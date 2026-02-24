@@ -11,8 +11,6 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-
-
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
@@ -24,21 +22,11 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
-
-
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
-
-
 
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
-
-
-
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-
-
-
 
 abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;

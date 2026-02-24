@@ -6,7 +6,6 @@ import {console} from "forge-std/console.sol";
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
@@ -37,7 +36,10 @@ import {
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {IAssetTrackerBase, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {
+    IAssetTrackerBase,
+    TOKEN_BALANCE_MIGRATION_DATA_VERSION
+} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";

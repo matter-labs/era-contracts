@@ -7,7 +7,6 @@ import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
 import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
-
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 

@@ -39,7 +39,6 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
 
-
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 import {BytecodePublisher} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";

@@ -8,16 +8,6 @@ import {NotL1} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 
-
-
-
-
-
-
-
-
-
-
 contract AllowEvmEmulationTest is AdminTest {
     event EnableEvmEmulator();
 

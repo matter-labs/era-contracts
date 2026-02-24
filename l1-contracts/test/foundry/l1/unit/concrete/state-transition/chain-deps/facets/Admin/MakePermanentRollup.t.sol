@@ -12,8 +12,6 @@ import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
-
-
 import {AlreadyPermanentRollup, InvalidDAForPermanentRollup, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract MakePermanentRollupTest is AdminTest {

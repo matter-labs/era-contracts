@@ -5,19 +5,11 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-
-
-
-
-
-
-
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-
 
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
@@ -32,13 +24,9 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
-
-
-
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 
 import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.sol";
-
 
 /// @notice Script used for v31 upgrade flow
 contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {

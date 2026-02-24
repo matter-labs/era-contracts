@@ -19,7 +19,6 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
 import {L2LegacySharedBridgeTestHelper} from "../dev/L2LegacySharedBridgeTestHelper.sol";
@@ -37,11 +36,6 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
-
-
-
-
-
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -57,8 +51,6 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {CTMDeployedAddresses, Config, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
-
-
 
 import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
 

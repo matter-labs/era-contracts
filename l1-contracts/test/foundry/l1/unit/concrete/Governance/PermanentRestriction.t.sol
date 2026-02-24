@@ -30,7 +30,6 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 
-
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 
 import {ChainTypeManagerTest} from "test/foundry/l1/unit/concrete/state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";

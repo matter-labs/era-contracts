@@ -6,9 +6,6 @@ pragma solidity ^0.8.24;
 import {stdToml} from "forge-std/StdToml.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
-
-
-
 import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -18,9 +15,6 @@ import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddr
 import {Utils} from "../utils/Utils.sol";
 import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
 import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
-
-
-
 
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
@@ -61,9 +55,7 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
-
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
-
 
 import {
     StateTransitionDeployedAddresses,

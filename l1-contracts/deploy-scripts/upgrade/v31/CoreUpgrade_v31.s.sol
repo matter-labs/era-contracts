@@ -5,16 +5,9 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-
-
 import {Governance} from "contracts/governance/Governance.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-
-
-
-
-
 
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
@@ -27,10 +20,6 @@ import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.so
 import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
-
-
-
-
 import {Call} from "contracts/governance/Common.sol";
 
 import {
@@ -39,15 +28,7 @@ import {
     L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
-
-
-
-
-
-
-
 
 /// @notice Script used for v31 upgrade flow
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {

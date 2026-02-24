@@ -29,7 +29,6 @@ import {
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {BridgehubBase} from "contracts/core/bridgehub/BridgehubBase.sol";
 
-
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 

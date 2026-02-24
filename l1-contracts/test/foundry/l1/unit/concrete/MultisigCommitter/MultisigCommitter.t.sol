@@ -24,7 +24,6 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
-
 contract MultisigCommitterTest is Test {
     MultisigCommitter multisigCommitter;
     DummyChainTypeManagerForValidatorTimelock chainTypeManager;

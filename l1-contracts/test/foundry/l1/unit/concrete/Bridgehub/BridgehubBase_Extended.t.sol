@@ -21,7 +21,6 @@ import {AlreadyCurrentSL, NotChainAssetHandler} from "contracts/core/bridgehub/L
 import {TokenBridgingData} from "contracts/common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-
 contract DummyGWAssetTracker {
     function registerBaseTokenOnGateway(TokenBridgingData calldata) external {}
 }

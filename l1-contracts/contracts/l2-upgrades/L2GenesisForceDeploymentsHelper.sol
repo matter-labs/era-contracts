@@ -23,7 +23,10 @@ import {
     ZKChainSpecificForceDeploymentsData
 } from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL2WrappedBaseToken} from "../bridge/interfaces/IL2WrappedBaseToken.sol";
-import {ITransparentUpgradeableProxy, TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {
+    ITransparentUpgradeableProxy,
+    TransparentUpgradeableProxy
+} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SystemContractProxyAdmin} from "./SystemContractProxyAdmin.sol";
 import {IZKOSContractDeployer} from "contracts/l2-system/zksync-os/interfaces/IZKOSContractDeployer.sol";
 import {L2NativeTokenVault} from "../bridge/ntv/L2NativeTokenVault.sol";

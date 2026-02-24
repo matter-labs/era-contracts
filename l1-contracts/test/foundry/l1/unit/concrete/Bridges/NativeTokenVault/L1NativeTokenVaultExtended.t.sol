@@ -10,9 +10,7 @@ import {ERC20} from "@openzeppelin/contracts-v4/token/ERC20/ERC20.sol";
 
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 
-
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";

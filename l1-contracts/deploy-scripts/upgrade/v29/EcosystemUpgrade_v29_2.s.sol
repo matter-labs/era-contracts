@@ -15,10 +15,6 @@ import {Call} from "contracts/governance/Common.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 
-
-
-
-
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 
 /// @notice Script used for v29 -> v29.2 stage patch

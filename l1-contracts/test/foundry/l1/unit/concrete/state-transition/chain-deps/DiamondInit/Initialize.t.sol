@@ -10,8 +10,6 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
-
-
 import {EmptyAssetId, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract InitializeTest is DiamondInitTest {

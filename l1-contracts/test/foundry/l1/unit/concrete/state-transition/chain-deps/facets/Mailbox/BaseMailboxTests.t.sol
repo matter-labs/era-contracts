@@ -8,10 +8,6 @@ import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
 import {BaseTokenGasPriceDenominatorNotSet} from "contracts/common/L1ContractErrors.sol";
 
-
-
-
-
 contract MailboxBaseTests is MailboxTest {
     function setUp() public virtual {
         setupDiamondProxy();

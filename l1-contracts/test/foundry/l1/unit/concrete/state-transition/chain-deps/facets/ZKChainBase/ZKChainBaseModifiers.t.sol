@@ -21,7 +21,6 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 
 import {NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
 contract ZKChainBaseModifiersTest is UtilsCallMockerTest {

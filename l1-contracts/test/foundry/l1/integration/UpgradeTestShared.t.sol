@@ -15,14 +15,8 @@ import {Test} from "forge-std/Test.sol";
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 import {ChainUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol";
 
-
-
-
-
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {GetDiamondCutData} from "../../../../deploy-scripts/utils/GetDiamondCutData.sol";
-
-
 
 contract UpgradeIntegrationTestBase is Test {
     using stdToml for string;

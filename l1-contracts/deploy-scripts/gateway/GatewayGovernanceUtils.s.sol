@@ -21,15 +21,11 @@ import {Utils} from "../utils/Utils.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 
-
-
 import {
     IAssetRouterBase,
     SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
     NEW_ENCODING_VERSION
 } from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-
-
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
@@ -40,8 +36,6 @@ import {Call} from "contracts/governance/Common.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {IGWAssetTracker} from "contracts/bridge/asset-tracker/IGWAssetTracker.sol";
-
-
 
 abstract contract GatewayGovernanceUtils is Script {
     struct GatewayGovernanceConfig {

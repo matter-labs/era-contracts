@@ -6,9 +6,6 @@ pragma solidity ^0.8.20;
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-
-
-
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
@@ -31,7 +28,6 @@ import {
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-
 
 /// @title L2InteropFeesTestAbstract
 /// @notice Tests for InteropCenter fee configuration and fee collection functionality

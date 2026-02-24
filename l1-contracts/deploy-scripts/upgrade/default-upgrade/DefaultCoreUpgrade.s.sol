@@ -22,7 +22,6 @@ import {Governance} from "contracts/governance/Governance.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {BridgehubAddresses, CoreDeployedAddresses} from "../../utils/Types.sol";
 
-
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {Utils} from "../../utils/Utils.sol";

@@ -34,8 +34,6 @@ import {
     L2_INTEROP_CENTER_ADDR as INTEROP_CENTER_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
-
-
 import {
     BALANCE_CHANGE_VERSION,
     TOKEN_BALANCE_MIGRATION_DATA_VERSION,
@@ -70,7 +68,6 @@ import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExe
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
-
 
 import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {GWAssetTrackerTestHelper} from "./GWAssetTracker.t.sol";

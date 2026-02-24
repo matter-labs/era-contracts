@@ -44,8 +44,6 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-
-
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";

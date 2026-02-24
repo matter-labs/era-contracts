@@ -16,8 +16,6 @@ import {Utils} from "../utils/Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 
-
-
 import {Call} from "contracts/governance/Common.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
@@ -29,16 +27,25 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
-
-import {CTMDeployedAddresses, StateTransitionContracts, StateTransitionDeployedAddresses, Verifiers} from "../utils/Types.sol";
+import {
+    CTMDeployedAddresses,
+    StateTransitionContracts,
+    StateTransitionDeployedAddresses,
+    Verifiers
+} from "../utils/Types.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
-import {GatewayCTMDeployerHelper, DirectCreate2Calldata, DeployerCreate2Calldata, DeployerAddresses, DirectDeployedAddresses} from "./GatewayCTMDeployerHelper.sol";
+import {
+    GatewayCTMDeployerHelper,
+    DirectCreate2Calldata,
+    DeployerCreate2Calldata,
+    DeployerAddresses,
+    DirectDeployedAddresses
+} from "./GatewayCTMDeployerHelper.sol";
 import {
     DeployedContracts,
     GatewayCTMDeployerConfig
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
-
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 

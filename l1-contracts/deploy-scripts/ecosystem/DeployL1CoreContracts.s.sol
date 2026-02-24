@@ -28,9 +28,6 @@ import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
-
-
-
 import {Config, CoreDeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
 import {IDeployL1CoreContracts} from "contracts/script-interfaces/IDeployL1CoreContracts.sol";
 

@@ -14,17 +14,7 @@ import {
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-
-
-
-
-
-
-
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-
-
-
 
 abstract contract L2WethTestAbstract is Test, SharedL2ContractDeployer {
     function test_shouldDepositWethByCallingDeposit() public {

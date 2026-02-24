@@ -8,9 +8,6 @@ import {
     L2TransactionRequestTwoBridgesOuter
 } from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-
-
-
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
@@ -36,14 +33,7 @@ import {
     HistoricalSettlementLayerMismatch
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
-
-
-
-
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-
-
-
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";

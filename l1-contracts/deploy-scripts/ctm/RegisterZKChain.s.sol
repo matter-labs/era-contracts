@@ -27,7 +27,6 @@ import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainS
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
-
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 

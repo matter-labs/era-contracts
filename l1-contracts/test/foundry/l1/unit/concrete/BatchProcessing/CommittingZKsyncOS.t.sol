@@ -6,7 +6,6 @@ import "forge-std/console.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
-
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {MismatchL2DACommitmentScheme} from "contracts/state-transition/L1StateTransitionErrors.sol";

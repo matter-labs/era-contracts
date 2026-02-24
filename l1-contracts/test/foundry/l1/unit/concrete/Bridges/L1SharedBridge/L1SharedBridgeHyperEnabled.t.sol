@@ -8,7 +8,6 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 
-
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 

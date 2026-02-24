@@ -28,7 +28,6 @@ import {
 
 import {ProofData} from "contracts/common/Messaging.sol";
 
-
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";

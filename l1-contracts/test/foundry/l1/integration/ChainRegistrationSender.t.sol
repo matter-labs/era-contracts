@@ -22,7 +22,6 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {ChainsSettlementLayerMismatch, ChainsSettlingOnL1} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 

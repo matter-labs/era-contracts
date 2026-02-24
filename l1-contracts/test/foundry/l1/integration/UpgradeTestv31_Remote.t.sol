@@ -5,13 +5,7 @@ pragma solidity ^0.8.24;
 
 import {console2 as console} from "forge-std/Script.sol";
 
-
-
-
 import {Test} from "forge-std/Test.sol";
-
-
-
 
 import {UpgradeIntegrationTestBase} from "./UpgradeTestShared.t.sol";
 

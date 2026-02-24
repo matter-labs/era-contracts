@@ -22,7 +22,6 @@ import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CoreUpgrade_v31} from "./CoreUpgrade_v31.s.sol";
 import {CTMUpgrade_v31} from "./CTMUpgrade_v31.s.sol";
 
-
 /// @notice Script used for v31 ecosystem upgrade flow (core + CTM)
 /// TODO: IMPORTANT this script should also contain the following steps:
 /// - Initialize the previous Gateway migrations via `L1ChainAssetHandler.setHistoricalMigrationInterval`.

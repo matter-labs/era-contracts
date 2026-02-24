@@ -42,7 +42,6 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-
 import {DepositDoesNotExist, InvalidProof} from "contracts/common/L1ContractErrors.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
@@ -60,7 +59,6 @@ import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainA
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {IMessageRootBase, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
-
 
 contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;

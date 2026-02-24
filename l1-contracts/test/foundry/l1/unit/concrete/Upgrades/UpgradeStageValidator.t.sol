@@ -5,8 +5,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
-
-
 import {
     MigrationPaused,
     MigrationsNotPaused,

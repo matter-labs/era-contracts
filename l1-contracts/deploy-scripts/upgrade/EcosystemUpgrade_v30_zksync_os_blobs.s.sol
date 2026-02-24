@@ -10,15 +10,10 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
-
 import {Governance} from "contracts/governance/Governance.sol";
-
-
 
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-
-
 
 import {
     ChainCreationParams,
@@ -32,27 +27,12 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
-
-
-
-
-
 import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
-
-
-
-
-
-
-
-
-
 
 import {Call} from "contracts/governance/Common.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
-
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {
@@ -64,22 +44,10 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
-
-
-
-
-
-
-
-
 import {DeployedAddresses} from "../DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
-
-
-
-
 
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import {L2V30TestnetSystemProxiesUpgrade} from "contracts/l2-upgrades/L2V30TestnetSystemProxiesUpgrade.sol";

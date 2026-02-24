@@ -12,7 +12,6 @@ import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {DestinationChainNotRegistered} from "contracts/interop/InteropErrors.sol";
 
-
 import {
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,

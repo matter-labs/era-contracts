@@ -12,7 +12,6 @@ import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
 
-
 import {
     GW_ASSET_TRACKER_ADDR,
     L2_ASSET_ROUTER_ADDR,

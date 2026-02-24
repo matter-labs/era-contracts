@@ -11,15 +11,7 @@ import {
     L2TransactionRequestTwoBridgesOuter
 } from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
-
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
-
-
-
-
-
-
-
 
 import {
     DEFAULT_L2_LOGS_TREE_ROOT_HASH,
@@ -27,11 +19,6 @@ import {
     ETH_TOKEN_ADDRESS,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA
 } from "contracts/common/Config.sol";
-
-
-
-
-
 
 import {BridgehubInvariantTests} from "test/foundry/l1/integration/BridgehubTests.t.sol";
 
