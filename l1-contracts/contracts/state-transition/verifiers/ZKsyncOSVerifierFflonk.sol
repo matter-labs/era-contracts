@@ -808,6 +808,7 @@ contract ZKsyncOSVerifierFflonk is IVerifierV2 {
             ) {
                 let omega_h
                 let c
+
                 // setup round
                 // r
 
