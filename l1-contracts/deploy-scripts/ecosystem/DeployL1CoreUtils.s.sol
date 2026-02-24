@@ -25,6 +25,7 @@ import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRe
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {BridgehubAddresses, BridgesDeployedAddresses, CoreDeployedAddresses} from "../utils/Types.sol";
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
+import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -76,7 +77,7 @@ contract DeployL1CoreUtils is DeployUtils {
         config.contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
         config.contracts.maxNumberOfChains = toml.readUint("$.contracts.max_number_of_chains");
 
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues();
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues();
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
         instantiateCreate2Factory();
 
@@ -128,6 +129,7 @@ contract DeployL1CoreUtils is DeployUtils {
                     abi.encode(
                         coreAddresses.bridgehub.proxies.bridgehub,
                         coreAddresses.bridgehub.proxies.messageRoot,
+                        address(0), // _interopCenter
                         config.eraChainId,
                         config.eraDiamondProxyAddress
                     );

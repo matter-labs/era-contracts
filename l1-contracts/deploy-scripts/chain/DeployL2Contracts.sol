@@ -32,13 +32,10 @@ contract DeployL2Script is Script, IDeployL2Contracts {
 
     // solhint-disable-next-line gas-struct-packing
     struct Config {
-        uint256 eraChainId;
         uint256 chainId;
         address l1SharedBridgeProxy;
         address bridgehubAddress;
         address governance;
-        address erc20BridgeProxy;
-        address proposalAuthor;
         DAValidatorType validatorType;
         // The owner of the contract sets the validator/attester weights.
         // Can be the developer multisig wallet on mainnet.
@@ -184,8 +181,6 @@ contract DeployL2Script is Script, IDeployL2Contracts {
 
         address assetRouter = address(IL1Bridgehub(bridgehubAddress).assetRouter());
         config.l1SharedBridgeProxy = assetRouter;
-        config.erc20BridgeProxy = AddressIntrospector.getLegacyBridgeAddress(assetRouter);
-        config.eraChainId = AddressIntrospector.getEraChainId(assetRouter);
     }
 
     function saveOutput() internal {

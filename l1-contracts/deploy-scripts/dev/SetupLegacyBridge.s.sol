@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {Utils} from "./../Utils.sol";
+import {Utils} from "../utils/Utils.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 
@@ -65,7 +65,7 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
         addresses.diamondProxy = IL1Bridgehub(bridgehub).getZKChain(chainId);
 
         // Read create2 factory parameters from permanent-values.toml
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(vm);
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues();
         addresses.create2FactoryAddr = create2FactoryAddr;
         config.create2FactorySalt = create2FactorySalt;
 

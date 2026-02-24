@@ -44,6 +44,7 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
+import {PermanentValuesHelper} from "../../utils/PermanentValuesHelper.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
@@ -180,7 +181,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     ) internal virtual returns (PermanentCTMConfig memory permanentConfig) {
         string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
 
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(
+            permanentValuesInputPath
+        );
 
         address ctm = permanentValuesToml.readAddress("$.ctm_contracts.ctm_proxy_addr");
         address bytecodesSupplier = permanentValuesToml.readAddress("$.ctm_contracts.l1_bytecodes_supplier_addr");

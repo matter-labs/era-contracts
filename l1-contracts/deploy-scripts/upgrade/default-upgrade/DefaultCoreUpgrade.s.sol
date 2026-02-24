@@ -25,6 +25,7 @@ import {CoreDeployedAddresses} from "../../utils/Types.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
+import {PermanentValuesHelper} from "../../utils/PermanentValuesHelper.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {Utils} from "../../utils/Utils.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -126,7 +127,9 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory upgradeToml = vm.readFile(upgradeInputPath);
 
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(
+            permanentValuesInputPath
+        );
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
 
         // Read isZKsyncOS flag from permanent values (required)
