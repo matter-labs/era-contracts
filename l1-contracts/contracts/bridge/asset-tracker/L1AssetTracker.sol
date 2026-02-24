@@ -156,6 +156,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             totalBridgedOut += migratedBalance;
         }
 
+// Handling origin chain case.
         chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - totalBridgedOut;
         interopInfo[originChainId][_assetId].preV31ChainBalance = MAX_TOKEN_BALANCE - totalBridgedOut;
         isAssetRegistered[_assetId] = true;
