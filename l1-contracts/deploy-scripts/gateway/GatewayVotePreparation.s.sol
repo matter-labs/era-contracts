@@ -33,7 +33,7 @@ import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerB
 import {CTMDeployedAddresses, StateTransitionContracts, StateTransitionDeployedAddresses, Verifiers} from "../utils/Types.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
-import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper, DirectCreate2Calldata, DeployerCreate2Calldata, DeployerAddresses, DirectDeployedAddresses} from "./GatewayCTMDeployerHelper.sol";
 import {
     DeployedContracts,
     GatewayCTMDeployerConfig
