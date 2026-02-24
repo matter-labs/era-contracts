@@ -442,7 +442,7 @@ abstract contract NativeTokenVaultBase is
         address _originalCaller
     ) internal {
         // Note, that in order to track `totalPreV31TotalSupply` correctly in L2AssetTracker,
-        // we have to call it before the any balance changes will be performed.
+        // we have to call it before any balance changes will be performed.
         _handleBridgeToChain(_chainId, _assetId, _depositAmount);
 
         if (_assetId == _baseTokenAssetId()) {

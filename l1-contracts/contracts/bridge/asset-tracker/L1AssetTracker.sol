@@ -396,7 +396,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
 
-        // Such messages are only allowed has settled on Gateway and returned back.
+        // Such messages are only allowed once the chain has settled on Gateway and returned back.
         uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
         require(
             chainMigrationNumber == MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1,
@@ -419,7 +419,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         // From all the requirements at the start of the file it follows that `assetMigrationNumber[data.chainId][data.assetId] < chainMigrationNumber = MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1`,
         // i.e. assetMigrationNumber[data.chainId][data.assetId] must be equal to either 0 or 1.
-        // We also double check the same invarint for `data.assetMigrationNumber`, which should be also either 0 or 1.
+        // We also double check the same invariant for `data.assetMigrationNumber`, which should be also either 0 or 1.
         // This check does not serve a specific purpose, since `data.assetMigrationNumber` is not used anywhere later, it is an invariant check.
         require(data.assetMigrationNumber == 0 || data.assetMigrationNumber == 1, InvalidAssetMigrationNumber());
 
@@ -490,11 +490,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @dev Conceptually it should cover the finalization of all outstanding withdrawals or claimed failed deposits
     /// *that would reduce the chainBalance of the chain*. One could say it is `totalWithdrawalsToL1 + totalFailedDepositsFromL1 - totalClaimed`.
     /// Note, both `totalWithdrawalsToL1` and `totalFailedDepositsFromL1` must only refer to messages that happened when the chain
-    /// settled on L1, while `totalClaimed` should only include claims for such withdrawlas/failed deposits.
+    /// settled on L1, while `totalClaimed` should only include claims for such withdrawals/failed deposits.
     /// We calculate `totalFailedDepositsFromL1` as the difference between the total deposits for when the chain settled on L1 and the total successful
     /// deposits from the same period. All in all, we get the following formula:
     /// `amountToKeep = totalWithdrawalsToL1 + (totalDepositedFromL1 - totalSuccessfulDepositsFromL1) - totalClaimedOnL1`.
-    /// For some of the older tokens, we did not track neither of the values above, so when the token is registered inside this contract, we remember
+    /// For some of the older tokens, we did not track either of the values above, so when the token is registered inside this contract, we remember
     /// its pre-v31 chain balance, which is equal to `totalDepositedFromL1BeforeV31 - totalClaimedOnL1BeforeV31`.
     /// For similar reasons the chain should return its pre-v31 totalSupply on L2, which is equal to `totalSuccessfulDepositsFromL1 - totalWithdrawalsToL1`.
     /// All-in-all, we get the following formula:
@@ -522,11 +522,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // s1,...,st -- all successful deposits
         // c1,...,cv -- all claims on L1.
         // ​
-        // In essense we want to keep on L1 the following:
+        // In essence we want to keep on L1 the following:
         // (w1 + ... + wn) + (d1 + ... + dm) - (s1 + ... + st) - (c1 + ... + cv)
         // ​
-        // preV31ChainBalance = d1 + ... + d_m* - c1 + ... + cv* for some m* and v*, i.e. for some segment right before the rest of the deposits and claimes started being tracked separately.
-        // So by making preV31ChainBalance + totalDepositedFromsL1 - totalClaimedOnL1 we calculate the
+        // preV31ChainBalance = d1 + ... + d_m* - c1 + ... + cv* for some m* and v*, i.e. for some segment right before the rest of the deposits and claims started being tracked separately.
+        // So by making preV31ChainBalance + totalDepositedFromL1 - totalClaimedOnL1 we calculate the
         // (d1 + ... + dm) - (c1 + ... + cv) part
         // Similarly, _preV31TotalSupply = (s1 + ... + st*) - (w1 + ... + wn*) and by adding the values after the upgrade I get (s1 + ... + st) - (w1 + ... + wn)
 

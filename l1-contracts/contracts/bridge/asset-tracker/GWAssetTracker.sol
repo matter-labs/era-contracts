@@ -620,7 +620,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         // slither-disable-next-line reentrancy-no-eth
         _sendGatewayToL1MigrationDataToL1(tokenBalanceMigrationData);
 
-        // We assign chain balance to the 0 and bump asset migration number for replay protection
+        // We assign chain balance to 0 and bump asset migration number for replay protection
         chainBalance[_chainId][_assetId] = 0;
         assetMigrationNumber[_chainId][_assetId] = chainMigrationNumber;
 

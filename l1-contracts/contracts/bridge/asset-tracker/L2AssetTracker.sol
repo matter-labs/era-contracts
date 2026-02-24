@@ -26,7 +26,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @dev For tokens that existed before the chain migrated to v31, it should be equal to `totalSuccessfulDeposits - totalWithdrawalsToL1`.
     /// - If a token is a bridged token, it is equal to its `totalSupply()`.
     /// - If a token is a native token, it is equal to the `2^256-1 - balanceOf of the native token vault`, i.e. one
-    /// could image there was a big successful deposit at the inception time of 2^256-1 and then the withdrawals behaved the same way as for
+    /// could imagine there was a big successful deposit at the inception time of 2^256-1 and then the withdrawals behaved the same way as for
     /// the bridged L2 tokens.
     /// @dev For native tokens, it is expected to be populated automatically with `isAssetRegistered[block.chainid]`.
     /// @dev IMPORTANT: for base token this value may not be correct for ZKsync OS chains until the totalSupply for the base
