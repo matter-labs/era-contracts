@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-// solhint-disable-next-line no-unused-import
+// solhint-disable no-unused-import
 import {
     L2DACommitmentScheme,
     L2_TO_L1_LOG_SERIALIZE_SIZE,
@@ -10,6 +10,7 @@ import {
     L2_TO_L1_LOGS_MERKLE_TREE_DEPTH,
     SUPPORTED_PROOF_METADATA_VERSION
 } from "system-contracts/contracts/Constants.sol";
+// solhint-enable no-unused-import
 
 /// @dev `keccak256("")`
 bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;

@@ -18,7 +18,7 @@ import {IGWAssetTracker} from "../../bridge/asset-tracker/IGWAssetTracker.sol";
 import {ISystemContext} from "../interfaces/ISystemContext.sol";
 import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 
-// solhint-disable-next-line no-unused-import
+// solhint-disable no-unused-import
 import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR,
@@ -43,6 +43,7 @@ import {
     MAX_BUILT_IN_CONTRACT_ADDR,
     L2_BOOTLOADER_ADDRESS
 } from "./L2ContractAddresses.sol";
+// solhint-enable no-unused-import
 
 /// @dev The address of the L2 deployer system contract.
 IL2ContractDeployer constant L2_CONTRACT_DEPLOYER = IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
