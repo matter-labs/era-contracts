@@ -31,6 +31,9 @@ struct ProtocolCli {
 
 #[derive(Subcommand, Debug)]
 pub enum ProtocolCliSubcommands {
+    /// Check that node, yarn, forge, cast, and anvil versions match expected tooling.
+    #[command(name = "check-tooling-versions")]
+    CheckToolingVersions,
     /// Ecosystem related commands
     #[command(subcommand, alias = "eco")]
     Ecosystem(Box<EcosystemCommands>),
@@ -78,6 +81,7 @@ async fn run_subcommand(cli_args: ProtocolCli) -> anyhow::Result<()> {
     versions::assert_versions(&shell)?;
 
     match cli_args.command {
+        ProtocolCliSubcommands::CheckToolingVersions => {}
         ProtocolCliSubcommands::Ecosystem(args) => commands::ecosystem::run(&shell, *args).await?,
         ProtocolCliSubcommands::Chain(args) => commands::chain::run(&shell, *args).await?,
         ProtocolCliSubcommands::Hub(args) => commands::hub::run(&shell, *args).await?,
