@@ -71,6 +71,23 @@ contract DefaultEcosystemUpgrade is Script {
         string memory _upgradeInputPath,
         string memory _ecosystemOutputPath
     ) public virtual {
+        permanentValuesInputPath;
+        _upgradeInputPath;
+        _ecosystemOutputPath;
+        revert("DefaultEcosystemUpgrade.initialize(permanent-values path,...) is deprecated. Use initializeWithArgs(...)");
+    }
+
+    function initializeWithArgs(
+        address bridgehubProxyAddress,
+        address ctmProxy,
+        address bytecodesSupplier,
+        address rollupDAManager,
+        bool isZKsyncOS,
+        bytes32 create2FactorySalt,
+        string memory _upgradeInputPath,
+        string memory _ecosystemOutputPath,
+        address governance
+    ) public virtual {
         string memory root = vm.projectRoot();
         ecosystemOutputPath = string.concat(root, _ecosystemOutputPath);
         upgradeInputPath = _upgradeInputPath;
@@ -85,12 +102,27 @@ contract DefaultEcosystemUpgrade is Script {
 
         // Initialize core upgrade with its own output path
         coreUpgrade = createCoreUpgrade();
-        coreUpgrade.initialize(permanentValuesInputPath, _upgradeInputPath, _coreOutputPath);
+        coreUpgrade.initializeWithArgs(
+            bridgehubProxyAddress,
+            isZKsyncOS,
+            create2FactorySalt,
+            _upgradeInputPath,
+            _coreOutputPath
+        );
         _coreInitialized = true;
 
         // Initialize CTM upgrade with its own output path
         ctmUpgrade = createCTMUpgrade();
-        ctmUpgrade.initialize(permanentValuesInputPath, _upgradeInputPath, _ctmOutputPath);
+        ctmUpgrade.initializeWithArgs(
+            ctmProxy,
+            bytecodesSupplier,
+            isZKsyncOS,
+            rollupDAManager,
+            create2FactorySalt,
+            _upgradeInputPath,
+            _ctmOutputPath,
+            governance
+        );
         _ctmInitialized = true;
 
         // Configure optional output sections based on upgrade config (default: false)
@@ -306,12 +338,8 @@ contract DefaultEcosystemUpgrade is Script {
 
     /// @notice E2e upgrade generation
     function run() public virtual {
-        initialize(
-            vm.envString("PERMANENT_VALUES_INPUT"),
-            vm.envString("UPGRADE_INPUT"),
-            vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
+        revert(
+            "DefaultEcosystemUpgrade.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly"
         );
-        prepareEcosystemUpgrade();
-        prepareDefaultGovernanceCalls();
     }
 }

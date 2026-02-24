@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -47,8 +46,6 @@ import {UpgradeUtils} from "./UpgradeUtils.sol";
 /// @notice Script used for default CTM on gateway upgrade flow, should be run after L1 CTM upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
 contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
-    using stdToml for string;
-
     /**
      * @dev Storage slot with the admin of the contract.
      * This is the keccak-256 hash of "eip1967.proxy.admin" subtracted by 1, and is
@@ -101,10 +98,39 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         string memory newConfigPath,
         string memory _outputPath
     ) public virtual {
+        permanentValuesInputPath;
+        newConfigPath;
+        _outputPath;
+        revert(
+            "DefaultGatewayUpgrade.initialize(permanent-values path,...) is deprecated. Use initializeWithArgs(...)"
+        );
+    }
+
+    function initializeWithArgs(
+        bool _isZKsyncOS,
+        bytes32 _create2FactorySalt,
+        uint256 _eraChainId,
+        uint256 _priorityTxsL2GasLimit,
+        uint256 _maxExpectedL1GasPrice,
+        Gateway memory _gatewayConfig,
+        string memory newConfigPath,
+        string memory _outputPath,
+        address _governance
+    ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
-        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
-        initializeConfigFromFile(permanentValuesInputPath, newConfigPath);
+
+        initializeConfig(
+            _create2FactorySalt,
+            Utils.DETERMINISTIC_CREATE2_ADDRESS,
+            _isZKsyncOS,
+            getChainCreationParamsConfig(chainCreationParamsPath(_isZKsyncOS)),
+            _eraChainId,
+            _priorityTxsL2GasLimit,
+            _maxExpectedL1GasPrice,
+            _gatewayConfig,
+            _governance
+        );
 
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
@@ -156,63 +182,10 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         string memory permanentValuesInputPath,
         string memory newConfigPath
     ) internal virtual {
-        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
-        string memory toml = vm.readFile(newConfigPath);
-
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
-
-        // Can we safely get it from the CTM? is it always exists even for zksync os ?
-        uint256 eraChainId = permanentValuesToml.readUint("$.era_chain_id");
-
-        address governance;
-        if (toml.keyExists("$.governance")) {
-            governance = toml.readAddress("$.governance");
-        } else {
-            governance = address(0);
-        }
-
-        // TODO can we discover it?. Try to get it from the chain
-        bool isZKsyncOS;
-        if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {
-            isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
-        }
-        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
-            chainCreationParamsPath(isZKsyncOS)
-        );
-
-        Gateway memory gateway;
-        // Gateway params
-        gateway.chainId = permanentValuesToml.readUint("$.gateway.chain_id");
-        gateway.gatewayStateTransition.proxies.chainTypeManager = permanentValuesToml.readAddress(
-            "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
-        );
-
-        gateway.gatewayTransparentProxyAdmin = permanentValuesToml.readAddress(
-            "$.gateway.gateway_state_transition.chain_type_manager_proxy_admin"
-        );
-
-        gateway.gatewayStateTransition.rollupDAManager = permanentValuesToml.readAddress(
-            "$.gateway.gateway_state_transition.rollup_da_manager"
-        );
-
-        gateway.gatewayStateTransition.rollupSLDAValidator = permanentValuesToml.readAddress(
-            "$.gateway.gateway_state_transition.rollup_sl_da_validator"
-        );
-
-        // L2 transactions params
-        uint priorityTxsL2GasLimit = permanentValuesToml.readUint("$.priority_txs_l2_gas_limit");
-        uint maxExpectedL1GasPrice = permanentValuesToml.readUint("$.max_expected_l1_gas_price");
-
-        initializeConfig(
-            create2FactorySalt,
-            create2FactoryAddr,
-            isZKsyncOS,
-            chainCreationParams,
-            eraChainId,
-            priorityTxsL2GasLimit,
-            maxExpectedL1GasPrice,
-            gateway,
-            governance
+        permanentValuesInputPath;
+        newConfigPath;
+        revert(
+            "DefaultGatewayUpgrade.initializeConfigFromFile(...) is deprecated. Use initializeWithArgs(...)"
         );
     }
 
@@ -267,14 +240,9 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
-        initialize(
-            vm.envString("PERMANENT_VALUES_INPUT"),
-            vm.envString("UPGRADE_GATEWAY_INPUT"),
-            vm.envString("UPGRADE_GATEWAY_OUTPUT")
+        revert(
+            "DefaultGatewayUpgrade.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly"
         );
-        prepareEcosystemUpgrade();
-
-        prepareDefaultGovernanceCalls();
     }
 
     function getNewProtocolVersion() public virtual returns (uint256) {

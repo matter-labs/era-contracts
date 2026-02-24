@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 // solhint-disable no-console, gas-custom-errors
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "../../utils/Utils.sol";
 
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -20,8 +19,6 @@ import {ChainTypeManagerBase} from "../../../contracts/state-transition/ChainTyp
 import {GetDiamondCutData} from "../../utils/GetDiamondCutData.sol";
 
 contract DefaultChainUpgrade is Script {
-    using stdToml for string;
-
     struct ChainConfig {
         uint256 chainChainId;
         address chainDiamondProxyAddress;
@@ -38,18 +35,15 @@ contract DefaultChainUpgrade is Script {
     }
 
     function prepareChain(uint256 chainId, string memory permanentValuesInputPath) public {
-        string memory root = vm.projectRoot();
-        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
+        chainId;
+        permanentValuesInputPath;
+        revert("DefaultChainUpgrade.prepareChain(..., permanent-values path) is deprecated. Use prepareChainWithBridgehub(...)");
+    }
 
-        // Grab config from output of l1 deployment
-        string memory permanentValuesInputToml = vm.readFile(permanentValuesInputPath);
-
-        // Config file must be parsed key by key, otherwise values returned
-        // are parsed alfabetically and not by key.
-        // https://book.getfoundry.sh/cheatcodes/parse-toml
-
+    function prepareChainWithBridgehub(uint256 chainId, address bridgehubProxyAddress) public {
         config.chainChainId = chainId;
-        config.bridgehubProxyAddress = permanentValuesInputToml.readAddress("$.core_contracts.bridgehub_proxy_addr");
+        config.bridgehubProxyAddress = bridgehubProxyAddress;
+        require(config.bridgehubProxyAddress != address(0), "bridgehub proxy is zero");
 
         address ctm = L1Bridgehub(config.bridgehubProxyAddress).chainTypeManager(config.chainChainId);
         setupConfigFromOnchain(ctm, config.chainChainId);

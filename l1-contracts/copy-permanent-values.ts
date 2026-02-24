@@ -29,10 +29,6 @@ const outputData = {
     rollup_da_manager: deployCTMData.deployed_addresses.l1_rollup_da_manager,
     l1_bytecodes_supplier_addr: deployCTMData.deployed_addresses.state_transition.bytecodes_supplier_addr,
   },
-  permanent_contracts: {
-    create2_factory_addr: deployL1Data.contracts.create2_factory_addr,
-    create2_factory_salt: deployL1Data.contracts.create2_factory_salt,
-  },
 };
 
 // Write the output TOML file (manually format since toml package only parses)
@@ -45,10 +41,6 @@ bridgehub_proxy_addr = "${outputData.core_contracts.bridgehub_proxy_addr}"
 ctm_proxy_addr = "${outputData.ctm_contracts.ctm_proxy_addr}"
 rollup_da_manager = "${outputData.ctm_contracts.rollup_da_manager}"
 l1_bytecodes_supplier_addr = "${outputData.ctm_contracts.l1_bytecodes_supplier_addr}"
-
-[permanent_contracts]
-create2_factory_addr = "${outputData.permanent_contracts.create2_factory_addr}"
-create2_factory_salt = "${outputData.permanent_contracts.create2_factory_salt}"
 `;
 
 fs.writeFileSync(permanentValuesOut, outputToml);
@@ -57,4 +49,3 @@ console.log(`✓ Successfully copied values to ${permanentValuesOut}`);
 console.log(`  - era_chain_id: ${outputData.era_chain_id}`);
 console.log(`  - bridgehub_proxy_addr: ${outputData.core_contracts.bridgehub_proxy_addr}`);
 console.log(`  - ctm_proxy_addr: ${outputData.ctm_contracts.ctm_proxy_addr}`);
-console.log(`  - create2_factory_addr: ${outputData.permanent_contracts.create2_factory_addr}`);

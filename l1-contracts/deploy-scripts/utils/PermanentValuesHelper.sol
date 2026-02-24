@@ -5,62 +5,56 @@ import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 /// @title PermanentValuesHelper
-/// @notice A small helper library to read create2 factory values from permanent-values.toml
+/// @notice A helper library to read and write create2 factory values from permanent-values.toml
 library PermanentValuesHelper {
+    address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+    Vm internal constant vm = Vm(VM_ADDRESS);
+
+    bytes32 internal constant DEFAULT_SALT = 0x88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5;
+    address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+    string internal constant CREATE2_FACTORY_SALT_ENV = "CREATE2_FACTORY_SALT";
+
     using stdToml for string;
 
     /// @notice Returns the path to the permanent values TOML file
-    /// @param vm The Forge VM instance
     /// @return The full path to the permanent values file
-    function getPermanentValuesPath(Vm vm) internal view returns (string memory) {
-        string memory root = vm.projectRoot();
-        return string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
+    function getPermanentValuesPath() internal view returns (string memory) {
+        return string.concat(vm.projectRoot(), vm.envString("PERMANENT_VALUES_INPUT"));
     }
 
-    /// @notice Reads create2 factory values from the permanent values TOML file
-    /// @param vm The Forge VM instance
+    /// @notice Reads create2 factory values.
+    /// @dev Scripts always use deterministic Create2 factory address and take salt from env var.
+    /// If CREATE2_FACTORY_SALT is not provided, DEFAULT_SALT is used.
     /// @param permanentValuesPath The path to the permanent values file
-    /// @return create2FactoryAddr The create2 factory address (if configured)
+    /// @return create2FactoryAddr The deterministic create2 factory address
     /// @return create2FactorySalt The create2 factory salt
     function getPermanentValues(
-        Vm vm,
         string memory permanentValuesPath
     ) internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-        create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
-        if (vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
-        }
+        permanentValuesPath;
+        create2FactoryAddr = DETERMINISTIC_CREATE2_ADDRESS;
+        create2FactorySalt = vm.envOr(CREATE2_FACTORY_SALT_ENV, DEFAULT_SALT);
     }
 
     /// @notice Convenience function to get permanent values without providing the path
-    /// @param vm The Forge VM instance
-    /// @return create2FactoryAddr The create2 factory address (if configured)
+    /// @return create2FactoryAddr The deterministic create2 factory address
     /// @return create2FactorySalt The create2 factory salt
-    function getPermanentValues(Vm vm) internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
-        string memory permanentValuesPath = getPermanentValuesPath(vm);
-        return getPermanentValues(vm, permanentValuesPath);
+    function getPermanentValues() internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
+        return getPermanentValues(getPermanentValuesPath());
     }
 
-    /// @notice Reads create2 factory values with a custom TOML path prefix
-    /// @param vm The Forge VM instance
-    /// @param permanentValuesPath The path to the permanent values file
-    /// @param pathPrefix The TOML path prefix (e.g., "$.contracts" or "$.permanent_contracts")
-    /// @return create2FactoryAddr The create2 factory address (if configured)
-    /// @return create2FactorySalt The create2 factory salt
-    function getPermanentValuesWithPrefix(
-        Vm vm,
-        string memory permanentValuesPath,
-        string memory pathPrefix
-    ) internal view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-        string memory saltPath = string.concat(pathPrefix, ".create2_factory_salt");
-        string memory addrPath = string.concat(pathPrefix, ".create2_factory_addr");
+    /// @notice Deprecated no-op. Create2 salt no longer comes from permanent values.
+    function createPermanentValuesIfNeeded() internal {
+        // no-op
+    }
 
-        create2FactorySalt = permanentValuesToml.readBytes32(saltPath);
-        if (vm.keyExistsToml(permanentValuesToml, addrPath)) {
-            create2FactoryAddr = permanentValuesToml.readAddress(addrPath);
-        }
+    /// @notice Deprecated no-op. Kept for backward compatibility.
+    /// @param _create2FactoryAddr Unused. Kept for backward-compatible call sites.
+    /// @param _create2FactorySalt The create2 factory salt
+    function savePermanentValues(address _create2FactoryAddr, bytes32 _create2FactorySalt) internal {
+        _create2FactoryAddr;
+        _create2FactorySalt;
+        // no-op
     }
 
     /// @notice Reads the legacy Gateway chain ID from the permanent values TOML file
@@ -81,7 +75,7 @@ library PermanentValuesHelper {
     /// @param vm The Forge VM instance
     /// @return legacyGwChainId The legacy Gateway chain ID (0 if not configured)
     function getLegacyGwChainId(Vm vm) internal view returns (uint256 legacyGwChainId) {
-        string memory permanentValuesPath = getPermanentValuesPath(vm);
+        string memory permanentValuesPath = getPermanentValuesPath();
         return getLegacyGwChainId(vm, permanentValuesPath);
     }
 }

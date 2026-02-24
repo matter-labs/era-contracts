@@ -45,33 +45,15 @@ abstract contract Create2FactoryUtils is Script {
     }
 
     /// @notice Instantiates the Create2Factory.
-    /// If a factory address is configured and contains code, that address is used.
-    /// Otherwise, if the deterministic address is deployed, then it is used.
-    /// If neither condition holds, a new Create2Factory is deployed via Utils.deployCreate2Factory().
-    /// The determined address is stored in create2FactoryState.
+    /// @dev Scripts assume deterministic Create2Factory is predeployed.
+    /// If code is missing at deterministic address, this function reverts.
     function instantiateCreate2Factory() internal {
-        address deployedAddress;
-        bool isConfigured = create2FactoryParams.factoryAddress != address(0);
-        bool isDeterministicDeployed = Utils.DETERMINISTIC_CREATE2_ADDRESS.code.length > 0;
-
-        if (isConfigured) {
-            if (create2FactoryParams.factoryAddress.code.length == 0) {
-                deployedAddress = Utils.deployCreate2Factory();
-                if (create2FactoryParams.factoryAddress.code.length == 0) {
-                    revert AddressHasNoCode(create2FactoryParams.factoryAddress);
-                }
-            }
-            deployedAddress = create2FactoryParams.factoryAddress;
-            console.log("Using configured Create2Factory address:", deployedAddress);
-        } else if (isDeterministicDeployed) {
-            deployedAddress = Utils.DETERMINISTIC_CREATE2_ADDRESS;
-            console.log("Using deterministic Create2Factory address:", deployedAddress);
-        } else {
-            deployedAddress = Utils.deployCreate2Factory();
-            console.log("Create2Factory deployed at:", deployedAddress);
+        if (Utils.DETERMINISTIC_CREATE2_ADDRESS.code.length == 0) {
+            revert AddressHasNoCode(Utils.DETERMINISTIC_CREATE2_ADDRESS);
         }
 
-        create2FactoryState = Create2FactoryState({create2FactoryAddress: deployedAddress});
+        create2FactoryState = Create2FactoryState({create2FactoryAddress: Utils.DETERMINISTIC_CREATE2_ADDRESS});
+        console.log("Using deterministic Create2Factory address:", Utils.DETERMINISTIC_CREATE2_ADDRESS);
     }
 
     /// @notice Deploys a contract via Create2 using the provided complete bytecode.
@@ -246,23 +228,5 @@ abstract contract Create2FactoryUtils is Script {
     /// @return True if the strings are identical, false otherwise.
     function compareStrings(string memory a, string memory b) internal pure returns (bool) {
         return Utils.compareStrings(a, b);
-    }
-
-    function getPermanentValues() public view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
-        string memory permanentValuesPath = string.concat(vm.projectRoot(), vm.envString("PERMANENT_VALUES_INPUT"));
-        return getPermanentValues(permanentValuesPath);
-    }
-
-    function getPermanentValues(
-        string memory permanentValuesPath
-    ) public view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
-        // Read create2 factory values from permanent values file
-        string memory permanentValuesToml = vm.readFile(permanentValuesPath);
-
-        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
-        }
     }
 }
