@@ -33,7 +33,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// token has been backfilled, so before using this value for the base token, one should check that it was set (`needBaseTokenTotalSupplyBackfill = false`).
     mapping(bytes32 assetId => SavedTotalSupply snapshot) internal totalPreV31TotalSupply;
 
-    /// @dev On zkSync os chains, the `totalSupply()` of the base token is not available by default,
+    /// @dev On ZKsync OS chains, the `totalSupply()` of the base token is not available by default,
     /// so before we ever use it to do any migrations, we need to backfill it.
     /// @dev This variable is expected to be deleted after v31 upgrade, once all the zksync os chains have their base token
     /// amount backfilled.
