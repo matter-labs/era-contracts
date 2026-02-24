@@ -415,7 +415,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // wont be processable. This limitation will be fixed in the future releases.
         require(BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId), InvalidWithdrawalChainId());
 
-        // `assetMigrationNumber` can be either 0 or 1 (didnt migrate the balance to GW or did migrate).
+        // `assetMigrationNumber` can be either 0 or 1 (didn't migrate the balance to GW or did migrate).
         // `data.assetMigrationNumber` should be also either 0 or 1.
         // This check does not serve a specific purpose, it is an invariant check.
         uint256 readAssetMigrationNumber = assetMigrationNumber[data.chainId][data.assetId];

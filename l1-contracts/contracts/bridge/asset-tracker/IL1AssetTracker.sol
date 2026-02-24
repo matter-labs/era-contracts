@@ -17,7 +17,7 @@ interface IL1AssetTracker {
     /// deposit will be processed while the chain is still settling on L1. It is the responsibility of the chain admin to ensure that.
     /// @param totalClaimedOnL1 Total amount claimed on L1 (withdrawals and failed deposits) since v31 accounting started. Note, that it is not just
     /// about any claim, but claims that affect `chainBalance` of the chain (i.e. the respective failed deposits or withdrawals were submitted
-    /// while the chain was settling on L1)).
+    /// while the chain was settling on L1).
     /// @dev It is the responsibility of the *chain* to ensure that all deposits are processed before the migration to Gateway is complete
     /// and vice versa, i.e. all deposits are either fully processed on L1 or fully processed while it settles on ZK Gateway. In case the chain violates
     /// this rule, invalid migration amount can be migrated, but it must only affect the chain and its users.
