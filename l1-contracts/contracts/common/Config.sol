@@ -3,7 +3,14 @@
 pragma solidity ^0.8.21;
 
 // solhint-disable-next-line no-unused-import
-import {L2DACommitmentScheme, L2_TO_L1_LOG_SERIALIZE_SIZE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, SUPPORTED_PROOF_METADATA_VERSION} from "system-contracts/contracts/Constants.sol";
+import {
+    L2DACommitmentScheme,
+    L2_TO_L1_LOG_SERIALIZE_SIZE,
+    L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
+    L2_TO_L1_LOGS_MERKLE_TREE_LEAVES,
+    L2_TO_L1_LOGS_MERKLE_TREE_DEPTH,
+    SUPPORTED_PROOF_METADATA_VERSION
+} from "system-contracts/contracts/Constants.sol";
 
 /// @dev `keccak256("")`
 bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;

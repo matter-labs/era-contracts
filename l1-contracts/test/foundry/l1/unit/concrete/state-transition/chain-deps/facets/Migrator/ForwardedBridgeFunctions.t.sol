@@ -4,7 +4,22 @@ pragma solidity 0.8.28;
 
 import {MigratorTest} from "./_Migrator_Shared.t.sol";
 import {Unauthorized, NotAZKChain} from "contracts/common/L1ContractErrors.sol";
-import {NotL1, AlreadyMigrated, NotChainAdmin, NotEraChain, NotAllBatchesExecuted, ProtocolVersionNotUpToDate, OutdatedProtocolVersion, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, NotMigrated, NotHistoricalRoot, ContractNotDeployed, DepositsNotPaused} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {
+    NotL1,
+    AlreadyMigrated,
+    NotChainAdmin,
+    NotEraChain,
+    NotAllBatchesExecuted,
+    ProtocolVersionNotUpToDate,
+    OutdatedProtocolVersion,
+    ExecutedIsNotConsistentWithVerified,
+    VerifiedIsNotConsistentWithCommitted,
+    InvalidNumberOfBatchHashes,
+    NotMigrated,
+    NotHistoricalRoot,
+    ContractNotDeployed,
+    DepositsNotPaused
+} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ZKChainCommitment} from "contracts/common/Config.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {PriorityTreeCommitment} from "contracts/state-transition/libraries/PriorityTree.sol";
@@ -13,7 +28,10 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET} from "contracts/common/Config.sol";
+import {
+    L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS,
+    CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET
+} from "contracts/common/Config.sol";
 
 contract ForwardedBridgeFunctionsTest is MigratorTest {
     address chainAssetHandler;

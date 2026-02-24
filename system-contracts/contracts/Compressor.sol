@@ -14,7 +14,22 @@ import {UnsafeBytesCalldata} from "./libraries/UnsafeBytesCalldata.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {STATE_DIFF_ENTRY_SIZE} from "./Constants.sol";
 import {KNOWN_CODE_STORAGE_CONTRACT, L1_MESSENGER_CONTRACT} from "./Contracts.sol";
-import {CompressionValueAddError, CompressionValueSubError, CompressionValueTransformError, CompressorEnumIndexNotEqual, CompressorInitialWritesProcessedNotEqual, DerivedKeyNotEqualToCompressedValue, DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo, EncodedAndRealBytecodeChunkNotEqual, EncodedLengthNotFourTimesSmallerThanOriginal, IndexOutOfBounds, IndexSizeError, InvalidCompressionMetadata, StateDiffLengthMismatch, UnsupportedOperation} from "./SystemContractErrors.sol";
+import {
+    CompressionValueAddError,
+    CompressionValueSubError,
+    CompressionValueTransformError,
+    CompressorEnumIndexNotEqual,
+    CompressorInitialWritesProcessedNotEqual,
+    DerivedKeyNotEqualToCompressedValue,
+    DictionaryDividedByEightNotGreaterThanEncodedDividedByTwo,
+    EncodedAndRealBytecodeChunkNotEqual,
+    EncodedLengthNotFourTimesSmallerThanOriginal,
+    IndexOutOfBounds,
+    IndexSizeError,
+    InvalidCompressionMetadata,
+    StateDiffLengthMismatch,
+    UnsupportedOperation
+} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs

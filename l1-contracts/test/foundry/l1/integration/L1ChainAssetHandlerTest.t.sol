@@ -29,7 +29,12 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {IChainAssetHandlerBase, MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {MigrationNumberMismatch, MigrationIntervalNotSet, MigrationIntervalInvalid, HistoricalSettlementLayerMismatch} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {
+    MigrationNumberMismatch,
+    MigrationIntervalNotSet,
+    MigrationIntervalInvalid,
+    HistoricalSettlementLayerMismatch
+} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";

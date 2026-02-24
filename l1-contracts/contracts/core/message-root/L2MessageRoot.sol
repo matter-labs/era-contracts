@@ -4,7 +4,11 @@ pragma solidity 0.8.28;
 
 import {MessageRootBase} from "./MessageRootBase.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BRIDGEHUB_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR
+} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {OnlyL1} from "../bridgehub/L1BridgehubErrors.sol";
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";

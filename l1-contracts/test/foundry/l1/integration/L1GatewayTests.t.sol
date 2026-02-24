@@ -23,7 +23,13 @@ import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR, GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2CanonicalTransaction, L2Message, TxStatus, ConfirmTransferResultData, TokenBridgingData} from "contracts/common/Messaging.sol";
+import {
+    L2CanonicalTransaction,
+    L2Message,
+    TxStatus,
+    ConfirmTransferResultData,
+    TokenBridgingData
+} from "contracts/common/Messaging.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";

@@ -22,7 +22,12 @@ import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {L2Message, L2Log} from "contracts/common/Messaging.sol";
 import {InvalidChainId, ZeroAddress, AddressNotZero} from "contracts/common/L1ContractErrors.sol";
-import {DepositsPaused, NotHyperchain, NotL1, NotSettlementLayer} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {
+    DepositsPaused,
+    NotHyperchain,
+    NotL1,
+    NotSettlementLayer
+} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof, OnlyGateway} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 contract MailboxOnGatewayTest is UtilsCallMockerTest {

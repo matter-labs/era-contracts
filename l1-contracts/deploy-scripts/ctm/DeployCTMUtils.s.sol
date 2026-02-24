@@ -69,7 +69,13 @@ import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.so
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
-import {StateTransitionDeployedAddresses, DataAvailabilityDeployedAddresses, ChainCreationParamsConfig, BridgehubAddresses, CoreDeployedAddresses} from "../utils/Types.sol";
+import {
+    StateTransitionDeployedAddresses,
+    DataAvailabilityDeployedAddresses,
+    ChainCreationParamsConfig,
+    BridgehubAddresses,
+    CoreDeployedAddresses
+} from "../utils/Types.sol";
 import {ChainCreationParamsLib} from "./ChainCreationParamsLib.sol";
 
 import {DeployCTML1OrGateway, CTMCoreDeploymentConfig, CTMContract} from "./DeployCTML1OrGateway.sol";

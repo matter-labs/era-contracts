@@ -23,7 +23,12 @@ import {
 } from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IExecutor, SystemLogKey, MAX_NUMBER_OF_BLOBS, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {
+    IExecutor,
+    SystemLogKey,
+    MAX_NUMBER_OF_BLOBS,
+    TOTAL_BLOBS_IN_COMMITMENT
+} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {InteropRoot, L2CanonicalTransaction, L2Log} from "contracts/common/Messaging.sol";
 

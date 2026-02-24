@@ -5,7 +5,15 @@ pragma solidity 0.8.28;
 import {UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {EmptyProofLength, UnknownVerifierType, MockVerifierNotSupported, InvalidProofFormat, ZeroAddress, AddressAlreadySet, EmptyPublicInputsLength} from "../../common/L1ContractErrors.sol";
+import {
+    EmptyProofLength,
+    UnknownVerifierType,
+    MockVerifierNotSupported,
+    InvalidProofFormat,
+    ZeroAddress,
+    AddressAlreadySet,
+    EmptyPublicInputsLength
+} from "../../common/L1ContractErrors.sol";
 import {IZKsyncOSDualVerifier} from "../chain-interfaces/IZKsyncOSDualVerifier.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 

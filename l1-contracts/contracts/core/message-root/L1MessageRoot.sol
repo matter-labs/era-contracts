@@ -6,7 +6,16 @@ import {MessageRootBase} from "./MessageRootBase.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "./IMessageRoot.sol";
 import {IL1MessageRoot} from "./IL1MessageRoot.sol";
-import {CurrentBatchNumberAlreadySet, InvalidSettlementLayerForBatch, OnlyOnSettlementLayer, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, LocallyNoChainsAtGenesis, V31UpgradeChainBatchNumberAlreadySet, NotAllChainsOnL1} from "../bridgehub/L1BridgehubErrors.sol";
+import {
+    CurrentBatchNumberAlreadySet,
+    InvalidSettlementLayerForBatch,
+    OnlyOnSettlementLayer,
+    TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber,
+    TotalBatchesExecutedZero,
+    LocallyNoChainsAtGenesis,
+    V31UpgradeChainBatchNumberAlreadySet,
+    NotAllChainsOnL1
+} from "../bridgehub/L1BridgehubErrors.sol";
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";

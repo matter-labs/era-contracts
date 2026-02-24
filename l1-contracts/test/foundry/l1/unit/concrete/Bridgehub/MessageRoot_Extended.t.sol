@@ -10,7 +10,15 @@ import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {ChainExists, MessageRootNotRegistered, OnlyChain, OnlyGateway, OnlyOnSettlementLayer, TotalBatchesExecutedZero, V31UpgradeChainBatchNumberNotSet} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {
+    ChainExists,
+    MessageRootNotRegistered,
+    OnlyChain,
+    OnlyGateway,
+    OnlyOnSettlementLayer,
+    TotalBatchesExecutedZero,
+    V31UpgradeChainBatchNumberNotSet
+} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {Unauthorized, InvalidCaller} from "contracts/common/L1ContractErrors.sol";
 import {
     GW_ASSET_TRACKER_ADDR,

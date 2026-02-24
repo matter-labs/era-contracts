@@ -33,7 +33,22 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {CoreDeployedAddresses, BridgehubAddresses, BridgehubContracts, ZkChainAddresses, L2ERC20BridgeAddresses, StateTransitionDeployedAddresses, StateTransitionContracts, Verifiers, Facets, BridgesDeployedAddresses, BridgeContracts, CTMDeployedAddresses, CTMAdminAddresses, DataAvailabilityDeployedAddresses} from "./Types.sol";
+import {
+    CoreDeployedAddresses,
+    BridgehubAddresses,
+    BridgehubContracts,
+    ZkChainAddresses,
+    L2ERC20BridgeAddresses,
+    StateTransitionDeployedAddresses,
+    StateTransitionContracts,
+    Verifiers,
+    Facets,
+    BridgesDeployedAddresses,
+    BridgeContracts,
+    CTMDeployedAddresses,
+    CTMAdminAddresses,
+    DataAvailabilityDeployedAddresses
+} from "./Types.sol";
 import {IEraDualVerifier} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
 import {IZKsyncOSDualVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSDualVerifier.sol";
 

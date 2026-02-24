@@ -5,8 +5,16 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {GatewayVotePreparation} from "deploy-scripts/gateway/GatewayVotePreparation.s.sol";
-import {GatewayCTMDeployerHelper, DeployerCreate2Calldata, DeployerAddresses, DirectCreate2Calldata} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
-import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {
+    GatewayCTMDeployerHelper,
+    DeployerCreate2Calldata,
+    DeployerAddresses,
+    DirectCreate2Calldata
+} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
+import {
+    DeployedContracts,
+    GatewayCTMDeployerConfig
+} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";

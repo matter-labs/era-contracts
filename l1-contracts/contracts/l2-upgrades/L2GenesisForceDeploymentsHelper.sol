@@ -36,7 +36,13 @@ import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandl
 import {InteropHandler} from "../interop/InteropHandler.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol";
-import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingContract, ZKsyncOSNotForceDeployToPrecompileAddress, NonCanonicalRepresentation} from "../common/L1ContractErrors.sol";
+import {
+    DeployFailed,
+    UnsupportedUpgradeType,
+    ZKsyncOSNotForceDeployForExistingContract,
+    ZKsyncOSNotForceDeployToPrecompileAddress,
+    NonCanonicalRepresentation
+} from "../common/L1ContractErrors.sol";
 
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
