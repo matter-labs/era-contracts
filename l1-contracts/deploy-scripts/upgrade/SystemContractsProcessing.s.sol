@@ -28,7 +28,7 @@ struct SystemContract {
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
 uint256 constant SYSTEM_CONTRACTS_COUNT = 30;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
-uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 8;
+uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 9;
 
 library SystemContractsProcessing {
     /// @notice Retrieves the entire list of system contracts as a memory array
@@ -424,7 +424,7 @@ library SystemContractsProcessing {
             input: ""
         });
         forceDeployments[8] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[7]),
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[8]),
             newAddress: L2_BASE_TOKEN_HOLDER_ADDR,
             callConstructor: false,
             value: 0,
