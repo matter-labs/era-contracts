@@ -10,8 +10,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {DefaultCoreUpgrade} from "./DefaultCoreUpgrade.s.sol";
 import {DefaultCTMUpgrade} from "./DefaultCTMUpgrade.s.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
-import {BridgehubAddresses} from "../../ecosystem/DeployL1CoreUtils.s.sol";
-import {CTMDeployedAddresses, CoreDeployedAddresses} from "../../utils/Types.sol";
+import {BridgehubAddresses, CTMDeployedAddresses, CoreDeployedAddresses} from "../../utils/Types.sol";
 
 /// @notice Unified script that runs both ecosystem core upgrade and CTM upgrade
 /// @dev This script combines DefaultCoreUpgrade and DefaultCTMUpgrade, running them in sequence

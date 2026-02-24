@@ -22,7 +22,7 @@ import {
 import {
     GatewayCTMDeployerConfig,
     GatewayCTMDeployer
-} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
+} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
 abstract contract GW_CTMDeployerTest is Test {
     using stdStorage for StdStorage;

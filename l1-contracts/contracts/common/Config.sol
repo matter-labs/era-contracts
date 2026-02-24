@@ -7,7 +7,6 @@ import {
     L2DACommitmentScheme,
     L2_TO_L1_LOG_SERIALIZE_SIZE,
     L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
-    L2_TO_L1_LOGS_MERKLE_TREE_LEAVES,
     L2_TO_L1_LOGS_MERKLE_TREE_DEPTH,
     SUPPORTED_PROOF_METADATA_VERSION
 } from "system-contracts/contracts/Constants.sol";

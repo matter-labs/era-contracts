@@ -37,7 +37,7 @@ import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
 import {
     DeployedContracts,
     GatewayCTMDeployerConfig
-} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
+} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";

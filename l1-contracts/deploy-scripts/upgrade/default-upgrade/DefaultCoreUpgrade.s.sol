@@ -16,11 +16,11 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Call} from "contracts/governance/Common.sol";
 
-import {BridgehubAddresses, DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
+import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {CoreDeployedAddresses} from "../../utils/Types.sol";
+import {BridgehubAddresses, CoreDeployedAddresses} from "../../utils/Types.sol";
 
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
