@@ -24,18 +24,18 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @dev Token total supply snapshot captured before the first post-v31 bridge operation for each token.
     /// @dev For tokens that existed before the chain migrated to v31, it should be equal to `totalSuccessfulDeposits - totalWithdrawalsToL1`.
-    /// - If a token is bridged tokens, it is equal to its `totalSupply()`.
+    /// - If a token is a bridged token, it is equal to its `totalSupply()`.
     /// - If a token is a native token, it is equal to the `2^256-1 - balanceOf of the native token vault`, i.e. one
     /// could image there was a big successful deposit at the inception time of 2^256-1 and then the withdrawals behaved the same way as for
     /// the bridged L2 tokens.
     /// @dev For native tokens, it is expected to be populated automatically with `isAssetRegistered[block.chainid]`.
-    /// @dev IMPORTANT: for base token this value may not be correct for zksync os chains until the totalSupply for the base
+    /// @dev IMPORTANT: for base token this value may not be correct for ZKsync OS chains until the totalSupply for the base
     /// token has been backfilled, so before using this value for the base token, one should check that it was set (`needBaseTokenTotalSupplyBackfill = false`).
     mapping(bytes32 assetId => SavedTotalSupply snapshot) internal totalPreV31TotalSupply;
 
-    /// @dev On zkSync os chains, the `totalSupply()` of the base token is not available by default,
+    /// @dev On ZKsync OS chains, the `totalSupply()` of the base token is not available by default,
     /// so before we ever use it to do any migrations, we need to backfill it.
-    /// @dev This variable is expected to be deleted after v31 upgrade, once all the zksync os chains have their base token
+    /// @dev This variable is expected to be deleted after v31 upgrade, once all the ZKsync OS chains have their base token
     /// amount backfilled.
     bool public needBaseTokenTotalSupplyBackfill;
 
@@ -282,8 +282,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     function _registerLegacyToken(bytes32 _assetId, address _tokenAddress) internal returns (uint256 totalSupply) {
         INativeTokenVaultBase ntv = _nativeTokenVault();
 
-        // Token is not new and yet it does not have the prev31 total supply saved,
-        // so it is a token that has been present on the chain before the v31 upgrade.
+        // Legacy tokens are all expected to have the origin chain id set on the L2NativeTokenVault.
         uint256 originChainId = ntv.originChainId(_assetId);
         require(originChainId != 0, AssetIdNotRegistered(_assetId));
         if (originChainId == block.chainid) {

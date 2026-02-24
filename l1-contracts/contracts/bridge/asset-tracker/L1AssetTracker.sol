@@ -167,7 +167,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     function _registerNewTokenInner(uint256 _originChainId, bytes32 _assetId) internal {
         if (isAssetRegistered[_assetId]) {
-            return;
+            // In reality, we should never hit this error, this is just an invariant check as this function
+            // should be only called for tokens that have not yet been registered.
+            revert AssetAlreadyRegistered(_assetId);
         }
 
         isAssetRegistered[_assetId] = true;

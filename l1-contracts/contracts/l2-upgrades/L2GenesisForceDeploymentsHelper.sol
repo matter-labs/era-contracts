@@ -542,7 +542,7 @@ library L2GenesisForceDeploymentsHelper {
         L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(
             fixedForceDeploymentsData.l1ChainId,
             additionalForceDeploymentsData.baseTokenBridgingData.assetId,
-            // The only chains that need backfill for the base token's total supply are zksync os
+            // The only chains that need backfill for the base token's total supply are ZKsync OS
             // chains that existing before the v31 upgrade (i.e. isGenesis is false).
             _isZKsyncOS && !_isGenesisUpgrade
         );

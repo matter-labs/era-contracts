@@ -176,8 +176,14 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         IAssetTrackerBase l1AssetTracker = IAssetTrackerBase(address(nativeTokenVault.l1AssetTracker()));
 
         return
+            // The chain must have version higher than v31.
             !IL1MessageRoot(address(_messageRoot())).isPreV31(_chainId) &&
+            // The chain's base token must be registered as otherwise the token balance
+            // migration wont work. This is done just in case to unblock any potentail L1->L2 transactions.
             l1AssetTracker.isAssetRegistered(baseAssetId) &&
+            // The chain's base token must support `totalSupply()`, which is the case
+            // for all chains except for pre-v31 ZKsync OS ones. For them, this value
+            // has to be backfilled. Otherwise token balance migration may not work.
             IZKChain(zkChain).baseTokenSupportsTotalSupply();
     }
 
