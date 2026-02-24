@@ -4,13 +4,13 @@ pragma solidity ^0.8.24;
 
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
-import {L2_BASE_TOKEN_HOLDER, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_VERIFICATION, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_HOLDER, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_VERIFICATION, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {BUNDLE_IDENTIFIER, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, BundleStatus, CallStatus, InteropBundle, InteropCall, MessageInclusionProof} from "../common/Messaging.sol";
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
-import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId, InvalidInteropBundleVersion, InvalidInteropCallVersion} from "./InteropErrors.sol";
+import {BundleAlreadyProcessed, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId, InvalidInteropBundleVersion, InvalidInteropCallVersion} from "./InteropErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
@@ -37,15 +37,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         _;
     }
 
-    /// @notice Initializes the reentrancy guard.
+    /// @inheritdoc IInteropHandler
     function initL2(uint256 _l1ChainId) public reentrancyGuardInitializer onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
     }
 
-    /// @notice Executes a full bundle atomically.
-    /// @dev Reverts if any call fails, or if bundle has been processed already.
-    /// @param _bundle ABI-encoded InteropBundle to execute.
-    /// @param _proof Inclusion proof for the bundle message. The bundle message itself gets broadcasted by InteropCenter contract whenever a bundle is sent.
+    /// @inheritdoc IInteropHandler
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
@@ -120,10 +117,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         emit BundleExecuted(bundleHash);
     }
 
-    /// @notice Verifies receipt of a bundle without executing calls.
-    /// @dev Marks bundle as Verified on success.
-    /// @param _bundle ABI-encoded InteropBundle to verify.
-    /// @param _proof Inclusion proof for the bundle message. The bundle message itself gets broadcasted by InteropCenter contract whenever a bundle is sent.
+    /// @inheritdoc IInteropHandler
     function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
@@ -144,23 +138,13 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         );
 
         // If the bundle was already fully executed or unbundled, we revert stating that it was processed already.
-        require(
-            status == BundleStatus.Unreceived || status == BundleStatus.Verified,
-            BundleAlreadyProcessed(bundleHash)
-        );
-
-        // Revert if the bundle was verified already.
-        require(status != BundleStatus.Verified, BundleVerifiedAlready(bundleHash));
+        require(status == BundleStatus.Unreceived, BundleAlreadyProcessed(bundleHash));
 
         // Verify the bundle inclusion
         _verifyBundle(_bundle, _proof, bundleHash);
     }
 
-    /// @notice Function used to unbundle the bundle. It's present to give more flexibility in cancelling and overall processing of bundles.
-    ///         Can be invoked multiple times until all calls are processed.
-    /// @param _sourceChainId Originating chain ID of the bundle.
-    /// @param _bundle ABI-encoded InteropBundle to unbundle.
-    /// @param _providedCallStatus Array of desired statuses per call.
+    /// @inheritdoc IInteropHandler
     function unbundleBundle(
         uint256 _sourceChainId,
         bytes memory _bundle,
@@ -312,7 +296,10 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @param _bundleHash Hash corresponding to the bundle that is to be verified.
     /// That message gets sent to L1 by origin chain in InteropCenter contract, and is picked up and included in receiving chain by sequencer.
     function _verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bytes32 _bundleHash) internal {
-        // Verify that the message came from the legitimate InteropCenter
+        // Verify that the message came from the legitimate InteropCenter.
+        // It is expected that all allowed messages have gone through the GWAssetTracker which
+        // ensured that if the `L2_INTEROP_CENTER_ADDR` is the sender of the message, then the message
+        // corresponds to a bundle with the valid balance changes.
         require(
             _proof.message.sender == L2_INTEROP_CENTER_ADDR,
             UnauthorizedMessageSender(L2_INTEROP_CENTER_ADDR, _proof.message.sender)
@@ -372,6 +359,8 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
         (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
 
+        // NOTE: it is important that we always support the legacy messages formats (i.e. dont change selectors)
+        // since otherwise the messages that were sent before wont be executable.
         if (selector == this.executeBundle.selector) {
             _handleExecuteBundle(payload, senderChainId, senderAddress, sender);
         } else if (selector == this.verifyBundle.selector) {

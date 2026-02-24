@@ -116,13 +116,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
             new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager))
         );
         ctmAddresses.stateTransition.facets.mailboxFacet = address(
-            new MailboxFacet(
-                config.eraChainId,
-                config.l1ChainId,
-                L2_CHAIN_ASSET_HANDLER_ADDR,
-                IEIP7702Checker(address(0)),
-                false
-            )
+            new MailboxFacet(config.l1ChainId, L2_CHAIN_ASSET_HANDLER_ADDR, IEIP7702Checker(address(0)), false)
         );
         ctmAddresses.stateTransition.facets.gettersFacet = address(new GettersFacet());
         ctmAddresses.stateTransition.facets.migratorFacet = address(new MigratorFacet(config.l1ChainId, true));

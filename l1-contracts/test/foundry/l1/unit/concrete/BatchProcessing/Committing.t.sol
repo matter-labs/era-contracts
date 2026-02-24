@@ -13,6 +13,7 @@ import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {BLOB_DATA_OFFSET} from "../../../da-contracts-imports/CalldataDA.sol";
 import {BlobHashCommitmentError, EmptyBlobVersionHash, InvalidPubdataCommitmentsSize, NonEmptyBlobVersionHash, OperatorDAInputTooSmall} from "../../../da-contracts-imports/DAContractsErrors.sol";
 import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, HashMismatch, InvalidLogSender, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, TimeNotReached, TimestampError, UnexpectedSystemLog, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
+import {InteropRoot} from "contracts/common/Messaging.sol";
 
 contract CommittingTest is ExecutorTest {
     bytes32[] defaultBlobVersionedHashes;
@@ -1026,20 +1027,12 @@ contract CommittingTest is ExecutorTest {
         );
     }
 
-    struct InteropRoot {
-        uint256 chainId;
-        uint256 blockNumber;
-        // We double overloading this. The sides normally contain the root, as well as the sides.
-        // Second overloading: if the length is 1, we are importing a chainBatchRoot/InteropRoot instead of sides.
-        bytes32[] sides;
-    }
-
     function test_recalculateinteropRootRollingHash() public {
         InteropRoot[] memory interopRoots = new InteropRoot[](2);
-        InteropRoot memory interopRoot1 = InteropRoot({chainId: 260, blockNumber: 1, sides: new bytes32[](1)});
+        InteropRoot memory interopRoot1 = InteropRoot({chainId: 260, blockOrBatchNumber: 1, sides: new bytes32[](1)});
         interopRoot1.sides[0] = 0xfb2eb93318710c98f501f6ff6b11c373baccd0ffcaefe15f97debe09cb7939e1;
         interopRoots[0] = interopRoot1;
-        InteropRoot memory interopRoot2 = InteropRoot({chainId: 506, blockNumber: 17, sides: new bytes32[](1)});
+        InteropRoot memory interopRoot2 = InteropRoot({chainId: 506, blockOrBatchNumber: 17, sides: new bytes32[](1)});
         interopRoot2.sides[0] = 0xf83b13aa476ef3253e6acff5779276da7924fabaec9a8c39274cf021efe1255a;
         interopRoots[1] = interopRoot2;
         bytes32 rollingHash = 0x0000000000000000000000000000000000000000000000000000000000000000;
@@ -1049,7 +1042,7 @@ contract CommittingTest is ExecutorTest {
                 abi.encodePacked(
                     rollingHash,
                     interopRoot.chainId,
-                    interopRoot.blockNumber,
+                    interopRoot.blockOrBatchNumber,
                     uint256(96),
                     interopRoot.sides.length,
                     interopRoot.sides
@@ -1059,7 +1052,7 @@ contract CommittingTest is ExecutorTest {
                 abi.encodePacked(
                     rollingHash,
                     interopRoot.chainId,
-                    interopRoot.blockNumber,
+                    interopRoot.blockOrBatchNumber,
                     uint256(96),
                     interopRoot.sides.length,
                     interopRoot.sides

@@ -19,14 +19,12 @@ import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainA
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
 contract MailboxTest is UtilsCallMockerTest {
     IMailbox internal mailboxFacet;
     UtilsFacet internal utilsFacet;
     IGetters internal gettersFacet;
     address sender;
-    uint256 constant eraChainId = 9;
     address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     address diamondProxy;
     address bridgehub;
@@ -86,9 +84,7 @@ contract MailboxTest is UtilsCallMockerTest {
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(
-                new MailboxFacet(eraChainId, block.chainid, address(chainAssetHandler), eip7702Checker, false)
-            ),
+            facet: address(new MailboxFacet(block.chainid, address(chainAssetHandler), eip7702Checker, false)),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getMailboxSelectors()

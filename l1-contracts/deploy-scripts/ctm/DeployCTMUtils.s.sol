@@ -85,6 +85,7 @@ struct Config {
     uint256 eraChainId;
     uint256 gatewayChainId;
     address ownerAddress;
+    bytes32 zkTokenAssetId;
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
     bool isZKsyncOS;
@@ -161,6 +162,10 @@ abstract contract DeployCTMUtils is DeployUtils {
         if (toml.keyExists("$.is_zk_sync_os")) {
             config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
         }
+        if (toml.keyExists("$.zk_token_asset_id")) {
+            config.zkTokenAssetId = toml.readBytes32("$.zk_token_asset_id");
+        }
+        require(config.zkTokenAssetId != bytes32(0), "zk_token_asset_id must be non-zero in config");
 
         (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesPath);
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
@@ -476,7 +481,6 @@ abstract contract DeployCTMUtils is DeployUtils {
             CTMCoreDeploymentConfig({
                 isZKsyncOS: _config.isZKsyncOS,
                 testnetVerifier: _config.testnetVerifier,
-                eraChainId: _config.eraChainId,
                 l1ChainId: _config.l1ChainId,
                 bridgehubProxy: coreAddresses.bridgehub.proxies.bridgehub,
                 interopCenterProxy: L2_INTEROP_CENTER_ADDR,

@@ -7,9 +7,10 @@ import {Test} from "forge-std/Test.sol";
 import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol";
 import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.sol";
 import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
-import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_HOLDER, L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MINT_BASE_TOKEN_HOOK} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MINT_BASE_TOKEN_HOOK} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_HOLDER} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
-import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {BaseTokenHolderMintFailed, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 
@@ -105,7 +106,7 @@ contract L2BaseTokenZKOSTest is Test {
 
         // Expected message format
         bytes memory expectedMessage = abi.encodePacked(
-            IMailboxImpl.finalizeEthWithdrawal.selector,
+            IMailboxLegacy.finalizeEthWithdrawal.selector,
             l1Receiver,
             WITHDRAW_AMOUNT
         );
@@ -210,7 +211,7 @@ contract L2BaseTokenZKOSTest is Test {
 
         // Expected extended message format
         bytes memory expectedMessage = abi.encodePacked(
-            IMailboxImpl.finalizeEthWithdrawal.selector,
+            IMailboxLegacy.finalizeEthWithdrawal.selector,
             l1Receiver,
             WITHDRAW_AMOUNT,
             sender,
@@ -579,7 +580,7 @@ contract L2BaseTokenZKOSTest is Test {
         vm.deal(sender, WITHDRAW_AMOUNT);
 
         bytes memory expectedMessage = abi.encodePacked(
-            IMailboxImpl.finalizeEthWithdrawal.selector,
+            IMailboxLegacy.finalizeEthWithdrawal.selector,
             l1Receiver,
             WITHDRAW_AMOUNT
         );
@@ -592,7 +593,7 @@ contract L2BaseTokenZKOSTest is Test {
         assembly {
             selector := mload(add(expectedMessage, 32))
         }
-        assertEq(selector, IMailboxImpl.finalizeEthWithdrawal.selector, "Selector should match");
+        assertEq(selector, IMailboxLegacy.finalizeEthWithdrawal.selector, "Selector should match");
     }
 
     function test_withdrawWithMessage_extendedFormat() public {
@@ -600,7 +601,7 @@ contract L2BaseTokenZKOSTest is Test {
         bytes memory additionalData = "hello";
 
         bytes memory expectedMessage = abi.encodePacked(
-            IMailboxImpl.finalizeEthWithdrawal.selector,
+            IMailboxLegacy.finalizeEthWithdrawal.selector,
             l1Receiver,
             WITHDRAW_AMOUNT,
             sender,

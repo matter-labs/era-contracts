@@ -59,6 +59,8 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {Config, CTMDeployedAddresses, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {TokenBridgingData} from "contracts/common/Messaging.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
 
@@ -543,7 +545,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
                 coreAddresses.bridgehub.proxies.chainRegistrationSender
             ),
-            dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
+            dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon,
+            zkTokenAssetId: config.zkTokenAssetId
         });
     }
 
@@ -558,7 +561,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)));
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(
-            1,
             1,
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             IEIP7702Checker(address(0)),

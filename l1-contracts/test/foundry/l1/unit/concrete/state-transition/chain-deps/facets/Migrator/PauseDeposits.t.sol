@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {MigratorTest} from "./_Migrator_Shared.t.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {DepositsAlreadyPaused, NotL1, TotalPriorityTxsIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 
 contract PauseDepositsTest is MigratorTest {
@@ -15,8 +14,8 @@ contract PauseDepositsTest is MigratorTest {
     bytes32 pausedDepositsTimestampSlot = bytes32(uint256(62));
 
     function setUp() public override {
-        // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
-        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET + 1);
+        // Avoid block.timestamp == 0 to keep paused-deposits sentinel semantics stable in tests.
+        vm.warp(1);
         super.setUp();
     }
 
@@ -40,7 +39,7 @@ contract PauseDepositsTest is MigratorTest {
 
     function test_successfulCall_newChain() public {
         uint256 chainId = utilsFacet.util_getChainId();
-        uint256 expectedTimestamp = block.timestamp - PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
+        uint256 expectedTimestamp = block.timestamp;
         address admin = utilsFacet.util_getAdmin();
 
         vm.startPrank(admin);

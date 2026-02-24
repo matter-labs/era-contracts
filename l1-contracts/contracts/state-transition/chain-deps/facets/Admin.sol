@@ -10,7 +10,7 @@ import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {L1DAValidatorAddressIsZero, NotL1, NotZKsyncOS, PriorityModeAlreadyAllowed} from "../../L1StateTransitionErrors.sol";
+import {L1DAValidatorAddressIsZero, NotL1, NotZKsyncOS, PriorityModeAlreadyAllowed, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, NotMigrated} from "../../L1StateTransitionErrors.sol";
 import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, FeeParamsChangeTooLarge, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityModeRequiresPermanentRollup, PriorityOpsRequestTimestampMissing, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TokenMultiplierChangeTooFrequent, TooMuchGas, Unauthorized, NotCompatibleWithPriorityMode} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
@@ -51,6 +51,29 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function _onlyL1() internal view {
         if (block.chainid != L1_CHAIN_ID) {
             revert NotL1(block.chainid);
+        }
+    }
+
+    /// @dev Validates batch count consistency: executed <= verified <= committed
+    function _validateBatchConsistency(uint256 _executed, uint256 _verified, uint256 _committed) internal pure {
+        if (_executed > _verified) {
+            revert ExecutedIsNotConsistentWithVerified(_executed, _verified);
+        }
+        if (_verified > _committed) {
+            revert VerifiedIsNotConsistentWithCommitted(_verified, _committed);
+        }
+    }
+
+    /// @dev Performs diamond cut and emits ExecuteUpgrade event
+    function _executeDiamondCut(Diamond.DiamondCutData memory _diamondCut) internal {
+        Diamond.diamondCut(_diamondCut);
+        emit ExecuteUpgrade(_diamondCut);
+    }
+
+    /// @dev Requires the chain to be currently migrated (settlement layer != 0)
+    function _requireMigrated() internal view {
+        if (s.settlementLayer == address(0)) {
+            revert NotMigrated();
         }
     }
 
@@ -416,8 +439,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (s.protocolVersion != _oldProtocolVersion) {
             revert ProtocolIdMismatch(s.protocolVersion, _oldProtocolVersion);
         }
-        Diamond.diamondCut(_diamondCut);
-        emit ExecuteUpgrade(_diamondCut);
+        _executeDiamondCut(_diamondCut);
         if (s.protocolVersion <= _oldProtocolVersion) {
             revert ProtocolIdNotGreater();
         }
@@ -425,8 +447,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function executeUpgrade(Diamond.DiamondCutData calldata _diamondCut) external onlyChainTypeManager {
-        Diamond.diamondCut(_diamondCut);
-        emit ExecuteUpgrade(_diamondCut);
+        _executeDiamondCut(_diamondCut);
     }
 
     /// @dev we have to set the chainId at genesis, as blockhashzero is the same for all chains with the same chainId
@@ -446,8 +467,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
             )
         });
 
-        Diamond.diamondCut(cutData);
-        emit ExecuteUpgrade(cutData);
+        _executeDiamondCut(cutData);
     }
 
     /*//////////////////////////////////////////////////////////////

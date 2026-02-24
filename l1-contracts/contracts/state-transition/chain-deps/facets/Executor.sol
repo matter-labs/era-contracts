@@ -9,7 +9,7 @@ import {EMPTY_STRING_KECCAK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.so
 import {IExecutor, ProcessLogsInput} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
-import {GW_ASSET_TRACKER} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, InvalidMessageRoot, InvalidProof, NonSequentialBatch, PriorityOperationsRollingHashMismatch, VerifiedBatchesExceedsCommittedBatches} from "../../../common/L1ContractErrors.sol";
 import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
@@ -153,7 +153,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             InteropRoot[][] memory dependencyRoots,
             L2Log[][] memory logs,
             bytes[][] memory messages,
-            bytes32[] memory messageRoots
+            bytes32[] memory messageRoots,
+            address settlementFeePayer
         ) = BatchDecoder.decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
         if (batchesData.length != priorityOpsData.length) {
@@ -182,7 +183,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     chainId: s.chainId,
                     batchNumber: batchesData[i].batchNumber,
                     chainBatchRoot: batchesData[i].l2LogsTreeRoot,
-                    messageRoot: messageRoots[i]
+                    messageRoot: messageRoots[i],
+                    settlementFeePayer: settlementFeePayer
                 });
                 GW_ASSET_TRACKER.processLogsAndMessages(processLogsInput);
             }

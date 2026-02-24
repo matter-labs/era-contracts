@@ -4,8 +4,8 @@ pragma solidity 0.8.28;
 
 import {IL2BaseTokenBase} from "./interfaces/IL2BaseTokenBase.sol";
 import {IL2ToL1Messenger} from "../common/l2-helpers/IL2ToL1Messenger.sol";
-import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
-import {L2_BASE_TOKEN_HOLDER, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {IMailboxLegacy} from "../state-transition/chain-interfaces/IMailboxLegacy.sol";
+import {L2_BASE_TOKEN_HOLDER, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractInterfaces.sol";
 
 /**
  * @title L2BaseTokenBase
@@ -79,7 +79,7 @@ abstract contract L2BaseTokenBase is IL2BaseTokenBase {
     /// @param _amount The amount being withdrawn.
     /// @return The encoded withdrawal message.
     function _getL1WithdrawMessage(address _to, uint256 _amount) internal pure returns (bytes memory) {
-        return abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, _to, _amount);
+        return abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, _to, _amount);
     }
 
     /// @dev Get the extended message to be sent to L1 to initiate a withdrawal with additional data.
@@ -95,6 +95,6 @@ abstract contract L2BaseTokenBase is IL2BaseTokenBase {
         bytes memory _additionalData
     ) internal pure returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
+        return abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
     }
 }

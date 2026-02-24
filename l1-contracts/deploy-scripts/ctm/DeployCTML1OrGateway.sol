@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 struct CTMCoreDeploymentConfig {
     bool isZKsyncOS;
     bool testnetVerifier;
-    uint256 eraChainId;
     uint256 l1ChainId;
     address bridgehubProxy;
     address interopCenterProxy;
@@ -43,13 +42,7 @@ library DeployCTML1OrGateway {
             return abi.encode(config.l1ChainId, config.rollupDAManager);
         } else if (contractName == CTMContract.MailboxFacet) {
             return
-                abi.encode(
-                    config.eraChainId,
-                    config.l1ChainId,
-                    config.chainAssetHandler,
-                    config.eip7702Checker,
-                    config.testnetVerifier
-                );
+                abi.encode(config.l1ChainId, config.chainAssetHandler, config.eip7702Checker, config.testnetVerifier);
         } else if (contractName == CTMContract.ValidatorTimelock) {
             return abi.encode(config.bridgehubProxy);
         } else if (contractName == CTMContract.ExecutorFacet) {

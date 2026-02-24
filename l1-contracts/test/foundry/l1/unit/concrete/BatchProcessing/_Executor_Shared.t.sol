@@ -161,13 +161,11 @@ contract ExecutorTest is UtilsCallMockerTest {
     }
 
     function getMailboxSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](7);
+        bytes4[] memory selectors = new bytes4[](5);
         uint256 i = 0;
         selectors[i++] = mailbox.proveL2MessageInclusion.selector;
         selectors[i++] = mailbox.proveL2LogInclusion.selector;
         selectors[i++] = mailbox.proveL1ToL2TransactionStatus.selector;
-        selectors[i++] = mailbox.finalizeEthWithdrawal.selector;
-        selectors[i++] = mailbox.requestL2Transaction.selector;
         selectors[i++] = mailbox.bridgehubRequestL2Transaction.selector;
         selectors[i++] = mailbox.l2TransactionBaseCost.selector;
         return selectors;
@@ -275,7 +273,7 @@ contract ExecutorTest is UtilsCallMockerTest {
         getters = new GettersFacet();
         executor = new TestExecutor();
         committer = new TestCommitter();
-        mailbox = new MailboxFacet(l2ChainId, block.chainid, address(chainAssetHandler), eip7702Checker, false);
+        mailbox = new MailboxFacet(block.chainid, address(chainAssetHandler), eip7702Checker, false);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
         vm.mockCall(
@@ -424,7 +422,8 @@ contract ExecutorTest is UtilsCallMockerTest {
             lastBlockTimestamp: uint64(currentTimestamp),
             lastBlockNumber: uint64(2),
             chainId: l2ChainId,
-            operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+            operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+            slChainId: block.chainid
         });
 
         dummyBridgehub.setZKChain(l2ChainId, address(diamondProxy));

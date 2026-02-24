@@ -6,9 +6,6 @@ import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
 import {V31AcrossRecovery} from "./V31AcrossRecovery.sol";
 import {IL2V31Upgrade} from "../upgrades/IL2V31Upgrade.sol";
 
-/// @dev Storage slot with the admin of the contract used for EIP‑1967 proxies (e.g., TUP, BeaconProxy, etc.).
-bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
-
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
 /// @title L2V31Upgrade, contains v31 upgrade fixes.
