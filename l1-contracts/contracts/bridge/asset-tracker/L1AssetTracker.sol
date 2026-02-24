@@ -96,6 +96,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// that the max number of chains is bound by 100, so this function should be always processable.
     /// @dev We need to migrate the balance for every single chain first to ensure that the `preV31ChainBalance`
     /// is set correctly for the origin chain.
+    /// @dev After all the pre-31 tokens are registered, this function can be deleted.
     /// @param _assetId The asset id of the token to migrate the token balance for.
     function registerLegacyToken(bytes32 _assetId) public {
         IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
