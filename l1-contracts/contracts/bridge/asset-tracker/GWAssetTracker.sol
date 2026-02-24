@@ -447,7 +447,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             // solhint-disable-next-line
             _processInteropCall(_chainId, interopCall, interopBundle.destinationChainId);
         }
-        
+
         // We check on the InteropHandler of the destination chain that the `destinationBaseTokenAssetId` is the correct one
         _decreaseChainBalance(_chainId, interopBundle.destinationBaseTokenAssetId, totalBaseTokenAmount);
         _increaseAndSaveChainBalance(

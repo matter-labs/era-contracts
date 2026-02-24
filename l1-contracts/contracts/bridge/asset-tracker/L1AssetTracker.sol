@@ -514,7 +514,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     ) internal view returns (uint256 amountToKeep) {
         InteropL1Info memory info = interopInfo[_chainId][_assetId];
 
-
         // Additional explanation for the math:
         // Let's define:
         // w1,...,wn -- all withdrawals
