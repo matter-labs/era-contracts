@@ -1,4 +1,8 @@
 tools/verifier-gen/data
+l1-contracts/contracts/state-transition/verifiers/EraVerifierPlonk.sol
+l1-contracts/contracts/state-transition/verifiers/EraVerifierFflonk.sol
+l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol
+l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol
 l1-contracts/lib
 l1-contracts-foundry/lib
 lib
