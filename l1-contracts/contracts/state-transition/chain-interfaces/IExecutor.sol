@@ -4,24 +4,8 @@ pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
 import {L2Log} from "../../common/Messaging.sol";
-
-/// @dev Enum used by L2 System Contracts to differentiate logs.
-enum SystemLogKey {
-    L2_TO_L1_LOGS_TREE_ROOT_KEY,
-    PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-    CHAINED_PRIORITY_TXN_HASH_KEY,
-    NUMBER_OF_LAYER_1_TXS_KEY,
-    // Note, that it is important that `PREV_BATCH_HASH_KEY` has position
-    // `4` since it is the same as it was in the previous protocol version and
-    // it is the only one that is emitted before the system contracts are upgraded.
-    PREV_BATCH_HASH_KEY,
-    L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
-    USED_L2_DA_VALIDATOR_ADDRESS_KEY,
-    MESSAGE_ROOT_ROLLING_HASH_KEY,
-    L2_TXS_STATUS_ROLLING_HASH_KEY,
-    SETTLEMENT_LAYER_CHAIN_ID_KEY,
-    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
-}
+// solhint-disable-next-line no-unused-import
+import {SystemLogKey, MAX_NUMBER_OF_BLOBS} from "system-contracts/contracts/Constants.sol";
 
 struct LogProcessingOutput {
     uint256 numberOfLayer1Txs;
@@ -40,7 +24,27 @@ struct LogProcessingOutput {
 /// @dev Maximal value that SystemLogKey variable can have.
 uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
 
-/// @notice The struct passed to the assetTracker.
+/// @notice The struct passed to the assetTracker for processing L2 logs and collecting settlement fees.
+/// @param logs The L2 logs from the batch.
+/// @param messages The L2 messages corresponding to the logs. Note: there can be fewer messages than logs,
+///        as not all logs have corresponding messages.
+/// @param chainId The chain ID of the settling chain.
+/// @param batchNumber The batch number being processed.
+/// @param chainBatchRoot The batch root hash for verification.
+/// @param messageRoot The message root hash for verification.
+/// @param settlementFeePayer Address that pays gateway settlement fees for interop calls in this batch.
+///
+/// @dev Settlement Fee Payer Requirements:
+///      1. Must have called `agreeToPaySettlementFees(chainId)` on GWAssetTracker to opt-in for this specific chain
+///      2. Must have sufficient wrapped ZK token balance to cover: gatewaySettlementFee * chargeableInteropCount
+///      3. Must have approved GWAssetTracker to spend wrapped ZK tokens
+///      The opt-in mechanism prevents front-running attacks where a malicious operator could
+///      make another address pay for their chain's settlements by specifying it as settlementFeePayer.
+///
+/// @dev Failure Behavior:
+///      - If fee collection fails (payer not agreed, insufficient balance, or no approval), batch execution reverts
+///      - This ensures fees are always paid atomically with settlement
+///      - Operators must ensure their fee payer has agreed and maintains sufficient balance/approval
 struct ProcessLogsInput {
     L2Log[] logs;
     bytes[] messages;
@@ -48,6 +52,7 @@ struct ProcessLogsInput {
     uint256 batchNumber;
     bytes32 chainBatchRoot;
     bytes32 messageRoot;
+    address settlementFeePayer;
 }
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch)
@@ -58,9 +63,6 @@ uint256 constant L2_LOG_KEY_OFFSET = 24;
 
 /// @dev Offset used to pull Value From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch) + 20 (bytes for address) + 32 (bytes for key)
 uint256 constant L2_LOG_VALUE_OFFSET = 56;
-
-/// @dev Max number of blobs currently supported
-uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 
 /// @dev The number of blobs that must be present in the commitment to a batch.
 /// It represents the maximal number of blobs that circuits can support and can be larger
@@ -130,7 +132,7 @@ interface IExecutor is IZKChainBase {
     /// `ValidatorTimelock` and `Executor` for easier and cheaper implementation of the timelock.
     /// @param _processFrom The batch number from which the execution starts.
     /// @param _processTo The batch number at which the execution ends.
-    /// @param _executeData The encoded data of the new batches to be executed.
+    /// @param _executeData The encoded data of the new batches to be executed. Contains settlement fee payer address.
     function executeBatchesSharedBridge(
         address _chainAddress,
         uint256 _processFrom,

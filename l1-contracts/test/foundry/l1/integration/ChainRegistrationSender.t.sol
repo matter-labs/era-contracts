@@ -19,12 +19,14 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
+import {ChainsSettlingOnL1, ChainsSettlementLayerMismatch} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
     uint256 constant TEST_USERS_COUNT = 10;
+    uint256 constant GATEWAY_CHAIN_ID = 506;
     address[] public users;
     address[] public l2ContractAddresses;
 
@@ -66,6 +68,15 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
             abi.encode(10)
         );
+
+        // Simulate gateway mode for integration tests.
+        for (uint256 i = 0; i < zkChainIds.length; i++) {
+            stdstore
+                .target(address(addresses.bridgehub))
+                .sig("settlementLayer(uint256)")
+                .with_key(zkChainIds[i])
+                .checked_write(GATEWAY_CHAIN_ID);
+        }
     }
 
     function test_chainRegistrationSender() public {
@@ -174,6 +185,45 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
 
         // Verify the transaction hash has expected format (non-zero bytes)
         assertTrue(uint256(txHash) > 0, "Transaction hash should be a valid non-zero value");
+    }
+
+    function test_chainRegistrationSender_revertWhen_chainsSettleOnL1() public {
+        stdstore
+            .target(address(addresses.bridgehub))
+            .sig("settlementLayer(uint256)")
+            .with_key(zkChainIds[0])
+            .checked_write(block.chainid);
+
+        stdstore
+            .target(address(addresses.bridgehub))
+            .sig("settlementLayer(uint256)")
+            .with_key(zkChainIds[1])
+            .checked_write(block.chainid);
+
+        vm.expectRevert(ChainsSettlingOnL1.selector);
+        addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
+    }
+
+    function test_chainRegistrationSender_revertWhen_settlementLayersMismatch() public {
+        uint256 firstSettlementLayer = GATEWAY_CHAIN_ID;
+        uint256 secondSettlementLayer = GATEWAY_CHAIN_ID + 1;
+
+        stdstore
+            .target(address(addresses.bridgehub))
+            .sig("settlementLayer(uint256)")
+            .with_key(zkChainIds[0])
+            .checked_write(firstSettlementLayer);
+
+        stdstore
+            .target(address(addresses.bridgehub))
+            .sig("settlementLayer(uint256)")
+            .with_key(zkChainIds[1])
+            .checked_write(secondSettlementLayer);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(ChainsSettlementLayerMismatch.selector, firstSettlementLayer, secondSettlementLayer)
+        );
+        addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
     }
 
     // add this to be excluded from coverage report

@@ -34,8 +34,8 @@ library ContractsBytecodesLib {
             "EIP7702Checker"
         ];
 
-        uint256 DA_CONTRACT_IDENTIFIERS_LENGTH = EVM_CONTRACT_IDENTIFIERS.length;
-        for (uint i = 0; i < DA_CONTRACT_IDENTIFIERS_LENGTH; i++) {
+        uint256 EVM_CONTRACT_IDENTIFIERS_LENGTH = EVM_CONTRACT_IDENTIFIERS.length;
+        for (uint i = 0; i < EVM_CONTRACT_IDENTIFIERS_LENGTH; i++) {
             if (Utils.compareStrings(EVM_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
                 return Utils.readDAContractBytecode(contractIdentifier);
             }
@@ -63,7 +63,6 @@ library ContractsBytecodesLib {
             "ChainAdminOwnable",
             "L1ChainAssetHandler",
             "L2ChainAssetHandler",
-            "ChainRegistrar",
             "EraChainTypeManager",
             "ZKsyncOSChainTypeManager",
             "CTMDeploymentTracker",
@@ -96,6 +95,7 @@ library ContractsBytecodesLib {
             "ServerNotifier", // ???
             "ValidatorTimelock",
             "ValidiumL1DAValidator", // ???
+            "L2InteropRootStorage",
             "L2MessageVerification",
             "L2V31Upgrade",
             "UpgradeableBeaconDeployer"

@@ -5,15 +5,15 @@ pragma solidity ^0.8.21;
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IZKChainBase} from "contracts/state-transition/chain-interfaces/IZKChainBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
+import {IBaseTokenAssetHandler} from "contracts/bridge/interfaces/IBaseTokenAssetHandler.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
@@ -197,14 +197,7 @@ library AddressIntrospector {
     // ============ CTM Addresses ============
 
     function getCTMAddresses(ChainTypeManagerBase _ctm) public view returns (CTMDeployedAddresses memory info) {
-        return _getCTMAddressesInternal(address(_ctm), false, false);
-    }
-
-    function getCTMAddresses(
-        ChainTypeManagerBase _ctm,
-        bool isZKsyncOS
-    ) public view returns (CTMDeployedAddresses memory info) {
-        return _getCTMAddressesInternal(address(_ctm), false, isZKsyncOS);
+        return _getCTMAddressesInternal(address(_ctm), false, _ctm.isZKsyncOS());
     }
 
     function getCTMAddressesV29(
@@ -298,7 +291,7 @@ library AddressIntrospector {
 
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(chainId);
         address assetHandlerAddress = IAssetRouterBase(bridgehub.assetRouter()).assetHandlerAddress(baseTokenAssetId);
-        address baseTokenAddress = IL1BaseTokenAssetHandler(assetHandlerAddress).tokenAddress(baseTokenAssetId);
+        address baseTokenAddress = IBaseTokenAssetHandler(assetHandlerAddress).tokenAddress(baseTokenAssetId);
 
         info = ZkChainAddresses({
             chainId: chainId,

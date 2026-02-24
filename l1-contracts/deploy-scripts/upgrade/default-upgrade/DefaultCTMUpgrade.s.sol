@@ -32,12 +32,13 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {DeployCTMUtils, CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
-import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {L2CanonicalTransaction, TokenBridgingData} from "contracts/common/Messaging.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 import {BytecodePublisher} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
@@ -391,7 +392,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             // V29 introspection returns zero for bytecodesSupplier, overwrite with correct value
             ctmAddresses.stateTransition.proxies.bytecodesSupplier = _bytecodesSupplier;
         } else {
-            ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm), config.isZKsyncOS);
+            ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
             coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
         }
 
@@ -476,7 +477,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
                 coreAddresses.bridgehub.proxies.chainRegistrationSender
             ),
             // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
-            dangerousTestOnlyForcedBeacon: address(0)
+            dangerousTestOnlyForcedBeacon: address(0),
+            zkTokenAssetId: config.zkTokenAssetId
         });
     }
 
@@ -718,7 +720,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         result[0] = Call({
             target: coreAddresses.bridgehub.proxies.chainAssetHandler,
             value: 0,
-            data: abi.encodeCall(IChainAssetHandler.pauseMigration, ())
+            data: abi.encodeCall(IChainAssetHandlerBase.pauseMigration, ())
         });
     }
 

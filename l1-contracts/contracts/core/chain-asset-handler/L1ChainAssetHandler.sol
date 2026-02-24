@@ -11,10 +11,11 @@ import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1AssetHandler} from "../../bridge/interfaces/IL1AssetHandler.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
-import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
 import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
+import {ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
+import {CTMNotRegistered} from "../../common/L1ContractErrors.sol";
 import {MigrationIntervalInvalid, MigrationIntervalNotSet, MigrationNumberMismatch, SettlementLayerMustNotBeL1, IteratedMigrationsNotSupported, HistoricalSettlementLayerMismatch} from "../bridgehub/L1BridgehubErrors.sol";
 import {MigrationInterval} from "./IChainAssetHandler.sol";
 
@@ -24,7 +25,7 @@ import {MigrationInterval} from "./IChainAssetHandler.sol";
 /// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
 /// @dev L1 version – keeps the cheap immutables set in the constructor.
-contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1ChainAssetHandler, IChainAssetHandlerShared {
+contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1ChainAssetHandler {
     /// @dev The assetId of the ETH.
     bytes32 public immutable override ETH_TOKEN_ASSET_ID;
 
@@ -46,7 +47,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @dev The message root contract. Set via `setAddresses` after deployment because
     /// L1MessageRoot is deployed after L1ChainAssetHandler (so that L1MessageRoot can store
     /// the chain asset handler address as an immutable).
-    IMessageRoot internal messageRoot;
+    IMessageRootBase internal messageRoot;
 
     /// @dev The asset router contract. Set via `setAddresses` after deployment because
     /// L1AssetRouter is deployed after L1ChainAssetHandler.
@@ -62,13 +63,12 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     function _bridgehub() internal view override returns (IL1Bridgehub) {
         return BRIDGEHUB;
     }
-
-    function _messageRoot() internal view override returns (IMessageRoot) {
+    function _messageRoot() internal view override returns (IMessageRootBase) {
         return messageRoot;
     }
 
     // solhint-disable-next-line func-name-mixedcase
-    function MESSAGE_ROOT() public view override returns (IMessageRoot) {
+    function MESSAGE_ROOT() public view override returns (IMessageRootBase) {
         return messageRoot;
     }
 
@@ -117,10 +117,16 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
         uint256 chainId = bridgehubBurnData.chainId;
 
+        // Note: _chainId is the settlement layer chain (e.g. gateway) where the migration tx was proven,
+        // while bridgehubBurnData.chainId is the chain being migrated. These are intentionally different.
+
         (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeConfirmTransferResult(
             chainId,
             _txStatus
         );
+
+        require(zkChain != address(0), ZKChainNotRegistered());
+        require(ctm != address(0), CTMNotRegistered());
 
         IChainTypeManager(ctm).forwardedBridgeConfirmTransferResult({
             _chainId: chainId,
@@ -173,12 +179,16 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     ) external onlyOwner {
         require(_migrationNumber == 0, MigrationNumberMismatch(0, _migrationNumber));
         require(!_interval.isActive, MigrationIntervalNotSet());
-        uint256 legacyGwChainId = IMessageRoot(_messageRoot()).ERA_GATEWAY_CHAIN_ID();
+        uint256 legacyGwChainId = _messageRoot().ERA_GATEWAY_CHAIN_ID();
         require(
             _interval.settlementLayerChainId == legacyGwChainId,
             HistoricalSettlementLayerMismatch(legacyGwChainId, _interval.settlementLayerChainId)
         );
         require(_interval.migrateFromGWBatchNumber > _interval.migrateToGWBatchNumber, MigrationIntervalInvalid());
+        require(
+            _interval.settlementLayerBatchUpperBound > _interval.settlementLayerBatchLowerBound,
+            MigrationIntervalInvalid()
+        );
         _migrationInterval[_chainId][_migrationNumber] = _interval;
     }
 
@@ -188,11 +198,13 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @param _chainId The ID of the chain.
     /// @param _batchNumber The batch number to check.
     /// @param _claimedSettlementLayer The settlement layer chain ID claimed in the proof.
+    /// @param _claimedSettlementLayerBatchNumber The batch number claimed in the settlement layer.
     /// @return True if the claimed settlement layer is valid for this chain and batch.
     function isValidSettlementLayer(
         uint256 _chainId,
         uint256 _batchNumber,
-        uint256 _claimedSettlementLayer
+        uint256 _claimedSettlementLayer,
+        uint256 _claimedSettlementLayerBatchNumber
     ) external view returns (bool) {
         // Check all migration intervals for this chain (including legacy GW at index 0)
         // We iterate from 0 to current migration number to find which interval contains this batch
@@ -215,10 +227,22 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
                 return _claimedSettlementLayer == _l1ChainId();
             }
 
+            if (interval.isActive) {
+                // Batch is after migration to SL, and the chain hasn't returned yet, so it must be on the settlement layer.
+                return
+                    _claimedSettlementLayer == interval.settlementLayerChainId &&
+                    _claimedSettlementLayerBatchNumber >= interval.settlementLayerBatchLowerBound;
+            }
+
             // Batch is after migration to SL
-            if (interval.isActive || _batchNumber <= interval.migrateFromGWBatchNumber) {
-                // Batch is in the SL range: (migrateToSL, migrateFromSL] or chain hasn't returned
-                return _claimedSettlementLayer == interval.settlementLayerChainId;
+            if (_batchNumber <= interval.migrateFromGWBatchNumber) {
+                // Batch is in the SL range: (migrateToSL, migrateFromSL] or chain hasn't returned.
+                // Also verify the claimed SL batch number falls within the recorded bounds.
+                // For active intervals, the upper bound is not yet known so we only check the lower bound.
+                return
+                    _claimedSettlementLayer == interval.settlementLayerChainId &&
+                    _claimedSettlementLayerBatchNumber >= interval.settlementLayerBatchLowerBound &&
+                    _claimedSettlementLayerBatchNumber <= interval.settlementLayerBatchUpperBound;
             }
 
             // Batch is after migration back from SL, continue to check next interval
@@ -252,14 +276,23 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
             _newMigrationNum == MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
             MigrationNumberMismatch(MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, _newMigrationNum)
         );
+        uint256 slBatchLowerBound = _messageRoot().currentChainBatchNumber(_settlementChainId);
         _migrationInterval[_chainId][_newMigrationNum] = MigrationInterval({
             migrateToGWBatchNumber: _batchNumber,
             migrateFromGWBatchNumber: 0,
+            settlementLayerBatchLowerBound: slBatchLowerBound,
+            settlementLayerBatchUpperBound: 0,
             settlementLayerChainId: _settlementChainId,
             isActive: true
         });
     }
 
+    /// @notice Records that a chain has returned from a settlement layer back to L1.
+    /// @dev The `settlementLayerBatchUpperBound` is set to the settlement layer's current batch number at the time
+    /// this function is called (during `bridgeMint` on L1). This is not a perfect upper bound — the exact settlement
+    /// layer batch number is not trivially available, so we use the current value at finalization time. The sooner the
+    /// migration is finalized, the more precise this value is, since the settlement layer continues producing batches
+    /// in the meantime. A more precise solution will be introduced in future releases.
     function _recordMigrationFromSL(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -272,6 +305,9 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         MigrationInterval storage interval = _migrationInterval[_chainId][MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER];
         require(interval.isActive, MigrationIntervalNotSet());
         interval.migrateFromGWBatchNumber = _batchNumber;
+        interval.settlementLayerBatchUpperBound = _messageRoot().currentChainBatchNumber(
+            interval.settlementLayerChainId
+        );
         interval.isActive = false;
     }
 }

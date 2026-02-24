@@ -4,15 +4,14 @@ pragma solidity 0.8.28;
 
 import {MessageRootBase} from "./MessageRootBase.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {OnlyL1} from "../bridgehub/L1BridgehubErrors.sol";
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
 
 import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
-import {InvalidCaller, Unauthorized} from "../../common/L1ContractErrors.sol";
-import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
+import {InvalidCaller} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -32,7 +31,7 @@ contract L2MessageRoot is MessageRootBase {
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _bridgehub() internal view override returns (address) {
+    function _bridgehub() internal pure override returns (address) {
         return L2_BRIDGEHUB_ADDR;
     }
 
@@ -40,9 +39,13 @@ contract L2MessageRoot is MessageRootBase {
         return ERA_GATEWAY_CHAIN_ID;
     }
 
+    function _chainAssetHandler() internal view override returns (address) {
+        return L2_CHAIN_ASSET_HANDLER_ADDR;
+    }
+
     // A method for backwards compatibility with the old implementation
     // solhint-disable-next-line func-name-mixedcase
-    function BRIDGE_HUB() public view returns (address) {
+    function BRIDGE_HUB() public pure returns (address) {
         return L2_BRIDGEHUB_ADDR;
     }
 
@@ -59,19 +62,20 @@ contract L2MessageRoot is MessageRootBase {
         _;
     }
 
-    modifier onlyServiceTransactionSender() {
-        require(msg.sender == SERVICE_TRANSACTION_SENDER, Unauthorized(msg.sender));
-        _;
-    }
-
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
+    /// @dev Expected to be called only once by the ComplexUpgrader and during genesis only, while
+    /// for already existing chains an `updateL2` function should be used.
     /// @param _l1ChainId The chain id of L1.
-    function initL2(uint256 _l1ChainId, uint256 _eraGatewayChainId) public onlyUpgrader {
+    function initL2(uint256 _l1ChainId, uint256 _eraGatewayChainId) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
+        updateL2(_l1ChainId, _eraGatewayChainId);
+        _initialize();
+    }
+
+    function updateL2(uint256 _l1ChainId, uint256 _eraGatewayChainId) public onlyUpgrader {
         ERA_GATEWAY_CHAIN_ID = _eraGatewayChainId;
         l1ChainId = _l1ChainId;
-        _initialize();
     }
 
     /// @notice Adds a new chainBatchRoot to the chainTree.
@@ -106,5 +110,10 @@ contract L2MessageRoot is MessageRootBase {
         uint256
     ) internal pure override returns (bool) {
         revert OnlyL1();
+    }
+
+    /// @inheritdoc MessageRootBase
+    function _noBatchFallback(uint256, uint256) internal pure override returns (bytes32) {
+        return bytes32(0);
     }
 }

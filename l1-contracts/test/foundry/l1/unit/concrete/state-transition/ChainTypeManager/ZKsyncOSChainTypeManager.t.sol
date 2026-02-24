@@ -25,9 +25,8 @@ import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestne
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress, GenesisBatchHashZero, GenesisBatchCommitmentIncorrect, GenesisUpgradeZero} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -72,8 +71,8 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
     Diamond.FacetCut[] internal facetCuts;
 
     function setUp() public {
-        // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
-        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET + 1);
+        // Avoid block.timestamp == 0 to keep paused-deposits sentinel semantics stable in tests.
+        vm.warp(1);
 
         interopCenterAddress = makeAddr("interopCenter");
         governor = makeAddr("governor");
@@ -167,13 +166,7 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
         facetCuts.push(
             Diamond.FacetCut({
                 facet: address(
-                    new MailboxFacet(
-                        eraChainId,
-                        block.chainid,
-                        address(0),
-                        IEIP7702Checker(makeAddr("eip7702Checker")),
-                        false
-                    )
+                    new MailboxFacet(block.chainid, address(0), IEIP7702Checker(makeAddr("eip7702Checker")), false)
                 ),
                 action: Diamond.Action.Add,
                 isFreezable: false,

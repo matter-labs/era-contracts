@@ -1,6 +1,19 @@
 [
   {
     "type": "function",
+    "name": "BRIDGE_HUB",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IL1Bridgehub"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "ERA_CHAIN_ID",
     "inputs": [],
     "outputs": [
@@ -8,6 +21,19 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "ERA_DIAMOND_PROXY",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IZKChain"
       }
     ],
     "stateMutability": "view"
@@ -242,6 +268,59 @@
   },
   {
     "type": "function",
+    "name": "claimFailedDeposit",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_depositSender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_l1Token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2TxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_l2BatchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2MessageIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2TxNumberInBatch",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "_merkleProof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "depositLegacyErc20Bridge",
     "inputs": [
       {
@@ -377,6 +456,19 @@
   },
   {
     "type": "function",
+    "name": "legacyBridge",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IL1ERC20Bridge"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "nativeTokenVault",
     "inputs": [],
     "outputs": [
@@ -463,31 +555,6 @@
   },
   {
     "type": "event",
-    "name": "AssetDeploymentTrackerRegistered",
-    "inputs": [
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "additionalData",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "assetDeploymentTracker",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "AssetDeploymentTrackerSet",
     "inputs": [
       {
@@ -563,31 +630,6 @@
   },
   {
     "type": "event",
-    "name": "BridgehubDepositFinalized",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "txDataHash",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "l2DepositTxHash",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "BridgehubDepositInitiated",
     "inputs": [
       {
@@ -619,50 +661,6 @@
         "type": "bytes",
         "indexed": false,
         "internalType": "bytes"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "BridgehubMintData",
-    "inputs": [
-      {
-        "name": "bridgeMintData",
-        "type": "bytes",
-        "indexed": false,
-        "internalType": "bytes"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "BridgehubWithdrawalInitiated",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "sender",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      },
-      {
-        "name": "assetDataHash",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
       }
     ],
     "anonymous": false

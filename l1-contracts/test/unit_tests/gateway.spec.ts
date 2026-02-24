@@ -72,7 +72,7 @@ describe("Gateway", function () {
   });
 
   it("Check register synclayer", async () => {
-    await gatewayDeployer.registerSettlementLayer();
+    await gatewayDeployer.setSettlementLayerStatus();
   });
 
   it("Check start move chain to synclayer", async () => {

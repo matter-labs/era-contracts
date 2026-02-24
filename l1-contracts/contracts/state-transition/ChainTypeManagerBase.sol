@@ -20,7 +20,7 @@ import {AdminZero, InitialForceDeploymentMismatch, NotAPatchUpgrade, OutdatedPro
 import {ChainAlreadyLive, HashMismatch, MigrationsNotPaused, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
-import {IChainAssetHandler} from "../core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {TxStatus} from "../common/Messaging.sol";
@@ -151,6 +151,10 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         _;
     }
 
+    /// @return flag whether CTM is for ZKsync OS or Era VM.
+    /// @dev To be defined in derived contracts.
+    function isZKsyncOS() external pure virtual returns (bool);
+
     /// @return The tuple of (major, minor, patch) protocol version.
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
         // slither-disable-next-line unused-return
@@ -184,6 +188,12 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
     /// initialized.
     function initialize(ChainTypeManagerInitializeData calldata _initializeData) external reentrancyGuardInitializer {
         if (_initializeData.owner == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_initializeData.validatorTimelock == address(0)) {
+            revert ZeroAddress();
+        }
+        if (_initializeData.serverNotifier == address(0)) {
             revert ZeroAddress();
         }
         _transferOwnership(_initializeData.owner);
@@ -263,18 +273,17 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
     /// @notice Accepts transfer of admin rights. Only pending admin can accept the role.
     function acceptAdmin() external {
-        address currentPendingAdmin = pendingAdmin;
         // Only proposed by current admin address can claim the admin rights
-        if (msg.sender != currentPendingAdmin) {
+        if (msg.sender != pendingAdmin) {
             revert Unauthorized(msg.sender);
         }
 
         address previousAdmin = admin;
-        admin = currentPendingAdmin;
+        admin = msg.sender;
         delete pendingAdmin;
 
-        emit NewPendingAdmin(currentPendingAdmin, address(0));
-        emit NewAdmin(previousAdmin, currentPendingAdmin);
+        emit NewPendingAdmin(msg.sender, address(0));
+        emit NewAdmin(previousAdmin, msg.sender);
     }
 
     /// @dev Used to set legacy validatorTimelock.
@@ -416,7 +425,7 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
         address _verifier
     ) internal {
         // Migrations must be paused before setting new version upgrades
-        if (!IChainAssetHandler(IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()).migrationPaused()) {
+        if (!IChainAssetHandlerBase(IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()).migrationPaused()) {
             revert MigrationsNotPaused();
         }
         uint256 previousProtocolVersion = protocolVersion;

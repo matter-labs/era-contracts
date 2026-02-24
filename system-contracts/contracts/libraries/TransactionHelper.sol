@@ -6,7 +6,8 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IPaymasterFlow} from "../interfaces/IPaymasterFlow.sol";
-import {BASE_TOKEN_SYSTEM_CONTRACT, BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
+import {BASE_TOKEN_SYSTEM_CONTRACT} from "../Contracts.sol";
 import {RLPEncoder} from "./RLPEncoder.sol";
 import {EfficientCall} from "./EfficientCall.sol";
 import {InvalidInput, UnsupportedPaymasterFlow, UnsupportedTxType} from "../SystemContractErrors.sol";
