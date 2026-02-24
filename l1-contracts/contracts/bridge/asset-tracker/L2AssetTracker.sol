@@ -154,7 +154,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         // - It is not present in the system at all
         // - It is a legacy token.
         // We distinguish these cases by checking the origin chain id in the NTV.
-        // `_tryGetTokenAddress` is expected to revert if the token is registered on NTV.
+        // `_tryGetTokenAddress` is expected to revert if the token is not registered on NTV.
         address tokenAddress = _tryGetTokenAddress(_assetId);
         _registerLegacyToken(_assetId, tokenAddress);
     }
