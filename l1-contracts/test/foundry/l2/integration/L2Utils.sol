@@ -6,14 +6,16 @@ import {Vm} from "forge-std/Vm.sol";
 
 import "forge-std/console.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_ASSET_TRACKER_ADDR, GW_ASSET_TRACKER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_ASSET_TRACKER_ADDR, GW_ASSET_TRACKER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenger.sol";
+import {DummyInteropRecipient} from "contracts/dev-contracts/test/DummyInteropRecipient.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 
 import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
@@ -69,8 +71,22 @@ library L2Utils {
         forceDeployInteropHandler(_args);
         forceDeployL2AssetTracker(_args);
         forceDeployGWAssetTracker(_args);
+        forceDeployL2L1Messenger(_args);
 
         initializeBridgehub(_args);
+    }
+
+    function forceDeployL2L1Messenger(SystemContractsArgs memory _args) internal {
+        // Deploy DummyL2L1Messenger to handle sendToL1 calls in zkfoundry
+        new DummyL2L1Messenger();
+        forceDeployWithoutConstructor("DummyL2L1Messenger", L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR);
+    }
+
+    function deployDummyInteropRecipient(address _targetAddress) internal {
+        // Deploy DummyInteropRecipient to handle receiveMessage calls in zkfoundry
+        // Use forceDeployOnAddresses to register the contract in zkfoundry state
+        new DummyInteropRecipient();
+        forceDeployWithoutConstructor("DummyInteropRecipient", _targetAddress);
     }
 
     function forceDeployMessageRoot(SystemContractsArgs memory _args) internal {
@@ -95,7 +111,7 @@ library L2Utils {
         bridgehub.setAddresses(
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_args.l1CtmDeployer),
-            IMessageRoot(L2_MESSAGE_ROOT_ADDR),
+            IMessageRootBase(L2_MESSAGE_ROOT_ADDR),
             L2_CHAIN_ASSET_HANDLER_ADDR,
             address(0)
         );
@@ -133,7 +149,11 @@ library L2Utils {
         forceDeployWithoutConstructor("InteropCenter", L2_INTEROP_CENTER_ADDR);
         InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
+            _args.l1ChainId,
+            _args.aliasedOwner,
+            DataEncoding.encodeNTVAssetId(_args.eraChainId, address(uint160(uint256(keccak256("zkToken")))))
+        );
     }
 
     function forceDeployInteropHandler(SystemContractsArgs memory _args) internal {
@@ -193,7 +213,7 @@ library L2Utils {
             _args.l2TokenProxyBytecodeHash,
             _args.legacySharedBridge,
             _args.l2TokenBeacon,
-            address(0),
+            _args.wethToken,
             TokenBridgingData({assetId: ethAssetId, originChainId: _args.l1ChainId, originToken: ETH_TOKEN_ADDRESS}),
             TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
         );

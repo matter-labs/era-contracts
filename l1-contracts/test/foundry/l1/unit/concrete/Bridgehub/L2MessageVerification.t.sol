@@ -7,8 +7,8 @@ import {Merkle} from "contracts/common/libraries/Merkle.sol";
 
 import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
 import {L2Log, L2Message} from "contracts/common/Messaging.sol";
-// import {IL2InteropRootStorage} from "contracts/common/interfaces/IL2InteropRootStorage.sol";
-import {L2_INTEROP_ROOT_STORAGE} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+// import {IL2InteropRootStorage} from "contracts/interop/IL2InteropRootStorage.sol";
+import {L2_INTEROP_ROOT_STORAGE} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(

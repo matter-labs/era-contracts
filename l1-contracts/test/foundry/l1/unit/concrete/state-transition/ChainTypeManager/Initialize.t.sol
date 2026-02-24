@@ -25,10 +25,16 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             validatorTimelock: validator,
             chainCreationParams: params,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
-        EraChainTypeManager ctm = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0));
+        EraChainTypeManager ctm = new EraChainTypeManager(
+            address(bridgehub),
+            interopCenterAddress,
+            address(0),
+            address(0)
+        );
 
         vm.expectRevert(err);
         TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(

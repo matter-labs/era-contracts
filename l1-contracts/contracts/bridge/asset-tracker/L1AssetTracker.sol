@@ -4,11 +4,11 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {ConfirmBalanceMigrationData, TokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {InvalidProof, ZeroAddress, InvalidChainId, Unauthorized} from "../../common/L1ContractErrors.sol";
-import {IMessageRoot, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../core/message-root/IMessageRoot.sol";
+import {IMessageRootBase, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "../../core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
@@ -23,7 +23,7 @@ import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {IChainAssetHandler} from "../../core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "../../core/chain-asset-handler/IChainAssetHandler.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
 
@@ -32,11 +32,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     INativeTokenVaultBase public immutable NATIVE_TOKEN_VAULT;
 
-    IMessageRoot public immutable MESSAGE_ROOT;
+    IMessageRootBase public immutable MESSAGE_ROOT;
 
     IL1Nullifier public immutable L1_NULLIFIER;
 
-    IChainAssetHandler public chainAssetHandler;
+    IChainAssetHandlerBase public chainAssetHandler;
 
     /// Todo Deprecate after V31 is finished.
     mapping(bytes32 assetId => bool l1TotalSupplyMigrated) internal l1TotalSupplyMigrated;
@@ -72,7 +72,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         BRIDGE_HUB = IBridgehubBase(_bridgehub);
         NATIVE_TOKEN_VAULT = INativeTokenVaultBase(_nativeTokenVault);
-        MESSAGE_ROOT = IMessageRoot(_messageRoot);
+        MESSAGE_ROOT = IMessageRootBase(_messageRoot);
         L1_NULLIFIER = IL1Nullifier(IL1NativeTokenVault(_nativeTokenVault).L1_NULLIFIER());
     }
 
@@ -82,7 +82,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     function setAddresses() external onlyOwner {
-        chainAssetHandler = IChainAssetHandler(BRIDGE_HUB.chainAssetHandler());
+        chainAssetHandler = IChainAssetHandlerBase(BRIDGE_HUB.chainAssetHandler());
     }
 
     /// @notice This function is used to migrate the token balance from the NTV to the AssetTracker for V31 upgrade.
@@ -185,8 +185,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     function handleChainBalanceDecreaseOnL1(
         uint256 _chainId,
         bytes32 _assetId,
-        uint256 _amount,
-        uint256 // _tokenOriginChainId
+        uint256 _amount
     ) external onlyNativeTokenVault {
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
 
@@ -211,21 +210,14 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         // We need to wait for the proper v31UpgradeChainBatchNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
         require(
-            v31UpgradeChainBatchNumber != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
+            v31UpgradeChainBatchNumber != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE,
             V31UpgradeChainBatchNumberNotSet()
         );
-        if (v31UpgradeChainBatchNumber != 0) {
-            /// For chains that were settling on GW before V31, we need to update the chain's chainBalance until the chain updates to V31.
-            /// Logic: If no settlement layer OR the batch number is before V31 upgrade, update the chain itself.
-            /// Otherwise, update the settlement layer (Gateway) balance.
-            chainToUpdate = settlementLayer == 0 || l2BatchNumber < v31UpgradeChainBatchNumber
-                ? _chainId
-                : settlementLayer;
-        } else {
-            /// For chains deployed at V31 or later, the logic is simpler:
-            /// Update the chain balance if settling on L1, otherwise update the settlement layer balance.
-            chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
-        }
+
+        /// For chains that were settling on GW before V31, we need to update the chain's chainBalance until the chain updates to V31.
+        /// Logic: If no settlement layer OR the batch number is before V31 upgrade, update the chain itself.
+        /// Otherwise, update the settlement layer (Gateway) balance.
+        chainToUpdate = settlementLayer == 0 || l2BatchNumber < v31UpgradeChainBatchNumber ? _chainId : settlementLayer;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -330,18 +322,13 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         assetMigrationNumber[data.chainId][data.assetId] = data.chainMigrationNumber;
 
-        ConfirmBalanceMigrationData memory confirmBalanceMigrationData = ConfirmBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
-            isL1ToGateway: data.isL1ToGateway,
-            chainId: data.chainId,
-            assetId: data.assetId,
-            migrationNumber: data.chainMigrationNumber,
-            amount: data.amount
-        });
+        TokenBalanceMigrationData memory tokenBalanceMigrationData = data;
+        tokenBalanceMigrationData.assetMigrationNumber = data.chainMigrationNumber;
+        tokenBalanceMigrationData.chainMigrationNumber = 0;
 
         _sendConfirmationToChains(
             data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,
-            confirmBalanceMigrationData
+            tokenBalanceMigrationData
         );
     }
 
@@ -359,19 +346,19 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     function _sendConfirmationToChains(
         uint256 _settlementLayerChainId,
-        ConfirmBalanceMigrationData memory _confirmBalanceMigrationData
+        TokenBalanceMigrationData memory _tokenBalanceMigrationData
     ) internal {
         // We send the confirmMigrationOnGateway first, so that withdrawals are definitely paused until the migration is confirmed on GW.
         // Note: the confirmMigrationOnL2 is a L1->GW->L2 txs if the chain is settling on Gateway.
         _sendToChain(
             _settlementLayerChainId,
             GW_ASSET_TRACKER_ADDR,
-            abi.encodeCall(IGWAssetTracker.confirmMigrationOnGateway, (_confirmBalanceMigrationData))
+            abi.encodeCall(IGWAssetTracker.confirmMigrationOnGateway, (_tokenBalanceMigrationData))
         );
         _sendToChain(
-            _confirmBalanceMigrationData.chainId,
+            _tokenBalanceMigrationData.chainId,
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (_confirmBalanceMigrationData))
+            abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (_tokenBalanceMigrationData))
         );
     }
 

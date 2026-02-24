@@ -4,16 +4,17 @@ pragma solidity 0.8.28;
 
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
+import {IEraDualVerifier} from "../chain-interfaces/IEraDualVerifier.sol";
 import {EmptyProofLength, UnknownVerifierType} from "../../common/L1ContractErrors.sol";
 
-/// @title Dual Verifier
+/// @title ZKsync Era Dual Verifier
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This contract wraps two different verifiers (FFLONK and PLONK) and routes zk-SNARK proof verification
 /// to the correct verifier based on the provided proof type. It reuses the same interface as on the original `Verifier`
 /// contract, while abusing on of the fields (`_recursiveAggregationInput`) for proof verification type. The contract is
 /// needed for the smooth transition from PLONK based verifier to the FFLONK verifier.
-contract EraDualVerifier is IVerifier {
+contract EraDualVerifier is IVerifier, IEraDualVerifier {
     /// @notice The latest FFLONK verifier contract.
     IVerifierV2 public immutable FFLONK_VERIFIER;
 

@@ -9,7 +9,7 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
-import {IMessageRoot, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
@@ -20,7 +20,7 @@ import {L2Message} from "contracts/common/Messaging.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
@@ -108,7 +108,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler),
-            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
             abi.encode(0)
         );
         vm.mockCall(
@@ -143,7 +143,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         );
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.messageRoot),
-            abi.encodeWithSelector(IMessageRoot.getProofData.selector),
+            abi.encodeWithSelector(IMessageRootBase.getProofData.selector),
             abi.encode(
                 ProofData({
                     settlementLayerChainId: 506,
