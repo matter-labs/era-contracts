@@ -20,8 +20,6 @@ import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 
 // solhint-disable-next-line no-unused-import
 import {
-    MAX_BUILT_IN_CONTRACT_ADDR,
-    L2_BOOTLOADER_ADDRESS,
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR,
     L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
@@ -41,7 +39,9 @@ import {
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_ASSET_TRACKER_ADDR,
-    GW_ASSET_TRACKER_ADDR
+    GW_ASSET_TRACKER_ADDR,
+    MAX_BUILT_IN_CONTRACT_ADDR,
+    L2_BOOTLOADER_ADDRESS
 } from "./L2ContractAddresses.sol";
 
 /// @dev The address of the L2 deployer system contract.
