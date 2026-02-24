@@ -65,6 +65,7 @@ struct CommitBatchInfoZKsyncOS {
     uint64 lastBlockNumber;
     uint256 chainId;
     bytes operatorDAInput;
+    uint256 slChainId;
 }
 
 /// @notice Container for a list of transaction statuses to precommit.
