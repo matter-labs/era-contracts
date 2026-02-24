@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {Merkle} from "./Merkle.sol";
-import {MerkleWrongIndex, MerkleWrongLength} from "../L1ContractErrors.sol";
+import {MerkleWrongIndex, MerkleNothingToProve} from "../L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -53,7 +53,7 @@ library FullMerkle {
         if (index != 0) {
             uint256 oldMaxNodeNumber = index - 1;
             uint256 maxNodeNumber = index;
-            for (uint256 i; i < self._height; i = i.uncheckedInc()) {
+            for (uint256 i; i < self._height; ++i) {
                 if (oldMaxNodeNumber == maxNodeNumber) {
                     break;
                 }
@@ -77,7 +77,7 @@ library FullMerkle {
         }
         self._nodes[0][_index] = _itemHash;
         bytes32 currentHash = _itemHash;
-        for (uint256 i; i < self._height; i = i.uncheckedInc()) {
+        for (uint256 i; i < self._height; ++i) {
             if (_index % 2 == 0) {
                 currentHash = Merkle.efficientHash(
                     currentHash,
@@ -94,52 +94,34 @@ library FullMerkle {
     }
 
     /**
-     * @dev Updated all leaves in the tree.
-     * @param _newLeaves The new leaves to be added to the tree.
-     */
-    function updateAllLeaves(FullTree storage self, bytes32[] memory _newLeaves) internal returns (bytes32) {
-        if (_newLeaves.length != self._leafNumber) {
-            revert MerkleWrongLength(_newLeaves.length, self._leafNumber);
-        }
-        return updateAllNodesAtHeight(self, 0, _newLeaves);
-    }
-
-    /**
-     * @dev Update all nodes at a certain height in the tree.
-     * @param _height The height of the nodes to be updated.
-     * @param _newNodes The new nodes to be added to the tree.
-     */
-    function updateAllNodesAtHeight(
-        FullTree storage self,
-        uint256 _height,
-        bytes32[] memory _newNodes
-    ) internal returns (bytes32) {
-        if (_height == self._height) {
-            self._nodes[_height][0] = _newNodes[0];
-            return _newNodes[0];
-        }
-
-        uint256 newRowLength = (_newNodes.length + 1) / 2;
-        bytes32[] memory _newRow = new bytes32[](newRowLength);
-
-        uint256 length = _newNodes.length;
-        for (uint256 i; i < length; i = i.uncheckedAdd(2)) {
-            self._nodes[_height][i] = _newNodes[i];
-            if (i + 1 < length) {
-                self._nodes[_height][i + 1] = _newNodes[i + 1];
-                _newRow[i / 2] = Merkle.efficientHash(_newNodes[i], _newNodes[i + 1]);
-            } else {
-                // Handle odd number of nodes by hashing the last node with zero
-                _newRow[i / 2] = Merkle.efficientHash(_newNodes[i], self._zeros[_height]);
-            }
-        }
-        return updateAllNodesAtHeight(self, _height + 1, _newRow);
-    }
-
-    /**
      * @dev Returns the root of the tree.
      */
     function root(FullTree storage self) internal view returns (bytes32) {
         return self._nodes[self._height][0];
+    }
+
+    /**
+     * @dev Returns merkle path for a certain leaf index.
+     * @param _index The index of the leaf to calculate proof for.
+     */
+    function merklePath(FullTree storage self, uint256 _index) internal view returns (bytes32[] memory) {
+        if (self._leafNumber == 0) {
+            revert MerkleNothingToProve();
+        }
+        uint256 maxNodeNumber = self._leafNumber - 1;
+        if (_index > maxNodeNumber) {
+            revert MerkleWrongIndex(_index, maxNodeNumber);
+        }
+        bytes32[] memory proof = new bytes32[](self._height);
+        for (uint256 i = 0; i < self._height; i = i.uncheckedInc()) {
+            if (_index % 2 == 0) {
+                proof[i] = maxNodeNumber == _index ? self._zeros[i] : self._nodes[i][_index + 1];
+            } else {
+                proof[i] = self._nodes[i][_index - 1];
+            }
+            _index /= 2;
+            maxNodeNumber /= 2;
+        }
+        return proof;
     }
 }

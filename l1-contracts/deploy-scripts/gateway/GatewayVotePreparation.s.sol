@@ -14,7 +14,7 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {Utils} from "../utils/Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
@@ -70,6 +70,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
+    uint256 internal gatewaySettlementFee;
 
     address internal serverNotifier;
     address internal refundRecipient;
@@ -90,6 +91,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
         gatewayChainId = toml.readUint("$.gateway_chain_id");
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
+        gatewaySettlementFee = toml.readUint("$.gateway_settlement_fee");
 
         setAddressesBasedOnBridgehub(ctmRepresentativeChainId, bridgehubProxy);
         // Get eraChainId from AssetRouter
@@ -108,6 +110,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
             gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
+            migratorSelectors: Utils.getAllSelectorsForFacet("Migrator"),
+            committerSelectors: Utils.getAllSelectorsForFacet("Committer"),
             bootloaderHash: config.contracts.chainCreationParams.bootloaderHash,
             defaultAccountHash: config.contracts.chainCreationParams.defaultAAHash,
             evmEmulatorHash: config.contracts.chainCreationParams.evmEmulatorHash,
@@ -192,6 +196,12 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         // Deploy GettersFacet
         runGatewayL1L2Transaction(targetAddr, directCalldata.gettersFacetCalldata);
 
+        // Deploy MigratorFacet
+        runGatewayL1L2Transaction(targetAddr, directCalldata.migratorFacetCalldata);
+
+        // Deploy CommitterFacet
+        runGatewayL1L2Transaction(targetAddr, directCalldata.committerFacetCalldata);
+
         // Deploy DiamondInit
         runGatewayL1L2Transaction(targetAddr, directCalldata.diamondInitCalldata);
 
@@ -230,12 +240,16 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 proxies: StateTransitionContracts({
                     chainTypeManager: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
                     serverNotifier: expectedGatewayContracts.stateTransition.serverNotifierProxy,
-                    validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockProxy
+                    validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockProxy,
+                    bytecodesSupplier: address(0),
+                    permissionlessValidator: address(0)
                 }),
                 implementations: StateTransitionContracts({
                     chainTypeManager: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
                     serverNotifier: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
-                    validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockImplementation
+                    validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockImplementation,
+                    bytecodesSupplier: address(0),
+                    permissionlessValidator: address(0)
                 }),
                 verifiers: expectedGatewayContracts.stateTransition.verifiers,
                 facets: expectedGatewayContracts.stateTransition.facets,
@@ -243,7 +257,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 defaultUpgrade: address(0),
                 legacyValidatorTimelock: address(0),
                 eraDiamondProxy: address(0),
-                bytecodesSupplier: address(0),
                 rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager,
                 rollupSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator
             }),
@@ -318,7 +331,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 _gatewayValidatorTimelock: output.gatewayStateTransition.proxies.validatorTimelock,
                 _gatewayServerNotifier: output.gatewayStateTransition.proxies.serverNotifier,
                 _refundRecipient: refundRecipient,
-                _ctmRepresentativeChainId: ctmRepresentativeChainId
+                _ctmRepresentativeChainId: ctmRepresentativeChainId,
+                _gatewaySettlementFee: gatewaySettlementFee
             })
         );
 

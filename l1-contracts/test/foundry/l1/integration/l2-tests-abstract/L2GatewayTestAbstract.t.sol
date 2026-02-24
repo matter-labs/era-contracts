@@ -8,13 +8,7 @@ import {StdStorage, Test, console2 as console, stdStorage} from "forge-std/Test.
 import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 
-import {
-    L2_ASSET_ROUTER_ADDR,
-    L2_BRIDGEHUB_ADDR,
-    L2_CHAIN_ASSET_HANDLER_ADDR,
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 import {
     SETTLEMENT_LAYER_RELAY_SENDER,
@@ -39,7 +33,7 @@ import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
 import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {BalanceChange} from "contracts/common/Messaging.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 
 abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
@@ -83,7 +77,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
         vm.mockCall(
             L2_CHAIN_ASSET_HANDLER_ADDR,
-            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
             abi.encode(1)
         );
         BalanceChange memory balanceChange = BalanceChange({

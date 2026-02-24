@@ -90,6 +90,8 @@ struct StateTransitionContracts {
     address chainTypeManager;
     address serverNotifier;
     address validatorTimelock;
+    address bytecodesSupplier;
+    address permissionlessValidator;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -102,7 +104,6 @@ struct StateTransitionDeployedAddresses {
     address defaultUpgrade;
     address legacyValidatorTimelock;
     address eraDiamondProxy;
-    address bytecodesSupplier;
     address rollupDAManager;
     address rollupSLDAValidator;
 }

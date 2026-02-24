@@ -19,12 +19,7 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
-import {
-    GW_ASSET_TRACKER,
-    L2_ASSET_ROUTER,
-    L2_ASSET_TRACKER_ADDR,
-    L2_NATIVE_TOKEN_VAULT_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {ZKSProvider} from "../provider/ZKSProvider.s.sol";
 
 import {Utils} from "../utils/Utils.sol";
@@ -85,18 +80,18 @@ contract GatewayMigrateTokenBalances is ZKSProvider, IGatewayMigrateTokenBalance
             );
         }
 
-        for (uint256 i = 0; i < bridgedTokenCount; i++) {
-            if (finalizeL1DepositParams[i].merkleProof.length == 0) {
-                console.log("No merkle proof for token", i, vm.toString(txHashes[i]));
-                continue;
-            }
-            waitForBatchToBeExecuted(address(bridgehub), chainId, finalizeL1DepositParams[i]);
-            break;
-        }
+        // for (uint256 i = 0; i < bridgedTokenCount; i++) {
+        //     if (finalizeL1DepositParams[i].merkleProof.length == 0) {
+        //         console.log("No merkle proof for token", i, vm.toString(txHashes[i]));
+        //         continue;
+        //     }
+        //     waitForBatchToBeExecuted(address(bridgehub), chainId, finalizeL1DepositParams[i]);
+        //     break;
+        // }
 
-        if (onlyWaitForFinalization) {
-            return;
-        }
+        // if (onlyWaitForFinalization) {
+        //     return;
+        // }
 
         IL1AssetTracker l1AssetTracker = IL1AssetTracker(address(l1NativeTokenVault.l1AssetTracker()));
         IAssetTrackerBase l1AssetTrackerBase = IAssetTrackerBase(address(l1AssetTracker));

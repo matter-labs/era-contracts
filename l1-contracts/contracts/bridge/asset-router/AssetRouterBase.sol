@@ -55,7 +55,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
     /// @notice Sets the asset handler address for a specified asset ID on the chain of the asset deployment tracker.
     /// @dev The caller of this function is encoded within the `assetId`, therefore, it should be invoked by the asset deployment tracker contract.
-    /// @dev No access control on the caller, as msg.sender is encoded in the assetId.
+    /// @dev Access control restricts the caller to either the NTV or the asset deployment tracker for the specific asset.
     /// @dev Typically, for most tokens, ADT is the native token vault. However, custom tokens may have their own specific asset deployment trackers.
     /// @dev `setAssetHandlerAddressOnCounterpart` should be called on L1 to set asset handlers on L2 chains for a specific asset ID.
     /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
@@ -76,7 +76,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         require(senderIsNTV || msg.sender == assetDeploymentTracker[assetId], Unauthorized(msg.sender));
         _setAssetHandler(assetId, _assetHandlerAddress);
         assetDeploymentTracker[assetId] = msg.sender;
-        emit AssetDeploymentTrackerRegistered(assetId, _assetRegistrationData, msg.sender);
+        emit AssetDeploymentTrackerSet(assetId, msg.sender, _assetRegistrationData);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -199,7 +199,9 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @notice Finalize the withdrawal and release funds.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _assetId The bridged asset ID.
-    /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+    /// @param _transferData The data used to finalize the withdrawal, it includes the data needed for the asset handler (e.g. NativeTokenVault).
+    /// @dev Important note is that chains can be potentially malicious and provide arbitrary data here, so in case
+    /// a piece of data affects other chains than the `_chainId`, special care needs to be applied for validation.
     /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
     /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
     function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) public payable virtual;

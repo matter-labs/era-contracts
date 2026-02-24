@@ -175,6 +175,25 @@
   },
   {
     "type": "function",
+    "name": "chainTree",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "_nextLeafIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "currentChainBatchNumber",
     "inputs": [
       {
@@ -220,6 +239,25 @@
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getMerklePathForChain",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
       }
     ],
     "stateMutability": "view"
@@ -641,7 +679,7 @@
   },
   {
     "type": "function",
-    "name": "setMigratingChainBatchRoot",
+    "name": "setMigratingChainBatchNumber",
     "inputs": [
       {
         "name": "_chainId",
@@ -677,10 +715,16 @@
   },
   {
     "type": "function",
-    "name": "updateFullTree",
+    "name": "totalPublishedInteropRoots",
     "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "event",
@@ -848,6 +892,11 @@
   },
   {
     "type": "error",
+    "name": "MerkleNothingToProve",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "MerklePathEmpty",
     "inputs": []
   },
@@ -874,22 +923,6 @@
   },
   {
     "type": "error",
-    "name": "MerkleWrongLength",
-    "inputs": [
-      {
-        "name": "newLeavesLength",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "leafNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "MessageRootNotRegistered",
     "inputs": []
   },
@@ -904,17 +937,6 @@
       },
       {
         "name": "batchNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "NotWhitelistedSettlementLayer",
-    "inputs": [
-      {
-        "name": "chainId",
         "type": "uint256",
         "internalType": "uint256"
       }

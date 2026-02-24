@@ -19,6 +19,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
@@ -58,7 +59,7 @@ import {
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
 /// We are testing all the specified revert and require cases.
@@ -281,7 +282,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_finalizeWithdrawal_EthOnEth_withdrawalFailed() public {
         vm.deal(address(nativeTokenVault), 0);
-        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -711,7 +712,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_finalizeWithdrawal_chainBalance() public {
-        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -745,7 +746,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_checkWithdrawal_wrongProof() public {
-        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -778,7 +779,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_parseL2WithdrawalMessage_wrongMsgLength() public {
-        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector);
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector);
 
         vm.expectRevert(abi.encodeWithSelector(L2WithdrawalMessageWrongLength.selector, message.length));
         sharedBridge.finalizeWithdrawal({

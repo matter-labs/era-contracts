@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
+import {L2DACommitmentScheme} from "./Config.sol";
+
 // 0x5ecf2d7a
 error AccessToFallbackDenied(address target, address invoker);
 // 0x3995f750
@@ -37,8 +39,6 @@ error BadTransferDataLength();
 error BaseTokenGasPriceDenominatorNotSet();
 // 0x55ad3fd3
 error BatchHashMismatch(bytes32 expected, bytes32 actual);
-// 0x2078a6a0
-error BatchNotExecuted(uint256 batchNumber);
 // 0xbd4455ff
 error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumber);
 // 0x6cf12312
@@ -47,8 +47,6 @@ error BridgeHubAlreadyRegistered();
 error BridgeMintNotImplemented();
 // 0xaa5f6180
 error BurningNativeWETHNotSupported();
-// 0xccdd18d2
-error BytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x25d8333c
 error CallerNotTimerAdmin();
 // 0x3331e9c0
@@ -113,12 +111,20 @@ error EmptyDeposit();
 error EmptyPrecommitData(uint256 batchNumber);
 // 0x456f8f7a
 error EmptyProofLength();
+// 0x05410cbc
+error EmptyPublicInputsLength();
+// 0x876e8b23
+error EraBytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0x627e0872
 error ETHDepositNotSupported();
+// 0x61733a89
+error EVMBytecodeAlreadyPublished(bytes32 bytecodeHash);
 // 0xf4072616
 error ExecuteMessageFailed();
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
+// 0x3fce21be
+error FeeParamsChangeTooLarge(uint256 oldPrice, uint256 newPrice, uint256 maxAllowedPrice);
 // 0xc91cf3b1
 error GasPerPubdataMismatch();
 // 0x5ca97564
@@ -163,7 +169,7 @@ error InvalidDelay();
 // 0x075aaa80
 error InvalidInteropCalldata(bytes4);
 // 0x3f98a77e
-error InvalidL2DACommitmentScheme(uint8);
+error InvalidL2DACommitmentScheme(L2DACommitmentScheme);
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
 // 0x6eca2e4b
@@ -180,6 +186,8 @@ error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 num
 error InvalidPackedPrecommitmentLength(uint256 length);
 // 0x09bde339
 error InvalidProof();
+// 0x5a1c353a
+error InvalidProofFormat();
 // 0x48c5fa28
 error InvalidProofLengthForFinalNode();
 // 0x5428eae7
@@ -192,6 +200,8 @@ error InvalidSelector(bytes4 func);
 error InvalidSystemLogsLength();
 // 0x7b7a98f1
 error InvalidThreshold(uint256 max, uint256 got);
+// 0xd857fbc0
+error InvalidTxCountInPriorityMode(uint256 l2TxCount, uint256 l1TxCount);
 // 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xfb5c22e6
@@ -254,6 +264,8 @@ error NoFunctionsForDiamondCut();
 error NoFundsTransferred();
 // 0xb20b58ce
 error NoLegacySharedBridge();
+// 0xc4dc2673
+error NonCanonicalRepresentation();
 // 0xc21b1ab7
 error NonEmptyCalldata();
 // 0x536ec84b
@@ -274,6 +286,8 @@ error NotARestriction(address addr);
 error NotAssetRouter(address _sender, address _assetRouter);
 // 0xb49df1f2
 error NotAZKChain(address addr);
+// 0x7fdf8632
+error NotCompatibleWithPriorityMode();
 // 0x5e67e793
 error NotCurrentSettlementLayer();
 // 0x230f9d11
@@ -286,8 +300,10 @@ error NotL1(uint256 l1ChainId, uint256 blockChainId);
 error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
 // 0xdf17e316
 error NotWhitelisted(address);
-// 0xf3ed9dfa
-error OnlyEraSupported();
+// 0x9d7bb13f
+error OnlyNormalMode();
+// 0xd702c443
+error OnlyPriorityMode();
 // 0x6c167909
 error OnlySelfAllowed();
 // 0x1a21feed
@@ -304,8 +320,16 @@ error PayloadTooShort();
 error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
 // 0x9b48e060
 error PreviousOperationNotExecuted();
+// 0x67c198fe
+error PriorityModeActivationTooEarly(uint256 earliestActivationTimestamp, uint256 currentTimestamp);
+// 0xdbfcbbef
+error PriorityModeIsNotAllowed();
+// 0x2b9d9c4c
+error PriorityModeRequiresPermanentRollup();
 // 0xd5a99014
 error PriorityOperationsRollingHashMismatch();
+// 0xbeda0935
+error PriorityOpsRequestTimestampMissing(uint256 requestId);
 // 0x1a4d284a
 error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 // 0xa461f651
@@ -366,6 +390,8 @@ error TimerAlreadyStarted();
 error TimestampError();
 // 0xa51fa558
 error TokenIsLegacy();
+// 0xb1e96bbd
+error TokenMultiplierChangeTooFrequent(uint256 nextAllowedTimestamp);
 // 0x1850b46b
 error TokenNotLegacy();
 // 0x06439c6b
@@ -430,6 +456,10 @@ error ZeroChainId();
 error ZKChainLimitReached();
 // 0x646ac57e
 error ZKsyncOSNotForceDeployForExistingContract(address);
+// 0xb24b1ccb
+error ZKsyncOSNotForceDeployToPrecompileAddress(address);
+// 0x3d9d4821
+error ZKsyncOSPrecommitsNotSupported();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

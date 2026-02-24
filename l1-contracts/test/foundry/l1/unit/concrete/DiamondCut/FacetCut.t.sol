@@ -29,9 +29,8 @@ contract FacetCutTest is DiamondCutTest {
     uint256 eraChainId;
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](4);
+        bytes4[] memory selectors = new bytes4[](3);
         uint256 i = 0;
-        selectors[i++] = executorFacet1.commitBatchesSharedBridge.selector;
         selectors[i++] = executorFacet1.proveBatchesSharedBridge.selector;
         selectors[i++] = executorFacet1.executeBatchesSharedBridge.selector;
         selectors[i++] = executorFacet1.revertBatchesSharedBridge.selector;
@@ -42,7 +41,7 @@ contract FacetCutTest is DiamondCutTest {
         eraChainId = 9;
         diamondCutTestContract = new DiamondCutTestContract();
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        mailboxFacet = new MailboxFacet(eraChainId, block.chainid, address(0), eip7702Checker, false);
+        mailboxFacet = new MailboxFacet(block.chainid, address(0), eip7702Checker, false);
         gettersFacet = new GettersFacet();
         executorFacet1 = new ExecutorFacet(block.chainid);
         executorFacet2 = new ExecutorFacet(block.chainid);

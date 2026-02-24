@@ -23,7 +23,7 @@ contract AdminTest is UtilsCallMockerTest {
     DummyBridgehub internal dummyBridgehub;
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](22);
+        bytes4[] memory selectors = new bytes4[](20);
         uint256 i = 0;
         selectors[i++] = IAdmin.setPendingAdmin.selector;
         selectors[i++] = IAdmin.acceptAdmin.selector;
@@ -36,15 +36,13 @@ contract AdminTest is UtilsCallMockerTest {
         selectors[i++] = IAdmin.executeUpgrade.selector;
         selectors[i++] = IAdmin.freezeDiamond.selector;
         selectors[i++] = IAdmin.unfreezeDiamond.selector;
-        selectors[i++] = IAdmin.pauseDepositsBeforeInitiatingMigration.selector;
-        selectors[i++] = IAdmin.unpauseDeposits.selector;
         selectors[i++] = IAdmin.setTransactionFilterer.selector;
+        selectors[i++] = IAdmin.setPriorityModeTransactionFilterer.selector;
+        selectors[i++] = IAdmin.permanentlyAllowPriorityMode.selector;
+        selectors[i++] = IAdmin.deactivatePriorityMode.selector;
+        selectors[i++] = IAdmin.activatePriorityMode.selector;
         selectors[i++] = IAdmin.setPubdataPricingMode.selector;
         selectors[i++] = IAdmin.setDAValidatorPair.selector;
-        selectors[i++] = IAdmin.forwardedBridgeBurn.selector;
-        selectors[i++] = IAdmin.forwardedBridgeMint.selector;
-        selectors[i++] = IAdmin.forwardedBridgeConfirmTransferResult.selector;
-        selectors[i++] = IAdmin.prepareChainCommitment.selector;
         selectors[i++] = IAdmin.allowEvmEmulation.selector;
         selectors[i++] = IAdmin.makePermanentRollup.selector;
         return selectors;
@@ -53,7 +51,7 @@ contract AdminTest is UtilsCallMockerTest {
     function setUp() public virtual {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)), false)),
+            facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)))),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: getAdminSelectors()
@@ -67,7 +65,8 @@ contract AdminTest is UtilsCallMockerTest {
 
         dummyBridgehub = new DummyBridgehub();
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), bytes32(0));
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, address(dummyBridgehub));
+        mockChainTypeManagerVerifier(testnetVerifier);
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, address(dummyBridgehub));
         adminFacet = IAdmin(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }

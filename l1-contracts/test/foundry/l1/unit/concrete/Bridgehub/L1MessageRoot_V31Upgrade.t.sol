@@ -3,8 +3,9 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
-import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "contracts/core/message-root/IMessageRoot.sol";
+import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {
@@ -32,8 +33,21 @@ contract L1MessageRootV31UpgradeTest is Test {
             abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
             abi.encode(allZKChainChainIDs)
         );
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(makeAddr("chainAssetHandler"))
+        );
 
-        messageRoot = new L1MessageRoot(bridgeHub, 1);
+        messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(bridgeHub, 1, makeAddr("chainAssetHandler"))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
     }
 
     function test_L1_CHAIN_ID() public view {
@@ -105,7 +119,7 @@ contract L1MessageRootV31UpgradeTest is Test {
         vm.mockCall(
             zkChain,
             abi.encodeWithSelector(IGetters.getTotalBatchesExecuted.selector),
-            abi.encode(V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1)
+            abi.encode(V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE)
         );
 
         vm.prank(zkChain);
@@ -154,17 +168,27 @@ contract L1MessageRootV31UpgradeTest is Test {
         );
         vm.mockCall(
             newBridgehub,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(makeAddr("chainAssetHandler"))
+        );
+        vm.mockCall(
+            newBridgehub,
             abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, CHAIN_ID),
             abi.encode(block.chainid)
         );
 
-        L1MessageRoot newMessageRoot = new L1MessageRoot(newBridgehub, 1);
+        L1MessageRoot newMessageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(newBridgehub, 1, makeAddr("chainAssetHandler"))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                )
+            )
+        );
 
         // Verify the placeholder was set
-        assertEq(
-            newMessageRoot.v31UpgradeChainBatchNumber(CHAIN_ID),
-            V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1
-        );
+        assertEq(newMessageRoot.v31UpgradeChainBatchNumber(CHAIN_ID), V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE);
 
         // Setup zkChain mock
         address zkChain = makeAddr("zkChain");
@@ -201,11 +225,24 @@ contract L1MessageRootV31UpgradeTest is Test {
         );
         vm.mockCall(
             newBridgehub,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(makeAddr("chainAssetHandler"))
+        );
+        vm.mockCall(
+            newBridgehub,
             abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, CHAIN_ID),
             abi.encode(block.chainid)
         );
 
-        L1MessageRoot newMessageRoot = new L1MessageRoot(newBridgehub, 1);
+        L1MessageRoot newMessageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(newBridgehub, 1, makeAddr("chainAssetHandler"))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                )
+            )
+        );
 
         // Setup zkChain mock
         address zkChain = makeAddr("zkChain");
@@ -247,6 +284,11 @@ contract L1MessageRootV31UpgradeTest is Test {
         );
         vm.mockCall(
             newBridgehub,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(makeAddr("chainAssetHandler"))
+        );
+        vm.mockCall(
+            newBridgehub,
             abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, chainId1),
             abi.encode(block.chainid)
         );
@@ -256,16 +298,18 @@ contract L1MessageRootV31UpgradeTest is Test {
             abi.encode(block.chainid)
         );
 
-        L1MessageRoot newMessageRoot = new L1MessageRoot(newBridgehub, 1);
+        L1MessageRoot newMessageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(newBridgehub, 1, makeAddr("chainAssetHandler"))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                )
+            )
+        );
 
         // Both chains should have placeholder value
-        assertEq(
-            newMessageRoot.v31UpgradeChainBatchNumber(chainId1),
-            V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1
-        );
-        assertEq(
-            newMessageRoot.v31UpgradeChainBatchNumber(chainId2),
-            V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1
-        );
+        assertEq(newMessageRoot.v31UpgradeChainBatchNumber(chainId1), V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE);
+        assertEq(newMessageRoot.v31UpgradeChainBatchNumber(chainId2), V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE);
     }
 }

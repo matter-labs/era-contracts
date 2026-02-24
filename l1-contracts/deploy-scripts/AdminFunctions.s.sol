@@ -7,6 +7,7 @@ import {IAdminFunctions} from "contracts/script-interfaces/IAdminFunctions.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
@@ -17,7 +18,8 @@ import {ChainInfoFromBridgehub, Utils} from "./utils/Utils.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {GetDiamondCutData} from "./utils/GetDiamondCutData.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
@@ -149,7 +151,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         saveAndSendAdminTx(ecosystemAdminAddr, calls, true);
     }
 
-    function adminEncodeMulticall(bytes memory callsToExecute) external {
+    function adminEncodeMulticall(bytes memory callsToExecute) external pure {
         Call[] memory calls = abi.decode(callsToExecute, (Call[]));
 
         bytes memory result = abi.encodeCall(ChainAdmin.multicall, (calls, true));
@@ -172,6 +174,49 @@ contract AdminFunctions is Script, IAdminFunctions {
             abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
             0
         );
+    }
+
+    /// @notice Upgrade a chain by reading the diamond cut directly from the CTM
+    /// @dev This avoids TOML parsing issues with large hex strings
+    /// @param chainAddress The address of the chain proxy to upgrade
+    /// @param adminAddr The address of the ChainAdmin
+    /// @param accessControlRestriction The address of the AccessControlRestriction
+    function upgradeChainFromCTM(address chainAddress, address adminAddr, address accessControlRestriction) public {
+        console.log("AdminFunctions: upgrading chain", chainAddress);
+
+        IZKChain chain = IZKChain(chainAddress);
+        IChainTypeManager ctm = IChainTypeManager(chain.getChainTypeManager());
+        console.log("AdminFunctions: using CTM", address(ctm));
+
+        // Get the protocol version from CTM
+        uint256 newProtocolVersion = ctm.protocolVersion();
+        console.log("AdminFunctions: new protocol version", newProtocolVersion);
+
+        // Get the current chain protocol version
+        uint256 currentProtocolVersion = chain.getProtocolVersion();
+        console.log("AdminFunctions: current chain protocol version", currentProtocolVersion);
+
+        require(
+            newProtocolVersion > currentProtocolVersion,
+            "AdminFunctions: new protocol version must be greater than current"
+        );
+
+        // Get the upgrade data from CTM using the GetDiamondCutData library
+        Diamond.DiamondCutData memory diamondCut = GetDiamondCutData.getDiamondCutData(
+            address(ctm),
+            currentProtocolVersion
+        );
+
+        // Execute the upgrade through the admin flow
+        Utils.adminExecute(
+            adminAddr,
+            accessControlRestriction,
+            chainAddress,
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (currentProtocolVersion, diamondCut)),
+            0
+        );
+
+        console.log("AdminFunctions: upgrade completed successfully");
     }
 
     function adminScheduleUpgrade(
@@ -434,7 +479,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         calls[0] = Call({
             target: chainInfo.diamondProxy,
             value: 0,
-            data: abi.encodeCall(IAdmin.pauseDepositsBeforeInitiatingMigration, ())
+            data: abi.encodeCall(IMigrator.pauseDepositsBeforeInitiatingMigration, ())
         });
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
@@ -444,7 +489,11 @@ contract AdminFunctions is Script, IAdminFunctions {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
         Call[] memory calls = new Call[](1);
-        calls[0] = Call({target: chainInfo.diamondProxy, value: 0, data: abi.encodeCall(IAdmin.unpauseDeposits, ())});
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IMigrator.unpauseDeposits, ())
+        });
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }

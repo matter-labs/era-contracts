@@ -2,14 +2,8 @@
 
 pragma solidity ^0.8.24;
 
-import {BASE_TOKEN_SYSTEM_CONTRACT, L2_MESSAGE_VERIFICATION} from "../Constants.sol";
-import {
-    BUNDLE_IDENTIFIER,
-    InteropBundle,
-    InteropCall,
-    L2Message,
-    MessageInclusionProof
-} from "../libraries/Messaging.sol";
+import {BASE_TOKEN_SYSTEM_CONTRACT, L2_MESSAGE_VERIFICATION} from "../Contracts.sol";
+import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Message, MessageInclusionProof} from "../libraries/Messaging.sol";
 
 error MessageNotIncluded();
 error BundleAlreadyExecuted(bytes32 bundleHash);

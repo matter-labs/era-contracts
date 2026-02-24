@@ -5,11 +5,7 @@ pragma solidity 0.8.28;
 import {AdminTest} from "./_Admin_Shared.t.sol";
 
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {
-    InvalidPubdataPricingMode,
-    PriorityTxPubdataExceedsMaxPubDataPerBatch,
-    Unauthorized
-} from "contracts/common/L1ContractErrors.sol";
+import {FeeParamsChangeTooLarge, InvalidPubdataPricingMode, PriorityTxPubdataExceedsMaxPubDataPerBatch, TokenMultiplierChangeTooFrequent, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {FeeParamsWereNotChangedCorrectly} from "../../../../../../../L1TestsErrors.sol";
 
 contract ChangeFeeParamsTest is AdminTest {
@@ -18,6 +14,8 @@ contract ChangeFeeParamsTest is AdminTest {
     function setUp() public override {
         super.setUp();
 
+        utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(1);
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setFeeParams(
             FeeParams({
                 pubdataPricingMode: PubdataPricingMode.Rollup,
@@ -110,11 +108,11 @@ contract ChangeFeeParamsTest is AdminTest {
         FeeParams memory oldFeeParams = utilsFacet.util_getFeeParams();
         FeeParams memory newFeeParams = FeeParams({
             pubdataPricingMode: PubdataPricingMode.Rollup,
-            batchOverheadL1Gas: 2_000_000,
-            maxPubdataPerBatch: 220_000,
-            maxL2GasPerBatch: 100_000_000,
+            batchOverheadL1Gas: 1_200_000,
+            maxPubdataPerBatch: 120_000,
+            maxL2GasPerBatch: 90_000_000,
             priorityTxMaxPubdata: 100_000,
-            minimalL2GasPrice: 450_000_000
+            minimalL2GasPrice: 300_000_000
         });
 
         // solhint-disable-next-line func-named-parameters
@@ -129,5 +127,44 @@ contract ChangeFeeParamsTest is AdminTest {
         if (currentFeeParamsHash != newFeeParamsHash) {
             revert FeeParamsWereNotChangedCorrectly();
         }
+    }
+
+    function test_revertWhen_changeFeeParamsTooFrequent() public {
+        address chainTypeManager = utilsFacet.util_getChainTypeManager();
+        FeeParams memory newFeeParams = FeeParams({
+            pubdataPricingMode: PubdataPricingMode.Rollup,
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: 110_000,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: 99_000,
+            minimalL2GasPrice: 260_000_000
+        });
+
+        uint256 nowTimestamp = block.timestamp;
+        vm.startPrank(chainTypeManager);
+        adminFacet.changeFeeParams(newFeeParams);
+
+        // Hits the shared 1-day cooldown (neither fee params nor token multiplier within 1 day)
+        vm.expectRevert(abi.encodeWithSelector(TokenMultiplierChangeTooFrequent.selector, nowTimestamp + 1 days));
+        adminFacet.changeFeeParams(newFeeParams);
+    }
+
+    function test_revertWhen_changeFeeParamsPriceIncreaseTooLarge() public {
+        // Price bounds are only enforced for stage1 chains (canBeActivated = true)
+        utilsFacet.util_setPriorityModeCanBeActivated(true);
+
+        address chainTypeManager = utilsFacet.util_getChainTypeManager();
+        FeeParams memory newFeeParams = FeeParams({
+            pubdataPricingMode: PubdataPricingMode.Rollup,
+            batchOverheadL1Gas: 1_000_000,
+            maxPubdataPerBatch: 110_000,
+            maxL2GasPerBatch: 80_000_000,
+            priorityTxMaxPubdata: 99_000,
+            minimalL2GasPrice: 1_000_000_000
+        });
+
+        vm.startPrank(chainTypeManager);
+        vm.expectPartialRevert(FeeParamsChangeTooLarge.selector);
+        adminFacet.changeFeeParams(newFeeParams);
     }
 }

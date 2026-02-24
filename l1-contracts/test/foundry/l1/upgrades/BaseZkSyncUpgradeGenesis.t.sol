@@ -21,6 +21,8 @@ contract DummyBaseZkSyncUpgradeGenesis is BaseZkSyncUpgradeGenesis, BaseUpgradeU
 
 contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
     DummyBaseZkSyncUpgradeGenesis baseZkSyncUpgrade;
+    address mockChainTypeManager = makeAddr("mockChainTypeManager");
+    address mockVerifier = makeAddr("mockVerifier");
 
     function setUp() public {
         baseZkSyncUpgrade = new DummyBaseZkSyncUpgradeGenesis();
@@ -29,6 +31,10 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
 
         baseZkSyncUpgrade.setPriorityTxMaxGasLimit(1 ether);
         baseZkSyncUpgrade.setPriorityTxMaxPubdata(1000000);
+
+        // Set up CTM for verifier lookup
+        baseZkSyncUpgrade.setChainTypeManager(mockChainTypeManager);
+        baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
     }
 
     // New protocol version is not greater than the current one
@@ -119,7 +125,6 @@ contract BaseZkSyncUpgradeGenesisTest is BaseUpgrade {
         baseZkSyncUpgrade.upgrade(proposedUpgrade);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getVerifier(), proposedUpgrade.verifier);
         assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
         assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }

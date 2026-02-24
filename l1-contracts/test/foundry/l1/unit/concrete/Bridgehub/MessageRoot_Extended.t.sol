@@ -3,22 +3,14 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {
-    ChainExists,
-    MessageRootNotRegistered,
-    NotL2,
-    OnlyChain,
-    OnlyGateway,
-    OnlyOnSettlementLayer,
-    TotalBatchesExecutedZero,
-    V31UpgradeChainBatchNumberNotSet
-} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {ChainExists, MessageRootNotRegistered, OnlyChain, OnlyGateway, OnlyOnSettlementLayer, TotalBatchesExecutedZero, V31UpgradeChainBatchNumberNotSet} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {Unauthorized, InvalidCaller} from "contracts/common/L1ContractErrors.sol";
 import {
     GW_ASSET_TRACKER_ADDR,
@@ -64,7 +56,15 @@ contract MessageRoot_Extended_Test is Test {
         );
         vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector), abi.encode(0));
 
-        messageRoot = new L1MessageRoot(bridgeHub, gatewayChainId);
+        messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(bridgeHub, gatewayChainId, chainAssetHandler)),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
         l2MessageRoot = new L2MessageRoot();
 
         uint256[] memory allZKChainChainIDs = new uint256[](1);
@@ -107,7 +107,7 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.prank(chainAssetHandler);
         vm.expectEmit(true, false, false, false);
-        emit IMessageRoot.AddedChain(chainId, 0);
+        emit IMessageRootBase.AddedChain(chainId, 0);
         messageRoot.addNewChain(chainId, 0);
 
         assertTrue(messageRoot.chainRegistered(chainId));
@@ -195,12 +195,12 @@ contract MessageRoot_Extended_Test is Test {
         messageRoot.saveV31UpgradeChainBatchNumber(chainId);
     }
 
-    function test_SetMigratingChainBatchRoot_Success() public {
+    function test_setMigratingChainBatchNumber_Success() public {
         uint256 chainId = 271;
         uint256 batchNumber = 1;
 
         vm.prank(bridgeHub);
-        messageRoot.setMigratingChainBatchRoot(chainId, batchNumber);
+        messageRoot.setMigratingChainBatchNumber(chainId, batchNumber);
 
         assertEq(messageRoot.currentChainBatchNumber(chainId), batchNumber);
     }
@@ -260,7 +260,7 @@ contract MessageRoot_Extended_Test is Test {
         uint256 v31UpgradeBatchNumber = 0;
 
         vm.prank(bridgeHub);
-        messageRoot.setMigratingChainBatchRoot(chainId, 1);
+        messageRoot.setMigratingChainBatchNumber(chainId, 1);
 
         uint256 v31Batch = messageRoot.v31UpgradeChainBatchNumber(chainId);
         assertEq(v31Batch, v31UpgradeBatchNumber);
@@ -332,38 +332,6 @@ contract MessageRoot_Extended_Test is Test {
         assertEq(messageRoot.currentChainBatchNumber(chainId), 2);
     }
 
-    function test_UpdateFullTree() public {
-        uint256 chainId = 271;
-        address chainSender = makeAddr("chainSender");
-
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
-            abi.encode(chainSender)
-        );
-
-        // Mock the getSemverProtocolVersion call
-        vm.mockCall(
-            chainSender,
-            abi.encodeWithSelector(IGetters.getSemverProtocolVersion.selector),
-            abi.encode(0, 29, 0) // major, minor, patch
-        );
-
-        vm.prank(bridgeHub);
-        messageRoot.addNewChain(chainId, 0);
-
-        // Add a batch root
-        vm.prank(chainSender);
-        messageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
-
-        // Update the full tree
-        messageRoot.updateFullTree();
-
-        // Verify the aggregated root is updated
-        bytes32 root = messageRoot.getAggregatedRoot();
-        assertTrue(root != bytes32(0));
-    }
-
     function test_HistoricalRoot() public {
         uint256 chainId = 271;
         address chainSender = makeAddr("chainSender");
@@ -384,9 +352,21 @@ contract MessageRoot_Extended_Test is Test {
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(chainId, 0);
 
+        // totalPublishedInteropRoots accounts for _emitRoot calls in _addNewChain:
+        // initL2 adds block.chainid (1), addNewChain(chainId) (2)
+        uint256 countBefore = l2MessageRoot.totalPublishedInteropRoots();
+        assertEq(countBefore, 2, "totalPublishedInteropRoots should be 2 after chain additions");
+
         // Add a batch root
         vm.prank(GW_ASSET_TRACKER_ADDR);
         l2MessageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
+
+        // Verify totalPublishedInteropRoots incremented after addChainBatchRoot (L2MessageRoot calls _emitRoot)
+        assertEq(
+            l2MessageRoot.totalPublishedInteropRoots(),
+            countBefore + 1,
+            "totalPublishedInteropRoots should increment by 1 after addChainBatchRoot"
+        );
 
         // Check that historical root is set
         bytes32 historicalRoot = l2MessageRoot.historicalRoot(block.number);

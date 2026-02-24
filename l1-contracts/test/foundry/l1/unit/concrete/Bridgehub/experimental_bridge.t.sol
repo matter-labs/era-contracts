@@ -23,6 +23,7 @@ import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.
 import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubSetter.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1CrossChainSender} from "contracts/bridge/interfaces/IL1CrossChainSender.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -37,7 +38,7 @@ import {Utils} from "../Utils/Utils.sol";
 
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {
     BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
@@ -88,7 +89,7 @@ contract ExperimentalBridgeTest is Test {
     L1AssetRouter secondBridge;
     TestnetERC20Token testToken;
     L1NativeTokenVault ntv;
-    IMessageRoot messageRoot;
+    IMessageRootBase messageRoot;
     L1Nullifier l1Nullifier;
     L1AssetTracker assetTracker;
     SimpleExecutor simpleExecutor;
@@ -144,12 +145,20 @@ contract ExperimentalBridgeTest is Test {
         bridgehub = L1Bridgehub(address(dummyBridgehub));
         interopCenter = new InteropCenter();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        interopCenter.initL2(l1ChainId, bridgeOwner);
-        messageRoot = new L1MessageRoot(address(bridgehub), 1);
+        interopCenter.initL2(l1ChainId, bridgeOwner, DataEncoding.encodeNTVAssetId(eraChainId, makeAddr("zkToken")));
+        messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(bridgehub), 1, makeAddr("chainAssetHandler"))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        mockChainContract = new DummyZKChain(address(bridgehub), eraChainId, block.chainid, address(0), eip7702Checker);
+        mockChainContract = new DummyZKChain(address(bridgehub), block.chainid, address(0), eip7702Checker);
 
         mockL2Contract = makeAddr("mockL2Contract");
         // mocks to use in bridges instead of using a dummy one
@@ -177,7 +186,15 @@ contract ExperimentalBridgeTest is Test {
         ntv.registerToken(address(testToken));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(testToken));
 
-        messageRoot = new L1MessageRoot(address(bridgehub), gatewayChainId);
+        messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(bridgehub), gatewayChainId, makeAddr("chainAssetHandler"))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
 
         sharedBridge = new L1AssetRouter(
             mockL1WethAddress,
@@ -504,7 +521,7 @@ contract ExperimentalBridgeTest is Test {
         bridgehub.setAddresses(
             address(mockSharedBridge),
             ICTMDeploymentTracker(address(0)),
-            IMessageRoot(address(0)),
+            IMessageRootBase(address(0)),
             address(0),
             address(0)
         );
@@ -544,7 +561,7 @@ contract ExperimentalBridgeTest is Test {
         bridgehub.setAddresses(
             address(mockSharedBridge),
             ICTMDeploymentTracker(address(0)),
-            IMessageRoot(address(0)),
+            IMessageRootBase(address(0)),
             address(0),
             address(0)
         );
@@ -579,13 +596,13 @@ contract ExperimentalBridgeTest is Test {
     function test_setAddresses(address randomAssetRouter, address randomCTMDeployer, address randomMessageRoot) public {
         assertTrue(address(bridgehub.assetRouter()) == address(0), "Shared bridge is already there");
         assertTrue(bridgehub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
-        assertTrue(bridgehub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
+        assertTrue(bridgehub.messageRoot() == IMessageRootBase(address(0)), "Message root is already there");
 
         vm.prank(bridgeOwner);
         bridgehub.setAddresses(
             randomAssetRouter,
             ICTMDeploymentTracker(randomCTMDeployer),
-            IMessageRoot(randomMessageRoot),
+            IMessageRootBase(randomMessageRoot),
             address(0),
             address(0)
         );
@@ -595,7 +612,7 @@ contract ExperimentalBridgeTest is Test {
             bridgehub.l1CtmDeployer() == ICTMDeploymentTracker(randomCTMDeployer),
             "L1 CTM deployer is already there"
         );
-        assertTrue(bridgehub.messageRoot() == IMessageRoot(randomMessageRoot), "Message root is already there");
+        assertTrue(bridgehub.messageRoot() == IMessageRootBase(randomMessageRoot), "Message root is already there");
     }
 
     function test_setAddresses_cannotBeCalledByRandomAddress(
@@ -611,14 +628,14 @@ contract ExperimentalBridgeTest is Test {
         bridgehub.setAddresses(
             randomAssetRouter,
             ICTMDeploymentTracker(randomCTMDeployer),
-            IMessageRoot(randomMessageRoot),
+            IMessageRootBase(randomMessageRoot),
             address(0),
             address(0)
         );
 
         assertTrue(address(bridgehub.assetRouter()) == address(0), "Shared bridge is already there");
         assertTrue(bridgehub.l1CtmDeployer() == ICTMDeploymentTracker(address(0)), "L1 CTM deployer is already there");
-        assertTrue(bridgehub.messageRoot() == IMessageRoot(address(0)), "Message root is already there");
+        assertTrue(bridgehub.messageRoot() == IMessageRootBase(address(0)), "Message root is already there");
     }
 
     uint256 newChainId;
@@ -1389,7 +1406,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.mockCall(
             secondBridgeAddress,
-            abi.encodeWithSelector(IL1AssetRouter.bridgehubDeposit.selector),
+            abi.encodeWithSelector(IL1CrossChainSender.bridgehubDeposit.selector),
             abi.encode(request)
         );
 
@@ -1461,7 +1478,7 @@ contract ExperimentalBridgeTest is Test {
             address(secondBridgeAddressValue),
             l2TxnReq2BridgeOut.secondBridgeValue,
             abi.encodeWithSelector(
-                IL1AssetRouter.bridgehubDeposit.selector,
+                IL1CrossChainSender.bridgehubDeposit.selector,
                 l2TxnReq2BridgeOut.chainId,
                 randomCaller,
                 l2TxnReq2BridgeOut.l2Value,

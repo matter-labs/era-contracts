@@ -13,12 +13,7 @@ import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {MsgValueMismatch} from "contracts/common/L1ContractErrors.sol";
 
-import {
-    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-    L2_BRIDGEHUB_ADDR,
-    L2_INTEROP_CENTER,
-    L2_ASSET_ROUTER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER, L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {IL2CrossChainSender} from "contracts/bridge/interfaces/IL2CrossChainSender.sol";
@@ -94,11 +89,12 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             callAttributes: callAttributes
         });
 
-        bytes[] memory bundleAttributes = new bytes[](1);
+        bytes[] memory bundleAttributes = new bytes[](2);
         bundleAttributes[0] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
+        bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         vm.recordLogs();
 
@@ -146,11 +142,12 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             callAttributes: callAttributes
         });
 
-        bytes[] memory bundleAttributes = new bytes[](1);
+        bytes[] memory bundleAttributes = new bytes[](2);
         bundleAttributes[0] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
+        bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         // Test with only interopCallValue (missing indirectCallMessageValue)
         vm.deal(address(this), interopCallValue);
@@ -190,11 +187,12 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             callAttributes: callAttributes
         });
 
-        bytes[] memory bundleAttributes = new bytes[](1);
+        bytes[] memory bundleAttributes = new bytes[](2);
         bundleAttributes[0] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
+        bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         L2_INTEROP_CENTER.sendBundle{value: indirectCallMessageValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
@@ -230,11 +228,12 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             callAttributes: callAttributes
         });
 
-        bytes[] memory bundleAttributes = new bytes[](1);
+        bytes[] memory bundleAttributes = new bytes[](2);
         bundleAttributes[0] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
+        bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         L2_INTEROP_CENTER.sendBundle{value: interopCallValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
@@ -290,11 +289,12 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             callAttributes: callAttributes2
         });
 
-        bytes[] memory bundleAttributes = new bytes[](1);
+        bytes[] memory bundleAttributes = new bytes[](2);
         bundleAttributes[0] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
+        bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         L2_INTEROP_CENTER.sendBundle{value: totalValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
@@ -359,11 +359,12 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             callAttributes: indirectCallAttributes
         });
 
-        bytes[] memory bundleAttributes = new bytes[](1);
+        bytes[] memory bundleAttributes = new bytes[](2);
         bundleAttributes[0] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
+        bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         L2_INTEROP_CENTER.sendBundle{value: totalValue}(
             InteroperableAddress.formatEvmV1(destinationChainId),
@@ -430,11 +431,12 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             callAttributes: callAttributes
         });
 
-        bytes[] memory bundleAttributes = new bytes[](1);
+        bytes[] memory bundleAttributes = new bytes[](2);
         bundleAttributes[0] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
+        bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         // With different base tokens, msg.value should equal only indirectCallMessageValue
         L2_INTEROP_CENTER.sendBundle{value: indirectCallMessageValue}(
@@ -489,11 +491,12 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             callAttributes: callAttributes
         });
 
-        bytes[] memory bundleAttributes = new bytes[](1);
+        bytes[] memory bundleAttributes = new bytes[](2);
         bundleAttributes[0] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
+        bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         // This should NOT revert after the fix
         // msg.value = indirectCallMessageValue (only indirect value, no burned value)
@@ -561,11 +564,12 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             callAttributes: callAttributes2
         });
 
-        bytes[] memory bundleAttributes = new bytes[](1);
+        bytes[] memory bundleAttributes = new bytes[](2);
         bundleAttributes[0] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
+        bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         // This should NOT revert - total burned value is 0, only indirect values
         L2_INTEROP_CENTER.sendBundle{value: totalIndirectValue}(
@@ -655,11 +659,12 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
             callAttributes: callAttributes2
         });
 
-        bytes[] memory bundleAttributes = new bytes[](1);
+        bytes[] memory bundleAttributes = new bytes[](2);
         bundleAttributes[0] = abi.encodeCall(
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
+        bundleAttributes[1] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         // totalBurnedValue = 100, so bridgehubDepositBaseToken SHOULD be called
         L2_INTEROP_CENTER.sendBundle{value: totalIndirectValue}(

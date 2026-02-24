@@ -11,6 +11,10 @@ pub enum ContractSource {
     Bytecode(&'static [u8]),
 }
 
+pub const BASE_TOKEN_HOLDER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "0000000000000000000000000000000000010011"
+)));
+
 pub const L2_COMPLEX_UPGRADER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "000000000000000000000000000000000000800f"
 )));
@@ -107,7 +111,7 @@ pub const INITIAL_CONTRACTS: [(Address, ContractSource); 19] = [
     (SYSTEM_CONTRACT_PROXY_ADMIN, ContractSource::L1ContractName("SystemContractProxyAdmin")),
     (L2_COMPLEX_UPGRADER_IMPL_ADDR, ContractSource::L1ContractName("L2ComplexUpgrader")),
     (L2_MESSAGE_ROOT_ADDR, ContractSource::L1ContractName("L2MessageRoot")),
-    (L2_BRIDGEHUB_ADDR, ContractSource::L1ContractName("L2BridgeHub")),
+    (L2_BRIDGEHUB_ADDR, ContractSource::L1ContractName("L2Bridgehub")),
     (L2_ASSET_ROUTER_ADDR, ContractSource::L1ContractName("L2AssetRouter")),
     (L2_NATIVE_TOKEN_VAULT_ADDR, ContractSource::L1ContractName("L2NativeTokenVaultZKOS")),
     (L2_NTV_BEACON_DEPLOYER_ADDR, ContractSource::L1ContractName("UpgradeableBeaconDeployer")),

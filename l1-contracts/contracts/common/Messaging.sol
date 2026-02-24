@@ -47,12 +47,10 @@ struct L2Message {
 /// @dev Internal structure that contains the parameters for the writePriorityOp internal function.
 /// @param txId The id of the priority transaction.
 /// @param l2GasPrice The gas price for the l2 priority operation.
-/// @param expirationTimestamp The timestamp by which the priority operation must be processed by the operator.
 /// @param request The external calldata request for the priority operation.
 struct WritePriorityOpParams {
     uint256 txId;
     uint256 l2GasPrice;
-    uint64 expirationTimestamp;
     BridgehubL2TransactionRequest request;
 }
 
@@ -202,9 +200,23 @@ struct CallAttributes {
 
 /// @param executionAddress ERC-7930 Address allowed to execute the bundle on the destination chain. If the byte array is empty then execution is permissionless.
 /// @param unbundlerAddress ERC-7930 Address allowed to unbundle the bundle on the destination chain. Note, that it is required to be nonempty, unlike `executionAddress`.
+/// @param useFixedFee If true, user pays fixed ZK fees instead of base token fees controlled by chain operator.
+///                    This is a bundle-level attribute - all calls within a bundle share the same fee mode.
+///                    Users are free to choose which fee mode to use when creating their bundle.
+///                    In more details, any user of interop functionality is able to choose between two fee options:
+///                    - Fixed fee in ZK (ZK_INTEROP_FEE constant in InteropCenter). User pays this fee directly in ZK tokens via ERC20 transfer.
+///                    - Dynamic fee in base token of source chain where the interop is initiated. This value is fully under control of chain operator via interopProtocolFee in InteropCenter.
+///                    In any case, gateway settlement fees (gatewaySettlementFee per call, set by governance in GWAssetTracker) are charged from the settlementFeePayer address
+///                    (encoded within the batch data of executeBatchesSharedBridge) when the chain settles on Gateway via processLogsAndMessages(). The settlementFeePayer must have pre-approved
+///                    GWAssetTracker to spend wrapped ZK tokens.
+///                    Note on ZK-as-base-token chains: On chains where ZK is the base token, useFixedFee=true still requires wrapped ZK tokens
+///                    (paid via ERC20 transfer), while useFixedFee=false accepts native ZK via msg.value. This is intentional behavior.
+///                    IMPORTANT: useFixedFee=true requires ZK token to be bridged to the source chain. If ZK token is not yet available
+///                    in the chain's NativeTokenVault, the transaction will revert with ZKTokenNotAvailable().
 struct BundleAttributes {
     bytes executionAddress;
     bytes unbundlerAddress;
+    bool useFixedFee;
 }
 
 /// @dev A single call.
@@ -238,6 +250,7 @@ enum CallStatus {
 /// @dev A set of `InteropCall`s to send to another chain.
 /// @param version Version of the InteropBundle.
 /// @param destinationChainId ChainId of the target chain.
+/// @param destinationBaseTokenAssetId Asset ID of the base token of the target chain.
 /// @param interopBundleSalt Salt of the interopBundle. It's required to ensure that all bundles have distinct hashes.
 ///                          It's equal to the keccak256(abi.encodePacked(senderOfTheBundle, NumberOfBundleSentByTheSender))
 /// @param calls Array of InteropCall structs to execute.
@@ -246,6 +259,7 @@ struct InteropBundle {
     bytes1 version;
     uint256 sourceChainId;
     uint256 destinationChainId;
+    bytes32 destinationBaseTokenAssetId;
     bytes32 interopBundleSalt;
     InteropCall[] calls;
     BundleAttributes bundleAttributes;
@@ -326,15 +340,6 @@ struct TokenBalanceMigrationData {
     uint256 amount;
     uint256 chainMigrationNumber;
     uint256 assetMigrationNumber;
-}
-
-struct ConfirmBalanceMigrationData {
-    bytes1 version;
-    bool isL1ToGateway;
-    uint256 chainId;
-    bytes32 assetId;
-    uint256 migrationNumber;
-    uint256 amount;
 }
 
 struct BalanceChange {
