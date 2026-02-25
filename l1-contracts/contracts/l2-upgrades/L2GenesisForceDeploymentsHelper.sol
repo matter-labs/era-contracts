@@ -265,7 +265,13 @@ library L2GenesisForceDeploymentsHelper {
             _isGenesisUpgrade: _isGenesisUpgrade,
             _isZKsyncOS: _isZKsyncOS
         });
-        _finalizeDeployments(_ctmDeployer, fixedForceDeploymentsData, additionalForceDeploymentsData);
+        _finalizeDeployments({
+            _ctmDeployer: _ctmDeployer,
+            fixedForceDeploymentsData: fixedForceDeploymentsData,
+            additionalForceDeploymentsData: additionalForceDeploymentsData,
+            _isZKsyncOS: _isZKsyncOS,
+            _isGenesisUpgrade: _isGenesisUpgrade
+        });
     }
 
     function _setupProxyAdmin() private {
@@ -516,7 +522,9 @@ library L2GenesisForceDeploymentsHelper {
     function _finalizeDeployments(
         address _ctmDeployer,
         FixedForceDeploymentsData memory fixedForceDeploymentsData,
-        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData
+        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData,
+        bool _isZKsyncOS,
+        bool _isGenesisUpgrade
     ) private {
         // It is expected that either through the force deployments above
         // or upon initialization, both the L2 deployment of BridgeHub, AssetRouter, and MessageRoot are deployed.
@@ -531,9 +539,12 @@ library L2GenesisForceDeploymentsHelper {
             _chainRegistrationSender: fixedForceDeploymentsData.aliasedChainRegistrationSender
         });
 
-        L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(
+        L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(
             fixedForceDeploymentsData.l1ChainId,
-            additionalForceDeploymentsData.baseTokenBridgingData.assetId
+            additionalForceDeploymentsData.baseTokenBridgingData.assetId,
+            // The only chains that need backfill for the base token's total supply are ZKsync OS
+            // chains that existed before the v31 upgrade (i.e. isGenesis is false).
+            _isZKsyncOS && !_isGenesisUpgrade
         );
 
         GWAssetTracker(GW_ASSET_TRACKER_ADDR).initL2(
@@ -541,11 +552,10 @@ library L2GenesisForceDeploymentsHelper {
             fixedForceDeploymentsData.aliasedL1Governance
         );
 
-        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setAddresses(
-            additionalForceDeploymentsData.baseTokenBridgingData.originChainId
-        );
-
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
+
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
+
         emit PerformForceDeployedContractsInitCompleted();
     }
 

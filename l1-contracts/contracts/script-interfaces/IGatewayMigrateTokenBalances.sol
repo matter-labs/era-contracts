@@ -10,14 +10,14 @@ interface IGatewayMigrateTokenBalances {
     /// @return assetIds The list of asset IDs.
     function getBridgedTokenAssetIds() external returns (uint256 bridgedTokenCountPlusOne, bytes32[] memory assetIds);
 
-    /// @notice Finalizes token balance migration on L1 by finalizing deposits and calling receiveMigrationOnL1.
+    /// @notice Finalizes token balance migration on L1 by finalizing deposits and calling the direction-specific L1 receiver.
     /// @param toGateway Whether the migration is to the gateway.
     /// @param bridgehub The Bridgehub contract interface.
     /// @param chainId The chain ID being migrated.
     /// @param gatewayChainId The gateway's chain ID.
     /// @param l2RpcUrl The L2 RPC URL.
     /// @param gwRpcUrl The gateway RPC URL.
-    /// @param onlyWaitForFinalization Whether to only wait for finalization, but not call receiveMigrationOnL1.
+    /// @param onlyWaitForFinalization Whether to only wait for finalization, but not call the L1 receiver.
     /// @param txHashes The L2 transaction hashes.
     function finishMigrationOnL1(
         bool toGateway,

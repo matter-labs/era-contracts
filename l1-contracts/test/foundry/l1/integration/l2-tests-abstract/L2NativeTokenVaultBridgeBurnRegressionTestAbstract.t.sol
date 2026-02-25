@@ -11,7 +11,8 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
@@ -65,12 +66,16 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             depositAmount,
-            abi.encodeCall(IBaseToken.burnMsgValue, ()),
+            abi.encodeWithSelector(IBaseToken.burnMsgValue.selector),
             abi.encode()
         );
 
         // Expect the burnMsgValue call
-        vm.expectCall(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, depositAmount, abi.encodeCall(IBaseToken.burnMsgValue, ()));
+        vm.expectCall(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            depositAmount,
+            abi.encodeWithSelector(IBaseToken.burnMsgValue.selector)
+        );
 
         // Call bridgeBurn from the asset router (which is the only allowed caller)
         // Before the fix: This would revert because bridgeBurn would try to call
@@ -154,6 +159,10 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20Metadata.symbol, ()), abi.encode("TT"));
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20Metadata.decimals, ()), abi.encode(uint8(18)));
 
+        // Mock totalSupply() - called by L2AssetTracker._registerLegacyToken for bridged tokens
+        // (originChainId != block.chainid) during _registerLegacyTokenIfNeeded
+        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(uint256(0)));
+
         // Expect the bridgeBurn call on the bridged token
         vm.expectCall(
             expectedL2TokenAddress,
@@ -191,7 +200,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             depositAmount,
-            abi.encodeCall(IBaseToken.burnMsgValue, ()),
+            abi.encodeWithSelector(IBaseToken.burnMsgValue.selector),
             abi.encode()
         );
 
