@@ -318,10 +318,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 
-        bytes32 emptyMultichainBatchRootForChain = _getEmptyMultichainBatchRoot(_processLogsInputs.chainId);
+        bytes32 expectedEmptyMultichainBatchRoot = _getEmptyMultichainBatchRoot(_processLogsInputs.chainId);
         require(
-            _processLogsInputs.multichainBatchRoot == emptyMultichainBatchRootForChain,
-            InvalidEmptyMultichainBatchRoot(emptyMultichainBatchRootForChain, _processLogsInputs.multichainBatchRoot)
+            _processLogsInputs.multichainBatchRoot == expectedEmptyMultichainBatchRoot,
+            InvalidEmptyMultichainBatchRoot(expectedEmptyMultichainBatchRoot, _processLogsInputs.multichainBatchRoot)
         );
         bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.multichainBatchRoot));
 
