@@ -208,7 +208,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         vm.expectEmit(true, false, false, false);
         emit IInteropHandler.BundleUnbundled(bundleHash);
         vm.prank(UNBUNDLER_ADDRESS);
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(proof.chainId, bundle, callStatuses1);
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(bundle, callStatuses1);
         // Check storage changes after first unbundle
         assertEq(
             uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
@@ -236,7 +236,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         vm.expectEmit(true, false, false, false);
         emit IInteropHandler.BundleUnbundled(bundleHash);
         vm.prank(UNBUNDLER_ADDRESS);
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(proof.chainId, bundle, callStatuses2);
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(bundle, callStatuses2);
         // Check storage changes after second unbundle
         assertEq(
             uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
@@ -569,7 +569,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         );
 
         vm.expectRevert(NotInGatewayMode.selector);
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(ERA_CHAIN_ID, bundle, statuses);
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(bundle, statuses);
     }
 
     /// @notice Test that executeBundle works in gateway mode by accessing currentSettlementLayerChainId
