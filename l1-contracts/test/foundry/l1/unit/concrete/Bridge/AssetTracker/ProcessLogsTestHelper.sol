@@ -106,7 +106,7 @@ library ProcessLogsTestHelper {
     }
 
     /// @notice Builds a complete ProcessLogsInput with correct Merkle root and chainBatchRoot.
-    /// @param _gwAssetTracker The GWAssetTrackerTestHelper instance (needed for getEmptyMessageRoot).
+    /// @param _gwAssetTracker The GWAssetTrackerTestHelper instance (needed for getEmptyMultichainBatchRoot).
     /// @param _chainId The settling chain ID.
     /// @param _batchNumber Batch number.
     /// @param _logs Array of L2Log entries.
@@ -120,9 +120,9 @@ library ProcessLogsTestHelper {
         bytes[] memory _messages,
         address _settlementFeePayer
     ) internal returns (ProcessLogsInput memory) {
-        bytes32 emptyMessageRoot = _gwAssetTracker.getEmptyMessageRoot(_chainId);
+        bytes32 emptyMultichainBatchRoot = _gwAssetTracker.getEmptyMultichainBatchRoot(_chainId);
         bytes32 logsRoot = buildLogsMerkleRoot(_logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         return
             ProcessLogsInput({
@@ -131,7 +131,7 @@ library ProcessLogsTestHelper {
                 logs: _logs,
                 messages: _messages,
                 chainBatchRoot: chainBatchRoot,
-                messageRoot: emptyMessageRoot,
+                multichainBatchRoot: emptyMultichainBatchRoot,
                 settlementFeePayer: _settlementFeePayer
             });
     }
