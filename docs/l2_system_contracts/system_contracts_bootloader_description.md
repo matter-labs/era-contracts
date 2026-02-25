@@ -391,14 +391,12 @@ We process the L2 transactions according to our account abstraction protocol: [h
 1. We [deduct](../../system-contracts/bootloader/bootloader.yul#L1263) the transaction’s upfront payment for the overhead for the block’s processing. You can read more on how that works in the fee model [description](./zksync_fee_model.md).
 2. Then we calculate the gasPrice for these transactions according to the EIP1559 rules.
 3. We [conduct the validation step](../../system-contracts/bootloader/bootloader.yul#L1287) of the AA protocol:
-
    - We calculate the hash of the transaction.
    - If enough gas has been provided, we near_call the validation function in the bootloader. It sets the tx.origin to the address of the bootloader, sets the ergsPrice. It also marks the factory dependencies provided by the transaction as marked and then invokes the validation method of the account and verifies the returned magic.
    - Calls the accounts and, if needed, the paymaster to receive the payment for the transaction. Note, that accounts may not use `block.baseFee` context variable, so they have no way to know what exact sum to pay. That’s why the accounts typically firstly send `tx.maxFeePerErg * tx.ergsLimit` and the bootloader [refunds](../../system-contracts/bootloader/bootloader.yul#L792) for any excess funds sent.
 
 4. [We perform the execution of the transaction](../../system-contracts/bootloader/bootloader.yul#L1352). Note, that if the sender is an EOA, tx.origin is set equal to the `from` the value of the transaction. During the execution of the transaction, the publishing of the compressed bytecodes happens: for each factory dependency if it has not been published yet and its hash is currently pointed to in the compressed bytecodes area of the bootloader, a call to the bytecode compressor is done. Also, at the end the call to the KnownCodeStorage is done to ensure all the bytecodes have indeed been published.
 5. We [refund](../../system-contracts/bootloader/bootloader.yul#L1206) the user for any excess funds he spent on the transaction:
-
    - Firstly, the `postTransaction` operation is called to the paymaster.
    - The bootloader asks the operator to provide a refund. During the first VM run without proofs the provide directly inserts the refunds in the memory of the bootloader. During the run for the proved batches, the operator already knows what which values have to be inserted there. You can read more about it in the [documentation](./zksync_fee_model.md) of the fee model.
    - The bootloader refunds the user.

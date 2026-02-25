@@ -15,13 +15,32 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 
-import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus, TokenBridgingData} from "../../common/Messaging.sol";
+import {BridgehubL2TransactionRequest, L2Log, L2Message, TokenBridgingData, TxStatus} from "../../common/Messaging.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {AlreadyCurrentSL, NotChainAssetHandler, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
-import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, NoCTMForAssetId, NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../../common/L1ContractErrors.sol";
-import {L2_COMPLEX_UPGRADER_ADDR, GW_ASSET_TRACKER} from "../../common/l2-helpers/L2ContractInterfaces.sol";
+import {
+    AssetHandlerNotRegistered,
+    AssetIdAlreadyRegistered,
+    AssetIdNotSupported,
+    BridgeHubAlreadyRegistered,
+    CTMAlreadyRegistered,
+    CTMNotRegistered,
+    ChainIdCantBeCurrentChain,
+    ChainIdNotRegistered,
+    ChainIdTooBig,
+    EmptyAssetId,
+    NoCTMForAssetId,
+    NotCurrentSettlementLayer,
+    SettlementLayersMustSettleOnL1,
+    SharedBridgeNotSet,
+    Unauthorized,
+    ZKChainLimitReached,
+    ZeroAddress,
+    ZeroChainId
+} from "../../common/L1ContractErrors.sol";
+import {GW_ASSET_TRACKER, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

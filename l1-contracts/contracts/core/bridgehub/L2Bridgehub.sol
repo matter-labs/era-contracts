@@ -5,9 +5,8 @@ pragma solidity 0.8.28;
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
-import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER} from "../../common/Config.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL2Bridgehub} from "./IL2Bridgehub.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";

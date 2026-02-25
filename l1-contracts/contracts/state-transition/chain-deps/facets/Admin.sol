@@ -5,13 +5,50 @@ pragma solidity 0.8.28;
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, MAX_PRICE_CHANGE_DENOMINATOR, MAX_PRICE_CHANGE_NUMERATOR, PRICE_REFERENCE_L1_GAS, PRICE_UPDATE_INTERVAL, PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../../../common/Config.sol";
+import {
+    L2DACommitmentScheme,
+    MAX_GAS_PER_TRANSACTION,
+    MAX_PRICE_CHANGE_DENOMINATOR,
+    MAX_PRICE_CHANGE_NUMERATOR,
+    PRICE_REFERENCE_L1_GAS,
+    PRICE_UPDATE_INTERVAL,
+    PRIORITY_EXPIRATION,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {L1DAValidatorAddressIsZero, NotL1, PriorityModeAlreadyAllowed, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, NotMigrated} from "../../L1StateTransitionErrors.sol";
-import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, FeeParamsChangeTooLarge, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, PriorityModeActivationTooEarly, PriorityModeIsNotAllowed, PriorityModeRequiresPermanentRollup, PriorityOpsRequestTimestampMissing, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TokenMultiplierChangeTooFrequent, TooMuchGas, Unauthorized, NotCompatibleWithPriorityMode} from "../../../common/L1ContractErrors.sol";
+import {
+    L1DAValidatorAddressIsZero,
+    NotL1,
+    PriorityModeAlreadyAllowed,
+    ExecutedIsNotConsistentWithVerified,
+    VerifiedIsNotConsistentWithCommitted,
+    NotMigrated
+} from "../../L1StateTransitionErrors.sol";
+import {
+    AlreadyPermanentRollup,
+    DenominatorIsZero,
+    DiamondAlreadyFrozen,
+    DiamondNotFrozen,
+    FeeParamsChangeTooLarge,
+    HashMismatch,
+    InvalidDAForPermanentRollup,
+    InvalidL2DACommitmentScheme,
+    InvalidPubdataPricingMode,
+    PriorityModeActivationTooEarly,
+    PriorityModeIsNotAllowed,
+    PriorityModeRequiresPermanentRollup,
+    PriorityOpsRequestTimestampMissing,
+    PriorityTxPubdataExceedsMaxPubDataPerBatch,
+    ProtocolIdMismatch,
+    ProtocolIdNotGreater,
+    TokenMultiplierChangeTooFrequent,
+    TooMuchGas,
+    Unauthorized,
+    NotCompatibleWithPriorityMode
+} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";

@@ -6,7 +6,15 @@ import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../l2-helpers/L2ContractAddresses.sol"
 import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1ERC20Bridge} from "../../bridge/interfaces/IL1ERC20Bridge.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
-import {AssetIdMismatch, IncorrectTokenAddressFromNTV, InvalidNTVBurnData, L2WithdrawalMessageWrongLength, UnsupportedEncodingVersion, BadTransferDataLength, EmptyData} from "../L1ContractErrors.sol";
+import {
+    AssetIdMismatch,
+    IncorrectTokenAddressFromNTV,
+    InvalidNTVBurnData,
+    L2WithdrawalMessageWrongLength,
+    UnsupportedEncodingVersion,
+    BadTransferDataLength,
+    EmptyData
+} from "../L1ContractErrors.sol";
 import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
 import {InvalidFunctionSignature} from "../../bridge/asset-tracker/AssetTrackerErrors.sol";
 import {IAssetTrackerDataEncoding} from "../../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";

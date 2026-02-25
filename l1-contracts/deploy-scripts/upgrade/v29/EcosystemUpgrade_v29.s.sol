@@ -9,13 +9,11 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 
 import {Utils} from "../../utils/Utils.sol";
 import {StateTransitionDeployedAddresses} from "../../utils/Types.sol";
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 
 import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentTracker.sol";
@@ -24,11 +22,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {AddressHasNoCode} from "../../utils/ZkSyncScriptErrors.sol";
-import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
-import {SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -38,7 +32,11 @@ import {ContractsBytecodesLib} from "../../utils/bytecode/ContractsBytecodesLib.
 
 import {Call} from "contracts/governance/Common.sol";
 
-import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_VERSION_SPECIFIC_UPGRADER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";

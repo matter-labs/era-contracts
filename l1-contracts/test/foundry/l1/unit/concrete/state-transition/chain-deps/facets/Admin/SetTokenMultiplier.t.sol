@@ -2,7 +2,12 @@
 pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {DenominatorIsZero, FeeParamsChangeTooLarge, TokenMultiplierChangeTooFrequent, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {
+    DenominatorIsZero,
+    FeeParamsChangeTooLarge,
+    TokenMultiplierChangeTooFrequent,
+    Unauthorized
+} from "contracts/common/L1ContractErrors.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
 contract SetTokenMultiplierTest is AdminTest {

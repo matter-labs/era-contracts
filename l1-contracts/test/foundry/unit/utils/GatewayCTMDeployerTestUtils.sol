@@ -2,7 +2,17 @@
 
 pragma solidity ^0.8.20;
 
-import {DAContracts, DeployedContracts, Facets, StateTransitionContracts, DAContracts, GatewayProxyAdminDeployerResult, GatewayValidatorTimelockDeployerResult, Verifiers, GatewayCTMFinalResult} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {
+    DAContracts,
+    DeployedContracts,
+    Facets,
+    StateTransitionContracts,
+    DAContracts,
+    GatewayProxyAdminDeployerResult,
+    GatewayValidatorTimelockDeployerResult,
+    Verifiers,
+    GatewayCTMFinalResult
+} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
 /// @notice Struct to hold all deployer results for testing
 struct AllDeployerResults {

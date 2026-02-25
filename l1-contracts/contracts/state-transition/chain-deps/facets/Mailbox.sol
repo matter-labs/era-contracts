@@ -11,16 +11,39 @@ import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.
 import {IEIP7702Checker} from "../../chain-interfaces/IEIP7702Checker.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
-import {BalanceChange, BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Log, L2Message, TxStatus, WritePriorityOpParams} from "../../../common/Messaging.sol";
+import {
+    BalanceChange,
+    BridgehubL2TransactionRequest,
+    L2CanonicalTransaction,
+    L2Log,
+    L2Message,
+    TxStatus,
+    WritePriorityOpParams
+} from "../../../common/Messaging.sol";
 import {MessageHashing} from "../../../common/libraries/MessageHashing.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET} from "../../../common/Config.sol";
+import {
+    MAX_NEW_FACTORY_DEPS,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    SERVICE_TRANSACTION_SENDER,
+    SETTLEMENT_LAYER_RELAY_SENDER,
+    PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+    PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET
+} from "../../../common/Config.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {AddressNotZero, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {
+    AddressNotZero,
+    GasPerPubdataMismatch,
+    InvalidChainId,
+    MsgValueTooLow,
+    TooManyFactoryDeps,
+    TransactionNotAllowed,
+    ZeroAddress
+} from "../../../common/L1ContractErrors.sol";
 import {DepositsPaused, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it

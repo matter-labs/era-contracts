@@ -7,7 +7,18 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRootBase, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain} from "../bridgehub/L1BridgehubErrors.sol";
+import {
+    BatchZeroNotAllowed,
+    ChainBatchRootAlreadyExists,
+    ChainBatchRootZero,
+    ChainExists,
+    DepthMoreThanOneForRecursiveMerkleProof,
+    MessageRootNotRegistered,
+    NonConsecutiveBatchNumber,
+    OnlyAssetTracker,
+    OnlyBridgehubOrChainAssetHandler,
+    OnlyChain
+} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {GW_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 

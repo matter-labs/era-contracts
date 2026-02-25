@@ -2,7 +2,15 @@
 
 pragma solidity 0.8.28;
 
-import {InvalidL2DAOutputHash, InvalidNumberOfBlobs, InvalidPubdataHash, OnlyOneBlobWithCalldataAllowed, OperatorDAInputTooSmall, PubdataInputTooSmall, PubdataLengthTooBig} from "../L1StateTransitionErrors.sol";
+import {
+    InvalidL2DAOutputHash,
+    InvalidNumberOfBlobs,
+    InvalidPubdataHash,
+    OnlyOneBlobWithCalldataAllowed,
+    OperatorDAInputTooSmall,
+    PubdataInputTooSmall,
+    PubdataLengthTooBig
+} from "../L1StateTransitionErrors.sol";
 import {BLOB_SIZE_BYTES} from "system-contracts/contracts/Constants.sol";
 
 /// @dev The state diff hash, hash of pubdata + the number of blobs.

@@ -3,7 +3,12 @@
 pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {NotCompatibleWithPriorityMode, OnlyPriorityMode, PriorityOpsRequestTimestampMissing, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {
+    NotCompatibleWithPriorityMode,
+    OnlyPriorityMode,
+    PriorityOpsRequestTimestampMissing,
+    Unauthorized
+} from "contracts/common/L1ContractErrors.sol";
 import {PriorityModeAlreadyAllowed} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract PriorityModeAdminTest is AdminTest {

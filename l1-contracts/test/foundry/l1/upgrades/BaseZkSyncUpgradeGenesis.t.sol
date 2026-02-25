@@ -4,7 +4,13 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {BaseZkSyncUpgradeGenesis} from "contracts/upgrades/BaseZkSyncUpgradeGenesis.sol";
-import {PreviousUpgradeBatchNotCleared, PreviousUpgradeNotFinalized, ProtocolMajorVersionNotZero, ProtocolVersionDeltaTooLarge, ProtocolVersionTooSmall} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
+import {
+    PreviousUpgradeBatchNotCleared,
+    PreviousUpgradeNotFinalized,
+    ProtocolMajorVersionNotZero,
+    ProtocolVersionDeltaTooLarge,
+    ProtocolVersionTooSmall
+} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "contracts/common/Config.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
