@@ -340,6 +340,24 @@
   },
   {
     "type": "function",
+    "name": "governanceAcceptOwnerAggregated",
+    "inputs": [
+      {
+        "name": "governor",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "governanceExecuteCalls",
     "inputs": [
       {
