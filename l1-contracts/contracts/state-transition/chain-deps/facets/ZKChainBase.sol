@@ -12,7 +12,8 @@ import {
     BaseTokenGasPriceDenominatorNotSet,
     Unauthorized,
     OnlyNormalMode,
-    OnlyPriorityMode
+    OnlyPriorityMode,
+    MustBeEraChain
 } from "../../../common/L1ContractErrors.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
@@ -72,7 +73,7 @@ contract ZKChainBase is ReentrancyGuard {
 
     /// @notice Ensures that the chain uses EraVM
     modifier onlyEra() {
-        require(!s.zksyncOS, "Only for EraVM-based chains");
+        require(!s.zksyncOS, MustBeEraChain());
         _;
     }
 
