@@ -16,7 +16,7 @@ import type {
   CTMDeployedAddresses,
   DeploymentState,
 } from "./types";
-import { getDefaultAccountPrivateKey, sleep } from "./utils";
+import { getDefaultAccountPrivateKey } from "./utils";
 import { ETH_TOKEN_ADDRESS } from "./const";
 
 export class DeploymentRunner {
@@ -50,15 +50,15 @@ export class DeploymentRunner {
 
     const config = this.getConfig();
 
-    for (const chainConfig of config.chains) {
-      await anvilManager.startChain({
-        chainId: chainConfig.chainId,
-        port: chainConfig.port,
-        isL1: chainConfig.isL1,
-      });
-    }
-
-    await sleep(2000);
+    await Promise.all(
+      config.chains.map((chainConfig) =>
+        anvilManager.startChain({
+          chainId: chainConfig.chainId,
+          port: chainConfig.port,
+          isL1: chainConfig.isL1,
+        })
+      )
+    );
 
     const l1Chain = anvilManager.getL1Chain();
     const l2Chains = anvilManager.getL2Chains();
@@ -166,15 +166,17 @@ export class DeploymentRunner {
     const state = this.loadState();
     const l2Chains = state.chains?.l2 || [];
 
-    console.log("Initializing L2 system contracts...\n");
-    for (const chain of chainAddresses) {
-      const l2Chain = l2Chains.find((c) => c.chainId === chain.chainId);
-      if (!l2Chain) {
-        throw new Error(`L2 chain ${chain.chainId} not found in state`);
-      }
-      await registry.initializeL2SystemContracts(chain.chainId, chain.diamondProxy, l2Chain.rpcUrl);
-      console.log(`  Chain ${chain.chainId} system contracts initialized`);
-    }
+    console.log("Initializing L2 system contracts (in parallel)...\n");
+    await Promise.all(
+      chainAddresses.map(async (chain) => {
+        const l2Chain = l2Chains.find((c) => c.chainId === chain.chainId);
+        if (!l2Chain) {
+          throw new Error(`L2 chain ${chain.chainId} not found in state`);
+        }
+        await registry.initializeL2SystemContracts(chain.chainId, chain.diamondProxy, l2Chain.rpcUrl);
+        console.log(`  Chain ${chain.chainId} system contracts initialized`);
+      })
+    );
   }
 
   async step5SetupGateway(

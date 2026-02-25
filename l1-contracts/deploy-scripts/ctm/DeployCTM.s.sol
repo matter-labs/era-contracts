@@ -503,7 +503,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             gatewayChainId: config.gatewayChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
+            l2TokenProxyBytecodeHash: config.isZKsyncOS
+                ? keccak256(Utils.readFoundryDeployedBytecodeL1("BeaconProxy.sol", "BeaconProxy"))
+                : getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(ctmAddresses.admin.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeInfo: config.isZKsyncOS

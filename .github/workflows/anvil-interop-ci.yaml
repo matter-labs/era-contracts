@@ -194,14 +194,8 @@ jobs:
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
 
-      - name: Build l1-contracts artifacts
-        run: yarn l1 build:foundry
-
-      - name: Build system-contract artifacts
-        run: yarn sc build:foundry
-
-      - name: Build l2-contracts artifacts
-        run: yarn l2 build:foundry
+      - name: Build l1-contracts artifacts (solc only, no zksolc)
+        run: forge build
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
