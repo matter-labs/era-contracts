@@ -11,6 +11,10 @@ contract DummyChainAssetHandler {
         migrationNumber[_chainId] = _number;
     }
 
+    function isReadyForMigration(uint256) external pure returns (bool) {
+        return true;
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }

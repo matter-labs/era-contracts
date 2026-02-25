@@ -3,7 +3,15 @@
 pragma solidity 0.8.28;
 
 import {IMigrator} from "../../chain-interfaces/IMigrator.sol";
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, ZKChainCommitment, CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET} from "../../../common/Config.sol";
+import {
+    L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS,
+    L2DACommitmentScheme,
+    ZKChainCommitment,
+    CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
+    CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET,
+    PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+    PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET
+} from "../../../common/Config.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {IZKChain} from "../../../state-transition/chain-interfaces/IZKChain.sol";
@@ -11,7 +19,26 @@ import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAssetHandler.sol";
-import {AlreadyMigrated, PriorityQueueNotFullyProcessed, TotalPriorityTxsIsZero, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted, MigrationInProgress} from "../../L1StateTransitionErrors.sol";
+import {
+    AlreadyMigrated,
+    PriorityQueueNotFullyProcessed,
+    TotalPriorityTxsIsZero,
+    ContractNotDeployed,
+    DepositsAlreadyPaused,
+    DepositsNotPaused,
+    ExecutedIsNotConsistentWithVerified,
+    InvalidNumberOfBatchHashes,
+    NotAllBatchesExecuted,
+    NotChainAdmin,
+    NotEraChain,
+    NotHistoricalRoot,
+    NotL1,
+    NotMigrated,
+    OutdatedProtocolVersion,
+    ProtocolVersionNotUpToDate,
+    VerifiedIsNotConsistentWithCommitted,
+    MigrationInProgress
+} from "../../L1StateTransitionErrors.sol";
 import {NotAZKChain, NotCompatibleWithPriorityMode} from "../../../common/L1ContractErrors.sol";
 import {OnlyGateway} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";

@@ -5,9 +5,9 @@ pragma solidity ^0.8.21;
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
+
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IZKChainBase} from "contracts/state-transition/chain-interfaces/IZKChainBase.sol";
@@ -21,13 +21,34 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Utils} from "../utils/Utils.sol";
-import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BRIDGEHUB_ADDR,
+    L2_ASSET_ROUTER_ADDR,
+    L2_MESSAGE_ROOT_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_ASSET_TRACKER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {CoreDeployedAddresses, BridgehubAddresses, BridgehubContracts, ZkChainAddresses, L2ERC20BridgeAddresses, StateTransitionDeployedAddresses, StateTransitionContracts, Verifiers, Facets, BridgesDeployedAddresses, BridgeContracts, CTMDeployedAddresses, CTMAdminAddresses, DataAvailabilityDeployedAddresses} from "./Types.sol";
+import {
+    CoreDeployedAddresses,
+    BridgehubAddresses,
+    BridgehubContracts,
+    ZkChainAddresses,
+    L2ERC20BridgeAddresses,
+    StateTransitionDeployedAddresses,
+    StateTransitionContracts,
+    Verifiers,
+    Facets,
+    BridgesDeployedAddresses,
+    BridgeContracts,
+    CTMDeployedAddresses,
+    CTMAdminAddresses,
+    DataAvailabilityDeployedAddresses
+} from "./Types.sol";
 import {IEraDualVerifier} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
 import {IZKsyncOSDualVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSDualVerifier.sol";
 

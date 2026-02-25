@@ -11,4 +11,8 @@ interface IL1MessageRoot {
     function v31UpgradeChainBatchNumber(uint256 _chainId) external view returns (uint256);
 
     function saveV31UpgradeChainBatchNumber(uint256 _chainId) external;
+
+    /// @notice Returns whether a chain has not finalized its v31 upgrade marker yet.
+    /// @param _chainId The chain id to query.
+    function isPreV31(uint256 _chainId) external view returns (bool);
 }

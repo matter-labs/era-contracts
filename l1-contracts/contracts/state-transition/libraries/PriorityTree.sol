@@ -5,7 +5,13 @@ pragma solidity ^0.8.21;
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 import {Merkle} from "../../common/libraries/Merkle.sol";
 import {PriorityTreeCommitment} from "../../common/Config.sol";
-import {InvalidCommitment, InvalidNextLeafIndex, InvalidStartIndex, InvalidUnprocessedIndex, NotHistoricalRoot} from "../L1StateTransitionErrors.sol";
+import {
+    InvalidCommitment,
+    InvalidNextLeafIndex,
+    InvalidStartIndex,
+    InvalidUnprocessedIndex,
+    NotHistoricalRoot
+} from "../L1StateTransitionErrors.sol";
 
 struct PriorityOpsBatchInfo {
     bytes32[] leftPath;

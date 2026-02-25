@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {TokenMetadata, TokenBridgingData} from "../../common/Messaging.sol";
+import {TokenBridgingData, TokenMetadata} from "../../common/Messaging.sol";
 
 /// @notice A struct that describes a forced deployment on an address
 struct ForceDeployment {

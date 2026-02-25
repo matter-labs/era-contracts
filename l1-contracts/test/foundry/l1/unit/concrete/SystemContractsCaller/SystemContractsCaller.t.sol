@@ -4,7 +4,12 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {CalldataForwardingMode, SystemContractsCaller, U32CastOverflow, Utils} from "contracts/common/l2-helpers/SystemContractsCaller.sol";
+import {
+    CalldataForwardingMode,
+    SystemContractsCaller,
+    U32CastOverflow,
+    Utils
+} from "contracts/common/l2-helpers/SystemContractsCaller.sol";
 
 contract SystemContractsCallerTest is Test {
     using SystemContractsCaller for *;

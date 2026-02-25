@@ -18,6 +18,13 @@ describe("L2BaseToken tests", () => {
 
   before(async () => {
     await prepareEnvironment();
+    // Mock L1_CHAIN_ID() on the L2AssetTracker — it is a view function, so we must
+    // set an explicit result to avoid the MockContract fallback emitting an event
+    // inside a STATICCALL context (which would revert).
+    await setResult("IL2AssetTracker", "L1_CHAIN_ID", [], {
+      failure: false,
+      returnData: ethers.utils.defaultAbiCoder.encode(["uint256"], [1]),
+    });
     await deployContractOnAddress(TEST_BASE_TOKEN_SYSTEM_CONTRACT_ADDRESS, "L2BaseToken");
     L2BaseToken = L2BaseTokenFactory.connect(TEST_BASE_TOKEN_SYSTEM_CONTRACT_ADDRESS, richWallet);
     bootloaderAccount = await ethers.getImpersonatedSigner(TEST_BOOTLOADER_FORMAL_ADDRESS);

@@ -6,29 +6,55 @@ import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 
-import {BalanceChange, TokenBalanceMigrationData, L2Log, TxStatus, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
-import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_HANDLER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_COMPRESSOR_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER, MAX_BUILT_IN_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR as INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {
+    BalanceChange,
+    MigrationConfirmationData,
+    L2Log,
+    TxStatus,
+    InteropBundle,
+    InteropCall
+} from "contracts/common/Messaging.sol";
+import {
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_MESSAGE_ROOT_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_BOOTLOADER_ADDRESS,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    L2_INTEROP_HANDLER_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
+    L2_COMPRESSOR_ADDR,
+    L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
+    L2_ASSET_ROUTER,
+    MAX_BUILT_IN_CONTRACT_ADDR,
+    L2_INTEROP_CENTER_ADDR as INTEROP_CENTER_ADDR
+} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
-import {BALANCE_CHANGE_VERSION, TOKEN_BALANCE_MIGRATION_DATA_VERSION, INTEROP_BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {
+    BALANCE_CHANGE_VERSION,
+    INTEROP_BALANCE_CHANGE_VERSION
+} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
 import {InvalidCanonicalTxHash, RegisterNewTokenNotAllowed, InvalidFunctionSignature, InvalidBuiltInContractMessage, InvalidEmptyMultichainBatchRoot, InvalidL2ShardId, InvalidServiceLog, InvalidInteropBalanceChange} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {Unauthorized, ChainIdNotRegistered, InvalidMessage, ReconstructionMismatch, InvalidInteropCalldata} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+
 import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
-import {L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "contracts/common/Config.sol";
-import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {GWAssetTrackerTestHelper} from "./GWAssetTracker.t.sol";
 import {ProcessLogsTestHelper} from "./ProcessLogsTestHelper.sol";
@@ -326,7 +352,14 @@ contract GWAssetTrackerExtendedTest is Test {
         );
 
         vm.prank(mockZKChain);
-        vm.expectRevert(abi.encodeWithSelector(InvalidInteropBalanceChange.selector, bundleHash));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                InvalidBuiltInContractMessage.selector,
+                uint256(0),
+                uint256(0),
+                bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))
+            )
+        );
         gwAssetTracker.processLogsAndMessages(input);
     }
 
@@ -662,8 +695,8 @@ contract GWAssetTrackerExtendedTest is Test {
         gwAssetTracker.requestPauseDepositsForChain(CHAIN_ID);
     }
 
-    // Test confirmMigrationOnGateway with saved balance (lines 630-631)
-    function test_ConfirmMigrationOnGateway_GatewayToL1_WithSavedBalance() public {
+    // Test Gateway->L1 confirmation does not modify chain balance on Gateway.
+    function test_ConfirmMigrationOnGateway_GatewayToL1_LeavesBalanceUnchanged() public {
         // First increase chain balance
         BalanceChange memory balanceChange = BalanceChange({
             version: BALANCE_CHANGE_VERSION,
@@ -698,15 +731,13 @@ contract GWAssetTrackerExtendedTest is Test {
         );
 
         // Confirm migration
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+        MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             assetMigrationNumber: MIGRATION_NUMBER,
-            chainMigrationNumber: 0,
             isL1ToGateway: false
         });
 
@@ -715,8 +746,8 @@ contract GWAssetTrackerExtendedTest is Test {
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.confirmMigrationOnGateway(data);
 
-        // Verify balance was decreased (lines 624, 630-631)
-        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), balanceBefore - AMOUNT);
+        // Gateway state changes for this flow happen at migration initiation, not confirmation.
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), balanceBefore);
         // Verify token data
         assertEq(gwAssetTracker.getOriginToken(ASSET_ID), ORIGIN_TOKEN);
         assertEq(gwAssetTracker.getTokenOriginChainId(ASSET_ID), ORIGIN_CHAIN_ID);
