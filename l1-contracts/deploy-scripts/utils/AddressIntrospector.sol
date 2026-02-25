@@ -200,7 +200,7 @@ library AddressIntrospector {
         return _getCTMAddressesInternal(address(_ctm), false, false);
     }
 
-    function getCTMAddresses(
+    function getCTMAddressesZKOS(
         ChainTypeManagerBase _ctm,
         bool isZKsyncOS
     ) public view returns (CTMDeployedAddresses memory info) {

@@ -391,7 +391,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             // V29 introspection returns zero for bytecodesSupplier, overwrite with correct value
             ctmAddresses.stateTransition.proxies.bytecodesSupplier = _bytecodesSupplier;
         } else {
-            ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm), config.isZKsyncOS);
+            ctmAddresses = AddressIntrospector.getCTMAddressesZKOS(ChainTypeManagerBase(ctm), config.isZKsyncOS);
             coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
         }
 

@@ -189,7 +189,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
 
     function initializeConfigFromOnChain(address _ctmAddress) internal {
         ChainTypeManagerBase ctm = ChainTypeManagerBase(_ctmAddress);
-        ctmAddresses = AddressIntrospector.getCTMAddresses(ctm, config.isZKsyncOS);
+        ctmAddresses = AddressIntrospector.getCTMAddressesZKOS(ctm, config.isZKsyncOS);
         IL1Bridgehub bridgehub = IL1Bridgehub(ctm.BRIDGE_HUB());
         coreAddresses = AddressIntrospector.getCoreDeployedAddresses(address(bridgehub));
     }
