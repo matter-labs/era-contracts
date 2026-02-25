@@ -19,6 +19,12 @@ import type {
 import { getDefaultAccountPrivateKey } from "./utils";
 import { ETH_TOKEN_ADDRESS } from "./const";
 
+function timeIt(label: string): () => void {
+  const start = Date.now();
+  console.log(`⏱️  [TIMING] Starting: ${label}`);
+  return () => console.log(`⏱️  [TIMING] Finished: ${label} in ${((Date.now() - start) / 1000).toFixed(1)}s`);
+}
+
 export class DeploymentRunner {
   private stateDir: string;
   private configPath: string;
@@ -85,19 +91,27 @@ export class DeploymentRunner {
     const privateKey = getDefaultAccountPrivateKey();
     const deployer = new ForgeDeployer(l1RpcUrl, privateKey);
 
+    let done = timeIt("deployL1Core (forge script)");
     const l1Addresses = await deployer.deployL1Core();
+    done();
     console.log("\nL1 Core Addresses:");
     console.log(`  Bridgehub: ${l1Addresses.bridgehub}`);
     console.log(`  L1SharedBridge: ${l1Addresses.l1SharedBridge}`);
 
     // Accept bridgehub admin (required for Anvil)
+    done = timeIt("acceptBridgehubAdmin");
     await deployer.acceptBridgehubAdmin(l1Addresses.bridgehub);
+    done();
 
+    done = timeIt("deployCTM (forge script)");
     const ctmAddresses = await deployer.deployCTM(l1Addresses.bridgehub);
+    done();
     console.log("\nCTM Addresses:");
     console.log(`  ChainTypeManager: ${ctmAddresses.chainTypeManager}`);
 
+    done = timeIt("registerCTM (forge script)");
     await deployer.registerCTM(l1Addresses.bridgehub, ctmAddresses.chainTypeManager);
+    done();
 
     const state = this.loadState();
     state.l1Addresses = l1Addresses;
@@ -127,6 +141,7 @@ export class DeploymentRunner {
       const chainConfig = chainConfigs.find((c) => c.chainId === l2Chain.chainId);
       const isGateway = chainConfig?.isGateway || false;
 
+      const done = timeIt(`registerChain ${l2Chain.chainId} (forge script)`);
       const addresses = await registry.registerChain({
         chainId: l2Chain.chainId,
         rpcUrl: l2Chain.rpcUrl,
@@ -134,6 +149,7 @@ export class DeploymentRunner {
         validiumMode: false,
         isGateway,
       });
+      done();
 
       chainAddresses.push(addresses);
 
@@ -173,7 +189,9 @@ export class DeploymentRunner {
         if (!l2Chain) {
           throw new Error(`L2 chain ${chain.chainId} not found in state`);
         }
+        const done = timeIt(`initializeL2SystemContracts chain ${chain.chainId}`);
         await registry.initializeL2SystemContracts(chain.chainId, chain.diamondProxy, l2Chain.rpcUrl);
+        done();
         console.log(`  Chain ${chain.chainId} system contracts initialized`);
       })
     );

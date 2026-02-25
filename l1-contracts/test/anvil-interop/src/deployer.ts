@@ -187,7 +187,6 @@ export class ForgeDeployer {
       "--sender",
       this.senderAddress,
       "--broadcast",
-      "--slow", // Send transactions one at a time to avoid overwhelming Anvil
       "--legacy",
       "--ffi", // Enable FFI for scripts that need to call external commands
       "--sig",

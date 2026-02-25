@@ -6,6 +6,13 @@ import * as path from "path";
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");
 
+const totalStart = Date.now();
+
+function elapsedSince(start: number): string {
+  const ms = Date.now() - start;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
 function runOrThrow(command: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv): void {
   const result = spawnSync(command, args, {
     cwd,
@@ -16,6 +23,13 @@ function runOrThrow(command: string, args: string[], cwd: string, env?: NodeJS.P
   if (result.status !== 0) {
     throw new Error(`${command} ${args.join(" ")} failed with exit code ${result.status ?? "unknown"}`);
   }
+}
+
+function timedRun(label: string, command: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv): void {
+  const start = Date.now();
+  console.log(`\n⏱️  [TIMING] Starting: ${label} (total elapsed: ${elapsedSince(totalStart)})`);
+  runOrThrow(command, args, cwd, env);
+  console.log(`⏱️  [TIMING] Finished: ${label} in ${elapsedSince(start)} (total elapsed: ${elapsedSince(totalStart)})`);
 }
 
 async function main(): Promise<void> {
@@ -29,16 +43,17 @@ async function main(): Promise<void> {
 
   try {
     if (!skipSetup) {
-      runOrThrow("yarn", ["cleanup"], anvilInteropDir, interopEnv);
-      runOrThrow("yarn", ["step1"], anvilInteropDir, interopEnv);
-      runOrThrow("yarn", ["step2"], anvilInteropDir, interopEnv);
-      runOrThrow("yarn", ["step3"], anvilInteropDir, interopEnv);
-      runOrThrow("yarn", ["step4"], anvilInteropDir, interopEnv);
-      runOrThrow("yarn", ["step5"], anvilInteropDir, interopEnv);
-      runOrThrow("yarn", ["deploy:test-token"], anvilInteropDir, interopEnv);
+      timedRun("cleanup", "yarn", ["cleanup"], anvilInteropDir, interopEnv);
+      timedRun("step1 - Start Anvil chains", "yarn", ["step1"], anvilInteropDir, interopEnv);
+      timedRun("step2 - Deploy L1 contracts", "yarn", ["step2"], anvilInteropDir, interopEnv);
+      timedRun("step3 - Register L2 chains", "yarn", ["step3"], anvilInteropDir, interopEnv);
+      timedRun("step4 - Initialize L2 system contracts", "yarn", ["step4"], anvilInteropDir, interopEnv);
+      timedRun("step5 - Setup gateway", "yarn", ["step5"], anvilInteropDir, interopEnv);
+      timedRun("deploy:test-token", "yarn", ["deploy:test-token"], anvilInteropDir, interopEnv);
     }
 
-    runOrThrow(
+    timedRun(
+      "hardhat test - token transfer",
       "yarn",
       [
         "hardhat",
@@ -55,6 +70,8 @@ async function main(): Promise<void> {
         ANVIL_INTEROP_SKIP_CLEANUP: "1",
       }
     );
+
+    console.log(`\n⏱️  [TIMING] Total test run: ${elapsedSince(totalStart)}`);
   } finally {
     if (!skipCleanup) {
       runOrThrow("yarn", ["cleanup"], anvilInteropDir, interopEnv);

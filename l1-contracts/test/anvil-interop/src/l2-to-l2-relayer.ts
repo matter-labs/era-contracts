@@ -203,8 +203,8 @@ export class L2ToL2Relayer {
       );
 
       interopBundle = decodedData[2];
-      targetChainId = Number(interopBundle[2]); // bytes32 destination
-      const rawCalls = interopBundle[4]; // InteropCallStarter[] calls (as arrays)
+      targetChainId = Number(interopBundle[2]); // uint256 destinationChainId
+      const rawCalls = interopBundle[5]; // InteropCall[] calls
 
       // Decode destination (uint256 encoded as bytes32)
       // destinationChainId extracted above

@@ -89,6 +89,9 @@ export async function executeTokenTransfer(
   const sourceVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbi, sourceProvider);
   const targetVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbi, targetProvider);
 
+  const transferStart = Date.now();
+  const elapsed = () => `${((Date.now() - transferStart) / 1000).toFixed(1)}s`;
+
   log("Configuration:");
   log(`  Source Chain: ${sourceChainId}`);
   log(`  Target Chain: ${targetChainId}`);
@@ -98,6 +101,7 @@ export async function executeTokenTransfer(
   log(`  Sender: ${sourceWallet.address}`);
   log("");
 
+  log(`⏱️  [${elapsed()}] Checking source balance...`);
   const sourceBalanceBefore = await sourceToken.balanceOf(sourceWallet.address);
   log(`💰 Source balance: ${sourceBalanceBefore.toString()} TEST tokens`);
   const amountWei = ethers.utils.parseUnits(amount, 18);
@@ -105,6 +109,7 @@ export async function executeTokenTransfer(
     throw new Error(`Insufficient balance. Have: ${sourceBalanceBefore.toString()}, Need: ${amountWei.toString()}`);
   }
 
+  log(`⏱️  [${elapsed()}] Checking allowance...`);
   const currentAllowance = await sourceToken.allowance(sourceWallet.address, L2_NATIVE_TOKEN_VAULT_ADDR);
   if (currentAllowance.lt(amountWei)) {
     log(`\n📝 Approving L2NativeTokenVault to spend ${amount} TEST tokens...`);
@@ -121,6 +126,7 @@ export async function executeTokenTransfer(
   );
   log(`\n🔑 Asset ID: ${assetId}`);
 
+  log(`⏱️  [${elapsed()}] Checking token registration...`);
   const registeredAssetId = await sourceVault.assetId(sourceTokenAddr);
   if (registeredAssetId === ethers.constants.HashZero) {
     log("\n📝 Registering token in L2NativeTokenVault...");
@@ -132,6 +138,7 @@ export async function executeTokenTransfer(
     log("\n✅ Token already registered in L2NativeTokenVault");
   }
 
+  log(`⏱️  [${elapsed()}] Reading destination balance before...`);
   const destinationTokenBefore = await targetVault.tokenAddress(assetId);
   const destinationBalanceBefore =
     destinationTokenBefore === ethers.constants.AddressZero
@@ -166,7 +173,7 @@ export async function executeTokenTransfer(
     callAttributes: [indirectCallAttribute, interopCallValueAttribute],
   };
 
-  log("\n🚀 Sending token transfer via InteropCenter...");
+  log(`\n⏱️  [${elapsed()}] Sending token transfer via InteropCenter...`);
   log(`   InteropCenter: ${INTEROP_CENTER_ADDR}`);
   log(`   Target: L2AssetRouter at ${L2_ASSET_ROUTER_ADDR}`);
 
@@ -177,7 +184,7 @@ export async function executeTokenTransfer(
   });
   log(`\n   Transaction sent: ${sourceTx.hash}`);
   const sourceReceipt = await sourceTx.wait();
-  log(`   ✅ Transaction confirmed in block ${sourceReceipt?.blockNumber}`);
+  log(`   ✅ Transaction confirmed in block ${sourceReceipt?.blockNumber} [${elapsed()}]`);
 
   let interopBundle: unknown = null;
   if (sourceReceipt?.logs) {
@@ -201,6 +208,7 @@ export async function executeTokenTransfer(
     throw new Error("InteropBundleSent event not found in source transaction receipt");
   }
 
+  log(`⏱️  [${elapsed()}] Waiting for relay on target chain...`);
   let targetTxHash: string | null = null;
   for (let attempt = 0; attempt < 60 && !targetTxHash; attempt++) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -225,9 +233,9 @@ export async function executeTokenTransfer(
   }
 
   if (targetTxHash) {
-    log("ℹ️ Bundle already appears on destination chain; skipping direct executeBundle call.");
+    log(`ℹ️ Bundle already appears on destination chain; skipping direct executeBundle call. [${elapsed()}]`);
   } else {
-    log("⚙️ Executing bundle directly on destination chain via L2InteropHandler...");
+    log(`⏱️  [${elapsed()}] Executing bundle directly on destination chain via L2InteropHandler...`);
     const interopHandlerAbi = loadAbiFromOut("InteropHandler.sol/InteropHandler.json");
     const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi, targetWallet);
 
@@ -260,6 +268,7 @@ export async function executeTokenTransfer(
     }
   }
 
+  log(`⏱️  [${elapsed()}] Reading final balances...`);
   const sourceBalanceAfter = await sourceToken.balanceOf(sourceWallet.address);
   const destinationToken = await targetVault.tokenAddress(assetId);
   const destinationBalanceAfter =
@@ -275,6 +284,8 @@ export async function executeTokenTransfer(
   if (targetTxHash) {
     log(`  cast run ${targetTxHash} -r ${targetChain.rpcUrl}`);
   }
+
+  log(`\n⏱️  [${elapsed()}] Token transfer complete`);
 
   return {
     sourceChainId,
