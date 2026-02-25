@@ -146,7 +146,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         );
 
         // The bundle status have to be either verified (we know that it's received, but not processed yet), or unbundled.
-        // Note, that on the first call to unbundle the status of the bundle should be verified.
+        // Note, that on the first call to unbundle the status of the bundle should be verified, which validates bundle correctness.
         require(status == BundleStatus.Verified || status == BundleStatus.Unbundled, CanNotUnbundle(bundleHash));
 
         // Mark the given bundle as unbundled, following CEI pattern.
