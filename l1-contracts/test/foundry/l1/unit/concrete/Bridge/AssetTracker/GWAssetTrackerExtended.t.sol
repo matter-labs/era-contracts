@@ -42,8 +42,22 @@ import {
 } from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
-import {InvalidCanonicalTxHash, RegisterNewTokenNotAllowed, InvalidFunctionSignature, InvalidBuiltInContractMessage, InvalidEmptyMultichainBatchRoot, InvalidL2ShardId, InvalidServiceLog, InvalidInteropBalanceChange} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
-import {Unauthorized, ChainIdNotRegistered, InvalidMessage, ReconstructionMismatch, InvalidInteropCalldata} from "contracts/common/L1ContractErrors.sol";
+import {
+    InvalidCanonicalTxHash,
+    RegisterNewTokenNotAllowed,
+    InvalidFunctionSignature,
+    InvalidBuiltInContractMessage,
+    InvalidEmptyMultichainBatchRoot,
+    InvalidL2ShardId,
+    InvalidServiceLog
+} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {
+    Unauthorized,
+    ChainIdNotRegistered,
+    InvalidMessage,
+    ReconstructionMismatch,
+    InvalidInteropCalldata
+} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 

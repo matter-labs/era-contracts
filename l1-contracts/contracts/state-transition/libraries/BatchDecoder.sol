@@ -275,17 +275,17 @@ library BatchDecoder {
                 multichainBatchRoots,
                 settlementFeePayer
             ) = abi.decode(
-                _executeData[1:],
-                (
-                    IExecutor.StoredBatchInfo[],
-                    PriorityOpsBatchInfo[],
-                    InteropRoot[][],
-                    L2Log[][],
-                    bytes[][],
-                    bytes32[],
-                    address
-                )
-            );
+                    _executeData[1:],
+                    (
+                        IExecutor.StoredBatchInfo[],
+                        PriorityOpsBatchInfo[],
+                        InteropRoot[][],
+                        L2Log[][],
+                        bytes[][],
+                        bytes32[],
+                        address
+                    )
+                );
         } else {
             revert UnsupportedExecuteBatchEncoding(encodingVersion);
         }

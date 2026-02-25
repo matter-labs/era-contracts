@@ -69,7 +69,7 @@ import {
     InvalidInteropChainId,
     InvalidL2ShardId,
     InvalidServiceLog,
-    InvalidEmptyMessageRoot,
+    InvalidEmptyMultichainBatchRoot,
     RegisterNewTokenNotAllowed,
     InvalidFeeRecipient,
     SettlementFeePayerNotAgreed
