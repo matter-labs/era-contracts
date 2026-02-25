@@ -60,7 +60,7 @@ export async function executeTokenTransfer(
   const runner = new DeploymentRunner();
   const state = runner.loadState();
   if (!state.chains?.l2 || !state.testTokens) {
-    throw new Error("State missing. Run 'yarn step:all' and 'yarn deploy:test-token' first.");
+    throw new Error("State missing. Run 'yarn start' and 'yarn deploy:test-token' first.");
   }
 
   const sourceChain = state.chains.l2.find((chain) => chain.chainId === sourceChainId);

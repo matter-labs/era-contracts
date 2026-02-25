@@ -38,7 +38,7 @@ async function main() {
     await new providers.JsonRpcProvider(sourceChain.rpcUrl).getBlockNumber();
     await new providers.JsonRpcProvider(targetChain.rpcUrl).getBlockNumber();
   } catch {
-    throw new Error("RPC endpoints are not reachable. Run 'yarn step:all' first.");
+    throw new Error("RPC endpoints are not reachable. Run 'yarn start' first.");
   }
 
   if (!state.testTokens) {

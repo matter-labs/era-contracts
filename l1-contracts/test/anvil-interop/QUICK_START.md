@@ -20,10 +20,10 @@
 ### Option A: All at Once (Recommended)
 
 ```bash
-yarn step:all
+yarn start
 ```
 
-This runs steps 1-5 automatically with proper error handling.
+This runs all steps automatically (start chains, deploy L1, register L2s, initialize, setup gateway) and keeps the environment running until Ctrl+C.
 
 ### Option B: Step by Step
 
@@ -35,10 +35,10 @@ yarn step4  # Initialize L2 (L2GenesisUpgrade with isZKsyncOS=true)
 yarn step5  # Setup gateway
 ```
 
-## Testing L2→L2 Messaging
+## Testing L2->L2 Messaging
 
 ```bash
-# Basic test (chain 11 → chain 12)
+# Basic test (chain 11 -> chain 12)
 yarn send:l2-to-l2
 
 # Custom parameters
@@ -73,17 +73,8 @@ ls outputs/state/
 | Issue                       | Solution                                            |
 | --------------------------- | --------------------------------------------------- |
 | "L2 chains not found"       | Run `yarn step1` first                              |
-| step:all stops at step1     | **FIXED** - now uses detached processes             |
 | "Could not read [Contract]" | Run `forge build` first                             |
 | Transaction reverted        | Check gas limit (should be 50M), verify L1 deployed |
-
-## Key Changes
-
-- ✅ **Anvil processes now stay running** after step1 exits
-- ✅ **Uses L2GenesisUpgrade** with `isZKsyncOS = true`
-- ✅ **Normal solc bytecodes** from `out/` directory
-- ✅ **PID tracking** for process management
-- ✅ **step:all works correctly** now
 
 ## What's Next?
 
@@ -93,10 +84,3 @@ After successful setup:
 - `yarn test:interop` - Run interop tests
 - `yarn deploy:test-token` - Deploy test ERC20 token
 - `yarn send:token` - Send token transfers
-
----
-
-For detailed technical information, see:
-
-- `FIXED_L2_SETUP.md` - Complete changelog
-- `L2_GENESIS_UPGRADE_CHANGES.md` - Technical details

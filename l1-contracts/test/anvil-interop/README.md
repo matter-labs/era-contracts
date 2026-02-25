@@ -50,10 +50,10 @@ test/anvil-interop/
 ├── step5-setup-gateway.ts     # Step 5: Gateway setup
 ├── step6-start-settler.ts     # Step 6: Start batch settler
 ├── index.ts                   # All-in-one orchestrator
-├── run-all-steps.sh           # Run all steps sequentially
 ├── deploy-test-token.ts       # Deploy test ERC20 token
-├── send-l2-to-l2.ts           # Send L2→L2 interop message
-├── send-token-transfer.ts     # Send cross-chain token transfer
+├── send-interop-tx.ts         # Send L2→L2 interop message (ERC-7930 encoding)
+├── send-l2-to-l2.ts           # Send L2→L2 interop message (ABI encoding)
+├── send-token-simple.ts       # Send cross-chain token transfer
 ├── test-interop.ts            # Test interop functionality
 ├── cleanup.sh                 # Clean up Anvil processes and outputs
 ├── package.json

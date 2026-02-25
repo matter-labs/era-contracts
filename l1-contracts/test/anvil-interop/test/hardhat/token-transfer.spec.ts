@@ -21,7 +21,7 @@ describe("Anvil Interop Hardhat Integration", function () {
     if (process.env.ANVIL_INTEROP_SKIP_SETUP === "1") {
       return;
     }
-    runInteropCommand("yarn step:all");
+    runInteropCommand("yarn start");
     runInteropCommand("yarn deploy:test-token");
   });
 
