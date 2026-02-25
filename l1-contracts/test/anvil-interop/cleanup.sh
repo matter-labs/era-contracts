@@ -8,6 +8,9 @@ set -e
 
 echo "🧹 Cleaning up Anvil interop environment..."
 
+# Known ports used by our Anvil instances
+ANVIL_PORTS="9545 4050 4051 4052"
+
 # Stop all Anvil instances - try graceful shutdown first using PIDs
 echo "Stopping Anvil instances..."
 
@@ -27,44 +30,42 @@ if [ -f "outputs/anvil-pids.json" ]; then
     rm -f outputs/anvil-pids.json
 fi
 
-# Fallback: Kill any remaining anvil processes
-pkill -9 -f "anvil" 2>/dev/null || true
+# Fallback: Kill processes on known Anvil ports only (not system-wide)
+echo "Checking known Anvil ports..."
+for PORT in $ANVIL_PORTS; do
+    PID=$(lsof -ti :$PORT 2>/dev/null || true)
+    if [ -n "$PID" ]; then
+        echo "  Killing process on port $PORT (PID: $PID)..."
+        kill -9 $PID 2>/dev/null || true
+    fi
+done
 sleep 1
-pkill -9 anvil 2>/dev/null || true
-sleep 1
-
-# Stop any running ts-node processes from previous runs
-pkill -9 -f "ts-node index.ts" 2>/dev/null || true
-pkill -9 -f "ts-node step6-start-settler.ts" 2>/dev/null || true
-pkill -9 -f "yarn start" 2>/dev/null || true
-pkill -9 -f "yarn step6" 2>/dev/null || true
 
 # Clean up step6 log file
 rm -f /tmp/step6-output.log 2>/dev/null || true
 
-# Final check
-if pgrep -f "anvil" > /dev/null 2>&1; then
-    echo "⚠️  Warning: Some Anvil processes are still running. Forcing kill..."
-    pkill -9 -f "anvil" 2>/dev/null || true
-    sleep 2
-else
+# Verify ports are free
+ALL_CLEAR=true
+for PORT in $ANVIL_PORTS; do
+    if lsof -ti :$PORT > /dev/null 2>&1; then
+        echo "⚠️  Warning: Port $PORT is still in use"
+        ALL_CLEAR=false
+    fi
+done
+
+if [ "$ALL_CLEAR" = true ]; then
     echo "✅ All Anvil instances stopped"
+else
+    echo "⚠️  Some ports still in use, waiting..."
+    sleep 2
 fi
-
-# Wait for ports to be released
-sleep 2
-
-# Create backup of config files before cleanup (to preserve testnet_verifier and other settings)
-echo "Backing up configuration files..."
-cp config/l1-deployment.toml config/l1-deployment.toml.backup 2>/dev/null || true
-cp config/ctm-deployment.toml config/ctm-deployment.toml.backup 2>/dev/null || true
 
 # Clean up output files
 echo "Cleaning up output files..."
 rm -rf outputs
 mkdir -p outputs
 
-# Reset permanent values to initial state (but preserve config settings)
+# Reset permanent values to initial state
 echo "Resetting permanent values..."
 cat > config/permanent-values.toml << EOF
 [permanent_contracts]
@@ -88,30 +89,12 @@ cd test/anvil-interop
 
 echo "✅ Broadcast and cache files cleaned"
 
-# Restore the original config files to ensure testnet settings are preserved
-# This prevents deployment scripts from potentially modifying or removing these settings
-if [ -f config/l1-deployment.toml.backup ]; then
-    # Extract critical fields from backup and ensure they're in the current config
-    if grep -q "testnet_verifier" config/l1-deployment.toml.backup; then
-        echo "Ensuring testnet_verifier flag is preserved in l1-deployment.toml..."
-        # If testnet_verifier is missing, add it back from backup
-        if ! grep -q "testnet_verifier" config/l1-deployment.toml; then
-            # Add testnet_verifier flag at the top of the file if missing
-            sed -i.tmp '1s/^/testnet_verifier = true\'$'\n/' config/l1-deployment.toml && rm -f config/l1-deployment.toml.tmp
-        fi
+# Verify testnet_verifier flag exists in config files
+for config_file in config/l1-deployment.toml config/ctm-deployment.toml; do
+    if [ -f "$config_file" ] && ! grep -q "testnet_verifier" "$config_file"; then
+        echo "⚠️  Warning: testnet_verifier missing in $config_file"
     fi
-    rm -f config/l1-deployment.toml.backup
-fi
+done
 
-if [ -f config/ctm-deployment.toml.backup ]; then
-    if grep -q "testnet_verifier" config/ctm-deployment.toml.backup; then
-        echo "Ensuring testnet_verifier flag is preserved in ctm-deployment.toml..."
-        if ! grep -q "testnet_verifier" config/ctm-deployment.toml; then
-            sed -i.tmp '1s/^/testnet_verifier = true\'$'\n/' config/ctm-deployment.toml && rm -f config/ctm-deployment.toml.tmp
-        fi
-    fi
-    rm -f config/ctm-deployment.toml.backup
-fi
-
-echo "✅ Cleanup complete! Configuration files preserved with testnet settings."
+echo "✅ Cleanup complete!"
 echo "You can now run 'yarn start' fresh."

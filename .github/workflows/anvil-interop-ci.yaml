@@ -106,19 +106,19 @@ jobs:
         run: yarn
 
       - name: Install anvil-interop dependencies
-        working-directory: l1-contracts/scripts/anvil-interop
+        working-directory: l1-contracts/test/anvil-interop
         run: yarn install
 
       - name: TypeScript type check
-        working-directory: l1-contracts/scripts/anvil-interop
+        working-directory: l1-contracts/test/anvil-interop
         run: npx tsc --noEmit
 
       - name: Build TypeScript
-        working-directory: l1-contracts/scripts/anvil-interop
+        working-directory: l1-contracts/test/anvil-interop
         run: yarn build
 
       - name: Verify file structure
-        working-directory: l1-contracts/scripts/anvil-interop
+        working-directory: l1-contracts/test/anvil-interop
         run: |
           echo "Checking required files..."
           test -f index.ts || (echo "index.ts missing" && exit 1)
@@ -136,7 +136,7 @@ jobs:
           echo "✅ All required files present"
 
       - name: Verify configuration files
-        working-directory: l1-contracts/scripts/anvil-interop
+        working-directory: l1-contracts/test/anvil-interop
         run: |
           echo "Checking configuration files..."
           test -f config/anvil-config.json || (echo "anvil-config.json missing" && exit 1)
@@ -145,7 +145,7 @@ jobs:
           echo "✅ All configuration files present"
 
       - name: Validate JSON configuration
-        working-directory: l1-contracts/scripts/anvil-interop
+        working-directory: l1-contracts/test/anvil-interop
         run: |
           echo "Validating JSON configuration..."
           node -e "JSON.parse(require('fs').readFileSync('config/anvil-config.json', 'utf-8'))"
@@ -204,11 +204,11 @@ jobs:
         run: yarn l2 build:foundry
 
       - name: Install anvil-interop dependencies
-        working-directory: l1-contracts/scripts/anvil-interop
+        working-directory: l1-contracts/test/anvil-interop
         run: yarn install
 
       - name: Start Anvil Interop Environment
-        working-directory: l1-contracts/scripts/anvil-interop
+        working-directory: l1-contracts/test/anvil-interop
         run: |
           echo "Starting Anvil interop environment in background..."
           yarn start > deployment.log 2>&1 &
@@ -261,7 +261,7 @@ jobs:
             -vvv
 
       - name: Deploy test tokens for Hardhat interop test
-        working-directory: l1-contracts/scripts/anvil-interop
+        working-directory: l1-contracts/test/anvil-interop
         run: |
           echo "Deploying test tokens to L2 chains..."
           yarn deploy:test-token
@@ -273,11 +273,11 @@ jobs:
           ANVIL_INTEROP_SKIP_CLEANUP: "1"
         run: |
           echo "Running Hardhat interop token transfer test..."
-          yarn hardhat test scripts/anvil-interop/test/hardhat/token-transfer.spec.ts --network hardhat --no-compile
+          yarn hardhat test test/anvil-interop/test/hardhat/token-transfer.spec.ts --network hardhat --no-compile
 
       - name: Cleanup
         if: always()
-        working-directory: l1-contracts/scripts/anvil-interop
+        working-directory: l1-contracts/test/anvil-interop
         run: |
           echo "Cleaning up Anvil processes..."
           pkill -9 -f "yarn start" 2>/dev/null || true
