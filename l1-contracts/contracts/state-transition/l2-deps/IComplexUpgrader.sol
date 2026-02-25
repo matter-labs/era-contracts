@@ -50,5 +50,15 @@ interface IComplexUpgrader {
         bytes calldata _calldata
     ) external payable;
 
+    /// @notice Executes upgrade with universal force deployments.
+    /// @param _forceDeployments Universal deployment descriptors.
+    /// @param _delegateTo Target contract for delegatecall.
+    /// @param _calldata Calldata passed to delegate target.
+    function forceDeployAndUpgradeUniversal(
+        UniversalContractUpgradeInfo[] calldata _forceDeployments,
+        address _delegateTo,
+        bytes calldata _calldata
+    ) external payable;
+
     function upgrade(address _delegateTo, bytes calldata _calldata) external payable;
 }
