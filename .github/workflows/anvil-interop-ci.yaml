@@ -109,6 +109,7 @@ jobs:
         run: yarn da build:foundry
 
       - name: Build l1-contracts artifacts (solc only, no zksolc)
+        working-directory: l1-contracts
         run: forge build
 
       - name: Install anvil-interop dependencies
