@@ -125,7 +125,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             // Base token is already registered, no need to register it again
             return;
         }
-        _assetTracker().registerNewToken(BASE_TOKEN_ASSET_ID, originChainId[BASE_TOKEN_ASSET_ID]);
+        _assetTracker().registerNewTokenIfNeeded(BASE_TOKEN_ASSET_ID, originChainId[BASE_TOKEN_ASSET_ID]);
     }
 
     /// @notice Updates the contract.

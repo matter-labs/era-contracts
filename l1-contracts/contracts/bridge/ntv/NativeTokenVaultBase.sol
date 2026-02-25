@@ -575,7 +575,11 @@ abstract contract NativeTokenVaultBase is
         assetId[_tokenAddress] = _assetId;
         originChainId[_assetId] = _originChainId;
         _addTokenToTokensList(_assetId);
-        _assetTracker().registerNewToken(_assetId, _originChainId);
+        // Note, that it might be possible that the token is registered on the asset tracker, but not on the
+        // native token vault. An example is when a token is automatically registered for a token that is native to L2
+        // and moves its balance to ZK Gateway in order to use it for interop (i.e. registration got triggered, but the native
+        // token vault was never called since there was no actual withdrawal of the asset).
+        _assetTracker().registerNewTokenIfNeeded(_assetId, _originChainId);
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.

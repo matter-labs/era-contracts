@@ -123,7 +123,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     /// @inheritdoc AssetTrackerBase
-    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
+    function registerNewTokenIfNeeded(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
         if (isAssetRegistered[_assetId]) {
             return;
         }

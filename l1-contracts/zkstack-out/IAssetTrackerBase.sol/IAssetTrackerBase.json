@@ -44,7 +44,7 @@
   },
   {
     "type": "function",
-    "name": "registerNewToken",
+    "name": "registerNewTokenIfNeeded",
     "inputs": [
       {
         "name": "_assetId",

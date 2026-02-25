@@ -376,7 +376,7 @@ contract GWAssetTrackerTest is Test {
         // registerNewToken should always revert on GWAssetTracker
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
         vm.expectRevert(RegisterNewTokenNotAllowed.selector);
-        gwAssetTracker.registerNewToken(ASSET_ID, ORIGIN_CHAIN_ID);
+        gwAssetTracker.registerNewTokenIfNeeded(ASSET_ID, ORIGIN_CHAIN_ID);
     }
 
     function test_RequestPauseDepositsForChain_Unauthorized() public {

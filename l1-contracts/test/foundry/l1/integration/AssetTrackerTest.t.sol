@@ -264,7 +264,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         );
         // Ensure the token is registered before it can be migrated and NTV balance is already migrated.
         vm.prank(address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault));
-        L1AssetTracker(address(assetTracker)).registerNewToken(assetId, originalChainId);
+        L1AssetTracker(address(assetTracker)).registerNewTokenIfNeeded(assetId, originalChainId);
         vm.prank(address(assetTracker));
         IL1NativeTokenVault(address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault))
             .migrateTokenBalanceToAssetTracker(eraZKChainId, assetId);
@@ -434,7 +434,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         );
         // Ensure the token is registered before it can be migrated and NTV balance is already migrated.
         vm.prank(address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault));
-        L1AssetTracker(address(assetTracker)).registerNewToken(assetId, originalChainId);
+        L1AssetTracker(address(assetTracker)).registerNewTokenIfNeeded(assetId, originalChainId);
         vm.prank(address(assetTracker));
         IL1NativeTokenVault(address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault))
             .migrateTokenBalanceToAssetTracker(eraZKChainId, assetId);
@@ -598,7 +598,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encode(baseTokenAssetId)
         );
         vm.prank(address(ecosystemAddresses.bridges.proxies.l1NativeTokenVault));
-        L1AssetTracker(address(assetTracker)).registerNewToken(testAssetId, originalChainId);
+        L1AssetTracker(address(assetTracker)).registerNewTokenIfNeeded(testAssetId, originalChainId);
 
         // Set up initial balances
         vm.store(address(assetTracker), getChainBalanceLocation(testAssetId, originalChainId), bytes32(uint256(10000)));

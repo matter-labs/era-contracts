@@ -163,17 +163,18 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     /// @inheritdoc AssetTrackerBase
-    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
-        _registerNewTokenInner(_originChainId, _assetId);
+    function registerNewTokenIfNeeded(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
+        if (!isAssetRegistered[_assetId]) {
+            _registerNewTokenInner(_originChainId, _assetId);
+        }
     }
 
+    /// @notice An internal function used to register a new token.
+    /// @param _originChainId The origin chain id of the token to register.
+    /// @param _assetId The asset id of the token to register.
+    /// @dev Note, that it assumes that the token is not registered yet. It is important
+    /// that the caller double checks it.
     function _registerNewTokenInner(uint256 _originChainId, bytes32 _assetId) internal {
-        if (isAssetRegistered[_assetId]) {
-            // In reality, we should never hit this error, this is just an invariant check as this function
-            // should be only called for tokens that have not yet been registered.
-            revert AssetAlreadyRegistered(_assetId);
-        }
-
         isAssetRegistered[_assetId] = true;
         chainBalance[_originChainId][_assetId] = MAX_TOKEN_BALANCE;
         // For any new native token, we treat `preV31ChainBalance` as if at the moment of the inception
