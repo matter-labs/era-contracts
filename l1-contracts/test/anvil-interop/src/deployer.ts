@@ -79,7 +79,7 @@ export class ForgeDeployer {
       PERMANENT_VALUES_INPUT: permanentValuesPath,
     };
 
-    const sig = "runForTest(address,bool)";
+    const sig = "runForAnvilTest(address,bool)";
     const args = `${bridgehubAddr} false`;
 
     await this.runForgeScript(scriptPath, envVars, sig, args);

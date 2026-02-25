@@ -2,6 +2,9 @@
 
 import { spawnSync } from "child_process";
 import * as path from "path";
+import { AnvilManager } from "./src/anvil-manager";
+import { DeploymentRunner } from "./src/deployment-runner";
+import { deployTestTokens } from "./deploy-test-token";
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");
@@ -25,6 +28,14 @@ function runOrThrow(command: string, args: string[], cwd: string, env?: NodeJS.P
   }
 }
 
+async function timedAsync<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  const start = Date.now();
+  console.log(`\n⏱️  [TIMING] Starting: ${label} (total elapsed: ${elapsedSince(totalStart)})`);
+  const result = await fn();
+  console.log(`⏱️  [TIMING] Finished: ${label} in ${elapsedSince(start)} (total elapsed: ${elapsedSince(totalStart)})`);
+  return result;
+}
+
 function timedRun(label: string, command: string, args: string[], cwd: string, env?: NodeJS.ProcessEnv): void {
   const start = Date.now();
   console.log(`\n⏱️  [TIMING] Starting: ${label} (total elapsed: ${elapsedSince(totalStart)})`);
@@ -36,20 +47,55 @@ async function main(): Promise<void> {
   const keepChains = process.argv.includes("--keep-chains") || process.env.ANVIL_INTEROP_KEEP_CHAINS === "1";
   const skipSetup = process.env.ANVIL_INTEROP_SKIP_SETUP === "1";
   const skipCleanup = keepChains || process.env.ANVIL_INTEROP_SKIP_CLEANUP === "1";
-  const interopEnv: NodeJS.ProcessEnv = {
-    ...process.env,
-    ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE: process.env.ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE || "1",
-  };
+
+  // Set env for genesis upgrade deployer
+  process.env.ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE = process.env.ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE || "1";
 
   try {
     if (!skipSetup) {
-      timedRun("cleanup", "yarn", ["cleanup"], anvilInteropDir, interopEnv);
-      timedRun("step1 - Start Anvil chains", "yarn", ["step1"], anvilInteropDir, interopEnv);
-      timedRun("step2 - Deploy L1 contracts", "yarn", ["step2"], anvilInteropDir, interopEnv);
-      timedRun("step3 - Register L2 chains", "yarn", ["step3"], anvilInteropDir, interopEnv);
-      timedRun("step4 - Initialize L2 system contracts", "yarn", ["step4"], anvilInteropDir, interopEnv);
-      timedRun("step5 - Setup gateway", "yarn", ["step5"], anvilInteropDir, interopEnv);
-      timedRun("deploy:test-token", "yarn", ["deploy:test-token"], anvilInteropDir, interopEnv);
+      // Cleanup previous state (still uses shell script for process killing)
+      timedRun("cleanup", "yarn", ["cleanup"], anvilInteropDir);
+
+      const runner = new DeploymentRunner();
+      const anvilManager = new AnvilManager();
+      const config = runner.getConfig();
+
+      // Step 1: Start Anvil chains
+      const { chains } = await timedAsync("step1 - Start Anvil chains", () =>
+        runner.step1StartChains(anvilManager)
+      );
+
+      if (!chains.l1) {
+        throw new Error("L1 chain not found");
+      }
+
+      // Step 2: Deploy L1 contracts
+      const { l1Addresses, ctmAddresses } = await timedAsync("step2 - Deploy L1 contracts", () =>
+        runner.step2DeployL1(chains.l1!.rpcUrl)
+      );
+
+      // Step 3+4: Register L2 chains and initialize (pipelined)
+      const { chainAddresses } = await timedAsync("step3+4 - Register & init L2 chains", () =>
+        runner.step3And4RegisterAndInitChains(
+          chains.l1!.rpcUrl,
+          chains.l2,
+          chains.config,
+          l1Addresses,
+          ctmAddresses
+        )
+      );
+
+      // Step 5 + deploy:test-token in parallel (both independent after step 4)
+      const gatewayChainId = config.chains.find((c) => c.isGateway)?.chainId;
+
+      await timedAsync("step5 + deploy:test-token (parallel)", () =>
+        Promise.all([
+          gatewayChainId
+            ? runner.step5SetupGateway(chains.l1!.rpcUrl, gatewayChainId, l1Addresses, ctmAddresses)
+            : Promise.resolve(),
+          deployTestTokens(),
+        ])
+      );
     }
 
     timedRun(
@@ -65,7 +111,7 @@ async function main(): Promise<void> {
       ],
       l1ContractsDir,
       {
-        ...interopEnv,
+        ...process.env,
         ANVIL_INTEROP_SKIP_SETUP: "1",
         ANVIL_INTEROP_SKIP_CLEANUP: "1",
       }
@@ -74,7 +120,7 @@ async function main(): Promise<void> {
     console.log(`\n⏱️  [TIMING] Total test run: ${elapsedSince(totalStart)}`);
   } finally {
     if (!skipCleanup) {
-      runOrThrow("yarn", ["cleanup"], anvilInteropDir, interopEnv);
+      runOrThrow("yarn", ["cleanup"], anvilInteropDir);
     } else if (keepChains) {
       console.log("ℹ️ Keeping Anvil chains running (--keep-chains enabled).");
     }

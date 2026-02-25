@@ -121,7 +121,7 @@ export class DeploymentRunner {
     return { l1Addresses, ctmAddresses };
   }
 
-  async step3RegisterChains(
+  async step3And4RegisterAndInitChains(
     l1RpcUrl: string,
     l2Chains: Array<{ chainId: number; rpcUrl: string }>,
     chainConfigs: AnvilConfig["chains"],
@@ -130,13 +130,17 @@ export class DeploymentRunner {
   ): Promise<{
     chainAddresses: ChainAddresses[];
   }> {
-    console.log("\n=== Step 3: Registering L2 Chains ===\n");
+    console.log("\n=== Step 3+4: Register & Initialize L2 Chains (pipelined) ===\n");
 
     const privateKey = getDefaultAccountPrivateKey();
     const registry = new ChainRegistry(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
 
     const chainAddresses: ChainAddresses[] = [];
+    const initPromises: Promise<void>[] = [];
 
+    // Register chains sequentially on L1 (nonce constraint), but start L2 init
+    // immediately after each registration — L2 inits go to separate chains so
+    // they can run concurrently with the next L1 registration.
     for (const l2Chain of l2Chains) {
       const chainConfig = chainConfigs.find((c) => c.chainId === l2Chain.chainId);
       const isGateway = chainConfig?.isGateway || false;
@@ -152,49 +156,28 @@ export class DeploymentRunner {
       done();
 
       chainAddresses.push(addresses);
-
       console.log(`  Chain ${l2Chain.chainId} registered at: ${addresses.diamondProxy}`);
+
+      // Fire off L2 init immediately (runs on separate L2 Anvil instance)
+      const initDone = timeIt(`initializeL2 chain ${l2Chain.chainId}`);
+      initPromises.push(
+        registry
+          .initializeL2SystemContracts(l2Chain.chainId, addresses.diamondProxy, l2Chain.rpcUrl)
+          .then(() => {
+            initDone();
+            console.log(`  Chain ${l2Chain.chainId} system contracts initialized`);
+          })
+      );
     }
+
+    // Wait for any remaining L2 inits to complete
+    await Promise.all(initPromises);
 
     const state = this.loadState();
     state.chainAddresses = chainAddresses;
     this.saveState(state);
 
     return { chainAddresses };
-  }
-
-  async step4InitializeL2(
-    l1RpcUrl: string,
-    chainAddresses: ChainAddresses[],
-    l1Addresses: CoreDeployedAddresses,
-    ctmAddresses: CTMDeployedAddresses
-  ): Promise<void> {
-    console.log("\n=== Step 4: Initializing L2 System Contracts ===\n");
-
-    const privateKey = getDefaultAccountPrivateKey();
-    const registry = new ChainRegistry(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
-
-    // NOTE: Deposits are already enabled since we register chains without --pause-deposits
-    // No need to unpause deposits in this simplified Anvil environment
-    console.log("ℹ️  Deposits already enabled (chains registered without --pause-deposits)\n");
-
-    // Load state to get L2 chain RPC URLs
-    const state = this.loadState();
-    const l2Chains = state.chains?.l2 || [];
-
-    console.log("Initializing L2 system contracts (in parallel)...\n");
-    await Promise.all(
-      chainAddresses.map(async (chain) => {
-        const l2Chain = l2Chains.find((c) => c.chainId === chain.chainId);
-        if (!l2Chain) {
-          throw new Error(`L2 chain ${chain.chainId} not found in state`);
-        }
-        const done = timeIt(`initializeL2SystemContracts chain ${chain.chainId}`);
-        await registry.initializeL2SystemContracts(chain.chainId, chain.diamondProxy, l2Chain.rpcUrl);
-        done();
-        console.log(`  Chain ${chain.chainId} system contracts initialized`);
-      })
-    );
   }
 
   async step5SetupGateway(

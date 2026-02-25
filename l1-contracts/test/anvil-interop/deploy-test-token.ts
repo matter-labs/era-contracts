@@ -7,9 +7,10 @@ import * as fs from "fs";
 import * as path from "path";
 
 /**
- * Deploy TestToken ERC20 to all L2 chains for testing token transfers
+ * Deploy TestToken ERC20 to all L2 chains for testing token transfers.
+ * Deploys to all chains in parallel for speed.
  */
-async function main() {
+export async function deployTestTokens(): Promise<void> {
   console.log("\n=== Deploying TestToken to L2 Chains ===\n");
 
   const runner = new DeploymentRunner();
@@ -36,35 +37,38 @@ async function main() {
 
   const tokenAddresses: { [chainId: number]: string } = {};
 
-  for (const chain of state.chains.l2) {
-    console.log(`🚀 Deploying TestToken on chain ${chain.chainId}...`);
-    const provider = new providers.JsonRpcProvider(chain.rpcUrl);
-    const wallet = new Wallet(privateKey, provider);
+  // Deploy to all chains in parallel
+  await Promise.all(
+    state.chains.l2.map(async (chain) => {
+      console.log(`🚀 Deploying TestToken on chain ${chain.chainId}...`);
+      const provider = new providers.JsonRpcProvider(chain.rpcUrl);
+      const wallet = new Wallet(privateKey, provider);
 
-    try {
-      // Deploy TestToken contract
-      const factory = new ContractFactory(abi, bytecode, wallet);
-      const token = await factory.deploy("Test Token", "TEST", 18);
-      await token.deployed();
+      try {
+        const factory = new ContractFactory(abi, bytecode, wallet);
+        const token = await factory.deploy("Test Token", "TEST", 18);
+        await token.deployed();
 
-      const tokenAddress = token.address;
-      tokenAddresses[chain.chainId] = tokenAddress;
+        const tokenAddress = token.address;
+        tokenAddresses[chain.chainId] = tokenAddress;
 
-      console.log(`   ✅ TestnetERC20Token deployed at ${tokenAddress}`);
+        console.log(`   ✅ TestnetERC20Token deployed at ${tokenAddress} (chain ${chain.chainId})`);
 
-      // Mint some tokens to the deployer
-      const mintTx = await token.mint(wallet.address, ethers.utils.parseUnits("1000", 18));
-      await mintTx.wait();
+        const mintTx = await token.mint(wallet.address, ethers.utils.parseUnits("1000", 18));
+        await mintTx.wait();
 
-      console.log(`   ✅ Minted 1000 TEST tokens to ${wallet.address}\n`);
-    } catch (error: unknown) {
-      console.error(`   ❌ Failed to deploy on chain ${chain.chainId}: ${(error as Error).message}\n`);
-    }
-  }
+        console.log(`   ✅ Minted 1000 TEST tokens to ${wallet.address} (chain ${chain.chainId})`);
+      } catch (error: unknown) {
+        console.error(`   ❌ Failed to deploy on chain ${chain.chainId}: ${(error as Error).message}\n`);
+      }
+    })
+  );
 
   // Save token addresses to state by updating chains.json
-  state.testTokens = tokenAddresses;
-  fs.writeFileSync(path.join(__dirname, "outputs/state/chains.json"), JSON.stringify(state, null, 2));
+  // Re-load state to avoid overwriting concurrent changes
+  const freshState = runner.loadState();
+  freshState.testTokens = tokenAddresses;
+  runner.saveState(freshState);
 
   console.log("=== ✅ TestToken Deployed to All Chains ===\n");
   console.log("Token Addresses:");
@@ -74,7 +78,10 @@ async function main() {
   console.log();
 }
 
-main().catch((error) => {
-  console.error("❌ Failed:", error);
-  process.exit(1);
-});
+// Allow running as standalone script
+if (require.main === module) {
+  deployTestTokens().catch((error) => {
+    console.error("❌ Failed:", error);
+    process.exit(1);
+  });
+}

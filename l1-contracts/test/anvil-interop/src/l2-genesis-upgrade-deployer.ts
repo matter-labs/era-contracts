@@ -181,9 +181,11 @@ export class L2GenesisUpgradeDeployer {
   }
 
   private async ensurePredeployedContracts(): Promise<void> {
-    for (const contractSpec of PREDEPLOY_CONTRACTS) {
-      await this.ensureSystemContract(contractSpec.address, contractSpec.artifactPath, contractSpec.name);
-    }
+    await Promise.all(
+      PREDEPLOY_CONTRACTS.map((contractSpec) =>
+        this.ensureSystemContract(contractSpec.address, contractSpec.artifactPath, contractSpec.name)
+      )
+    );
   }
 
   private async callGenesisUpgradeViaComplexUpgrader(
@@ -272,9 +274,7 @@ export class L2GenesisUpgradeDeployer {
       { addr: GW_ASSET_TRACKER_ADDR, name: "GWAssetTracker" },
     ];
 
-    for (const contractInfo of expectedContracts) {
-      await this.assertCodePresent(contractInfo.addr, contractInfo.name);
-    }
+    await Promise.all(expectedContracts.map((c) => this.assertCodePresent(c.addr, c.name)));
   }
 
   async deployAllSystemContracts(chainId: number): Promise<void> {

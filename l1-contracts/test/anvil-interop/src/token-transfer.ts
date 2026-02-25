@@ -208,10 +208,12 @@ export async function executeTokenTransfer(
     throw new Error("InteropBundleSent event not found in source transaction receipt");
   }
 
-  log(`⏱️  [${elapsed()}] Waiting for relay on target chain...`);
+  log(`⏱️  [${elapsed()}] Checking if relay already delivered bundle on target chain...`);
   let targetTxHash: string | null = null;
-  for (let attempt = 0; attempt < 60 && !targetTxHash; attempt++) {
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+  // Quick check: only a few attempts to see if an external relayer already delivered.
+  // If not, we fall through to direct executeBundle below.
+  for (let attempt = 0; attempt < 3 && !targetTxHash; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
     const currentBlock = await targetProvider.getBlockNumber();
     for (let blockNum = startBlock; blockNum <= currentBlock; blockNum++) {
       const block = await targetProvider.getBlock(blockNum);

@@ -110,7 +110,7 @@ jobs:
 
       - name: Build l1-contracts artifacts (solc only, no zksolc, fast compile)
         working-directory: l1-contracts
-        run: forge build --optimizer-runs 1000
+        run: forge build --optimizer-runs 200
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop

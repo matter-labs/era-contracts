@@ -90,6 +90,18 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         );
     }
 
+    /// @notice Like runForTest but skips saveDiamondSelectors() for faster local testing.
+    function runForAnvilTest(address bridgehub, bool skipL1Deployments) public {
+        runInner(
+            vm.envString("PERMANENT_VALUES_INPUT"),
+            vm.envString("CTM_CONFIG"),
+            vm.envString("CTM_OUTPUT"),
+            bridgehub,
+            false,
+            skipL1Deployments
+        );
+    }
+
     function getAddresses() public view virtual returns (CTMDeployedAddresses memory) {
         return ctmAddresses;
     }
