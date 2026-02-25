@@ -382,6 +382,31 @@ contract CommittingTest is ExecutorTest {
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
+    function test_RevertWhen_IncorrectBatchSLChainId() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        CommitBatchInfoZKsyncOS memory wrongChainBatch = newCommitBatchInfoZKsyncOS;
+        wrongChainBatch.operatorDAInput = operatorDAInput;
+        wrongChainBatch.daCommitment = daCommitment;
+        wrongChainBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        wrongChainBatch.slChainId = 999; // Wrong SL chain ID
+
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = wrongChainBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSignature("SettlementLayerChainIdMismatch()"));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
     function test_RevertWhen_InvalidBlockRange() public {
         bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
         bytes32 daCommitment = bytes32(0);

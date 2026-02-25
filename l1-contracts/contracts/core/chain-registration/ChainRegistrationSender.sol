@@ -15,7 +15,7 @@ import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 
 import {Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
-import {ChainAlreadyRegistered, NoEthAllowed, ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
+import {ChainAlreadyRegistered, ChainsSettlingOnL1, ChainsSettlementLayerMismatch, NoEthAllowed, ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
 import {IL2Bridgehub} from "../bridgehub/IL2Bridgehub.sol";
 
 /// @dev The encoding version of the data.
@@ -57,10 +57,13 @@ contract ChainRegistrationSender is
     /// @notice used to register a chain for interop via a service transaction.abi
     /// @notice this is provided for ease of use, base tokens does not have to be provided.
     /// @notice to prevent spamming, we only allow this to be called once.
+    /// @notice only chains that are settling on the same settlement layer may be registered.
     /// @param chainToBeRegistered the chain to be registered
     /// @param chainRegisteredOn the chain to register on
     function registerChain(uint256 chainToBeRegistered, uint256 chainRegisteredOn) external {
         require(!chainRegisteredOnChain[chainToBeRegistered][chainRegisteredOn], ChainAlreadyRegistered());
+        _checkSettlementLayers(chainToBeRegistered, chainRegisteredOn);
+
         chainRegisteredOnChain[chainToBeRegistered][chainRegisteredOn] = true;
 
         IMailbox chainRegisteredOnAddress = IMailbox(BRIDGE_HUB.getZKChain(chainRegisteredOn));
@@ -76,7 +79,7 @@ contract ChainRegistrationSender is
     /// @notice this is can be called by anyone (via the bridgehub), but baseTokens need to be provided.
     // slither-disable-next-line locked-ether
     function bridgehubDeposit(
-        uint256,
+        uint256 chainRegisteredOn,
         address,
         uint256,
         bytes calldata _data
@@ -94,6 +97,8 @@ contract ChainRegistrationSender is
         if (chainToBeRegisteredAddress == address(0)) {
             revert ZKChainNotRegistered();
         }
+        _checkSettlementLayers(chainToBeRegistered, chainRegisteredOn);
+
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
             l2Contract: L2_BRIDGEHUB_ADDR,
@@ -113,6 +118,20 @@ contract ChainRegistrationSender is
     function _getL2TxCalldata(uint256 chainToBeRegistered) internal view returns (bytes memory) {
         bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(chainToBeRegistered);
         return abi.encodeCall(IL2Bridgehub.registerChainForInterop, (chainToBeRegistered, baseTokenAssetId));
+    }
+
+    /// @notice Checks that both chains are settling on the same settlement layer, which must not be the L1
+    /// @param chainToBeRegistered the chain to be registered
+    /// @param chainRegisteredOn the chain to register on
+    function _checkSettlementLayers(uint256 chainToBeRegistered, uint256 chainRegisteredOn) internal view {
+        uint256 chainToBeRegisteredSettlementLayer = BRIDGE_HUB.settlementLayer(chainToBeRegistered);
+        uint256 chainRegisteredOnSettlementLayer = BRIDGE_HUB.settlementLayer(chainRegisteredOn);
+        if (chainToBeRegisteredSettlementLayer != chainRegisteredOnSettlementLayer) {
+            revert ChainsSettlementLayerMismatch(chainToBeRegisteredSettlementLayer, chainRegisteredOnSettlementLayer);
+        }
+        if (chainToBeRegisteredSettlementLayer == block.chainid) {
+            revert ChainsSettlingOnL1();
+        }
     }
 
     /// @inheritdoc IL1CrossChainSender

@@ -37,6 +37,7 @@ contract GWAssetTrackerFeesTest is Test {
     uint256 public constant OTHER_CHAIN_ID = 271;
     uint256 public constant DESTINATION_CHAIN_ID = 300;
     bytes32 public constant BASE_TOKEN_ASSET_ID = keccak256("baseTokenAssetId");
+    bytes32 public constant DESTINATION_BASE_TOKEN_ASSET_ID = keccak256("destinationBaseTokenAssetId");
 
     event GatewaySettlementFeeUpdated(uint256 indexed oldFee, uint256 indexed newFee);
     event SettlementFeePayerAgreementUpdated(address indexed payer, uint256 indexed chainId, bool agreed);
@@ -128,6 +129,7 @@ contract GWAssetTrackerFeesTest is Test {
             InteropBundle memory bundle = ProcessLogsTestHelper.createSimpleInteropBundle(
                 CHAIN_ID,
                 DESTINATION_CHAIN_ID,
+                DESTINATION_BASE_TOKEN_ASSET_ID,
                 _callsPerBundle[i],
                 keccak256(abi.encode("salt", i, _batchNumber))
             );
@@ -705,6 +707,7 @@ contract GWAssetTrackerFeesTest is Test {
         InteropBundle memory bundle = ProcessLogsTestHelper.createSimpleInteropBundle(
             CHAIN_ID,
             DESTINATION_CHAIN_ID,
+            DESTINATION_BASE_TOKEN_ASSET_ID,
             3,
             keccak256("mixedSalt")
         );
