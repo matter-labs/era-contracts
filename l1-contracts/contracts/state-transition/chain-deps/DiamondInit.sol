@@ -128,6 +128,10 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
         s.zksyncOS = IS_ZKSYNC_OS;
 
+        // All new chains (both ZKsync OS ones and not) have the totalSupply tracked for the base token of the chain.
+        // The only exception are the legacy ZKsync OS chains.
+        s.baseTokenHasTotalSupply = true;
+
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
         assert(L2_TO_L1_LOG_SERIALIZE_SIZE != 2 * 32);

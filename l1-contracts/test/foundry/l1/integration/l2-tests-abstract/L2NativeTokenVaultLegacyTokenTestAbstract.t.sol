@@ -9,19 +9,22 @@ import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {TokenIsLegacy, TokenNotLegacy} from "contracts/common/L1ContractErrors.sol";
 
-import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";
-
 abstract contract L2NativeTokenVaultLegacyTokenTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
 
+    function _setLegacyBridgeMapping(address _l2Token, address _l1Token) internal {
+        stdstore.target(sharedBridgeLegacy).sig("l1TokenAddress(address)").with_key(_l2Token).checked_write(_l1Token);
+    }
+
     function test_registerLegacyToken() external {
-        address l2Token = makeAddr("l2Token");
+        address l2Token = address(new TestnetERC20Token("LegacyToken", "LGC", 18));
         address l1Token = makeAddr("l1Token");
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
@@ -30,11 +33,7 @@ abstract contract L2NativeTokenVaultLegacyTokenTestAbstract is Test, SharedL2Con
         // Verify token is not registered before
         assertEq(l2NativeTokenVault.assetId(l2Token), bytes32(0), "Asset ID should be zero before registration");
 
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
-            abi.encode(l1Token)
-        );
+        _setLegacyBridgeMapping(l2Token, l1Token);
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(l2Token);
 
         // Verify token is registered after
@@ -48,7 +47,7 @@ abstract contract L2NativeTokenVaultLegacyTokenTestAbstract is Test, SharedL2Con
     }
 
     function test_registerLegacyToken_IncorrectConfiguration() external {
-        address l2Token = makeAddr("l2Token");
+        address l2Token = address(new TestnetERC20Token("LegacyToken", "LGC", 18));
         address l1Token = makeAddr("l1Token");
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
@@ -73,11 +72,7 @@ abstract contract L2NativeTokenVaultLegacyTokenTestAbstract is Test, SharedL2Con
         assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
         assertNotEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
 
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
-            abi.encode(l1Token)
-        );
+        _setLegacyBridgeMapping(l2Token, l1Token);
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(l2Token);
 
         assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);
@@ -94,11 +89,7 @@ abstract contract L2NativeTokenVaultLegacyTokenTestAbstract is Test, SharedL2Con
     function test_registerTokenRevertIsLegacy() external {
         address l2Token = makeAddr("l2Token");
         address l1Token = makeAddr("l1Token");
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
-            abi.encode(l1Token)
-        );
+        _setLegacyBridgeMapping(l2Token, l1Token);
 
         vm.expectRevert(TokenIsLegacy.selector);
         INativeTokenVaultBase(L2_NATIVE_TOKEN_VAULT_ADDR).registerToken(l2Token);

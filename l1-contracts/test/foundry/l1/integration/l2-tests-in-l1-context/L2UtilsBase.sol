@@ -142,7 +142,7 @@ library L2UtilsBase {
             address l2AssetTrackerAddress = address(new L2AssetTracker());
             vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId, bytes32(0));
+            L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(_args.l1ChainId, bytes32(0), false);
 
             address gwAssetTrackerAddress = address(new GWAssetTracker());
             vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
@@ -213,6 +213,9 @@ library L2UtilsBase {
                 bytes32(uint256(_args.l2TokenProxyBytecodeHash))
             );
             L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
+
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
         }
 
         // Initialize GWAssetTracker after NTV is deployed (needs WETH_TOKEN)

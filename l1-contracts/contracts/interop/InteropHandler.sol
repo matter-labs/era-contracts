@@ -4,15 +4,7 @@ pragma solidity ^0.8.24;
 
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
-import {
-    L2_BASE_TOKEN_SYSTEM_CONTRACT,
-    L2_INTEROP_CENTER_ADDR,
-    L2_NATIVE_TOKEN_VAULT,
-    L2_MESSAGE_VERIFICATION,
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
-    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
-    L2_COMPLEX_UPGRADER_ADDR
-} from "../common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_MESSAGE_VERIFICATION, L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {
     BUNDLE_IDENTIFIER,
@@ -44,7 +36,6 @@ import {
     InvalidInteropCallVersion
 } from "./InteropErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
-import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 /// @title InteropHandler
 /// @author Matter Labs
@@ -196,8 +187,6 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         bytes memory _bundle,
         CallStatus[] calldata _providedCallStatus
     ) public {
-        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
-
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
             _bundle,
@@ -366,12 +355,6 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         require(isIncluded, MessageNotIncluded());
 
         bundleStatus[_bundleHash] = BundleStatus.Verified;
-
-        /// We send the fact of verification to L1 so that the GWAssetTracker can process the chainBalance changes.
-        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
-
-        // slither-disable-next-line reentrancy-no-eth,unused-return
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(this.verifyBundle.selector, _bundleHash));
 
         // Emit event stating that the bundle was verified.
         emit BundleVerified(_bundleHash);

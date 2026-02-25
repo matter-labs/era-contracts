@@ -279,13 +279,18 @@ contract ExperimentalBridgeTest is Test {
 
     function _deployNTV(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
         addr = _deployNTVWithoutEthToken(_sharedBridgeAddr);
+
+        assetTracker = new L1AssetTracker(address(bridgehub), address(addr), address(0));
+
         vm.prank(bridgeOwner);
         addr.setAssetTracker(address(assetTracker));
 
-        L1AssetTracker assetTracker2 = new L1AssetTracker(address(bridgehub), address(addr), address(0));
-
-        vm.etch(address(assetTracker), address(assetTracker2).code);
-        console.log(address(ntv));
+        // re-do the mock that has been set before inside the `setUp` function, since the assetTracker address has changed
+        vm.mockCall(
+            address(assetTracker),
+            abi.encodeWithSelector(IL1AssetTracker.handleChainBalanceIncreaseOnL1.selector),
+            abi.encode()
+        );
 
         addr.registerEthToken();
     }

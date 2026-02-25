@@ -74,6 +74,13 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
         require(allZKChainsLength == 0, LocallyNoChainsAtGenesis());
     }
 
+    /// @notice Returns whether a chain has not finalized its v31 upgrade marker yet.
+    /// @param _chainId The chain id to query.
+    /// @return True if the chain still stores the pre-v31 placeholder value.
+    function isPreV31(uint256 _chainId) external view returns (bool) {
+        return v31UpgradeChainBatchNumber[_chainId] == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE;
+    }
+
     /// @dev This initializer is used in the v31 upgrade. It is expected that it does not call `_initialize`, since
     /// all the actions from there should've been already performed during the previous deployment.
     function initializeL1V31Upgrade() external reinitializer(2) {

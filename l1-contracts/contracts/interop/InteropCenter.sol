@@ -374,7 +374,7 @@ contract InteropCenter is
             // Burn user value for interop calls.
             if (_totalBurnedCallsValue > 0) {
                 // slither-disable-next-line arbitrary-send-eth
-                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}();
+                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}(_destinationChainId);
             }
         } else {
             uint256 expectedValue = _totalIndirectCallsValue + protocolFee;

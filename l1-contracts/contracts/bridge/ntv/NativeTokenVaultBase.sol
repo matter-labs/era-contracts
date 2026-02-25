@@ -89,7 +89,10 @@ abstract contract NativeTokenVaultBase is
     /// @dev The number of bridged tokens.
     uint256 public bridgedTokensCount;
 
-    /// @dev The mapping of bridged tokens, count => assetId
+    /// @dev The mapping of bridged tokens, count => assetId.
+    /// @dev Note, that this mapping includes not only "bridged" assets, but also native ones
+    /// that were bridged to the other chains as well. For L2 chains it does not include the "base token"
+    /// system contract address.
     mapping(uint256 count => bytes32 assetId) public bridgedTokens;
 
     /// @dev Used to record the index of the bridged token in the bridgedTokens array.
@@ -147,7 +150,6 @@ abstract contract NativeTokenVaultBase is
         bytes32 currentAssetId = assetId[_nativeToken];
         if (currentAssetId == bytes32(0)) {
             tokenAssetId = _registerToken(_nativeToken);
-            _assetTracker().registerNewToken(tokenAssetId, block.chainid);
         } else {
             tokenAssetId = currentAssetId;
         }
@@ -454,20 +456,21 @@ abstract contract NativeTokenVaultBase is
         bytes32 _assetId,
         address _originalCaller
     ) internal {
+        // Note, that in order to track `totalPreV31TotalSupply` correctly in L2AssetTracker,
+        // we have to call it before any balance changes will be performed.
+        _handleBridgeToChain(_chainId, _assetId, _depositAmount);
+
         if (_assetId == _baseTokenAssetId()) {
             require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
             if (_isBridgedToken) {
                 // slither-disable-next-line arbitrary-send-eth
-                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: msg.value}();
+                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: msg.value}(_chainId);
             }
-            _handleBridgeToChain(_chainId, _assetId, _depositAmount);
         } else {
             require(msg.value == 0, NonEmptyMsgValue());
             if (_isBridgedToken) {
                 IBridgedStandardToken(_tokenAddress).bridgeBurn(_originalCaller, _depositAmount);
-                _handleBridgeToChain(_chainId, _assetId, _depositAmount);
             } else {
-                _handleBridgeToChain(_chainId, _assetId, _depositAmount);
                 if (!_depositChecked) {
                     uint256 expectedDepositAmount = _depositFunds(
                         _originalCaller,
@@ -587,7 +590,11 @@ abstract contract NativeTokenVaultBase is
         assetId[_tokenAddress] = _assetId;
         originChainId[_assetId] = _originChainId;
         _addTokenToTokensList(_assetId);
-        _assetTracker().registerNewToken(_assetId, _originChainId);
+        // Note, that it might be possible that the token is registered on the asset tracker, but not on the
+        // native token vault. An example is when a token is automatically registered for a token that is native to L2
+        // and moves its balance to ZK Gateway in order to use it for interop (i.e. registration got triggered, but the native
+        // token vault was never called since there was no actual withdrawal of the asset).
+        _assetTracker().registerNewTokenIfNeeded(_assetId, _originChainId);
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
