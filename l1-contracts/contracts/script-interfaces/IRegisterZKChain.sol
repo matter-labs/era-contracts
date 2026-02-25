@@ -30,6 +30,7 @@ struct RegisterZKChainConfig {
     address l1SharedBridgeProxy;
     bytes diamondCutData;
     bytes forceDeploymentsData;
+    bool isZKsyncOS;
 }
 
 /// @title IRegisterZKChain

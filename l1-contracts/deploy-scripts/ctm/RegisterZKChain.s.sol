@@ -189,7 +189,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
 
     function initializeConfigFromOnChain(address _ctmAddress) internal {
         ChainTypeManagerBase ctm = ChainTypeManagerBase(_ctmAddress);
-        ctmAddresses = AddressIntrospector.getCTMAddresses(ctm);
+        ctmAddresses = AddressIntrospector.getCTMAddresses(ctm, config.isZKsyncOS);
         IL1Bridgehub bridgehub = IL1Bridgehub(ctm.BRIDGE_HUB());
         coreAddresses = AddressIntrospector.getCoreDeployedAddresses(address(bridgehub));
     }
@@ -206,6 +206,9 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_addr");
         config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
+        if (vm.keyExistsToml(toml, "$.is_zk_sync_os")) {
+            config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
+        }
         path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
         initializeConfig(path, chainTypeManagerProxy, chainChainId);
     }
