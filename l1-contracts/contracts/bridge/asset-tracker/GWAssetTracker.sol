@@ -352,6 +352,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 }
             }
         }
+        if (msgCount != _processLogsInputs.messages.length) {
+            revert InvalidMessage();
+        }
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 

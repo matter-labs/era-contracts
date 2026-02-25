@@ -70,6 +70,12 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
+    /// @notice Ensures that the chain uses EraVM
+    modifier onlyEra() {
+        require(!s.zksyncOS, "Only for EraVM-based chains");
+        _;
+    }
+
     /// @notice Allows whitelisted validators, or the `PermissionlessValidator` when Priority Mode is active.
     /// @dev Reverts with {Unauthorized} if `msg.sender` is not authorized for the current mode.
     modifier onlyValidatorOrPriorityMode() {
