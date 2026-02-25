@@ -30,7 +30,6 @@ import {IMessageVerification} from "contracts/common/interfaces/IMessageVerifica
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
-import {NotInGatewayMode} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer {
     // Function selector for requestL2TransactionDirect(L2TransactionRequestDirect)
@@ -393,15 +392,54 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
     }
 
+    /// @notice Test that verifyBundle works while settling on L1.
+    /// @dev Bundle verification is not restricted to gateway mode.
+    function test_verifyBundleWorksWhenSettlingOnL1() public {
+        // Set the L1_CHAIN_ID storage variable in InteropHandler
+        // (The test setup doesn't call initL2, so L1_CHAIN_ID is uninitialized at slot 0)
+        vm.store(L2_INTEROP_HANDLER_ADDR, bytes32(0), bytes32(uint256(L1_CHAIN_ID)));
+
+        InteropBundle memory interopBundle = getInteropBundle(1);
+        bytes memory bundle = abi.encode(interopBundle);
+        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
+
+        // Mock message verification to return true
+        vm.mockCall(
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
+        );
+
+        // Mock currentSettlementLayerChainId to return L1_CHAIN_ID (not in gateway mode)
+        // This simulates the chain settling directly on L1
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
+            abi.encode(L1_CHAIN_ID)
+        );
+
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            1, // BundleStatus.Verified
+            "Bundle should be in Verified status"
+        );
+    }
+
     /// @notice Regression test to ensure bundles can only be verified with matching destination base token asset ID
     function test_verifyBundle_revertWhen_wrongDestinationBaseTokenAssetId() public {
         InteropBundle memory interopBundle = getInteropBundle(1);
+
         bytes32 wrongDestinationBaseTokenAssetId = keccak256("wrongDestinationBaseTokenAssetId");
         interopBundle.destinationBaseTokenAssetId = wrongDestinationBaseTokenAssetId;
 
         bytes memory bundle = abi.encode(interopBundle);
         MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
 
+        // Mock message verification to return true
         vm.mockCall(
             address(L2_MESSAGE_VERIFICATION),
             abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
@@ -418,9 +456,9 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
                 wrongDestinationBaseTokenAssetId
             )
         );
+
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
     }
-
     /// @notice Test pause functionality in InteropCenter
     function test_interopCenter_pause() public {
         address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
@@ -517,59 +555,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             1, // BundleStatus.Verified
             "Bundle should be in Verified status"
         );
-    }
-
-    /// @notice Test that verifyBundle correctly reverts with NotInGatewayMode when settling on L1
-    /// @dev This test verifies the access to currentSettlementLayerChainId works but the
-    ///      business logic correctly rejects verification when not in gateway mode
-    function test_regression_verifyBundleRevertsWhenSettlingOnL1() public {
-        // Set the L1_CHAIN_ID storage variable in InteropHandler
-        // (The test setup doesn't call initL2, so L1_CHAIN_ID is uninitialized at slot 0)
-        vm.store(L2_INTEROP_HANDLER_ADDR, bytes32(0), bytes32(uint256(L1_CHAIN_ID)));
-
-        InteropBundle memory interopBundle = getInteropBundle(1);
-        bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
-
-        // Mock message verification to return true
-        vm.mockCall(
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
-            abi.encode(true)
-        );
-
-        // Mock currentSettlementLayerChainId to return L1_CHAIN_ID (not in gateway mode)
-        // This simulates the chain settling directly on L1
-        vm.mockCall(
-            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
-            abi.encode(L1_CHAIN_ID)
-        );
-
-        // The call to currentSettlementLayerChainId should succeed (access control fixed),
-        // but the function should revert with NotInGatewayMode because we're settling on L1
-        vm.expectRevert(NotInGatewayMode.selector);
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
-    }
-
-    /// @notice Test that unbundleBundle correctly reverts with NotInGatewayMode when settling on L1
-    function test_regression_unbundleBundleRevertsWhenSettlingOnL1() public {
-        // Ensure L1_CHAIN_ID is initialized for InteropHandler
-        vm.store(L2_INTEROP_HANDLER_ADDR, bytes32(0), bytes32(uint256(L1_CHAIN_ID)));
-
-        InteropBundle memory interopBundle = getInteropBundle(1);
-        bytes memory bundle = abi.encode(interopBundle);
-        CallStatus[] memory statuses = new CallStatus[](interopBundle.calls.length);
-
-        // Simulate settling directly on L1
-        vm.mockCall(
-            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
-            abi.encode(L1_CHAIN_ID)
-        );
-
-        vm.expectRevert(NotInGatewayMode.selector);
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(bundle, statuses);
     }
 
     /// @notice Test that executeBundle works in gateway mode by accessing currentSettlementLayerChainId

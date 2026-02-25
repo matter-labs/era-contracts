@@ -330,9 +330,41 @@ struct ProofData {
     bool finalProofNode;
 }
 
-struct TokenBalanceMigrationData {
+/// @dev L2 -> L1 message payload used when migrating token balance from L1 tracking to Gateway tracking.
+/// @param version Encoding version.
+/// @param originToken Token address on origin chain.
+/// @param chainId Chain that is migrating.
+/// @param assetId Asset id being migrated.
+/// @param tokenOriginChainId Origin chain for the token.
+/// @param chainMigrationNumber Chain migration number this message is tied to.
+/// @param assetMigrationNumber Asset migration number currently known on L2. Not yet used, kept for future use.
+/// @param totalWithdrawalsToL1 Total withdrawals initiated from L2 to L1 since v31 tracking started.
+/// @param totalSuccessfulDepositsFromL1 Total successful deposits finalized on L2 since v31 tracking started.
+/// @param totalPreV31TotalSupply Token total supply snapshot captured on L2 before first post-v31 bridge operation.
+struct L1ToGatewayTokenBalanceMigrationData {
     bytes1 version;
-    bool isL1ToGateway;
+    address originToken;
+    uint256 chainId;
+    bytes32 assetId;
+    uint256 tokenOriginChainId;
+    uint256 chainMigrationNumber;
+    uint256 assetMigrationNumber;
+    uint256 totalWithdrawalsToL1;
+    uint256 totalSuccessfulDepositsFromL1;
+    uint256 totalPreV31TotalSupply;
+}
+
+/// @dev L2 -> L1 message payload used when migrating token balance from Gateway tracking back to L1 tracking.
+/// @param version Encoding version.
+/// @param originToken Token address on origin chain.
+/// @param chainId Chain that is migrating.
+/// @param assetId Asset id being migrated.
+/// @param tokenOriginChainId Origin chain for the token.
+/// @param amount Chain balance amount to migrate from Gateway to L1.
+/// @param chainMigrationNumber Chain migration number this message is tied to.
+/// @param assetMigrationNumber Asset migration number currently known on Gateway.
+struct GatewayToL1TokenBalanceMigrationData {
+    bytes1 version;
     address originToken;
     uint256 chainId;
     bytes32 assetId;
@@ -340,6 +372,25 @@ struct TokenBalanceMigrationData {
     uint256 amount;
     uint256 chainMigrationNumber;
     uint256 assetMigrationNumber;
+}
+
+/// @dev L1 -> L2 service transaction payload used to confirm migration processing.
+/// @param chainId Chain that was migrated.
+/// @param assetId Asset id that was migrated.
+/// @param tokenOriginChainId Origin chain for the token.
+/// @param originToken Token address on origin chain.
+/// @param amount Amount moved during the migration finalization on L1.
+/// @param assetMigrationNumber New migration number that should be persisted on L2/Gateway.
+/// @param isL1ToGateway Whether this confirmation corresponds to L1 -> Gateway direction.
+// solhint-disable-next-line gas-struct-packing
+struct MigrationConfirmationData {
+    uint256 chainId;
+    bytes32 assetId;
+    uint256 tokenOriginChainId;
+    address originToken;
+    uint256 amount;
+    uint256 assetMigrationNumber;
+    bool isL1ToGateway;
 }
 
 struct BalanceChange {

@@ -76,7 +76,7 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     /// @notice Initiate the withdrawal of the base token, funds will be available to claim on L1 `finalizeEthWithdrawal` method.
     /// @param _l1Receiver The address on L1 to receive the funds.
     function withdraw(address _l1Receiver) external payable override {
-        uint256 amount = _burnMsgValue();
+        uint256 amount = _burnMsgValue(L2_ASSET_TRACKER.L1_CHAIN_ID());
 
         // Send the L2 log, a user could use it as proof of the withdrawal
         bytes memory message = _getL1WithdrawMessage(_l1Receiver, amount);
@@ -89,7 +89,7 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     /// @param _l1Receiver The address on L1 to receive the funds.
     /// @param _additionalData Additional data to be sent to L1 with the withdrawal.
     function withdrawWithMessage(address _l1Receiver, bytes calldata _additionalData) external payable override {
-        uint256 amount = _burnMsgValue();
+        uint256 amount = _burnMsgValue(L2_ASSET_TRACKER.L1_CHAIN_ID());
 
         // Send the L2 log, a user could use it as proof of the withdrawal
         bytes memory message = _getExtendedWithdrawMessage(_l1Receiver, amount, msg.sender, _additionalData);
@@ -99,13 +99,15 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     }
 
     /// @dev The function burn the sent `msg.value`.
+    /// @param _toChainId The chain ID which the funds are sent to. L1 chain ID is not accessible within this
+    /// contract, so we use 0 as a placeholder to keep the initialization of the contract simpler.
     /// NOTE: Since this contract holds the mapping of all ether balances of the system,
     /// the sent `msg.value` is added to the `this` balance before the call.
     /// So the balance of `address(this)` is always bigger or equal to the `msg.value`!
-    function _burnMsgValue() internal returns (uint256 amount) {
+    function _burnMsgValue(uint256 _toChainId) internal returns (uint256 amount) {
         amount = msg.value;
         /// @dev This function is called to check if the token is withdrawable.
-        L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2(amount);
+        L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2(_toChainId, amount);
 
         // Silent burning of the ether
         unchecked {
@@ -116,8 +118,8 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
         }
     }
 
-    function burnMsgValue() external payable override onlyCallFromInteropCenterOrNTV {
-        _burnMsgValue();
+    function burnMsgValue(uint256 _toChainId) external payable override onlyCallFromInteropCenterOrNTV {
+        _burnMsgValue(_toChainId);
     }
 
     /// @dev Get the message to be sent to L1 to initiate a withdrawal.
