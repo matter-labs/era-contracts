@@ -4,7 +4,13 @@ pragma solidity ^0.8.24;
 
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_MESSAGE_VERIFICATION, L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractInterfaces.sol";
+import {
+    L2_BASE_TOKEN_SYSTEM_CONTRACT,
+    L2_INTEROP_CENTER_ADDR,
+    L2_NATIVE_TOKEN_VAULT,
+    L2_MESSAGE_VERIFICATION,
+    L2_COMPLEX_UPGRADER_ADDR
+} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {
     BUNDLE_IDENTIFIER,
