@@ -4,12 +4,18 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {Vm} from "forge-std/Vm.sol";
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {
+    L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_HANDLER,
+    L2_INTEROP_HANDLER_ADDR,
+    L2_MESSAGE_VERIFICATION,
+    L2_NATIVE_TOKEN_VAULT_ADDR
+} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {InteropBundle, MessageInclusionProof, BundleStatus, CallStatus} from "contracts/common/Messaging.sol";
+import {InteropBundle, MessageInclusionProof} from "contracts/common/Messaging.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
@@ -41,9 +47,9 @@ abstract contract L2InteropTestUtils is Test, SharedL2ContractDeployer {
             if (
                 logs[i].emitter == address(l2InteropCenter) &&
                 logs[i].topics[0] ==
-                keccak256(
-                    "InteropBundleSent(bytes32,bytes32,(bytes1,uint256,uint256,bytes32,bytes32,(bytes1,bool,address,address,uint256,bytes)[],(bytes,bytes,bool)))"
-                )
+                    keccak256(
+                        "InteropBundleSent(bytes32,bytes32,(bytes1,uint256,uint256,bytes32,bytes32,(bytes1,bool,address,address,uint256,bytes)[],(bytes,bytes,bool)))"
+                    )
             ) {
                 data = logs[i].data;
                 break;

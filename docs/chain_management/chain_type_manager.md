@@ -49,7 +49,6 @@ In the current release, each chain will be an instance of ZKsync Era and so the 
 
 1. Firstly, the governance of the CTM will publish the server (including sequencer, prover, etc) that support the new version . This is done offchain. Enough time should be given to various zkStack devs to update their version.
 2. The governance of the CTM will publish the upgrade onchain by automatically executing the following three transactions:
-
    - `setChainCreationParams` ⇒ to ensure that new chains will be created with the version
    - `setValidatorTimelock` (if needed) ⇒ to ensure that the new chains will use the new validator timelock right-away
    - `setNewVersionUpgrade` ⇒ to save the upgrade information that each ST will need to follow to conduct the upgrade on their side.

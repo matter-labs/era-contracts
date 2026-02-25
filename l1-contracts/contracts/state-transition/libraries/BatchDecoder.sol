@@ -5,7 +5,13 @@ pragma solidity ^0.8.21;
 import {IExecutor} from "../chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS, PrecommitInfo} from "../chain-interfaces/ICommitter.sol";
 import {PriorityOpsBatchInfo} from "./PriorityTree.sol";
-import {EmptyData, IncorrectBatchBounds, UnsupportedCommitBatchEncoding, UnsupportedExecuteBatchEncoding, UnsupportedProofBatchEncoding} from "../../common/L1ContractErrors.sol";
+import {
+    EmptyData,
+    IncorrectBatchBounds,
+    UnsupportedCommitBatchEncoding,
+    UnsupportedExecuteBatchEncoding,
+    UnsupportedProofBatchEncoding
+} from "../../common/L1ContractErrors.sol";
 import {InteropRoot, L2Log} from "../../common/Messaging.sol";
 
 /// @author Matter Labs

@@ -57,6 +57,11 @@
     "@blakek/curry" "^2.0.2"
     pathington "^1.1.7"
 
+"@bytecodealliance/preview2-shim@^0.17.2":
+  version "0.17.6"
+  resolved "https://registry.yarnpkg.com/@bytecodealliance/preview2-shim/-/preview2-shim-0.17.6.tgz#3d60f3fde44582b022643fafcee38077594069e5"
+  integrity sha512-n3cM88gTen5980UOBAD6xDcNNL3ocTK8keab21bpx1ONdA+ARj7uD1qoFxOWCyKlkpSi195FH+GeAut7Oc6zZw==
+
 "@colors/colors@1.5.0":
   version "1.5.0"
   resolved "https://registry.npmjs.org/@colors/colors/-/colors-1.5.0.tgz"
@@ -1072,6 +1077,13 @@
     table "^6.8.0"
     undici "^5.14.0"
 
+"@nomicfoundation/slang@1.3.1":
+  version "1.3.1"
+  resolved "https://registry.yarnpkg.com/@nomicfoundation/slang/-/slang-1.3.1.tgz#599cfbbec0d3cf8661833a3887fac258a0c5da94"
+  integrity sha512-gh0+JDjazmevEYCcwVgtuyfBJcV1209gIORZNRjUxbGzbQN0MOhQO9T0ptkzHKCf854gUy27SMxPbAyAu63fvQ==
+  dependencies:
+    "@bytecodealliance/preview2-shim" "^0.17.2"
+
 "@nomicfoundation/solidity-analyzer-darwin-arm64@0.1.1":
   version "0.1.1"
   resolved "https://registry.npmjs.org/@nomicfoundation/solidity-analyzer-darwin-arm64/-/solidity-analyzer-darwin-arm64-0.1.1.tgz"
@@ -1426,11 +1438,6 @@
   integrity sha512-6dKnHZn7fg/iQATVEzqyUOyEidbn05q7YA2mQ9hC0MMXhhV3/JrsxmFSYZAcr7j1yUP700LLhTruvJ3MiQmjJg==
   dependencies:
     antlr4ts "^0.5.0-alpha.4"
-
-"@solidity-parser/parser@^0.17.0":
-  version "0.17.0"
-  resolved "https://registry.npmjs.org/@solidity-parser/parser/-/parser-0.17.0.tgz"
-  integrity sha512-Nko8R0/kUo391jsEHHxrGM07QFdnPGvlmox4rmH0kNiNAashItAilhy4Mv4pK5gQmW5f4sXAF58fwJbmlkGcVw==
 
 "@solidity-parser/parser@^0.18.0":
   version "0.18.0"
@@ -6168,24 +6175,24 @@ prettier-linter-helpers@^1.0.0:
   dependencies:
     fast-diff "^1.1.2"
 
-prettier-plugin-solidity@^1.1.3:
-  version "1.3.1"
-  resolved "https://registry.npmjs.org/prettier-plugin-solidity/-/prettier-plugin-solidity-1.3.1.tgz"
-  integrity sha512-MN4OP5I2gHAzHZG1wcuJl0FsLS3c4Cc5494bbg+6oQWBPuEamjwDvmGfFMZ6NFzsh3Efd9UUxeT7ImgjNH4ozA==
+prettier-plugin-solidity@^2.2.1:
+  version "2.2.1"
+  resolved "https://registry.yarnpkg.com/prettier-plugin-solidity/-/prettier-plugin-solidity-2.2.1.tgz#a564c655e93b6ef7ea8e8128a3668e2e14549004"
+  integrity sha512-LOHfxECJ/gHsY7qi4D7vanz8cVsCf6yFotBapJ5O0qaX0ZR1sGUzbWfMd4JeQYOItFl+wXW9IcjZOdfr6bmSvQ==
   dependencies:
-    "@solidity-parser/parser" "^0.17.0"
-    semver "^7.5.4"
-    solidity-comments-extractor "^0.0.8"
+    "@nomicfoundation/slang" "1.3.1"
+    "@solidity-parser/parser" "^0.20.2"
+    semver "^7.7.3"
 
 prettier@^2.1.2, prettier@^2.3.1, prettier@^2.8.3:
   version "2.8.8"
   resolved "https://registry.npmjs.org/prettier/-/prettier-2.8.8.tgz"
   integrity sha512-tdN8qQGvNjw4CHbY+XXk0JgCXn9QiF21a55rBe5LJAU+kDyC4WQn4+awm2Xfk2lQMk5fKup9XgzTZtGkjBdP9Q==
 
-prettier@^3.0.3:
-  version "3.2.5"
-  resolved "https://registry.npmjs.org/prettier/-/prettier-3.2.5.tgz"
-  integrity sha512-3/GWa9aOC0YeD7LUfvOG2NiDyhOWRvt1k+rcKhOuYnMY24iiCphgneUfJDyFXd6rZCAnuLBv6UeAULtrhT/F4A==
+prettier@^3.8.1:
+  version "3.8.1"
+  resolved "https://registry.yarnpkg.com/prettier/-/prettier-3.8.1.tgz#edf48977cf991558f4fcbd8a3ba6015ba2a3a173"
+  integrity sha512-UOnG6LftzbdaHZcKoPFtOcCKztrQ57WkHDeRD9t/PTQtmT0NHSeWWepj6pS0z/N7+08BHFDQVUrfmfMRcZwbMg==
 
 process-nextick-args@~2.0.0:
   version "2.0.1"
@@ -6688,6 +6695,11 @@ semver@^7.6.2:
   resolved "https://registry.npmjs.org/semver/-/semver-7.6.3.tgz"
   integrity sha512-oVekP1cKtI+CTDvHWYFUcMtsK/00wmAEfyqKfNdARm8u1wNVhSgaX7A8d4UuIlUI5e84iEwOhs7ZPYRmzU9U6A==
 
+semver@^7.7.3:
+  version "7.7.3"
+  resolved "https://registry.yarnpkg.com/semver/-/semver-7.7.3.tgz#4b5f4143d007633a8dc671cd0a6ef9147b8bb946"
+  integrity sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q==
+
 serialize-javascript@6.0.0:
   version "6.0.0"
   resolved "https://registry.npmjs.org/serialize-javascript/-/serialize-javascript-6.0.0.tgz"
@@ -6927,11 +6939,6 @@ solhint@^6.0.1:
     text-table "^0.2.0"
   optionalDependencies:
     prettier "^2.8.3"
-
-solidity-comments-extractor@^0.0.8:
-  version "0.0.8"
-  resolved "https://registry.npmjs.org/solidity-comments-extractor/-/solidity-comments-extractor-0.0.8.tgz"
-  integrity sha512-htM7Vn6LhHreR+EglVMd2s+sZhcXAirB1Zlyrv5zBuTxieCvjfnRpd7iZk75m/u6NOlEyQ94C6TWbBn2cY7w8g==
 
 solidity-coverage@^0.8.5:
   version "0.8.12"

@@ -162,7 +162,6 @@ To compute $2P$ (or $P+P$), there are three cases:
 
 - If $P = O$, then $2P = O$.
 - Else $P = (x, y)$
-
   - If $y = 0$, then $2P = O$.
   - Else $y≠0$, then
 
@@ -179,7 +178,6 @@ To compute $P + Q$ where $P \neq Q$, there are four cases:
 - If $P = 0$ and $Q \neq 0$, then $P + Q = Q$.
 - If $Q = 0$ and $P \neq 0$, then $P + Q = P$.
 - Else $P = (x_{p},\ y_{p})$ and$Q = (x_{q},\ y_{q})$
-
   - If $x_{p} = x_{q}$ (and necessarily $y_{p} \neq y_{q}$), then $P + Q = O$.
   - Else $x_{p} \neq x_{q}$, then
 

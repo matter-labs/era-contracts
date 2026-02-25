@@ -26,8 +26,15 @@ import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddr
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {TxStatus} from "../../common/Messaging.sol";
 
-import {AssetIdAlreadyRegistered, NoFundsTransferred, OriginChainIdNotFound, Unauthorized, WithdrawFailed, ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {ClaimFailedDepositFailed, WrongCounterpart, OnlyFailureStatusAllowed} from "../L1BridgeContractErrors.sol";
+import {
+    AssetIdAlreadyRegistered,
+    NoFundsTransferred,
+    OriginChainIdNotFound,
+    Unauthorized,
+    WithdrawFailed,
+    ZeroAddress
+} from "../../common/L1ContractErrors.sol";
+import {ClaimFailedDepositFailed, OnlyFailureStatusAllowed, WrongCounterpart} from "../L1BridgeContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

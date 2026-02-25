@@ -8,16 +8,16 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {IChainRegistrationSender} from "contracts/core/chain-registration/IChainRegistrationSender.sol";
+
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ADDRESS_ONE, Utils} from "../utils/Utils.sol";
@@ -26,7 +26,6 @@ import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -40,7 +39,12 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "../utils/deploy/Create2AndTransfer.sol";
-import {ZkChainAddresses, StateTransitionDeployedAddresses, CTMDeployedAddresses, CoreDeployedAddresses} from "../utils/Types.sol";
+import {
+    ZkChainAddresses,
+    StateTransitionDeployedAddresses,
+    CTMDeployedAddresses,
+    CoreDeployedAddresses
+} from "../utils/Types.sol";
 import {IRegisterZKChain, RegisterZKChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
 import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 

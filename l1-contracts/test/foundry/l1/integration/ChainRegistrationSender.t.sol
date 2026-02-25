@@ -7,7 +7,10 @@ import {Vm} from "forge-std/Vm.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {CHAIN_REGISTRATION_SENDER_ENCODING_VERSION, ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
+import {
+    CHAIN_REGISTRATION_SENDER_ENCODING_VERSION,
+    ChainRegistrationSender
+} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 
@@ -19,9 +22,8 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
-import {ChainsSettlingOnL1, ChainsSettlementLayerMismatch} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {ChainsSettlementLayerMismatch, ChainsSettlingOnL1} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;

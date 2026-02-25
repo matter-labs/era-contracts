@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {RestrictionValidator} from "contracts/governance/restriction/RestrictionValidator.sol";
-import {IRestriction, RESTRICTION_MAGIC} from "contracts/governance/restriction/IRestriction.sol";
+
 import {NotARestriction} from "contracts/common/L1ContractErrors.sol";
 import {DummyRestriction} from "contracts/dev-contracts/DummyRestriction.sol";
 

@@ -6,7 +6,7 @@ import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
 import {DiamondInit, InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {FeeParams, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -104,8 +104,8 @@ contract UpgradeLogicTest is DiamondCutTest {
             l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
             l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
             l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
-            // initialProtocolVersion: 0,
         });
+        // initialProtocolVersion: 0,
 
         bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
