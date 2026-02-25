@@ -10,18 +10,37 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {IBridgehubBase} from "./IBridgehubBase.sol";
 
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
-import {IL1BaseTokenAssetHandler} from "../../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
+import {IBaseTokenAssetHandler} from "../../bridge/interfaces/IBaseTokenAssetHandler.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 
-import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus, TokenBridgingData} from "../../common/Messaging.sol";
+import {BridgehubL2TransactionRequest, L2Log, L2Message, TokenBridgingData, TxStatus} from "../../common/Messaging.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {AlreadyCurrentSL, NotChainAssetHandler, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
-import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, NoCTMForAssetId, NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../../common/L1ContractErrors.sol";
-import {L2_COMPLEX_UPGRADER_ADDR, GW_ASSET_TRACKER} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    AssetHandlerNotRegistered,
+    AssetIdAlreadyRegistered,
+    AssetIdNotSupported,
+    BridgeHubAlreadyRegistered,
+    CTMAlreadyRegistered,
+    CTMNotRegistered,
+    ChainIdCantBeCurrentChain,
+    ChainIdNotRegistered,
+    ChainIdTooBig,
+    EmptyAssetId,
+    NoCTMForAssetId,
+    NotCurrentSettlementLayer,
+    SettlementLayersMustSettleOnL1,
+    SharedBridgeNotSet,
+    Unauthorized,
+    ZKChainLimitReached,
+    ZeroAddress,
+    ZeroChainId
+} from "../../common/L1ContractErrors.sol";
+import {GW_ASSET_TRACKER, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -300,7 +319,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         if (assetHandlerAddress == address(0)) {
             revert AssetHandlerNotRegistered(baseTokenAssetId);
         }
-        return IL1BaseTokenAssetHandler(assetHandlerAddress).tokenAddress(baseTokenAssetId);
+        return IBaseTokenAssetHandler(assetHandlerAddress).tokenAddress(baseTokenAssetId);
     }
 
     /// @notice Returns all the registered zkChain addresses
@@ -479,7 +498,10 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /// @notice IL1AssetHandler interface, used to migrate (transfer) a chain to the settlement layer.
     /// @param _assetId The asset ID of the chain.
     /// @param _chainId The chain ID of the ZK chain.
-    /// @param _baseTokenBridgingData The data for the base token.
+    /// @param _baseTokenBridgingData The data for the base token. Note, that when migrating L2->L1, this
+    /// data contains ONLY `assetId`. The rest of the data is populated with zeroes and so should not be used.
+    /// When migrating L1->L2 all the fields are populated and can be trusted to be correct, since they are checked in
+    /// the chain asset handler contract.
     /// @return zkChain The address of the ZK chain.
     /// @return ctm The address of the CTM of the chain.
     function forwardedBridgeMint(

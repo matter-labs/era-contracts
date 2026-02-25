@@ -2,10 +2,17 @@
 
 pragma solidity 0.8.28;
 
-import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {
+    TransparentUpgradeableProxy,
+    ITransparentUpgradeableProxy
+} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Proxy} from "@openzeppelin/contracts-v4/proxy/Proxy.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {ConstructorsNotSupported, SystemContractProxyInitialized, NonEmptyMsgValue} from "../common/L1ContractErrors.sol";
+import {
+    ConstructorsNotSupported,
+    SystemContractProxyInitialized,
+    NonEmptyMsgValue
+} from "../common/L1ContractErrors.sol";
 import {ISystemContractProxy} from "./ISystemContractProxy.sol";
 
 /// @notice Proxy contract for system contracts on L2.

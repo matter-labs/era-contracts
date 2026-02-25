@@ -8,7 +8,13 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {CommitBatchInfo, PrecommitInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InteropRoot, L2Log} from "contracts/common/Messaging.sol";
-import {EmptyData, IncorrectBatchBounds, UnsupportedCommitBatchEncoding, UnsupportedExecuteBatchEncoding, UnsupportedProofBatchEncoding} from "contracts/common/L1ContractErrors.sol";
+import {
+    EmptyData,
+    IncorrectBatchBounds,
+    UnsupportedCommitBatchEncoding,
+    UnsupportedExecuteBatchEncoding,
+    UnsupportedProofBatchEncoding
+} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Unit tests for BatchDecoder library
 contract BatchDecoderTest is Test {
@@ -179,12 +185,13 @@ contract BatchDecoderTest is Test {
 
         bytes memory encodedData = abi.encodePacked(
             SUPPORTED_ENCODING_VERSION,
-            abi.encode(executeBatches, priorityOps, dependencyRoots, logs, messages, messageRoots)
+            abi.encode(executeBatches, priorityOps, dependencyRoots, logs, messages, messageRoots, address(0))
         );
 
         (
             IExecutor.StoredBatchInfo[] memory decodedExecuteBatches,
             PriorityOpsBatchInfo[] memory decodedPriorityOps,
+            ,
             ,
             ,
             ,
@@ -217,7 +224,7 @@ contract BatchDecoderTest is Test {
 
         bytes memory encodedData = abi.encodePacked(
             unsupportedVersion,
-            abi.encode(executeBatches, priorityOps, dependencyRoots, logs, messages, messageRoots)
+            abi.encode(executeBatches, priorityOps, dependencyRoots, logs, messages, messageRoots, address(0))
         );
 
         vm.expectRevert(abi.encodeWithSelector(UnsupportedExecuteBatchEncoding.selector, unsupportedVersion));
@@ -237,7 +244,7 @@ contract BatchDecoderTest is Test {
 
         bytes memory encodedData = abi.encodePacked(
             SUPPORTED_ENCODING_VERSION,
-            abi.encode(executeBatches, priorityOps, dependencyRoots, logs, messages, messageRoots)
+            abi.encode(executeBatches, priorityOps, dependencyRoots, logs, messages, messageRoots, address(0))
         );
 
         vm.expectRevert(abi.encodeWithSelector(IncorrectBatchBounds.selector, 100, 200, 11, 12));
@@ -254,7 +261,7 @@ contract BatchDecoderTest is Test {
 
         bytes memory encodedData = abi.encodePacked(
             SUPPORTED_ENCODING_VERSION,
-            abi.encode(executeBatches, priorityOps, dependencyRoots, logs, messages, messageRoots)
+            abi.encode(executeBatches, priorityOps, dependencyRoots, logs, messages, messageRoots, address(0))
         );
 
         vm.expectRevert(EmptyData.selector);
@@ -315,7 +322,8 @@ contract BatchDecoderTest is Test {
             InteropRoot[][] memory,
             L2Log[][] memory,
             bytes[][] memory,
-            bytes32[] memory
+            bytes32[] memory,
+            address
         )
     {
         return BatchDecoder.decodeAndCheckExecuteData(_executeData, _processBatchFrom, _processBatchTo);

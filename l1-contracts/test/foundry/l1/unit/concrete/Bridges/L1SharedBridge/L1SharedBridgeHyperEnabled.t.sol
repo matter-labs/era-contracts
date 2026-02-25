@@ -4,11 +4,10 @@ pragma solidity 0.8.28;
 import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -304,12 +303,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
     function test_finalizeWithdrawal_BaseErcOnErc() public {
         _setBaseTokenAssetId(tokenAssetId);
 
-        bytes memory message = abi.encodePacked(
-            AssetRouterBase.finalizeDeposit.selector,
-            chainId,
-            tokenAssetId,
-            abi.encode(0, alice, 0, amount, new bytes(0))
-        );
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -319,14 +313,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         vm.mockCall(
             messageRootAddress,
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                IMessageVerification.proveL2MessageInclusionShared.selector,
-                chainId
-                // l2BatchNumber,
-                // l2MessageIndex,
-                // l2ToL1Message,
-                // merkleProof
-            ),
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector, chainId),
             abi.encode(true)
         );
 

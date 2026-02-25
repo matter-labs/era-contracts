@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {Vm} from "forge-std/Vm.sol";
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
@@ -14,12 +14,17 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_INTEROP_CENTER,
+    L2_NATIVE_TOKEN_VAULT_ADDR
+} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 
-import {L2InteropTestUtils, BundleExecutionResult} from "./L2InteropTestUtils.sol";
+import {BundleExecutionResult, L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
 abstract contract L2InteropNativeTokenDifferentBaseTestAbstract is L2InteropTestUtils {
@@ -94,7 +99,7 @@ abstract contract L2InteropNativeTokenDifferentBaseTestAbstract is L2InteropTest
             data: empty,
             callAttributes: callAttributes
         });
-        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(UNBUNDLER_ADDRESS);
+        bytes[] memory bundleAttributes = InteropLibrary.buildBundleAttributes(address(0), UNBUNDLER_ADDRESS, false);
 
         L2_INTEROP_CENTER.sendBundle{value: amount}(
             InteroperableAddress.formatEvmV1(destinationChainId),
@@ -108,6 +113,8 @@ abstract contract L2InteropNativeTokenDifferentBaseTestAbstract is L2InteropTest
 
         // Set BASE_TOKEN_ASSET_ID on destination chain L2AssetRouter (slot 256)
         vm.store(L2_ASSET_ROUTER_ADDR, bytes32(uint256(256)), otherBaseTokenAssetId);
+        // Set BASE_TOKEN_ASSET_ID on destination chain L2NativeTokenVault (slot 252)
+        vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(252)), otherBaseTokenAssetId);
 
         // Register asset handler on destination chain for source base token
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);

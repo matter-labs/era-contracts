@@ -3,17 +3,76 @@
 pragma solidity 0.8.28;
 
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, L2_TO_L1_LOG_SERIALIZE_SIZE, MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PACKED_L2_PRECOMMITMENT_LENGTH, PACKED_NUMBER_OF_L1_TRANSACTIONS_LOG_MASK, PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH} from "../../../common/Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, LogProcessingOutput, MAX_LOG_KEY, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
-import {ICommitter, CommitBatchInfo, CommitBatchInfoZKsyncOS, PrecommitInfo} from "../../chain-interfaces/ICommitter.sol";
+import {
+    COMMIT_TIMESTAMP_APPROXIMATION_DELTA,
+    L2_TO_L1_LOG_SERIALIZE_SIZE,
+    MAINNET_CHAIN_ID,
+    MAINNET_COMMIT_TIMESTAMP_NOT_OLDER,
+    MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES,
+    PACKED_L2_BLOCK_TIMESTAMP_MASK,
+    PACKED_L2_PRECOMMITMENT_LENGTH,
+    PACKED_NUMBER_OF_L1_TRANSACTIONS_LOG_MASK,
+    PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS,
+    TESTNET_COMMIT_TIMESTAMP_NOT_OLDER,
+    DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH
+} from "../../../common/Config.sol";
+import {
+    IExecutor,
+    L2_LOG_ADDRESS_OFFSET,
+    L2_LOG_KEY_OFFSET,
+    L2_LOG_VALUE_OFFSET,
+    LogProcessingOutput,
+    MAX_LOG_KEY,
+    SystemLogKey,
+    TOTAL_BLOBS_IN_COMMITMENT
+} from "../../chain-interfaces/IExecutor.sol";
+import {
+    ICommitter,
+    CommitBatchInfo,
+    CommitBatchInfoZKsyncOS,
+    PrecommitInfo
+} from "../../chain-interfaces/ICommitter.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {StoredBatchHashing} from "../StoredBatchHashing.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BOOTLOADER_ADDRESS,
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
+} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {BatchNumberMismatch, CanOnlyProcessOneBatch, EmptyPrecommitData, HashMismatch, IncorrectBatchChainId, InvalidBatchNumber, InvalidLogSender, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, PrecommitmentMismatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, NonZeroBlobToVerifyZKsyncOS, InvalidBlockRange, InvalidTxCountInPriorityMode, ZKsyncOSPrecommitsNotSupported} from "../../../common/L1ContractErrors.sol";
+import {
+    BatchNumberMismatch,
+    CanOnlyProcessOneBatch,
+    EmptyPrecommitData,
+    HashMismatch,
+    IncorrectBatchChainId,
+    InvalidBatchNumber,
+    InvalidLogSender,
+    InvalidNumberOfBlobs,
+    InvalidPackedPrecommitmentLength,
+    InvalidProtocolVersion,
+    InvalidSystemLogsLength,
+    L2TimestampTooBig,
+    LogAlreadyProcessed,
+    MissingSystemLogs,
+    NonIncreasingTimestamp,
+    PrecommitmentMismatch,
+    SystemLogsSizeTooBig,
+    TimeNotReached,
+    TimestampError,
+    TxHashMismatch,
+    UnexpectedSystemLog,
+    UpgradeBatchNumberIsNotZero,
+    ValueMismatch,
+    NonZeroBlobToVerifyZKsyncOS,
+    InvalidBlockRange,
+    InvalidTxCountInPriorityMode,
+    ZKsyncOSPrecommitsNotSupported
+} from "../../../common/L1ContractErrors.sol";
 import {MismatchL2DACommitmentScheme, SettlementLayerChainIdMismatch} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -355,44 +414,48 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             revert BatchNumberMismatch(_previousBatch.batchNumber + 1, _newBatch.batchNumber);
         }
 
-        // we can just ignore l1 da validator output with ZKsync OS:
-        // - used state diffs hash correctness verified within state transition program
-        // - blob commitments/linear hashes verification not supported, we use different way and custom DA validator for blobs with ZKsync OS
-        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
-            _chainId: s.chainId,
-            _batchNumber: uint256(_newBatch.batchNumber),
-            _l2DAValidatorOutputHash: _newBatch.daCommitment,
-            _operatorDAInput: _newBatch.operatorDAInput,
-            _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
-        });
+        // Preventing stack too deep error
+        {
+            // we can just ignore l1 da validator output with ZKsync OS:
+            // - used state diffs hash correctness verified within state transition program
+            // - blob commitments/linear hashes verification not supported, we use different way and custom DA validator for blobs with ZKsync OS
+            L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
+                _chainId: s.chainId,
+                _batchNumber: uint256(_newBatch.batchNumber),
+                _l2DAValidatorOutputHash: _newBatch.daCommitment,
+                _operatorDAInput: _newBatch.operatorDAInput,
+                _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
+            });
+
+            // Theoretically, we can just ignore it, all the DA validators, except `RollupL1DAValidator`, always return a 0 array,
+            // and `RollupL1DAValidator` will fail if we try to submit blobs with ZKsync OS, so it also returns zeroes here.
+            // However, we are double-checking that the L1 DA validator doesn't rely on "EraVM like" blobs verification, just in case.
+            if (
+                daOutput.blobsLinearHashes.length != daOutput.blobsOpeningCommitments.length ||
+                (daOutput.blobsLinearHashes.length != 0 &&
+                    daOutput.blobsLinearHashes.length != TOTAL_BLOBS_IN_COMMITMENT)
+            ) {
+                revert InvalidNumberOfBlobs(
+                    TOTAL_BLOBS_IN_COMMITMENT,
+                    daOutput.blobsOpeningCommitments.length,
+                    daOutput.blobsLinearHashes.length
+                );
+            }
+            uint256 blobsNumber = daOutput.blobsLinearHashes.length;
+            for (uint256 i = 0; i < blobsNumber; ++i) {
+                if (daOutput.blobsLinearHashes[i] != bytes32(0) || daOutput.blobsOpeningCommitments[i] != bytes32(0)) {
+                    revert NonZeroBlobToVerifyZKsyncOS(
+                        i,
+                        daOutput.blobsLinearHashes[i],
+                        daOutput.blobsOpeningCommitments[i]
+                    );
+                }
+            }
+        }
 
         // When priority mode is activated, the batch must contain only priority transactions
         if (s.priorityModeInfo.activated && (_newBatch.numberOfLayer2Txs != 0 || _newBatch.numberOfLayer1Txs == 0)) {
             revert InvalidTxCountInPriorityMode(_newBatch.numberOfLayer2Txs, _newBatch.numberOfLayer1Txs);
-        }
-
-        // Theoretically, we can just ignore it, all the DA validators, except `RollupL1DAValidator`, always return a 0 array,
-        // and `RollupL1DAValidator` will fail if we try to submit blobs with ZKsync OS, so it also returns zeroes here.
-        // However, we are double-checking that the L1 DA validator doesn't rely on "EraVM like" blobs verification, just in case.
-        if (
-            daOutput.blobsLinearHashes.length != daOutput.blobsOpeningCommitments.length ||
-            (daOutput.blobsLinearHashes.length != 0 && daOutput.blobsLinearHashes.length != TOTAL_BLOBS_IN_COMMITMENT)
-        ) {
-            revert InvalidNumberOfBlobs(
-                TOTAL_BLOBS_IN_COMMITMENT,
-                daOutput.blobsOpeningCommitments.length,
-                daOutput.blobsLinearHashes.length
-            );
-        }
-        uint256 blobsNumber = daOutput.blobsLinearHashes.length;
-        for (uint256 i = 0; i < blobsNumber; ++i) {
-            if (daOutput.blobsLinearHashes[i] != bytes32(0) || daOutput.blobsOpeningCommitments[i] != bytes32(0)) {
-                revert NonZeroBlobToVerifyZKsyncOS(
-                    i,
-                    daOutput.blobsLinearHashes[i],
-                    daOutput.blobsOpeningCommitments[i]
-                );
-            }
         }
 
         if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > _newBatch.firstBlockTimestamp) {
@@ -406,6 +469,9 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         }
         if (_newBatch.daCommitmentScheme != s.l2DACommitmentScheme) {
             revert MismatchL2DACommitmentScheme(uint256(_newBatch.daCommitmentScheme), uint256(s.l2DACommitmentScheme));
+        }
+        if (_newBatch.slChainId != block.chainid) {
+            revert SettlementLayerChainIdMismatch();
         }
 
         // The batch proof public input can be calculated as keccak256(state_commitment_before & state_commitment_after & batch_output_hash)
@@ -423,7 +489,8 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 _newBatch.priorityOperationsHash,
                 _newBatch.l2LogsTreeRoot,
                 _expectedSystemContractUpgradeTxHash,
-                _newBatch.dependencyRootsRollingHash
+                _newBatch.dependencyRootsRollingHash,
+                _newBatch.slChainId
             )
         );
 
@@ -652,9 +719,7 @@ contract CommitterFacet is ZKChainBase, ICommitter {
                 let ptr := add(_packedTxPrecommitments, 32)
                 let ptrTo := add(ptr, length)
 
-                for {
-
-                } lt(ptr, ptrTo) {
+                for {} lt(ptr, ptrTo) {
                     ptr := add(ptr, precommitmentLength)
                 } {
                     let txPrecommitment := keccak256(ptr, precommitmentLength)

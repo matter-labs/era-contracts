@@ -2,21 +2,21 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
+// solhint-disable no-unused-import
+import {
+    L2DACommitmentScheme,
+    L2_TO_L1_LOG_SERIALIZE_SIZE,
+    L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
+    L2_TO_L1_LOGS_MERKLE_TREE_DEPTH,
+    SUPPORTED_PROOF_METADATA_VERSION
+} from "system-contracts/contracts/Constants.sol";
+// solhint-enable no-unused-import
+
 /// @dev `keccak256("")`
 bytes32 constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
-/// @dev Bytes in raw L2 log
-/// @dev Equal to the bytes size of the tuple - (uint8 ShardId, bool isService, uint16 txNumberInBatch, address sender,
-/// bytes32 key, bytes32 value)
-uint256 constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
-
 /// @dev The maximum length of the bytes array with L2 -> L1 logs
 uint256 constant MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES = 4 + L2_TO_L1_LOG_SERIALIZE_SIZE * 512;
-
-/// @dev The value of default leaf hash for L2 -> L1 logs Merkle tree
-/// @dev An incomplete fixed-size tree is filled with this value to be a full binary tree
-/// @dev Actually equal to the `keccak256(new bytes(L2_TO_L1_LOG_SERIALIZE_SIZE))`
-bytes32 constant L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = 0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba;
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = bytes32(0);
 
@@ -166,9 +166,6 @@ uint256 constant MAX_NUMBER_OF_ZK_CHAINS = 100;
 /// @dev Used as the `msg.sender` for transactions that relayed via a settlement layer.
 address constant SETTLEMENT_LAYER_RELAY_SENDER = address(uint160(0x1111111111111111111111111111111111111111));
 
-/// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.
-uint256 constant SUPPORTED_PROOF_METADATA_VERSION = 1;
-
 /// @dev The virtual address of the L1 settlement layer.
 address constant L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS = address(
     uint160(uint256(keccak256("L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS")) - 1)
@@ -220,46 +217,20 @@ bytes32 constant DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH = bytes32(uint256(1));
 /// @dev The length of a packed transaction precommitment in bytes. It consists of two parts: 32-byte tx hash and 1-byte status (0 or 1).
 uint256 constant PACKED_L2_PRECOMMITMENT_LENGTH = 33;
 
-/// @dev Pubdata commitment scheme used for DA.
-/// @param NONE Invalid option.
-/// @param EMPTY_NO_DA No DA commitment, used by Validiums.
-/// @param PUBDATA_KECCAK256 Keccak of stateDiffHash and keccak(pubdata). Can be used by custom DA solutions.
-/// @param BLOBS_AND_PUBDATA_KECCAK256 This commitment includes EIP-4844 blobs data. Used by default RollupL1DAValidator.
-/// @param BLOBS_ZKSYNC_OS Keccak of blob versioned hashes filled with pubdata. This commitment scheme is used only for ZKsyncOS.
-enum L2DACommitmentScheme {
-    NONE,
-    EMPTY_NO_DA,
-    PUBDATA_KECCAK256,
-    BLOBS_AND_PUBDATA_KECCAK256,
-    BLOBS_ZKSYNC_OS
-}
-
 /// @dev The L2 data availability commitment scheme that permanent rollups are expected to use.
 L2DACommitmentScheme constant ROLLUP_L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256;
 
-uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
-
-uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_DEPTH = 14 + 1;
-
 /// @dev The start of the pause deposits time window. We pause when migrating to/from gateway.
-uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET = 3 days + 12 hours;
+/// @dev It is set to 0 in this release, since stage1 is not yet supported for chains that settle on top of ZK Gateway.
+uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET = 0;
 
-/// @dev The start of the chain migration window, it equals the PAUSE_DEPOSITS_TIME_WINDOW_START.
-uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET = 3 days + 12 hours;
+/// @dev The delay from `pausedDepositsTimestamp` from which the migration is allowed. It equals the PAUSE_DEPOSITS_TIME_WINDOW_START.
+/// @dev It is set to 0 in this release, since stage1 is not yet supported for chains that settle on top of ZK Gateway.
+uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET = 0;
 
-/// @dev The end of the chain migration window.
-uint256 constant CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET = 4 days + 12 hours;
+uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET = 0;
 
-/// @dev The end of the pause deposits time window. We pause when migrating to/from gateway.
-uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET = 7 days;
-
-uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET = 1;
-
-uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET = 1;
-
-uint256 constant CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET = 1 days;
-
-uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET = 2 days;
+uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET = 0;
 
 /// @dev Default overhead value in L1 gas for each batch during chain creation.
 uint32 constant DEFAULT_BATCH_OVERHEAD_L1_GAS = 1_000_000;
@@ -289,6 +260,9 @@ PubdataPricingMode constant DEFAULT_PUBDATA_PRICING_MODE = PubdataPricingMode.Ro
 
 /// @dev Default maximum gas limit for priority transactions during chain creation.
 uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
+
+/// @dev The total number of support interop attributes.
+uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 5;
 
 /// @dev Migration number used when a chain migrates from L1 to a settlement layer.
 uint256 constant MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER = 1;

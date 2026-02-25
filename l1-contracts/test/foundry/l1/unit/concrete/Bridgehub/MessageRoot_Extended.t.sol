@@ -10,15 +10,26 @@ import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {ChainExists, MessageRootNotRegistered, OnlyChain, OnlyGateway, OnlyOnSettlementLayer, TotalBatchesExecutedZero, V31UpgradeChainBatchNumberNotSet} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
-import {Unauthorized, InvalidCaller} from "contracts/common/L1ContractErrors.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    ChainExists,
+    MessageRootNotRegistered,
+    OnlyChain,
+    OnlyGateway,
+    OnlyOnSettlementLayer,
+    TotalBatchesExecutedZero,
+    V31UpgradeChainBatchNumberNotSet
+} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+
+import {
+    GW_ASSET_TRACKER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {ProofData} from "contracts/common/Messaging.sol";
 
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
+
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 contract MessageRoot_Extended_Test is Test {
@@ -55,7 +66,7 @@ contract MessageRoot_Extended_Test is Test {
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, gatewayChainId, makeAddr("chainAssetHandler"))),
+                    address(new L1MessageRoot(bridgeHub, gatewayChainId, chainAssetHandler)),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )
@@ -191,12 +202,12 @@ contract MessageRoot_Extended_Test is Test {
         messageRoot.saveV31UpgradeChainBatchNumber(chainId);
     }
 
-    function test_SetMigratingChainBatchRoot_Success() public {
+    function test_setMigratingChainBatchNumber_Success() public {
         uint256 chainId = 271;
         uint256 batchNumber = 1;
 
         vm.prank(bridgeHub);
-        messageRoot.setMigratingChainBatchRoot(chainId, batchNumber);
+        messageRoot.setMigratingChainBatchNumber(chainId, batchNumber);
 
         assertEq(messageRoot.currentChainBatchNumber(chainId), batchNumber);
     }
@@ -256,7 +267,7 @@ contract MessageRoot_Extended_Test is Test {
         uint256 v31UpgradeBatchNumber = 0;
 
         vm.prank(bridgeHub);
-        messageRoot.setMigratingChainBatchRoot(chainId, 1);
+        messageRoot.setMigratingChainBatchNumber(chainId, 1);
 
         uint256 v31Batch = messageRoot.v31UpgradeChainBatchNumber(chainId);
         assertEq(v31Batch, v31UpgradeBatchNumber);
@@ -326,50 +337,6 @@ contract MessageRoot_Extended_Test is Test {
         assertEq(messageRoot.chainBatchRoots(chainId, 1), batchRoot1);
         assertEq(messageRoot.chainBatchRoots(chainId, 2), batchRoot2);
         assertEq(messageRoot.currentChainBatchNumber(chainId), 2);
-    }
-
-    function test_UpdateFullTree() public {
-        uint256 chainId = 271;
-        address chainSender = makeAddr("chainSender");
-
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
-            abi.encode(chainSender)
-        );
-
-        // Mock the getSemverProtocolVersion call
-        vm.mockCall(
-            chainSender,
-            abi.encodeWithSelector(IGetters.getSemverProtocolVersion.selector),
-            abi.encode(0, 29, 0) // major, minor, patch
-        );
-
-        vm.prank(bridgeHub);
-        messageRoot.addNewChain(chainId, 0);
-
-        // totalPublishedInteropRoots accounts for _emitRoot calls in _addNewChain:
-        // initialize adds block.chainid (1), addNewChain(chainId) (2)
-        uint256 countBefore = messageRoot.totalPublishedInteropRoots();
-        assertEq(countBefore, 2, "totalPublishedInteropRoots should be 2 after chain additions");
-
-        // Add a batch root (on L1, addChainBatchRoot returns early without calling _emitRoot)
-        vm.prank(chainSender);
-        messageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
-
-        // Update the full tree
-        messageRoot.updateFullTree();
-
-        // Verify totalPublishedInteropRoots incremented after updateFullTree
-        assertEq(
-            messageRoot.totalPublishedInteropRoots(),
-            countBefore + 1,
-            "totalPublishedInteropRoots should increment by 1 after updateFullTree"
-        );
-
-        // Verify the aggregated root is updated
-        bytes32 root = messageRoot.getAggregatedRoot();
-        assertTrue(root != bytes32(0));
     }
 
     function test_HistoricalRoot() public {

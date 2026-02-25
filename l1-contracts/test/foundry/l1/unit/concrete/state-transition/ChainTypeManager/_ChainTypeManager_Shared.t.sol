@@ -13,7 +13,7 @@ import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -26,14 +26,17 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
-import {IChainTypeManager, ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {
+    IChainTypeManager,
+    ChainCreationParams,
+    ChainTypeManagerInitializeData
+} from "contracts/state-transition/IChainTypeManager.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -80,8 +83,8 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
-        // Timestamp needs to be late enough for `pauseDepositsBeforeInitiatingMigration` time checks
-        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET + 1);
+        // Avoid block.timestamp == 0 to keep paused-deposits sentinel semantics stable in tests.
+        vm.warp(1);
 
         interopCenterAddress = makeAddr("interopCenter");
         governor = makeAddr("governor");

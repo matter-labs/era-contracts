@@ -10,29 +10,35 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "../../utils/Utils.sol";
-import {StateTransitionDeployedAddresses, ChainCreationParamsConfig, StateTransitionDeployedAddresses, StateTransitionDeployedAddresses, ZkChainAddresses} from "../../utils/Types.sol";
+import {
+    StateTransitionDeployedAddresses,
+    ChainCreationParamsConfig,
+    StateTransitionDeployedAddresses,
+    StateTransitionDeployedAddresses,
+    ZkChainAddresses
+} from "../../utils/Types.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+
 import {Governance} from "contracts/governance/Governance.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
+
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ContractsBytecodesLib} from "../../utils/bytecode/ContractsBytecodesLib.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
+
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
-import {DeployCTMUtils, CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
-import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
+
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 import {BytecodePublisher} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
@@ -391,7 +397,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             // V29 introspection returns zero for bytecodesSupplier, overwrite with correct value
             ctmAddresses.stateTransition.proxies.bytecodesSupplier = _bytecodesSupplier;
         } else {
-            ctmAddresses = AddressIntrospector.getCTMAddressesZKOS(ChainTypeManagerBase(ctm), config.isZKsyncOS);
+            ctmAddresses = AddressIntrospector.getCTMAddresses(ChainTypeManagerBase(ctm));
             coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehubAddr);
         }
 
@@ -476,7 +482,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
                 coreAddresses.bridgehub.proxies.chainRegistrationSender
             ),
             // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
-            dangerousTestOnlyForcedBeacon: address(0)
+            dangerousTestOnlyForcedBeacon: address(0),
+            zkTokenAssetId: config.zkTokenAssetId
         });
     }
 

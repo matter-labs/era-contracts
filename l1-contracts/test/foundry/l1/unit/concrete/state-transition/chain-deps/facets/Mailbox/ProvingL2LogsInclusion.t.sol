@@ -6,23 +6,25 @@ import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {L2CanonicalTransaction, L2Log, L2Message, MessageInclusionProof} from "contracts/common/Messaging.sol";
 import "forge-std/Test.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/common/Config.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BOOTLOADER_ADDRESS,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {HashedLogIsDefault} from "contracts/common/L1ContractErrors.sol";
 
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 import {TxStatus} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {InvalidSettlementLayerForBatch} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {MigrationInterval} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 
-import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {MerkleTreeNoSort} from "test/foundry/l1/unit/concrete/common/libraries/Merkle/MerkleTreeNoSort.sol";
 import {MessageHashing, ProofData} from "contracts/common/libraries/MessageHashing.sol";
-import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
@@ -47,7 +49,33 @@ contract MailboxL2LogsProve is MailboxTest {
         utilsFacet.util_setTotalBatchesExecuted(2);
         batchNumber = gettersFacet.getTotalBatchesExecuted();
 
-        messageRoot = new L1MessageRoot(address(bridgehub), LEGACY_GW_CHAIN_ID, address(realChainAssetHandler));
+        // Mock getAllZKChainChainIDs to return the test chain so v31 upgrade sets the placeholder
+        uint256[] memory chainIds = new uint256[](1);
+        chainIds[0] = gettersFacet.getChainId();
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
+            abi.encode(chainIds)
+        );
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, gettersFacet.getChainId()),
+            abi.encode(block.chainid)
+        );
+
+        // Deploy messageRoot as a proxy with v31 upgrade initialization so that
+        // v31UpgradeChainBatchNumber is set to the placeholder value, enabling
+        // _noBatchFallback to query l2LogsRootHash from the chain directly.
+        messageRoot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(bridgehub), LEGACY_GW_CHAIN_ID, address(realChainAssetHandler))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+                )
+            )
+        );
+
         vm.mockCall(
             address(bridgehub),
             abi.encodeCall(IBridgehubBase.messageRoot, ()),
@@ -330,6 +358,8 @@ contract MailboxL2LogsProve is MailboxTest {
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: batchNumber - 1, // batch 1
             migrateFromGWBatchNumber: 1000,
+            settlementLayerBatchLowerBound: 0,
+            settlementLayerBatchUpperBound: type(uint256).max,
             settlementLayerChainId: _settlementLayerChainId,
             isActive: false
         });
@@ -465,6 +495,8 @@ contract MailboxL2LogsProve is MailboxTest {
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 5,
             migrateFromGWBatchNumber: 100,
+            settlementLayerBatchLowerBound: 0,
+            settlementLayerBatchUpperBound: type(uint256).max,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });
@@ -534,6 +566,8 @@ contract MailboxL2LogsProve is MailboxTest {
         MigrationInterval memory interval = MigrationInterval({
             migrateToGWBatchNumber: 1,
             migrateFromGWBatchNumber: 5,
+            settlementLayerBatchLowerBound: 0,
+            settlementLayerBatchUpperBound: type(uint256).max,
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });

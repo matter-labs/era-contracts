@@ -5,7 +5,12 @@ import {Test} from "forge-std/Test.sol";
 
 import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Proxy.sol";
-import {BridgeMintNotImplemented, Unauthorized, WithdrawFailed, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {
+    BridgeMintNotImplemented,
+    Unauthorized,
+    WithdrawFailed,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @notice Unit tests for L2WrappedBaseToken contract

@@ -4,6 +4,10 @@ pragma solidity ^0.8.21;
 
 // 0x587df426
 error AlreadyCurrentSL(uint256 blockChainId);
+// 0xd506f12c
+error BaseTokenOriginChainIdNotRegistered();
+// 0x178de541
+error BaseTokenOriginTokenNotRegistered();
 // 0xa695b1ef
 error BatchZeroNotAllowed();
 // 0xb0b5006f
@@ -14,6 +18,12 @@ error ChainBatchRootAlreadyExists(uint256 chainId, uint256 batchNumber);
 error ChainBatchRootZero();
 // 0x65e8a019
 error ChainExists();
+// 0xf8d5f418
+error ChainNotReadyForMigration(uint256 chainId);
+// 0x824e4e26
+error ChainsSettlementLayerMismatch(uint256 chainToRegisterSL, uint256 chainRegisteredOnSL);
+// 0x1ed6c04f
+error ChainsSettlingOnL1();
 // 0x5d03f19d
 error CurrentBatchNumberAlreadySet();
 // 0x68d91b49

@@ -6,10 +6,9 @@ import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Proxy.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ZeroAddress, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract MockNTVForAdditional {
     function L1_CHAIN_ID() external view returns (uint256) {

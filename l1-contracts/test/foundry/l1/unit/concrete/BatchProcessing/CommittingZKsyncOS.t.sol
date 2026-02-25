@@ -2,16 +2,19 @@
 pragma solidity 0.8.28;
 
 import "forge-std/console.sol";
-import {Vm} from "forge-std/Test.sol";
+
 import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
-import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {MismatchL2DACommitmentScheme} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
-import {InvalidPubdataHash, InvalidBlobsPublished, BlobNotPublished} from "../../../da-contracts-imports/DAContractsErrors.sol";
+import {
+    InvalidPubdataHash,
+    InvalidBlobsPublished,
+    BlobNotPublished
+} from "../../../da-contracts-imports/DAContractsErrors.sol";
 import {BlobsL1DAValidatorZKsyncOS} from "../../../da-contracts-imports/BlobsL1DAValidatorZKsyncOS.sol";
 
 contract CommittingTest is ExecutorTest {
@@ -379,6 +382,31 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         vm.expectRevert(abi.encodeWithSignature("IncorrectBatchChainId(uint256,uint256)", 999, l2ChainId));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_IncorrectBatchSLChainId() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        CommitBatchInfoZKsyncOS memory wrongChainBatch = newCommitBatchInfoZKsyncOS;
+        wrongChainBatch.operatorDAInput = operatorDAInput;
+        wrongChainBatch.daCommitment = daCommitment;
+        wrongChainBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        wrongChainBatch.slChainId = 999; // Wrong SL chain ID
+
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = wrongChainBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSignature("SettlementLayerChainIdMismatch()"));
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 

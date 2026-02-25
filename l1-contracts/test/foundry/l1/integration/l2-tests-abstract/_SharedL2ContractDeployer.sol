@@ -16,8 +16,21 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
 import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_ROUTER, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "contracts/common/Config.sol";
+import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_ROUTER,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_HANDLER_ADDR,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
+} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -28,8 +41,13 @@ import {IL2AssetRouter} from "../../../../../contracts/bridge/asset-router/IL2As
 import {IL1Nullifier} from "../../../../../contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "../../../../../contracts/bridge/asset-router/IL1AssetRouter.sol";
 
-import {BridgehubL2TransactionRequest, L2Message, MessageInclusionProof, TokenBridgingData} from "../../../../../contracts/common/Messaging.sol";
-import {IInteropCenter, InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
+import {
+    BridgehubL2TransactionRequest,
+    L2Message,
+    MessageInclusionProof,
+    TokenBridgingData
+} from "../../../../../contracts/common/Messaging.sol";
+import {InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
 import {L2WrappedBaseToken} from "../../../../../contracts/bridge/L2WrappedBaseToken.sol";
 import {L2SharedBridgeLegacy} from "../../../../../contracts/bridge/L2SharedBridgeLegacy.sol";
 import {MailboxFacet} from "../../../../../contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -38,7 +56,7 @@ import {DataEncoding} from "../../../../../contracts/common/libraries/DataEncodi
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
+
 import {SystemContractsArgs} from "./Utils.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
@@ -98,8 +116,8 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     }
 
     function setUpInner(bool _skip) public virtual {
-        // Timestamp needs to be big enough for `pauseDepositsBeforeInitiatingMigration` time checks
-        vm.warp(PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET + 1);
+        // Avoid block.timestamp == 0 to keep paused-deposits sentinel semantics stable in tests.
+        vm.warp(1);
 
         if (_skip) {
             vm.startBroadcast();
@@ -188,7 +206,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
 
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
+            abi.encodeWithSelector(IBaseToken.burnMsgValue.selector),
             abi.encode(bytes(""))
         );
         vm.mockCall(

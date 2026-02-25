@@ -3,7 +3,15 @@
 pragma solidity 0.8.28;
 
 import {IMigrator} from "../../chain-interfaces/IMigrator.sol";
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, ZKChainCommitment, CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET, CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET, CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "../../../common/Config.sol";
+import {
+    L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS,
+    L2DACommitmentScheme,
+    ZKChainCommitment,
+    CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
+    CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET,
+    PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+    PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET
+} from "../../../common/Config.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {IZKChain} from "../../../state-transition/chain-interfaces/IZKChain.sol";
@@ -11,7 +19,26 @@ import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAssetHandler.sol";
-import {AlreadyMigrated, PriorityQueueNotFullyProcessed, TotalPriorityTxsIsZero, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted, MigrationInProgress} from "../../L1StateTransitionErrors.sol";
+import {
+    AlreadyMigrated,
+    PriorityQueueNotFullyProcessed,
+    TotalPriorityTxsIsZero,
+    ContractNotDeployed,
+    DepositsAlreadyPaused,
+    DepositsNotPaused,
+    ExecutedIsNotConsistentWithVerified,
+    InvalidNumberOfBatchHashes,
+    NotAllBatchesExecuted,
+    NotChainAdmin,
+    NotEraChain,
+    NotHistoricalRoot,
+    NotL1,
+    NotMigrated,
+    OutdatedProtocolVersion,
+    ProtocolVersionNotUpToDate,
+    VerifiedIsNotConsistentWithCommitted,
+    MigrationInProgress
+} from "../../L1StateTransitionErrors.sol";
 import {NotAZKChain, NotCompatibleWithPriorityMode} from "../../../common/L1ContractErrors.sol";
 import {OnlyGateway} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
@@ -38,14 +65,8 @@ contract MigratorFacet is ZKChainBase, IMigrator {
     /// @notice The timestamp when chain migration becomes available.
     uint256 internal immutable CHAIN_MIGRATION_TIME_WINDOW_START;
 
-    /// @notice The timestamp when chain migration is no longer available.
-    uint256 internal immutable CHAIN_MIGRATION_TIME_WINDOW_END;
-
     /// @notice The timestamp when deposits start being paused.
     uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_START;
-
-    /// @notice The timestamp when deposits stop being paused.
-    uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_END;
 
     constructor(uint256 _l1ChainId, bool _isTestnet) {
         L1_CHAIN_ID = _l1ChainId;
@@ -53,15 +74,9 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         CHAIN_MIGRATION_TIME_WINDOW_START = _isTestnet
             ? CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET
             : CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET;
-        CHAIN_MIGRATION_TIME_WINDOW_END = _isTestnet
-            ? CHAIN_MIGRATION_TIME_WINDOW_END_TESTNET
-            : CHAIN_MIGRATION_TIME_WINDOW_END_MAINNET;
         PAUSE_DEPOSITS_TIME_WINDOW_START = _isTestnet
             ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET
             : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
-        PAUSE_DEPOSITS_TIME_WINDOW_END = _isTestnet
-            ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
-            : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET;
     }
 
     modifier onlyL1() {
@@ -87,7 +102,7 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         if (s.priorityModeInfo.canBeActivated) {
             revert NotCompatibleWithPriorityMode();
         }
-        require(s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp, DepositsAlreadyPaused());
+        require(s.pausedDepositsTimestamp == 0, DepositsAlreadyPaused());
         uint256 timestamp;
         // Note, if the chain is new (total number of priority transactions is 0) we allow admin to pause the deposits with immediate effect.
         // This is in place to allow for faster migration for newly spawned chains.
@@ -109,11 +124,7 @@ contract MigratorFacet is ZKChainBase, IMigrator {
 
     /// @inheritdoc IMigrator
     function unpauseDeposits() external onlyAdmin onlyL1 {
-        require(
-            s.pausedDepositsTimestamp != 0 &&
-                s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp,
-            DepositsNotPaused()
-        );
+        require(s.pausedDepositsTimestamp != 0, DepositsNotPaused());
         require(
             !IL1ChainAssetHandler(IL1Bridgehub(s.bridgehub).chainAssetHandler()).isMigrationInProgress(s.chainId),
             MigrationInProgress()
@@ -154,8 +165,7 @@ contract MigratorFacet is ZKChainBase, IMigrator {
 
         uint256 timestamp = s.pausedDepositsTimestamp;
         require(
-            timestamp + CHAIN_MIGRATION_TIME_WINDOW_START < block.timestamp &&
-                block.timestamp < timestamp + CHAIN_MIGRATION_TIME_WINDOW_END,
+            timestamp != 0 && timestamp + CHAIN_MIGRATION_TIME_WINDOW_START <= block.timestamp,
             DepositsNotPaused()
         );
 

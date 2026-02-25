@@ -16,7 +16,7 @@ import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {ChainTypeManagerBase} from "../../../contracts/state-transition/ChainTypeManagerBase.sol";
+
 import {GetDiamondCutData} from "../../utils/GetDiamondCutData.sol";
 
 contract DefaultChainUpgrade is Script {

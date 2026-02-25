@@ -3,7 +3,13 @@
 pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
-import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "../../common/Messaging.sol";
+import {
+    BridgehubL2TransactionRequest,
+    L2CanonicalTransaction,
+    L2Log,
+    L2Message,
+    TxStatus
+} from "../../common/Messaging.sol";
 
 /// @title The interface of the ZKsync Mailbox contract that provides functions for L1 <-> L2 interaction.
 /// @author Matter Labs

@@ -15,10 +15,14 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
-import {AssetHandlerDoesNotExist, AssetIdNotSupported, Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
+import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
+import {
+    AssetHandlerDoesNotExist,
+    AssetIdNotSupported,
+    Unauthorized,
+    UnsupportedEncodingVersion
+} from "../../common/L1ContractErrors.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -194,7 +198,9 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @notice Finalize the withdrawal and release funds.
     /// @param _chainId The chain ID of the transaction to check.
     /// @param _assetId The bridged asset ID.
-    /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+    /// @param _transferData The data used to finalize the withdrawal, it includes the data needed for the asset handler (e.g. NativeTokenVault).
+    /// @dev Important note is that chains can be potentially malicious and provide arbitrary data here, so in case
+    /// a piece of data affects other chains than the `_chainId`, special care needs to be applied for validation.
     /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
     /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
     function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) public payable virtual;
