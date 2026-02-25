@@ -1,8 +1,12 @@
 import type { providers } from "ethers";
 import { Contract, Wallet, utils } from "ethers";
-import type { ChainAddresses, CoreDeployedAddresses } from "./types";
 import { sleep, loadAbiFromOut } from "./utils";
-import { INTEROP_BUNDLE_TUPLE_TYPE, INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR } from "./const";
+import {
+  INTEROP_BUNDLE_SENT_TOPIC,
+  INTEROP_BUNDLE_TUPLE_TYPE,
+  INTEROP_CENTER_ADDR,
+  L2_INTEROP_HANDLER_ADDR,
+} from "./const";
 
 /**
  * L2→L2 Cross-Chain Relayer
@@ -17,36 +21,21 @@ import { INTEROP_BUNDLE_TUPLE_TYPE, INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR
  * - Data: ABI-encoded (targetChainId, targetAddress, targetCalldata)
  */
 export class L2ToL2Relayer {
-  private l1Provider: providers.JsonRpcProvider;
   private l2Providers: Map<number, providers.JsonRpcProvider>;
   private l1Wallet: Wallet;
-  private l1Addresses: CoreDeployedAddresses;
-  private chainAddresses: Map<number, ChainAddresses>;
   private isRunning: boolean = false;
   private pollingInterval: number = 2000; // 2 seconds
   private lastProcessedBlocks: Map<number, number> = new Map();
   private processedTxHashes: Set<string> = new Set();
 
-  // InteropCenter system contract address
-  private readonly INTEROP_CENTER_ADDR = INTEROP_CENTER_ADDR;
-
-  // InteropBundleSent event signature
-  // event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle interopBundle)
-  private readonly INTEROP_BUNDLE_SENT_TOPIC = "0xd5e1642d9c6ff371d1f102384c70a9a38530493e4747a53919f128685013cb6e";
-
   constructor(
     l1Provider: providers.JsonRpcProvider,
     l2Providers: Map<number, providers.JsonRpcProvider>,
     privateKey: string,
-    l1Addresses: CoreDeployedAddresses,
-    chainAddresses: Map<number, ChainAddresses>,
     pollingIntervalMs: number = 2000
   ) {
-    this.l1Provider = l1Provider;
     this.l2Providers = l2Providers;
     this.l1Wallet = new Wallet(privateKey, l1Provider);
-    this.l1Addresses = l1Addresses;
-    this.chainAddresses = chainAddresses;
     this.pollingInterval = pollingIntervalMs;
 
     // Initialize last processed blocks for each L2
@@ -161,8 +150,8 @@ export class L2ToL2Relayer {
 
     for (const log of receipt.logs) {
       if (
-        log.address.toLowerCase() === this.INTEROP_CENTER_ADDR.toLowerCase() &&
-        log.topics[0] === this.INTEROP_BUNDLE_SENT_TOPIC
+        log.address.toLowerCase() === INTEROP_CENTER_ADDR.toLowerCase() &&
+        log.topics[0] === INTEROP_BUNDLE_SENT_TOPIC
       ) {
         foundInteropEvent = true;
         interopEventLog = log;
@@ -178,7 +167,7 @@ export class L2ToL2Relayer {
     console.log(`      Source Tx Hash: ${txHash}`);
 
     try {
-      await this.relayCrossChainMessage(sourceChainId, txHash, interopEventLog, provider);
+      await this.relayCrossChainMessage(sourceChainId, interopEventLog);
       this.processedTxHashes.add(txHash);
       console.log("      ✅ Cross-chain message relayed");
     } catch (error: unknown) {
@@ -186,14 +175,8 @@ export class L2ToL2Relayer {
     }
   }
 
-  private async relayCrossChainMessage(
-    sourceChainId: number,
-    _sourceTxHash: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    interopEventLog: any,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _sourceProvider: providers.JsonRpcProvider
-  ): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async relayCrossChainMessage(sourceChainId: number, interopEventLog: any): Promise<void> {
     // Parse InteropBundleSent event to extract destination chain and calls
     const abiCoder = new utils.AbiCoder();
 
@@ -297,10 +280,4 @@ export class L2ToL2Relayer {
     }
   }
 
-  getStats(): { processedMessages: number; chainsMonitored: number } {
-    return {
-      processedMessages: this.processedTxHashes.size,
-      chainsMonitored: this.l2Providers.size,
-    };
-  }
 }

@@ -4,11 +4,9 @@ import { utils } from "ethers";
 import {
   ETH_TOKEN_ADDRESS,
   L1_CHAIN_ID,
-  L2_COMPLEX_UPGRADER_ADDR,
-  L2_GENESIS_UPGRADE_ADDR,
   ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE,
 } from "./const";
-import { encodeNtvAssetId, loadAbiFromOut } from "./utils";
+import { encodeNtvAssetId } from "./utils";
 
 /**
  * Helper for building L2GenesisUpgrade data structures
@@ -28,7 +26,7 @@ import { encodeNtvAssetId, loadAbiFromOut } from "./utils";
  * DO NOT use zksolc or zkout/ - these contracts MUST come from regular Solc compilation.
  */
 
-export interface BytecodeInfo {
+interface BytecodeInfo {
   messageRootBytecodeInfo: string;
   l2NtvBytecodeInfo: string;
   l2AssetRouterBytecodeInfo: string;
@@ -40,7 +38,7 @@ export interface BytecodeInfo {
   assetTrackerBytecodeInfo: string;
 }
 
-export interface FixedForceDeploymentsData {
+interface FixedForceDeploymentsData {
   l1ChainId: bigint;
   gatewayChainId: bigint;
   eraChainId: bigint;
@@ -63,7 +61,7 @@ export interface FixedForceDeploymentsData {
   dangerousTestOnlyForcedBeacon: string;
 }
 
-export interface ZKChainSpecificForceDeploymentsData {
+interface ZKChainSpecificForceDeploymentsData {
   l2LegacySharedBridge: string;
   predeployedL2WethAddress: string;
   baseTokenL1Address: string;
@@ -93,7 +91,7 @@ export interface ZKChainSpecificForceDeploymentsData {
  *
  * DO NOT use this with zksolc bytecode - only regular Solc bytecode.
  */
-export function hashL2Bytecode(bytecode: string): string {
+function hashL2Bytecode(bytecode: string): string {
   // Remove 0x prefix if present
   if (bytecode.startsWith("0x")) {
     bytecode = bytecode.slice(2);
@@ -150,7 +148,7 @@ export function hashL2Bytecode(bytecode: string): string {
  *
  * DO NOT read from zkout/ - must read from out/ (regular Solc compilation).
  */
-export function readSolcBytecode(contractsRoot: string, fileName: string, contractName: string): string {
+function readSolcBytecode(contractsRoot: string, fileName: string, contractName: string): string {
   const artifactPath = path.join(contractsRoot, "l1-contracts/out", fileName, `${contractName}.json`);
 
   if (!fs.existsSync(artifactPath)) {
@@ -332,68 +330,3 @@ export function buildAdditionalForceDeploymentsData(baseTokenL1Address: string):
   );
 }
 
-/**
- * Build the complete L2GenesisUpgrade calldata
- */
-export function buildL2GenesisUpgradeCalldata(
-  chainId: number,
-  ctmDeployerAddress: string,
-  l1AssetRouter: string,
-  baseTokenL1Address: string,
-  contractsRoot: string,
-  gatewayChainId: number = L1_CHAIN_ID
-): string {
-  const bytecodeInfo = getBytecodeInfo(contractsRoot);
-  const fixedForceDeploymentsData = buildFixedForceDeploymentsData(
-    chainId,
-    l1AssetRouter,
-    bytecodeInfo,
-    gatewayChainId
-  );
-  const additionalForceDeploymentsData = buildAdditionalForceDeploymentsData(baseTokenL1Address);
-  const genesisUpgradeAbi = loadAbiFromOut("L2GenesisUpgrade.sol/L2GenesisUpgrade.json");
-  const iface = new utils.Interface(genesisUpgradeAbi);
-  return iface.encodeFunctionData("genesisUpgrade", [
-    true,
-    chainId,
-    ctmDeployerAddress,
-    fixedForceDeploymentsData,
-    additionalForceDeploymentsData,
-  ]);
-}
-
-/**
- * Build the L2ComplexUpgrader.upgrade() calldata for L2 genesis initialization
- *
- * CRITICAL: This deploys L2 system contracts compiled with REGULAR SOLC (NOT zksolc).
- * The Solc bytecode is padded and hashed for ZKsync L2 deployment format.
- *
- * The L2ComplexUpgrader receives this calldata and calls L2GenesisUpgrade.genesisUpgrade()
- * to set up the L2 system state with the properly formatted bytecode hashes.
- *
- * Bytecode hashes use SHA256 (not keccak256) to match ZKsync's L2 format.
- */
-export function buildComplexUpgraderCalldata(
-  chainId: number,
-  ctmDeployerAddress: string,
-  l1AssetRouter: string,
-  baseTokenL1Address: string,
-  contractsRoot: string,
-  gatewayChainId: number = L1_CHAIN_ID
-): string {
-  const l2GenesisUpgradeCalldata = buildL2GenesisUpgradeCalldata(
-    chainId,
-    ctmDeployerAddress,
-    l1AssetRouter,
-    baseTokenL1Address,
-    contractsRoot,
-    gatewayChainId
-  );
-  const complexUpgraderAbi = loadAbiFromOut("L2ComplexUpgrader.sol/L2ComplexUpgrader.json");
-  const iface = new utils.Interface(complexUpgraderAbi);
-  return iface.encodeFunctionData("upgrade", [L2_GENESIS_UPGRADE_ADDR, l2GenesisUpgradeCalldata]);
-}
-
-export function getL2ComplexUpgraderAddress(): string {
-  return L2_COMPLEX_UPGRADER_ADDR;
-}

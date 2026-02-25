@@ -27,7 +27,6 @@ export const GW_ASSET_TRACKER_ADDR = "0x0000000000000000000000000000000000010010
 
 export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
 
-export const INTEROP_CALL_TUPLE_TYPE = "tuple(bytes1,bool,address,address,uint256,bytes)";
 export const INTEROP_BUNDLE_TUPLE_TYPE =
   "tuple(bytes1,uint256,uint256,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes))";
 export const INTEROP_BUNDLE_SENT_TOPIC = "0xd5e1642d9c6ff371d1f102384c70a9a38530493e4747a53919f128685013cb6e";

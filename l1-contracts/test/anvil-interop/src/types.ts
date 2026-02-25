@@ -1,5 +1,4 @@
 import type { ChildProcess } from "child_process";
-import type { providers } from "ethers";
 
 export interface AnvilChain {
   chainId: number;
@@ -114,22 +113,13 @@ export interface AnvilConfig {
   };
 }
 
-export interface DeploymentContext {
-  l1Provider: providers.JsonRpcProvider;
-  l2Providers: Map<number, providers.JsonRpcProvider>;
-  l1Addresses: CoreDeployedAddresses;
-  ctmAddresses: CTMDeployedAddresses;
-  chainAddresses: Map<number, ChainAddresses>;
-  gatewayChainId?: number;
-}
-
-export interface L1ChainInfo {
+interface L1ChainInfo {
   chainId: number;
   rpcUrl: string;
   port: number;
 }
 
-export interface L2ChainInfo {
+interface L2ChainInfo {
   chainId: number;
   rpcUrl: string;
   port: number;

@@ -27,11 +27,6 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export function loadTomlConfig<T>(filePath: string): T {
-  const content = fs.readFileSync(filePath, "utf-8");
-  return parseToml(content) as T;
-}
-
 export function saveTomlConfig(filePath: string, data: Record<string, unknown>): void {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {
@@ -78,58 +73,11 @@ export function ensureDirectoryExists(dirPath: string): void {
   }
 }
 
-export function keccak256Hash(data: string): string {
-  return utils.keccak256(utils.toUtf8Bytes(data));
-}
-
 export function encodeNtvAssetId(chainId: number, tokenAddress: string): string {
   const abiCoder = new utils.AbiCoder();
   return utils.keccak256(
     abiCoder.encode(["uint256", "address", "address"], [chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress])
   );
-}
-
-export function encodeSystemLogs(logs: Array<{ data?: string }>): string {
-  if (logs.length === 0) {
-    return "0x";
-  }
-
-  const abiCoder = new utils.AbiCoder();
-  return abiCoder.encode(["bytes[]"], [logs.map((log) => log.data || "0x")]);
-}
-
-export function hexToBytes(hex: string): Uint8Array {
-  if (hex.startsWith("0x")) {
-    hex = hex.slice(2);
-  }
-  const bytes = new Uint8Array(hex.length / 2);
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
-  }
-  return bytes;
-}
-
-export function bytesToHex(bytes: Uint8Array): string {
-  return "0x" + Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
-export async function waitForTransactionReceipt(
-  provider: providers.JsonRpcProvider,
-  txHash: string,
-  maxAttempts = 60
-): Promise<providers.TransactionReceipt | null> {
-  for (let i = 0; i < maxAttempts; i++) {
-    try {
-      const receipt = await provider.getTransactionReceipt(txHash);
-      if (receipt && receipt.blockNumber) {
-        return receipt;
-      }
-    } catch (error) {
-      // Transaction not found yet
-    }
-    await sleep(1000);
-  }
-  throw new Error(`Transaction ${txHash} not confirmed after ${maxAttempts} attempts`);
 }
 
 export function formatChainInfo(chainId: number, port: number, isL1: boolean): string {
@@ -140,11 +88,6 @@ export function formatChainInfo(chainId: number, port: number, isL1: boolean): s
 export function getDefaultAccountPrivateKey(): string {
   // Default Anvil account #0 private key
   return "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
-}
-
-export function getDefaultAccountAddress(): string {
-  // Default Anvil account #0 address
-  return "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -158,7 +101,7 @@ export function loadBytecodeFromOut(artifactRelativePath: string): string {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function loadArtifactFromOut(artifactRelativePath: string): any {
+function loadArtifactFromOut(artifactRelativePath: string): any {
   const outRoot = path.resolve(__dirname, "../../../out");
   const artifactPath = path.join(outRoot, artifactRelativePath);
   return JSON.parse(fs.readFileSync(artifactPath, "utf-8"));

@@ -26,40 +26,48 @@ A TypeScript-based testing environment that sets up a complete multi-chain ZKsyn
 
 ```
 test/anvil-interop/
-├── src/                       # Core implementation
-│   ├── anvil-manager.ts       # Manage Anvil process lifecycle
-│   ├── deployer.ts            # Execute Foundry deployment scripts
-│   ├── chain-registry.ts      # Register and initialize L2 chains
-│   ├── gateway-setup.ts       # Gateway setup (simplified for Anvil)
-│   ├── batch-settler.ts       # Batch settlement daemon
-│   ├── l1-to-l2-relayer.ts    # Relay L1→L2 transactions
-│   ├── l2-to-l2-relayer.ts    # Relay L2→L2 cross-chain messages
-│   ├── l2-genesis-helper.ts   # L2 genesis upgrade bytecode handling
-│   ├── deployment-runner.ts   # Orchestrate deployment steps
-│   ├── types.ts               # TypeScript interfaces
-│   └── utils.ts               # Helper functions
+├── src/                              # Core implementation
+│   ├── anvil-manager.ts              # Manage Anvil process lifecycle
+│   ├── deployer.ts                   # Execute Foundry deployment scripts
+│   ├── chain-registry.ts             # Register and initialize L2 chains
+│   ├── gateway-setup.ts              # Gateway setup (simplified for Anvil)
+│   ├── batch-settler.ts              # Batch settlement daemon
+│   ├── l1-to-l2-relayer.ts           # Relay L1→L2 transactions
+│   ├── l2-to-l2-relayer.ts           # Relay L2→L2 cross-chain messages
+│   ├── l2-genesis-helper.ts          # L2 genesis upgrade bytecode handling
+│   ├── l2-genesis-upgrade-deployer.ts # L2GenesisUpgrade-based deployer
+│   ├── system-contracts-deployer.ts  # Direct system contracts deployer
+│   ├── token-transfer.ts             # Cross-chain token transfer logic
+│   ├── deployment-runner.ts          # Orchestrate deployment steps
+│   ├── const.ts                      # System contract addresses & constants
+│   ├── types.ts                      # TypeScript interfaces
+│   └── utils.ts                      # Helper functions
 ├── config/
-│   ├── anvil-config.json      # Anvil chain configurations
-│   ├── l1-deployment.toml     # L1 deployment parameters
-│   └── ctm-deployment.toml    # ChainTypeManager config
-├── outputs/                   # Deployment outputs (generated, gitignored)
-├── step1-start-chains.ts      # Step 1: Start Anvil chains
-├── step2-deploy-l1.ts         # Step 2: Deploy L1 contracts
-├── step3-register-chains.ts   # Step 3: Register L2 chains
-├── step4-initialize-l2.ts     # Step 4: Initialize L2 system contracts
-├── step5-setup-gateway.ts     # Step 5: Gateway setup
-├── step6-start-settler.ts     # Step 6: Start batch settler
-├── index.ts                   # All-in-one orchestrator
-├── deploy-test-token.ts       # Deploy test ERC20 token
-├── send-interop-tx.ts         # Send L2→L2 interop message (ERC-7930 encoding)
-├── send-l2-to-l2.ts           # Send L2→L2 interop message (ABI encoding)
-├── send-token-simple.ts       # Send cross-chain token transfer
-├── test-interop.ts            # Test interop functionality
-├── cleanup.sh                 # Clean up Anvil processes and outputs
+│   ├── anvil-config.json             # Anvil chain configurations
+│   ├── l1-deployment.toml            # L1 deployment parameters
+│   └── ctm-deployment.toml           # ChainTypeManager config
+├── test/
+│   └── hardhat/
+│       └── token-transfer.spec.ts    # Hardhat integration test
+├── outputs/                          # Deployment outputs (generated, gitignored)
+├── step1-start-chains.ts             # Step 1: Start Anvil chains
+├── step2-deploy-l1.ts                # Step 2: Deploy L1 contracts
+├── step3-register-chains.ts          # Step 3: Register L2 chains
+├── step4-initialize-l2.ts            # Step 4: Initialize L2 system contracts
+├── step5-setup-gateway.ts            # Step 5: Gateway setup
+├── step6-start-settler.ts            # Step 6: Start batch settler
+├── index.ts                          # All-in-one orchestrator
+├── deploy-test-token.ts              # Deploy test ERC20 token
+├── send-interop-tx.ts                # Send L2→L2 interop message (ERC-7930 encoding)
+├── send-l2-to-l2.ts                  # Send L2→L2 interop message (ABI encoding)
+├── send-token-simple.ts              # Send cross-chain token transfer
+├── test-interop.ts                   # Test interop functionality
+├── run-hardhat-interop-test.ts       # Hardhat test runner
+├── cleanup.sh                        # Clean up Anvil processes and outputs
 ├── package.json
 ├── tsconfig.json
 ├── README.md
-└── QUICK_START.md             # Quick reference guide
+└── QUICK_START.md                    # Quick reference guide
 ```
 
 ## Prerequisites

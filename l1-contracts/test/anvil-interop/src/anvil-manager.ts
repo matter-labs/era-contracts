@@ -117,20 +117,6 @@ export class AnvilManager {
     fs.writeFileSync(this.pidFilePath, JSON.stringify(pids, null, 2));
   }
 
-  loadPids(): void {
-    if (!fs.existsSync(this.pidFilePath)) {
-      return;
-    }
-
-    try {
-      const pids = JSON.parse(fs.readFileSync(this.pidFilePath, "utf-8"));
-      console.log("📋 Found existing Anvil PIDs:", pids);
-      console.log("   (Use 'yarn cleanup' to stop them)");
-    } catch (error) {
-      console.warn("⚠️  Could not read PID file:", error);
-    }
-  }
-
   async stopChain(chainId: number): Promise<void> {
     const chain = this.chains.get(chainId);
     if (!chain || !chain.process) {
@@ -182,14 +168,6 @@ export class AnvilManager {
       throw new Error(`Chain ${chainId} not found`);
     }
     return new providers.JsonRpcProvider(chain.rpcUrl);
-  }
-
-  getChain(chainId: number): AnvilChain | undefined {
-    return this.chains.get(chainId);
-  }
-
-  getAllChains(): AnvilChain[] {
-    return Array.from(this.chains.values());
   }
 
   getL1Chain(): AnvilChain | undefined {

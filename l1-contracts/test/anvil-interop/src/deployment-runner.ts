@@ -223,8 +223,6 @@ export class DeploymentRunner {
       l1Provider,
       l2Providers,
       privateKey,
-      this.loadState().l1Addresses!,
-      chainAddresses,
       2000 // Poll every 2 seconds
     );
     await l2ToL2Relayer.start();

@@ -188,10 +188,4 @@ export class L1ToL2Relayer {
     }
   }
 
-  getStats(): { processedTxs: number; lastBlock: number } {
-    return {
-      processedTxs: this.processedTxIds.size,
-      lastBlock: this.lastProcessedBlock,
-    };
-  }
 }
