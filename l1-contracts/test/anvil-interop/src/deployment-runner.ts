@@ -130,48 +130,45 @@ export class DeploymentRunner {
   ): Promise<{
     chainAddresses: ChainAddresses[];
   }> {
-    console.log("\n=== Step 3+4: Register & Initialize L2 Chains (pipelined) ===\n");
+    console.log("\n=== Step 3+4: Register & Initialize L2 Chains ===\n");
 
     const privateKey = getDefaultAccountPrivateKey();
     const registry = new ChainRegistry(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
 
-    const chainAddresses: ChainAddresses[] = [];
-    const initPromises: Promise<void>[] = [];
-
-    // Register chains sequentially on L1 (nonce constraint), but start L2 init
-    // immediately after each registration — L2 inits go to separate chains so
-    // they can run concurrently with the next L1 registration.
-    for (const l2Chain of l2Chains) {
+    // Batch-register all chains in a single forge call (avoids nonce conflicts)
+    const configs = l2Chains.map((l2Chain) => {
       const chainConfig = chainConfigs.find((c) => c.chainId === l2Chain.chainId);
-      const isGateway = chainConfig?.isGateway || false;
-
-      const done = timeIt(`registerChain ${l2Chain.chainId} (forge script)`);
-      const addresses = await registry.registerChain({
+      return {
         chainId: l2Chain.chainId,
         rpcUrl: l2Chain.rpcUrl,
         baseToken: ETH_TOKEN_ADDRESS,
         validiumMode: false,
-        isGateway,
-      });
-      done();
+        isGateway: chainConfig?.isGateway || false,
+      };
+    });
 
-      chainAddresses.push(addresses);
-      console.log(`  Chain ${l2Chain.chainId} registered at: ${addresses.diamondProxy}`);
+    const regDone = timeIt(`registerChains batch [${configs.map((c) => c.chainId).join(",")}]`);
+    const chainAddresses = await registry.registerChainBatch(configs);
+    regDone();
 
-      // Fire off L2 init immediately (runs on separate L2 Anvil instance)
-      const initDone = timeIt(`initializeL2 chain ${l2Chain.chainId}`);
-      initPromises.push(
-        registry
-          .initializeL2SystemContracts(l2Chain.chainId, addresses.diamondProxy, l2Chain.rpcUrl)
-          .then(() => {
-            initDone();
-            console.log(`  Chain ${l2Chain.chainId} system contracts initialized`);
-          })
-      );
+    for (const addr of chainAddresses) {
+      console.log(`  Chain ${addr.chainId} registered at: ${addr.diamondProxy}`);
     }
 
-    // Wait for any remaining L2 inits to complete
-    await Promise.all(initPromises);
+    // Initialize all L2 chains in parallel (each goes to a separate Anvil instance)
+    console.log("\nInitializing L2 system contracts (in parallel)...\n");
+    await Promise.all(
+      chainAddresses.map(async (chain) => {
+        const l2Chain = l2Chains.find((c) => c.chainId === chain.chainId);
+        if (!l2Chain) {
+          throw new Error(`L2 chain ${chain.chainId} not found`);
+        }
+        const done = timeIt(`initializeL2 chain ${chain.chainId}`);
+        await registry.initializeL2SystemContracts(chain.chainId, chain.diamondProxy, l2Chain.rpcUrl);
+        done();
+        console.log(`  Chain ${chain.chainId} system contracts initialized`);
+      })
+    );
 
     const state = this.loadState();
     state.chainAddresses = chainAddresses;

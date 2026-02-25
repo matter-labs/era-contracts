@@ -75,6 +75,42 @@ export class ChainRegistry {
     };
   }
 
+  async registerChainBatch(configs: ChainConfig[]): Promise<ChainAddresses[]> {
+    console.log(`📝 Registering ${configs.length} L2 chains in batch...`);
+
+    // Generate all config files first
+    for (const config of configs) {
+      await this.generateChainConfig(config);
+    }
+
+    const chainIds = configs.map((c) => c.chainId);
+    const scriptPath = "deploy-scripts/ctm/RegisterZKChain.s.sol:RegisterZKChainScript";
+    const sig = `runForTestBatch(address,uint256[])`;
+    // Encode chainIds array as ABI: [id1,id2,id3]
+    const chainIdsArg = `[${chainIds.join(",")}]`;
+    const args = `${this.ctmAddresses.chainTypeManager} ${chainIdsArg}`;
+
+    const envVars = {
+      CTM_OUTPUT: "/test/anvil-interop/outputs/ctm-output.toml",
+      PERMANENT_VALUES_INPUT: "/test/anvil-interop/config/permanent-values.toml",
+    };
+
+    await this.runForgeScript(scriptPath, envVars, sig, args);
+
+    // Parse per-chain outputs
+    const results: ChainAddresses[] = [];
+    for (const config of configs) {
+      const outputPath = path.join(this.outputDir, `chain-${config.chainId}-output.toml`);
+      const output = parseForgeScriptOutput(outputPath);
+      console.log(`✅ Chain ${config.chainId} registered`);
+      results.push({
+        chainId: config.chainId,
+        diamondProxy: (output.diamond_proxy_addr || output.diamond_proxy) as string,
+      });
+    }
+    return results;
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async initializeL2SystemContracts(chainId: number, _chainProxy: string, l2RpcUrl: string): Promise<void> {
     console.log(`🔧 Initializing L2 system contracts for chain ${chainId}...`);

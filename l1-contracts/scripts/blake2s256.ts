@@ -1,6 +1,7 @@
 #!/usr/bin/env ts-node
 
 import * as blakejs from "blakejs";
+import * as fs from "fs";
 
 // Helper to convert a hex string to Uint8Array
 function hexToBytes(hex: string): Uint8Array {
@@ -15,18 +16,28 @@ function hexToBytes(hex: string): Uint8Array {
   return bytes;
 }
 
-// Grab the input from the command-line arguments (excluding node and script path)
-const input = process.argv.slice(2).join(" ");
-if (!input) {
-  console.error("Usage: blake2s-hash <your text>");
-  process.exit(1);
+const args = process.argv.slice(2);
+
+if (args[0] === "--batch") {
+  // Batch mode: read hex bytecodes (one per line) from a file,
+  // output all 32-byte hashes concatenated as a single 0x-prefixed hex string.
+  const inputFile = args[1];
+  if (!inputFile) {
+    console.error("Usage: blake2s256.ts --batch <input-file>");
+    process.exit(1);
+  }
+  const lines = fs.readFileSync(inputFile, "utf-8").split("\n").filter(Boolean);
+  let output = "";
+  for (const line of lines) {
+    output += blakejs.blake2sHex(hexToBytes(line.trim()));
+  }
+  console.log("0x" + output);
+} else {
+  // Single mode: hash hex from CLI args
+  const input = args.join(" ");
+  if (!input) {
+    console.error("Usage: blake2s256.ts <hex-string>");
+    process.exit(1);
+  }
+  console.log(blakejs.blake2sHex(hexToBytes(input)));
 }
-
-// Convert input hex to bytes
-const inputBytes = hexToBytes(input);
-
-// Compute the BLAKE2s hash
-const hash = blakejs.blake2sHex(inputBytes);
-
-// Output
-console.log(hash);
