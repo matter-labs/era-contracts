@@ -260,19 +260,26 @@ library BatchDecoder {
 
         uint8 encodingVersion = uint8(_executeData[0]);
         if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
-            (executeData, priorityOpsData, dependencyRoots, logs, messages, multichainBatchRoots, settlementFeePayer) = abi
-                .decode(
-                    _executeData[1:],
-                    (
-                        IExecutor.StoredBatchInfo[],
-                        PriorityOpsBatchInfo[],
-                        InteropRoot[][],
-                        L2Log[][],
-                        bytes[][],
-                        bytes32[],
-                        address
-                    )
-                );
+            (
+                executeData,
+                priorityOpsData,
+                dependencyRoots,
+                logs,
+                messages,
+                multichainBatchRoots,
+                settlementFeePayer
+            ) = abi.decode(
+                _executeData[1:],
+                (
+                    IExecutor.StoredBatchInfo[],
+                    PriorityOpsBatchInfo[],
+                    InteropRoot[][],
+                    L2Log[][],
+                    bytes[][],
+                    bytes32[],
+                    address
+                )
+            );
         } else {
             revert UnsupportedExecuteBatchEncoding(encodingVersion);
         }

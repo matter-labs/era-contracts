@@ -324,7 +324,7 @@
             "internalType": "bytes32"
           },
           {
-            "name": "messageRoot",
+            "name": "multichainBatchRoot",
             "type": "bytes32",
             "internalType": "bytes32"
           },
