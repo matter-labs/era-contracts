@@ -27,8 +27,8 @@ import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol"
 
 contract GWAssetTrackerTestHelper is GWAssetTracker {
     constructor() GWAssetTracker() {}
-    function getEmptyMessageRoot(uint256 _chainId) external returns (bytes32) {
-        return _getEmptyMessageRoot(_chainId);
+    function getEmptyMultichainBatchRoot(uint256 _chainId) external returns (bytes32) {
+        return _getEmptyMultichainBatchRoot(_chainId);
     }
 
     function getOriginToken(bytes32 _assetId) external view returns (address) {
@@ -235,7 +235,7 @@ contract GWAssetTrackerTest is Test {
     }
 
     function test_emptyRootEquivalence() public {
-        bytes32 emptyRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
 
         vm.chainId(CHAIN_ID);
         L2MessageRoot dummyL2MessageRoot = new L2MessageRoot();
@@ -245,9 +245,9 @@ contract GWAssetTrackerTest is Test {
         assertEq(dummyL2MessageRoot.getAggregatedRoot(), emptyRoot);
     }
 
-    function test_regression_emptyMessageRootTreeHeightConsistency() public {
+    function test_regression_emptyMultichainBatchRootTreeHeightConsistency() public {
         // Get empty root from GWAssetTracker
-        bytes32 gwEmptyRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 gwEmptyRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
 
         // Create an L2MessageRoot and initialize it the same way it's done in production
         vm.chainId(CHAIN_ID);
@@ -270,7 +270,7 @@ contract GWAssetTrackerTest is Test {
         assertTrue(gwEmptyRoot != bytes32(0), "Empty root should not be zero");
     }
 
-    function test_regression_emptyMessageRootConsistentAcrossChains() public {
+    function test_regression_emptyMultichainBatchRootConsistentAcrossChains() public {
         uint256[] memory chainIds = new uint256[](3);
         chainIds[0] = 100;
         chainIds[1] = 200;
@@ -280,7 +280,7 @@ contract GWAssetTrackerTest is Test {
             uint256 chainId = chainIds[i];
 
             // Get empty root from GWAssetTracker for this chain
-            bytes32 gwEmptyRoot = gwAssetTracker.getEmptyMessageRoot(chainId);
+            bytes32 gwEmptyRoot = gwAssetTracker.getEmptyMultichainBatchRoot(chainId);
 
             // Create an L2MessageRoot and initialize it for this chain
             vm.chainId(chainId);
@@ -349,12 +349,12 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), initialBalance + AMOUNT);
     }
 
-    function test_GetEmptyMessageRoot_Cached() public {
+    function test_GetEmptyMultichainBatchRoot_Cached() public {
         // First call calculates and caches
-        bytes32 emptyRoot1 = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyRoot1 = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
 
         // Second call should return cached value
-        bytes32 emptyRoot2 = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyRoot2 = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
 
         assertEq(emptyRoot1, emptyRoot2);
     }
@@ -493,12 +493,12 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), BASE_TOKEN_AMOUNT * 5);
     }
 
-    function test_GetEmptyMessageRoot_DifferentChains() public {
+    function test_GetEmptyMultichainBatchRoot_DifferentChains() public {
         uint256 chainId1 = 100;
         uint256 chainId2 = 200;
 
-        bytes32 emptyRoot1 = gwAssetTracker.getEmptyMessageRoot(chainId1);
-        bytes32 emptyRoot2 = gwAssetTracker.getEmptyMessageRoot(chainId2);
+        bytes32 emptyRoot1 = gwAssetTracker.getEmptyMultichainBatchRoot(chainId1);
+        bytes32 emptyRoot2 = gwAssetTracker.getEmptyMultichainBatchRoot(chainId2);
 
         // Different chain IDs should produce different roots
         assertTrue(emptyRoot1 != emptyRoot2);

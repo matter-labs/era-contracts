@@ -14,7 +14,7 @@ import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol
 import {BALANCE_CHANGE_VERSION, TOKEN_BALANCE_MIGRATION_DATA_VERSION, INTEROP_BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
-import {InvalidCanonicalTxHash, RegisterNewTokenNotAllowed, InvalidFunctionSignature, InvalidBuiltInContractMessage, InvalidEmptyMessageRoot, InvalidL2ShardId, InvalidServiceLog, InvalidInteropBalanceChange} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {InvalidCanonicalTxHash, RegisterNewTokenNotAllowed, InvalidFunctionSignature, InvalidBuiltInContractMessage, InvalidEmptyMultichainBatchRoot, InvalidL2ShardId, InvalidServiceLog, InvalidInteropBalanceChange} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {Unauthorized, ChainIdNotRegistered, InvalidMessage, ReconstructionMismatch, InvalidInteropCalldata} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -105,7 +105,7 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: new L2Log[](0),
             messages: new bytes[](0),
             chainBatchRoot: bytes32(0),
-            messageRoot: bytes32(0),
+            multichainBatchRoot: bytes32(0),
             settlementFeePayer: address(0)
         });
 
@@ -138,9 +138,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = correctMessage;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -148,7 +148,7 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot,
+            multichainBatchRoot: emptyMultichainBatchRoot,
             settlementFeePayer: address(0)
         });
 
@@ -188,9 +188,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -198,7 +198,7 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot,
+            multichainBatchRoot: emptyMultichainBatchRoot,
             settlementFeePayer: address(0)
         });
 
@@ -238,9 +238,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -248,7 +248,7 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot,
+            multichainBatchRoot: emptyMultichainBatchRoot,
             settlementFeePayer: address(0)
         });
 
@@ -290,9 +290,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -300,7 +300,7 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot,
+            multichainBatchRoot: emptyMultichainBatchRoot,
             settlementFeePayer: address(0)
         });
 
@@ -355,9 +355,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -365,7 +365,7 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot,
+            multichainBatchRoot: emptyMultichainBatchRoot,
             settlementFeePayer: address(0)
         });
 
@@ -429,9 +429,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -439,7 +439,7 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot,
+            multichainBatchRoot: emptyMultichainBatchRoot,
             settlementFeePayer: address(0)
         });
 
@@ -485,9 +485,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -495,7 +495,7 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot,
+            multichainBatchRoot: emptyMultichainBatchRoot,
             settlementFeePayer: address(0)
         });
 
@@ -542,9 +542,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -552,7 +552,7 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot,
+            multichainBatchRoot: emptyMultichainBatchRoot,
             settlementFeePayer: address(0)
         });
 
@@ -601,9 +601,9 @@ contract GWAssetTrackerExtendedTest is Test {
             value: bytes32(uint256(TxStatus.Failure))
         });
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -611,7 +611,7 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: new bytes[](0),
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot,
+            multichainBatchRoot: emptyMultichainBatchRoot,
             settlementFeePayer: address(0)
         });
 

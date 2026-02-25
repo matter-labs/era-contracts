@@ -16,7 +16,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, MIGR
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAssetMigrationNumber, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange, InvalidFeeRecipient, SettlementFeePayerNotAgreed} from "./AssetTrackerErrors.sol";
+import {InvalidAssetMigrationNumber, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMultichainBatchRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange, InvalidFeeRecipient, SettlementFeePayerNotAgreed} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
@@ -59,8 +59,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// On such chains, it is responsible for sending withdrawal messages.
     mapping(uint256 chainId => address legacySharedBridgeAddress) internal legacySharedBridgeAddress;
 
-    /// @notice Empty messageRoot calculated for specific chain.
-    mapping(uint256 chainId => bytes32 emptyMessageRoot) internal emptyMessageRoot;
+    /// @notice Empty multichainBatchRoot calculated for specific chain.
+    mapping(uint256 chainId => bytes32 emptyMultichainBatchRoot) internal emptyMultichainBatchRoot;
 
     /// @notice We save the chainBalance which equals the chains totalSupply before the first GW->L1 migration so that it can be replayed.
     /// @dev Note, that the balance is only saved for even migration numbers, i.e. when the chain did not settle on top of Gateway.
@@ -318,12 +318,12 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 
-        bytes32 emptyMultichainBatchRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
+        bytes32 emptyMultichainBatchRootForChain = _getEmptyMultichainBatchRoot(_processLogsInputs.chainId);
         require(
-            _processLogsInputs.messageRoot == emptyMultichainBatchRootForChain,
-            InvalidEmptyMessageRoot(emptyMultichainBatchRootForChain, _processLogsInputs.messageRoot)
+            _processLogsInputs.multichainBatchRoot == emptyMultichainBatchRootForChain,
+            InvalidEmptyMultichainBatchRoot(emptyMultichainBatchRootForChain, _processLogsInputs.multichainBatchRoot)
         );
-        bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.messageRoot));
+        bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.multichainBatchRoot));
 
         if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {
             revert ReconstructionMismatch(chainBatchRootHash, _processLogsInputs.chainBatchRoot);
@@ -383,10 +383,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         emit GatewaySettlementFeesCollected(_chainId, _settlementFeePayer, totalFee, _chargeableInteropCount);
     }
 
-    function _getEmptyMessageRoot(uint256 _chainId) internal returns (bytes32) {
-        bytes32 savedEmptyMessageRoot = emptyMessageRoot[_chainId];
-        if (savedEmptyMessageRoot != bytes32(0)) {
-            return savedEmptyMessageRoot;
+    function _getEmptyMultichainBatchRoot(uint256 _chainId) internal returns (bytes32) {
+        bytes32 savedEmptyMultichainBatchRoot = emptyMultichainBatchRoot[_chainId];
+        if (savedEmptyMultichainBatchRoot != bytes32(0)) {
+            return savedEmptyMultichainBatchRoot;
         }
         FullMerkleMemory.FullTree memory sharedTree;
         sharedTree.createTree(1);
@@ -397,10 +397,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         chainTree.createTree(1);
         bytes32 initialChainTreeHash = chainTree.setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
         bytes32 leafHash = MessageHashing.chainIdLeafHash(initialChainTreeHash, _chainId);
-        bytes32 emptyMessageRootCalculated = sharedTree.pushNewLeaf(leafHash);
+        bytes32 emptyMultichainBatchRootCalculated = sharedTree.pushNewLeaf(leafHash);
 
-        emptyMessageRoot[_chainId] = emptyMessageRootCalculated;
-        return emptyMessageRootCalculated;
+        emptyMultichainBatchRoot[_chainId] = emptyMultichainBatchRootCalculated;
+        return emptyMultichainBatchRootCalculated;
     }
 
     /// @notice Handles potential failed deposits. Not all L1->L2 txs are deposits.
