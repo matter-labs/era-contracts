@@ -51,6 +51,7 @@ error BurningNativeWETHNotSupported();
 error CallerNotTimerAdmin();
 // 0x3331e9c0
 error CallNotAllowed(bytes call);
+error ChainIdLeafMustBeZeroForFinalProofNode();
 // 0xe85392f9
 error CanOnlyProcessOneBatch();
 // 0x00c6ead2
@@ -278,6 +279,8 @@ error NonSequentialBatch();
 error NonSequentialVersion();
 // 0x0e0ff4d9
 error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
+// 0xd31b640b
+error NotAFinalProofNode();
 // 0xfa5cd00f
 error NotAllowed(address addr);
 // 0x64846fe4
@@ -362,6 +365,9 @@ error RevertedBatchNotAfterNewLastBatch();
 error RoleAccessDenied(address chainAddress, bytes32 role, address account);
 // 0xd3b6535b
 error SelectorsMustAllHaveSameFreezability();
+error SettlementLayerBatchNumberMustBeZeroForFinalProofNode();
+error SettlementLayerBatchRootMaskMustBeZeroForFinalProofNode();
+error SettlementLayerChainIdMustBeZeroForFinalProofNode();
 // 0x02181a13
 error SettlementLayersMustSettleOnL1();
 // 0x856d5b77

@@ -10,7 +10,7 @@ import {L2Log, L2Message, ProofData, TxStatus} from "../Messaging.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 
 import {UnsupportedProofMetadataVersion} from "../../state-transition/L1StateTransitionErrors.sol";
-import {HashedLogIsDefault, InvalidProofLengthForFinalNode} from "../../common/L1ContractErrors.sol";
+import {HashedLogIsDefault, InvalidProofLengthForFinalNode, NotAFinalProofNode, SettlementLayerChainIdMustBeZeroForFinalProofNode, SettlementLayerBatchNumberMustBeZeroForFinalProofNode, SettlementLayerBatchRootMaskMustBeZeroForFinalProofNode, ChainIdLeafMustBeZeroForFinalProofNode} from "../../common/L1ContractErrors.sol";
 
 bytes32 constant BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf");
 bytes32 constant CHAIN_ID_LEAF_PADDING = keccak256("zkSync:ChainIdLeaf");

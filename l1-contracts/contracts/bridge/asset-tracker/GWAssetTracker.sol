@@ -216,6 +216,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
     }
 
+    /// @inheritdoc IGWAssetTracker
+    function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external onlyUpgrader {
+        legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
+    }
+
     function _l1ChainId() internal view returns (uint256) {
         return L1_CHAIN_ID;
     }
