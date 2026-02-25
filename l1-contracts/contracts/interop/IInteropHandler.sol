@@ -27,10 +27,10 @@ interface IInteropHandler {
 
     /// @notice Function used to unbundle the bundle. It's present to give more flexibility in cancelling and overall processing of bundles.
     ///         Can be invoked multiple times until all calls are processed.
-    /// @param _sourceChainId Originating chain ID of the bundle.
+    /// @dev This function does not verify the validity of the bundle, as it's assumed it was already checked inside `verifyBundle`.
     /// @param _bundle ABI-encoded InteropBundle to unbundle.
     /// @param _callStatus Array of desired statuses per call.
-    function unbundleBundle(uint256 _sourceChainId, bytes memory _bundle, CallStatus[] calldata _callStatus) external;
+    function unbundleBundle(bytes memory _bundle, CallStatus[] calldata _callStatus) external;
 
     /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
