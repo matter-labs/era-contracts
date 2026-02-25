@@ -7,18 +7,29 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {ChainExists, MessageRootNotRegistered, NotL2, OnlyChain, OnlyGateway, OnlyOnSettlementLayer, TotalBatchesExecutedZero, V31UpgradeChainBatchNumberNotSet} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
-import {Unauthorized, InvalidCaller} from "contracts/common/L1ContractErrors.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    ChainExists,
+    MessageRootNotRegistered,
+    OnlyChain,
+    OnlyGateway,
+    OnlyOnSettlementLayer,
+    TotalBatchesExecutedZero,
+    V31UpgradeChainBatchNumberNotSet
+} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+
+import {
+    GW_ASSET_TRACKER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {ProofData} from "contracts/common/Messaging.sol";
 
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
+
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 contract MessageRoot_Extended_Test is Test {
@@ -103,7 +114,7 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.prank(chainAssetHandler);
         vm.expectEmit(true, false, false, false);
-        emit IMessageRoot.AddedChain(chainId, 0);
+        emit IMessageRootBase.AddedChain(chainId, 0);
         messageRoot.addNewChain(chainId, 0);
 
         assertTrue(messageRoot.chainRegistered(chainId));
@@ -328,48 +339,6 @@ contract MessageRoot_Extended_Test is Test {
         assertEq(messageRoot.currentChainBatchNumber(chainId), 2);
     }
 
-    function test_UpdateFullTree() public {
-        uint256 chainId = 271;
-        address chainSender = makeAddr("chainSender");
-
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
-            abi.encode(chainSender)
-        );
-
-        // Mock the getSemverProtocolVersion call
-        vm.mockCall(
-            chainSender,
-            abi.encodeWithSelector(IGetters.getSemverProtocolVersion.selector),
-            abi.encode(0, 29, 0) // major, minor, patch
-        );
-
-        vm.prank(L2_BRIDGEHUB_ADDR);
-        l2MessageRoot.addNewChain(chainId, 0);
-
-        // Verify totalPublishedInteropRoots is 0 before any updates
-        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
-
-        // Add a batch root
-        vm.prank(GW_ASSET_TRACKER_ADDR);
-        l2MessageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
-
-        // Update the full tree
-        l2MessageRoot.updateFullTree();
-
-        // Verify totalPublishedInteropRoots incremented after updateFullTree
-        assertEq(
-            l2MessageRoot.totalPublishedInteropRoots(),
-            2,
-            "totalPublishedInteropRoots should be 2 after updateFullTree"
-        );
-
-        // Verify the aggregated root is updated
-        bytes32 root = l2MessageRoot.getAggregatedRoot();
-        assertTrue(root != bytes32(0));
-    }
-
     function test_HistoricalRoot() public {
         uint256 chainId = 271;
         address chainSender = makeAddr("chainSender");
@@ -390,8 +359,10 @@ contract MessageRoot_Extended_Test is Test {
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(chainId, 0);
 
-        // Verify totalPublishedInteropRoots is 0 before adding batch root
-        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
+        // totalPublishedInteropRoots accounts for _emitRoot calls in _addNewChain:
+        // initL2 adds block.chainid (1), addNewChain(chainId) (2)
+        uint256 countBefore = l2MessageRoot.totalPublishedInteropRoots();
+        assertEq(countBefore, 2, "totalPublishedInteropRoots should be 2 after chain additions");
 
         // Add a batch root
         vm.prank(GW_ASSET_TRACKER_ADDR);
@@ -400,8 +371,8 @@ contract MessageRoot_Extended_Test is Test {
         // Verify totalPublishedInteropRoots incremented after addChainBatchRoot (L2MessageRoot calls _emitRoot)
         assertEq(
             l2MessageRoot.totalPublishedInteropRoots(),
-            1,
-            "totalPublishedInteropRoots should be 1 after addChainBatchRoot"
+            countBefore + 1,
+            "totalPublishedInteropRoots should increment by 1 after addChainBatchRoot"
         );
 
         // Check that historical root is set

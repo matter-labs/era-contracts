@@ -5,11 +5,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
-import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
@@ -105,6 +100,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             vm.startBroadcast(owner);
             // CTM is already registered from prepare(), no need to add it again
             addresses.bridgehub.addTokenAssetId(baseTokenAssetId);
+            // registerAlreadyDeployedZKChain records CTM for the chain; no separate addChainTypeManager needed here.
             addresses.bridgehub.registerAlreadyDeployedZKChain(chainId, chain);
             vm.stopBroadcast();
 

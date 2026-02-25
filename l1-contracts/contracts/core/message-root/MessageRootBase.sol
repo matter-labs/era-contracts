@@ -6,12 +6,24 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 
-import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain} from "../bridgehub/L1BridgehubErrors.sol";
+import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRootBase, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
+import {
+    BatchZeroNotAllowed,
+    ChainBatchRootAlreadyExists,
+    ChainBatchRootZero,
+    ChainExists,
+    DepthMoreThanOneForRecursiveMerkleProof,
+    MessageRootNotRegistered,
+    NonConsecutiveBatchNumber,
+    OnlyAssetTracker,
+    OnlyBridgehubOrChainAssetHandler,
+    OnlyChain
+} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {GW_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
 
@@ -22,7 +34,7 @@ import {MessageVerification} from "../../common/MessageVerification.sol";
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
 /// @dev From V31 onwards it is also used for L2->L1 message verification, this allows bypassing the Mailbox of individual chains.
 /// This is especially useful for chains settling on Gateway.
-abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerification {
+abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initializable, MessageVerification {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
@@ -125,14 +137,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         _;
     }
 
-    /// @notice Checks that the Chain ID is not L1 when adding chain batch root.
-    modifier onlyL2() {
-        if (block.chainid == L1_CHAIN_ID()) {
-            revert NotL2();
-        }
-        _;
-    }
-
     function _initialize() internal {
         // slither-disable-next-line unused-return
         sharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
@@ -188,6 +192,19 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         currentChainBatchNumber[_chainId] = expectedNewChainBatchNumber;
     }
 
+    /// @notice Emits a new interop root event when the shared tree root changes.
+    function _emitRoot(bytes32 _root) internal {
+        // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
+        // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
+        bytes32[] memory _sides = new bytes32[](1);
+        _sides[0] = _root;
+
+        uint256 currentCount = totalPublishedInteropRoots;
+        totalPublishedInteropRoots = currentCount + 1;
+
+        emit NewInteropRoot(block.chainid, block.number, currentCount, _sides);
+    }
+
     /// @notice Gets the aggregated root of all chains.
     function getAggregatedRoot() external view returns (bytes32) {
         if (chainCount == 0) {
@@ -221,10 +238,12 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         // slither-disable-next-line unused-return
         bytes32 initialHash = chainTree[_chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
 
-        // slither-disable-next-line unused-return
-        sharedTree.pushNewLeaf(MessageHashing.chainIdLeafHash(initialHash, _chainId));
+        bytes32 sharedTreeRoot = sharedTree.pushNewLeaf(MessageHashing.chainIdLeafHash(initialHash, _chainId));
 
         emit AddedChain(_chainId, cachedChainCount);
+
+        _emitRoot(sharedTreeRoot);
+        historicalRoot[block.number] = sharedTreeRoot;
     }
 
     //////////////////////////////

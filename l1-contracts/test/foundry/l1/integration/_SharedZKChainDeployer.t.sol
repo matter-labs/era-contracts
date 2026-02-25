@@ -6,16 +6,15 @@ import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {RegisterZKChainScript} from "deploy-scripts/ctm/RegisterZKChain.s.sol";
 import {RegisterZKChainConfig as ChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+
 import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;
@@ -247,6 +246,7 @@ contract ZKChainDeployer is L1ContractDeployer {
 
         {
             // stack too deep
+            // InitializeData layout includes bridgehub, interop center, and CTM for v31+ init calldata.
             initData1 = bytes.concat(
                 IDiamondInit.initialize.selector,
                 bytes32(_chainId),

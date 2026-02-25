@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {PriorityQueue, PriorityOperation} from "contracts/state-transition/libraries/PriorityQueue.sol";
+import {PriorityOperation, PriorityQueue} from "contracts/state-transition/libraries/PriorityQueue.sol";
 import {QueueIsEmpty} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Unit tests for PriorityQueue library

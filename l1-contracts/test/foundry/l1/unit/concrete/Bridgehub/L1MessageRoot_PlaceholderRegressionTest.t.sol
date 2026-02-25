@@ -50,7 +50,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
         L1MessageRoot messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1, address(0))),
+                    address(new L1MessageRoot(bridgeHub, 1, makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
                 )
@@ -113,7 +113,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
         L1MessageRoot messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1, address(0))),
+                    address(new L1MessageRoot(bridgeHub, 1, makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )
@@ -168,7 +168,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
         L1MessageRoot messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1, address(0))),
+                    address(new L1MessageRoot(bridgeHub, 1, makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
                 )
@@ -230,8 +230,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
     function testFuzz_regression_anyValidBatchNumberWorks(uint256 totalBatchesExecuted) public {
         // Skip invalid values
         vm.assume(totalBatchesExecuted > 0);
-        vm.assume(totalBatchesExecuted < type(uint256).max); // Prevent overflow in +1
-        vm.assume(totalBatchesExecuted != V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE);
+        vm.assume(totalBatchesExecuted < V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE - 1);
 
         uint256[] memory chainIds = new uint256[](1);
         chainIds[0] = CHAIN_ID;
@@ -250,7 +249,7 @@ contract L1MessageRootPlaceholderRegressionTest is Test {
         L1MessageRoot messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1, address(0))),
+                    address(new L1MessageRoot(bridgeHub, 1, makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
                 )

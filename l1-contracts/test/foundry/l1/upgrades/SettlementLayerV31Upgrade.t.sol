@@ -2,14 +2,19 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {SettlementLayerV31Upgrade, PriorityQueueNotReady, NotAllBatchesExecuted} from "contracts/upgrades/SettlementLayerV31Upgrade.sol";
-import {BaseZkSyncUpgrade, ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
+import {
+    SettlementLayerV31Upgrade,
+    PriorityQueueNotReady,
+    NotAllBatchesExecuted
+} from "contracts/upgrades/SettlementLayerV31Upgrade.sol";
+import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -45,7 +50,7 @@ contract DummySettlementLayerV31Upgrade is SettlementLayerV31Upgrade, BaseUpgrad
         return s.assetTracker;
     }
 
-    function setChainTypeManager(address _chainTypeManager) public {
+    function setChainTypeManager(address _chainTypeManager) public override {
         s.chainTypeManager = _chainTypeManager;
     }
 }
@@ -60,7 +65,8 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
     address internal mockMessageRoot;
     address internal mockChainAssetHandler;
     address internal mockGWChain;
-    address internal mockChainTypeManager;
+    address internal mockChainTypeManager = makeAddr("mockChainTypeManager");
+    address internal mockVerifier = makeAddr("mockVerifier");
 
     uint256 internal testChainId = 123;
     uint256 internal gwChainId = 456;
@@ -86,6 +92,10 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         upgrade.setPriorityTxMaxPubdata(1000000);
 
         _prepareEmptyProposedUpgrade();
+
+        // Set up CTM for verifier lookup
+        upgrade.setChainTypeManager(mockChainTypeManager);
+        upgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
     }
 
     function _setupMocks() internal {
@@ -148,7 +158,7 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         // Mock messageRoot.ERA_GATEWAY_CHAIN_ID
         vm.mockCall(
             mockMessageRoot,
-            abi.encodeWithSelector(IMessageRoot.ERA_GATEWAY_CHAIN_ID.selector),
+            abi.encodeWithSelector(IMessageRootBase.ERA_GATEWAY_CHAIN_ID.selector),
             abi.encode(gwChainId)
         );
 

@@ -200,9 +200,23 @@ struct CallAttributes {
 
 /// @param executionAddress ERC-7930 Address allowed to execute the bundle on the destination chain. If the byte array is empty then execution is permissionless.
 /// @param unbundlerAddress ERC-7930 Address allowed to unbundle the bundle on the destination chain. Note, that it is required to be nonempty, unlike `executionAddress`.
+/// @param useFixedFee If true, user pays fixed ZK fees instead of base token fees controlled by chain operator.
+///                    This is a bundle-level attribute - all calls within a bundle share the same fee mode.
+///                    Users are free to choose which fee mode to use when creating their bundle.
+///                    In more details, any user of interop functionality is able to choose between two fee options:
+///                    - Fixed fee in ZK (ZK_INTEROP_FEE constant in InteropCenter). User pays this fee directly in ZK tokens via ERC20 transfer.
+///                    - Dynamic fee in base token of source chain where the interop is initiated. This value is fully under control of chain operator via interopProtocolFee in InteropCenter.
+///                    In any case, gateway settlement fees (gatewaySettlementFee per call, set by governance in GWAssetTracker) are charged from the settlementFeePayer address
+///                    (encoded within the batch data of executeBatchesSharedBridge) when the chain settles on Gateway via processLogsAndMessages(). The settlementFeePayer must have pre-approved
+///                    GWAssetTracker to spend wrapped ZK tokens.
+///                    Note on ZK-as-base-token chains: On chains where ZK is the base token, useFixedFee=true still requires wrapped ZK tokens
+///                    (paid via ERC20 transfer), while useFixedFee=false accepts native ZK via msg.value. This is intentional behavior.
+///                    IMPORTANT: useFixedFee=true requires ZK token to be bridged to the source chain. If ZK token is not yet available
+///                    in the chain's NativeTokenVault, the transaction will revert with ZKTokenNotAvailable().
 struct BundleAttributes {
     bytes executionAddress;
     bytes unbundlerAddress;
+    bool useFixedFee;
 }
 
 /// @dev A single call.
@@ -236,6 +250,7 @@ enum CallStatus {
 /// @dev A set of `InteropCall`s to send to another chain.
 /// @param version Version of the InteropBundle.
 /// @param destinationChainId ChainId of the target chain.
+/// @param destinationBaseTokenAssetId Asset ID of the base token of the target chain.
 /// @param interopBundleSalt Salt of the interopBundle. It's required to ensure that all bundles have distinct hashes.
 ///                          It's equal to the keccak256(abi.encodePacked(senderOfTheBundle, NumberOfBundleSentByTheSender))
 /// @param calls Array of InteropCall structs to execute.
@@ -244,6 +259,7 @@ struct InteropBundle {
     bytes1 version;
     uint256 sourceChainId;
     uint256 destinationChainId;
+    bytes32 destinationBaseTokenAssetId;
     bytes32 interopBundleSalt;
     InteropCall[] calls;
     BundleAttributes bundleAttributes;
@@ -323,9 +339,41 @@ struct ProofData {
     bool finalProofNode;
 }
 
-struct TokenBalanceMigrationData {
+/// @dev L2 -> L1 message payload used when migrating token balance from L1 tracking to Gateway tracking.
+/// @param version Encoding version.
+/// @param originToken Token address on origin chain.
+/// @param chainId Chain that is migrating.
+/// @param assetId Asset id being migrated.
+/// @param tokenOriginChainId Origin chain for the token.
+/// @param chainMigrationNumber Chain migration number this message is tied to.
+/// @param assetMigrationNumber Asset migration number currently known on L2. Not yet used, kept for future use.
+/// @param totalWithdrawalsToL1 Total withdrawals initiated from L2 to L1 since v31 tracking started.
+/// @param totalSuccessfulDepositsFromL1 Total successful deposits finalized on L2 since v31 tracking started.
+/// @param totalPreV31TotalSupply Token total supply snapshot captured on L2 before first post-v31 bridge operation.
+struct L1ToGatewayTokenBalanceMigrationData {
     bytes1 version;
-    bool isL1ToGateway;
+    address originToken;
+    uint256 chainId;
+    bytes32 assetId;
+    uint256 tokenOriginChainId;
+    uint256 chainMigrationNumber;
+    uint256 assetMigrationNumber;
+    uint256 totalWithdrawalsToL1;
+    uint256 totalSuccessfulDepositsFromL1;
+    uint256 totalPreV31TotalSupply;
+}
+
+/// @dev L2 -> L1 message payload used when migrating token balance from Gateway tracking back to L1 tracking.
+/// @param version Encoding version.
+/// @param originToken Token address on origin chain.
+/// @param chainId Chain that is migrating.
+/// @param assetId Asset id being migrated.
+/// @param tokenOriginChainId Origin chain for the token.
+/// @param amount Chain balance amount to migrate from Gateway to L1.
+/// @param chainMigrationNumber Chain migration number this message is tied to.
+/// @param assetMigrationNumber Asset migration number currently known on Gateway.
+struct GatewayToL1TokenBalanceMigrationData {
+    bytes1 version;
     address originToken;
     uint256 chainId;
     bytes32 assetId;
@@ -333,6 +381,25 @@ struct TokenBalanceMigrationData {
     uint256 amount;
     uint256 chainMigrationNumber;
     uint256 assetMigrationNumber;
+}
+
+/// @dev L1 -> L2 service transaction payload used to confirm migration processing.
+/// @param chainId Chain that was migrated.
+/// @param assetId Asset id that was migrated.
+/// @param tokenOriginChainId Origin chain for the token.
+/// @param originToken Token address on origin chain.
+/// @param amount Amount moved during the migration finalization on L1.
+/// @param assetMigrationNumber New migration number that should be persisted on L2/Gateway.
+/// @param isL1ToGateway Whether this confirmation corresponds to L1 -> Gateway direction.
+// solhint-disable-next-line gas-struct-packing
+struct MigrationConfirmationData {
+    uint256 chainId;
+    bytes32 assetId;
+    uint256 tokenOriginChainId;
+    address originToken;
+    uint256 amount;
+    uint256 assetMigrationNumber;
+    bool isL1ToGateway;
 }
 
 struct BalanceChange {

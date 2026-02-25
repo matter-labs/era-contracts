@@ -7,14 +7,21 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
-import {IChainAssetHandler} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {
+    MessageRootNotRegistered,
+    OnlyBridgehubOrChainAssetHandler
+} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    GW_ASSET_TRACKER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
@@ -127,7 +134,7 @@ contract MessageRootTest is Test {
 
         vm.prank(bridgeHub);
         vm.expectEmit(true, false, false, false);
-        emit IMessageRoot.AddedChain(alphaChainId, 0);
+        emit IMessageRootBase.AddedChain(alphaChainId, 0);
         messageRoot.addNewChain(alphaChainId, 0);
 
         assertTrue(messageRoot.chainRegistered(alphaChainId), "alpha chain 2");
@@ -175,74 +182,24 @@ contract MessageRootTest is Test {
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(alphaChainId, 0);
 
-        // Verify totalPublishedInteropRoots is 0 before adding batch root
-        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
+        // totalPublishedInteropRoots accounts for _emitRoot calls in _addNewChain:
+        // initL2 adds block.chainid (1), addNewChain(L1_CHAIN_ID) (2), addNewChain(alphaChainId) (3)
+        uint256 countBefore = l2MessageRoot.totalPublishedInteropRoots();
+        assertEq(countBefore, 3, "totalPublishedInteropRoots should be 3 after chain additions");
 
         vm.prank(alphaChainSender);
         vm.expectEmit(true, false, false, false);
-        emit IMessageRoot.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+        emit IMessageRootBase.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
         vm.expectEmit(true, false, false, false);
-        emit IMessageRoot.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
+        emit IMessageRootBase.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
         l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
 
         // Verify totalPublishedInteropRoots incremented after addChainBatchRoot
-        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 1, "totalPublishedInteropRoots should be 1 after");
-    }
-
-    function test_updateFullTree() public {
-        address alphaChainSender = makeAddr("alphaChainSender");
-        uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
-        vm.mockCall(
-            address(bridgeHub),
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
-            abi.encode(alphaChainSender)
-        );
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
-            abi.encode(alphaChainSender)
-        );
-        vm.mockCall(
-            address(bridgeHub),
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(L2_CHAIN_ASSET_HANDLER_ADDR)
-        );
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(L2_CHAIN_ASSET_HANDLER_ADDR)
-        );
-        vm.prank(bridgeHub);
-        messageRoot.addNewChain(alphaChainId, 0);
-        vm.prank(alphaChainSender);
-        messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
-        vm.prank(L2_BRIDGEHUB_ADDR);
-        l2MessageRoot.addNewChain(alphaChainId, 0);
-        vm.chainId(gatewayChainId);
-
-        // Verify totalPublishedInteropRoots before adding batch root
-        assertEq(l2MessageRoot.totalPublishedInteropRoots(), 0, "totalPublishedInteropRoots should be 0 before");
-
-        vm.prank(GW_ASSET_TRACKER_ADDR);
-        l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
-
-        // Verify totalPublishedInteropRoots after adding batch root (L2MessageRoot.addChainBatchRoot calls _emitRoot)
         assertEq(
             l2MessageRoot.totalPublishedInteropRoots(),
-            1,
-            "totalPublishedInteropRoots should be 1 after addChainBatchRoot"
+            countBefore + 1,
+            "totalPublishedInteropRoots should increment by 1"
         );
-
-        l2MessageRoot.updateFullTree();
-
-        // Verify totalPublishedInteropRoots after updateFullTree
-        assertEq(
-            l2MessageRoot.totalPublishedInteropRoots(),
-            2,
-            "totalPublishedInteropRoots should be 2 after updateFullTree"
-        );
-
-        assertEq(l2MessageRoot.getAggregatedRoot(), 0x0ef1ac67d77f177a33449c47a8f05f0283300a81adca6f063c92c774beed140c);
     }
 
     function test_addChainBatchRootWithRealData() public {

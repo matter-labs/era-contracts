@@ -11,12 +11,19 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {IAccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access/IAccessControlDefaultAdminRules.sol";
 
-import {IL1Bridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {
+    IL1Bridgehub,
+    L2TransactionRequestDirect,
+    L2TransactionRequestTwoBridgesOuter
+} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2_CREATE2_FACTORY_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_CREATE2_FACTORY_ADDR,
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {EIP712Utils} from "./EIP712Utils.sol";
@@ -25,7 +32,7 @@ import {IEmergencyUpgrageBoard} from "../interfaces/IEmergencyUpgrageBoard.sol";
 import {ISecurityCouncil} from "../interfaces/ISecurityCouncil.sol";
 import {IMultisig} from "../interfaces/IMultisig.sol";
 import {ISafe} from "../interfaces/ISafe.sol";
-import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
@@ -342,7 +349,7 @@ library Utils {
         bytes32 create2Salt,
         bytes32 bytecodeHash,
         bytes memory constructorArgs
-    ) internal view returns (address) {
+    ) internal pure returns (address) {
         return
             L2ContractHelper.computeCreate2Address(
                 L2_CREATE2_FACTORY_ADDR,
@@ -356,7 +363,7 @@ library Utils {
         bytes32 create2Salt,
         bytes memory bytecode,
         bytes memory constructorArgs
-    ) internal view returns (bytes32 bytecodeHash, bytes memory data) {
+    ) internal pure returns (bytes32 bytecodeHash, bytes memory data) {
         bytecodeHash = L2ContractHelper.hashL2Bytecode(bytecode);
 
         data = abi.encodeWithSignature("create2(bytes32,bytes32,bytes)", create2Salt, bytecodeHash, constructorArgs);
@@ -442,7 +449,7 @@ library Utils {
                 params.l2GasLimit,
                 REQUIRED_L2_GAS_PRICE_PER_PUBDATA
             ) *
-            2 +
+                2 +
             params.l2Value;
 
         l2TransactionRequestDirect = L2TransactionRequestDirect({
@@ -475,8 +482,7 @@ library Utils {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddress);
 
         requiredValueToDeploy =
-            bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
-            2;
+            bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) * 2;
 
         l2TransactionRequest = L2TransactionRequestTwoBridgesOuter({
             chainId: chainId,
@@ -632,7 +638,7 @@ library Utils {
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata,
         address refundRecipient
-    ) internal returns (Call[] memory calls) {
+    ) internal view returns (Call[] memory calls) {
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
             uint256 requiredValueToDeploy
@@ -701,7 +707,7 @@ library Utils {
         address bridgehubAddress,
         address l1SharedBridgeProxy,
         address refundRecipient
-    ) internal returns (Call[] memory calls) {
+    ) internal view returns (Call[] memory calls) {
         // 1) Prepare the L2TransactionRequestDirect (same logic as before)
         (
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
@@ -756,7 +762,7 @@ library Utils {
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata,
         address refundRecipient
-    ) internal returns (Call[] memory calls) {
+    ) internal view returns (Call[] memory calls) {
         // 1) Prepare the L2TransactionRequestTwoBridges (same logic as before)
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
@@ -891,7 +897,7 @@ library Utils {
         address l1SharedBridgeProxy,
         uint256 chainId,
         uint256 amountToApprove
-    ) internal returns (uint256 ethAmountToPass, Call[] memory calls) {
+    ) internal view returns (uint256 ethAmountToPass, Call[] memory calls) {
         address baseTokenAddress = bridgehub.baseToken(chainId);
         if (ADDRESS_ONE != baseTokenAddress) {
             // Base token is not ETH, so we need to create an approval call
@@ -1138,7 +1144,10 @@ library Utils {
         vm.stopBroadcast();
     }
 
-    function encodeChainAdminMulticall(Call[] memory _calls, bool _requireSuccess) internal returns (bytes memory) {
+    function encodeChainAdminMulticall(
+        Call[] memory _calls,
+        bool _requireSuccess
+    ) internal pure returns (bytes memory) {
         return abi.encodeCall(IChainAdmin.multicall, (_calls, _requireSuccess));
     }
 
@@ -1383,7 +1392,7 @@ library Utils {
         bytes32 observableBytecodeHash = keccak256(bytecode);
         bytecodeInfo = ZKSyncOSBytecodeInfo.encodeZKSyncOSBytecodeInfo(
             bytecodeBlakeHash,
-            bytecode.length,
+            uint32(bytecode.length),
             observableBytecodeHash
         );
     }

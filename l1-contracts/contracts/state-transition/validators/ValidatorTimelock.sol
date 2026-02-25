@@ -252,7 +252,7 @@ contract ValidatorTimelock is
         address _chainAddress,
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
-        bytes calldata // _batchData (unused in this specific implementation)
+        bytes calldata // _batchData (unused in this specific implementation, forwarded via calldata)
     ) external onlyRole(_chainAddress, EXECUTOR_ROLE) {
         uint256 delay = executionDelay; // uint32
         unchecked {

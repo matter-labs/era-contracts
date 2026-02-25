@@ -3,19 +3,33 @@
 pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
-import {Vm} from "forge-std/Vm.sol";
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
-import {InteropCallStarter, InteropBundle, InteropCall, BundleAttributes, BundleStatus, CallStatus, MessageInclusionProof, L2Message, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION} from "contracts/common/Messaging.sol";
+import {
+    InteropCallStarter,
+    InteropBundle,
+    InteropCall,
+    BundleAttributes,
+    BundleStatus,
+    CallStatus,
+    MessageInclusionProof,
+    L2Message,
+    INTEROP_BUNDLE_VERSION,
+    INTEROP_CALL_VERSION
+} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 
-import {L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_VERIFICATION} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_HANDLER,
+    L2_INTEROP_HANDLER_ADDR,
+    L2_MESSAGE_VERIFICATION
+} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 
@@ -73,6 +87,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: sourceChainId,
             destinationChainId: destinationChainId,
+            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             interopBundleSalt: bytes32(uint256(1)),
             calls: calls,
             bundleAttributes: _createBundleAttributes(bundleExecutor)
@@ -134,6 +149,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: sourceChainId,
             destinationChainId: destinationChainId,
+            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             interopBundleSalt: bytes32(uint256(1)),
             calls: calls1,
             bundleAttributes: _createBundleAttributes(bundleExecutor)
@@ -153,6 +169,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: sourceChainId,
             destinationChainId: destinationChainId,
+            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             interopBundleSalt: bytes32(uint256(2)),
             calls: calls2,
             bundleAttributes: _createBundleAttributes(bundleExecutor)
@@ -222,6 +239,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: sourceChainId,
             destinationChainId: destinationChainId,
+            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             interopBundleSalt: bytes32(uint256(1)),
             calls: calls,
             bundleAttributes: _createBundleAttributes(bundleExecutor)
@@ -256,7 +274,8 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         return
             BundleAttributes({
                 executionAddress: InteroperableAddress.formatEvmV1(destinationChainId, executor),
-                unbundlerAddress: InteroperableAddress.formatEvmV1(destinationChainId, executor)
+                unbundlerAddress: InteroperableAddress.formatEvmV1(destinationChainId, executor),
+                useFixedFee: false
             });
     }
 

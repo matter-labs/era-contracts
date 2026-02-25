@@ -3,7 +3,14 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, L2_TO_L1_MESSENGER, SystemLogKey, Utils, L2_DA_COMMITMENT_SCHEME} from "./Utils.sol";
+import {
+    L2_BOOTLOADER_ADDRESS,
+    L2_SYSTEM_CONTEXT_ADDRESS,
+    L2_TO_L1_MESSENGER,
+    SystemLogKey,
+    Utils,
+    L2_DA_COMMITMENT_SCHEME
+} from "./Utils.sol";
 
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 
@@ -119,7 +126,7 @@ contract UtilsTest is UtilsCallMockerTest {
             Utils.constructL2Log(
                 true,
                 L2_TO_L1_MESSENGER,
-                uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+                uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
                 bytes32(uint256(L2_DA_COMMITMENT_SCHEME))
             ),
             "log[6] should be correct"

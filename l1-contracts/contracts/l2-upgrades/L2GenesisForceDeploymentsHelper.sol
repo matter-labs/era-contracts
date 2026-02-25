@@ -2,11 +2,31 @@
 
 pragma solidity 0.8.28;
 
-import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, L2_INTEROP_CENTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    GW_ASSET_TRACKER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
+    L2_ASSET_ROUTER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_INTEROP_HANDLER_ADDR,
+    L2_MESSAGE_ROOT_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_NTV_BEACON_DEPLOYER_ADDR,
+    L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
+    L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
+    L2_INTEROP_CENTER_ADDR
+} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
-import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {
+    FixedForceDeploymentsData,
+    ZKChainSpecificForceDeploymentsData
+} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL2WrappedBaseToken} from "../bridge/interfaces/IL2WrappedBaseToken.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {
+    ITransparentUpgradeableProxy,
+    TransparentUpgradeableProxy
+} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SystemContractProxyAdmin} from "./SystemContractProxyAdmin.sol";
 import {IZKOSContractDeployer} from "contracts/l2-system/zksync-os/interfaces/IZKOSContractDeployer.sol";
 import {L2NativeTokenVault} from "../bridge/ntv/L2NativeTokenVault.sol";
@@ -19,20 +39,25 @@ import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandl
 import {InteropHandler} from "../interop/InteropHandler.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol";
-import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingContract} from "../common/L1ContractErrors.sol";
+import {
+    DeployFailed,
+    UnsupportedUpgradeType,
+    ZKsyncOSNotForceDeployForExistingContract,
+    ZKsyncOSNotForceDeployToPrecompileAddress,
+    NonCanonicalRepresentation
+} from "../common/L1ContractErrors.sol";
 
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
 import {ICTMDeploymentTracker} from "../core/ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "../core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 import {InteropCenter} from "../interop/InteropCenter.sol";
 
 import {UpgradeableBeaconDeployer} from "../bridge/UpgradeableBeaconDeployer.sol";
 import {ISystemContractProxy} from "./ISystemContractProxy.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 
-import {ZKSyncOSBytecodeInfo} from "../common/libraries/ZKSyncOSBytecodeInfo.sol";
+import {BYTECODE_INFO_LENGTH, ZKSyncOSBytecodeInfo} from "../common/libraries/ZKSyncOSBytecodeInfo.sol";
 
 /// @title L2GenesisForceDeploymentsHelper
 /// @author Matter Labs
@@ -85,11 +110,19 @@ library L2GenesisForceDeploymentsHelper {
             input: hex""
         });
 
-        IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(forceDeployments);
+        bytes memory data = abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (forceDeployments));
+
+        (bool success, ) = L2_DEPLOYER_SYSTEM_CONTRACT_ADDR.call(data);
+        if (!success) {
+            revert DeployFailed();
+        }
         emit ForceDeployEraCompleted(_newAddress);
     }
 
     function unsafeForceDeployZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
+        // Validate canonical encoding for (bytes32, uint32, bytes32)
+        require(_bytecodeInfo.length == BYTECODE_INFO_LENGTH, NonCanonicalRepresentation());
+
         emit ZKsyncOSForceDeployStarted(_newAddress);
 
         // Decode the bytecode info using the library
@@ -121,6 +154,11 @@ library L2GenesisForceDeploymentsHelper {
 
     function forceDeployOnAddressZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
         require(_newAddress.code.length == 0, ZKsyncOSNotForceDeployForExistingContract(_newAddress));
+
+        // Block deployment to precompile addresses (0x01-0xFF) and zero address.
+        uint160 addr = uint160(_newAddress);
+        require(addr > 0xFF, ZKsyncOSNotForceDeployToPrecompileAddress(_newAddress));
+
         unsafeForceDeployZKsyncOS(_bytecodeInfo, _newAddress);
     }
 
@@ -132,8 +170,18 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function updateZKsyncOSContract(bytes memory _bytecodeInfo, address _newAddress) internal {
+        // Validate that _bytecodeInfo contains exactly the expected length for (bytes, bytes) encoding
+        // to prevent trailing bytes from affecting the hash calculation
+        require(_bytecodeInfo.length >= 64, NonCanonicalRepresentation());
+
         emit UpdateZKsyncOSContractStarted(_newAddress);
+
         (bytes memory bytecodeInfo, bytes memory bytecodeInfoSystemProxy) = abi.decode((_bytecodeInfo), (bytes, bytes));
+
+        // This data is provided by decentralized governance, so it can be trusted to be encoded correctly.
+        // We still verify canonical encoding as an extra safety measure.
+        bytes memory canonicalEncoding = abi.encode(bytecodeInfo, bytecodeInfoSystemProxy);
+        require(keccak256(_bytecodeInfo) == keccak256(canonicalEncoding), NonCanonicalRepresentation());
 
         address implAddress = generateRandomAddress(bytecodeInfo);
         emit ImplementationAddressGenerated(implAddress);
@@ -158,7 +206,7 @@ library L2GenesisForceDeploymentsHelper {
             }
         }
 
-        // If the address does not have any bytecode, we expect that it is a proxy
+        // If the address does not have any bytecode, we expect that it is a proxy.
         if (_newAddress.code.length == 0) {
             forceDeployOnAddressZKsyncOS(bytecodeInfoSystemProxy, _newAddress);
             ISystemContractProxy(_newAddress).forceInitAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR);
@@ -242,7 +290,13 @@ library L2GenesisForceDeploymentsHelper {
             _isGenesisUpgrade: _isGenesisUpgrade,
             _isZKsyncOS: _isZKsyncOS
         });
-        _finalizeDeployments(_ctmDeployer, fixedForceDeploymentsData, additionalForceDeploymentsData);
+        _finalizeDeployments({
+            _ctmDeployer: _ctmDeployer,
+            fixedForceDeploymentsData: fixedForceDeploymentsData,
+            additionalForceDeploymentsData: additionalForceDeploymentsData,
+            _isZKsyncOS: _isZKsyncOS,
+            _isGenesisUpgrade: _isGenesisUpgrade
+        });
     }
 
     function _setupProxyAdmin() private {
@@ -472,6 +526,12 @@ library L2GenesisForceDeploymentsHelper {
         if (_isGenesisUpgrade) {
             InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
+                fixedForceDeploymentsData.aliasedL1Governance,
+                fixedForceDeploymentsData.zkTokenAssetId
+            );
+        } else {
+            InteropCenter(L2_INTEROP_CENTER_ADDR).updateL2(
+                fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance
             );
         }
@@ -487,7 +547,9 @@ library L2GenesisForceDeploymentsHelper {
     function _finalizeDeployments(
         address _ctmDeployer,
         FixedForceDeploymentsData memory fixedForceDeploymentsData,
-        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData
+        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData,
+        bool _isZKsyncOS,
+        bool _isGenesisUpgrade
     ) private {
         // It is expected that either through the force deployments above
         // or upon initialization, both the L2 deployment of BridgeHub, AssetRouter, and MessageRoot are deployed.
@@ -497,23 +559,28 @@ library L2GenesisForceDeploymentsHelper {
         L2Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses({
             _assetRouter: L2_ASSET_ROUTER_ADDR,
             _l1CtmDeployer: ICTMDeploymentTracker(_ctmDeployer),
-            _messageRoot: IMessageRoot(L2_MESSAGE_ROOT_ADDR),
+            _messageRoot: IMessageRootBase(L2_MESSAGE_ROOT_ADDR),
             _chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
             _chainRegistrationSender: fixedForceDeploymentsData.aliasedChainRegistrationSender
         });
 
-        L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(
+        L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(
             fixedForceDeploymentsData.l1ChainId,
-            additionalForceDeploymentsData.baseTokenBridgingData.assetId
+            additionalForceDeploymentsData.baseTokenBridgingData.assetId,
+            // The only chains that need backfill for the base token's total supply are ZKsync OS
+            // chains that existed before the v31 upgrade (i.e. isGenesis is false).
+            _isZKsyncOS && !_isGenesisUpgrade
         );
 
-        GWAssetTracker(GW_ASSET_TRACKER_ADDR).setAddresses(fixedForceDeploymentsData.l1ChainId);
-
-        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setAddresses(
-            additionalForceDeploymentsData.baseTokenBridgingData.originChainId
+        GWAssetTracker(GW_ASSET_TRACKER_ADDR).initL2(
+            fixedForceDeploymentsData.l1ChainId,
+            fixedForceDeploymentsData.aliasedL1Governance
         );
 
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
+
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
+
         emit PerformForceDeployedContractsInitCompleted();
     }
 

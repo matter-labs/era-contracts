@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 // solhint-disable gas-custom-errors
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";

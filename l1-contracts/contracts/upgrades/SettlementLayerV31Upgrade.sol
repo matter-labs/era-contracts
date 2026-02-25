@@ -6,7 +6,7 @@ import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {L2_GENESIS_UPGRADE_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {IMessageRoot} from "../core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
@@ -60,14 +60,23 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
         proposedUpgrade.l2ProtocolUpgradeTx.data = complexUpgraderCalldata;
         super.upgrade(proposedUpgrade);
-        IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
+        IMessageRootBase messageRoot = IMessageRootBase(bridgehub.messageRoot());
 
         if (s.settlementLayer == address(0)) {
+            // slither-disable-next-line reentrancy-no-eth
             IL1MessageRoot(address(messageRoot)).saveV31UpgradeChainBatchNumber(s.chainId);
         }
 
         if (bridgehub.whitelistedSettlementLayers(s.chainId)) {
             require(IGetters(address(this)).getPriorityQueueSize() == 0, PriorityQueueNotReady());
+        }
+
+        // Era chains automatically have it tracked.
+        // ZKsync OS chains havent been tracking this value until the v31 upgrade.
+        // It will have to be backfilled.
+        // FIXME The actual logic for backfilling will be introduced in a separate PR.
+        if (!s.zksyncOS) {
+            s.baseTokenHasTotalSupply = true;
         }
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;

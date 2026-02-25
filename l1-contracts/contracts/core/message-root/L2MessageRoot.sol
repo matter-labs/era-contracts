@@ -4,7 +4,11 @@ pragma solidity 0.8.28;
 
 import {MessageRootBase} from "./MessageRootBase.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BRIDGEHUB_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR
+} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {OnlyL1} from "../bridgehub/L1BridgehubErrors.sol";
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
@@ -31,7 +35,7 @@ contract L2MessageRoot is MessageRootBase {
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _bridgehub() internal view override returns (address) {
+    function _bridgehub() internal pure override returns (address) {
         return L2_BRIDGEHUB_ADDR;
     }
 
@@ -45,7 +49,7 @@ contract L2MessageRoot is MessageRootBase {
 
     // A method for backwards compatibility with the old implementation
     // solhint-disable-next-line func-name-mixedcase
-    function BRIDGE_HUB() public view returns (address) {
+    function BRIDGE_HUB() public pure returns (address) {
         return L2_BRIDGEHUB_ADDR;
     }
 
@@ -67,7 +71,7 @@ contract L2MessageRoot is MessageRootBase {
     /// @dev Expected to be called only once by the ComplexUpgrader and during genesis only, while
     /// for already existing chains an `updateL2` function should be used.
     /// @param _l1ChainId The chain id of L1.
-    function initL2(uint256 _l1ChainId, uint256 _eraGatewayChainId) public onlyUpgrader {
+    function initL2(uint256 _l1ChainId, uint256 _eraGatewayChainId) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
         updateL2(_l1ChainId, _eraGatewayChainId);
         _initialize();
@@ -115,33 +119,5 @@ contract L2MessageRoot is MessageRootBase {
     /// @inheritdoc MessageRootBase
     function _noBatchFallback(uint256, uint256) internal pure override returns (bytes32) {
         return bytes32(0);
-    }
-
-    /// @notice emit a new message root when committing a new batch
-    function _emitRoot(bytes32 _root) internal {
-        // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
-        // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
-        bytes32[] memory _sides = new bytes32[](1);
-        _sides[0] = _root;
-
-        uint256 currentCount = totalPublishedInteropRoots;
-        totalPublishedInteropRoots = currentCount + 1;
-
-        emit NewInteropRoot(block.chainid, block.number, currentCount, _sides);
-    }
-
-    /// @notice This function is used to update the full tree with the latest batch roots of all chains.
-    /// @dev It is expected to be public.
-    /// FIXME: it is harmless, but why do we need it?
-    function updateFullTree() public {
-        uint256 cachedChainCount = chainCount;
-        bytes32[] memory newLeaves = new bytes32[](cachedChainCount);
-        for (uint256 i = 0; i < cachedChainCount; ++i) {
-            uint256 chainId = chainIndexToId[i];
-            newLeaves[i] = MessageHashing.chainIdLeafHash(chainTree[chainId].root(), chainId);
-        }
-        bytes32 newRoot = sharedTree.updateAllLeaves(newLeaves);
-        _emitRoot(newRoot);
-        historicalRoot[block.number] = newRoot;
     }
 }

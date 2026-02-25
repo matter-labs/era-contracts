@@ -12,7 +12,13 @@ import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "../../bridge/asset-router/AssetRouterBase.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {NoEthAllowed, NotOwner, NotOwnerViaRouter, OnlyBridgehub, WrongCounterPart} from "../bridgehub/L1BridgehubErrors.sol";
+import {
+    NoEthAllowed,
+    NotOwner,
+    NotOwnerViaRouter,
+    OnlyBridgehub,
+    WrongCounterPart
+} from "../bridgehub/L1BridgehubErrors.sol";
 import {CTMNotRegistered, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 
 /// @dev The encoding version of the data.
@@ -36,7 +42,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub.
+    /// @notice Checks that the message sender is the L1_ASSET_ROUTER and the original caller is the contract owner.
     modifier onlyOwnerViaRouter(address _originalCaller) {
         if (msg.sender != address(L1_ASSET_ROUTER) || _originalCaller != owner()) {
             revert NotOwnerViaRouter(msg.sender, _originalCaller);

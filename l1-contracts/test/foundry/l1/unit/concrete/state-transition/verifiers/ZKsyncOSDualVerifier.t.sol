@@ -4,9 +4,9 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {EmptyProofLength, UnknownVerifierType, MockVerifierNotSupported} from "contracts/common/L1ContractErrors.sol";
+import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {EmptyProofLength, MockVerifierNotSupported, UnknownVerifierType} from "contracts/common/L1ContractErrors.sol";
 import {UnknownVerifierVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 /// @notice Mock FFLONK verifier for testing
@@ -68,8 +68,11 @@ contract ZKsyncOSDualVerifierTest is Test {
 
     // ============ Constructor Tests ============
 
-    function test_constructor_setsVerifiersAtVersion0() public view {
+    function test_constructor_setsFflonkVerifierAtVersion0() public view {
         assertEq(address(verifier.fflonkVerifiers(0)), address(fflonkVerifier));
+    }
+
+    function test_constructor_setsPlonkVerifiersAtVersion0() public view {
         assertEq(address(verifier.plonkVerifiers(0)), address(plonkVerifier));
     }
 

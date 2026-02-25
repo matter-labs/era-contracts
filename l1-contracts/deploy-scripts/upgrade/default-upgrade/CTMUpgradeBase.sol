@@ -3,25 +3,37 @@ pragma solidity 0.8.28;
 
 import "../SystemContractsProcessing.s.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {DeployCTMUtils} from "../../ctm/DeployCTMUtils.s.sol";
+
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_FORCE_DEPLOYER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
+import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
-import {UpgradeUtils} from "./UpgradeUtils.sol";
+
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 abstract contract CTMUpgradeBase is DeployCTMScript {
     function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual returns (bool);
+
+    function getEmptyVerifierParams() internal pure returns (VerifierParams memory) {
+        return
+            VerifierParams({
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            });
+    }
 
     /// @notice Get protocol upgrade nonce from protocol version
     function getProtocolUpgradeNonce(uint256 protocolVersion) internal pure returns (uint256) {
@@ -198,17 +210,16 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     }
 
     function getProposedPatchUpgrade(
-        StateTransitionDeployedAddresses memory stateTransition,
         uint256 newProtocolVersion
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
-        VerifierParams memory verifierParams = getVerifierParams();
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: emptyUpgradeTx(),
             bootloaderHash: bytes32(0),
             defaultAccountHash: bytes32(0),
             evmEmulatorHash: bytes32(0),
-            verifier: stateTransition.verifiers.verifier,
-            verifierParams: verifierParams,
+            // Verifier is resolved from CTM; keep zeroed fields for calldata compatibility.
+            verifier: address(0),
+            verifierParams: getEmptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
             upgradeTimestamp: 0,
@@ -225,8 +236,6 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         uint256 protocolUpgradeNonce,
         bool isZKsyncOS
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
-        VerifierParams memory verifierParams = getVerifierParams();
-
         IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
             .getBaseForceDeployments(l1ChainId, ownerAddress);
 
@@ -248,10 +257,11 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             bootloaderHash: chainCreationParams.bootloaderHash,
             defaultAccountHash: chainCreationParams.defaultAAHash,
             evmEmulatorHash: chainCreationParams.evmEmulatorHash,
-            verifierParams: verifierParams,
+            // Verifier is resolved from CTM; keep zeroed fields for calldata compatibility.
+            verifier: address(0),
+            verifierParams: getEmptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
-            verifier: stateTransition.verifiers.verifier,
             upgradeTimestamp: 0,
             newProtocolVersion: chainCreationParams.latestProtocolVersion
         });

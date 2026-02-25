@@ -4,17 +4,32 @@ pragma solidity 0.8.28;
 import {StdStorage, Test, Vm, stdStorage} from "forge-std/Test.sol";
 import {EVENT_INDEX, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../Utils/Utils.sol";
 
-import {EMPTY_PREPUBLISHED_COMMITMENT, ExecutorTest, POINT_EVALUATION_PRECOMPILE_RESULT} from "./_Executor_Shared.t.sol";
+import {
+    EMPTY_PREPUBLISHED_COMMITMENT,
+    ExecutorTest,
+    POINT_EVALUATION_PRECOMPILE_RESULT
+} from "./_Executor_Shared.t.sol";
 
-import {POINT_EVALUATION_PRECOMPILE_ADDR, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
+import {
+    POINT_EVALUATION_PRECOMPILE_ADDR,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    TESTNET_COMMIT_TIMESTAMP_NOT_OLDER
+} from "contracts/common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {BatchHashMismatch, CantExecuteUnprovenBatches, NonSequentialBatch, PriorityOperationsRollingHashMismatch, QueueIsEmpty} from "contracts/common/L1ContractErrors.sol";
+import {
+    BatchHashMismatch,
+    CantExecuteUnprovenBatches,
+    NonSequentialBatch,
+    PriorityOperationsRollingHashMismatch,
+    QueueIsEmpty
+} from "contracts/common/L1ContractErrors.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InteropRoot} from "contracts/common/Messaging.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 
 contract ExecutingTest is ExecutorTest {
     using stdStorage for StdStorage;
@@ -178,7 +193,7 @@ contract ExecutingTest is ExecutorTest {
             );
         vm.mockCall(
             address(messageRoot),
-            abi.encodeWithSelector(IMessageRoot.addChainBatchRoot.selector, 9, 10, bytes32(0)),
+            abi.encodeWithSelector(IMessageRootBase.addChainBatchRoot.selector, 9, 10, bytes32(0)),
             abi.encode()
         );
 
@@ -387,15 +402,19 @@ contract ExecutingTest is ExecutorTest {
         uint256 l2Value = 10 ether;
         uint256 totalCost = baseCost + l2Value;
 
-        mailbox.requestL2Transaction{value: totalCost}({
-            _contractL2: address(0),
-            _l2Value: l2Value,
-            _calldata: bytes(""),
-            _l2GasLimit: l2GasLimit,
-            _l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            _factoryDeps: factoryDeps,
-            _refundRecipient: address(0)
-        });
+        dummyBridgehub.requestL2TransactionDirect{value: totalCost}(
+            L2TransactionRequestDirect({
+                chainId: l2ChainId,
+                mintValue: totalCost,
+                l2Contract: address(0),
+                l2Value: l2Value,
+                l2Calldata: bytes(""),
+                l2GasLimit: l2GasLimit,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                factoryDeps: factoryDeps,
+                refundRecipient: address(0)
+            })
+        );
 
         vm.prank(validator);
         vm.expectRevert(PriorityOperationsRollingHashMismatch.selector);
@@ -723,6 +742,7 @@ contract ExecutingTest is ExecutorTest {
             IExecutor.StoredBatchInfo[] memory storedBatchInfos,
             PriorityOpsBatchInfo[] memory priorityOpsBatchInfos,
             InteropRoot[][] memory dependencyRoots,
+            ,
             ,
             ,
 

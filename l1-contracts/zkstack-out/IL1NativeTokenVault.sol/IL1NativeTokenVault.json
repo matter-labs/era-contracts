@@ -305,25 +305,6 @@
   },
   {
     "type": "event",
-    "name": "BridgedTokenBeaconUpdated",
-    "inputs": [
-      {
-        "name": "bridgedTokenBeacon",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      },
-      {
-        "name": "bridgedTokenProxyBytecodeHash",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "TokenBeaconUpdated",
     "inputs": [
       {

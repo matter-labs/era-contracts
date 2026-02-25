@@ -3,21 +3,37 @@
 pragma solidity 0.8.28;
 
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
-import {ETH_TOKEN_ADDRESS, MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1, MAX_ALLOWED_NUMBER_OF_MIGRATIONS} from "../../common/Config.sol";
+import {
+    ETH_TOKEN_ADDRESS,
+    MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
+    MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1,
+    MAX_ALLOWED_NUMBER_OF_MIGRATIONS
+} from "../../common/Config.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {TxStatus} from "../../common/Messaging.sol";
-import {IBridgehubBase, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehubBase.sol";
+import {BridgehubBurnCTMAssetData, IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1AssetHandler} from "../../bridge/interfaces/IL1AssetHandler.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
-import {IL1MessageRoot} from "../message-root/IL1MessageRoot.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
-import {IChainAssetHandlerShared} from "./IChainAssetHandlerShared.sol";
+import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
+import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
+import {IAssetTrackerBase} from "../../bridge/asset-tracker/IAssetTrackerBase.sol";
 import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
-import {MigrationIntervalInvalid, MigrationIntervalNotSet, MigrationNumberMismatch, SettlementLayerMustNotBeL1, IteratedMigrationsNotSupported, HistoricalSettlementLayerMismatch} from "../bridgehub/L1BridgehubErrors.sol";
+import {ChainNotReadyForMigration, ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
+import {CTMNotRegistered} from "../../common/L1ContractErrors.sol";
+import {
+    MigrationIntervalInvalid,
+    MigrationIntervalNotSet,
+    MigrationNumberMismatch,
+    SettlementLayerMustNotBeL1,
+    IteratedMigrationsNotSupported,
+    HistoricalSettlementLayerMismatch
+} from "../bridgehub/L1BridgehubErrors.sol";
 import {MigrationInterval} from "./IChainAssetHandler.sol";
+import {IL1MessageRoot} from "../message-root/IL1MessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -25,7 +41,7 @@ import {MigrationInterval} from "./IChainAssetHandler.sol";
 /// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
 /// @dev L1 version – keeps the cheap immutables set in the constructor.
-contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1ChainAssetHandler, IChainAssetHandlerShared {
+contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1ChainAssetHandler {
     /// @dev The assetId of the ETH.
     bytes32 public immutable override ETH_TOKEN_ASSET_ID;
 
@@ -47,7 +63,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     /// @dev The message root contract. Set via `setAddresses` after deployment because
     /// L1MessageRoot is deployed after L1ChainAssetHandler (so that L1MessageRoot can store
     /// the chain asset handler address as an immutable).
-    IMessageRoot internal messageRoot;
+    IMessageRootBase internal messageRoot;
 
     /// @dev The asset router contract. Set via `setAddresses` after deployment because
     /// L1AssetRouter is deployed after L1ChainAssetHandler.
@@ -63,13 +79,12 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     function _bridgehub() internal view override returns (IL1Bridgehub) {
         return BRIDGEHUB;
     }
-
-    function _messageRoot() internal view override returns (IMessageRoot) {
+    function _messageRoot() internal view override returns (IMessageRootBase) {
         return messageRoot;
     }
 
     // solhint-disable-next-line func-name-mixedcase
-    function MESSAGE_ROOT() public view override returns (IMessageRoot) {
+    function MESSAGE_ROOT() public view override returns (IMessageRootBase) {
         return messageRoot;
     }
 
@@ -118,10 +133,16 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
         uint256 chainId = bridgehubBurnData.chainId;
 
+        // Note: _chainId is the settlement layer chain (e.g. gateway) where the migration tx was proven,
+        // while bridgehubBurnData.chainId is the chain being migrated. These are intentionally different.
+
         (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeConfirmTransferResult(
             chainId,
             _txStatus
         );
+
+        require(zkChain != address(0), ZKChainNotRegistered());
+        require(ctm != address(0), CTMNotRegistered());
 
         IChainTypeManager(ctm).forwardedBridgeConfirmTransferResult({
             _chainId: chainId,
@@ -154,10 +175,32 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         });
     }
 
+    /// @notice Returns whether a chain can be migrated from L1 to a settlement layer.
+    /// @dev A chain is ready only when its legacy base-token balance in L1NativeTokenVault has been migrated.
+    /// @param _chainId The chain id to check.
+    /// @return True if migration preconditions are met.
+    function isReadyForMigration(uint256 _chainId) public view returns (bool) {
+        bytes32 baseAssetId = BRIDGEHUB.baseTokenAssetId(_chainId);
+        address zkChain = BRIDGEHUB.getZKChain(_chainId);
+        require(zkChain != address(0), ZKChainNotRegistered());
+        IL1AssetRouter l1AssetRouter = IL1AssetRouter(address(_assetRouter()));
+        IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AssetRouter.nativeTokenVault()));
+        IAssetTrackerBase l1AssetTracker = IAssetTrackerBase(address(nativeTokenVault.l1AssetTracker()));
+
+        return
+            // The chain must have version higher than v31.
+            !IL1MessageRoot(address(_messageRoot())).isPreV31(_chainId) &&
+            // The chain's base token must be registered as otherwise the token balance
+            // migration wont work. This is done just in case to unblock any potential L1->L2 transactions.
+            l1AssetTracker.isAssetRegistered(baseAssetId) &&
+            // The chain's base token must support `totalSupply()`, which is the case
+            // for all chains except for pre-v31 ZKsync OS ones. For them, this value
+            // has to be backfilled. Otherwise token balance migration may not work.
+            IZKChain(zkChain).baseTokenSupportsTotalSupply();
+    }
+
     function _setMigrationInProgressOnL1(uint256 _chainId) internal override {
-        if (IL1MessageRoot(_messageRoot()).isChainPreV31(_chainId)) {
-            revert MigrationPreV31NotAllowed();
-        }
+        require(isReadyForMigration(_chainId), ChainNotReadyForMigration(_chainId));
         isMigrationInProgress[_chainId] = true;
     }
 
@@ -177,7 +220,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
     ) external onlyOwner {
         require(_migrationNumber == 0, MigrationNumberMismatch(0, _migrationNumber));
         require(!_interval.isActive, MigrationIntervalNotSet());
-        uint256 legacyGwChainId = IMessageRoot(_messageRoot()).ERA_GATEWAY_CHAIN_ID();
+        uint256 legacyGwChainId = _messageRoot().ERA_GATEWAY_CHAIN_ID();
         require(
             _interval.settlementLayerChainId == legacyGwChainId,
             HistoricalSettlementLayerMismatch(legacyGwChainId, _interval.settlementLayerChainId)
@@ -274,7 +317,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
             _newMigrationNum == MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
             MigrationNumberMismatch(MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, _newMigrationNum)
         );
-        uint256 slBatchLowerBound = IMessageRoot(_messageRoot()).currentChainBatchNumber(_settlementChainId);
+        uint256 slBatchLowerBound = _messageRoot().currentChainBatchNumber(_settlementChainId);
         _migrationInterval[_chainId][_newMigrationNum] = MigrationInterval({
             migrateToGWBatchNumber: _batchNumber,
             migrateFromGWBatchNumber: 0,
@@ -303,7 +346,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         MigrationInterval storage interval = _migrationInterval[_chainId][MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER];
         require(interval.isActive, MigrationIntervalNotSet());
         interval.migrateFromGWBatchNumber = _batchNumber;
-        interval.settlementLayerBatchUpperBound = IMessageRoot(_messageRoot()).currentChainBatchNumber(
+        interval.settlementLayerBatchUpperBound = _messageRoot().currentChainBatchNumber(
             interval.settlementLayerChainId
         );
         interval.isActive = false;

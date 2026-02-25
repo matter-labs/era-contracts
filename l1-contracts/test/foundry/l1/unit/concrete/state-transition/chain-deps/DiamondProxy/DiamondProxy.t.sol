@@ -13,7 +13,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {InvalidSelector, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
+
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
@@ -56,9 +56,10 @@ contract DiamondProxyTest is UtilsCallMockerTest {
             })
         );
         dummyBridgehub = new DummyBridgehub();
-        initializeData = Utils.makeInitializeData(testnetVerifier, address(dummyBridgehub));
+        initializeData = Utils.makeInitializeData(address(dummyBridgehub));
 
         mockDiamondInitInteropCenterCallsWithAddress(initializeData.bridgehub, address(0), bytes32(0));
+        mockChainTypeManagerVerifier(testnetVerifier);
     }
 
     function test_revertWhen_chainIdDiffersFromBlockChainId() public {

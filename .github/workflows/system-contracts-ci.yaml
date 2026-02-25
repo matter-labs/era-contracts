@@ -17,9 +17,9 @@ jobs:
         uses: ./.github/actions/install-zksync-foundry
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
-          node-version: 18.20.8
+          node-version-file: .nvmrc
 
       - name: Install Yarn
         run: npm install -g yarn
@@ -62,9 +62,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
-          node-version: 18.20.8
+          node-version-file: .nvmrc
           cache: yarn
 
       - name: Install dependencies
@@ -106,53 +106,52 @@ jobs:
           cd system-contracts/bootloader/test_infra
           cargo run
 
-  # FIXME: uncomment once fixed.
-  # test-contracts:
-  #   needs: [build, lint]
-  #   runs-on: ubuntu-latest
+  test-contracts:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
 
-  #   steps:
-  #     - name: Checkout the repository
-  #       uses: actions/checkout@v4
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
 
-  #     - name: Use Node.js
-  #       uses: actions/setup-node@v3
-  #       with:
-  #         node-version: 18.20.8
-  #         cache: yarn
+      - name: Use Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: yarn
 
-  #     - name: Run anvil-zksync
-  #       uses: dutterbutter/anvil-zksync-action@v1.3.0
-  #       with:
-  #         mode: run
-  #         protocolVersion: 29
-  #         evmInterpreter: true
-  #         logFilePath: "anvil_zksync.log"
-  #         offline: true
+      - name: Run anvil-zksync
+        uses: dutterbutter/anvil-zksync-action@v1.3.0
+        with:
+          mode: run
+          protocolVersion: 29
+          evmInterpreter: true
+          logFilePath: "anvil_zksync.log"
+          offline: true
 
-  #     - name: Install dependencies
-  #       run: yarn
+      - name: Install dependencies
+        run: yarn
 
-  #     - name: Restore artifacts cache
-  #       uses: actions/cache/restore@v3
-  #       with:
-  #         fail-on-cache-miss: true
-  #         key: artifacts-system-${{ github.sha }}
-  #         path: |
-  #           system-contracts/zkout
-  #           system-contracts/cache-forge
-  #           system-contracts/bootloader/build
-  #           system-contracts/artifacts-zk
-  #           system-contracts/cache-zk
-  #           system-contracts/typechain
-  #           system-contracts/contracts-preprocessed
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-system-${{ github.sha }}
+          path: |
+            system-contracts/zkout
+            system-contracts/cache-forge
+            system-contracts/bootloader/build
+            system-contracts/artifacts-zk
+            system-contracts/cache-zk
+            system-contracts/typechain
+            system-contracts/contracts-preprocessed
 
-  #     - name: Run tests
-  #       run: yarn sc test
+      - name: Run tests
+        run: yarn sc test
 
-  #     - name: Print output logs of anvil-zksync
-  #       if: always()
-  #       run: cat anvil_zksync.log
+      - name: Print output logs of anvil-zksync
+        if: always()
+        run: cat anvil_zksync.log
 
   test-contracts-foundry:
     needs: [lint]
@@ -165,9 +164,9 @@ jobs:
           submodules: recursive
 
       - name: Use Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v6
         with:
-          node-version: 18.20.8
+          node-version-file: .nvmrc
           cache: yarn
 
       - name: Install dependencies

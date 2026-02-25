@@ -3,12 +3,25 @@ pragma solidity 0.8.28;
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {BridgehubBurnCTMAssetData, IBridgehubBase, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {
+    BridgehubBurnCTMAssetData,
+    IBridgehubBase,
+    L2TransactionRequestTwoBridgesOuter
+} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
-import {AlreadyWhitelisted, CallNotAllowed, InvalidSelector, NotAllowed, RemovingPermanentRestriction, TooHighDeploymentNonce, UnallowedImplementation, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {
+    AlreadyWhitelisted,
+    CallNotAllowed,
+    InvalidSelector,
+    NotAllowed,
+    RemovingPermanentRestriction,
+    TooHighDeploymentNonce,
+    UnallowedImplementation,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -16,7 +29,6 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
 
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 
@@ -373,7 +385,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         L1MessageRoot messageRootNew = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(address(bridgehub), 1, address(0))),
+                    address(new L1MessageRoot(address(bridgehub), 1, makeAddr("chainAssetHandler"))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )

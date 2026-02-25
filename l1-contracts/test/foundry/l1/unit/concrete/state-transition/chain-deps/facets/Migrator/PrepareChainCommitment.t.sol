@@ -4,7 +4,10 @@ pragma solidity 0.8.28;
 
 import {MigratorTest} from "./_Migrator_Shared.t.sol";
 import {ZKChainCommitment} from "contracts/common/Config.sol";
-import {ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {
+    ExecutedIsNotConsistentWithVerified,
+    VerifiedIsNotConsistentWithCommitted
+} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract PrepareChainCommitmentTest is MigratorTest {
     function test_prepareChainCommitment_RevertWhen_ExecutedExceedsVerified() public {

@@ -2,9 +2,9 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L2Log, L2Message, TxStatus, TokenBridgingData} from "../../common/Messaging.sol";
+import {L2Log, L2Message, TokenBridgingData, TxStatus} from "../../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 
 struct L2TransactionRequestDirect {
@@ -72,7 +72,7 @@ interface IBridgehubBase {
         address sender
     );
 
-    event SettlementLayerRegistered(uint256 indexed chainId, bool indexed isWhitelisted);
+    event SettlementLayerRegistered(uint256 indexed chainId, bool isWhitelisted);
 
     event NewChain(uint256 indexed chainId, address chainTypeManager, address indexed chainGovernance);
 
@@ -101,7 +101,7 @@ interface IBridgehubBase {
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
-    function messageRoot() external view returns (IMessageRoot);
+    function messageRoot() external view returns (IMessageRootBase);
 
     function getZKChain(uint256 _chainId) external view returns (address);
 

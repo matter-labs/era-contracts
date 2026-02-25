@@ -6,10 +6,20 @@ import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../l2-helpers/L2ContractAddresses.sol"
 import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1ERC20Bridge} from "../../bridge/interfaces/IL1ERC20Bridge.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
-import {AssetIdMismatch, IncorrectTokenAddressFromNTV, InvalidNTVBurnData, L2WithdrawalMessageWrongLength, UnsupportedEncodingVersion, BadTransferDataLength} from "../L1ContractErrors.sol";
+import {
+    AssetIdMismatch,
+    IncorrectTokenAddressFromNTV,
+    InvalidNTVBurnData,
+    L2WithdrawalMessageWrongLength,
+    UnsupportedEncodingVersion,
+    BadTransferDataLength,
+    EmptyData
+} from "../L1ContractErrors.sol";
 import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
+import {InvalidFunctionSignature} from "../../bridge/asset-tracker/AssetTrackerErrors.sol";
+import {IAssetTrackerDataEncoding} from "../../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 import {UnsafeBytes} from "./UnsafeBytes.sol";
-import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {GatewayToL1TokenBalanceMigrationData, L1ToGatewayTokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
 
 /**
@@ -188,6 +198,9 @@ library DataEncoding {
     function decodeTokenData(
         bytes calldata _tokenData
     ) internal pure returns (uint256 chainId, bytes memory name, bytes memory symbol, bytes memory decimals) {
+        if (_tokenData.length == 0) {
+            revert EmptyData();
+        }
         bytes1 encodingVersion = _tokenData[0];
         if (encodingVersion == LEGACY_ENCODING_VERSION) {
             (name, symbol, decimals) = abi.decode(_tokenData, (bytes, bytes, bytes));
@@ -355,13 +368,30 @@ library DataEncoding {
         transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
     }
 
-    function decodeTokenBalanceMigrationData(
+    function decodeL1ToGatewayTokenBalanceMigrationData(
         bytes memory _l2ToL1message
-    ) internal pure returns (bytes4 functionSignature, TokenBalanceMigrationData memory data) {
+    ) internal pure returns (bytes4 functionSignature, L1ToGatewayTokenBalanceMigrationData memory data) {
         (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         functionSignature = bytes4(functionSignatureUint);
+        require(
+            functionSignature == IAssetTrackerDataEncoding.receiveL1ToGatewayMigrationOnL1.selector,
+            InvalidFunctionSignature(functionSignature)
+        );
         bytes memory transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
-        data = abi.decode(transferData, (TokenBalanceMigrationData));
+        data = abi.decode(transferData, (L1ToGatewayTokenBalanceMigrationData));
+    }
+
+    function decodeGatewayToL1TokenBalanceMigrationData(
+        bytes memory _l2ToL1message
+    ) internal pure returns (bytes4 functionSignature, GatewayToL1TokenBalanceMigrationData memory data) {
+        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
+        functionSignature = bytes4(functionSignatureUint);
+        require(
+            functionSignature == IAssetTrackerDataEncoding.receiveGatewayToL1MigrationOnL1.selector,
+            InvalidFunctionSignature(functionSignature)
+        );
+        bytes memory transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
+        data = abi.decode(transferData, (GatewayToL1TokenBalanceMigrationData));
     }
 
     function getSelector(bytes memory _data) internal pure returns (bytes4) {

@@ -4,14 +4,19 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {Vm} from "forge-std/Vm.sol";
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_VERIFICATION} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_HANDLER,
+    L2_INTEROP_HANDLER_ADDR,
+    L2_MESSAGE_VERIFICATION
+} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {InteropBundle, MessageInclusionProof, CallStatus, BundleStatus} from "contracts/common/Messaging.sol";
+import {CallStatus, InteropBundle, MessageInclusionProof} from "contracts/common/Messaging.sol";
 
-import {L2InteropTestUtils, BundleExecutionResult} from "./L2InteropTestUtils.sol";
+import {BundleExecutionResult, L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
@@ -21,7 +26,7 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
         vm.deal(address(this), 1000 ether);
         vm.recordLogs();
 
-        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100);
+        InteropLibrary.sendNative(destinationChainId, interopTargetContract, UNBUNDLER_ADDRESS, 100, false);
         Vm.Log[] memory logs1 = vm.getRecordedLogs();
 
         // Verify the first bundle emission
@@ -70,7 +75,7 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
         InteropLibrary.sendDirectCall(
             destinationChainId,
             L2_INTEROP_HANDLER_ADDR,
-            abi.encodeCall(L2_INTEROP_HANDLER.unbundleBundle, (originalChainId, bundle, callStatuses)),
+            abi.encodeCall(L2_INTEROP_HANDLER.unbundleBundle, (bundle, callStatuses)),
             UNBUNDLER_ADDRESS,
             UNBUNDLER_ADDRESS
         );

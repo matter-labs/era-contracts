@@ -9,6 +9,8 @@ import {MigrationInterval} from "./IChainAssetHandler.sol";
 interface IL1ChainAssetHandler {
     function isMigrationInProgress(uint256 _chainId) external view returns (bool);
 
+    function isReadyForMigration(uint256 _chainId) external view returns (bool);
+
     /// @notice Returns the migration interval for a chain at a specific migration number.
     /// @param _chainId The ID of the chain.
     /// @param _migrationNumber The migration number (0 for legacy GW, 1+ for regular migrations).

@@ -4,52 +4,34 @@ pragma solidity 0.8.28;
 // solhint-disable no-console, gas-custom-errors
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {stdToml} from "forge-std/StdToml.sol";
-
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
+
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-
 import {Call} from "contracts/governance/Common.sol";
 
-import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_VERSION_SPECIFIC_UPGRADER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
-import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
-
-import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
-import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
-import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.sol";
-import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
-import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 
 /// @notice Script used for v31 upgrade flow
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
-    using stdToml for string;
-
     /// @notice E2e upgrade generation
     function run() public virtual override {
         initialize(
@@ -60,63 +42,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
 
         prepareEcosystemUpgrade();
         prepareDefaultGovernanceCalls();
-    }
-
-    /// todo create in deploy scripts instead of here.
-    function preparePermanentValues() public {
-        string memory root = vm.projectRoot();
-        string memory permanentValuesInputPath = string.concat(root, "/upgrade-envs/permanent-values/local.toml");
-        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
-        string memory outputDeployL1Toml = vm.readFile(string.concat(root, "/script-out/output-deploy-l1.toml"));
-        string memory outputDeployCTMToml = vm.readFile(string.concat(root, "/script-out/output-deploy-ctm.toml"));
-
-        bytes32 create2FactorySalt = permanentValuesToml.readBytes32("$.permanent_contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(permanentValuesToml, "$.permanent_contracts.create2_factory_addr")) {
-            create2FactoryAddr = permanentValuesToml.readAddress("$.permanent_contracts.create2_factory_addr");
-        }
-        address ctm = outputDeployCTMToml.readAddress(
-            "$.deployed_addresses.state_transition.state_transition_proxy_addr"
-        );
-        address bytecodesSupplier = outputDeployCTMToml.readAddress(
-            "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
-        );
-        address l1Bridgehub = outputDeployL1Toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-        address rollupDAManager = outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
-        uint256 eraChainId = outputDeployL1Toml.readUint("$.era_chain_id");
-
-        // Serialize permanent_contracts section
-        {
-            vm.serializeString("permanent_contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
-            string memory permanent_contracts = vm.serializeAddress(
-                "permanent_contracts",
-                "create2_factory_addr",
-                create2FactoryAddr
-            );
-            vm.serializeString("root", "permanent_contracts", permanent_contracts);
-        }
-
-        // Serialize ctm_contracts section
-        {
-            vm.serializeAddress("ctm_contracts", "ctm_proxy_addr", ctm);
-            vm.serializeAddress("ctm_contracts", "rollup_da_manager", rollupDAManager);
-            string memory ctm_contracts = vm.serializeAddress(
-                "ctm_contracts",
-                "l1_bytecodes_supplier_addr",
-                bytecodesSupplier
-            );
-            vm.serializeString("root", "ctm_contracts", ctm_contracts);
-        }
-
-        // Serialize core_contracts section
-        {
-            string memory core_contracts = vm.serializeAddress("core_contracts", "bridgehub_proxy_addr", l1Bridgehub);
-            vm.serializeString("root", "core_contracts", core_contracts);
-        }
-
-        // Write the final TOML
-        string memory outputToml = vm.serializeUint("root", "era_chain_id", eraChainId);
-        vm.writeToml(outputToml, permanentValuesInputPath);
     }
 
     function deployNewEcosystemContractsL1() public virtual override {
@@ -139,7 +64,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
             false
         );
         // deploySimpleContract("L1ChainTypeManager", false);
-
         // Configure AssetTracker connections after deployment
         updateContractConnections();
     }

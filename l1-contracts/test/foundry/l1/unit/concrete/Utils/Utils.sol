@@ -15,10 +15,20 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
 
-import {FeeParams, IVerifier, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {
+    FeeParams,
+    IVerifier,
+    PubdataPricingMode,
+    VerifierParams
+} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {
+    IExecutor,
+    SystemLogKey,
+    MAX_NUMBER_OF_BLOBS,
+    TOTAL_BLOBS_IN_COMMITMENT
+} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {InteropRoot, L2CanonicalTransaction, L2Log} from "contracts/common/Messaging.sol";
 
@@ -37,9 +47,6 @@ address constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008
 L2DACommitmentScheme constant L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.PUBDATA_KECCAK256;
 // Owner of the RollupDAManager in tests
 address constant TEST_ROLLUP_DA_MANAGER_OWNER = address(0x1234567890DEADBEEF);
-
-uint256 constant MAX_NUMBER_OF_BLOBS = 6;
-uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
 
 uint256 constant EVENT_INDEX = 0;
 
@@ -112,7 +119,7 @@ library Utils {
         logs[6] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
             bytes32(uint256(L2_DA_COMMITMENT_SCHEME))
         );
         logs[7] = constructL2Log(
@@ -139,10 +146,10 @@ library Utils {
 
     function createSystemLogsWithNoneDAValidator() public returns (bytes[] memory) {
         bytes[] memory systemLogs = createSystemLogs(bytes32(0));
-        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)] = constructL2Log(
+        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY)] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
             bytes32(uint256(L2DACommitmentScheme.NONE))
         );
 
@@ -276,37 +283,53 @@ library Utils {
         IExecutor.StoredBatchInfo[] memory _batchesData,
         PriorityOpsBatchInfo[] memory _priorityOpsData
     ) internal pure returns (uint256, uint256, bytes memory) {
-        InteropRoot[][] memory dependencyRoots = new InteropRoot[][](_batchesData.length);
-        L2Log[] memory l2Logs = new L2Log[](_batchesData.length);
-        bytes[] memory messages = new bytes[](_batchesData.length);
-        bytes32[] memory messageRoots = new bytes32[](_batchesData.length);
+        return encodeExecuteBatchesData(_batchesData, _priorityOpsData, address(0));
+    }
 
-        return (
-            _batchesData[0].batchNumber,
-            _batchesData[_batchesData.length - 1].batchNumber,
-            bytes.concat(
-                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
-                abi.encode(_batchesData, _priorityOpsData, dependencyRoots, l2Logs, messages, messageRoots)
-            )
-        );
+    function encodeExecuteBatchesData(
+        IExecutor.StoredBatchInfo[] memory _batchesData,
+        PriorityOpsBatchInfo[] memory _priorityOpsData,
+        address _settlementFeePayer
+    ) internal pure returns (uint256, uint256, bytes memory) {
+        uint256 len = _batchesData.length;
+        return _encodeExecuteBatchesDataInner(_batchesData, _priorityOpsData, _settlementFeePayer, len);
     }
 
     function encodeExecuteBatchesDataZeroLogs(
         IExecutor.StoredBatchInfo[] memory _batchesData,
         PriorityOpsBatchInfo[] memory _priorityOpsData
     ) internal pure returns (uint256, uint256, bytes memory) {
-        InteropRoot[][] memory dependencyRoots = new InteropRoot[][](_batchesData.length);
-        L2Log[] memory l2Logs = new L2Log[](0);
-        bytes[] memory messages = new bytes[](0);
-        bytes32[] memory messageRoots = new bytes32[](0);
+        return encodeExecuteBatchesDataZeroLogs(_batchesData, _priorityOpsData, address(0));
+    }
 
+    function encodeExecuteBatchesDataZeroLogs(
+        IExecutor.StoredBatchInfo[] memory _batchesData,
+        PriorityOpsBatchInfo[] memory _priorityOpsData,
+        address _settlementFeePayer
+    ) internal pure returns (uint256, uint256, bytes memory) {
+        return _encodeExecuteBatchesDataInner(_batchesData, _priorityOpsData, _settlementFeePayer, 0);
+    }
+
+    function _encodeExecuteBatchesDataInner(
+        IExecutor.StoredBatchInfo[] memory _batchesData,
+        PriorityOpsBatchInfo[] memory _priorityOpsData,
+        address _settlementFeePayer,
+        uint256 _logsLen
+    ) private pure returns (uint256, uint256, bytes memory) {
+        uint256 len = _batchesData.length;
+        bytes memory encoded = abi.encode(
+            _batchesData,
+            _priorityOpsData,
+            new InteropRoot[][](len),
+            new L2Log[](_logsLen),
+            new bytes[](_logsLen),
+            new bytes32[](_logsLen),
+            _settlementFeePayer
+        );
         return (
             _batchesData[0].batchNumber,
-            _batchesData[_batchesData.length - 1].batchNumber,
-            bytes.concat(
-                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
-                abi.encode(_batchesData, _priorityOpsData, dependencyRoots, l2Logs, messages, messageRoots)
-            )
+            _batchesData[len - 1].batchNumber,
+            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION), encoded)
         );
     }
 
@@ -406,13 +429,11 @@ library Utils {
     }
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](9);
+        bytes4[] memory selectors = new bytes4[](7);
         uint256 i = 0;
         selectors[i++] = MailboxFacet.proveL2MessageInclusion.selector;
         selectors[i++] = MailboxFacet.proveL2LogInclusion.selector;
         selectors[i++] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
-        selectors[i++] = MailboxFacet.finalizeEthWithdrawal.selector;
-        selectors[i++] = MailboxFacet.requestL2Transaction.selector;
         selectors[i++] = MailboxFacet.bridgehubRequestL2Transaction.selector;
         selectors[i++] = MailboxFacet.l2TransactionBaseCost.selector;
         selectors[i++] = MailboxFacet.proveL2LeafInclusion.selector;
@@ -502,7 +523,7 @@ library Utils {
         return IVerifier(testnetVerifier);
     }
 
-    function makeInitializeData(address testnetVerifier, address bridgehub) public returns (InitializeData memory) {
+    function makeInitializeData(address bridgehub) public pure returns (InitializeData memory) {
         return
             InitializeData({
                 chainId: 1,
@@ -514,35 +535,26 @@ library Utils {
                 validatorTimelock: address(0x85430237648403822345345),
                 baseTokenAssetId: bytes32(uint256(0x923645439232223445)),
                 storedBatchZero: bytes32(0),
-                verifier: makeVerifier(testnetVerifier),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
             });
     }
 
-    function makeInitializeDataForNewChain(
-        address testnetVerifier,
-        address _permissionlessValidator
-    ) public pure returns (InitializeDataNewChain memory) {
+    function makeInitializeDataForNewChain() public pure returns (InitializeDataNewChain memory) {
         return
             InitializeDataNewChain({
-                verifier: makeVerifier(testnetVerifier),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
             });
     }
 
-    function makeDiamondProxy(
-        Diamond.FacetCut[] memory facetCuts,
-        address testnetVerifier,
-        address bridgehub
-    ) public returns (address) {
+    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address bridgehub) public returns (address) {
         DiamondInit diamondInit = new DiamondInit(false);
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,
-            makeInitializeData(testnetVerifier, bridgehub)
+            makeInitializeData(bridgehub)
         );
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({

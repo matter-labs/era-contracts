@@ -10,7 +10,16 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {AddressHasNoCode, FacetExists, NoFunctionsForDiamondCut, RemoveFunctionFacetAddressNotZero, RemoveFunctionFacetAddressZero, ReplaceFunctionFacetAddressZero, SelectorsMustAllHaveSameFreezability, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {
+    AddressHasNoCode,
+    FacetExists,
+    NoFunctionsForDiamondCut,
+    RemoveFunctionFacetAddressNotZero,
+    RemoveFunctionFacetAddressZero,
+    ReplaceFunctionFacetAddressZero,
+    SelectorsMustAllHaveSameFreezability,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
 
 contract FacetCutTest is DiamondCutTest {
     MailboxFacet private mailboxFacet;
@@ -32,7 +41,7 @@ contract FacetCutTest is DiamondCutTest {
         eraChainId = 9;
         diamondCutTestContract = new DiamondCutTestContract();
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        mailboxFacet = new MailboxFacet(eraChainId, block.chainid, address(0), eip7702Checker, false);
+        mailboxFacet = new MailboxFacet(block.chainid, address(0), eip7702Checker, false);
         gettersFacet = new GettersFacet();
         executorFacet1 = new ExecutorFacet(block.chainid);
         executorFacet2 = new ExecutorFacet(block.chainid);
