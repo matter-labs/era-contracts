@@ -14,7 +14,8 @@ import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandar
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
-    L2_NATIVE_TOKEN_VAULT_ADDR
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
