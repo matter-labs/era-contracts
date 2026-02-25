@@ -25,7 +25,7 @@ A TypeScript-based testing environment that sets up a complete multi-chain ZKsyn
 ## File Structure
 
 ```
-scripts/anvil-interop/
+test/anvil-interop/
 ├── src/                       # Core implementation
 │   ├── anvil-manager.ts       # Manage Anvil process lifecycle
 │   ├── deployer.ts            # Execute Foundry deployment scripts
@@ -71,7 +71,7 @@ scripts/anvil-interop/
 ## Installation
 
 ```bash
-cd scripts/anvil-interop
+cd test/anvil-interop
 yarn install
 # or
 npm install
@@ -352,7 +352,7 @@ ls -R src/ config/
 
 The CI workflow runs automatically when:
 
-- Pull requests modify files in `l1-contracts/scripts/anvil-interop/`
+- Pull requests modify files in `l1-contracts/test/anvil-interop/`
 - Changes are pushed to the `main` branch
 
 **Optional Integration Test:**

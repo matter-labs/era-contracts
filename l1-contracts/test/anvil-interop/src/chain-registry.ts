@@ -56,7 +56,7 @@ export class ChainRegistry {
     const args = `${this.ctmAddresses.chainTypeManager} ${config.chainId}`;
 
     // Paths relative to project root (must start with /)
-    const ctmOutputRelPath = "/scripts/anvil-interop/outputs/ctm-output.toml";
+    const ctmOutputRelPath = "/test/anvil-interop/outputs/ctm-output.toml";
     const chainConfigRelPath = configPath.replace(this.projectRoot, "");
     const chainOutputRelPath = outputPath.replace(this.projectRoot, "");
 
@@ -68,7 +68,7 @@ export class ChainRegistry {
       CTM_OUTPUT: ctmOutputRelPath,
       ZK_CHAIN_CONFIG: chainConfigRelPath,
       ZK_CHAIN_OUT: chainOutputRelPath,
-      PERMANENT_VALUES_INPUT: "/scripts/anvil-interop/config/permanent-values.toml",
+      PERMANENT_VALUES_INPUT: "/test/anvil-interop/config/permanent-values.toml",
     };
 
     await this.runForgeScript(scriptPath, envVars, sig, args);
@@ -123,7 +123,7 @@ export class ChainRegistry {
     const l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
     const l2Wallet = new Wallet(this.privateKey, l2Provider);
 
-    // Get the contracts root (go up from scripts/anvil-interop to contracts/)
+    // Get the contracts root (go up from test/anvil-interop to contracts/)
     const contractsRoot = path.resolve(this.projectRoot, "..");
 
     console.log("   Using Anvil unlocked mode to deploy system contracts...");

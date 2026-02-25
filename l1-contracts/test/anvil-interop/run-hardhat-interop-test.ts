@@ -60,7 +60,7 @@ async function main(): Promise<void> {
       [
         "hardhat",
         "test",
-        "scripts/anvil-interop/test/hardhat/token-transfer.spec.ts",
+        "test/anvil-interop/test/hardhat/token-transfer.spec.ts",
         "--network",
         "hardhat",
         "--no-compile",

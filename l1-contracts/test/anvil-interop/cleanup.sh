@@ -84,7 +84,7 @@ rm -rf cache-forge/DeployL1CoreContracts.s.sol 2>/dev/null || true
 rm -rf cache-forge/DeployCTM.s.sol 2>/dev/null || true
 rm -rf cache-forge/RegisterCTM.s.sol 2>/dev/null || true
 
-cd scripts/anvil-interop
+cd test/anvil-interop
 
 echo "✅ Broadcast and cache files cleaned"
 

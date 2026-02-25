@@ -12,7 +12,7 @@
 2. **Navigate to anvil-interop:**
 
    ```bash
-   cd scripts/anvil-interop
+   cd test/anvil-interop
    ```
 
 ## Running the Stack

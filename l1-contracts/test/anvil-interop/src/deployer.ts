@@ -28,13 +28,13 @@ export class ForgeDeployer {
 
     const scriptPath = "deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol:DeployL1CoreContractsScript";
     // Use path from l1-contracts root (must start with / for string.concat in script)
-    const configPath = "/scripts/anvil-interop/config/l1-deployment.toml";
-    const outputPath = "/scripts/anvil-interop/outputs/l1-core-output.toml";
+    const configPath = "/test/anvil-interop/config/l1-deployment.toml";
+    const outputPath = "/test/anvil-interop/outputs/l1-core-output.toml";
 
     const envVars = {
       L1_CONFIG: configPath,
       L1_OUTPUT: outputPath,
-      PERMANENT_VALUES_INPUT: "/scripts/anvil-interop/config/permanent-values.toml",
+      PERMANENT_VALUES_INPUT: "/test/anvil-interop/config/permanent-values.toml",
     };
 
     // Use runForAnvil() which skips the acceptAdmin() step
@@ -69,9 +69,9 @@ export class ForgeDeployer {
 
     const scriptPath = "deploy-scripts/ctm/DeployCTM.s.sol:DeployCTMScript";
     // Use path from l1-contracts root (must start with / for string.concat in script)
-    const configPath = "/scripts/anvil-interop/config/ctm-deployment.toml";
-    const outputPath = "/scripts/anvil-interop/outputs/ctm-output.toml";
-    const permanentValuesPath = "/scripts/anvil-interop/config/permanent-values.toml";
+    const configPath = "/test/anvil-interop/config/ctm-deployment.toml";
+    const outputPath = "/test/anvil-interop/outputs/ctm-output.toml";
+    const permanentValuesPath = "/test/anvil-interop/config/permanent-values.toml";
 
     const envVars = {
       CTM_CONFIG: configPath,
