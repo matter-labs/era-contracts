@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { DeploymentRunner } from "./src/deployment-runner";
+import { getGwSettledChainIds } from "./src/utils";
 
 async function main() {
   const runner = new DeploymentRunner();
@@ -23,11 +24,23 @@ async function main() {
     return;
   }
 
+  const gwChain = state.chains.l2?.find((c) => c.chainId === gatewayChainId);
+  const gwSettledChainIds = getGwSettledChainIds(config.chains);
+
+  // Build L2 chain RPC URL map for migration preconditions
+  const l2ChainRpcUrls = new Map<number, string>();
+  for (const l2Chain of state.chains.l2 || []) {
+    l2ChainRpcUrls.set(l2Chain.chainId, l2Chain.rpcUrl);
+  }
+
   const { gatewayCTMAddr } = await runner.step5SetupGateway(
     state.chains.l1.rpcUrl,
     gatewayChainId,
     state.l1Addresses,
-    state.ctmAddresses
+    state.ctmAddresses,
+    gwChain?.rpcUrl,
+    gwSettledChainIds,
+    l2ChainRpcUrls
   );
 
   console.log("\n✅ Gateway setup complete");

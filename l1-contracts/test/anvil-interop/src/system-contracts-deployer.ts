@@ -1,7 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import { providers, Contract, Wallet, utils } from "ethers";
-import { loadAbiFromOut } from "./utils";
+import { impersonateAndRun } from "./utils";
+import { l2BridgehubAbi, interopCenterAbi, interopHandlerAbi, l2AssetRouterAbi, l2AssetTrackerAbi, l2NativeTokenVaultAbi, l2NativeTokenVaultDevAbi } from "./contracts";
 import {
   ETH_TOKEN_ADDRESS,
   INTEROP_CENTER_ADDR,
@@ -81,20 +82,16 @@ export class SystemContractsDeployer {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     txOverrides?: Record<string, any>
   ): Promise<void> {
-    await this.l2Provider.send("anvil_impersonateAccount", [impersonatedAccount]);
-    await this.l2Provider.send("anvil_setBalance", [impersonatedAccount, "0x56BC75E2D63100000"]);
+    await impersonateAndRun(this.l2Provider, impersonatedAccount, async (signer) => {
+      const contract = new Contract(contractAddress, abi, this.l2Provider);
+      const contractWithSigner = contract.connect(signer);
 
-    const contract = new Contract(contractAddress, abi, this.l2Provider);
-    const signer = await this.l2Provider.getSigner(impersonatedAccount);
-    const contractWithSigner = contract.connect(signer);
-
-    console.log(`   Initializing ${name}...`);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tx = await (contractWithSigner as any)[initFunction](...args, txOverrides || {});
-    await tx.wait();
-    console.log(`   ✅ ${name} initialized`);
-
-    await this.l2Provider.send("anvil_stopImpersonatingAccount", [impersonatedAccount]);
+      console.log(`   Initializing ${name}...`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tx = await (contractWithSigner as any)[initFunction](...args, txOverrides || {});
+      await tx.wait();
+      console.log(`   ✅ ${name} initialized`);
+    });
   }
 
   /**
@@ -237,10 +234,10 @@ export class SystemContractsDeployer {
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async deployL2Bridgehub(_chainId: number): Promise<void> {
-    const l2BridgehubAbi = loadAbiFromOut("L2Bridgehub.sol/L2Bridgehub.json");
+    const l2BridgehubAbiData = l2BridgehubAbi();
 
     // Check if already initialized
-    const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbi, this.l2Provider);
+    const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbiData, this.l2Provider);
     let isInitialized = false;
     try {
       const l1ChainId = await l2Bridgehub.L1_CHAIN_ID();
@@ -262,7 +259,7 @@ export class SystemContractsDeployer {
       const ownerAddress = await this.l2Wallet.getAddress();
       await this.initializeContract(
         L2_BRIDGEHUB_ADDR,
-        l2BridgehubAbi,
+        l2BridgehubAbiData,
         "initL2",
         [1, ownerAddress, 100],
         L2_COMPLEX_UPGRADER_ADDR,
@@ -295,16 +292,12 @@ export class SystemContractsDeployer {
 
       console.log(`   Registering chain ${targetChainId} on L2Bridgehub...`);
 
-      await this.l2Provider.send("anvil_impersonateAccount", [SERVICE_TX_SENDER_ADDR]);
-      await this.l2Provider.send("anvil_setBalance", [SERVICE_TX_SENDER_ADDR, "0x56BC75E2D63100000"]);
+      await impersonateAndRun(this.l2Provider, SERVICE_TX_SENDER_ADDR, async (signer) => {
+        const l2BridgehubWithSigner = l2Bridgehub.connect(signer);
 
-      const signer = await this.l2Provider.getSigner(SERVICE_TX_SENDER_ADDR);
-      const l2BridgehubWithSigner = l2Bridgehub.connect(signer);
-
-      const tx = await l2BridgehubWithSigner.registerChainForInterop(targetChainId, ethAssetId);
-      await tx.wait();
-
-      await this.l2Provider.send("anvil_stopImpersonatingAccount", [SERVICE_TX_SENDER_ADDR]);
+        const tx = await l2BridgehubWithSigner.registerChainForInterop(targetChainId, ethAssetId);
+        await tx.wait();
+      });
       console.log(`   ✅ Chain ${targetChainId} registered`);
     }
   }
@@ -313,9 +306,9 @@ export class SystemContractsDeployer {
    * Deploy and initialize InteropCenter
    */
   private async deployInteropCenter(): Promise<void> {
-    const interopCenterAbi = loadAbiFromOut("InteropCenter.sol/InteropCenter.json");
+    const interopCenterAbiData = interopCenterAbi();
 
-    const interopCenter = new Contract(INTEROP_CENTER_ADDR, interopCenterAbi, this.l2Provider);
+    const interopCenter = new Contract(INTEROP_CENTER_ADDR, interopCenterAbiData, this.l2Provider);
 
     // Check if already initialized
     let isInitialized = false;
@@ -339,7 +332,7 @@ export class SystemContractsDeployer {
       const ownerAddress = await this.l2Wallet.getAddress();
       await this.initializeContract(
         INTEROP_CENTER_ADDR,
-        interopCenterAbi,
+        interopCenterAbiData,
         "initL2",
         [1, ownerAddress],
         L2_COMPLEX_UPGRADER_ADDR,
@@ -371,9 +364,9 @@ export class SystemContractsDeployer {
     );
 
     // Initialize L2InteropHandler
-    const interopHandlerAbi = loadAbiFromOut("InteropHandler.sol/InteropHandler.json");
+    const interopHandlerAbiData = interopHandlerAbi();
 
-    const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi, this.l2Provider);
+    const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbiData, this.l2Provider);
 
     // Check if already initialized
     let isInitialized = false;
@@ -390,7 +383,7 @@ export class SystemContractsDeployer {
     if (!isInitialized) {
       await this.initializeContract(
         L2_INTEROP_HANDLER_ADDR,
-        interopHandlerAbi,
+        interopHandlerAbiData,
         "initL2",
         [1], // L1 chain ID = 1
         L2_COMPLEX_UPGRADER_ADDR,
@@ -403,9 +396,9 @@ export class SystemContractsDeployer {
    * Deploy and initialize L2AssetRouter for token bridging
    */
   private async deployL2AssetRouter(): Promise<void> {
-    const l2AssetRouterAbi = loadAbiFromOut("L2AssetRouter.sol/L2AssetRouter.json");
+    const l2AssetRouterAbiData = l2AssetRouterAbi();
 
-    const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbi, this.l2Provider);
+    const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbiData, this.l2Provider);
 
     // Check if already initialized
     let isInitialized = false;
@@ -432,7 +425,7 @@ export class SystemContractsDeployer {
 
       await this.initializeContract(
         L2_ASSET_ROUTER_ADDR,
-        l2AssetRouterAbi,
+        l2AssetRouterAbiData,
         "initL2",
         [
           1, // L1 chain ID
@@ -482,9 +475,9 @@ export class SystemContractsDeployer {
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async deployL2AssetTracker(_chainId: number): Promise<void> {
-    const l2AssetTrackerAbi = loadAbiFromOut("L2AssetTracker.sol/L2AssetTracker.json");
+    const l2AssetTrackerAbiData = l2AssetTrackerAbi();
 
-    const l2AssetTracker = new Contract(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAbi, this.l2Provider);
+    const l2AssetTracker = new Contract(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAbiData, this.l2Provider);
 
     // Check if already initialized
     let isInitialized = false;
@@ -513,7 +506,7 @@ export class SystemContractsDeployer {
 
       await this.initializeContract(
         L2_ASSET_TRACKER_ADDR,
-        l2AssetTrackerAbi,
+        l2AssetTrackerAbiData,
         "setAddresses",
         [
           1, // L1 chain ID
@@ -529,10 +522,10 @@ export class SystemContractsDeployer {
    * Deploy L2NativeTokenVault for token management
    */
   private async deployL2NativeTokenVault(): Promise<void> {
-    const l2NativeTokenVaultAbi = loadAbiFromOut("L2NativeTokenVault.sol/L2NativeTokenVault.json");
-    const l2NativeTokenVaultDevAbi = loadAbiFromOut("L2NativeTokenVaultDev.sol/L2NativeTokenVaultDev.json");
+    const l2NativeTokenVaultAbiData = l2NativeTokenVaultAbi();
+    const l2NativeTokenVaultDevAbiData = l2NativeTokenVaultDevAbi();
 
-    const l2NativeTokenVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbi, this.l2Provider);
+    const l2NativeTokenVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbiData, this.l2Provider);
 
     // Check if already initialized
     let isInitialized = false;
@@ -553,7 +546,7 @@ export class SystemContractsDeployer {
         "L2NativeTokenVaultDev"
       );
 
-      const l2NativeTokenVaultDev = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultDevAbi, this.l2Wallet);
+      const l2NativeTokenVaultDev = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultDevAbiData, this.l2Wallet);
 
       const ownerAddress = await this.l2Wallet.getAddress();
       const abiCoder = new utils.AbiCoder();
@@ -579,7 +572,7 @@ export class SystemContractsDeployer {
 
       await this.initializeContract(
         L2_NATIVE_TOKEN_VAULT_ADDR,
-        l2NativeTokenVaultAbi,
+        l2NativeTokenVaultAbiData,
         "initL2",
         [
           1, // L1 chain ID
@@ -631,25 +624,21 @@ export class SystemContractsDeployer {
     console.log(`   Registering asset handler for token ${tokenAddress}...`);
     console.log(`   Asset ID: ${assetId}`);
 
-    const l2AssetRouterAbi = loadAbiFromOut("L2AssetRouter.sol/L2AssetRouter.json");
+    const l2AssetRouterAbiData2 = l2AssetRouterAbi();
 
-    const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbi, this.l2Provider);
+    const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbiData2, this.l2Provider);
 
     // Check if asset handler already registered
     const currentHandler = await l2AssetRouter.assetHandlerAddress(assetId);
     if (currentHandler === "0x0000000000000000000000000000000000000000") {
       // Register L2NativeTokenVault as the handler
       // We need to impersonate L2NativeTokenVault to call setLegacyTokenAssetHandler
-      await this.l2Provider.send("anvil_impersonateAccount", [L2_NATIVE_TOKEN_VAULT_ADDR]);
-      await this.l2Provider.send("anvil_setBalance", [L2_NATIVE_TOKEN_VAULT_ADDR, "0x56BC75E2D63100000"]);
+      await impersonateAndRun(this.l2Provider, L2_NATIVE_TOKEN_VAULT_ADDR, async (signer) => {
+        const l2AssetRouterWithSigner = l2AssetRouter.connect(signer);
 
-      const signer = await this.l2Provider.getSigner(L2_NATIVE_TOKEN_VAULT_ADDR);
-      const l2AssetRouterWithSigner = l2AssetRouter.connect(signer);
-
-      const tx = await l2AssetRouterWithSigner.setLegacyTokenAssetHandler(assetId);
-      await tx.wait();
-
-      await this.l2Provider.send("anvil_stopImpersonatingAccount", [L2_NATIVE_TOKEN_VAULT_ADDR]);
+        const tx = await l2AssetRouterWithSigner.setLegacyTokenAssetHandler(assetId);
+        await tx.wait();
+      });
 
       console.log(`   ✅ Asset handler registered: ${L2_NATIVE_TOKEN_VAULT_ADDR}`);
     } else {
@@ -657,9 +646,9 @@ export class SystemContractsDeployer {
     }
 
     // Now register the token in L2NativeTokenVault
-    const l2NativeTokenVaultAbi = loadAbiFromOut("L2NativeTokenVault.sol/L2NativeTokenVault.json");
+    const l2NativeTokenVaultAbiData2 = l2NativeTokenVaultAbi();
 
-    const l2NativeTokenVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbi, this.l2Provider);
+    const l2NativeTokenVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbiData2, this.l2Provider);
 
     // Check if token is already registered
     const registeredAssetId = await l2NativeTokenVault.assetId(tokenAddress);

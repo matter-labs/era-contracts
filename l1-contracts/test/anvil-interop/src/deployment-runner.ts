@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import type { providers } from "ethers";
+import { Contract, Wallet, providers } from "ethers";
 import type { AnvilManager } from "./anvil-manager";
 import { ForgeDeployer } from "./deployer";
 import { ChainRegistry } from "./chain-registry";
@@ -16,8 +16,9 @@ import type {
   CTMDeployedAddresses,
   DeploymentState,
 } from "./types";
-import { getDefaultAccountPrivateKey } from "./utils";
-import { ETH_TOKEN_ADDRESS } from "./const";
+import { loadBytecodeFromOut } from "./utils";
+import { dummyL1MessageRootAbi, migratorFacetAbi } from "./contracts";
+import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./const";
 
 function timeIt(label: string): () => void {
   const start = Date.now();
@@ -88,7 +89,7 @@ export class DeploymentRunner {
   }> {
     console.log("\n=== Step 2: Deploying L1 Contracts ===\n");
 
-    const privateKey = getDefaultAccountPrivateKey();
+    const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
     const deployer = new ForgeDeployer(l1RpcUrl, privateKey);
 
     let done = timeIt("deployL1Core (forge script)");
@@ -113,6 +114,27 @@ export class DeploymentRunner {
     await deployer.registerCTM(l1Addresses.bridgehub, ctmAddresses.chainTypeManager);
     done();
 
+    // Replace L1MessageRoot proxy code with DummyL1MessageRoot
+    // This preserves all storage (chain registrations, batch roots) but bypasses proof verification
+    if (l1Addresses.messageRoot) {
+      const dummyBytecode = loadBytecodeFromOut("DummyL1MessageRoot.sol/DummyL1MessageRoot.json");
+      const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
+      await l1Provider.send("anvil_setCode", [l1Addresses.messageRoot, dummyBytecode]);
+
+      // Set stored addresses since immutables are lost after code replacement
+      const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
+      const wallet = new Wallet(privateKey, l1Provider);
+      const dummy = new Contract(l1Addresses.messageRoot, dummyL1MessageRootAbi(), wallet);
+      const setAddrTx = await dummy.setStoredAddresses(
+        l1Addresses.bridgehub,
+        l1Addresses.l1AssetTracker,
+        11, // ERA_GATEWAY_CHAIN_ID
+        { gasLimit: 500_000 }
+      );
+      await setAddrTx.wait();
+      console.log(`   Replaced L1MessageRoot proxy (${l1Addresses.messageRoot}) with DummyL1MessageRoot`);
+    }
+
     const state = this.loadState();
     state.l1Addresses = l1Addresses;
     state.ctmAddresses = ctmAddresses;
@@ -132,7 +154,7 @@ export class DeploymentRunner {
   }> {
     console.log("\n=== Step 3+4: Register & Initialize L2 Chains ===\n");
 
-    const privateKey = getDefaultAccountPrivateKey();
+    const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
     const registry = new ChainRegistry(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
 
     // Batch-register all chains in a single forge call (avoids nonce conflicts)
@@ -170,6 +192,17 @@ export class DeploymentRunner {
       })
     );
 
+    // Unpause deposits on all chains (deposits are paused by default during initializeNewChain)
+    console.log("\nUnpausing deposits on all chains...");
+    const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
+    const wallet = new Wallet(privateKey, l1Provider);
+    for (const chain of chainAddresses) {
+      const migrator = new Contract(chain.diamondProxy, migratorFacetAbi(), wallet);
+      const tx = await migrator.unpauseDeposits({ gasLimit: 500_000 });
+      await tx.wait();
+      console.log(`  Deposits unpaused on chain ${chain.chainId}`);
+    }
+
     const state = this.loadState();
     state.chainAddresses = chainAddresses;
     this.saveState(state);
@@ -181,14 +214,22 @@ export class DeploymentRunner {
     l1RpcUrl: string,
     gatewayChainId: number,
     l1Addresses: CoreDeployedAddresses,
-    ctmAddresses: CTMDeployedAddresses
+    ctmAddresses: CTMDeployedAddresses,
+    gwRpcUrl?: string,
+    gwSettledChainIds?: number[],
+    l2ChainRpcUrls?: Map<number, string>
   ): Promise<{ gatewayCTMAddr: string }> {
     console.log("\n=== Step 5: Setting Up Gateway ===\n");
 
-    const privateKey = getDefaultAccountPrivateKey();
+    const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
     const gatewaySetup = new GatewaySetup(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
 
-    const gatewayCTMAddr = await gatewaySetup.designateAsGateway(gatewayChainId);
+    const gatewayCTMAddr = await gatewaySetup.designateAsGateway(
+      gatewayChainId,
+      gwRpcUrl,
+      gwSettledChainIds,
+      l2ChainRpcUrls
+    );
 
     console.log(`  Gateway CTM: ${gatewayCTMAddr}`);
 
@@ -203,7 +244,7 @@ export class DeploymentRunner {
   ): Promise<{ settler: BatchSettler; l1ToL2Relayer: L1ToL2Relayer; l2ToL2Relayer: L2ToL2Relayer }> {
     console.log("\n=== Step 6: Starting Daemons ===\n");
 
-    const privateKey = getDefaultAccountPrivateKey();
+    const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
     // Start L1→L2 Relayer
     console.log("Starting L1→L2 Transaction Relayer...");

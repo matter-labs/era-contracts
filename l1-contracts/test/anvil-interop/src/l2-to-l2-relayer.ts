@@ -1,6 +1,7 @@
 import type { providers } from "ethers";
 import { Contract, Wallet, utils } from "ethers";
-import { sleep, loadAbiFromOut } from "./utils";
+import { sleep } from "./utils";
+import { interopHandlerAbi } from "./contracts";
 import {
   INTEROP_BUNDLE_SENT_TOPIC,
   INTEROP_BUNDLE_TUPLE_TYPE,
@@ -164,7 +165,7 @@ export class L2ToL2Relayer {
     }
 
     console.log(`\n   🔗 Found L2→L2 cross-chain message on chain ${sourceChainId}`);
-    console.log(`      Source Tx Hash: ${txHash}`);
+    console.log(`      Source Tx: cast run ${txHash} -r ${provider.connection.url}`);
 
     try {
       await this.relayCrossChainMessage(sourceChainId, interopEventLog);
@@ -256,9 +257,7 @@ export class L2ToL2Relayer {
       proof: [],
     };
 
-    const interopHandlerAbi = loadAbiFromOut("InteropHandler.sol/InteropHandler.json");
-
-    const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi, targetWallet);
+    const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi(), targetWallet);
 
     // Extract just the InteropBundle from the event data
     // The event emits (l2l1MsgHash, interopBundleHash, InteropBundle)
@@ -270,7 +269,7 @@ export class L2ToL2Relayer {
         gasLimit: 5000000,
       });
 
-      console.log(`      L2 Target Tx: ${tx.hash}`);
+      console.log(`      L2 Target Tx: cast run ${tx.hash} -r ${targetProvider.connection.url}`);
 
       const receipt = await tx.wait();
       console.log(`      Confirmed in L2 block ${receipt?.blockNumber}`);

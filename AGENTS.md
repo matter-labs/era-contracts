@@ -40,6 +40,53 @@ address result = _tryAddress(target, "someFunction()");
 - They mask initialization issues and timing problems
 - The codebase should fail fast and clearly, not silently return defaults
 
+### NEVER Override Storage Slots in Tests
+
+**THIS IS AN ABSOLUTE RULE - NO EXCEPTIONS**
+
+❌ **FORBIDDEN PATTERNS:**
+
+- `anvil_setStorageAt` to set contract state
+- Any direct manipulation of storage slots to bypass contract logic
+
+✅ **CORRECT APPROACH:**
+
+- Use real contract calls and flows to achieve the desired state
+- If a flow requires multiple steps (e.g., Token Balance Migration), implement all steps properly
+- If a relay transaction fails, fix the root cause instead of setting storage directly
+
+**WHY THIS RULE EXISTS:**
+
+- Storage slot overrides hide real bugs in the test setup
+- They make tests fragile and tightly coupled to storage layout
+- Real flows validate that the contracts work correctly end-to-end
+- Storage layouts change between versions, silently breaking tests
+
+### NEVER Declare ABIs Inline in TypeScript
+
+**THIS IS AN ABSOLUTE RULE - NO EXCEPTIONS**
+
+❌ **FORBIDDEN PATTERNS:**
+
+```typescript
+// NEVER DO THIS:
+const someAbi = [
+  "function someMethod(uint256 param) view returns (address)",
+];
+const contract = new Contract(addr, someAbi, provider);
+```
+
+✅ **CORRECT APPROACH:**
+
+- Always import ABIs from the centralized `contracts.ts` file (or equivalent ABI module)
+- If an ABI doesn't exist yet, add it to `contracts.ts` and import it
+
+**WHY THIS RULE EXISTS:**
+
+- Inline ABIs are duplicated across files and easily go out of sync with actual contracts
+- Centralized ABIs are easier to maintain and update when contracts change
+- Import-based ABIs provide a single source of truth
+
 ### Constructors and Immutables
 
 - ONLY contracts deployed on L1 should have immutables. Contracts on L2 are deployed within zksync os environment and so and so DO NOT SUPPORT CONSTRUCTORS ALL (and so no immutable can be set). It is important that the `*Base` contracts that the L2 contracts inherit from dont have immutables or constructors too.

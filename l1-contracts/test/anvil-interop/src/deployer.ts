@@ -1,8 +1,10 @@
-import { spawn, exec } from "child_process";
+import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
 import type { CoreDeployedAddresses, CTMDeployedAddresses } from "./types";
 import { parseForgeScriptOutput, ensureDirectoryExists } from "./utils";
+import { ANVIL_DEFAULT_ACCOUNT_ADDR } from "./const";
+import { runForgeScript } from "./forge";
 
 const execAsync = promisify(exec);
 
@@ -16,8 +18,7 @@ export class ForgeDeployer {
   constructor(rpcUrl: string, privateKey: string) {
     this.rpcUrl = rpcUrl;
     this.privateKey = privateKey;
-    // First Anvil account address corresponding to the default private key
-    this.senderAddress = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+    this.senderAddress = ANVIL_DEFAULT_ACCOUNT_ADDR;
     this.projectRoot = path.resolve(__dirname, "../../..");
     this.outputDir = path.join(__dirname, "../outputs");
     ensureDirectoryExists(this.outputDir);
@@ -38,7 +39,7 @@ export class ForgeDeployer {
     };
 
     // Use runForAnvil() which skips the acceptAdmin() step
-    await this.runForgeScript(scriptPath, envVars, "runForAnvil()");
+    await runForgeScript({ scriptPath, envVars, rpcUrl: this.rpcUrl, senderAddress: this.senderAddress, projectRoot: this.projectRoot, sig: "runForAnvil()" });
 
     const fullOutputPath = path.join(this.projectRoot, outputPath);
     const output = parseForgeScriptOutput(fullOutputPath);
@@ -57,10 +58,15 @@ export class ForgeDeployer {
       l1SharedBridge: bridges.shared_bridge_proxy_addr as string,
       l1NullifierProxy: bridges.l1_nullifier_proxy_addr as string,
       l1NativeTokenVault: deployed.native_token_vault_addr as string,
+      l1AssetTracker: bridgehub.l1_asset_tracker_proxy_addr as string,
       l1ERC20Bridge: bridges.erc20_bridge_proxy_addr as string,
       governance: deployed.governance_addr as string,
       transparentProxyAdmin: deployed.transparent_proxy_admin_addr as string,
       blobVersionedHashRetriever: deployed.blob_versioned_hash_retriever_addr as string,
+      messageRoot: bridgehub.message_root_proxy_addr as string,
+      ctmDeploymentTracker: bridgehub.ctm_deployment_tracker_proxy_addr as string,
+      l1ChainAssetHandler: deployed.chain_asset_handler_proxy_addr as string,
+      chainRegistrationSender: bridgehub.chain_registration_sender_proxy_addr as string,
     };
   }
 
@@ -82,7 +88,7 @@ export class ForgeDeployer {
     const sig = "runForAnvilTest(address,bool)";
     const args = `${bridgehubAddr} false`;
 
-    await this.runForgeScript(scriptPath, envVars, sig, args);
+    await runForgeScript({ scriptPath, envVars, rpcUrl: this.rpcUrl, senderAddress: this.senderAddress, projectRoot: this.projectRoot, sig, args });
 
     const fullOutputPath = path.join(this.projectRoot, outputPath);
     const output = parseForgeScriptOutput(fullOutputPath);
@@ -120,7 +126,7 @@ export class ForgeDeployer {
       CTM_ADDR: ctmAddr,
     };
 
-    await this.runForgeScript(scriptPath, envVars, sig, args);
+    await runForgeScript({ scriptPath, envVars, rpcUrl: this.rpcUrl, senderAddress: this.senderAddress, projectRoot: this.projectRoot, sig, args });
 
     console.log("✅ ChainTypeManager registered");
   }
@@ -166,86 +172,4 @@ export class ForgeDeployer {
     }
   }
 
-  private async runForgeScript(
-    scriptPath: string,
-    envVars: Record<string, string>,
-    sig?: string,
-    args?: string
-  ): Promise<string> {
-    const env = {
-      ...process.env,
-      ...envVars,
-    };
-
-    // Build command arguments array
-    const commandArgs = [
-      "script",
-      scriptPath,
-      "--rpc-url",
-      this.rpcUrl,
-      "--unlocked",
-      "--sender",
-      this.senderAddress,
-      "--broadcast",
-      "--legacy",
-      "--ffi", // Enable FFI for scripts that need to call external commands
-      "--sig",
-      sig || "runForTest()",
-    ];
-
-    if (sig && args) {
-      commandArgs.push(...args.split(" "));
-    }
-
-    console.log(`   Running: ${scriptPath}`);
-    console.log(`   Command: forge ${commandArgs.join(" ")}`);
-    console.log("");
-
-    return new Promise((resolve, reject) => {
-      const forgeProcess = spawn("forge", commandArgs, {
-        cwd: this.projectRoot,
-        env,
-        stdio: ["ignore", "pipe", "pipe"],
-      });
-
-      let stdout = "";
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      let _stderr = "";
-
-      // Stream stdout in real-time
-      forgeProcess.stdout.on("data", (data: Buffer) => {
-        const text = data.toString();
-        stdout += text;
-        process.stdout.write(text);
-      });
-
-      // Stream stderr in real-time, but filter warnings
-      forgeProcess.stderr.on("data", (data: Buffer) => {
-        const text = data.toString();
-        _stderr += text;
-        // Only show non-warning stderr
-        const lines = text.split("\n");
-        const nonWarningLines = lines.filter((line: string) => !line.includes("Warning"));
-        if (nonWarningLines.length > 0 && nonWarningLines.join("").trim()) {
-          process.stderr.write(nonWarningLines.join("\n") + "\n");
-        }
-      });
-
-      forgeProcess.on("close", (code: number) => {
-        console.log("");
-        if (code === 0) {
-          console.log("✅ Script completed successfully");
-          resolve(stdout);
-        } else {
-          console.error(`❌ Forge script failed with exit code ${code}`);
-          reject(new Error(`Forge script exited with code ${code}`));
-        }
-      });
-
-      forgeProcess.on("error", (error: Error) => {
-        console.error("❌ Failed to spawn forge process:", error.message);
-        reject(error);
-      });
-    });
-  }
 }

@@ -2,7 +2,7 @@
 
 import { ethers, providers, Wallet, ContractFactory } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
-import { getDefaultAccountPrivateKey } from "./src/utils";
+import { ANVIL_DEFAULT_PRIVATE_KEY } from "./src/const";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -20,7 +20,7 @@ export async function deployTestTokens(): Promise<void> {
     throw new Error("L2 chains not found");
   }
 
-  const privateKey = getDefaultAccountPrivateKey();
+  const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
   // Load TestnetERC20Token artifact
   const artifactPath = path.join(__dirname, "../../out/TestnetERC20Token.sol/TestnetERC20Token.json");

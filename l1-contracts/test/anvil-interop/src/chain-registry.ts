@@ -1,5 +1,3 @@
-import { exec } from "child_process";
-import { promisify } from "util";
 import * as path from "path";
 import * as fs from "fs";
 import { providers, Wallet } from "ethers";
@@ -7,8 +5,7 @@ import type { ChainConfig, ChainAddresses, CoreDeployedAddresses, CTMDeployedAdd
 import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig } from "./utils";
 import { SystemContractsDeployer } from "./system-contracts-deployer";
 import { L2GenesisUpgradeDeployer } from "./l2-genesis-upgrade-deployer";
-
-const execAsync = promisify(exec);
+import { runForgeScript } from "./forge";
 
 export class ChainRegistry {
   private l1RpcUrl: string;
@@ -63,7 +60,7 @@ export class ChainRegistry {
       PERMANENT_VALUES_INPUT: "/test/anvil-interop/config/permanent-values.toml",
     };
 
-    await this.runForgeScript(scriptPath, envVars, sig, args);
+    await runForgeScript({ scriptPath, envVars, rpcUrl: this.l1RpcUrl, privateKey: this.privateKey, projectRoot: this.projectRoot, sig, args });
 
     const output = parseForgeScriptOutput(outputPath);
 
@@ -95,7 +92,7 @@ export class ChainRegistry {
       PERMANENT_VALUES_INPUT: "/test/anvil-interop/config/permanent-values.toml",
     };
 
-    await this.runForgeScript(scriptPath, envVars, sig, args);
+    await runForgeScript({ scriptPath, envVars, rpcUrl: this.l1RpcUrl, privateKey: this.privateKey, projectRoot: this.projectRoot, sig, args });
 
     // Parse per-chain outputs
     const results: ChainAddresses[] = [];
@@ -128,7 +125,9 @@ export class ChainRegistry {
           l2RpcUrl,
           this.privateKey,
           this.l1Addresses.l1SharedBridge,
-          this.ctmAddresses.chainTypeManager,
+          this.l1Addresses.ctmDeploymentTracker,
+          this.l1Addresses.governance,
+          this.l1Addresses.chainRegistrationSender,
           gatewayChainId
         )
       : new SystemContractsDeployer(l2RpcUrl, this.privateKey);
@@ -170,52 +169,4 @@ export class ChainRegistry {
     return configPath;
   }
 
-  private async runForgeScript(
-    scriptPath: string,
-    envVars: Record<string, string>,
-    sig?: string,
-    args?: string
-  ): Promise<string> {
-    const env = {
-      ...process.env,
-      ...envVars,
-    };
-
-    let command = `forge script ${scriptPath} --rpc-url ${this.l1RpcUrl} --private-key ${this.privateKey} --broadcast --legacy`;
-
-    if (sig) {
-      command += ` --sig "${sig}"`;
-      if (args) {
-        command += ` ${args}`;
-      }
-    }
-
-    console.log(`   Running: ${scriptPath}`);
-
-    try {
-      const { stdout, stderr } = await execAsync(command, {
-        cwd: this.projectRoot,
-        env,
-        maxBuffer: 10 * 1024 * 1024,
-      });
-
-      if (stderr && !stderr.includes("Warning")) {
-        console.warn("   Forge stderr:", stderr);
-      }
-
-      return stdout;
-    } catch (error) {
-      const err = error as { message?: string; stdout?: string; stderr?: string };
-      console.error("❌ Forge script failed:");
-      console.error("   Command:", command);
-      console.error("   Error:", err.message);
-      if (err.stdout) {
-        console.error("   Stdout:", err.stdout);
-      }
-      if (err.stderr) {
-        console.error("   Stderr:", err.stderr);
-      }
-      throw error;
-    }
-  }
 }

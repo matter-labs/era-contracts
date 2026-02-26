@@ -9,7 +9,7 @@ set -e
 echo "🧹 Cleaning up Anvil interop environment..."
 
 # Known ports used by our Anvil instances
-ANVIL_PORTS="9545 4050 4051 4052"
+ANVIL_PORTS="9545 4050 4051 4052 4053"
 
 # Stop all Anvil instances - try graceful shutdown first using PIDs
 echo "Stopping Anvil instances..."

@@ -6,7 +6,7 @@ import {
   L1_CHAIN_ID,
   ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE,
 } from "./const";
-import { encodeNtvAssetId } from "./utils";
+import { applyL1ToL2Alias, encodeNtvAssetId } from "./utils";
 
 /**
  * Helper for building L2GenesisUpgrade data structures
@@ -232,15 +232,18 @@ export function buildFixedForceDeploymentsData(
   chainId: number,
   l1AssetRouter: string,
   bytecodeInfo: BytecodeInfo,
-  gatewayChainId: number = L1_CHAIN_ID
+  gatewayChainId: number,
+  l1Governance: string,
+  l1ChainRegistrationSender: string,
+  l1ChainId: number = L1_CHAIN_ID
 ): string {
   const data: FixedForceDeploymentsData = {
-    l1ChainId: BigInt(L1_CHAIN_ID),
+    l1ChainId: BigInt(l1ChainId),
     gatewayChainId: BigInt(gatewayChainId),
     eraChainId: BigInt(chainId),
     l1AssetRouter: l1AssetRouter,
     l2TokenProxyBytecodeHash: "0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70",
-    aliasedL1Governance: "0x0000000000000000000000000000000000000001", // Placeholder
+    aliasedL1Governance: applyL1ToL2Alias(l1Governance),
     maxNumberOfZKChains: BigInt(100),
     bridgehubBytecodeInfo: bytecodeInfo.bridgehubBytecodeInfo,
     l2AssetRouterBytecodeInfo: bytecodeInfo.l2AssetRouterBytecodeInfo,
@@ -253,7 +256,7 @@ export function buildFixedForceDeploymentsData(
     beaconDeployerInfo: bytecodeInfo.beaconDeployerBytecodeInfo,
     l2SharedBridgeLegacyImpl: "0x0000000000000000000000000000000000000000",
     l2BridgedStandardERC20Impl: "0x0000000000000000000000000000000000000000",
-    aliasedChainRegistrationSender: "0x0000000000000000000000000000000000000001",
+    aliasedChainRegistrationSender: applyL1ToL2Alias(l1ChainRegistrationSender),
     dangerousTestOnlyForcedBeacon: "0x0000000000000000000000000000000000000000",
   };
 

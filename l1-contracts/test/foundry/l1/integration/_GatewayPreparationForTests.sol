@@ -13,6 +13,15 @@ import {ChainInfoFromBridgehub, Utils} from "deploy-scripts/utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {AdminFunctions} from "deploy-scripts/AdminFunctions.s.sol";
 import {Call} from "contracts/governance/Common.sol";
+import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {BridgehubBurnCTMAssetData, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {ConfirmTransferResultData, TxStatus} from "contracts/common/Messaging.sol";
 
 contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
     using stdToml for string;
@@ -24,7 +33,6 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         string memory toml = vm.readFile(path);
 
         uint256 gatewayChainId = toml.readUint("$.chain.chain_chain_id");
-        gatewayChainId = 506; //toml.readUint("$.chain.chain_chain_id");
         // // currently there is a single gateway test file.
         // console.log("Gateway chain id skipped value = %s", toml.readUint("$.chain.chain_chain_id"));
 
@@ -144,6 +152,128 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
             })
         );
         Utils.executeCalls(L1Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), bytes32(0), 0, calls);
+    }
+
+    function runGovernanceRegisterGateway() public {
+        initializeConfig();
+        governanceRegisterGateway();
+    }
+
+    function runFullRegistration() public {
+        initializeConfig();
+        fullGatewayRegistration();
+    }
+
+    function runPauseAndMigrateChain(uint256 chainId) public {
+        initializeConfig();
+
+        L1Bridgehub bridgehub = L1Bridgehub(_gatewayGovernanceConfig.bridgehubProxy);
+        address diamondProxy = bridgehub.getZKChain(chainId);
+        address chainAdmin = IZKChain(diamondProxy).getAdmin();
+
+        // Pause deposits: call diamondProxy.pauseDepositsBeforeInitiatingMigration()
+        // directly from the chain admin (which is an EOA in test setup).
+        vm.startBroadcast(chainAdmin);
+        IMigrator(diamondProxy).pauseDepositsBeforeInitiatingMigration();
+        vm.stopBroadcast();
+
+        // Build migration calldata
+        bytes32 chainAssetId = bridgehub.ctmAssetIdFromChainId(chainId);
+        address l1AssetRouter = address(bridgehub.assetRouter());
+
+        bytes memory bridgehubData = abi.encode(
+            BridgehubBurnCTMAssetData({
+                chainId: chainId,
+                ctmData: abi.encode(
+                    AddressAliasHelper.applyL1ToL2Alias(chainAdmin),
+                    hex""
+                ),
+                chainData: abi.encode(IZKChain(diamondProxy).getProtocolVersion())
+            })
+        );
+        bytes memory secondBridgeData = abi.encodePacked(
+            NEW_ENCODING_VERSION,
+            abi.encode(chainAssetId, bridgehubData)
+        );
+
+        // Compute required value (baseCost * 2 as in Utils.prepareL1L2TransactionTwoBridges)
+        uint256 l1GasPrice = _getL1GasPrice();
+        uint256 requiredValue = bridgehub.l2TransactionBaseCost(
+            _gatewayGovernanceConfig.gatewayChainId,
+            l1GasPrice,
+            Utils.MAX_PRIORITY_TX_GAS,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        ) * 2;
+
+        // Call requestL2TransactionTwoBridges directly from chain admin.
+        // This sets isMigrationInProgress[chainId] = true and pausedDepositsTimestamp on the diamond proxy.
+        // Capture the canonical L2 tx hash returned by the function.
+        vm.startBroadcast(chainAdmin);
+        bytes32 canonicalTxHash = bridgehub.requestL2TransactionTwoBridges{value: requiredValue}(
+            L2TransactionRequestTwoBridgesOuter({
+                chainId: _gatewayGovernanceConfig.gatewayChainId,
+                mintValue: requiredValue,
+                l2Value: 0,
+                l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                refundRecipient: chainAdmin,
+                secondBridgeAddress: l1AssetRouter,
+                secondBridgeValue: 0,
+                secondBridgeCalldata: secondBridgeData
+            })
+        );
+        vm.stopBroadcast();
+
+        // NOTE: bridgeConfirmTransferResult cannot be called here because the canonical L2 tx hash
+        // changes between Forge simulation and broadcast (different block numbers/state), causing
+        // depositHappened lookup to fail with DepositDoesNotExist. The confirmation is done via
+        // runConfirmMigration() in a separate forge script invocation, using the actual on-chain
+        // canonical tx hash from the BridgehubDepositFinalized event.
+        console.log("   Migration initiated on L1 for chain", chainId);
+    }
+
+    /// @notice Confirm migration on L1 after the migration initiation broadcast.
+    /// Called as a separate forge script invocation with the actual canonical L2 tx hash
+    /// (extracted from the BridgehubDepositFinalized event by TypeScript).
+    function runConfirmMigration(uint256 chainId, bytes32 l2TxHash) public {
+        initializeConfig();
+
+        L1Bridgehub bridgehub = L1Bridgehub(_gatewayGovernanceConfig.bridgehubProxy);
+        address assetRouter = address(bridgehub.assetRouter());
+        IL1Nullifier l1Nullifier = L1AssetRouter(assetRouter).L1_NULLIFIER();
+
+        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(chainId);
+        address diamondProxy = bridgehub.getZKChain(chainId);
+        address chainAdmin = IZKChain(diamondProxy).getAdmin();
+
+        bytes memory transferData = abi.encode(
+            BridgehubBurnCTMAssetData({
+                chainId: chainId,
+                ctmData: abi.encode(AddressAliasHelper.applyL1ToL2Alias(chainAdmin), hex""),
+                chainData: abi.encode(IZKChain(diamondProxy).getProtocolVersion())
+            })
+        );
+
+        bytes32[] memory merkleProof = new bytes32[](1);
+        merkleProof[0] = bytes32(uint256(1));
+
+        vm.broadcast();
+        l1Nullifier.bridgeConfirmTransferResult(
+            ConfirmTransferResultData({
+                _chainId: _gatewayGovernanceConfig.gatewayChainId,
+                _depositSender: chainAdmin,
+                _l2TxNumberInBatch: 0,
+                _txStatus: TxStatus.Success,
+                _assetId: assetId,
+                _assetData: transferData,
+                _l2TxHash: l2TxHash,
+                _l2BatchNumber: 0,
+                _l2MessageIndex: 0,
+                _merkleProof: merkleProof
+            })
+        );
+
+        console.log("   Migration confirmed on L1 for chain", chainId);
     }
 
     function run() public {

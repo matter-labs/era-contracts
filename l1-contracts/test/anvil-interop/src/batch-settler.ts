@@ -1,7 +1,8 @@
 import type { providers } from "ethers";
 import { Contract, Wallet, utils } from "ethers";
 import type { BatchState, L2Transaction, CommitBatchInfo, StoredBatchInfo, ProofInput, ChainAddresses } from "./types";
-import { sleep, loadAbiFromOut } from "./utils";
+import { sleep } from "./utils";
+import { executorFacetAbi } from "./contracts";
 
 export class BatchSettler {
   private l1Provider: providers.JsonRpcProvider;
@@ -134,9 +135,7 @@ export class BatchSettler {
         throw new Error(`Chain addresses not found for chain ${chainId}`);
       }
 
-      const executorAbi = loadAbiFromOut("Executor.sol/ExecutorFacet.json");
-
-      const executor = new Contract(chainAddresses.diamondProxy, executorAbi, this.wallet);
+      const executor = new Contract(chainAddresses.diamondProxy, executorFacetAbi(), this.wallet);
 
       const batchNumber = state.lastCommitted + 1;
       const commitBatchInfo = this.buildCommitBatchInfo(batchNumber, state.pendingTxs);
@@ -179,9 +178,7 @@ export class BatchSettler {
         throw new Error(`Chain addresses not found for chain ${chainId}`);
       }
 
-      const executorAbi = loadAbiFromOut("Executor.sol/ExecutorFacet.json");
-
-      const executor = new Contract(chainAddresses.diamondProxy, executorAbi, this.wallet);
+      const executor = new Contract(chainAddresses.diamondProxy, executorFacetAbi(), this.wallet);
 
       const batchNumber = state.lastProved + 1;
 
@@ -235,9 +232,7 @@ export class BatchSettler {
         throw new Error(`Chain addresses not found for chain ${chainId}`);
       }
 
-      const executorAbi = loadAbiFromOut("Executor.sol/ExecutorFacet.json");
-
-      const executor = new Contract(chainAddresses.diamondProxy, executorAbi, this.wallet);
+      const executor = new Contract(chainAddresses.diamondProxy, executorFacetAbi(), this.wallet);
 
       const batchNumber = state.lastExecuted + 1;
 

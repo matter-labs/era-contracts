@@ -5,6 +5,8 @@ import * as path from "path";
 import { AnvilManager } from "./src/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { deployTestTokens } from "./deploy-test-token";
+import { getGwSettledChainIds } from "./src/utils";
+import { registerAndMigrateTestTokens } from "./src/token-balance-migration-helper";
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");
@@ -75,7 +77,7 @@ async function main(): Promise<void> {
       );
 
       // Step 3+4: Register L2 chains and initialize (pipelined)
-      const { chainAddresses } = await timedAsync("step3+4 - Register & init L2 chains", () =>
+      await timedAsync("step3+4 - Register & init L2 chains", () =>
         runner.step3And4RegisterAndInitChains(
           chains.l1!.rpcUrl,
           chains.l2,
@@ -86,25 +88,76 @@ async function main(): Promise<void> {
       );
 
       // Step 5 + deploy:test-token in parallel (both independent after step 4)
-      const gatewayChainId = config.chains.find((c) => c.isGateway)?.chainId;
+      const gatewayConfig = config.chains.find((c) => c.isGateway);
+      const gatewayChainId = gatewayConfig?.chainId;
+      const gwChain = chains.l2.find((c) => c.chainId === gatewayChainId);
+
+      // Build L2 chain RPC URL map for migration preconditions
+      const l2ChainRpcUrls = new Map<number, string>();
+      for (const l2Chain of chains.l2) {
+        l2ChainRpcUrls.set(l2Chain.chainId, l2Chain.rpcUrl);
+      }
+
+      const gwSettledChainIds = getGwSettledChainIds(config.chains);
 
       await timedAsync("step5 + deploy:test-token (parallel)", () =>
         Promise.all([
           gatewayChainId
-            ? runner.step5SetupGateway(chains.l1!.rpcUrl, gatewayChainId, l1Addresses, ctmAddresses)
+            ? runner.step5SetupGateway(
+                chains.l1!.rpcUrl,
+                gatewayChainId,
+                l1Addresses,
+                ctmAddresses,
+                gwChain?.rpcUrl,
+                gwSettledChainIds,
+                l2ChainRpcUrls
+              )
             : Promise.resolve(),
           deployTestTokens(),
         ])
       );
+
+      // Run Token Balance Migration (TBM) for test tokens on GW-settled chains.
+      // Test tokens are native to their respective L2 chains. After gateway migration,
+      // outgoing transfers from GW-settled chains require assetMigrationNumber == migrationNumber.
+      // The real TBM flow (L2→L1→GW+L2 confirmations) properly sets assetMigrationNumber.
+      if (gwSettledChainIds.length > 0 && gwChain?.rpcUrl) {
+        const freshState = runner.loadState();
+        if (freshState.testTokens && Object.keys(freshState.testTokens).length > 0) {
+          const gwDiamondProxy = freshState.chainAddresses!.find(
+            (c) => c.chainId === gatewayChainId
+          )!.diamondProxy;
+
+          await timedAsync("TBM for test tokens on GW-settled chains", () =>
+            registerAndMigrateTestTokens({
+              gwSettledChainIds,
+              l2ChainRpcUrls,
+              testTokens: freshState.testTokens!,
+              l1RpcUrl: chains.l1!.rpcUrl,
+              gwRpcUrl: gwChain!.rpcUrl,
+              l1AssetTrackerAddr: l1Addresses.l1AssetTracker,
+              gwDiamondProxyAddr: gwDiamondProxy,
+              chainAddresses: freshState.chainAddresses!,
+              logger: (line) => console.log(line),
+            })
+          );
+        }
+      }
+
     }
 
     timedRun(
-      "hardhat test - token transfer",
+      "hardhat test - all interop specs",
       "yarn",
       [
         "hardhat",
         "test",
-        "test/anvil-interop/test/hardhat/token-transfer.spec.ts",
+        "test/anvil-interop/test/hardhat/01-deployment-verification.spec.ts",
+        "test/anvil-interop/test/hardhat/02-direct-bridge.spec.ts",
+        "test/anvil-interop/test/hardhat/03-interop-transfer.spec.ts",
+        "test/anvil-interop/test/hardhat/04-gateway-setup.spec.ts",
+        "test/anvil-interop/test/hardhat/05-gateway-bridge.spec.ts",
+        "test/anvil-interop/test/hardhat/06-gateway-interop.spec.ts",
         "--network",
         "hardhat",
         "--no-compile",

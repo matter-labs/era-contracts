@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 /// @notice A minimal mock for L2BaseToken that returns dummy values
 contract MockL2BaseToken {
     /// @notice Burns msg.value amount of ETH from the user
-    function burnMsgValue() external payable {
+    function burnMsgValue(uint256 /* _toChainId */) external payable {
         // In a real implementation, this would burn the ETH
         // For testing, we just accept the call
     }

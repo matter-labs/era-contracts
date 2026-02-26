@@ -1,7 +1,7 @@
 import { BigNumber, Contract, ethers, providers, Wallet } from "ethers";
 import { DeploymentRunner } from "./deployment-runner";
 import type { MultiChainTokenTransferParams, MultiChainTokenTransferResult } from "./types";
-import { loadAbiFromOut } from "./utils";
+import { testnetERC20TokenAbi, interopCenterAbi, l2NativeTokenVaultAbi, interopHandlerAbi } from "./contracts";
 import {
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
@@ -44,8 +44,7 @@ async function readTokenBalance(
   tokenAddress: string,
   walletAddress: string
 ): Promise<BigNumber> {
-  const testTokenAbi = loadAbiFromOut("TestnetERC20Token.sol/TestnetERC20Token.json");
-  const token = new Contract(tokenAddress, testTokenAbi, provider);
+  const token = new Contract(tokenAddress, testnetERC20TokenAbi(), provider);
   return token.balanceOf(walletAddress);
 }
 
@@ -81,13 +80,10 @@ export async function executeTokenTransfer(
   const sourceWallet = new Wallet(privateKey, sourceProvider);
   const targetWallet = new Wallet(privateKey, targetProvider);
 
-  const testTokenAbi = loadAbiFromOut("TestnetERC20Token.sol/TestnetERC20Token.json");
-  const sourceToken = new Contract(sourceTokenAddr, testTokenAbi, sourceWallet);
-  const interopCenterAbi = loadAbiFromOut("InteropCenter.sol/InteropCenter.json");
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, interopCenterAbi, sourceWallet);
-  const l2NativeTokenVaultAbi = loadAbiFromOut("L2NativeTokenVault.sol/L2NativeTokenVault.json");
-  const sourceVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbi, sourceProvider);
-  const targetVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbi, targetProvider);
+  const sourceToken = new Contract(sourceTokenAddr, testnetERC20TokenAbi(), sourceWallet);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, interopCenterAbi(), sourceWallet);
+  const sourceVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbi(), sourceProvider);
+  const targetVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbi(), targetProvider);
 
   const transferStart = Date.now();
   const elapsed = () => `${((Date.now() - transferStart) / 1000).toFixed(1)}s`;
@@ -182,7 +178,7 @@ export async function executeTokenTransfer(
     gasLimit: 500000,
     value: 0,
   });
-  log(`\n   Transaction sent: ${sourceTx.hash}`);
+  log(`\n   Transaction sent: cast run ${sourceTx.hash} -r ${sourceChain.rpcUrl}`);
   const sourceReceipt = await sourceTx.wait();
   log(`   ✅ Transaction confirmed in block ${sourceReceipt?.blockNumber} [${elapsed()}]`);
 
@@ -238,8 +234,7 @@ export async function executeTokenTransfer(
     log(`ℹ️ Bundle already appears on destination chain; skipping direct executeBundle call. [${elapsed()}]`);
   } else {
     log(`⏱️  [${elapsed()}] Executing bundle directly on destination chain via L2InteropHandler...`);
-    const interopHandlerAbi = loadAbiFromOut("InteropHandler.sol/InteropHandler.json");
-    const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi, targetWallet);
+    const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi(), targetWallet);
 
     const mockProof = {
       chainId: sourceChainId,
@@ -258,7 +253,7 @@ export async function executeTokenTransfer(
       const executeTx = await interopHandler.executeBundle(bundleData, mockProof, { gasLimit: 5_000_000 });
       await executeTx.wait();
       targetTxHash = executeTx.hash;
-      log(`   ✅ executeBundle tx: ${executeTx.hash}`);
+      log(`   ✅ executeBundle tx: cast run ${executeTx.hash} -r ${targetChain.rpcUrl}`);
     } catch (error: unknown) {
       const message = (error as Error)?.message || String(error);
       log(`   ⚠️ executeBundle failed: ${message}`);

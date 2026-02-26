@@ -5,7 +5,8 @@ import {
   buildFixedForceDeploymentsData,
   getBytecodeInfo,
 } from "./l2-genesis-helper";
-import { encodeNtvAssetId, loadAbiFromOut, loadBytecodeFromOut } from "./utils";
+import { encodeNtvAssetId, impersonateAndRun, loadBytecodeFromOut } from "./utils";
+import { l2ComplexUpgraderAbi, l2GenesisUpgradeAbi, l2BridgehubAbi } from "./contracts";
 import {
   ETH_TOKEN_ADDRESS,
   GW_ASSET_TRACKER_ADDR,
@@ -38,7 +39,7 @@ interface PredeployedContractSpec {
 }
 
 const ZERO_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000";
-const INTEROP_TEST_CHAIN_IDS = [10, 11, 12];
+const INTEROP_TEST_CHAIN_IDS = [10, 11, 12, 13];
 
 const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
   {
@@ -147,20 +148,29 @@ export class L2GenesisUpgradeDeployer {
   private contractsRoot: string;
   private ctmDeployerAddress: string;
   private l1AssetRouterAddress: string;
+  private governanceAddress: string;
+  private chainRegistrationSender: string;
   private gatewayChainId: number;
+  private l1ChainId: number;
 
   constructor(
     l2RpcUrl: string,
     _privateKey: string,
     l1AssetRouterAddress: string,
     ctmDeployerAddress: string,
-    gatewayChainId: number
+    governanceAddress: string,
+    chainRegistrationSender: string,
+    gatewayChainId: number,
+    l1ChainId: number = L1_CHAIN_ID
   ) {
     this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
     this.contractsRoot = path.resolve(__dirname, "../../../..");
     this.l1AssetRouterAddress = l1AssetRouterAddress;
     this.ctmDeployerAddress = ctmDeployerAddress;
+    this.governanceAddress = governanceAddress;
+    this.chainRegistrationSender = chainRegistrationSender;
     this.gatewayChainId = gatewayChainId;
+    this.l1ChainId = l1ChainId;
   }
 
   private async ensureSystemContract(address: string, artifactPath: string, name: string): Promise<void> {
@@ -193,9 +203,9 @@ export class L2GenesisUpgradeDeployer {
     fixedData: string,
     additionalData: string
   ): Promise<void> {
-    const l2ComplexUpgraderAbi = loadAbiFromOut("L2ComplexUpgrader.sol/L2ComplexUpgrader.json");
-    const l2GenesisUpgradeAbi = loadAbiFromOut("L2GenesisUpgrade.sol/L2GenesisUpgrade.json");
-    const l2GenesisUpgradeInterface = new utils.Interface(l2GenesisUpgradeAbi);
+    const l2ComplexUpgraderAbiData = l2ComplexUpgraderAbi();
+    const l2GenesisUpgradeAbiData = l2GenesisUpgradeAbi();
+    const l2GenesisUpgradeInterface = new utils.Interface(l2GenesisUpgradeAbiData);
     const genesisUpgradeCalldata = l2GenesisUpgradeInterface.encodeFunctionData("genesisUpgrade", [
       true,
       chainId,
@@ -204,12 +214,8 @@ export class L2GenesisUpgradeDeployer {
       additionalData,
     ]);
 
-    await this.l2Provider.send("anvil_impersonateAccount", [L2_FORCE_DEPLOYER_ADDR]);
-    await this.l2Provider.send("anvil_setBalance", [L2_FORCE_DEPLOYER_ADDR, "0x56BC75E2D63100000"]);
-
-    try {
-      const forceDeployerSigner = await this.l2Provider.getSigner(L2_FORCE_DEPLOYER_ADDR);
-      const l2ComplexUpgrader = new Contract(L2_COMPLEX_UPGRADER_ADDR, l2ComplexUpgraderAbi, forceDeployerSigner);
+    await impersonateAndRun(this.l2Provider, L2_FORCE_DEPLOYER_ADDR, async (forceDeployerSigner) => {
+      const l2ComplexUpgrader = new Contract(L2_COMPLEX_UPGRADER_ADDR, l2ComplexUpgraderAbiData, forceDeployerSigner);
 
       console.log("   Running L2ComplexUpgrader.upgrade(...L2GenesisUpgrade.genesisUpgrade)");
       const tx = await l2ComplexUpgrader.upgrade(L2_GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata, {
@@ -217,23 +223,17 @@ export class L2GenesisUpgradeDeployer {
       });
       await tx.wait();
       console.log("   ✅ L2GenesisUpgrade executed via L2ComplexUpgrader");
-    } finally {
-      await this.l2Provider.send("anvil_stopImpersonatingAccount", [L2_FORCE_DEPLOYER_ADDR]);
-    }
+    });
   }
 
   private async registerInteropChains(currentChainId: number): Promise<void> {
-    const l2BridgehubAbi = loadAbiFromOut("L2Bridgehub.sol/L2Bridgehub.json");
-    const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbi, this.l2Provider);
-    const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+    const l2BridgehubAbiData = l2BridgehubAbi();
+    const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbiData, this.l2Provider);
+    const ethAssetId = encodeNtvAssetId(this.l1ChainId, ETH_TOKEN_ADDRESS);
 
     const chainIds = Array.from(new Set([...INTEROP_TEST_CHAIN_IDS, currentChainId, this.gatewayChainId]));
 
-    await this.l2Provider.send("anvil_impersonateAccount", [SERVICE_TX_SENDER_ADDR]);
-    await this.l2Provider.send("anvil_setBalance", [SERVICE_TX_SENDER_ADDR, "0x56BC75E2D63100000"]);
-
-    try {
-      const serviceTxSenderSigner = await this.l2Provider.getSigner(SERVICE_TX_SENDER_ADDR);
+    await impersonateAndRun(this.l2Provider, SERVICE_TX_SENDER_ADDR, async (serviceTxSenderSigner) => {
       const l2BridgehubWithSigner = l2Bridgehub.connect(serviceTxSenderSigner);
 
       for (const chainId of chainIds) {
@@ -248,9 +248,7 @@ export class L2GenesisUpgradeDeployer {
         await registerTx.wait();
         console.log(`   ✅ Chain ${chainId} registered on L2Bridgehub`);
       }
-    } finally {
-      await this.l2Provider.send("anvil_stopImpersonatingAccount", [SERVICE_TX_SENDER_ADDR]);
-    }
+    });
   }
 
   private async assertCodePresent(address: string, name: string): Promise<void> {
@@ -285,7 +283,10 @@ export class L2GenesisUpgradeDeployer {
       chainId,
       this.l1AssetRouterAddress,
       bytecodeInfo,
-      this.gatewayChainId
+      this.gatewayChainId,
+      this.governanceAddress,
+      this.chainRegistrationSender,
+      this.l1ChainId
     );
     const additionalData = buildAdditionalForceDeploymentsData(ETH_TOKEN_ADDRESS);
 

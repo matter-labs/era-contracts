@@ -1,7 +1,8 @@
 import type { providers } from "ethers";
 import { Contract, Wallet } from "ethers";
 import type { ChainAddresses, CoreDeployedAddresses } from "./types";
-import { sleep, loadAbiFromOut } from "./utils";
+import { sleep } from "./utils";
+import { il1BridgehubAbi } from "./contracts";
 
 /**
  * L1→L2 Transaction Relayer
@@ -88,7 +89,7 @@ export class L1ToL2Relayer {
 
   private async processBridgehubTransactions(fromBlock: number, toBlock: number): Promise<void> {
     // ABI for requestL2TransactionDirect function
-    const bridgehubAbi = loadAbiFromOut("IL1Bridgehub.sol/IL1Bridgehub.json");
+    const bridgehubAbi = il1BridgehubAbi();
 
     const bridgehub = new Contract(this.l1Addresses.bridgehub, bridgehubAbi, this.l1Provider);
     const iface = bridgehub.interface;
@@ -137,7 +138,7 @@ export class L1ToL2Relayer {
     }
 
     console.log(`\n   ⚡ Processing L1→L2 transaction for chain ${chainId}`);
-    console.log(`      L1 Tx Hash: ${txHash}`);
+    console.log(`      L1 Tx: cast run ${txHash} -r ${this.l1Provider.connection.url}`);
 
     try {
       await this.executeOnL2(chainId, request);
@@ -176,7 +177,7 @@ export class L1ToL2Relayer {
       gasLimit: gasLimit,
     });
 
-    console.log(`      L2 Tx Hash: ${tx.hash}`);
+    console.log(`      L2 Tx: cast run ${tx.hash} -r ${l2Provider.connection.url}`);
 
     const receipt = await tx.wait();
     console.log(`      Confirmed in L2 block ${receipt?.blockNumber}`);

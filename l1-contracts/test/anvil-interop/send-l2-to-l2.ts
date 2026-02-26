@@ -2,8 +2,8 @@
 
 import { ethers, providers, Wallet, Contract } from "ethers";
 import { DeploymentRunner } from "./src/deployment-runner";
-import { getDefaultAccountPrivateKey, loadAbiFromOut } from "./src/utils";
-import { CONTRACT_DEPLOYER_ADDR, INTEROP_CENTER_ADDR } from "./src/const";
+import { interopCenterAbi } from "./src/contracts";
+import { ANVIL_DEFAULT_PRIVATE_KEY, CONTRACT_DEPLOYER_ADDR, INTEROP_CENTER_ADDR } from "./src/const";
 
 /**
  * Send a cross-chain message from one L2 chain to another L2 chain using InteropCenter
@@ -49,14 +49,11 @@ async function main() {
   console.log(`  Target Calldata: ${targetCalldata}`);
   console.log();
 
-  const privateKey = getDefaultAccountPrivateKey();
+  const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
   const sourceProvider = new providers.JsonRpcProvider(sourceChain.rpcUrl);
   const wallet = new Wallet(privateKey, sourceProvider);
 
-  // InteropCenter ABI - sendBundle function
-  const interopCenterAbi = loadAbiFromOut("InteropCenter.sol/InteropCenter.json");
-
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, interopCenterAbi, wallet);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, interopCenterAbi(), wallet);
 
   // Encode destination chain ID (uint256 as bytes)
   const abiCoder = ethers.utils.defaultAbiCoder;

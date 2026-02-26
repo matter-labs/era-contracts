@@ -15,10 +15,27 @@ export interface CoreDeployedAddresses {
   l1SharedBridge: string;
   l1NullifierProxy: string;
   l1NativeTokenVault: string;
+  l1AssetTracker: string;
   l1ERC20Bridge: string;
   governance: string;
   transparentProxyAdmin: string;
   blobVersionedHashRetriever: string;
+  messageRoot: string;
+  ctmDeploymentTracker: string;
+  l1ChainAssetHandler: string;
+  chainRegistrationSender: string;
+}
+
+export interface BalanceSnapshot {
+  // Actual token balances
+  l1TokenBalance: string;
+  l2TokenBalance: string;
+
+  // L1AssetTracker state
+  l1ChainBalance: string;
+
+  // GWAssetTracker state (for GW-settled chains)
+  gwChainBalance?: string;
 }
 
 export interface CTMDeployedAddresses {
@@ -145,6 +162,16 @@ export interface MultiChainTokenTransferParams {
   amount?: string;
 }
 
+export interface FinalizeWithdrawalParams {
+  chainId: number;
+  l2BatchNumber: number;
+  l2MessageIndex: number;
+  l2Sender: string;
+  l2TxNumberInBatch: number;
+  message: string;
+  merkleProof: string[];
+}
+
 export interface MultiChainTokenTransferResult {
   sourceChainId: number;
   targetChainId: number;
@@ -161,4 +188,10 @@ export interface MultiChainTokenTransferResult {
   destinationBalanceAfter: string;
   sourceTxHash: string;
   targetTxHash: string | null;
+}
+
+export interface PriorityRequestData {
+  from: string;
+  to: string;
+  calldata: string;
 }

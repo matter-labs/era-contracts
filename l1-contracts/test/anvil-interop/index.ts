@@ -7,7 +7,7 @@ import { AnvilManager } from "./src/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 import type { BatchSettler } from "./src/batch-settler";
 import type { ChainAddresses } from "./src/types";
-import { sleep } from "./src/utils";
+import { getGwSettledChainIds, sleep } from "./src/utils";
 
 async function main() {
   console.log("🚀 Starting Multi-Chain Anvil Testing Environment\n");
@@ -58,7 +58,21 @@ async function main() {
     // Step 5: Setup gateway if configured
     const gatewayChainId = config.chains.find((c) => c.isGateway)?.chainId;
     if (gatewayChainId) {
-      await runner.step5SetupGateway(chains.l1.rpcUrl, gatewayChainId, l1Addresses, ctmAddresses);
+      const gwChain = chains.l2.find((c) => c.chainId === gatewayChainId);
+      const gwSettledChainIds = getGwSettledChainIds(config.chains);
+      const l2ChainRpcUrls = new Map<number, string>();
+      for (const l2Chain of chains.l2) {
+        l2ChainRpcUrls.set(l2Chain.chainId, l2Chain.rpcUrl);
+      }
+      await runner.step5SetupGateway(
+        chains.l1.rpcUrl,
+        gatewayChainId,
+        l1Addresses,
+        ctmAddresses,
+        gwChain?.rpcUrl,
+        gwSettledChainIds,
+        l2ChainRpcUrls
+      );
     }
 
     // Step 6: Start batch settler daemon
