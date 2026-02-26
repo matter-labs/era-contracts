@@ -153,7 +153,7 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
 
                 // Call AssetTracker to migrate the balance
                 vm.broadcast(getBroadcasterAddress());
-                assetTracker.migrateTokenBalanceFromNTVV31(chainId, assetId);
+                assetTracker.registerLegacyToken(assetId);
 
                 console.log("  Migration successful");
             }

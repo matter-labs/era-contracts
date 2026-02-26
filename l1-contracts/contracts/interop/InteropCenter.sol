@@ -345,7 +345,7 @@ contract InteropCenter is
             // Burn user value for interop calls.
             if (_totalBurnedCallsValue > 0) {
                 // Send tokens to BaseTokenHolder and notify L2AssetTracker via burnAndStartBridging
-                L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: _totalBurnedCallsValue}();
+                L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: _totalBurnedCallsValue}(_destinationChainId);
             }
         } else {
             uint256 expectedValue = _totalIndirectCallsValue + protocolFee;

@@ -3,7 +3,7 @@
 pragma solidity ^0.8.24;
 
 /// @title DummyBaseTokenSystemContract
-/// @notice A test smart contract that simulates L2BaseToken for testing interop flows using ZKOS logic (native ETH transfers)
+/// @notice A test smart contract that simulates L2BaseToken for testing interop flows (native ETH transfers)
 contract DummyBaseTokenSystemContract {
     /// @notice Emitted during token transfers
     event Transfer(address indexed from, address indexed to, uint256 value);

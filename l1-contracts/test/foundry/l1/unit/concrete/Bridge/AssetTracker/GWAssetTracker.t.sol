@@ -6,12 +6,12 @@ import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 
-import {BalanceChange, TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
+import {BalanceChange, MigrationConfirmationData} from "contracts/common/Messaging.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
-import {BALANCE_CHANGE_VERSION, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
 import {InvalidCanonicalTxHash, RegisterNewTokenNotAllowed} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
@@ -47,10 +47,9 @@ contract GWAssetTrackerTestHelper is GWAssetTracker {
         uint256 _sourceChainId,
         uint256 _destinationChainId,
         bytes32 _assetId,
-        uint256 _amount,
-        bool _isInteropCall
+        uint256 _amount
     ) external {
-        _handleChainBalanceChangeOnGateway(_sourceChainId, _destinationChainId, _assetId, _amount, _isInteropCall);
+        _handleChainBalanceChangeOnGateway(_sourceChainId, _destinationChainId, _assetId, _amount);
     }
 
     /// @notice Helper to set chain balance directly for testing
@@ -205,15 +204,13 @@ contract GWAssetTrackerTest is Test {
     }
 
     function test_ConfirmMigrationOnGateway_Unauthorized() public {
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+        MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             assetMigrationNumber: MIGRATION_NUMBER,
-            chainMigrationNumber: 0,
             isL1ToGateway: false
         });
 
@@ -330,15 +327,13 @@ contract GWAssetTrackerTest is Test {
 
         uint256 initialBalance = gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID);
 
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+        MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             assetMigrationNumber: MIGRATION_NUMBER,
-            chainMigrationNumber: 0,
             isL1ToGateway: true
         });
 
@@ -381,7 +376,7 @@ contract GWAssetTrackerTest is Test {
         // registerNewToken should always revert on GWAssetTracker
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
         vm.expectRevert(RegisterNewTokenNotAllowed.selector);
-        gwAssetTracker.registerNewToken(ASSET_ID, ORIGIN_CHAIN_ID);
+        gwAssetTracker.registerNewTokenIfNeeded(ASSET_ID, ORIGIN_CHAIN_ID);
     }
 
     function test_RequestPauseDepositsForChain_Unauthorized() public {
@@ -581,7 +576,7 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.chainBalance(chainId2, ASSET_ID), 2000);
     }
 
-    function test_ConfirmMigrationOnGateway_GatewayToL1_DecreaseBalance() public {
+    function test_ConfirmMigrationOnGateway_GatewayToL1_NoBalanceChange() public {
         // First set up some balance
         BalanceChange memory balanceChange = BalanceChange({
             version: BALANCE_CHANGE_VERSION,
@@ -605,42 +600,43 @@ contract GWAssetTrackerTest is Test {
             abi.encode(0) // Return 0 to indicate not settled on current chain
         );
 
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+        MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             assetMigrationNumber: MIGRATION_NUMBER,
-            chainMigrationNumber: 0,
             isL1ToGateway: false
         });
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.confirmMigrationOnGateway(data);
 
-        // When isL1ToGateway is false, balance should decrease
-        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), initialBalance - AMOUNT);
+        // For Gateway->L1 confirmations, Gateway state is updated at initiation time,
+        // so confirmation should not modify chainBalance.
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), initialBalance);
     }
 
-    function test_ConfirmMigrationOnGateway_InvalidVersion() public {
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
-            version: 0, // Invalid version
+    function test_ConfirmMigrationOnGateway_InsufficientBalanceDoesNotRevert() public {
+        MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             assetMigrationNumber: MIGRATION_NUMBER,
-            chainMigrationNumber: 0,
             isL1ToGateway: false
         });
 
+        uint256 initialBalance = gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID);
+        uint256 initialAssetMigrationNumber = gwAssetTracker.assetMigrationNumber(CHAIN_ID, ASSET_ID);
+
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        // This should fail due to version check
-        vm.expectRevert();
         gwAssetTracker.confirmMigrationOnGateway(data);
+
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), initialBalance);
+        assertEq(gwAssetTracker.assetMigrationNumber(CHAIN_ID, ASSET_ID), initialAssetMigrationNumber);
     }
 
     function test_ParseTokenData() public {
@@ -705,15 +701,13 @@ contract GWAssetTrackerTest is Test {
     }
 
     function test_ConfirmMigrationOnGateway_L1ToGateway_ZeroAmount() public {
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+        MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: 0,
             assetMigrationNumber: MIGRATION_NUMBER,
-            chainMigrationNumber: 0,
             isL1ToGateway: true
         });
 
@@ -729,15 +723,13 @@ contract GWAssetTrackerTest is Test {
     function testFuzz_ConfirmMigrationOnGateway_L1ToGateway(uint256 _amount) public {
         _amount = bound(_amount, 0, type(uint128).max);
 
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+        MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: _amount,
             assetMigrationNumber: MIGRATION_NUMBER,
-            chainMigrationNumber: 0,
             isL1ToGateway: true
         });
 
@@ -747,7 +739,7 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), _amount);
     }
 
-    function test_regression_interopCallDoesNotIncreaseDestinationBalance() public {
+    function test_regression_chainBalanceChangeIncreasesDestinationBalance() public {
         uint256 sourceChainId = 100;
         uint256 destinationChainId = 200;
         bytes32 assetId = keccak256("testAsset");
@@ -760,14 +752,7 @@ contract GWAssetTrackerTest is Test {
         uint256 sourceBalanceBefore = gwAssetTracker.chainBalance(sourceChainId, assetId);
         uint256 destBalanceBefore = gwAssetTracker.chainBalance(destinationChainId, assetId);
 
-        // Call with _isInteropCall = true (simulating InteropCenter message processing)
-        gwAssetTracker.handleChainBalanceChangeOnGateway(
-            sourceChainId,
-            destinationChainId,
-            assetId,
-            transferAmount,
-            true // _isInteropCall = true
-        );
+        gwAssetTracker.handleChainBalanceChangeOnGateway(sourceChainId, destinationChainId, assetId, transferAmount);
 
         // Source balance should decrease
         assertEq(
@@ -776,59 +761,44 @@ contract GWAssetTrackerTest is Test {
             "Source chain balance should decrease"
         );
 
-        // Destination balance should NOT increase when _isInteropCall is true
-        // This is the key fix - before PR #1757, this would have increased
-        assertEq(
-            gwAssetTracker.chainBalance(destinationChainId, assetId),
-            destBalanceBefore,
-            "Destination chain balance should NOT increase for interop calls"
-        );
-    }
-
-    /// @notice Test that non-interop calls DO increase destination balance
-    /// @dev This verifies the fix doesn't break normal (non-interop) transfers
-    function test_regression_nonInteropCallIncreasesDestinationBalance() public {
-        uint256 sourceChainId = 100;
-        uint256 destinationChainId = 200;
-        bytes32 assetId = keccak256("testAsset");
-        uint256 transferAmount = 1000;
-
-        // Set up initial source chain balance
-        gwAssetTracker.setChainBalance(sourceChainId, assetId, transferAmount * 2);
-
-        // Record initial balances
-        uint256 sourceBalanceBefore = gwAssetTracker.chainBalance(sourceChainId, assetId);
-        uint256 destBalanceBefore = gwAssetTracker.chainBalance(destinationChainId, assetId);
-
-        // Call with _isInteropCall = false (normal transfer, not interop)
-        gwAssetTracker.handleChainBalanceChangeOnGateway(
-            sourceChainId,
-            destinationChainId,
-            assetId,
-            transferAmount,
-            false // _isInteropCall = false
-        );
-
-        // Source balance should decrease
-        assertEq(
-            gwAssetTracker.chainBalance(sourceChainId, assetId),
-            sourceBalanceBefore - transferAmount,
-            "Source chain balance should decrease"
-        );
-
-        // Destination balance SHOULD increase for non-interop calls
+        // Destination balance should increase when destination is not L1.
         assertEq(
             gwAssetTracker.chainBalance(destinationChainId, assetId),
             destBalanceBefore + transferAmount,
-            "Destination chain balance should increase for non-interop calls"
+            "Destination chain balance should increase"
         );
     }
 
-    /// @notice Test the full scenario that demonstrates the double increment bug is fixed
-    /// @dev Before the fix, calling with isInteropCall=true followed by a second increment
-    ///      would result in balance being incremented twice for a single transaction.
-    ///      After the fix, only the second (explicit) increment should occur.
-    function test_regression_noDoubleBalanceIncrementForInterop() public {
+    function test_regression_chainBalanceChangeForNormalTransfer() public {
+        uint256 sourceChainId = 100;
+        uint256 destinationChainId = 200;
+        bytes32 assetId = keccak256("testAsset");
+        uint256 transferAmount = 1000;
+
+        // Set up initial source chain balance
+        gwAssetTracker.setChainBalance(sourceChainId, assetId, transferAmount * 2);
+
+        // Record initial balances
+        uint256 sourceBalanceBefore = gwAssetTracker.chainBalance(sourceChainId, assetId);
+        uint256 destBalanceBefore = gwAssetTracker.chainBalance(destinationChainId, assetId);
+
+        gwAssetTracker.handleChainBalanceChangeOnGateway(sourceChainId, destinationChainId, assetId, transferAmount);
+
+        // Source balance should decrease
+        assertEq(
+            gwAssetTracker.chainBalance(sourceChainId, assetId),
+            sourceBalanceBefore - transferAmount,
+            "Source chain balance should decrease"
+        );
+
+        assertEq(
+            gwAssetTracker.chainBalance(destinationChainId, assetId),
+            destBalanceBefore + transferAmount,
+            "Destination chain balance should increase"
+        );
+    }
+
+    function test_regression_singleCallIncrementsDestinationOnce() public {
         uint256 sourceChainId = 100;
         uint256 destinationChainId = 200;
         bytes32 assetId = keccak256("testAsset");
@@ -840,48 +810,16 @@ contract GWAssetTrackerTest is Test {
         // Initial destination balance
         uint256 destBalanceInitial = gwAssetTracker.chainBalance(destinationChainId, assetId);
 
-        // Step 1: Process InteropCenter message (isInteropCall = true)
-        // This should decrease source but NOT increase destination
-        gwAssetTracker.handleChainBalanceChangeOnGateway(
-            sourceChainId,
-            destinationChainId,
-            assetId,
-            transferAmount,
-            true // _isInteropCall = true (InteropCenter path)
-        );
+        gwAssetTracker.handleChainBalanceChangeOnGateway(sourceChainId, destinationChainId, assetId, transferAmount);
 
-        // Verify destination balance unchanged after InteropCenter message
+        // A single call should increment destination by exactly transferAmount.
         assertEq(
             gwAssetTracker.chainBalance(destinationChainId, assetId),
-            destBalanceInitial,
-            "Destination balance should not change after InteropCenter message"
-        );
-
-        // Step 2: Simulate the InteropHandler message processing
-        // In the real contract, this happens via _handleInteropHandlerReceiveMessage
-        // which calls _increaseAndSaveChainBalance directly.
-        // Here we simulate by calling with isInteropCall=false to a dummy source
-        // or we just directly increase the balance to simulate what _handleInteropHandlerReceiveMessage does.
-
-        // For this test, we'll just verify the balance stayed at destBalanceInitial
-        // The key point is that the first call (with isInteropCall=true) did NOT increment
-
-        // If the bug existed (isInteropCall parameter not working), the balance would be:
-        // destBalanceInitial + transferAmount after step 1
-        // And then another +transferAmount after step 2 = destBalanceInitial + 2*transferAmount
-
-        // With the fix, after step 1, balance is still destBalanceInitial
-        // After step 2 (InteropHandler), it would be destBalanceInitial + transferAmount (correct!)
-
-        assertEq(
-            gwAssetTracker.chainBalance(destinationChainId, assetId),
-            destBalanceInitial,
-            "After InteropCenter message, destination balance should remain unchanged"
+            destBalanceInitial + transferAmount,
+            "Destination balance should increment exactly once"
         );
     }
 
-    /// @notice Test that L1 destination chains are handled correctly regardless of isInteropCall
-    /// @dev When destination is L1, balance should never be increased (we don't track L1 balance on Gateway)
     function test_regression_l1DestinationNeverIncreases() public {
         uint256 sourceChainId = 100;
         bytes32 assetId = keccak256("testAsset");
@@ -893,13 +831,11 @@ contract GWAssetTrackerTest is Test {
         uint256 sourceBalanceBefore = gwAssetTracker.chainBalance(sourceChainId, assetId);
         uint256 l1BalanceBefore = gwAssetTracker.chainBalance(L1_CHAIN_ID, assetId);
 
-        // Call with L1 as destination, isInteropCall = false
         gwAssetTracker.handleChainBalanceChangeOnGateway(
             sourceChainId,
             L1_CHAIN_ID, // L1 as destination
             assetId,
-            transferAmount,
-            false
+            transferAmount
         );
 
         // Source balance should decrease
@@ -917,12 +853,10 @@ contract GWAssetTrackerTest is Test {
         );
     }
 
-    /// @notice Fuzz test for the isInteropCall parameter behavior
-    function testFuzz_regression_isInteropCallParameter(
+    function testFuzz_regression_chainBalanceChange(
         uint256 _sourceChainId,
         uint256 _destinationChainId,
-        uint256 _amount,
-        bool _isInteropCall
+        uint256 _amount
     ) public {
         // Bound inputs to reasonable values
         _sourceChainId = bound(_sourceChainId, 2, 1000);
@@ -940,13 +874,7 @@ contract GWAssetTrackerTest is Test {
         uint256 sourceBalanceBefore = gwAssetTracker.chainBalance(_sourceChainId, ASSET_ID);
         uint256 destBalanceBefore = gwAssetTracker.chainBalance(_destinationChainId, ASSET_ID);
 
-        gwAssetTracker.handleChainBalanceChangeOnGateway(
-            _sourceChainId,
-            _destinationChainId,
-            ASSET_ID,
-            _amount,
-            _isInteropCall
-        );
+        gwAssetTracker.handleChainBalanceChangeOnGateway(_sourceChainId, _destinationChainId, ASSET_ID, _amount);
 
         // Source should always decrease
         assertEq(
@@ -955,20 +883,11 @@ contract GWAssetTrackerTest is Test {
             "Source balance should decrease"
         );
 
-        // Destination behavior depends on _isInteropCall
-        if (_isInteropCall) {
-            assertEq(
-                gwAssetTracker.chainBalance(_destinationChainId, ASSET_ID),
-                destBalanceBefore,
-                "Destination should NOT increase when isInteropCall=true"
-            );
-        } else {
-            assertEq(
-                gwAssetTracker.chainBalance(_destinationChainId, ASSET_ID),
-                destBalanceBefore + _amount,
-                "Destination should increase when isInteropCall=false"
-            );
-        }
+        assertEq(
+            gwAssetTracker.chainBalance(_destinationChainId, ASSET_ID),
+            destBalanceBefore + _amount,
+            "Destination should increase for non-L1 destination"
+        );
     }
 
     function test_regression_legacySharedBridgeMessageDecodingDoesNotFail() public {

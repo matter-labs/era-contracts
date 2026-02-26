@@ -38,7 +38,7 @@ contract L2BaseTokenZKOSTest is Test {
         // Mock L2AssetTracker to accept calls
         vm.mockCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)"),
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)"),
             abi.encode()
         );
 
@@ -93,7 +93,7 @@ contract L2BaseTokenZKOSTest is Test {
         // Expect the AssetTracker call
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)", WITHDRAW_AMOUNT)
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, WITHDRAW_AMOUNT)
         );
 
         vm.prank(sender);
@@ -194,7 +194,7 @@ contract L2BaseTokenZKOSTest is Test {
         // Expect the AssetTracker call
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)", WITHDRAW_AMOUNT)
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, WITHDRAW_AMOUNT)
         );
 
         vm.prank(sender);
@@ -413,7 +413,7 @@ contract L2BaseTokenZKOSTest is Test {
 
         vm.prank(untrustedSender);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, untrustedSender));
-        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: 1 ether}();
+        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: 1 ether}(0);
     }
 
     /// @notice Verifies that BaseTokenHolder notifies L2AssetTracker when receiving ETH via burnAndStartBridging from InteropCenter
@@ -426,7 +426,7 @@ contract L2BaseTokenZKOSTest is Test {
         // Mock L2AssetTracker to accept calls
         vm.mockCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)"),
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)"),
             abi.encode()
         );
 
@@ -435,13 +435,13 @@ contract L2BaseTokenZKOSTest is Test {
         // Expect the AssetTracker call when InteropCenter calls burnAndStartBridging
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)", burnAmount)
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, burnAmount)
         );
 
         // InteropCenter calls burnAndStartBridging (simulating a bridging burn)
         vm.deal(L2_INTEROP_CENTER_ADDR, burnAmount);
         vm.prank(L2_INTEROP_CENTER_ADDR);
-        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}();
+        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(0);
     }
 
     /// @notice Verifies that BaseTokenHolder notifies L2AssetTracker when receiving ETH via burnAndStartBridging from NativeTokenVault
@@ -454,7 +454,7 @@ contract L2BaseTokenZKOSTest is Test {
         // Mock L2AssetTracker to accept calls
         vm.mockCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)"),
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)"),
             abi.encode()
         );
 
@@ -463,13 +463,13 @@ contract L2BaseTokenZKOSTest is Test {
         // Expect the AssetTracker call when NativeTokenVault calls burnAndStartBridging
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)", burnAmount)
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, burnAmount)
         );
 
         // NativeTokenVault calls burnAndStartBridging (simulating a bridging burn)
         vm.deal(L2_NATIVE_TOKEN_VAULT_ADDR, burnAmount);
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
-        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}();
+        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(0);
     }
 
     /// @notice Verifies that L2BaseToken can call burnAndStartBridging for withdrawals
@@ -482,7 +482,7 @@ contract L2BaseTokenZKOSTest is Test {
         // Mock L2AssetTracker to accept calls
         vm.mockCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)"),
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)"),
             abi.encode()
         );
 
@@ -491,13 +491,13 @@ contract L2BaseTokenZKOSTest is Test {
         // Expect the AssetTracker call when L2BaseToken calls burnAndStartBridging
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)", burnAmount)
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, burnAmount)
         );
 
         // L2BaseToken calls burnAndStartBridging (simulating a withdrawal)
         vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, burnAmount);
         vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
-        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}();
+        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(0);
     }
 
     /// @notice Verifies that BaseTokenHolder does NOT notify L2AssetTracker when receiving ETH via receive() from L2BaseToken
@@ -512,7 +512,7 @@ contract L2BaseTokenZKOSTest is Test {
         // Expect the AssetTracker to NOT be called (count = 0)
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)", initAmount),
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, initAmount),
             0 // count = 0 means we expect it NOT to be called
         );
 
@@ -544,7 +544,7 @@ contract L2BaseTokenZKOSTest is Test {
         // Expect the AssetTracker to NOT be called during initialization
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256)", INITIAL_BASE_TOKEN_HOLDER_BALANCE),
+            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, INITIAL_BASE_TOKEN_HOLDER_BALANCE),
             0 // count = 0 means we expect it NOT to be called
         );
 
@@ -622,7 +622,7 @@ contract RejectingContract {
 
 /// @notice Helper contract that rejects burnAndStartBridging calls
 contract RejectingBurnAndStartBridgingContract {
-    function burnAndStartBridging() external payable {
+    function burnAndStartBridging(uint256) external payable {
         revert("Rejected");
     }
 

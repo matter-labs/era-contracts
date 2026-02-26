@@ -13,11 +13,15 @@ import {IL1AssetHandler} from "../../bridge/interfaces/IL1AssetHandler.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
+import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
+import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
+import {IAssetTrackerBase} from "../../bridge/asset-tracker/IAssetTrackerBase.sol";
 import {IL1ChainAssetHandler} from "./IL1ChainAssetHandler.sol";
-import {ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
+import {ChainNotReadyForMigration, ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
 import {CTMNotRegistered} from "../../common/L1ContractErrors.sol";
 import {MigrationIntervalInvalid, MigrationIntervalNotSet, MigrationNumberMismatch, SettlementLayerMustNotBeL1, IteratedMigrationsNotSupported, HistoricalSettlementLayerMismatch} from "../bridgehub/L1BridgehubErrors.sol";
 import {MigrationInterval} from "./IChainAssetHandler.sol";
+import {IL1MessageRoot} from "../message-root/IL1MessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -159,7 +163,32 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler, IL1Chain
         });
     }
 
+    /// @notice Returns whether a chain can be migrated from L1 to a settlement layer.
+    /// @dev A chain is ready only when its legacy base-token balance in L1NativeTokenVault has been migrated.
+    /// @param _chainId The chain id to check.
+    /// @return True if migration preconditions are met.
+    function isReadyForMigration(uint256 _chainId) public view returns (bool) {
+        bytes32 baseAssetId = BRIDGEHUB.baseTokenAssetId(_chainId);
+        address zkChain = BRIDGEHUB.getZKChain(_chainId);
+        require(zkChain != address(0), ZKChainNotRegistered());
+        IL1AssetRouter l1AssetRouter = IL1AssetRouter(address(_assetRouter()));
+        IL1NativeTokenVault nativeTokenVault = IL1NativeTokenVault(address(l1AssetRouter.nativeTokenVault()));
+        IAssetTrackerBase l1AssetTracker = IAssetTrackerBase(address(nativeTokenVault.l1AssetTracker()));
+
+        return
+            // The chain must have version higher than v31.
+            !IL1MessageRoot(address(_messageRoot())).isPreV31(_chainId) &&
+            // The chain's base token must be registered as otherwise the token balance
+            // migration wont work. This is done just in case to unblock any potential L1->L2 transactions.
+            l1AssetTracker.isAssetRegistered(baseAssetId) &&
+            // The chain's base token must support `totalSupply()`, which is the case
+            // for all chains except for pre-v31 ZKsync OS ones. For them, this value
+            // has to be backfilled. Otherwise token balance migration may not work.
+            IZKChain(zkChain).baseTokenSupportsTotalSupply();
+    }
+
     function _setMigrationInProgressOnL1(uint256 _chainId) internal override {
+        require(isReadyForMigration(_chainId), ChainNotReadyForMigration(_chainId));
         isMigrationInProgress[_chainId] = true;
     }
 
