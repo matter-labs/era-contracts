@@ -874,6 +874,7 @@ contract ExperimentalBridgeTest is Test {
         chainId = bound(chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
         vm.assume(randomCaller != deployerAddress && randomCaller != bridgeOwner);
+        vm.assume(newChainAddress != address(0));
 
         _initializeBridgehub();
 
