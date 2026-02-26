@@ -123,6 +123,9 @@ contract ChainRegistrationSender is
     /// @return the L2 transaction calldata
     function _getL2TxCalldata(uint256 chainToBeRegistered) internal view returns (bytes memory) {
         bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(chainToBeRegistered);
+        if (baseTokenAssetId == bytes32(0)) {
+            revert ZKChainNotRegistered();
+        }
         return abi.encodeCall(IL2Bridgehub.registerChainForInterop, (chainToBeRegistered, baseTokenAssetId));
     }
 

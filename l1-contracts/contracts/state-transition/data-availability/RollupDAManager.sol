@@ -10,6 +10,12 @@ import {L2DACommitmentScheme} from "../../common/Config.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Responsible for determining which DA configurations (DAPairs) are allowed to be used
 /// for permanent rollups.
+/// @dev IMPORTANT: Rollup DA Manager must contain only compatible versions for a single protocol version.
+/// I.e. a separate `RollupDAManager` needs to be deployed per protocol version / chain type (ZKsync OS vs Era)
+/// as otherwise a malicious chain admin could switch the DA configuration to an incompatible one, causing the rollup to be unable to verify blocks and thus halt.
+/// This is an issue for stage1 since it may disable `PermissionlessValidator` from settling new batches.
+/// It is okay if two protocol versions have the same rollup DA manager if they have *exactly same* set of compatible
+/// DA validator pairs.
 contract RollupDAManager is Ownable2Step {
     /// @dev Mapping to track the status (enabled/disabled) of each DAPair.
     mapping(address l1DAValidator => mapping(L2DACommitmentScheme l2DACommitmentScheme => bool))
