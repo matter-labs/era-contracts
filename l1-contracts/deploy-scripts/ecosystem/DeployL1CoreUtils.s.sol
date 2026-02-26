@@ -268,7 +268,7 @@ contract DeployL1CoreUtils is DeployUtils {
                 return
                     abi.encodeCall(
                         L1NativeTokenVault.initialize,
-                        (coreAddresses.shared.governance, coreAddresses.bridges.bridgedTokenBeacon)
+                        (config.deployerAddress, coreAddresses.bridges.bridgedTokenBeacon)
                     );
             } else {
                 revert(string.concat("Contract ", contractName, " initialize calldata not set"));
