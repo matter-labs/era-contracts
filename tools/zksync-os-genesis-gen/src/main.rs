@@ -1,3 +1,4 @@
+use alloy::primitives::{b256, bytes};
 use crate::genesis::build_genesis_root_hash;
 use crate::types::{Genesis, InitialGenesisInput};
 use structopt::StructOpt;
@@ -43,5 +44,9 @@ fn update_local_genesis() -> anyhow::Result<Genesis> {
     )?;
     genesis.initial_genesis = InitialGenesisInput::local();
     genesis.genesis_root = build_genesis_root_hash(&genesis.initial_genesis)?;
+    genesis.additional_preimages = Some(vec![(
+        b256!("0x49d1759eb6d2cd7eda55639c305253810d31f5d50cea1ede0be519ccbb1d8a93"),
+        bytes!("0x0000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+    )]);
     Ok(genesis)
 }
