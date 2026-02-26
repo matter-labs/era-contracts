@@ -13,10 +13,15 @@ contract DummyChainTypeManagerWBH is EraChainTypeManager {
 
     address zkChain;
     /// @notice Constructor
-    constructor(address bridgeHub) EraChainTypeManager(bridgeHub, address(0), address(0)) {}
+    constructor(address bridgeHub) EraChainTypeManager(bridgeHub, address(0), address(0), address(0)) {}
 
     function setZKChain(uint256 _chainId, address _zkChain) external {
         zkChain = _zkChain;
+    }
+
+    /// @notice Sets verifier for a protocol version (no access control for testing)
+    function setProtocolVersionVerifierForTesting(uint256 _protocolVersion, address _verifier) external {
+        _setProtocolVersionVerifier(_protocolVersion, _verifier);
     }
 
     // add this to be excluded from coverage report

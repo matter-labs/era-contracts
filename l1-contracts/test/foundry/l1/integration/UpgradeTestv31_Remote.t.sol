@@ -5,14 +5,8 @@ pragma solidity ^0.8.24;
 
 import {console2 as console} from "forge-std/Script.sol";
 
-import {EcosystemUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol";
-import {DefaultChainUpgrade} from "../../../../deploy-scripts/upgrade/default_upgrade/DefaultChainUpgrade.s.sol";
-import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
-import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default_upgrade/DefaultCTMUpgrade.s.sol";
-import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
-import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
+
 import {UpgradeIntegrationTestBase} from "./UpgradeTestShared.t.sol";
 
 contract UpgradeIntegrationTest_Remote is UpgradeIntegrationTestBase {

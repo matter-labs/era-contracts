@@ -1,5 +1,5 @@
 [profile.default]
-allow_paths = ["../l2-contracts/contracts", "../lib"]
+allow_paths = ["../l2-contracts/contracts", "../lib", "../system-contracts/contracts"]
 src = "contracts"
 out = "out"
 libs = ["./lib"]
@@ -9,7 +9,7 @@ solc_version = "0.8.28"
 evm_version = "prague"
 fs_permissions = [
     { access = "read-write", path = "./script-out" },
-    { access = "read-write", path = "./scripts/anvil-interop/" },
+    { access = "read-write", path = "./test/anvil-interop/" },
     { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-config/" },
     { access = "read-write", path = "./test/foundry/l1/integration/deploy-scripts/script-out/" },
     { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-config/" },
@@ -46,6 +46,7 @@ remappings = [
   "murky/=lib/murky/src/",
   "foundry-test/=test/foundry/",
   "l2-contracts/=../l2-contracts/contracts/",
+    "system-contracts/=../system-contracts/",
   "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
   "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
 ]

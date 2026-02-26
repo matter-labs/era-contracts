@@ -4,54 +4,47 @@ pragma solidity ^0.8.24;
 // solhint-disable no-console, gas-custom-errors
 
 import {stdToml} from "forge-std/StdToml.sol";
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {console2 as console} from "forge-std/Script.sol";
 
-import {Vm} from "forge-std/Vm.sol";
-import {stdJson} from "forge-std/StdJson.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Utils} from "../utils/Utils.sol";
 import {Utils} from "../utils/Utils.sol";
 import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
 import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
-import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {SemVer} from "contracts/common/libraries/SemVer.sol";
+
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
+
 import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
 import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
 import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
+import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
@@ -61,17 +54,23 @@ import {ValidiumL1DAValidator} from "contracts/state-transition/data-availabilit
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
-import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
-import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
-import {StateTransitionDeployedAddresses, DataAvailabilityDeployedAddresses, ChainCreationParamsConfig, BridgehubAddresses, CoreDeployedAddresses} from "../utils/Types.sol";
 
-import {DeployCTML1OrGateway, CTMCoreDeploymentConfig, CTMContract} from "./DeployCTML1OrGateway.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
+import {
+    StateTransitionDeployedAddresses,
+    DataAvailabilityDeployedAddresses,
+    ChainCreationParamsConfig,
+    BridgehubAddresses,
+    CoreDeployedAddresses
+} from "../utils/Types.sol";
+import {ChainCreationParamsLib} from "./ChainCreationParamsLib.sol";
+
+import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
+
 import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
-import {CTMDeployedAddresses, BridgesDeployedAddresses} from "../utils/Types.sol";
+import {CTMDeployedAddresses} from "../utils/Types.sol";
+import {SettlementLayerV31Upgrade} from "contracts/upgrades/SettlementLayerV31Upgrade.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -80,6 +79,7 @@ struct Config {
     uint256 eraChainId;
     uint256 gatewayChainId;
     address ownerAddress;
+    bytes32 zkTokenAssetId;
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
     bool isZKsyncOS;
@@ -123,6 +123,8 @@ abstract contract DeployCTMUtils is DeployUtils {
         ctmAddresses.stateTransition.facets.adminFacet = deploySimpleContract("AdminFacet", false);
         ctmAddresses.stateTransition.facets.mailboxFacet = deploySimpleContract("MailboxFacet", false);
         ctmAddresses.stateTransition.facets.gettersFacet = deploySimpleContract("GettersFacet", false);
+        ctmAddresses.stateTransition.facets.migratorFacet = deploySimpleContract("MigratorFacet", false);
+        ctmAddresses.stateTransition.facets.committerFacet = deploySimpleContract("CommitterFacet", false);
         ctmAddresses.stateTransition.facets.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
@@ -142,7 +144,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;
-        config.deployerAddress = msg.sender;
+        config.deployerAddress = getBroadcasterAddress();
 
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
@@ -154,6 +156,10 @@ abstract contract DeployCTMUtils is DeployUtils {
         if (toml.keyExists("$.is_zk_sync_os")) {
             config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
         }
+        if (toml.keyExists("$.zk_token_asset_id")) {
+            config.zkTokenAssetId = toml.readBytes32("$.zk_token_asset_id");
+        }
+        require(config.zkTokenAssetId != bytes32(0), "zk_token_asset_id must be non-zero in config");
 
         (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesPath);
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
@@ -178,13 +184,13 @@ abstract contract DeployCTMUtils is DeployUtils {
         return ChainCreationParamsLib.getChainCreationParams(_config, config.isZKsyncOS);
     }
 
-    /// @notice Get all four facet cuts
+    /// @notice Get all six facet cuts
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
         // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
         // If we start to use different selectors for Gateway, we should change this.
-        facetCuts = new Diamond.FacetCut[](4);
+        facetCuts = new Diamond.FacetCut[](6);
         facetCuts[0] = Diamond.FacetCut({
             facet: stateTransition.facets.adminFacet,
             action: Diamond.Action.Add,
@@ -208,6 +214,18 @@ abstract contract DeployCTMUtils is DeployUtils {
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getAllSelectors(ctmAddresses.stateTransition.facets.executorFacet.code)
+        });
+        facetCuts[4] = Diamond.FacetCut({
+            facet: stateTransition.facets.migratorFacet,
+            action: Diamond.Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(ctmAddresses.stateTransition.facets.migratorFacet.code)
+        });
+        facetCuts[5] = Diamond.FacetCut({
+            facet: stateTransition.facets.committerFacet,
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(ctmAddresses.stateTransition.facets.committerFacet.code)
         });
     }
 
@@ -248,20 +266,12 @@ abstract contract DeployCTMUtils is DeployUtils {
         ChainCreationParams memory chainCreationParams = getChainCreationParams(stateTransition);
         return
             ChainTypeManagerInitializeData({
-                owner: msg.sender,
+                owner: getBroadcasterAddress(),
                 validatorTimelock: stateTransition.proxies.validatorTimelock,
                 chainCreationParams: chainCreationParams,
                 protocolVersion: config.contracts.chainCreationParams.latestProtocolVersion,
+                verifier: stateTransition.verifiers.verifier,
                 serverNotifier: stateTransition.proxies.serverNotifier
-            });
-    }
-
-    function getVerifierParams() internal returns (VerifierParams memory) {
-        return
-            VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
             });
     }
 
@@ -280,7 +290,6 @@ abstract contract DeployCTMUtils is DeployUtils {
 
         return
             DiamondInitializeDataNewChain({
-                verifier: IVerifier(stateTransition.verifiers.verifier),
                 l2BootloaderBytecodeHash: config.contracts.chainCreationParams.bootloaderHash,
                 l2DefaultAccountBytecodeHash: config.contracts.chainCreationParams.defaultAAHash,
                 l2EvmEmulatorBytecodeHash: config.contracts.chainCreationParams.evmEmulatorHash
@@ -342,6 +351,8 @@ abstract contract DeployCTMUtils is DeployUtils {
                 return type(L1GenesisUpgrade).creationCode;
             } else if (compareStrings(contractName, "ValidatorTimelock")) {
                 return type(ValidatorTimelock).creationCode;
+            } else if (compareStrings(contractName, "PermissionlessValidator")) {
+                return type(PermissionlessValidator).creationCode;
             } else if (compareStrings(contractName, "EraChainTypeManager")) {
                 return type(EraChainTypeManager).creationCode;
             } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
@@ -356,10 +367,16 @@ abstract contract DeployCTMUtils is DeployUtils {
                 return type(MailboxFacet).creationCode;
             } else if (compareStrings(contractName, "GettersFacet")) {
                 return type(GettersFacet).creationCode;
+            } else if (compareStrings(contractName, "MigratorFacet")) {
+                return type(MigratorFacet).creationCode;
+            } else if (compareStrings(contractName, "CommitterFacet")) {
+                return type(CommitterFacet).creationCode;
             } else if (compareStrings(contractName, "DiamondInit")) {
                 return type(DiamondInit).creationCode;
             } else if (compareStrings(contractName, "ServerNotifier")) {
                 return type(ServerNotifier).creationCode;
+            } else if (compareStrings(contractName, "SettlementLayerV31Upgrade")) {
+                return type(SettlementLayerV31Upgrade).creationCode;
             }
         } else {
             if (compareStrings(contractName, "Verifier")) {
@@ -407,6 +424,8 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "SettlementLayerV31Upgrade")) {
+            return abi.encode();
         } else if (compareStrings(contractName, "Governance")) {
             return
                 abi.encode(
@@ -423,6 +442,8 @@ abstract contract DeployCTMUtils is DeployUtils {
             restrictions[0] = ctmAddresses.admin.accessControlRestrictionAddress;
             return abi.encode(restrictions);
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "PermissionlessValidator")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ProxyAdmin")) {
             return abi.encode();
@@ -454,19 +475,20 @@ abstract contract DeployCTMUtils is DeployUtils {
             CTMCoreDeploymentConfig({
                 isZKsyncOS: _config.isZKsyncOS,
                 testnetVerifier: _config.testnetVerifier,
-                eraChainId: _config.eraChainId,
                 l1ChainId: _config.l1ChainId,
                 bridgehubProxy: coreAddresses.bridgehub.proxies.bridgehub,
                 interopCenterProxy: L2_INTEROP_CENTER_ADDR,
                 rollupDAManager: ctmAddresses.daAddresses.rollupDAManager,
                 chainAssetHandler: coreAddresses.bridgehub.proxies.chainAssetHandler,
-                l1BytecodesSupplier: ctmAddresses.stateTransition.bytecodesSupplier,
+                l1BytecodesSupplier: ctmAddresses.stateTransition.proxies.bytecodesSupplier,
                 eip7702Checker: ctmAddresses.admin.eip7702Checker,
                 verifierFflonk: ctmAddresses.stateTransition.verifiers.verifierFflonk,
                 verifierPlonk: ctmAddresses.stateTransition.verifiers.verifierPlonk,
                 // For L1 deployment we need to use the deployer as the owner of the verifier,
-                // because we set the dual verifier later
-                verifierOwner: msg.sender
+                // because we set the dual verifier later. Use getBroadcasterAddress() to get
+                // the actual EOA when this is called from a contract created via `new` during the script.
+                verifierOwner: getBroadcasterAddress(),
+                permissionlessValidator: ctmAddresses.stateTransition.proxies.permissionlessValidator
             });
     }
 
@@ -502,6 +524,10 @@ abstract contract DeployCTMUtils is DeployUtils {
                     ValidatorTimelock.initialize,
                     (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
                 );
+        } else if (compareStrings(contractName, "BytecodesSupplier")) {
+            return abi.encodeCall(BytecodesSupplier.initialize, ());
+        } else if (compareStrings(contractName, "PermissionlessValidator")) {
+            return abi.encodeCall(PermissionlessValidator.initialize, ());
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }
@@ -511,33 +537,9 @@ abstract contract DeployCTMUtils is DeployUtils {
         return ctmAddresses.admin.transparentProxyAdmin;
     }
 
-    function test() internal virtual {}
-}
-
-library ChainCreationParamsLib {
-    using stdJson for string;
-    address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
-    Vm internal constant vm = Vm(VM_ADDRESS);
-
-    function getChainCreationParams(
-        string memory _config,
-        bool isZKsyncOs
-    ) public returns (ChainCreationParamsConfig memory chainCreationParams) {
-        string memory json = vm.readFile(_config);
-        uint32 major = uint32(json.readUint("$.protocol_semantic_version.major"));
-        uint32 minor = uint32(json.readUint("$.protocol_semantic_version.minor"));
-        uint32 patch = uint32(json.readUint("$.protocol_semantic_version.patch"));
-        chainCreationParams.latestProtocolVersion = SemVer.packSemVer(major, minor, patch);
-        chainCreationParams.genesisRoot = json.readBytes32("$.genesis_root");
-        if (isZKsyncOs) {
-            chainCreationParams.genesisBatchCommitment = bytes32(uint256(1));
-        } else {
-            // These fields are used only for zksync era
-            chainCreationParams.genesisRollupLeafIndex = json.readUint("$.genesis_rollup_leaf_index");
-            chainCreationParams.genesisBatchCommitment = json.readBytes32("$.genesis_batch_commitment");
-            chainCreationParams.defaultAAHash = json.readBytes32("$.default_aa_hash");
-            chainCreationParams.bootloaderHash = json.readBytes32("$.bootloader_hash");
-            chainCreationParams.evmEmulatorHash = json.readBytes32("$.evm_emulator_hash");
-        }
+    function getBroadcasterAddress() internal view virtual returns (address) {
+        return tx.origin;
     }
+
+    function test() internal virtual {}
 }

@@ -3,8 +3,16 @@ pragma solidity 0.8.28;
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
-import {IChainTypeManager, ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
-import {GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisUpgradeZero} from "contracts/common/L1ContractErrors.sol";
+import {
+    IChainTypeManager,
+    ChainCreationParams,
+    ChainTypeManagerInitializeData
+} from "contracts/state-transition/IChainTypeManager.sol";
+import {
+    GenesisBatchCommitmentZero,
+    GenesisBatchHashZero,
+    GenesisUpgradeZero
+} from "contracts/common/L1ContractErrors.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
 contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
@@ -25,10 +33,16 @@ contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
             validatorTimelock: validator,
             chainCreationParams: params,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
-        EraChainTypeManager ctm = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0));
+        EraChainTypeManager ctm = new EraChainTypeManager(
+            address(bridgehub),
+            interopCenterAddress,
+            address(0),
+            address(0)
+        );
 
         vm.expectRevert(err);
         TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(

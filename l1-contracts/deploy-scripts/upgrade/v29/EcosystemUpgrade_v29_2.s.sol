@@ -14,12 +14,8 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
-import {DefaultCTMUpgrade} from "../default_upgrade/DefaultCTMUpgrade.s.sol";
+import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 
 /// @notice Script used for v29 -> v29.2 stage patch
 contract EcosystemUpgrade_v29_2 is Script, DefaultCTMUpgrade {

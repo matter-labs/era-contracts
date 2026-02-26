@@ -2,7 +2,7 @@
 pragma solidity ^0.8.18;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {ZeroAddress, InvalidL2DACommitmentScheme} from "../../common/L1ContractErrors.sol";
+import {InvalidL2DACommitmentScheme, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @title The RollupManager contract
@@ -30,7 +30,7 @@ contract RollupDAManager is Ownable2Step {
         }
 
         if (l2DACommitmentScheme == L2DACommitmentScheme.NONE) {
-            revert InvalidL2DACommitmentScheme(uint8(l2DACommitmentScheme));
+            revert InvalidL2DACommitmentScheme(l2DACommitmentScheme);
         }
         _;
     }

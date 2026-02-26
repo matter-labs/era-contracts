@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {PubdataPricingMode, L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {L2DACommitmentScheme, PubdataPricingMode} from "contracts/common/Config.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -42,6 +42,8 @@ interface IAdminFunctions {
         uint256 newProtocolVersion,
         uint256 timestamp
     ) external;
+
+    function upgradeChainFromCTM(address chainAddress, address adminAddr, address accessControlRestriction) external;
 
     function makePermanentRollup(ChainAdmin chainAdmin, address target) external;
 

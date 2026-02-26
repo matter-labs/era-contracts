@@ -9,9 +9,9 @@ import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
 import {LEGACY_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
-import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
+import {IL1CrossChainSender} from "../interfaces/IL1CrossChainSender.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
@@ -22,15 +22,27 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
-import {AddressAlreadySet, LegacyBridgeUsesNonNativeToken, LegacyEncodingUsedForNonL1Token, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {
+    AddressAlreadySet,
+    LegacyBridgeUsesNonNativeToken,
+    LegacyEncodingUsedForNonL1Token,
+    NonEmptyMsgValue,
+    TokenNotSupported,
+    TokensWithFeesNotSupported,
+    Unauthorized,
+    ZeroAddress
+} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../core/bridgehub/IBridgehubBase.sol";
+import {
+    IBridgehubBase,
+    L2TransactionRequestDirect,
+    L2TransactionRequestTwoBridgesInner
+} from "../../core/bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
-import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {TxStatus} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
@@ -268,7 +280,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             });
     }
 
-    /// @inheritdoc IL1AssetRouter
+    /// @inheritdoc IL1CrossChainSender
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,

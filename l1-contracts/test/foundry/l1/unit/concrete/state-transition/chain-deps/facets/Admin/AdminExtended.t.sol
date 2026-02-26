@@ -2,9 +2,23 @@
 pragma solidity 0.8.28;
 
 import "./_Admin_Shared.t.sol";
-import {Unauthorized, DiamondNotFrozen, DenominatorIsZero, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, HashMismatch, ProtocolIdMismatch, InvalidL2DACommitmentScheme} from "contracts/common/L1ContractErrors.sol";
+import {
+    Unauthorized,
+    DiamondNotFrozen,
+    DenominatorIsZero,
+    TooMuchGas,
+    PriorityTxPubdataExceedsMaxPubDataPerBatch,
+    InvalidPubdataPricingMode,
+    HashMismatch,
+    ProtocolIdMismatch,
+    InvalidL2DACommitmentScheme
+} from "contracts/common/L1ContractErrors.sol";
 import {L1DAValidatorAddressIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {FeeParams, PubdataPricingMode, L2DACommitmentScheme} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {
+    FeeParams,
+    PubdataPricingMode,
+    L2DACommitmentScheme
+} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -13,6 +27,19 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 contract AdminExtendedTest is AdminTest {
     function setUp() public override {
         super.setUp();
+
+        utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(1);
+        utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
+        utilsFacet.util_setFeeParams(
+            FeeParams({
+                pubdataPricingMode: PubdataPricingMode.Rollup,
+                batchOverheadL1Gas: 1_000_000,
+                maxPubdataPerBatch: 110_000,
+                maxL2GasPerBatch: 80_000_000,
+                priorityTxMaxPubdata: 99_000,
+                minimalL2GasPrice: 250_000_000
+            })
+        );
     }
 
     function test_SetTokenMultiplier_DenominatorIsZero() public {
@@ -107,10 +134,10 @@ contract AdminExtendedTest is AdminTest {
         utilsFacet.util_setChainTypeManager(address(this));
 
         vm.prank(address(this));
-        adminFacet.setTokenMultiplier(5, 3);
+        adminFacet.setTokenMultiplier(11, 10);
 
-        assertEq(utilsFacet.util_getBaseTokenGasPriceMultiplierNominator(), 5);
-        assertEq(utilsFacet.util_getBaseTokenGasPriceMultiplierDenominator(), 3);
+        assertEq(utilsFacet.util_getBaseTokenGasPriceMultiplierNominator(), 11);
+        assertEq(utilsFacet.util_getBaseTokenGasPriceMultiplierDenominator(), 10);
     }
 
     function test_AcceptAdmin_Unauthorized() public {
@@ -247,6 +274,8 @@ contract AdminExtendedTest is AdminTest {
 
     function testFuzz_SetTokenMultiplier(uint128 nominator, uint128 denominator) public {
         vm.assume(denominator != 0);
+        vm.assume(uint256(nominator) * 10 <= uint256(denominator) * 13);
+        vm.assume(uint256(nominator) * 13 >= uint256(denominator) * 10);
 
         vm.prank(address(dummyBridgehub));
         utilsFacet.util_setChainTypeManager(address(this));

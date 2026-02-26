@@ -16,13 +16,8 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 );
 
 // The value that is saved in the v31UpgradeChainBatchNumber mapping for all deployed chains until the chain upgrades to v31.
-uint256 constant V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY = uint256(
-    keccak256(abi.encodePacked("V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY"))
-);
-
-// The value that is saved in the v31UpgradeChainBatchNumber mapping for all deployed chains until the chain upgrades to v31.
-uint256 constant V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1 = uint256(
-    keccak256(abi.encodePacked("V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1"))
+uint256 constant V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE = uint256(
+    keccak256(abi.encodePacked("V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE"))
 );
 
 /**
@@ -30,11 +25,11 @@ uint256 constant V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1 = uint2
  * @notice MessageRoot contract is responsible for storing and aggregating the roots of the batches from different chains into the MessageRoot.
  * @custom:security-contact security@matterlabs.dev
  */
-interface IMessageRoot is IMessageVerification {
+interface IMessageRootBase is IMessageVerification {
     /// @notice Emitted when a new chain is added to the MessageRoot.
     /// @param chainId The ID of the chain that is being added to the MessageRoot.
     /// @param chainIndex The index of the chain that is being added. Note, that chain where
-    /// the MessageRoot contract was deployed has chainIndex of 0, and this event is not emitted for it.
+    /// the MessageRoot contract was deployed has chainIndex of 0, and this event is being emitted for it.
     event AddedChain(uint256 indexed chainId, uint256 indexed chainIndex);
 
     /// @notice Emitted when a new chain batch root is appended to the chainTree.
@@ -46,13 +41,13 @@ interface IMessageRoot is IMessageVerification {
     /// @notice Emitted when a new chainTree root is produced and its corresponding leaf in sharedTree is updated.
     /// @param chainId The ID of the chain whose chainTree root is being updated.
     /// @param chainRoot The updated Merkle root of the chainTree after appending the latest batch root.
-    /// @param chainIdLeafHash The Merkle leaf value computed from `chainRoot` and the chain’s ID, used to update the shared tree.
+    /// @param chainIdLeafHash The Merkle leaf value computed from `chainRoot` and the chain's ID, used to update the shared tree.
     event NewChainRoot(uint256 indexed chainId, bytes32 chainRoot, bytes32 chainIdLeafHash);
 
     /// @notice Emitted whenever the sharedTree is updated, and the new InteropRoot (root of the sharedTree) is generated.
     /// @param chainId The ID of the chain where the sharedTree was updated.
     /// @param blockNumber The block number of the block in which the sharedTree was updated.
-    /// @param logId The ID of the log emitted when a new InteropRoot. In this release always equal to 0.
+    /// @param logId The ID of the log emitted when a new InteropRoot.
     /// @param sides The "sides" of the interop root. In this release which uses proof-based interop the sides is an array
     /// of length one, which only include the interop root itself. More on that in `L2InteropRootStorage` contract.
     event NewInteropRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
@@ -78,7 +73,9 @@ interface IMessageRoot is IMessageVerification {
         bytes32[] calldata _proof
     ) external pure returns (ProofData memory);
 
-    function setMigratingChainBatchRoot(uint256 _chainId, uint256 _batchNumber) external;
+    function setMigratingChainBatchNumber(uint256 _chainId, uint256 _batchNumber) external;
 
     function currentChainBatchNumber(uint256 _chainId) external view returns (uint256);
+
+    function getMerklePathForChain(uint256 _chainId) external view returns (bytes32[] memory);
 }

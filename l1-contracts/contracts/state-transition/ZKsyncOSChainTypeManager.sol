@@ -3,9 +3,12 @@
 pragma solidity 0.8.28;
 
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
-import {Diamond} from "./libraries/Diamond.sol";
 import {ChainCreationParams} from "./IChainTypeManager.sol";
-import {GenesisBatchHashZero, GenesisBatchCommitmentIncorrect, GenesisUpgradeZero} from "../common/L1ContractErrors.sol";
+import {
+    GenesisBatchHashZero,
+    GenesisBatchCommitmentIncorrect,
+    GenesisUpgradeZero
+} from "../common/L1ContractErrors.sol";
 
 /// @title ZKsync OS Chain Type Manager contract
 /// @author Matter Labs
@@ -15,8 +18,14 @@ contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
     constructor(
         address _bridgehub,
         address _interopCenter,
-        address _l1BytecodesSupplier
-    ) ChainTypeManagerBase(_bridgehub, _interopCenter, _l1BytecodesSupplier) {}
+        address _l1BytecodesSupplier,
+        address _permissionlessValidator
+    ) ChainTypeManagerBase(_bridgehub, _interopCenter, _l1BytecodesSupplier, _permissionlessValidator) {}
+
+    /// @return flag whether CTM is for ZKsync OS or Era VM.
+    function isZKsyncOS() external pure override returns (bool) {
+        return true;
+    }
 
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters
@@ -44,20 +53,5 @@ contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
         if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
             revert GenesisBatchHashZero();
         }
-    }
-
-    /// @dev set New Version with upgrade from old version
-    /// @param _cutData the new diamond cut data
-    /// @param _oldProtocolVersion the old protocol version
-    /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
-    /// @param _newProtocolVersion the new protocol version
-    function setNewVersionUpgrade(
-        Diamond.DiamondCutData calldata _cutData,
-        uint256 _oldProtocolVersion,
-        uint256 _oldProtocolVersionDeadline,
-        uint256 _newProtocolVersion
-    ) external override onlyOwner {
-        // No additional validation needed for ZKsync OS
-        _setNewVersionUpgrade(_cutData, _oldProtocolVersion, _oldProtocolVersionDeadline, _newProtocolVersion);
     }
 }

@@ -33,6 +33,16 @@
                     "name": "validatorTimelock",
                     "type": "address",
                     "internalType": "address"
+                  },
+                  {
+                    "name": "bytecodesSupplier",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "permissionlessValidator",
+                    "type": "address",
+                    "internalType": "address"
                   }
                 ]
               },
@@ -55,6 +65,16 @@
                     "name": "validatorTimelock",
                     "type": "address",
                     "internalType": "address"
+                  },
+                  {
+                    "name": "bytecodesSupplier",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "permissionlessValidator",
+                    "type": "address",
+                    "internalType": "address"
                   }
                 ]
               },
@@ -64,17 +84,17 @@
                 "internalType": "struct Verifiers",
                 "components": [
                   {
-                    "name": "verifier",
-                    "type": "address",
-                    "internalType": "address"
-                  },
-                  {
                     "name": "verifierFflonk",
                     "type": "address",
                     "internalType": "address"
                   },
                   {
                     "name": "verifierPlonk",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "verifier",
                     "type": "address",
                     "internalType": "address"
                   }
@@ -106,6 +126,16 @@
                     "internalType": "address"
                   },
                   {
+                    "name": "migratorFacet",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "committerFacet",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
                     "name": "diamondInit",
                     "type": "address",
                     "internalType": "address"
@@ -129,11 +159,6 @@
               },
               {
                 "name": "eraDiamondProxy",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "bytecodesSupplier",
                 "type": "address",
                 "internalType": "address"
               },
@@ -267,6 +292,11 @@
             "name": "ownerAddress",
             "type": "address",
             "internalType": "address"
+          },
+          {
+            "name": "zkTokenAssetId",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
             "name": "testnetVerifier",

@@ -19,7 +19,7 @@ import {Utils} from "../utils/Utils.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {TxStatus, ConfirmTransferResultData} from "contracts/common/Messaging.sol";
+import {ConfirmTransferResultData, TxStatus} from "contracts/common/Messaging.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayUtils is Script, IGatewayUtils {

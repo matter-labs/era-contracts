@@ -15,11 +15,9 @@ import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {Governance} from "contracts/governance/Governance.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
@@ -29,9 +27,6 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
-import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
-import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
 import {Config, CoreDeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
 import {IDeployL1CoreContracts} from "contracts/script-interfaces/IDeployL1CoreContracts.sol";
@@ -68,6 +63,11 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         return coreAddresses;
     }
 
+    /// @notice Returns the address to use as the deployer/owner for contracts.
+    function getDeployerAddress() public view returns (address) {
+        return tx.origin;
+    }
+
     function getConfig() public view returns (Config memory) {
         return config;
     }
@@ -98,6 +98,10 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridgehub.implementations.bridgehub,
             coreAddresses.bridgehub.proxies.bridgehub
         ) = deployTuppWithContract("L1Bridgehub", false);
+        (
+            coreAddresses.bridgehub.implementations.chainAssetHandler,
+            coreAddresses.bridgehub.proxies.chainAssetHandler
+        ) = deployTuppWithContract("L1ChainAssetHandler", false);
         (
             coreAddresses.bridgehub.implementations.messageRoot,
             coreAddresses.bridgehub.proxies.messageRoot
@@ -141,10 +145,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         ) = deployTuppWithContract("CTMDeploymentTracker", false);
 
         (
-            coreAddresses.bridgehub.implementations.chainAssetHandler,
-            coreAddresses.bridgehub.proxies.chainAssetHandler
-        ) = deployTuppWithContract("L1ChainAssetHandler", false);
-        (
             coreAddresses.bridgehub.implementations.chainRegistrationSender,
             coreAddresses.bridgehub.proxies.chainRegistrationSender
         ) = deployTuppWithContract("ChainRegistrationSender", false);
@@ -158,34 +158,35 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
 
     function setBridgehubParams() internal {
         IL1Bridgehub bridgehub = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
-        IMessageRoot messageRoot = IMessageRoot(coreAddresses.bridgehub.proxies.messageRoot);
         IL1AssetTracker assetTracker = L1AssetTracker(coreAddresses.bridgehub.proxies.assetTracker);
-        vm.startBroadcast(msg.sender);
+        L1ChainAssetHandler chainAssetHandler = L1ChainAssetHandler(coreAddresses.bridgehub.proxies.chainAssetHandler);
+        vm.startBroadcast(getDeployerAddress());
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         BridgehubBase(address(bridgehub)).setAddresses(
             coreAddresses.bridges.proxies.l1AssetRouter,
             ICTMDeploymentTracker(coreAddresses.bridgehub.proxies.ctmDeploymentTracker),
-            IMessageRoot(coreAddresses.bridgehub.proxies.messageRoot),
+            IMessageRootBase(coreAddresses.bridgehub.proxies.messageRoot),
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             coreAddresses.bridgehub.proxies.chainRegistrationSender
         );
         assetTracker.setAddresses();
+        chainAssetHandler.setAddresses();
         vm.stopBroadcast();
         console.log("SharedBridge registered");
     }
 
     function updateSharedBridge() internal {
         IL1AssetRouter sharedBridge = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
-        vm.broadcast(msg.sender);
+        vm.broadcast(getDeployerAddress());
         sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(coreAddresses.bridges.proxies.erc20Bridge));
         console.log("SharedBridge updated with ERC20Bridge address");
 
         L1NativeTokenVault ntv = L1NativeTokenVault(payable(coreAddresses.bridges.proxies.l1NativeTokenVault));
-        vm.broadcast(msg.sender);
+        vm.broadcast(getDeployerAddress());
         ntv.setAssetTracker(coreAddresses.bridgehub.proxies.assetTracker);
         console.log("L1NativeTokenVault updated with AssetTracker address");
 
-        vm.broadcast(msg.sender);
+        vm.broadcast(getDeployerAddress());
         IL1NativeTokenVault(coreAddresses.bridges.proxies.l1NativeTokenVault).registerEthToken();
     }
 
@@ -193,16 +194,16 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         IL1AssetRouter sharedBridge = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
         IL1Nullifier l1Nullifier = IL1Nullifier(coreAddresses.bridges.proxies.l1Nullifier);
         // Ownable ownable = Ownable(coreAddresses.bridges.proxies.l1AssetRouter);
-        vm.broadcast(msg.sender);
+        vm.broadcast(getDeployerAddress());
         sharedBridge.setNativeTokenVault(INativeTokenVaultBase(coreAddresses.bridges.proxies.l1NativeTokenVault));
-        vm.broadcast(msg.sender);
+        vm.broadcast(getDeployerAddress());
         l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(coreAddresses.bridges.proxies.l1NativeTokenVault));
-        vm.broadcast(msg.sender);
+        vm.broadcast(getDeployerAddress());
         l1Nullifier.setL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
     }
 
     function updateOwners() internal {
-        vm.startBroadcast(msg.sender);
+        vm.startBroadcast(getDeployerAddress());
 
         IL1Bridgehub bridgehub = IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub);
         IOwnable(address(bridgehub)).transferOwnership(coreAddresses.shared.governance);

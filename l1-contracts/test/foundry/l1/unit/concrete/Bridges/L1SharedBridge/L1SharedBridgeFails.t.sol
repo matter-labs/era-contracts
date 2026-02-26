@@ -8,7 +8,10 @@ import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {
+    NEW_ENCODING_VERSION,
+    SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION
+} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -16,20 +19,47 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import {AddressAlreadySet, AssetIdNotSupported, BurningNativeWETHNotSupported, DepositDoesNotExist, DepositExists, EmptyDeposit, InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength, NoFundsTransferred, NonEmptyMsgValue, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, WithdrawFailed, WithdrawalAlreadyFinalized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {
+    AddressAlreadySet,
+    AssetIdNotSupported,
+    BurningNativeWETHNotSupported,
+    DepositDoesNotExist,
+    DepositExists,
+    EmptyDeposit,
+    InvalidProof,
+    InvalidSelector,
+    L2WithdrawalMessageWrongLength,
+    NoFundsTransferred,
+    NonEmptyMsgValue,
+    SharedBridgeKey,
+    SharedBridgeValueNotSet,
+    TokenNotSupported,
+    TokensWithFeesNotSupported,
+    Unauthorized,
+    ValueMismatch,
+    WithdrawFailed,
+    WithdrawalAlreadyFinalized,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
 import {InsufficientChainBalance} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
-import {ClaimFailedDepositFailed, EmptyToken, NativeTokenVaultAlreadySet, WrongCounterpart} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {
+    ClaimFailedDepositFailed,
+    EmptyToken,
+    NativeTokenVaultAlreadySet,
+    WrongCounterpart
+} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
+
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
 /// We are testing all the specified revert and require cases.
@@ -252,7 +282,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_finalizeWithdrawal_EthOnEth_withdrawalFailed() public {
         vm.deal(address(nativeTokenVault), 0);
-        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -682,7 +712,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_finalizeWithdrawal_chainBalance() public {
-        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -716,7 +746,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_checkWithdrawal_wrongProof() public {
-        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -749,7 +779,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_parseL2WithdrawalMessage_wrongMsgLength() public {
-        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector);
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector);
 
         vm.expectRevert(abi.encodeWithSelector(L2WithdrawalMessageWrongLength.selector, message.length));
         sharedBridge.finalizeWithdrawal({

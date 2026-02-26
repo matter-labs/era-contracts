@@ -5,14 +5,13 @@ pragma solidity 0.8.28;
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
-import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER} from "../../common/Config.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL2Bridgehub} from "./IL2Bridgehub.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {NotInGatewayMode, NotRelayedSender} from "./L1BridgehubErrors.sol";
 
@@ -120,7 +119,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// @notice Used to forward a transaction on the gateway to the chains mailbox.
     /// @param _chainId the chainId of the chain
     /// @param _canonicalTxHash the canonical transaction hash
-    /// @param _expirationTimestamp the expiration timestamp for the transaction
+    /// @param _expirationTimestamp Deprecated, always 0.
     function forwardTransactionOnGateway(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
@@ -137,7 +136,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     function setAddresses(
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
-        IMessageRoot _messageRoot,
+        IMessageRootBase _messageRoot,
         address _chainAssetHandler,
         address _chainRegistrationSender
     ) external override onlyOwnerOrUpgrader {

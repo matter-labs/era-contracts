@@ -17,7 +17,7 @@ import {CTMDeploymentTracker} from "contracts/core/ctm-deployment/CTMDeploymentT
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {CoreDeployedAddresses} from "../../../../deploy-scripts/ecosystem/DeployL1CoreUtils.s.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
-import {Config, CTMDeployedAddresses} from "../../../../deploy-scripts/ctm/DeployCTMUtils.s.sol";
+import {CTMDeployedAddresses, Config} from "../../../../deploy-scripts/ctm/DeployCTMUtils.s.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 contract L1ContractDeployer is UtilsCallMockerTest {

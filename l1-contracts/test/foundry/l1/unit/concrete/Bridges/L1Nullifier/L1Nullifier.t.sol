@@ -9,10 +9,10 @@ import {ERC20} from "@openzeppelin/contracts-v4/token/ERC20/ERC20.sol";
 
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {IMessageRoot} from "contracts/core/message-root/IMessageRoot.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
+
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
@@ -20,10 +20,17 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {NEW_ENCODING_VERSION, LEGACY_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
-import {AddressAlreadySet, DepositDoesNotExist, DepositExists, LegacyMethodForNonL1Token, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {NativeTokenVaultAlreadySet, EthAlreadyMigratedToL1NTV} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {
+    AddressAlreadySet,
+    DepositDoesNotExist,
+    DepositExists,
+    LegacyMethodForNonL1Token,
+    Unauthorized,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
+import {EthAlreadyMigratedToL1NTV, NativeTokenVaultAlreadySet} from "contracts/bridge/L1BridgeContractErrors.sol";
 
 contract TestERC20 is ERC20 {
     constructor() ERC20("Test Token", "TEST") {
@@ -70,7 +77,7 @@ contract L1NullifierTest is Test {
 
         l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
-            _messageRoot: IMessageRoot(messageRoot),
+            _messageRoot: IMessageRootBase(messageRoot),
             _interopCenter: IInteropCenter(interopCenter),
             _eraChainId: ERA_CHAIN_ID,
             _eraDiamondProxy: eraDiamondProxy
@@ -96,7 +103,7 @@ contract L1NullifierTest is Test {
     function test_Initialize_RevertWhen_OwnerIsZeroAddress() public {
         L1NullifierDev impl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
-            _messageRoot: IMessageRoot(messageRoot),
+            _messageRoot: IMessageRootBase(messageRoot),
             _interopCenter: IInteropCenter(interopCenter),
             _eraChainId: ERA_CHAIN_ID,
             _eraDiamondProxy: eraDiamondProxy

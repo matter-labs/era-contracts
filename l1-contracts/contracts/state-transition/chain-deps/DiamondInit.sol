@@ -4,12 +4,28 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {ZKChainBase} from "./facets/ZKChainBase.sol";
-import {DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_BATCH_OVERHEAD_L1_GAS, DEFAULT_MAX_PUBDATA_PER_BATCH, DEFAULT_MAX_L2_GAS_PER_BATCH, DEFAULT_PRIORITY_TX_MAX_PUBDATA, DEFAULT_MINIMAL_L2_GAS_PRICE, DEFAULT_PUBDATA_PRICING_MODE, DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT} from "../../common/Config.sol";
+import {
+    DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH,
+    L2_TO_L1_LOG_SERIALIZE_SIZE,
+    DEFAULT_BATCH_OVERHEAD_L1_GAS,
+    DEFAULT_MAX_PUBDATA_PER_BATCH,
+    DEFAULT_MAX_L2_GAS_PER_BATCH,
+    DEFAULT_PRIORITY_TX_MAX_PUBDATA,
+    DEFAULT_MINIMAL_L2_GAS_PRICE,
+    DEFAULT_PUBDATA_PRICING_MODE,
+    DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT
+} from "../../common/Config.sol";
 import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
+import {IVerifier} from "../chain-interfaces/IVerifier.sol";
+import {IChainTypeManager} from "../IChainTypeManager.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
 import {EmptyAssetId, EmptyBytes32, ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_TRACKER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR
+} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
@@ -35,9 +51,6 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     function initialize(
         InitializeData calldata _initializeData
     ) public virtual reentrancyGuardInitializer returns (bytes32) {
-        if (address(_initializeData.verifier) == address(0)) {
-            revert ZeroAddress();
-        }
         if (_initializeData.admin == address(0)) {
             revert ZeroAddress();
         }
@@ -84,7 +97,15 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.baseTokenAssetId = _initializeData.baseTokenAssetId;
         s.protocolVersion = _initializeData.protocolVersion;
 
-        s.verifier = _initializeData.verifier;
+        // Fetch verifier from CTM based on protocol version to keep CTM as the single source of truth
+        // and avoid including the verifier address in the diamond cut init calldata.
+        address verifier = IChainTypeManager(_initializeData.chainTypeManager).protocolVersionVerifier(
+            _initializeData.protocolVersion
+        );
+        if (verifier == address(0)) {
+            revert ZeroAddress();
+        }
+        s.verifier = IVerifier(verifier);
         s.admin = _initializeData.admin;
         s.validators[_initializeData.validatorTimelock] = true;
 
@@ -93,6 +114,8 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.l2DefaultAccountBytecodeHash = _initializeData.l2DefaultAccountBytecodeHash;
         s.l2EvmEmulatorBytecodeHash = _initializeData.l2EvmEmulatorBytecodeHash;
         s.priorityTxMaxGasLimit = DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT;
+        s.priorityModeInfo.permissionlessValidator = IChainTypeManager(_initializeData.chainTypeManager)
+            .PERMISSIONLESS_VALIDATOR();
         s.feeParams = FeeParams({
             pubdataPricingMode: DEFAULT_PUBDATA_PRICING_MODE,
             batchOverheadL1Gas: DEFAULT_BATCH_OVERHEAD_L1_GAS,
@@ -104,6 +127,10 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.priorityTree.setup(s.__DEPRECATED_priorityQueue.getTotalPriorityTxs());
         s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
         s.zksyncOS = IS_ZKSYNC_OS;
+
+        // All new chains (both ZKsync OS ones and not) have the totalSupply tracked for the base token of the chain.
+        // The only exception are the legacy ZKsync OS chains.
+        s.baseTokenHasTotalSupply = true;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages

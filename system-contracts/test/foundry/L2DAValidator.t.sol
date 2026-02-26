@@ -8,8 +8,9 @@ import {TestStateDiffComposer} from "./TestStateDiffComposer.sol";
 
 import {L2DAValidatorTester} from "contracts/test-contracts/L2DAValidatorTester.sol";
 
-import {STATE_DIFF_ENTRY_SIZE, COMPRESSOR_CONTRACT, PUBDATA_CHUNK_PUBLISHER, L2DACommitmentScheme} from "contracts/Constants.sol";
-import {ReconstructionMismatch, PubdataField, InvalidDACommitmentScheme} from "contracts/SystemContractErrors.sol";
+import {L2DACommitmentScheme, STATE_DIFF_ENTRY_SIZE} from "contracts/Constants.sol";
+import {COMPRESSOR_CONTRACT, PUBDATA_CHUNK_PUBLISHER} from "contracts/Contracts.sol";
+import {InvalidDACommitmentScheme, PubdataField, ReconstructionMismatch} from "contracts/SystemContractErrors.sol";
 
 contract L2DAValidatorTest is Test {
     L2DAValidatorTester internal l2DAValidator;

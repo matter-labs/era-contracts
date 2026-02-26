@@ -2,9 +2,9 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L2Log, L2Message, TxStatus} from "../../common/Messaging.sol";
+import {L2Log, L2Message, TokenBridgingData, TxStatus} from "../../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 
 struct L2TransactionRequestDirect {
@@ -41,7 +41,7 @@ struct L2TransactionRequestTwoBridgesInner {
 
 struct BridgehubMintCTMAssetData {
     uint256 chainId;
-    bytes32 baseTokenAssetId;
+    TokenBridgingData baseTokenBridgingData;
     uint256 batchNumber;
     bytes ctmData;
     bytes chainData;
@@ -72,7 +72,7 @@ interface IBridgehubBase {
         address sender
     );
 
-    event SettlementLayerRegistered(uint256 indexed chainId, bool indexed isWhitelisted);
+    event SettlementLayerRegistered(uint256 indexed chainId, bool isWhitelisted);
 
     event NewChain(uint256 indexed chainId, address chainTypeManager, address indexed chainGovernance);
 
@@ -101,7 +101,7 @@ interface IBridgehubBase {
 
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
-    function messageRoot() external view returns (IMessageRoot);
+    function messageRoot() external view returns (IMessageRootBase);
 
     function getZKChain(uint256 _chainId) external view returns (address);
 
@@ -181,7 +181,7 @@ interface IBridgehubBase {
     function forwardedBridgeMint(
         bytes32 _assetId,
         uint256 _chainId,
-        bytes32 _baseTokenAssetId
+        TokenBridgingData calldata _baseTokenBridgingData
     ) external returns (address zkChain, address ctm);
 
     function registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) external;

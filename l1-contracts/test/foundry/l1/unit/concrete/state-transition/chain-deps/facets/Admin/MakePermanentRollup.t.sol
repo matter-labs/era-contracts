@@ -11,17 +11,15 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
-import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {Unauthorized, AlreadyPermanentRollup, InvalidDAForPermanentRollup} from "contracts/common/L1ContractErrors.sol";
+
+import {AlreadyPermanentRollup, InvalidDAForPermanentRollup, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract MakePermanentRollupTest is AdminTest {
     RollupDAManager internal rollupDAManager;
     address internal l1DAValidator;
 
     function getExtendedAdminSelectors() internal pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](18);
+        bytes4[] memory selectors = new bytes4[](16);
         uint256 i = 0;
         selectors[i++] = IAdmin.setPendingAdmin.selector;
         selectors[i++] = IAdmin.acceptAdmin.selector;
@@ -34,8 +32,6 @@ contract MakePermanentRollupTest is AdminTest {
         selectors[i++] = IAdmin.executeUpgrade.selector;
         selectors[i++] = IAdmin.freezeDiamond.selector;
         selectors[i++] = IAdmin.unfreezeDiamond.selector;
-        selectors[i++] = IAdmin.pauseDepositsBeforeInitiatingMigration.selector;
-        selectors[i++] = IAdmin.unpauseDeposits.selector;
         selectors[i++] = IAdmin.setTransactionFilterer.selector;
         selectors[i++] = IAdmin.setPubdataPricingMode.selector;
         selectors[i++] = IAdmin.setDAValidatorPair.selector;
@@ -56,7 +52,7 @@ contract MakePermanentRollupTest is AdminTest {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](2);
         // Use the ERA chain id (block.chainid) as L1 chain id so onlyL1 passes
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new AdminFacet(block.chainid, rollupDAManager, false)),
+            facet: address(new AdminFacet(block.chainid, rollupDAManager)),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: getExtendedAdminSelectors()
@@ -70,7 +66,8 @@ contract MakePermanentRollupTest is AdminTest {
 
         dummyBridgehub = new DummyBridgehub();
         mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), bytes32(0));
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, address(dummyBridgehub));
+        mockChainTypeManagerVerifier(testnetVerifier);
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, address(dummyBridgehub));
         adminFacet = IAdmin(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }

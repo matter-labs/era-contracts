@@ -19,11 +19,27 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 
 import {EmptyToken, TokenAlreadyInBridgedTokensList} from "../L1BridgeContractErrors.sol";
-import {AddressMismatch, AmountMustBeGreaterThanZero, AssetIdAlreadyRegistered, AssetIdMismatch, BurningNativeWETHNotSupported, DeployingBridgedTokenForNativeToken, EmptyDeposit, NonEmptyMsgValue, TokenNotLegacy, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {
+    AddressMismatch,
+    AmountMustBeGreaterThanZero,
+    AssetIdAlreadyRegistered,
+    AssetIdMismatch,
+    BurningNativeWETHNotSupported,
+    DeployingBridgedTokenForNativeToken,
+    EmptyDeposit,
+    NonEmptyMsgValue,
+    TokenNotLegacy,
+    TokenNotSupported,
+    TokensWithFeesNotSupported,
+    Unauthorized,
+    ValueMismatch,
+    ZeroAddress
+} from "../../common/L1ContractErrors.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 
 /// @author Matter Labs
@@ -33,6 +49,7 @@ import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 abstract contract NativeTokenVaultBase is
     INativeTokenVaultBase,
     IAssetHandler,
+    ReentrancyGuard,
     Ownable2StepUpgradeable,
     PausableUpgradeable,
     AssetHandlerModifiers
@@ -55,18 +72,27 @@ abstract contract NativeTokenVaultBase is
     IBeacon public bridgedTokenBeacon;
 
     /// @dev A mapping assetId => originChainId
+    /// @dev It is assumed, that `originChainId`, `tokenAddress` and `assetId`
+    /// mappings are always atomically populated
     mapping(bytes32 assetId => uint256 originChainId) public originChainId;
 
     /// @dev A mapping assetId => tokenAddress
+    /// @dev It is assumed, that `originChainId`, `tokenAddress` and `assetId`
+    /// mappings are always atomically populated
     mapping(bytes32 assetId => address tokenAddress) public tokenAddress;
 
     /// @dev A mapping tokenAddress => assetId
+    /// @dev It is assumed, that `originChainId`, `tokenAddress` and `assetId`
+    /// mappings are always atomically populated
     mapping(address tokenAddress => bytes32 assetId) public assetId;
 
     /// @dev The number of bridged tokens.
     uint256 public bridgedTokensCount;
 
-    /// @dev The mapping of bridged tokens, count => assetId
+    /// @dev The mapping of bridged tokens, count => assetId.
+    /// @dev Note, that this mapping includes not only "bridged" assets, but also native ones
+    /// that were bridged to the other chains as well. For L2 chains it does not include the "base token"
+    /// system contract address.
     mapping(uint256 count => bytes32 assetId) public bridgedTokens;
 
     /// @dev Used to record the index of the bridged token in the bridgedTokens array.
@@ -124,7 +150,6 @@ abstract contract NativeTokenVaultBase is
         bytes32 currentAssetId = assetId[_nativeToken];
         if (currentAssetId == bytes32(0)) {
             tokenAssetId = _registerToken(_nativeToken);
-            _assetTracker().registerNewToken(tokenAssetId, block.chainid);
         } else {
             tokenAssetId = currentAssetId;
         }
@@ -138,7 +163,8 @@ abstract contract NativeTokenVaultBase is
         if (tokenAssetId == bytes32(0)) {
             revert TokenNotLegacy();
         }
-        if (tokenIndex[tokenAssetId] != 0) {
+        uint256 index = tokenIndex[tokenAssetId];
+        if (index != 0 || (index == 0 && bridgedTokens[index] == tokenAssetId)) {
             revert TokenAlreadyInBridgedTokensList();
         }
         _addTokenToTokensList(tokenAssetId);
@@ -159,6 +185,15 @@ abstract contract NativeTokenVaultBase is
     /// @param _chainId The chainId that the message is from.
     /// @param _assetId The assetId of the asset being bridged.
     /// @param _data The abi.encoded transfer data.
+    /// @dev Note, the `_data` is provided by the potentially malicious `_chainId`. The best way to treat
+    /// the security of this function is "_chainId sent a message that _assetId needs to be minted with _data".
+    /// The following checks are applied to ensure safety:
+    /// - assetIdcheck must be performed. It does not verify the metadata.
+    /// - metadata not being verified is a known issue and will be addressed in the future releases. In the short term, we only expect
+    /// chains with decently trusted chain type managers. This issue might affect the user experience, but never lead
+    /// to loss of funds.
+    /// - To ensure no loss of funds, L1NativeTokenVault should track the balances using L1AssetTracker, while the L2NativeTokenVault trusts
+    /// the GWAssetTracker to track balances in case of interops and its L1 implementation to provide the valid data for `bridgeMint` in case of deposits.
     function bridgeMint(
         uint256 _chainId,
         bytes32 _assetId,
@@ -291,7 +326,7 @@ abstract contract NativeTokenVaultBase is
     function _decodeBurnAndCheckAssetId(
         bytes calldata _data,
         bytes32 _suppliedAssetId
-    ) internal returns (uint256 amount, address receiver, address parsedTokenAddress) {
+    ) internal view returns (uint256 amount, address receiver, address parsedTokenAddress) {
         (amount, receiver, parsedTokenAddress) = DataEncoding.decodeBridgeBurnData(_data);
 
         if (parsedTokenAddress == address(0)) {
@@ -421,20 +456,21 @@ abstract contract NativeTokenVaultBase is
         bytes32 _assetId,
         address _originalCaller
     ) internal {
+        // Note, that in order to track `totalPreV31TotalSupply` correctly in L2AssetTracker,
+        // we have to call it before any balance changes will be performed.
+        _handleBridgeToChain(_chainId, _assetId, _depositAmount);
+
         if (_assetId == _baseTokenAssetId()) {
             require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
             if (_isBridgedToken) {
                 // slither-disable-next-line arbitrary-send-eth
-                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: msg.value}();
+                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: msg.value}(_chainId);
             }
-            _handleBridgeToChain(_chainId, _assetId, _depositAmount);
         } else {
             require(msg.value == 0, NonEmptyMsgValue());
             if (_isBridgedToken) {
                 IBridgedStandardToken(_tokenAddress).bridgeBurn(_originalCaller, _depositAmount);
-                _handleBridgeToChain(_chainId, _assetId, _depositAmount);
             } else {
-                _handleBridgeToChain(_chainId, _assetId, _depositAmount);
                 if (!_depositChecked) {
                     uint256 expectedDepositAmount = _depositFunds(
                         _originalCaller,
@@ -554,7 +590,11 @@ abstract contract NativeTokenVaultBase is
         assetId[_tokenAddress] = _assetId;
         originChainId[_assetId] = _originChainId;
         _addTokenToTokensList(_assetId);
-        _assetTracker().registerNewToken(_assetId, _originChainId);
+        // Note, that it might be possible that the token is registered on the asset tracker, but not on the
+        // native token vault. An example is when a token is automatically registered for a token that is native to L2
+        // and moves its balance to ZK Gateway in order to use it for interop (i.e. registration got triggered, but the native
+        // token vault was never called since there was no actual withdrawal of the asset).
+        _assetTracker().registerNewTokenIfNeeded(_assetId, _originChainId);
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.

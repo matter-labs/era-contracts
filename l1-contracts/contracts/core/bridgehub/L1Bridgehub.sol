@@ -5,21 +5,32 @@ pragma solidity 0.8.28;
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
-import {ETH_TOKEN_ADDRESS, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
+import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 import {IL1Bridgehub} from "./IL1Bridgehub.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehubBase.sol";
+import {
+    L2TransactionRequestDirect,
+    L2TransactionRequestTwoBridgesOuter,
+    L2TransactionRequestTwoBridgesInner
+} from "./IBridgehubBase.sol";
 import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {IAssetRouterShared} from "../../bridge/asset-router/IAssetRouterShared.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "../message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 import {SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
 import {SettlementLayersMustSettleOnL1} from "../../common/L1ContractErrors.sol";
-import {ChainIdAlreadyExists, ChainIdMismatch, IncorrectBridgeHubAddress, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {
+    ChainIdAlreadyExists,
+    ChainIdMismatch,
+    IncorrectBridgeHubAddress,
+    MsgValueMismatch,
+    WrongMagicValue,
+    ZeroAddress
+} from "../../common/L1ContractErrors.sol";
 import {IL1CrossChainSender} from "../../bridge/interfaces/IL1CrossChainSender.sol";
 
 /// @author Matter Labs
@@ -62,11 +73,6 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         _initializeInner();
     }
 
-    /// @notice Used to initialize the contract on L1
-    function initializeV2() external initializer {
-        _initializeInner();
-    }
-
     /// @dev Returns the asset ID of ETH token for internal use.
     function _ethTokenAssetId() internal view override returns (bytes32) {
         return ETH_TOKEN_ASSET_ID;
@@ -82,15 +88,15 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         return L1_CHAIN_ID;
     }
 
-    /// @notice Used to register a chain as a settlement layer.
-    /// @param _newSettlementLayerChainId the chainId of the chain
-    /// @param _isWhitelisted whether the chain is a whitelisted settlement layer
-    function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external onlyOwner {
-        if (settlementLayer[_newSettlementLayerChainId] != block.chainid) {
+    /// @notice Sets the whitelist status of a settlement layer.
+    /// @param _settlementLayerChainId the chainId of the settlement layer
+    /// @param _isWhitelisted whether the settlement layer should be whitelisted
+    function setSettlementLayerStatus(uint256 _settlementLayerChainId, bool _isWhitelisted) external onlyOwner {
+        if (settlementLayer[_settlementLayerChainId] != block.chainid) {
             revert SettlementLayersMustSettleOnL1();
         }
-        whitelistedSettlementLayers[_newSettlementLayerChainId] = _isWhitelisted;
-        emit SettlementLayerRegistered(_newSettlementLayerChainId, _isWhitelisted);
+        whitelistedSettlementLayers[_settlementLayerChainId] = _isWhitelisted;
+        emit SettlementLayerRegistered(_settlementLayerChainId, _isWhitelisted);
     }
 
     /// @notice Register new chain. New chains can be only registered on Bridgehub deployed on L1. Later they can be moved to any other layer.
@@ -111,7 +117,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         address _admin,
         bytes calldata _initData,
         bytes[] calldata _factoryDeps
-    ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256) {
+    ) external onlyOwnerOrAdmin nonReentrant whenNotPaused returns (uint256 chainId) {
         _validateChainParams({_chainId: _chainId, _assetId: _baseTokenAssetId, _chainTypeManager: _chainTypeManager});
 
         chainTypeManager[_chainId] = _chainTypeManager;
@@ -263,7 +269,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     function setAddresses(
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
-        IMessageRoot _messageRoot,
+        IMessageRootBase _messageRoot,
         address _chainAssetHandler,
         address _chainRegistrationSender
     ) external override onlyOwnerOrUpgrader {

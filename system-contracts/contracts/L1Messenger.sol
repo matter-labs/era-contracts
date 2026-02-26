@@ -9,7 +9,15 @@ import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {L2DAValidator} from "./libraries/L2DAValidator.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {COMPUTATIONAL_PRICE_FOR_PUBDATA, KNOWN_CODE_STORAGE_CONTRACT, L2_MESSAGE_ROOT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, L2_TO_L1_LOG_SERIALIZE_SIZE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, SYSTEM_CONTEXT_CONTRACT, SystemLogKey, L2DACommitmentScheme} from "./Constants.sol";
+import {
+    COMPUTATIONAL_PRICE_FOR_PUBDATA,
+    L2_TO_L1_LOGS_MERKLE_TREE_LEAVES,
+    L2_TO_L1_LOG_SERIALIZE_SIZE,
+    L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
+    SystemLogKey,
+    L2DACommitmentScheme
+} from "./Constants.sol";
+import {KNOWN_CODE_STORAGE_CONTRACT, L2_MESSAGE_ROOT, SYSTEM_CONTEXT_CONTRACT} from "./Contracts.sol";
 import {PubdataField, ReconstructionMismatch, TooManyL2ToL1Logs} from "./SystemContractErrors.sol";
 import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
 
@@ -153,11 +161,9 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         // - at most 1 time keccakGasCost(64) when building the Merkle tree (as merkle tree can contain
         // ~2*N nodes, where the first N nodes are leaves the hash of which is calculated on the previous step).
         uint256 gasToPay = keccakGasCost(L2_TO_L1_LOG_SERIALIZE_SIZE) +
-            3 *
-            keccakGasCost(64) +
+            3 * keccakGasCost(64) +
             gasSpentOnMessageHashing +
-            COMPUTATIONAL_PRICE_FOR_PUBDATA *
-            pubdataLen;
+            COMPUTATIONAL_PRICE_FOR_PUBDATA * pubdataLen;
         SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), uint32(pubdataLen));
 
         emit L1MessageSent(msg.sender, hash, _message);
@@ -181,8 +187,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         // We need to charge cost of hashing, as it will be used in `publishPubdataAndClearState`
         uint256 gasToPay = sha256GasCost(bytecodeLen) +
             keccakGasCost(64) +
-            COMPUTATIONAL_PRICE_FOR_PUBDATA *
-            pubdataLen;
+            COMPUTATIONAL_PRICE_FOR_PUBDATA * pubdataLen;
         SystemContractHelper.burnGas(Utils.safeCastToU32(gasToPay), uint32(pubdataLen));
 
         emit BytecodeL1PublicationRequested(_bytecodeHash);
@@ -327,8 +332,8 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
 
         // Pubdata-related input, includes logs, messages, bytecodes, compressed and uncompressed state diffs
         // encoded as `bytes`, so it has offset and length
-        uint256 operatorDataOffset = 4 + uint256(bytes32(_operatorInput[4 + 32 * 4:4 + 32 * 4 + 32]));
-        uint256 operatorDataLength = uint256(bytes32(_operatorInput[operatorDataOffset:operatorDataOffset + 32]));
+        uint256 operatorDataOffset = 4 + offset;
+        uint256 operatorDataLength = length;
 
         // Validate pubdata and make commitment. Logs are not checked since we already checked them above.
         // Does nothing if commitment scheme is EMPTY_NO_DA.

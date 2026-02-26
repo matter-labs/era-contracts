@@ -15,7 +15,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
-import {TokenMetadata, TokenBridgingData} from "../common/Messaging.sol";
+import {TokenBridgingData, TokenMetadata} from "../common/Messaging.sol";
 
 /// @title L1FixedForceDeploymentsHelper
 /// @author Matter Labs
