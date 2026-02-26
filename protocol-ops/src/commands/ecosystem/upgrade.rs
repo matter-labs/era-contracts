@@ -13,7 +13,7 @@ use crate::common::logger;
 use crate::utils::paths;
 
 /// Build cast-ready transaction list from a forge run payload (broadcast JSON).
-/// Each item has "to", "data", "value" (normalized for cast), and optional "gasLimit".
+/// Each item has "to", "data", "value" (normalized for cast).
 fn run_payload_to_cast_transactions(payload: &Value) -> Vec<Value> {
     let txs = match payload.get("transactions").and_then(|t| t.as_array()) {
         Some(a) => a,
@@ -39,21 +39,7 @@ fn run_payload_to_cast_transactions(payload: &Value) -> Vec<Value> {
                 .or_else(|| v.as_u64().map(|n| n.to_string()))
         }).unwrap_or_else(|| "0".to_string());
         let value = normalize_cast_value(&value_raw);
-        let mut obj = json!({ "to": to, "data": data, "value": value });
-        if let Some(g) = params
-            .get("gasLimit")
-            .or_else(|| params.get("gas"))
-            .and_then(|v| {
-                v.get("hex")
-                    .and_then(|h| h.as_str())
-                    .map(String::from)
-                    .or_else(|| v.as_str().map(String::from))
-                    .or_else(|| v.as_u64().map(|n| n.to_string()))
-            })
-        {
-            obj["gasLimit"] = json!(g);
-        }
-        out.push(obj);
+        out.push(json!({ "to": to, "data": data, "value": value }));
     }
     out
 }
