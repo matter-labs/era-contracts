@@ -1,14 +1,144 @@
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use anyhow::Context;
 use clap::Parser;
 use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use xshell::Shell;
 
+use crate::common::forge::{resolve_execution, Forge, ForgeRunner, ForgeScriptArg};
 use crate::common::logger;
 use crate::utils::paths;
+
+/// Build cast-ready transaction list from a forge run payload (broadcast JSON).
+/// Each item has "to", "data", "value" (normalized for cast), and optional "gasLimit".
+fn run_payload_to_cast_transactions(payload: &Value) -> Vec<Value> {
+    let txs = match payload.get("transactions").and_then(|t| t.as_array()) {
+        Some(a) => a,
+        None => return vec![],
+    };
+    let mut out = Vec::with_capacity(txs.len());
+    for tx in txs {
+        let params = tx.get("transaction").unwrap_or(tx);
+        let to = match params.get("to").and_then(|v| v.as_str()) {
+            Some(s) => s,
+            None => continue,
+        };
+        let data = params
+            .get("data")
+            .or_else(|| params.get("input"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("0x");
+        let value_raw = params.get("value").and_then(|v| {
+            v.get("hex")
+                .and_then(|h| h.as_str())
+                .map(String::from)
+                .or_else(|| v.as_str().map(String::from))
+                .or_else(|| v.as_u64().map(|n| n.to_string()))
+        }).unwrap_or_else(|| "0".to_string());
+        let value = normalize_cast_value(&value_raw);
+        let mut obj = json!({ "to": to, "data": data, "value": value });
+        if let Some(g) = params
+            .get("gasLimit")
+            .or_else(|| params.get("gas"))
+            .and_then(|v| {
+                v.get("hex")
+                    .and_then(|h| h.as_str())
+                    .map(String::from)
+                    .or_else(|| v.as_str().map(String::from))
+                    .or_else(|| v.as_u64().map(|n| n.to_string()))
+            })
+        {
+            obj["gasLimit"] = json!(g);
+        }
+        out.push(obj);
+    }
+    out
+}
+
+fn normalize_cast_value(raw: &str) -> String {
+    let s = raw.trim();
+    if s.is_empty() || s == "0" || s == "0x0" || s == "0x" {
+        return "0".to_string();
+    }
+    if let Some(hex) = s.strip_prefix("0x") {
+        if hex.chars().all(|c| c.is_ascii_hexdigit()) {
+            let hex = hex.trim_start_matches('0');
+            if hex.is_empty() {
+                return "0".to_string();
+            }
+            return format!("0x{}", hex);
+        }
+    }
+    s.to_string()
+}
+
+/// Build structured --out JSON for no-governance-prepare (like init's build_output).
+fn build_output_no_governance_prepare(
+    runner: &ForgeRunner,
+    core_json: &Value,
+    ecosystem_json: &Value,
+    ctm_json: &Value,
+) -> Value {
+    let runs: Vec<_> = runner
+        .runs()
+        .iter()
+        .map(|r| json!({ "script": r.script.display().to_string(), "run": r.payload }))
+        .collect();
+    let transactions = runner
+        .runs()
+        .first()
+        .map(|r| run_payload_to_cast_transactions(&r.payload))
+        .unwrap_or_default();
+    let run_json = runner
+        .runs()
+        .last()
+        .map(|r| r.payload.clone())
+        .unwrap_or(Value::Object(Default::default()));
+    json!({
+        "command": "ecosystem.upgrade",
+        "stage": "no-governance-prepare",
+        "runs": runs,
+        "transactions": transactions,
+        "output": {
+            "core": core_json,
+            "ecosystem": ecosystem_json,
+            "ctm": ctm_json,
+            "run_json": run_json,
+        },
+    })
+}
+
+/// Build structured --out JSON for governance-stage* (like init's build_output).
+fn build_output_governance_stage(
+    runner: &ForgeRunner,
+    stage: u8,
+    governance_addr: Address,
+) -> Value {
+    let runs: Vec<_> = runner
+        .runs()
+        .iter()
+        .map(|r| json!({ "script": r.script.display().to_string(), "run": r.payload }))
+        .collect();
+    let transactions = runner
+        .runs()
+        .first()
+        .map(|r| run_payload_to_cast_transactions(&r.payload))
+        .unwrap_or_default();
+    let stage_name = format!("governance-stage{}", stage);
+    json!({
+        "command": "ecosystem.upgrade",
+        "stage": stage_name,
+        "runs": runs,
+        "transactions": transactions,
+        "output": {
+            "stage": stage,
+            "governance_address": format!("{:#x}", governance_addr),
+        },
+    })
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct EcosystemUpgradeArgs {
@@ -45,29 +175,70 @@ pub struct EcosystemUpgradeArgs {
     /// Upgrade output path relative to l1-contracts root (for no-governance-prepare)
     #[clap(long, default_value = "/script-out/v31-upgrade-ecosystem.toml")]
     pub upgrade_output_path: String,
-    /// Skip broadcasting transactions
+    /// Path to read ecosystem upgrade output (for governance-stage*). If unset, uses script-out/v31-upgrade-ecosystem.toml under l1-contracts.
+    #[clap(long)]
+    pub ecosystem_output_path: Option<PathBuf>,
+    /// Simulate against anvil fork (no on-chain changes)
     #[clap(long, default_value_t = false)]
-    pub skip_broadcast: bool,
+    pub simulate: bool,
+    /// Write full JSON output (runs with transactions) to file; implies broadcast when set
+    #[clap(long, help_heading = "Output")]
+    pub out: Option<PathBuf>,
     #[clap(flatten)]
     #[serde(flatten)]
     pub forge_args: crate::common::forge::ForgeArgs,
 }
 
 pub async fn run(args: EcosystemUpgradeArgs, shell: &Shell) -> anyhow::Result<()> {
-    let _ = shell;
-    match args.ecosystem_upgrade_stage.as_str() {
-        "no-governance-prepare" => run_no_governance_prepare(&args),
-        "governance-stage0" => run_governance_stage(&args, 0),
-        "governance-stage1" => run_governance_stage(&args, 1),
-        "governance-stage2" => run_governance_stage(&args, 2),
+    if args.simulate {
+        logger::info(format!(
+            "Simulation mode: forking {} via anvil",
+            args.l1_rpc_url
+        ));
+    }
+    let exec = if args.simulate {
+        Some(resolve_execution(
+            Some(args.private_key),
+            None,
+            true,
+            &args.l1_rpc_url,
+        )?)
+    } else {
+        None
+    };
+    let (effective_rpc, use_sender, sender_or_pk) = match &exec {
+        Some((_, sender, mode)) => (
+            mode.rpc_url(&args.l1_rpc_url).to_string(),
+            true,
+            format!("{:#x}", sender),
+        ),
+        None => (
+            args.l1_rpc_url.clone(),
+            false,
+            format!("{:#x}", args.private_key),
+        ),
+    };
+    let result = match args.ecosystem_upgrade_stage.as_str() {
+        "no-governance-prepare" => run_no_governance_prepare(shell, &args, &effective_rpc, use_sender, &sender_or_pk),
+        "governance-stage0" => run_governance_stage(shell, &args, 0, &effective_rpc, use_sender, &sender_or_pk),
+        "governance-stage1" => run_governance_stage(shell, &args, 1, &effective_rpc, use_sender, &sender_or_pk),
+        "governance-stage2" => run_governance_stage(shell, &args, 2, &effective_rpc, use_sender, &sender_or_pk),
         other => anyhow::bail!(
             "Unsupported ecosystem upgrade stage: {} (supported: no-governance-prepare, governance-stage0, governance-stage1, governance-stage2)",
             other
         ),
-    }
+    };
+    drop(exec);
+    result
 }
 
-fn run_no_governance_prepare(args: &EcosystemUpgradeArgs) -> anyhow::Result<()> {
+fn run_no_governance_prepare(
+    shell: &Shell,
+    args: &EcosystemUpgradeArgs,
+    effective_rpc: &str,
+    use_sender: bool,
+    sender_or_pk: &str,
+) -> anyhow::Result<()> {
     let contracts_path = resolve_l1_contracts_path(&paths::contracts_root())?;
     let script_path = "deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol";
     let script_full_path = contracts_path.join(script_path);
@@ -95,48 +266,93 @@ fn run_no_governance_prepare(args: &EcosystemUpgradeArgs) -> anyhow::Result<()> 
         anyhow::bail!("Upgrade input file not found: {}", upgrade_input.display());
     }
 
-    let mut cmd = Command::new("forge");
-    cmd.arg("script")
-        .arg(script_path)
-        .arg("--sig")
-        .arg("noGovernancePrepareWithArgs(address,address,address,address,bool,string,string,address)")
-        .arg(format!("{:#x}", bridgehub))
-        .arg(format!("{:#x}", ctm))
-        .arg(format!("{:#x}", bytecodes_supplier))
-        .arg(format!("{:#x}", rollup_da_manager))
-        .arg(if is_zk_sync_os { "true" } else { "false" })
-        .arg(args.upgrade_input_path.as_str())
-        .arg(args.upgrade_output_path.as_str())
-        .arg(format!("{:#x}", governance))
-        .arg("--rpc-url")
-        .arg(&args.l1_rpc_url)
-        .arg("--private-key")
-        .arg(format!("{:#x}", args.private_key))
-        .arg("--ffi")
-        .arg("--gas-limit")
-        .arg("1000000000000")
-        .current_dir(&contracts_path);
+    // Remove existing script outputs so we only read fresh results from this run.
+    let script_out = contracts_path.join("script-out");
+    let _ = fs::remove_file(script_out.join("v31-upgrade-core.toml"));
+    let _ = fs::remove_file(script_out.join("v31-upgrade-ecosystem.toml"));
+    let _ = fs::remove_file(script_out.join("v31-upgrade-ctm.toml"));
 
-    if !args.skip_broadcast {
-        cmd.arg("--broadcast");
+    let mut script_args = args.forge_args.script.clone();
+    script_args.add_arg(ForgeScriptArg::Sig {
+        sig: "noGovernancePrepareWithArgs(address,address,address,address,bool,string,string,address)".to_string(),
+    });
+    script_args.add_arg(ForgeScriptArg::RpcUrl {
+        url: effective_rpc.to_string(),
+    });
+    script_args.add_arg(ForgeScriptArg::Broadcast);
+    script_args.add_arg(ForgeScriptArg::Ffi);
+    script_args.add_arg(ForgeScriptArg::GasLimit {
+        gas_limit: 1000000000000,
+    });
+    if use_sender {
+        script_args.add_arg(ForgeScriptArg::Sender {
+            address: sender_or_pk.to_string(),
+        });
+        script_args.add_arg(ForgeScriptArg::Unlocked);
+    } else {
+        script_args.add_arg(ForgeScriptArg::PrivateKey {
+            private_key: sender_or_pk.to_string(),
+        });
     }
+    script_args.additional_args.extend([
+        format!("{:#x}", bridgehub),
+        format!("{:#x}", ctm),
+        format!("{:#x}", bytecodes_supplier),
+        format!("{:#x}", rollup_da_manager),
+        if is_zk_sync_os { "true".to_string() } else { "false".to_string() },
+        args.upgrade_input_path.clone(),
+        args.upgrade_output_path.clone(),
+        format!("{:#x}", governance),
+    ]);
+
+    let forge = Forge::new(&contracts_path);
+    let script = forge.script(Path::new(script_path), script_args);
+    let mut runner = ForgeRunner::new();
 
     logger::step("Running ecosystem no-governance-prepare");
-    logger::info(format!("RPC URL: {}", args.l1_rpc_url));
-    logger::info(format!("Broadcast: {}", !args.skip_broadcast));
+    logger::info(format!("RPC URL: {}", effective_rpc));
 
-    let output = cmd
-        .output()
-        .context("Failed to execute forge script for no-governance-prepare")?;
-    if !output.status.success() {
-        anyhow::bail!(
-            "Forge script failed:\nSTDOUT:\n{}\nSTDERR:\n{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
+    runner.run(shell, script).context("Failed to execute forge script for no-governance-prepare")?;
+
+    // Read TOML files written by the script; parse to JSON.
+    let script_out = contracts_path.join("script-out");
+    let core_path = script_out.join("v31-upgrade-core.toml");
+    let ecosystem_path = script_out.join("v31-upgrade-ecosystem.toml");
+    let ctm_path = script_out.join("v31-upgrade-ctm.toml");
+
+    let core_toml = fs::read_to_string(&core_path)
+        .with_context(|| format!("Failed to read {}", core_path.display()))?;
+    let ecosystem_toml = fs::read_to_string(&ecosystem_path)
+        .with_context(|| format!("Failed to read {}", ecosystem_path.display()))?;
+    let ctm_toml = fs::read_to_string(&ctm_path)
+        .with_context(|| format!("Failed to read {}", ctm_path.display()))?;
+
+    let core_json: serde_json::Value = toml::from_str::<toml::Value>(&core_toml)
+        .context("Failed to parse core TOML")
+        .and_then(|v| serde_json::to_value(v).map_err(|e| anyhow::anyhow!("{}", e)))?;
+    let ecosystem_json: serde_json::Value = toml::from_str::<toml::Value>(&ecosystem_toml)
+        .context("Failed to parse ecosystem TOML")
+        .and_then(|v| serde_json::to_value(v).map_err(|e| anyhow::anyhow!("{}", e)))?;
+    let ctm_json: serde_json::Value = toml::from_str::<toml::Value>(&ctm_toml)
+        .context("Failed to parse CTM TOML")
+        .and_then(|v| serde_json::to_value(v).map_err(|e| anyhow::anyhow!("{}", e)))?;
+
+    if let Some(ref out_path) = args.out {
+        let out_json = build_output_no_governance_prepare(&runner, &core_json, &ecosystem_json, &ctm_json);
+        let out_str = serde_json::to_string_pretty(&out_json)?;
+        fs::write(out_path, out_str)?;
+        logger::info(format!("Full output written to: {}", out_path.display()));
     }
 
     logger::success("No-governance-prepare completed");
+    if let Some(ref out_path) = args.out {
+        logger::outro(format!(
+            "No-governance-prepare complete. Output written to: {}",
+            out_path.display()
+        ));
+    } else {
+        logger::outro("No-governance-prepare complete.");
+    }
     Ok(())
 }
 
@@ -171,10 +387,21 @@ struct EcosystemUpgradeOutput {
     governance_calls: GovernanceCalls,
 }
 
-fn run_governance_stage(args: &EcosystemUpgradeArgs, stage: u8) -> anyhow::Result<()> {
+fn run_governance_stage(
+    shell: &Shell,
+    args: &EcosystemUpgradeArgs,
+    stage: u8,
+    effective_rpc: &str,
+    use_sender: bool,
+    sender_or_pk: &str,
+) -> anyhow::Result<()> {
     let contracts_path = resolve_l1_contracts_path(&paths::contracts_root())?;
-    let upgrade_output_path = contracts_path.join("script-out/v31-upgrade-ecosystem.toml");
-    let toml_content = std::fs::read_to_string(&upgrade_output_path).with_context(|| {
+    let default_path = contracts_path.join("script-out/v31-upgrade-ecosystem.toml");
+    let upgrade_output_path = args
+        .ecosystem_output_path
+        .as_deref()
+        .unwrap_or(&default_path);
+    let toml_content = std::fs::read_to_string(upgrade_output_path).with_context(|| {
         format!(
             "Failed to read upgrade output file: {}",
             upgrade_output_path.display()
@@ -199,42 +426,61 @@ fn run_governance_stage(args: &EcosystemUpgradeArgs, stage: u8) -> anyhow::Resul
     })?;
 
     let script_path = "deploy-scripts/AdminFunctions.s.sol";
-    let mut cmd = Command::new("forge");
-    cmd.arg("script")
-        .arg(script_path)
-        .arg("--sig")
-        .arg("governanceExecuteCalls(bytes,address)")
-        .arg(format!("0x{}", encoded_calls_hex.trim_start_matches("0x")))
-        .arg(format!("{:#x}", governance_addr))
-        .arg("--rpc-url")
-        .arg(&args.l1_rpc_url)
-        .arg("--private-key")
-        .arg(format!("{:#x}", args.private_key))
-        .arg("--ffi")
-        .arg("--gas-limit")
-        .arg("1000000000000")
-        .current_dir(&contracts_path);
-
-    if !args.skip_broadcast {
-        cmd.arg("--broadcast");
+    let mut script_args = args.forge_args.script.clone();
+    script_args.add_arg(ForgeScriptArg::Sig {
+        sig: "governanceExecuteCalls(bytes,address)".to_string(),
+    });
+    script_args.add_arg(ForgeScriptArg::RpcUrl {
+        url: effective_rpc.to_string(),
+    });
+    script_args.add_arg(ForgeScriptArg::Broadcast);
+    script_args.add_arg(ForgeScriptArg::Ffi);
+    script_args.add_arg(ForgeScriptArg::GasLimit {
+        gas_limit: 1000000000000,
+    });
+    if use_sender {
+        script_args.add_arg(ForgeScriptArg::Sender {
+            address: sender_or_pk.to_string(),
+        });
+        script_args.add_arg(ForgeScriptArg::Unlocked);
+    } else {
+        script_args.add_arg(ForgeScriptArg::PrivateKey {
+            private_key: sender_or_pk.to_string(),
+        });
     }
+    script_args.additional_args.extend([
+        format!("0x{}", encoded_calls_hex.trim_start_matches("0x")),
+        format!("{:#x}", governance_addr),
+    ]);
+
+    let forge = Forge::new(&contracts_path);
+    let script = forge.script(Path::new(script_path), script_args);
+    let mut runner = ForgeRunner::new();
 
     logger::step(format!("Running governance stage {}", stage));
     logger::info(format!("Governance address: {:#x}", governance_addr));
-    logger::info(format!("RPC URL: {}", args.l1_rpc_url));
-    logger::info(format!("Broadcast: {}", !args.skip_broadcast));
+    logger::info(format!("RPC URL: {}", effective_rpc));
 
-    let output = cmd
-        .output()
-        .context("Failed to execute forge script for governance stage")?;
-    if !output.status.success() {
-        anyhow::bail!(
-            "Forge script failed:\nSTDOUT:\n{}\nSTDERR:\n{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
+    runner.run(shell, script).with_context(|| {
+        format!("Failed to execute forge script for governance stage {}", stage)
+    })?;
+
+    if let Some(ref out_path) = args.out {
+        let out_json = build_output_governance_stage(&runner, stage, governance_addr);
+        let out_str = serde_json::to_string_pretty(&out_json)?;
+        fs::write(out_path, out_str)?;
+        logger::info(format!("Full output written to: {}", out_path.display()));
     }
 
     logger::success(format!("Governance stage {} completed", stage));
+    if let Some(ref out_path) = args.out {
+        logger::outro(format!(
+            "Governance stage {} complete. Output written to: {}",
+            stage,
+            out_path.display()
+        ));
+    } else {
+        logger::outro(format!("Governance stage {} complete.", stage));
+    }
     Ok(())
 }
