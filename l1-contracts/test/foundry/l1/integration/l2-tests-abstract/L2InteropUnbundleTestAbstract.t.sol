@@ -75,7 +75,7 @@ abstract contract L2InteropUnbundleTestAbstract is L2InteropTestUtils {
         InteropLibrary.sendDirectCall(
             destinationChainId,
             L2_INTEROP_HANDLER_ADDR,
-            abi.encodeCall(L2_INTEROP_HANDLER.unbundleBundle, (originalChainId, bundle, callStatuses)),
+            abi.encodeCall(L2_INTEROP_HANDLER.unbundleBundle, (bundle, callStatuses)),
             UNBUNDLER_ADDRESS,
             UNBUNDLER_ADDRESS
         );
