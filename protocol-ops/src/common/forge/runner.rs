@@ -209,7 +209,8 @@ fn check_error(cmd_result: &CmdResult<()>, error_text: &str) -> bool {
 /// Derive the *-latest.json filename from an optional --sig value:
 /// 1) no sig          -> "run-latest.json"
 /// 2) hex sig         -> "<first8hex>-latest.json" (strip 0x)
-/// 3) non-hex sig     -> "<sig>-latest.json"
+/// 3) non-hex sig     -> "<name>-latest.json" where name is the part before '(' (method name).
+///    Forge stores method-call broadcasts as e.g. governanceExecuteCalls-latest.json.
 fn derive_run_latest_filename(sig: Option<String>) -> String {
     fn is_hex_like(s: &str) -> bool {
         let s = s.strip_prefix("0x").unwrap_or(s);
@@ -226,7 +227,8 @@ fn derive_run_latest_filename(sig: Option<String>) -> String {
                 let prefix8 = &lower[..lower.len().min(8)];
                 format!("{prefix8}-latest.json")
             } else {
-                format!("{trimmed}-latest.json")
+                let name = trimmed.split('(').next().unwrap_or(trimmed).trim();
+                format!("{name}-latest.json")
             }
         }
     }
