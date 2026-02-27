@@ -6,6 +6,22 @@ pragma solidity ^0.8.20;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface for the BaseTokenHolder contract that holds the chain's base token reserves.
+///
+/// ## Base Token Minting via MINT_BASE_TOKEN_HOOK (ZK OS only)
+///
+/// To mint base tokens on ZK OS chains, call the MINT_BASE_TOKEN_HOOK with the amount to mint encoded as uint256:
+/// `(bool success, ) = MINT_BASE_TOKEN_HOOK.call(abi.encode(amountToMint));`
+/// The hook will credit the caller (L2BaseToken contract) with the specified amount of native tokens.
+/// After minting, the tokens can be transferred using Address.sendValue() or regular ETH transfers.
+///
+/// This hook is used during genesis/upgrade to initialize the BaseTokenHolder balance:
+/// 1. L2BaseTokenZKOS.initializeBaseTokenHolderBalance() calls this hook to mint 2^127-1 tokens
+/// 2. The minted tokens are then transferred to L2_BASE_TOKEN_HOLDER_ADDR
+/// 3. This establishes the initial token supply invariant for the chain
+///
+/// Authorization:
+/// - The hook validates that msg.sender is L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR (0x800A)
+/// - L2BaseTokenZKOS restricts initializeBaseTokenHolderBalance() to L2_COMPLEX_UPGRADER_ADDR only
 interface IBaseTokenHolder {
     /// @notice Gives out base tokens from the holder to a recipient.
     /// @param _to The address to receive the base tokens.

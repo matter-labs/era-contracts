@@ -43,4 +43,8 @@ interface IL2AssetTracker {
     function confirmMigrationOnL2(MigrationConfirmationData calldata _migrationConfirmationData) external;
 
     function registerLegacyToken(bytes32 _assetId) external;
+
+    function needBaseTokenTotalSupplyBackfill() external view returns (bool);
+
+    function backFillZKSyncOSBaseTokenV31MigrationData(uint256 _amount) external;
 }

@@ -8,13 +8,16 @@ import "forge-std/console.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_HANDLER, L2_MESSAGE_VERIFICATION, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_HOLDER, L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_HANDLER, L2_MESSAGE_VERIFICATION, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
+import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
+import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {IAssetRouterBase, AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {CallStatus, IInteropHandler} from "contracts/interop/IInteropHandler.sol";
@@ -607,5 +610,104 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             2, // BundleStatus.FullyExecuted
             "Bundle should be fully executed"
         );
+    }
+
+    /// @notice Creates an interop bundle where a call carries native value (ETH).
+    /// @dev This exercises the InteropHandler._executeCalls path where interopCall.value > 0,
+    /// which triggers L2_BASE_TOKEN_HOLDER.give() to transfer base tokens.
+    function getInteropBundleWithValue(uint256 _callValue) public returns (InteropBundle memory) {
+        InteropCall[] memory calls = new InteropCall[](1);
+        calls[0] = InteropCall({
+            version: INTEROP_CALL_VERSION,
+            shadowAccount: false,
+            to: interopTargetContract,
+            from: makeAddr("interopSender"),
+            value: _callValue,
+            data: abi.encode("test_payload")
+        });
+        InteropBundle memory interopBundle = InteropBundle({
+            version: INTEROP_BUNDLE_VERSION,
+            sourceChainId: ERA_CHAIN_ID,
+            destinationChainId: 31337,
+            destinationBaseTokenAssetId: baseTokenAssetId,
+            interopBundleSalt: keccak256(abi.encodePacked(makeAddr("depositorWithValue"), bytes32(0))),
+            calls: calls,
+            bundleAttributes: BundleAttributes({
+                executionAddress: InteroperableAddress.formatEvmV1(EXECUTION_ADDRESS),
+                unbundlerAddress: InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS),
+                useFixedFee: false
+            })
+        });
+        return interopBundle;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Inbound flow: InteropHandler → BaseTokenHolder.give() → asset tracker
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice Verifies that the full inbound interop flow notifies the asset tracker.
+    /// @dev Executes a bundle with value > 0 through InteropHandler, which calls
+    /// BaseTokenHolder.give(). Asserts that handleFinalizeBaseTokenBridgingOnL2 is called
+    /// on L2AssetTracker to track the inbound base token bridging.
+    function test_give_inboundFlow_notifiesAssetTracker() public {
+        uint256 callValue = 100;
+        InteropBundle memory interopBundle = getInteropBundleWithValue(callValue);
+        bytes memory bundle = abi.encode(interopBundle);
+        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
+
+        // Standard mocks for bundle verification and messenger
+        vm.mockCall(
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
+        );
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes32(0))
+        );
+
+        // The key assertion: when base tokens flow in via give(), the asset tracker
+        // MUST be notified via handleFinalizeBaseTokenBridgingOnL2.
+        vm.expectCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(IL2AssetTracker.handleFinalizeBaseTokenBridgingOnL2.selector, callValue)
+        );
+
+        vm.prank(EXECUTION_ADDRESS);
+        L2_INTEROP_HANDLER.executeBundle(bundle, proof);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  Outbound flow: burnAndStartBridging() → asset tracker
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice Verifies the full outbound bridging flow: BaseTokenHolder.burnAndStartBridging()
+    /// calls L2AssetTracker.handleInitiateBaseTokenBridgingOnL2() with correct access control.
+    /// @dev Deploys the real BaseTokenHolder (not the dummy) and does NOT mock the asset tracker.
+    /// Tests both that the notification happens AND that the access control allows it.
+    function test_burnAndStartBridging_outboundFlow_notifiesAssetTracker() public {
+        // Deploy real BaseTokenHolder (replacing the dummy)
+        BaseTokenHolder realHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(realHolder).code);
+        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, (2 ** 127) - 1);
+
+        uint256 burnAmount = 500;
+        uint256 toChainId = 271;
+
+        // NO mock on L2AssetTracker — tests the real access control and notification.
+        // If this fails with Unauthorized, it means the asset tracker's
+        // onlyL2BaseTokenSystemContract modifier rejects BaseTokenHolder (0x10011 != 0x800A).
+        vm.expectCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(
+                IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector,
+                toChainId,
+                burnAmount
+            )
+        );
+
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(toChainId);
     }
 }

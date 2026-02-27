@@ -39,6 +39,10 @@ error BadTransferDataLength();
 error BaseTokenGasPriceDenominatorNotSet();
 // 0xd3cd4bd2
 error BaseTokenHolderMintFailed();
+// 0x00a6b592
+error BaseTokenPreV31TotalSupplyNotSet();
+// 0x7f9159de
+error BaseTokenPreV31TotalSupplyAlreadySet();
 // 0xe3ec2bc9
 error BaseTokenTransferFailed();
 // 0x55ad3fd3

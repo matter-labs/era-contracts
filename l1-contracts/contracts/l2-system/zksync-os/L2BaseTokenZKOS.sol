@@ -6,9 +6,10 @@ import {Address} from "@openzeppelin/contracts-v4/utils/Address.sol";
 
 import {L2BaseTokenBase} from "../L2BaseTokenBase.sol";
 import {IL2BaseTokenZKOS} from "./interfaces/IL2BaseTokenZKOS.sol";
-import {L2_BASE_TOKEN_HOLDER_ADDR, L2_COMPLEX_UPGRADER_ADDR, MINT_BASE_TOKEN_HOOK} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_HOLDER_ADDR, MINT_BASE_TOKEN_HOOK} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_TRACKER} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE, SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
-import {BaseTokenHolderMintFailed, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {BaseTokenHolderMintFailed, BaseTokenPreV31TotalSupplyNotSet, Unauthorized} from "../../common/L1ContractErrors.sol";
 
 /**
  * @title L2BaseTokenZKOS
@@ -34,29 +35,38 @@ contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
     /// @dev Computed as: _zkosPreV31TotalSupply + (INITIAL_BASE_TOKEN_HOLDER_BALANCE - BaseTokenHolder.balance)
     /// @dev _zkosPreV31TotalSupply captures the total supply that existed before the V31 upgrade.
     /// @dev The delta (INITIAL - holder.balance) tracks tokens minted after V31 via the BaseTokenHolder pattern.
-    /// @dev WARNING: totalSupply() will return an incorrect value until the chain admin sets the pre-V31 total supply via setZkosPreV31TotalSupply(). This is done as a separate post-upgrade step.
+    /// @dev Reverts if the pre-V31 total supply has not been set yet to prevent underflow.
     function totalSupply() external view returns (uint256) {
+        if (L2_ASSET_TRACKER.needBaseTokenTotalSupplyBackfill()) {
+            revert BaseTokenPreV31TotalSupplyNotSet();
+        }
         return _zkosPreV31TotalSupply + (INITIAL_BASE_TOKEN_HOLDER_BALANCE - L2_BASE_TOKEN_HOLDER_ADDR.balance);
     }
 
-    /// @notice Sets the pre-V31 total supply for ZKOS chains.
+    /// @notice Sets the pre-V31 total supply for ZKOS chains and backfills the L2AssetTracker.
     /// @dev Can only be called via a service transaction (triggered by the chain admin on L1).
+    /// @dev Sets _zkosPreV31TotalSupply so that totalSupply() returns the correct value,
+    /// then calls L2AssetTracker.backFillZKSyncOSBaseTokenV31MigrationData() to register
+    /// the base token with the correct total supply.
     /// @param _totalSupply The total supply that existed before the V31 upgrade.
-    function setZkosPreV31TotalSupply(uint256 _totalSupply) external {
+    function SetZKsyncOSPreV31TotalSupply(uint256 _totalSupply) external {
         if (msg.sender != SERVICE_TRANSACTION_SENDER) {
             revert Unauthorized(msg.sender);
         }
         _zkosPreV31TotalSupply = _totalSupply;
+
+        // Backfill the L2AssetTracker with the correct total supply.
+        // This must happen after setting _zkosPreV31TotalSupply so that totalSupply()
+        // returns the correct value when registerLegacyToken reads it.
+        L2_ASSET_TRACKER.backFillZKSyncOSBaseTokenV31MigrationData(_totalSupply);
+
+        emit ZKsyncOSPreV31TotalSupplySet(_totalSupply);
     }
 
     /// @notice Initializes the BaseTokenHolder's balance during genesis or V31 upgrade.
     /// @dev This function mints 2^127 - 1 tokens to this contract via the mint hook, then transfers all tokens to BaseTokenHolder.
     /// @dev Can only be called by the ComplexUpgrader contract.
-    function initializeBaseTokenHolderBalance() external {
-        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
-
+    function initializeBaseTokenHolderBalance() external onlyComplexUpgrader {
         // Mint INITIAL_BASE_TOKEN_HOLDER_BALANCE tokens to this contract via the mint hook
         (bool mintSuccess, ) = MINT_BASE_TOKEN_HOOK.call(abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE));
         if (!mintSuccess) {

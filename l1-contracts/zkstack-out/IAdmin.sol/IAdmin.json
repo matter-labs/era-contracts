@@ -339,7 +339,7 @@
   },
   {
     "type": "function",
-    "name": "setZkosPreV31TotalSupply",
+    "name": "SetZKsyncOSPreV31TotalSupply",
     "inputs": [
       {
         "name": "_totalSupply",
@@ -796,7 +796,7 @@
   },
   {
     "type": "event",
-    "name": "SetZkosPreV31TotalSupply",
+    "name": "SetZKsyncOSPreV31TotalSupply",
     "inputs": [
       {
         "name": "totalSupply",

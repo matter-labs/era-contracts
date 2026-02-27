@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Address} from "@openzeppelin/contracts-v4/utils/Address.sol";
 
 import {IBaseTokenHolder} from "./interfaces/IBaseTokenHolder.sol";
-import {L2_ASSET_TRACKER, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER, L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_ASSET_TRACKER, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {Unauthorized} from "../common/L1ContractErrors.sol";
 
 /**
@@ -46,14 +46,16 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  * On Era, totalSupply is computed as INITIAL_BASE_TOKEN_HOLDER_BALANCE - eraAccountBalance[BaseTokenHolder].
  * On ZK OS, totalSupply is computed as _zkosPreV31TotalSupply + (INITIAL - holder.balance).
  * If funds were sent to this contract via selfdestruct (bypassing access controls), the holder balance
- * would increase, causing totalSupply() to undercount. However, selfdestruct is not supported on Era.
- * On ZK OS, selfdestruct would increase native balance, effectively returning tokens to the reserve.
+ * would increase, causing totalSupply() to undercount. On Era, selfdestruct is not supported so this
+ * cannot happen. On ZK OS, selfdestruct is supported and could cause totalSupply() to undercount.
+ * However, this is a view-only issue — no funds are at risk, as the accounting for bridging and
+ * withdrawals does not rely on totalSupply().
  */
 // slither-disable-next-line locked-ether
 contract BaseTokenHolder is IBaseTokenHolder {
     /// @notice Modifier that restricts access to the InteropHandler only.
     modifier onlyInteropHandler() {
-        if (msg.sender != address(L2_INTEROP_HANDLER)) {
+        if (msg.sender != L2_INTEROP_HANDLER_ADDR) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -66,7 +68,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
     /// @dev L2BaseToken: returns burned tokens during withdrawals
     modifier onlyBridgingCaller() {
         if (
-            msg.sender != address(L2_INTEROP_HANDLER) &&
+            msg.sender != L2_INTEROP_HANDLER_ADDR &&
             msg.sender != L2_INTEROP_CENTER_ADDR &&
             msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR &&
             msg.sender != L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
@@ -99,6 +101,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
         }
 
         Address.sendValue(payable(_to), _amount);
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_amount);
     }
 
     /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.

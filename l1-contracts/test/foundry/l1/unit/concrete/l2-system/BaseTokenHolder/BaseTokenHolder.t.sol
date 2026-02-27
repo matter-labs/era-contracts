@@ -6,6 +6,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
+import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
+import {L2_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
@@ -34,6 +36,12 @@ contract BaseTokenHolderTest is Test {
         uint256 recipientBalanceBefore = recipient.balance;
         uint256 holderBalanceBefore = address(baseTokenHolder).balance;
 
+        vm.mockCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(IL2AssetTracker.handleFinalizeBaseTokenBridgingOnL2.selector),
+            abi.encode()
+        );
+
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         baseTokenHolder.give(recipient, amount);
 
@@ -50,6 +58,24 @@ contract BaseTokenHolderTest is Test {
 
         assertEq(recipient.balance, recipientBalanceBefore, "Recipient balance should not change");
         assertEq(address(baseTokenHolder).balance, holderBalanceBefore, "Holder balance should not change");
+    }
+
+    function test_give_notifiesAssetTracker() public {
+        uint256 amount = 1 ether;
+
+        vm.mockCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(IL2AssetTracker.handleFinalizeBaseTokenBridgingOnL2.selector),
+            abi.encode()
+        );
+
+        vm.expectCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(IL2AssetTracker.handleFinalizeBaseTokenBridgingOnL2.selector, amount)
+        );
+
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        baseTokenHolder.give(recipient, amount);
     }
 
     function test_give_revertWhenCalledByNonInteropHandler() public {
@@ -78,6 +104,12 @@ contract BaseTokenHolderTest is Test {
         vm.assume(amount > 0 && amount <= INITIAL_BALANCE);
 
         uint256 recipientBalanceBefore = recipient.balance;
+
+        vm.mockCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(IL2AssetTracker.handleFinalizeBaseTokenBridgingOnL2.selector),
+            abi.encode()
+        );
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         baseTokenHolder.give(recipient, amount);
@@ -162,6 +194,114 @@ contract BaseTokenHolderTest is Test {
             holderBalanceBefore + amount,
             "Holder should receive correct amount"
         );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    burnAndStartBridging() TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    function test_burnAndStartBridging_successFromInteropHandler() public {
+        uint256 amount = 1 ether;
+        uint256 toChainId = 271;
+
+        vm.deal(L2_INTEROP_HANDLER_ADDR, amount);
+
+        // Mock asset tracker to accept the call
+        vm.mockCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector),
+            abi.encode()
+        );
+
+        vm.expectCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector, toChainId, amount)
+        );
+
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        baseTokenHolder.burnAndStartBridging{value: amount}(toChainId);
+    }
+
+    function test_burnAndStartBridging_successFromInteropCenter() public {
+        uint256 amount = 1 ether;
+        uint256 toChainId = 271;
+
+        vm.deal(L2_INTEROP_CENTER_ADDR, amount);
+
+        vm.mockCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector),
+            abi.encode()
+        );
+
+        vm.prank(L2_INTEROP_CENTER_ADDR);
+        baseTokenHolder.burnAndStartBridging{value: amount}(toChainId);
+    }
+
+    function test_burnAndStartBridging_successFromNativeTokenVault() public {
+        uint256 amount = 1 ether;
+        uint256 toChainId = 271;
+
+        vm.deal(L2_NATIVE_TOKEN_VAULT_ADDR, amount);
+
+        vm.mockCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector),
+            abi.encode()
+        );
+
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        baseTokenHolder.burnAndStartBridging{value: amount}(toChainId);
+    }
+
+    function test_burnAndStartBridging_successFromL2BaseToken() public {
+        uint256 amount = 1 ether;
+        uint256 toChainId = 271;
+
+        vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, amount);
+
+        vm.mockCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector),
+            abi.encode()
+        );
+
+        vm.prank(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        baseTokenHolder.burnAndStartBridging{value: amount}(toChainId);
+    }
+
+    function test_burnAndStartBridging_revertFromUnauthorizedCaller() public {
+        address unauthorizedCaller = makeAddr("unauthorizedCaller");
+        uint256 amount = 1 ether;
+        uint256 toChainId = 271;
+
+        vm.deal(unauthorizedCaller, amount);
+
+        vm.prank(unauthorizedCaller);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, unauthorizedCaller));
+        baseTokenHolder.burnAndStartBridging{value: amount}(toChainId);
+    }
+
+    function test_burnAndStartBridging_callsAssetTrackerWithCorrectParams() public {
+        uint256 amount = 2 ether;
+        uint256 toChainId = 505;
+
+        vm.deal(L2_INTEROP_HANDLER_ADDR, amount);
+
+        vm.mockCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector),
+            abi.encode()
+        );
+
+        // Verify exact parameters passed to asset tracker
+        vm.expectCall(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeWithSelector(IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector, toChainId, amount)
+        );
+
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        baseTokenHolder.burnAndStartBridging{value: amount}(toChainId);
     }
 
     /*//////////////////////////////////////////////////////////////

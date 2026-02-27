@@ -59,7 +59,7 @@ interface IAdmin is IZKChainBase {
     /// @notice Sets the pre-V31 total supply on ZKOS chains.
     /// @dev Sends a service transaction to L2BaseTokenZKOS to set the value.
     /// @param _totalSupply The total supply that existed before the V31 upgrade.
-    function setZkosPreV31TotalSupply(uint256 _totalSupply) external returns (bytes32 canonicalTxHash);
+    function SetZKsyncOSPreV31TotalSupply(uint256 _totalSupply) external returns (bytes32 canonicalTxHash);
 
     /// @notice Allow Priority Mode to be activated on the chain (does not activate it).
     function permanentlyAllowPriorityMode() external;
@@ -167,7 +167,7 @@ interface IAdmin is IZKChainBase {
     event EnableEvmEmulator();
 
     /// @notice Emitted when the ZKOS pre-V31 total supply is set via service transaction
-    event SetZkosPreV31TotalSupply(uint256 totalSupply);
+    event ZKsyncOSPreV31TotalSupplySet(uint256 totalSupply);
 
     /// @notice New L2 DA commitment scheme set
     event NewL2DACommitmentScheme(

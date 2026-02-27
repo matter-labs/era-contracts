@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {L2BaseTokenBase} from "../L2BaseTokenBase.sol";
 import {IL2BaseTokenEra} from "./interfaces/IL2BaseTokenEra.sol";
-import {L2_BASE_TOKEN_HOLDER_ADDR, L2_BOOTLOADER_ADDRESS, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, MSG_VALUE_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_HOLDER_ADDR, L2_BOOTLOADER_ADDRESS, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, MSG_VALUE_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2_ASSET_TRACKER} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "../../common/Config.sol";
 import {InsufficientFunds, Unauthorized} from "../../common/L1ContractErrors.sol";
@@ -79,23 +79,20 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// @param _account The address which to mint the funds to.
     /// @param _amount The amount of ETH in wei to be minted.
     function mint(address _account, uint256 _amount) external override onlyBootloader {
-        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_amount);
         // Transfer from BaseTokenHolder to the recipient
         // This decreases holder balance, which increases totalSupply() automatically
         eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR] -= _amount;
         eraAccountBalance[_account] += _amount;
         emit Mint(_account, _amount);
+
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_amount);
     }
 
     /// @notice Initializes the BaseTokenHolder's balance during the V31 upgrade.
     /// @dev Sets the holder balance so that the new computed totalSupply() equals the old value.
     /// @dev Formula: eraAccountBalance[holder] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply + eraAccountBalance[holder]
     /// @dev Can only be called by the ComplexUpgrader contract.
-    function initializeBaseTokenHolderBalance() external override {
-        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
-
+    function initializeBaseTokenHolderBalance() external override onlyComplexUpgrader {
         eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR] =
             INITIAL_BASE_TOKEN_HOLDER_BALANCE -
             __DEPRECATED_totalSupply +

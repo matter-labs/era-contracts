@@ -17,31 +17,28 @@ import {Call} from "contracts/governance/Common.sol";
 /// @dev diamond proxy, which sends a service transaction to L2BaseTokenZKOS.
 /// @dev
 /// @dev Execute mode (default):
-/// @dev   BRIDGEHUB=0x... CHAIN_ID=... PRE_V31_TOTAL_SUPPLY=... forge script SetZkosPreV31TotalSupplyScript --broadcast --private-key <KEY>
+/// @dev   forge script SetZkosPreV31TotalSupplyScript --sig "run(address,uint256,uint256)" <BRIDGEHUB> <CHAIN_ID> <PRE_V31_TOTAL_SUPPLY> --broadcast --private-key <KEY>
 /// @dev
 /// @dev Calldata-only mode (for multisig submission):
-/// @dev   BRIDGEHUB=0x... CHAIN_ID=... PRE_V31_TOTAL_SUPPLY=... SAVE_CALLDATA_ONLY=true OUTPUT_FILE=/script-out/... forge script SetZkosPreV31TotalSupplyScript
+/// @dev   SAVE_CALLDATA_ONLY=true OUTPUT_FILE=/script-out/... forge script SetZkosPreV31TotalSupplyScript --sig "run(address,uint256,uint256)" <BRIDGEHUB> <CHAIN_ID> <PRE_V31_TOTAL_SUPPLY>
 contract SetZkosPreV31TotalSupplyScript is Script {
-    function run() public {
-        address bridgehub = vm.envAddress("BRIDGEHUB");
-        uint256 chainId = vm.envUint("CHAIN_ID");
-        uint256 preV31TotalSupply = vm.envUint("PRE_V31_TOTAL_SUPPLY");
+    function run(address _bridgehub, uint256 _chainId, uint256 _preV31TotalSupply) public {
         bool saveOutputOnly = vm.envOr("SAVE_CALLDATA_ONLY", false);
 
-        address diamondProxy = L1Bridgehub(bridgehub).getZKChain(chainId);
+        address diamondProxy = L1Bridgehub(_bridgehub).getZKChain(_chainId);
         address chainAdmin = IZKChain(diamondProxy).getAdmin();
 
-        console.log("Bridgehub:", bridgehub);
-        console.log("Chain ID:", chainId);
+        console.log("Bridgehub:", _bridgehub);
+        console.log("Chain ID:", _chainId);
         console.log("Diamond Proxy:", diamondProxy);
         console.log("Chain Admin:", chainAdmin);
-        console.log("Pre-V31 Total Supply:", preV31TotalSupply);
+        console.log("Pre-V31 Total Supply:", _preV31TotalSupply);
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: diamondProxy,
             value: 0,
-            data: abi.encodeCall(IAdmin.setZkosPreV31TotalSupply, (preV31TotalSupply))
+            data: abi.encodeCall(IAdmin.SetZKsyncOSPreV31TotalSupply, (_preV31TotalSupply))
         });
 
         if (saveOutputOnly) {
