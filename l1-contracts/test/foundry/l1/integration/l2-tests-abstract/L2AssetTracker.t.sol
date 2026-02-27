@@ -309,8 +309,8 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             abi.encode(1000)
         );
 
-        // Call as L2 Base Token System Contract
-        vm.prank(address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
+        // Call as BaseTokenHolder (onlyBaseTokenHolder modifier)
+        vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(amount);
 
         // Verify chain balance did NOT increase (foreign token, not native)
