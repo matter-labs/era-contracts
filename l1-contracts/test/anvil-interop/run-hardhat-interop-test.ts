@@ -69,35 +69,40 @@ async function main(): Promise<void> {
       const anvilManager = new AnvilManager();
       const config = runner.getConfig();
 
-      // Step 1: Start Anvil chains
-      const { chains } = await timedAsync("step1 - Start Anvil chains", () =>
-        runner.step1StartChains(anvilManager)
-      );
+      let chains: Awaited<ReturnType<typeof runner.runFullDeployment>>["chains"];
+      let l1Addresses: Awaited<ReturnType<typeof runner.runFullDeployment>>["l1Addresses"];
+      let ctmAddresses: Awaited<ReturnType<typeof runner.runFullDeployment>>["ctmAddresses"];
+
+      // Try loading pre-generated chain states (much faster — skips deploy steps 2-5)
+      let usedPreloadedState = false;
+      if (runner.hasChainStates()) {
+        const stateDir = runner.getChainStatesDir();
+        console.log(`\nFound pre-generated chain states at ${stateDir}`);
+        const result = await timedAsync("load chain states", () =>
+          runner.loadChainStates(anvilManager, stateDir)
+        );
+        chains = result.chains;
+        l1Addresses = result.l1Addresses;
+        ctmAddresses = result.ctmAddresses;
+        usedPreloadedState = true;
+      } else {
+        console.log("\nNo pre-generated chain states found, running full deployment...");
+        const result = await timedAsync("full deployment (steps 1-5)", () =>
+          runner.runFullDeployment(anvilManager)
+        );
+        chains = result.chains;
+        l1Addresses = result.l1Addresses;
+        ctmAddresses = result.ctmAddresses;
+      }
 
       if (!chains.l1) {
         throw new Error("L1 chain not found");
       }
 
-      // Step 2: Deploy L1 contracts
-      const { l1Addresses, ctmAddresses } = await timedAsync("step2 - Deploy L1 contracts", () =>
-        runner.step2DeployL1(chains.l1!.rpcUrl)
-      );
-
-      // Step 3+4: Register L2 chains and initialize (pipelined)
-      await timedAsync("step3+4 - Register & init L2 chains", () =>
-        runner.step3And4RegisterAndInitChains(
-          chains.l1!.rpcUrl,
-          chains.l2,
-          chains.config,
-          l1Addresses,
-          ctmAddresses
-        )
-      );
-
-      // Step 5 + deploy:test-token in parallel (both independent after step 4)
       const gatewayConfig = config.chains.find((c) => c.isGateway);
       const gatewayChainId = gatewayConfig?.chainId;
       const gwChain = chains.l2.find((c) => c.chainId === gatewayChainId);
+      const gwSettledChainIds = getGwSettledChainIds(config.chains);
 
       // Build L2 chain RPC URL map for migration preconditions
       const l2ChainRpcUrls = new Map<number, string>();
@@ -105,24 +110,10 @@ async function main(): Promise<void> {
         l2ChainRpcUrls.set(l2Chain.chainId, l2Chain.rpcUrl);
       }
 
-      const gwSettledChainIds = getGwSettledChainIds(config.chains);
-
-      await timedAsync("step5 + deploy:test-token (parallel)", () =>
-        Promise.all([
-          gatewayChainId
-            ? runner.step5SetupGateway(
-                chains.l1!.rpcUrl,
-                gatewayChainId,
-                l1Addresses,
-                ctmAddresses,
-                gwChain?.rpcUrl,
-                gwSettledChainIds,
-                l2ChainRpcUrls
-              )
-            : Promise.resolve(),
-          deployTestTokens(),
-        ])
-      );
+      // Deploy test tokens only if not using preloaded state (tokens are included in state dump)
+      if (!usedPreloadedState) {
+        await timedAsync("deploy:test-token", () => deployTestTokens());
+      }
 
       // Run Token Balance Migration (TBM) for test tokens on GW-settled chains.
       // Test tokens are native to their respective L2 chains. After gateway migration,

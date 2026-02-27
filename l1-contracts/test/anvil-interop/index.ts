@@ -7,7 +7,7 @@ import { AnvilManager } from "./src/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 import type { BatchSettler } from "./src/batch-settler";
 import type { ChainAddresses } from "./src/types";
-import { getGwSettledChainIds, sleep } from "./src/utils";
+import { sleep } from "./src/utils";
 
 async function main() {
   console.log("🚀 Starting Multi-Chain Anvil Testing Environment\n");
@@ -31,51 +31,22 @@ async function main() {
   process.on("SIGTERM", cleanup);
 
   try {
-    // Step 1: Start Anvil chains
-    const { chains } = await runner.step1StartChains(anvilManager);
-
-    if (!chains.l1) {
-      throw new Error("L1 chain not found");
+    // Try loading pre-generated chain states (much faster — skips deploy steps 2-5)
+    let result;
+    if (runner.hasChainStates()) {
+      const stateDir = runner.getChainStatesDir();
+      console.log(`Found pre-generated chain states at ${stateDir}`);
+      result = await runner.loadChainStates(anvilManager, stateDir);
+    } else {
+      // Steps 1-5: Full deployment (start chains, deploy L1, register+init L2, gateway)
+      result = await runner.runFullDeployment(anvilManager);
     }
+    const { chains, l1Addresses, ctmAddresses, chainAddresses } = result;
 
-    const l1Provider = anvilManager.getProvider(chains.l1.chainId);
-
-    // Step 2: Deploy L1 contracts
-    const { l1Addresses, ctmAddresses } = await runner.step2DeployL1(chains.l1.rpcUrl);
-
-    // Step 3: Register L2 chains
-    const { chainAddresses } = await runner.step3RegisterChains(
-      chains.l1.rpcUrl,
-      chains.l2,
-      chains.config,
-      l1Addresses,
-      ctmAddresses
-    );
-
-    // Step 4: Initialize L2 system contracts
-    await runner.step4InitializeL2(chains.l1.rpcUrl, chainAddresses, l1Addresses, ctmAddresses);
-
-    // Step 5: Setup gateway if configured
     const gatewayChainId = config.chains.find((c) => c.isGateway)?.chainId;
-    if (gatewayChainId) {
-      const gwChain = chains.l2.find((c) => c.chainId === gatewayChainId);
-      const gwSettledChainIds = getGwSettledChainIds(config.chains);
-      const l2ChainRpcUrls = new Map<number, string>();
-      for (const l2Chain of chains.l2) {
-        l2ChainRpcUrls.set(l2Chain.chainId, l2Chain.rpcUrl);
-      }
-      await runner.step5SetupGateway(
-        chains.l1.rpcUrl,
-        gatewayChainId,
-        l1Addresses,
-        ctmAddresses,
-        gwChain?.rpcUrl,
-        gwSettledChainIds,
-        l2ChainRpcUrls
-      );
-    }
 
     // Step 6: Start batch settler daemon
+    const l1Provider = anvilManager.getProvider(chains.l1!.chainId);
     const l2Providers: Map<number, providers.JsonRpcProvider> = new Map();
     const chainAddressesMap: Map<number, ChainAddresses> = new Map();
 
@@ -99,7 +70,7 @@ async function main() {
 
     console.log("\n=== ✅ Multi-Chain Environment Ready ===\n");
     console.log("Environment Details:");
-    console.log(`  L1 Chain: ${chains.l1.chainId} at ${chains.l1.rpcUrl}`);
+    console.log(`  L1 Chain: ${chains.l1!.chainId} at ${chains.l1!.rpcUrl}`);
     for (const l2Chain of chains.l2) {
       const isGateway = l2Chain.chainId === gatewayChainId ? " (Gateway)" : "";
       console.log(`  L2 Chain: ${l2Chain.chainId} at ${l2Chain.rpcUrl}${isGateway}`);
@@ -110,7 +81,7 @@ async function main() {
       bridgehub: l1Addresses.bridgehub,
       assetRouter: l1Addresses.l1SharedBridge,
       chainTypeManager: ctmAddresses.chainTypeManager,
-      l1ChainId: chains.l1.chainId,
+      l1ChainId: chains.l1!.chainId,
       l2Chains: chains.l2.map((c) => ({
         chainId: c.chainId,
         rpcUrl: c.rpcUrl,

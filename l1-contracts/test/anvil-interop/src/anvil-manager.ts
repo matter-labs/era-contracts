@@ -35,8 +35,10 @@ export class AnvilManager {
     return "anvil";
   }
 
-  async startChain(config: Omit<AnvilChain, "rpcUrl" | "process">): Promise<void> {
-    const { chainId, port, isL1 } = config;
+  async startChain(
+    config: Omit<AnvilChain, "rpcUrl" | "process"> & { blockTime?: number; timestamp?: number; loadState?: string }
+  ): Promise<void> {
+    const { chainId, port, isL1, blockTime, timestamp, loadState } = config;
     const rpcUrl = `http://127.0.0.1:${port}`;
 
     console.log(`🚀 Starting ${formatChainInfo(chainId, port, isL1)}...`);
@@ -45,6 +47,7 @@ export class AnvilManager {
     const foundryBinPath = homeDir ? path.join(homeDir, ".foundry/bin") : "";
     const enrichedPath = foundryBinPath ? `${foundryBinPath}:${process.env.PATH || ""}` : process.env.PATH;
 
+    const effectiveBlockTime = blockTime ?? 1;
     const args = [
       "--port",
       port.toString(),
@@ -54,12 +57,22 @@ export class AnvilManager {
       "10",
       "--balance",
       "10000",
-      "--block-time",
-      "1",
       "--gas-limit",
       "100000000", // Increase block gas limit to 100M to accommodate L2 genesis upgrade
       "--auto-impersonate", // Allow impersonating any address without signatures
     ];
+
+    if (effectiveBlockTime > 0) {
+      args.push("--block-time", effectiveBlockTime.toString());
+    }
+
+    if (timestamp !== undefined) {
+      args.push("--timestamp", timestamp.toString());
+    }
+
+    if (loadState) {
+      args.push("--load-state", loadState);
+    }
 
     const childProcess = spawn(anvilBinary, args, {
       stdio: "ignore", // Must ignore all streams for detached process to truly detach

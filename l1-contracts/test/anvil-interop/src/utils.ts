@@ -117,6 +117,13 @@ export async function impersonateAndRun<T>(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function loadAbiFromOut(artifactRelativePath: string): any[] {
+  // Prefer zkstack-out/ (committed, ABI-only files) over out/ (forge build output).
+  // zkstack-out files are raw ABI arrays; out/ files wrap them as { abi: [...] }.
+  const zkstackOutRoot = path.resolve(__dirname, "../../../zkstack-out");
+  const zkstackPath = path.join(zkstackOutRoot, artifactRelativePath);
+  if (fs.existsSync(zkstackPath)) {
+    return JSON.parse(fs.readFileSync(zkstackPath, "utf-8"));
+  }
   return loadArtifactFromOut(artifactRelativePath).abi;
 }
 
@@ -256,23 +263,28 @@ export async function extractAndRelayNewPriorityRequests(
   logger?: (line: string) => void,
 ): Promise<string[]> {
   const log = logger || console.log;
-  const txHashes: string[] = [];
 
-  for (const chain of chains) {
-    const requests = extractNewPriorityRequests(receipt, chain.diamondProxy);
-    for (const req of requests) {
-      log(`   Relaying priority request from ${req.from} to ${req.to} via proxy ${chain.diamondProxy}`);
-      const result = await relayTx(chain.provider, req.from, req.to, req.calldata);
-      if (result.success) {
-        txHashes.push(result.txHash);
-        log(`   Relay tx: ${result.txHash}`);
-      } else {
-        throw new Error(`Relay tx failed: from=${req.from} to=${req.to} via proxy ${chain.diamondProxy}`);
+  // Relay across different target chains in parallel (different providers = no nonce conflicts).
+  // Within each chain, requests are relayed sequentially (same impersonated sender).
+  const perChainResults = await Promise.all(
+    chains.map(async (chain) => {
+      const hashes: string[] = [];
+      const requests = extractNewPriorityRequests(receipt, chain.diamondProxy);
+      for (const req of requests) {
+        log(`   Relaying priority request from ${req.from} to ${req.to} via proxy ${chain.diamondProxy}`);
+        const result = await relayTx(chain.provider, req.from, req.to, req.calldata);
+        if (result.success) {
+          hashes.push(result.txHash);
+          log(`   Relay tx: ${result.txHash}`);
+        } else {
+          throw new Error(`Relay tx failed: from=${req.from} to=${req.to} via proxy ${chain.diamondProxy}`);
+        }
       }
-    }
-  }
+      return hashes;
+    })
+  );
 
-  return txHashes;
+  return perChainResults.flat();
 }
 
 /**
