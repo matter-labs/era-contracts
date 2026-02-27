@@ -36,9 +36,9 @@ export class AnvilManager {
   }
 
   async startChain(
-    config: Omit<AnvilChain, "rpcUrl" | "process"> & { blockTime?: number; timestamp?: number; loadState?: string }
+    config: Omit<AnvilChain, "rpcUrl" | "process"> & { blockTime?: number; timestamp?: number }
   ): Promise<void> {
-    const { chainId, port, isL1, blockTime, timestamp, loadState } = config;
+    const { chainId, port, isL1, blockTime, timestamp } = config;
     const rpcUrl = `http://127.0.0.1:${port}`;
 
     console.log(`🚀 Starting ${formatChainInfo(chainId, port, isL1)}...`);
@@ -68,10 +68,6 @@ export class AnvilManager {
 
     if (timestamp !== undefined) {
       args.push("--timestamp", timestamp.toString());
-    }
-
-    if (loadState) {
-      args.push("--load-state", loadState);
     }
 
     const childProcess = spawn(anvilBinary, args, {

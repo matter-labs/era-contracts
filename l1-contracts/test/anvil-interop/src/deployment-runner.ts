@@ -247,6 +247,9 @@ export class DeploymentRunner {
   /**
    * Start all chains from pre-generated Anvil state files.
    * Skips deployment steps 2-5 entirely — chains boot with state already loaded.
+   *
+   * Uses anvil_loadState RPC (not --load-state CLI) for format compatibility
+   * with states produced by anvil_dumpState.
    */
   async loadChainStates(
     anvilManager: AnvilManager,
@@ -262,21 +265,34 @@ export class DeploymentRunner {
       throw new Error(`addresses.json not found in ${stateDir}`);
     }
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
-    const { l1Addresses, ctmAddresses, chainAddresses, testTokens } = addresses;
+    const { l1Addresses, ctmAddresses, chainAddresses } = addresses;
 
-    // Start all chains with --load-state pointing to their state file
+    // Start all chains normally (no --load-state), then load state via RPC
     await Promise.all(
-      config.chains.map((chainConfig) => {
+      config.chains.map((chainConfig) =>
+        anvilManager.startChain({
+          chainId: chainConfig.chainId,
+          port: chainConfig.port,
+          isL1: chainConfig.isL1,
+        })
+      )
+    );
+
+    // Load state into each chain via anvil_loadState RPC
+    await Promise.all(
+      config.chains.map(async (chainConfig) => {
         const stateFile = path.join(stateDir, `${chainConfig.chainId}.json`);
         if (!fs.existsSync(stateFile)) {
           throw new Error(`State file not found: ${stateFile}`);
         }
-        return anvilManager.startChain({
-          chainId: chainConfig.chainId,
-          port: chainConfig.port,
-          isL1: chainConfig.isL1,
-          loadState: stateFile,
-        });
+        const stateData = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
+        const rpcUrl = `http://127.0.0.1:${chainConfig.port}`;
+        const provider = new providers.JsonRpcProvider(rpcUrl);
+        const success = await provider.send("anvil_loadState", [stateData]);
+        if (!success) {
+          throw new Error(`Failed to load state for chain ${chainConfig.chainId}`);
+        }
+        console.log(`  Loaded state for chain ${chainConfig.chainId}`);
       })
     );
 
@@ -289,15 +305,12 @@ export class DeploymentRunner {
       config: config.chains,
     };
 
-    // Populate deployment state so downstream tools (TBM, tests) work
+    // Populate deployment state so downstream tools (deployTestTokens, TBM) work
     const state = this.loadState();
     state.chains = chainInfo;
     state.l1Addresses = l1Addresses;
     state.ctmAddresses = ctmAddresses;
     state.chainAddresses = chainAddresses;
-    if (testTokens) {
-      state.testTokens = testTokens;
-    }
     this.saveState(state);
 
     console.log(`  L1: chain ${l1Chain?.chainId} at ${l1Chain?.rpcUrl}`);
