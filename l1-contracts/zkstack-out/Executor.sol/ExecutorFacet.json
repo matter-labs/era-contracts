@@ -1,0 +1,430 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_l1ChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "executeBatchesSharedBridge",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_processFrom",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_processTo",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_executeData",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getName",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proveBatchesSharedBridge",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_processBatchFrom",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_processBatchTo",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_proofData",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "revertBatchesSharedBridge",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_newLastBatch",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "BlockExecution",
+    "inputs": [
+      {
+        "name": "batchNumber",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "batchHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "commitment",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "BlocksRevert",
+    "inputs": [
+      {
+        "name": "totalBatchesCommitted",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "totalBatchesVerified",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "totalBatchesExecuted",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "BlocksVerification",
+    "inputs": [
+      {
+        "name": "previousLastVerifiedBatch",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "currentLastVerifiedBatch",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "BatchHashMismatch",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "actual",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "CanOnlyProcessOneBatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CantExecuteUnprovenBatches",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CantRevertExecutedBatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CommitBasedInteropNotSupported",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "DependencyRootsRollingHashMismatch",
+    "inputs": [
+      {
+        "name": "_expected",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_actual",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "EmptyData",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "IncorrectBatchBounds",
+    "inputs": [
+      {
+        "name": "processFromExpected",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "processToExpected",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "processFromProvided",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "processToProvided",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidBatchesDataLength",
+    "inputs": [
+      {
+        "name": "batchesDataLength",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "priorityOpsDataLength",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidMessageRoot",
+    "inputs": [
+      {
+        "name": "expectedMessageRoot",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "providedMessageRoot",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidProof",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MerkleIndexOrHeightMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MerkleNothingToProve",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MerklePathEmpty",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MerklePathLengthMismatch",
+    "inputs": [
+      {
+        "name": "pathLength",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "expectedLength",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "MerklePathOutOfBounds",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MessageRootIsZero",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MismatchNumberOfLayer1Txs",
+    "inputs": [
+      {
+        "name": "numberOfLayer1Txs",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "expectedLength",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NonSequentialBatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotHistoricalRoot",
+    "inputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NotInitializedReentrancyGuard",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotSettlementLayer",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "OnlyNormalMode",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PriorityOperationsRollingHashMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Reentrancy",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RevertedBatchNotAfterNewLastBatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Unauthorized",
+    "inputs": [
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "UnsupportedExecuteBatchEncoding",
+    "inputs": [
+      {
+        "name": "version",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "UnsupportedProofBatchEncoding",
+    "inputs": [
+      {
+        "name": "version",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "VerifiedBatchesExceedsCommittedBatches",
+    "inputs": []
+  }
+]
