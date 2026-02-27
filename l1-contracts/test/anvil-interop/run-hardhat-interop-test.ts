@@ -74,7 +74,6 @@ async function main(): Promise<void> {
       let ctmAddresses: Awaited<ReturnType<typeof runner.runFullDeployment>>["ctmAddresses"];
 
       // Try loading pre-generated chain states (much faster — skips deploy steps 2-5)
-      let usedPreloadedState = false;
       if (runner.hasChainStates()) {
         const stateDir = runner.getChainStatesDir();
         console.log(`\nFound pre-generated chain states at ${stateDir}`);
@@ -84,7 +83,6 @@ async function main(): Promise<void> {
         chains = result.chains;
         l1Addresses = result.l1Addresses;
         ctmAddresses = result.ctmAddresses;
-        usedPreloadedState = true;
       } else {
         console.log("\nNo pre-generated chain states found, running full deployment...");
         const result = await timedAsync("full deployment (steps 1-5)", () =>
@@ -110,8 +108,11 @@ async function main(): Promise<void> {
         l2ChainRpcUrls.set(l2Chain.chainId, l2Chain.rpcUrl);
       }
 
-      // Deploy test tokens only if not using preloaded state (tokens are included in state dump)
-      if (!usedPreloadedState) {
+      // Deploy test tokens if not already present in the preloaded state.
+      // When state was generated with setup-and-dump-state.ts, tokens are included in the dump.
+      const preloadedState = runner.loadState();
+      const hasTestTokens = preloadedState.testTokens && Object.keys(preloadedState.testTokens).length > 0;
+      if (!hasTestTokens) {
         await timedAsync("deploy:test-token", () => deployTestTokens());
       }
 
