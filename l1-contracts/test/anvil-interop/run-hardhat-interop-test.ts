@@ -74,7 +74,9 @@ async function main(): Promise<void> {
       let ctmAddresses: Awaited<ReturnType<typeof runner.runFullDeployment>>["ctmAddresses"];
 
       // Try loading pre-generated chain states (much faster — skips deploy steps 2-5)
-      if (runner.hasChainStates()) {
+      // Set ANVIL_INTEROP_FRESH_DEPLOY=1 to force full deployment instead.
+      const freshDeploy = process.env.ANVIL_INTEROP_FRESH_DEPLOY === "1";
+      if (!freshDeploy && runner.hasChainStates()) {
         const stateDir = runner.getChainStatesDir();
         console.log(`\nFound pre-generated chain states at ${stateDir}`);
         const result = await timedAsync("load chain states", () =>
