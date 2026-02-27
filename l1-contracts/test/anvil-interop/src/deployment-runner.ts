@@ -1,6 +1,5 @@
 import * as fs from "fs";
 import * as path from "path";
-import { execFileSync } from "child_process";
 import { Contract, Wallet, providers } from "ethers";
 import type { AnvilManager } from "./anvil-manager";
 import { ForgeDeployer } from "./deployer";
@@ -24,6 +23,8 @@ import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./const";
 export interface StartChainOptions {
   blockTime?: number;
   timestamp?: number;
+  /** Map of chainId → file path. Anvil will dump state to these files on exit. */
+  dumpStatePaths?: Record<number, string>;
 }
 
 export interface FullDeploymentResult {
@@ -88,13 +89,15 @@ export class DeploymentRunner {
 
     const config = this.getConfig();
 
+    const { dumpStatePaths, ...baseOptions } = startChainOptions || {};
     await Promise.all(
       config.chains.map((chainConfig) =>
         anvilManager.startChain({
           chainId: chainConfig.chainId,
           port: chainConfig.port,
           isL1: chainConfig.isL1,
-          ...startChainOptions,
+          ...baseOptions,
+          dumpStatePath: dumpStatePaths?.[chainConfig.chainId],
         })
       )
     );
@@ -266,57 +269,25 @@ export class DeploymentRunner {
       throw new Error(`addresses.json not found in ${stateDir}`);
     }
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
-    const { l1Addresses, ctmAddresses, chainAddresses } = addresses;
+    const { l1Addresses, ctmAddresses, chainAddresses, testTokens } = addresses;
 
-    // Start all chains normally (no --load-state), then load state via RPC
+    // Start all chains with --load-state pointing to their state file.
+    // Uses the native Anvil JSON state format (produced by --dump-state),
+    // which is version-independent unlike the anvil_dumpState RPC binary format.
     await Promise.all(
-      config.chains.map((chainConfig) =>
-        anvilManager.startChain({
+      config.chains.map((chainConfig) => {
+        const stateFile = path.join(stateDir, `${chainConfig.chainId}.json`);
+        if (!fs.existsSync(stateFile)) {
+          throw new Error(`State file not found: ${stateFile}`);
+        }
+        return anvilManager.startChain({
           chainId: chainConfig.chainId,
           port: chainConfig.port,
           isL1: chainConfig.isL1,
-        })
-      )
+          loadStatePath: stateFile,
+        });
+      })
     );
-
-    // Load state into each chain via anvil_loadState RPC.
-    // Uses curl in a child process so that:
-    //  1. The 2MB+ state data stays out of V8's heap
-    //  2. No persistent TCP connection from Node.js to Anvil ports
-    //     (cleanup.sh uses lsof + kill-9, and would kill our process if we held a connection)
-    for (const chainConfig of config.chains) {
-      const stateFile = path.join(stateDir, `${chainConfig.chainId}.json`);
-      if (!fs.existsSync(stateFile)) {
-        throw new Error(`State file not found: ${stateFile}`);
-      }
-      const rpcUrl = `http://127.0.0.1:${chainConfig.port}`;
-
-      // Build the JSON-RPC request body by wrapping the state file content.
-      // The state file contains a JSON string (hex-encoded), e.g. "0x1f8b..."
-      const tmpReqFile = path.join(stateDir, `_req_${chainConfig.chainId}.json`);
-      const stateContent = fs.readFileSync(stateFile, "utf-8");
-      fs.writeFileSync(tmpReqFile, `{"jsonrpc":"2.0","method":"anvil_loadState","params":[${stateContent}],"id":1}`);
-
-      try {
-        const result = execFileSync("curl", [
-          "-s", "-X", "POST", rpcUrl,
-          "-H", "Content-Type: application/json",
-          "-d", `@${tmpReqFile}`,
-        ], { encoding: "utf-8", timeout: 30_000 });
-
-        const parsed = JSON.parse(result);
-        if (!parsed.result) {
-          throw new Error(`anvil_loadState returned false for chain ${chainConfig.chainId}`);
-        }
-      } finally {
-        // Clean up temp file
-        if (fs.existsSync(tmpReqFile)) {
-          fs.unlinkSync(tmpReqFile);
-        }
-      }
-
-      console.log(`  Loaded state for chain ${chainConfig.chainId}`);
-    }
 
     const l1Chain = anvilManager.getL1Chain();
     const l2Chains = anvilManager.getL2Chains();
@@ -327,12 +298,15 @@ export class DeploymentRunner {
       config: config.chains,
     };
 
-    // Populate deployment state so downstream tools (deployTestTokens, TBM) work
+    // Populate deployment state so downstream tools (TBM, tests) work
     const state = this.loadState();
     state.chains = chainInfo;
     state.l1Addresses = l1Addresses;
     state.ctmAddresses = ctmAddresses;
     state.chainAddresses = chainAddresses;
+    if (testTokens) {
+      state.testTokens = testTokens;
+    }
     this.saveState(state);
 
     console.log(`  L1: chain ${l1Chain?.chainId} at ${l1Chain?.rpcUrl}`);
@@ -356,22 +330,38 @@ export class DeploymentRunner {
     return fs.existsSync(path.join(stateDir, "addresses.json"));
   }
 
-  async dumpState(rpcUrl: string, outputPath: string): Promise<void> {
-    const provider = new providers.JsonRpcProvider(rpcUrl);
-    const state = await provider.send("anvil_dumpState", []);
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-    fs.writeFileSync(outputPath, JSON.stringify(state));
-  }
-
-  async dumpAllStates(outputDir: string): Promise<void> {
+  /**
+   * Build dumpStatePaths map for all chains in the config.
+   * Pass the result as StartChainOptions.dumpStatePaths so Anvil
+   * will dump state to these files on exit (via --dump-state flag).
+   */
+  buildDumpStatePaths(outputDir: string): Record<number, string> {
     const config = this.getConfig();
     fs.mkdirSync(outputDir, { recursive: true });
-    console.log("\n=== Dumping Chain States ===\n");
+    const paths: Record<number, string> = {};
     for (const chainConfig of config.chains) {
-      const rpcUrl = `http://127.0.0.1:${chainConfig.port}`;
+      paths[chainConfig.chainId] = path.join(outputDir, `${chainConfig.chainId}.json`);
+    }
+    return paths;
+  }
+
+  /**
+   * Stop all chains to trigger --dump-state file writes.
+   * Chains must have been started with dumpStatePaths in StartChainOptions.
+   */
+  async dumpAllStates(anvilManager: AnvilManager, outputDir: string): Promise<void> {
+    console.log("\n=== Dumping Chain States (stopping Anvil to trigger --dump-state) ===\n");
+    await anvilManager.stopAll();
+
+    // Verify all state files were written
+    const config = this.getConfig();
+    for (const chainConfig of config.chains) {
       const statePath = path.join(outputDir, `${chainConfig.chainId}.json`);
-      await this.dumpState(rpcUrl, statePath);
-      console.log(`  Chain ${chainConfig.chainId} state saved to ${statePath}`);
+      if (!fs.existsSync(statePath)) {
+        throw new Error(`State file not written: ${statePath}`);
+      }
+      const size = fs.statSync(statePath).size;
+      console.log(`  Chain ${chainConfig.chainId} state saved (${(size / 1024).toFixed(0)} KB)`);
     }
   }
 
