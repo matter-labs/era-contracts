@@ -11,7 +11,7 @@ import {
 } from "../../src/process-logs-helper";
 import { migrateTokenBalanceToGW } from "../../src/token-balance-migration-helper";
 import { ETH_TOKEN_ADDRESS, L1_CHAIN_ID } from "../../src/const";
-import { encodeNtvAssetId } from "../../src/utils";
+import { encodeNtvAssetId } from "../../src/data-encoding";
 
 const L2A_CHAIN_ID = 12; // GW-settled chain
 const GW_CHAIN_ID = 11;

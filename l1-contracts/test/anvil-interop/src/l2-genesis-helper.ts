@@ -6,7 +6,8 @@ import {
   L1_CHAIN_ID,
   ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE,
 } from "./const";
-import { applyL1ToL2Alias, encodeNtvAssetId } from "./utils";
+import { applyL1ToL2Alias } from "./utils";
+import { encodeNtvAssetId } from "./data-encoding";
 
 /**
  * Helper for building L2GenesisUpgrade data structures

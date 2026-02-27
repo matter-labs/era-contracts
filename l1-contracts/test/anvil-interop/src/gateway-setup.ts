@@ -13,10 +13,10 @@ import {
   L2_BOOTLOADER_ADDR,
 } from "./const";
 import {
-  encodeNtvAssetId,
   impersonateAndRun,
   scanAndRelayPriorityRequests,
 } from "./utils";
+import { encodeNtvAssetId } from "./data-encoding";
 import { migrateTokenBalanceToGW } from "./token-balance-migration-helper";
 import { prepareMergedToml, prepareGatewayChainConfig } from "./toml-handling";
 import { runForgeScript } from "./forge";

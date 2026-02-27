@@ -74,8 +74,6 @@ export function ensureDirectoryExists(dirPath: string): void {
   }
 }
 
-// Re-export from data-encoding for backwards compatibility
-export { encodeNtvAssetId } from "./data-encoding";
 
 /**
  * Get chain IDs of chains settled on the gateway (not L1, not GW itself, not direct-settled chain 10).
