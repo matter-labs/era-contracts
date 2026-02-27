@@ -37,7 +37,12 @@ export class DeploymentRunner {
   }
 
   getConfig(): AnvilConfig {
-    return JSON.parse(fs.readFileSync(this.configPath, "utf-8"));
+    const config: AnvilConfig = JSON.parse(fs.readFileSync(this.configPath, "utf-8"));
+    const portOffset = parseInt(process.env.ANVIL_INTEROP_PORT_OFFSET || "0", 10);
+    if (portOffset) {
+      config.chains = config.chains.map((c) => ({ ...c, port: c.port + portOffset }));
+    }
+    return config;
   }
 
   loadState(): DeploymentState {

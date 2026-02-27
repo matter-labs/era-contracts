@@ -50,6 +50,13 @@ async function main(): Promise<void> {
   const skipSetup = process.env.ANVIL_INTEROP_SKIP_SETUP === "1";
   const skipCleanup = keepChains || process.env.ANVIL_INTEROP_SKIP_CLEANUP === "1";
 
+  // Parse --port-offset <N> flag and propagate via env var
+  const portOffsetIdx = process.argv.indexOf("--port-offset");
+  const portOffset = portOffsetIdx !== -1 ? parseInt(process.argv[portOffsetIdx + 1], 10) : 0;
+  if (portOffset) {
+    process.env.ANVIL_INTEROP_PORT_OFFSET = portOffset.toString();
+  }
+
   // Set env for genesis upgrade deployer
   process.env.ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE = process.env.ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE || "1";
 
