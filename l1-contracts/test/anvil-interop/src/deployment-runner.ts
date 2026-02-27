@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import { execFileSync } from "child_process";
 import { Contract, Wallet, providers } from "ethers";
 import type { AnvilManager } from "./anvil-manager";
 import { ForgeDeployer } from "./deployer";
@@ -278,20 +279,42 @@ export class DeploymentRunner {
       )
     );
 
-    // Load state into each chain sequentially via anvil_loadState RPC.
-    // Sequential to avoid OOM on memory-constrained CI runners (state files can be large).
+    // Load state into each chain via anvil_loadState RPC.
+    // Uses curl in a child process so that:
+    //  1. The 2MB+ state data stays out of V8's heap
+    //  2. No persistent TCP connection from Node.js to Anvil ports
+    //     (cleanup.sh uses lsof + kill-9, and would kill our process if we held a connection)
     for (const chainConfig of config.chains) {
       const stateFile = path.join(stateDir, `${chainConfig.chainId}.json`);
       if (!fs.existsSync(stateFile)) {
         throw new Error(`State file not found: ${stateFile}`);
       }
-      const stateData = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
       const rpcUrl = `http://127.0.0.1:${chainConfig.port}`;
-      const provider = new providers.JsonRpcProvider(rpcUrl);
-      const success = await provider.send("anvil_loadState", [stateData]);
-      if (!success) {
-        throw new Error(`Failed to load state for chain ${chainConfig.chainId}`);
+
+      // Build the JSON-RPC request body by wrapping the state file content.
+      // The state file contains a JSON string (hex-encoded), e.g. "0x1f8b..."
+      const tmpReqFile = path.join(stateDir, `_req_${chainConfig.chainId}.json`);
+      const stateContent = fs.readFileSync(stateFile, "utf-8");
+      fs.writeFileSync(tmpReqFile, `{"jsonrpc":"2.0","method":"anvil_loadState","params":[${stateContent}],"id":1}`);
+
+      try {
+        const result = execFileSync("curl", [
+          "-s", "-X", "POST", rpcUrl,
+          "-H", "Content-Type: application/json",
+          "-d", `@${tmpReqFile}`,
+        ], { encoding: "utf-8", timeout: 30_000 });
+
+        const parsed = JSON.parse(result);
+        if (!parsed.result) {
+          throw new Error(`anvil_loadState returned false for chain ${chainConfig.chainId}`);
+        }
+      } finally {
+        // Clean up temp file
+        if (fs.existsSync(tmpReqFile)) {
+          fs.unlinkSync(tmpReqFile);
+        }
       }
+
       console.log(`  Loaded state for chain ${chainConfig.chainId}`);
     }
 
