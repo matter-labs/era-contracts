@@ -584,14 +584,14 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                SetZKsyncOSPreV31TotalSupply() TESTS
+                setZKsyncOSPreV31TotalSupply() TESTS
     //////////////////////////////////////////////////////////////*/
 
     function test_setZkosPreV31TotalSupply_success() public {
         uint256 totalSupply = 42 ether;
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2BaseToken.SetZKsyncOSPreV31TotalSupply(totalSupply);
+        l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
     }
 
     function test_setZkosPreV31TotalSupply_emitsEvent() public {
@@ -601,7 +601,7 @@ contract L2BaseTokenZKOSTest is Test {
         emit IL2BaseTokenZKOS.ZKsyncOSPreV31TotalSupplySet(totalSupply);
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2BaseToken.SetZKsyncOSPreV31TotalSupply(totalSupply);
+        l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
     }
 
     function test_setZkosPreV31TotalSupply_revertIfNotServiceTransactionSender() public {
@@ -609,7 +609,7 @@ contract L2BaseTokenZKOSTest is Test {
 
         vm.prank(nonServiceSender);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonServiceSender));
-        l2BaseToken.SetZKsyncOSPreV31TotalSupply(42 ether);
+        l2BaseToken.setZKsyncOSPreV31TotalSupply(42 ether);
     }
 
     function test_setZkosPreV31TotalSupply_affectsTotalSupply() public {
@@ -625,7 +625,7 @@ contract L2BaseTokenZKOSTest is Test {
 
         // Set the pre-V31 total supply
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).SetZKsyncOSPreV31TotalSupply(preV31Supply);
+        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).setZKsyncOSPreV31TotalSupply(preV31Supply);
 
         // totalSupply = preV31Supply + (INITIAL - holder.balance) = preV31Supply + 0 = preV31Supply
         assertEq(
@@ -645,7 +645,7 @@ contract L2BaseTokenZKOSTest is Test {
         );
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2BaseToken.SetZKsyncOSPreV31TotalSupply(totalSupply);
+        l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
     }
 
     function test_setZkosPreV31TotalSupply_revertsOnSecondCall() public {
@@ -653,7 +653,7 @@ contract L2BaseTokenZKOSTest is Test {
 
         // First call succeeds
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2BaseToken.SetZKsyncOSPreV31TotalSupply(totalSupply);
+        l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
 
         // Mock backfill to revert on second call (as L2AssetTracker would)
         vm.mockCallRevert(
@@ -665,7 +665,7 @@ contract L2BaseTokenZKOSTest is Test {
         // Second call reverts because backfill is no longer needed
         vm.prank(SERVICE_TRANSACTION_SENDER);
         vm.expectRevert(abi.encodeWithSignature("BaseTokenTotalSupplyBackfillNotNeeded()"));
-        l2BaseToken.SetZKsyncOSPreV31TotalSupply(totalSupply);
+        l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
     }
 
     /*//////////////////////////////////////////////////////////////

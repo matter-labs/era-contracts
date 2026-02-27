@@ -38,7 +38,7 @@ contract SetZkosPreV31TotalSupplyScript is Script {
         calls[0] = Call({
             target: diamondProxy,
             value: 0,
-            data: abi.encodeCall(IAdmin.SetZKsyncOSPreV31TotalSupply, (_preV31TotalSupply))
+            data: abi.encodeCall(IAdmin.setZKsyncOSPreV31TotalSupply, (_preV31TotalSupply))
         });
 
         if (saveOutputOnly) {

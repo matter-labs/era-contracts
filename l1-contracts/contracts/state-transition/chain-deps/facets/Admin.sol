@@ -447,7 +447,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function SetZKsyncOSPreV31TotalSupply(
+    function setZKsyncOSPreV31TotalSupply(
         uint256 _totalSupply
     ) external onlyAdmin onlyL1 returns (bytes32 canonicalTxHash) {
         if (!s.zksyncOS) {
@@ -458,7 +458,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
         canonicalTxHash = IMailbox(address(this)).requestL2ServiceTransaction(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-            abi.encodeCall(IL2BaseTokenZKOS.SetZKsyncOSPreV31TotalSupply, (_totalSupply))
+            abi.encodeCall(IL2BaseTokenZKOS.setZKsyncOSPreV31TotalSupply, (_totalSupply))
         );
         // We can set this on the SL side directly since service transactions cannot fail.
         s.baseTokenHasTotalSupply = true;

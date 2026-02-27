@@ -49,7 +49,7 @@ contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
     /// then calls L2AssetTracker.backFillZKSyncOSBaseTokenV31MigrationData() to register
     /// the base token with the correct total supply.
     /// @param _totalSupply The total supply that existed before the V31 upgrade.
-    function SetZKsyncOSPreV31TotalSupply(uint256 _totalSupply) external {
+    function setZKsyncOSPreV31TotalSupply(uint256 _totalSupply) external {
         if (msg.sender != SERVICE_TRANSACTION_SENDER) {
             revert Unauthorized(msg.sender);
         }

@@ -21,7 +21,6 @@ import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
 import {
     AssetIdNotRegistered,
-    BaseTokenTotalSupplyBackfillFailed,
     BaseTokenTotalSupplyBackfillNotNeeded,
     BaseTokenTotalSupplyBackfillRequired,
     ChainBalanceMustBeZeroBeforeMigration,
@@ -95,7 +94,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     /// @notice Backfills the base token's pre-V31 total supply for ZKOS chains.
-    /// @dev Called by L2BaseTokenZKOS.SetZKsyncOSPreV31TotalSupply() after setting the total supply.
+    /// @dev Called by L2BaseTokenZKOS.setZKsyncOSPreV31TotalSupply() after setting the total supply.
     /// @param _amount The pre-V31 total supply amount.
     function backFillZKSyncOSBaseTokenV31MigrationData(uint256 _amount) external onlyL2BaseToken {
         if (!needBaseTokenTotalSupplyBackfill) {
