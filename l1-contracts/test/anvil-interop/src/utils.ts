@@ -1,4 +1,4 @@
-import { ethers, providers, utils } from "ethers";
+import { ethers, providers } from "ethers";
 import { parse as parseToml } from "toml";
 import * as fs from "fs";
 import * as path from "path";

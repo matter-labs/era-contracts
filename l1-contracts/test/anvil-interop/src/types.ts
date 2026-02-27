@@ -1,4 +1,5 @@
 import type { ChildProcess } from "child_process";
+import type { BigNumber } from "ethers";
 
 export interface AnvilChain {
   chainId: number;
@@ -194,5 +195,5 @@ export interface PriorityRequestData {
   from: string;
   to: string;
   calldata: string;
-  value?: import("ethers").BigNumber;
+  value?: BigNumber;
 }

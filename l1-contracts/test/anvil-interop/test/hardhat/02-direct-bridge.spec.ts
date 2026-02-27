@@ -63,7 +63,7 @@ describe("02 - Direct L1<->L2 Bridge (Chain 10)", function () {
 
       // Verify L1AssetTracker.chainBalance increased by mintValue
       // (chainBalance tracks the full amount sent to the chain, including gas)
-      const { l1ChainBalanceDelta } = assertDepositBalances(before, after, amount);
+      const { l1ChainBalanceDelta } = assertDepositBalances(before, after);
       expect(
         l1ChainBalanceDelta.eq(result.mintValue),
         `L1AssetTracker.chainBalance[${CHAIN_ID}] should increase by ${result.mintValue.toString()}, got ${l1ChainBalanceDelta.toString()}`
@@ -100,7 +100,7 @@ describe("02 - Direct L1<->L2 Bridge (Chain 10)", function () {
       const after = await tracker.takeSnapshot(CHAIN_ID, assetId, undefined, undefined, walletAddr, false);
 
       // Verify L1AssetTracker.chainBalance decreased
-      const { l1ChainBalanceDelta } = assertWithdrawalBalances(before, after, amount);
+      const { l1ChainBalanceDelta } = assertWithdrawalBalances(before, after);
       expect(
         l1ChainBalanceDelta.eq(amount),
         `L1AssetTracker.chainBalance[${CHAIN_ID}] should decrease by ${amount.toString()}, got ${l1ChainBalanceDelta.toString()}`

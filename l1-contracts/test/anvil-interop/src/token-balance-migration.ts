@@ -1,8 +1,7 @@
-import { BigNumber, Contract, providers, ethers } from "ethers";
+import { BigNumber, Contract, providers } from "ethers";
 import type { CoreDeployedAddresses } from "./types";
-import { encodeNtvAssetId } from "./data-encoding";
 import { l1AssetTrackerAbi, gwAssetTrackerAbi } from "./contracts";
-import { ETH_TOKEN_ADDRESS, GW_ASSET_TRACKER_ADDR, L1_CHAIN_ID } from "./const";
+import { GW_ASSET_TRACKER_ADDR } from "./const";
 
 /**
  * Token balance migration helper.

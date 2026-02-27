@@ -1,14 +1,10 @@
 import { expect } from "chai";
 import { BigNumber } from "ethers";
 import { executeTokenTransfer } from "../../src/token-transfer";
-import { createBalanceTrackerFromState } from "../../src/balance-tracker";
-import { DeploymentRunner } from "../../src/deployment-runner";
 import type { MultiChainTokenTransferParams } from "../../src/types";
 
 describe("03 - Interop Transfer (Direct Settlement)", function () {
   this.timeout(0);
-
-  const runner = new DeploymentRunner();
 
   it("transfers tokens from chain 11 to chain 12 via InteropCenter", async () => {
     const params: MultiChainTokenTransferParams = {

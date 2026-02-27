@@ -71,7 +71,6 @@ async function main(): Promise<void> {
 
       let chains: Awaited<ReturnType<typeof runner.runFullDeployment>>["chains"];
       let l1Addresses: Awaited<ReturnType<typeof runner.runFullDeployment>>["l1Addresses"];
-      let ctmAddresses: Awaited<ReturnType<typeof runner.runFullDeployment>>["ctmAddresses"];
 
       // Try loading pre-generated chain states (much faster — skips deploy steps 2-5)
       // Set ANVIL_INTEROP_FRESH_DEPLOY=1 to force full deployment instead.
@@ -82,13 +81,11 @@ async function main(): Promise<void> {
         const result = await timedAsync("load chain states", () => runner.loadChainStates(anvilManager, stateDir));
         chains = result.chains;
         l1Addresses = result.l1Addresses;
-        ctmAddresses = result.ctmAddresses;
       } else {
         console.log("\nNo pre-generated chain states found, running full deployment...");
         const result = await timedAsync("full deployment (steps 1-5)", () => runner.runFullDeployment(anvilManager));
         chains = result.chains;
         l1Addresses = result.l1Addresses;
-        ctmAddresses = result.ctmAddresses;
       }
 
       if (!chains.l1) {

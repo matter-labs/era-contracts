@@ -179,8 +179,7 @@ export class BalanceTracker {
  */
 export function assertDepositBalances(
   before: BalanceSnapshot,
-  after: BalanceSnapshot,
-  _amount: BigNumber
+  after: BalanceSnapshot
 ): { l2BalanceDelta: BigNumber; l1ChainBalanceDelta: BigNumber } {
   const l2BalanceDelta = BigNumber.from(after.l2TokenBalance).sub(before.l2TokenBalance);
   const l1ChainBalanceDelta = BigNumber.from(after.l1ChainBalance).sub(before.l1ChainBalance);
@@ -195,8 +194,7 @@ export function assertDepositBalances(
  */
 export function assertWithdrawalBalances(
   before: BalanceSnapshot,
-  after: BalanceSnapshot,
-  _amount: BigNumber
+  after: BalanceSnapshot
 ): { l2BalanceDelta: BigNumber; l1ChainBalanceDelta: BigNumber } {
   const l2BalanceDelta = BigNumber.from(before.l2TokenBalance).sub(after.l2TokenBalance);
   const l1ChainBalanceDelta = BigNumber.from(before.l1ChainBalance).sub(after.l1ChainBalance);

@@ -1,86 +1,100 @@
 # Quick Start Guide
 
-## Setup (One Time)
-
-1. **Build contracts:**
-
-   ```bash
-   cd /path/to/contracts/l1-contracts
-   forge build
-   ```
-
-2. **Navigate to anvil-interop:**
-
-   ```bash
-   cd test/anvil-interop
-   ```
-
-## Running the Stack
-
-### Option A: All at Once (Recommended)
+## Prerequisites
 
 ```bash
+cd contracts/l1-contracts
+forge build                    # Build Solidity contracts
+cd test/anvil-interop
+yarn install                   # Install dependencies (if not done)
+```
+
+## Run Tests
+
+```bash
+# From repo root — fastest way to run everything (~85s with pregenerated state)
+yarn test:hardhat:interop
+
+# Force full deployment from scratch (~5 min)
+ANVIL_INTEROP_FRESH_DEPLOY=1 yarn test:hardhat:interop
+
+# Keep chains running after tests (for debugging or re-running individual tests)
+yarn test:hardhat:interop --keep-chains
+```
+
+## Re-run Tests (Chains Already Running)
+
+After `--keep-chains`, re-run tests without redeployment:
+
+```bash
+cd contracts/l1-contracts
+
+# All specs
+ANVIL_INTEROP_SKIP_SETUP=1 ANVIL_INTEROP_SKIP_CLEANUP=1 \
+  yarn hardhat test test/anvil-interop/test/hardhat/*.spec.ts \
+  --network hardhat --no-compile
+
+# Single spec
+ANVIL_INTEROP_SKIP_SETUP=1 ANVIL_INTEROP_SKIP_CLEANUP=1 \
+  yarn hardhat test test/anvil-interop/test/hardhat/02-direct-bridge.spec.ts \
+  --network hardhat --no-compile
+
+# Filter by test name
+ANVIL_INTEROP_SKIP_SETUP=1 ANVIL_INTEROP_SKIP_CLEANUP=1 \
+  yarn hardhat test test/anvil-interop/test/hardhat/05-gateway-bridge.spec.ts \
+  --network hardhat --no-compile --grep "deposits ETH"
+```
+
+## Interactive Environment
+
+```bash
+cd contracts/l1-contracts/test/anvil-interop
+
+# Start all chains + deploy + keep running (Ctrl+C to stop)
 yarn start
 ```
 
-This runs all steps automatically (start chains, deploy L1, register L2s, initialize, setup gateway) and keeps the environment running until Ctrl+C.
-
-### Option B: Step by Step
+Then in another terminal:
 
 ```bash
+yarn send:l2-to-l2              # L2->L2 interop message
+yarn deploy:test-token           # Deploy ERC20 test token
+yarn send:token                  # Token transfer
+```
+
+## Step-by-Step Deployment
+
+```bash
+cd contracts/l1-contracts/test/anvil-interop
 yarn step1  # Start Anvil chains
 yarn step2  # Deploy L1 contracts
 yarn step3  # Register L2 chains
-yarn step4  # Initialize L2 (L2GenesisUpgrade with isZKsyncOS=true)
+yarn step4  # Initialize L2 (L2GenesisUpgrade)
 yarn step5  # Setup gateway
+yarn step6  # Start batch settler daemon
 ```
 
-## Testing L2->L2 Messaging
+## Regenerate Pregenerated State
+
+After changing contracts, regenerate the chain state snapshots:
 
 ```bash
-# Basic test (chain 11 -> chain 12)
-yarn send:l2-to-l2
-
-# Custom parameters
-yarn send:l2-to-l2 [sourceChainId] [targetChainId] [targetAddress] [calldata]
+cd contracts/l1-contracts/test/anvil-interop
+yarn setup-and-dump
 ```
 
 ## Cleanup
 
 ```bash
-yarn cleanup
-```
-
-Stops all Anvil processes and cleans up deployment state.
-
-## Quick Check
-
-**Verify everything is running:**
-
-```bash
-# Check Anvil processes
-ps aux | grep anvil
-
-# Check PIDs file
-cat outputs/anvil-pids.json
-
-# Check deployment state
-ls outputs/state/
+yarn cleanup                    # Kill Anvil processes, remove outputs
 ```
 
 ## Troubleshooting
 
-| Issue                       | Solution                                            |
-| --------------------------- | --------------------------------------------------- |
-| "L2 chains not found"       | Run `yarn step1` first                              |
-| "Could not read [Contract]" | Run `forge build` first                             |
-| Transaction reverted        | Check gas limit (should be 50M), verify L1 deployed |
-
-## What's Next?
-
-After successful setup:
-
-- `yarn step6` - Start the settler daemon
-- `yarn test:interop` - Run interop tests
-- `yarn deploy:test-token` - Deploy test ERC20 token
-- `yarn send:token` - Send token transfers
+| Issue | Solution |
+|-------|----------|
+| "L2 chains not found" | Run `yarn step1` first |
+| "Could not read [Contract]" | Run `forge build` in `l1-contracts/` |
+| Transaction reverted | Use `cast run <tx_hash> -r <rpc_url>` to trace |
+| Tests fail after contract changes | Run `yarn setup-and-dump` to regenerate state |
+| Port conflicts | Use `ANVIL_INTEROP_PORT_OFFSET=100` to shift ports |
