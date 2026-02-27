@@ -271,21 +271,34 @@ export class DeploymentRunner {
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
     const { l1Addresses, ctmAddresses, chainAddresses, testTokens } = addresses;
 
-    // Start all chains with --load-state pointing to their state file.
-    // Uses the native Anvil JSON state format (produced by --dump-state),
-    // which is version-independent unlike the anvil_dumpState RPC binary format.
+    // Start all chains normally (no --load-state), then load state via RPC.
+    // The state files are hex-encoded gzip (from anvil_dumpState RPC), which
+    // anvil_loadState RPC accepts but --load-state CLI does not.
     await Promise.all(
-      config.chains.map((chainConfig) => {
+      config.chains.map((chainConfig) =>
+        anvilManager.startChain({
+          chainId: chainConfig.chainId,
+          port: chainConfig.port,
+          isL1: chainConfig.isL1,
+        })
+      )
+    );
+
+    // Load state into each chain via anvil_loadState RPC
+    await Promise.all(
+      config.chains.map(async (chainConfig) => {
         const stateFile = path.join(stateDir, `${chainConfig.chainId}.json`);
         if (!fs.existsSync(stateFile)) {
           throw new Error(`State file not found: ${stateFile}`);
         }
-        return anvilManager.startChain({
-          chainId: chainConfig.chainId,
-          port: chainConfig.port,
-          isL1: chainConfig.isL1,
-          loadStatePath: stateFile,
-        });
+        const stateData = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
+        const rpcUrl = `http://127.0.0.1:${chainConfig.port}`;
+        const provider = new providers.JsonRpcProvider(rpcUrl);
+        const success = await provider.send("anvil_loadState", [stateData]);
+        if (!success) {
+          throw new Error(`Failed to load state for chain ${chainConfig.chainId}`);
+        }
+        console.log(`  Loaded state for chain ${chainConfig.chainId}`);
       })
     );
 
