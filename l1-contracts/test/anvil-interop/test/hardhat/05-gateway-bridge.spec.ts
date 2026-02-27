@@ -36,18 +36,22 @@ describe("05 - Gateway Bridge (Chain 12, via GW)", function () {
       const assetId = await queryEthAssetId(l1Provider, state.l1Addresses!.l1NativeTokenVault);
       const amount = ethers.utils.parseEther("0.5");
       const l2Chain = state.chains!.l2.find((c) => c.chainId === L2A_CHAIN_ID)!;
+      const gwChain = state.chains!.l2.find((c) => c.chainId === GW_CHAIN_ID)!;
+      const gwDiamondProxy = state.chainAddresses!.find((c) => c.chainId === GW_CHAIN_ID)!.diamondProxy;
 
       // For gateway-settled chains, L1AssetTracker tracks the balance under the
       // settlement layer chain ID (GW), not the destination chain ID (L2A).
       const l1ChainBalanceBefore = await tracker.getL1ChainBalance(GW_CHAIN_ID, assetId);
 
-      // Execute deposit
+      // Execute deposit — relay through GW so GWAssetTracker.chainBalance[L2A] is updated
       const result = await depositETHToL2({
         l1RpcUrl: state.chains!.l1!.rpcUrl,
         l2RpcUrl: l2Chain.rpcUrl,
         chainId: L2A_CHAIN_ID,
         l1Addresses: state.l1Addresses!,
         amount,
+        gwRpcUrl: gwChain.rpcUrl,
+        gwDiamondProxy,
       });
 
       expect(result.l1TxHash).to.match(/^0x[0-9a-fA-F]{64}$/);

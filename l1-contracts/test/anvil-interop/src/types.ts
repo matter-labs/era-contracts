@@ -194,4 +194,5 @@ export interface PriorityRequestData {
   from: string;
   to: string;
   calldata: string;
+  value?: import("ethers").BigNumber;
 }

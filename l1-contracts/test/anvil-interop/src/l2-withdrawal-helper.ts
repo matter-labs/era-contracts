@@ -229,8 +229,9 @@ async function finalizeWithdrawalOnL1(
   let l2Sender: string;
 
   if (isBaseToken) {
-    // Base token format: finalizeEthWithdrawal(address,uint256) selector + packed(address, uint256)
-    const selector = ethers.utils.id("finalizeEthWithdrawal(address,uint256)").slice(0, 10);
+    // Base token format: IMailboxLegacy.finalizeEthWithdrawal selector + packed(address, uint256)
+    // The selector is from the full interface function (5 params), but the message body is just (address, uint256)
+    const selector = ethers.utils.id("finalizeEthWithdrawal(uint256,uint256,uint16,bytes,bytes32[])").slice(0, 10);
     message = ethers.utils.solidityPack(["bytes4", "address", "uint256"], [selector, recipient, amount]);
     l2Sender = L2_BASE_TOKEN_ADDR; // 0x800a
   } else {

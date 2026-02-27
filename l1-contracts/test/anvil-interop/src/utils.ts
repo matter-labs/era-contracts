@@ -185,15 +185,19 @@ export function buildFinalizeWithdrawalParams(
  */
 export function extractNewPriorityRequests(
   receipt: ethers.providers.TransactionReceipt,
-  diamondProxyAddr: string
+  diamondProxyAddr?: string
 ): PriorityRequestData[] {
   const newPriorityRequestTopic = ethers.utils.id(NEW_PRIORITY_REQUEST_EVENT_SIG);
 
   const priorityRequestLogs = receipt.logs.filter(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (logEntry: any) =>
-      logEntry.address.toLowerCase() === diamondProxyAddr.toLowerCase() &&
-      logEntry.topics[0] === newPriorityRequestTopic
+    (logEntry: any) => {
+      if (logEntry.topics[0] !== newPriorityRequestTopic) return false;
+      if (diamondProxyAddr) {
+        return logEntry.address.toLowerCase() === diamondProxyAddr.toLowerCase();
+      }
+      return true;
+    }
   );
 
   // Lazy import to avoid circular dependency at module init time
@@ -209,29 +213,32 @@ export function extractNewPriorityRequests(
       from: ethers.utils.getAddress(ethers.utils.hexZeroPad(fromUint256.toHexString(), 20)),
       to: ethers.utils.getAddress(ethers.utils.hexZeroPad(toUint256.toHexString(), 20)),
       calldata: parsed.args.transaction.data,
+      value: ethers.BigNumber.from(parsed.args.transaction.value),
     };
   });
 }
 
 /**
  * Relay a transaction on an Anvil chain by impersonating the given sender.
- * Returns { txHash, success } — does NOT throw on revert.
+ * Returns { txHash, success, receipt } — does NOT throw on revert.
  */
 export async function relayTx(
   provider: providers.JsonRpcProvider,
   from: string,
   to: string,
   calldata: string,
-): Promise<{ txHash: string; success: boolean }> {
+  value?: ethers.BigNumber,
+): Promise<{ txHash: string; success: boolean; receipt?: ethers.providers.TransactionReceipt }> {
   try {
     return await impersonateAndRun(provider, from, async (signer) => {
       const tx = await signer.sendTransaction({
         to,
         data: calldata,
         gasLimit: 30_000_000,
+        ...(value && !value.isZero() ? { value } : {}),
       });
       const receipt = await tx.wait();
-      return { txHash: receipt.transactionHash, success: receipt.status === 1 };
+      return { txHash: receipt.transactionHash, success: receipt.status === 1, receipt };
     });
   } catch (error) {
     // Transaction may have reverted — return failure instead of throwing
@@ -242,17 +249,24 @@ export async function relayTx(
 }
 
 /**
- * Extract NewPriorityRequest events from an L1 receipt and relay them to the target chains.
+ * Extract NewPriorityRequest events from a receipt and relay them to the target chains.
  *
  * For each chain entry, filters events from the corresponding diamond proxy, extracts the
- * sender, destination address, and calldata from the event data, and relays the transaction
- * by impersonating the original sender on the target chain.
+ * sender, destination address, calldata, and value from the event data, and relays the
+ * transaction by impersonating the original sender on the target chain.
+ *
+ * If a chain has `relayChains`, after relaying to it, any NewPriorityRequest events from
+ * the relay receipt are extracted and relayed to those chains (GW → L2 relay).
  *
  * @returns Array of relay transaction hashes
  */
 export async function extractAndRelayNewPriorityRequests(
   receipt: ethers.providers.TransactionReceipt,
-  chains: Array<{ diamondProxy: string; provider: providers.JsonRpcProvider }>,
+  chains: Array<{
+    diamondProxy: string;
+    provider: providers.JsonRpcProvider;
+    relayChains?: Array<{ provider: providers.JsonRpcProvider }>;
+  }>,
   logger?: (line: string) => void,
 ): Promise<string[]> {
   const log = logger || console.log;
@@ -262,10 +276,29 @@ export async function extractAndRelayNewPriorityRequests(
     const requests = extractNewPriorityRequests(receipt, chain.diamondProxy);
     for (const req of requests) {
       log(`   Relaying priority request from ${req.from} to ${req.to} via proxy ${chain.diamondProxy}`);
-      const result = await relayTx(chain.provider, req.from, req.to, req.calldata);
+      const result = await relayTx(chain.provider, req.from, req.to, req.calldata, req.value);
       if (result.success) {
         txHashes.push(result.txHash);
         log(`   Relay tx: ${result.txHash}`);
+
+        // GW relay: if this chain has relayChains, extract NewPriorityRequest events
+        // from the relay receipt and relay them to the next-hop chains.
+        if (chain.relayChains && result.receipt) {
+          const nextRequests = extractNewPriorityRequests(result.receipt);
+          log(`   Found ${nextRequests.length} next-hop priority request(s)`);
+          for (const nextReq of nextRequests) {
+            for (const relayChain of chain.relayChains) {
+              log(`   Relaying next-hop from ${nextReq.from} to ${nextReq.to}`);
+              const nextResult = await relayTx(relayChain.provider, nextReq.from, nextReq.to, nextReq.calldata, nextReq.value);
+              if (nextResult.success) {
+                txHashes.push(nextResult.txHash);
+                log(`   Next-hop relay tx: ${nextResult.txHash}`);
+              } else {
+                throw new Error(`Next-hop relay tx failed: from=${nextReq.from} to=${nextReq.to}`);
+              }
+            }
+          }
+        }
       } else {
         throw new Error(`Relay tx failed: from=${req.from} to=${req.to} via proxy ${chain.diamondProxy}`);
       }

@@ -1,6 +1,6 @@
 import { BigNumber, Contract, providers, Wallet, ethers } from "ethers";
 import type { CoreDeployedAddresses } from "./types";
-import { encodeNtvAssetId, impersonateAndRun } from "./utils";
+import { encodeNtvAssetId, impersonateAndRun, extractAndRelayNewPriorityRequests } from "./utils";
 import { l1BridgehubAbi, l2AssetRouterAbi, testnetERC20TokenAbi, l1NativeTokenVaultAbi } from "./contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS, L1_CHAIN_ID, L2_ASSET_ROUTER_ADDR } from "./const";
 
@@ -11,6 +11,10 @@ export interface DepositETHParams {
   l1Addresses: CoreDeployedAddresses;
   amount: BigNumber;
   recipient?: string;
+  /** L1 diamond proxy that emits NewPriorityRequest (chain's own for direct, GW's for GW-settled) */
+  l1DiamondProxy: string;
+  /** For GW-settled chains: relay deposit through the GW chain */
+  gwRpcUrl?: string;
 }
 
 export interface DepositETHResult {
@@ -38,14 +42,14 @@ export interface DepositERC20Result {
 }
 
 /**
- * Deposit ETH from L1 to an L2 chain via Bridgehub.requestL2TransactionDirect.
+ * Deposit ETH from L1 to an L2 chain via Bridgehub.requestL2TransactionTwoBridges.
  *
- * On a real chain, the L2 side would be executed by the sequencer. On Anvil, we
- * directly execute the L2 side by calling the L2AssetRouter.finalizeDeposit via
- * anvil_impersonateAccount (as the aliased L1AssetRouter address).
+ * This produces a self-finalizing priority request: L1AssetRouter.bridgehubDeposit
+ * generates L2 calldata containing L2AssetRouter.finalizeDeposit(...), so relay via
+ * extractAndRelayNewPriorityRequests works for both direct and GW-settled chains.
  */
 export async function depositETHToL2(params: DepositETHParams): Promise<DepositETHResult> {
-  const { l1RpcUrl, l2RpcUrl, chainId, l1Addresses, amount } = params;
+  const { l1RpcUrl, l2RpcUrl, chainId, l1Addresses, amount, l1DiamondProxy } = params;
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
   const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
@@ -53,97 +57,81 @@ export async function depositETHToL2(params: DepositETHParams): Promise<DepositE
   const l1Wallet = new Wallet(privateKey, l1Provider);
   const recipient = params.recipient || l1Wallet.address;
 
-  // Load ABIs
-  const bridgehubAbi = l1BridgehubAbi();
-  const bridgehub = new Contract(l1Addresses.bridgehub, bridgehubAbi, l1Wallet);
+  const bridgehub = new Contract(l1Addresses.bridgehub, l1BridgehubAbi(), l1Wallet);
 
-  // ETH deposit uses requestL2TransactionDirect
   const l2GasLimit = 1_000_000;
   const l2GasPerPubdataByteLimit = 800;
   const gasPrice = 50_000_000_000n; // 50 gwei
 
-  // Calculate baseCost so mintValue >= baseCost + l2Value
   const baseCost = await bridgehub.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, l2GasPerPubdataByteLimit);
-  const mintValue = baseCost.add(amount);
+
+  // Build two-bridges calldata: ETH deposit via L1AssetRouter
+  const abiCoder = ethers.utils.defaultAbiCoder;
+  const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+  const transferData = abiCoder.encode(
+    ["uint256", "address", "address"],
+    [amount, recipient, ETH_TOKEN_ADDRESS]
+  );
+  const secondBridgeCalldata = abiCoder.encode(
+    ["bytes32", "bytes"],
+    [ethAssetId, transferData]
+  );
 
   const request = {
-    chainId: chainId,
-    mintValue: mintValue,
-    l2Contract: recipient,
-    l2Value: amount,
-    l2Calldata: "0x",
-    l2GasLimit: l2GasLimit,
-    l2GasPerPubdataByteLimit: l2GasPerPubdataByteLimit,
-    factoryDeps: [],
+    chainId,
+    mintValue: baseCost,
+    l2Value: 0,
+    l2GasLimit,
+    l2GasPerPubdataByteLimit,
     refundRecipient: recipient,
+    secondBridgeAddress: l1Addresses.l1SharedBridge,
+    secondBridgeValue: amount,
+    secondBridgeCalldata,
   };
 
-  console.log(`   Depositing ${ethers.utils.formatEther(amount)} ETH to chain ${chainId}...`);
-  console.log(`   baseCost: ${baseCost.toString()}, mintValue: ${mintValue.toString()}`);
+  console.log(`   Depositing ${ethers.utils.formatEther(amount)} ETH to chain ${chainId} via TwoBridges...`);
+  console.log(`   baseCost: ${baseCost.toString()}, amount: ${amount.toString()}`);
 
-  const tx = await bridgehub.requestL2TransactionDirect(request, {
-    value: mintValue,
+  const tx = await bridgehub.requestL2TransactionTwoBridges(request, {
+    value: baseCost.add(amount),
     gasLimit: 5_000_000,
   });
-  await tx.wait();
+  const l1Receipt = await tx.wait();
 
   console.log(`   L1 tx: cast run ${tx.hash} -r ${l1RpcUrl}`);
 
-  // L2 finalization uses the L2 asset ID (computed with L2NTV address, matching L2 genesis init)
-  const l2EthAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+  let l2TxHash: string | null;
 
-  // Finalize on L2 side: the L1→L2 relayer normally does this, but we can do it directly.
-  // The L2AssetRouter.finalizeDeposit must be called by the aliased L1AssetRouter.
-  // With Anvil auto-impersonate, we can call from any address.
-  const l2TxHash = await finalizeETHDepositOnL2(l2Provider, chainId, l2EthAssetId, amount, recipient);
+  if (params.gwRpcUrl) {
+    // GW-settled: relay L1 → GW → L2
+    const gwProvider = new providers.JsonRpcProvider(params.gwRpcUrl);
+    const txHashes = await extractAndRelayNewPriorityRequests(
+      l1Receipt,
+      [{
+        diamondProxy: l1DiamondProxy,
+        provider: gwProvider,
+        relayChains: [{ provider: l2Provider }],
+      }],
+    );
+    l2TxHash = txHashes.length > 0 ? txHashes[txHashes.length - 1] : null;
+  } else {
+    // Direct chain: relay L1 → L2
+    const txHashes = await extractAndRelayNewPriorityRequests(
+      l1Receipt,
+      [{
+        diamondProxy: l1DiamondProxy,
+        provider: l2Provider,
+      }],
+    );
+    l2TxHash = txHashes.length > 0 ? txHashes[txHashes.length - 1] : null;
+  }
 
   return {
     l1TxHash: tx.hash,
     l2TxHash,
     amount,
-    mintValue,
+    mintValue: baseCost.add(amount),
   };
-}
-
-/**
- * Finalize an ETH deposit on L2 by calling L2AssetRouter.finalizeDeposit.
- * Uses anvil_impersonateAccount to act as the aliased L1AssetRouter.
- */
-async function finalizeETHDepositOnL2(
-  l2Provider: providers.JsonRpcProvider,
-  _chainId: number,
-  ethAssetId: string,
-  amount: BigNumber,
-  recipient: string
-): Promise<string | null> {
-
-  // The L2AssetRouter.finalizeDeposit expects to be called by the aliased counterpart
-  // or by itself. On Anvil with auto-impersonate, we can call from any address.
-  // Encode the transfer data: (amount, recipient, ETH_TOKEN_ADDRESS)
-  const abiCoder = ethers.utils.defaultAbiCoder;
-  const transferData = abiCoder.encode(
-    ["uint256", "address", "address"],
-    [amount, recipient, ETH_TOKEN_ADDRESS]
-  );
-
-  // We need to call from the L2AssetRouter itself (self-call) or from the aliased L1 address.
-  // Use the L2AssetRouter address as sender via impersonation.
-  try {
-    return await impersonateAndRun(l2Provider, L2_ASSET_ROUTER_ADDR, async (signer) => {
-      const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbi(), signer);
-
-      // originChainId = L1_CHAIN_ID (protocol chain ID = 1)
-      const tx = await l2AssetRouter.finalizeDeposit(L1_CHAIN_ID, ethAssetId, transferData, {
-        gasLimit: 5_000_000,
-      });
-      await tx.wait();
-      console.log(`   L2 finalizeDeposit tx: cast run ${tx.hash} -r ${l2Provider.connection.url}`);
-      return tx.hash;
-    });
-  } catch (error: unknown) {
-    console.error(`   Failed to finalize deposit on L2: ${(error as Error).message}`);
-    return null;
-  }
 }
 
 /**

@@ -29,6 +29,7 @@ describe("02 - Direct L1<->L2 Bridge (Chain 10)", function () {
       const walletAddr = ANVIL_DEFAULT_ACCOUNT_ADDR;
       const amount = ethers.utils.parseEther("1.0");
       const l2Chain = state.chains!.l2.find((c) => c.chainId === CHAIN_ID)!;
+      const chainDiamondProxy = state.chainAddresses!.find((c) => c.chainId === CHAIN_ID)!.diamondProxy;
 
       // Snapshot before
       const before = await tracker.takeSnapshot(
@@ -47,6 +48,7 @@ describe("02 - Direct L1<->L2 Bridge (Chain 10)", function () {
         chainId: CHAIN_ID,
         l1Addresses: state.l1Addresses!,
         amount,
+        l1DiamondProxy: chainDiamondProxy,
       });
 
       expect(result.l1TxHash).to.match(/^0x[0-9a-fA-F]{64}$/);
