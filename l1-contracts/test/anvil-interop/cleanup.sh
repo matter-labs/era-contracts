@@ -35,10 +35,12 @@ if [ -f "outputs/anvil-pids.json" ]; then
     rm -f outputs/anvil-pids.json
 fi
 
-# Fallback: Kill processes on known Anvil ports only (not system-wide)
+# Fallback: Kill processes LISTENING on known Anvil ports only (not system-wide)
+# -sTCP:LISTEN ensures we only kill Anvil server processes, not Node.js clients
+# that happen to have connections to those ports.
 echo "Checking known Anvil ports..."
 for PORT in $ANVIL_PORTS; do
-    PID=$(lsof -ti :$PORT 2>/dev/null || true)
+    PID=$(lsof -ti :$PORT -sTCP:LISTEN 2>/dev/null || true)
     if [ -n "$PID" ]; then
         echo "  Killing process on port $PORT (PID: $PID)..."
         kill -9 $PID 2>/dev/null || true
@@ -52,7 +54,7 @@ rm -f /tmp/step6-output.log 2>/dev/null || true
 # Verify ports are free
 ALL_CLEAR=true
 for PORT in $ANVIL_PORTS; do
-    if lsof -ti :$PORT > /dev/null 2>&1; then
+    if lsof -ti :$PORT -sTCP:LISTEN > /dev/null 2>&1; then
         echo "⚠️  Warning: Port $PORT is still in use"
         ALL_CLEAR=false
     fi
