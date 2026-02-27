@@ -16,9 +16,21 @@ import type {
   CTMDeployedAddresses,
   DeploymentState,
 } from "./types";
-import { loadBytecodeFromOut } from "./utils";
+import { loadBytecodeFromOut, getGwSettledChainIds } from "./utils";
 import { dummyL1MessageRootAbi, migratorFacetAbi } from "./contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./const";
+
+export interface StartChainOptions {
+  blockTime?: number;
+  timestamp?: number;
+}
+
+export interface FullDeploymentResult {
+  chains: ChainInfo;
+  l1Addresses: CoreDeployedAddresses;
+  ctmAddresses: CTMDeployedAddresses;
+  chainAddresses: ChainAddresses[];
+}
 
 function timeIt(label: string): () => void {
   const start = Date.now();
@@ -28,11 +40,13 @@ function timeIt(label: string): () => void {
 
 export class DeploymentRunner {
   private stateDir: string;
+  private configDir: string;
   private configPath: string;
 
   constructor(baseDir: string = __dirname + "/..") {
     this.stateDir = path.join(baseDir, "outputs/state");
-    this.configPath = path.join(baseDir, "config/anvil-config.json");
+    this.configDir = path.join(baseDir, "config");
+    this.configPath = path.join(this.configDir, "anvil-config.json");
     fs.mkdirSync(this.stateDir, { recursive: true });
   }
 
@@ -43,6 +57,14 @@ export class DeploymentRunner {
       config.chains = config.chains.map((c) => ({ ...c, port: c.port + portOffset }));
     }
     return config;
+  }
+
+  /** Read protocol version from configs/genesis/era/latest.json (the source of truth). */
+  getProtocolVersionString(): string {
+    const genesisPath = path.resolve(this.configDir, "../../../../configs/genesis/era/latest.json");
+    const genesis = JSON.parse(fs.readFileSync(genesisPath, "utf-8"));
+    const { major, minor, patch } = genesis.protocol_semantic_version;
+    return `v${major}.${minor}.${patch}`;
   }
 
   loadState(): DeploymentState {
@@ -57,7 +79,10 @@ export class DeploymentRunner {
     fs.writeFileSync(path.join(this.stateDir, "chains.json"), JSON.stringify(state, null, 2));
   }
 
-  async step1StartChains(anvilManager: AnvilManager): Promise<{ chains: ChainInfo }> {
+  async step1StartChains(
+    anvilManager: AnvilManager,
+    startChainOptions?: StartChainOptions
+  ): Promise<{ chains: ChainInfo }> {
     console.log("=== Step 1: Starting Anvil Chains ===\n");
 
     const config = this.getConfig();
@@ -68,6 +93,7 @@ export class DeploymentRunner {
           chainId: chainConfig.chainId,
           port: chainConfig.port,
           isL1: chainConfig.isL1,
+          ...startChainOptions,
         })
       )
     );
@@ -197,22 +223,168 @@ export class DeploymentRunner {
       })
     );
 
-    // Unpause deposits on all chains (deposits are paused by default during initializeNewChain)
+    // Unpause deposits on all chains in parallel using explicit nonces
     console.log("\nUnpausing deposits on all chains...");
     const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
     const wallet = new Wallet(privateKey, l1Provider);
-    for (const chain of chainAddresses) {
-      const migrator = new Contract(chain.diamondProxy, migratorFacetAbi(), wallet);
-      const tx = await migrator.unpauseDeposits({ gasLimit: 500_000 });
-      await tx.wait();
-      console.log(`  Deposits unpaused on chain ${chain.chainId}`);
-    }
+    const baseNonce = await wallet.getTransactionCount();
+    await Promise.all(
+      chainAddresses.map(async (chain, i) => {
+        const migrator = new Contract(chain.diamondProxy, migratorFacetAbi(), wallet);
+        const tx = await migrator.unpauseDeposits({ gasLimit: 500_000, nonce: baseNonce + i });
+        await tx.wait();
+        console.log(`  Deposits unpaused on chain ${chain.chainId}`);
+      })
+    );
 
     const state = this.loadState();
     state.chainAddresses = chainAddresses;
     this.saveState(state);
 
     return { chainAddresses };
+  }
+
+  /**
+   * Start all chains from pre-generated Anvil state files.
+   * Skips deployment steps 2-5 entirely — chains boot with state already loaded.
+   */
+  async loadChainStates(
+    anvilManager: AnvilManager,
+    stateDir: string
+  ): Promise<FullDeploymentResult> {
+    console.log(`\n=== Loading Pre-Generated Chain States from ${stateDir} ===\n`);
+
+    const config = this.getConfig();
+
+    // Load addresses saved alongside chain states
+    const addressesPath = path.join(stateDir, "addresses.json");
+    if (!fs.existsSync(addressesPath)) {
+      throw new Error(`addresses.json not found in ${stateDir}`);
+    }
+    const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
+    const { l1Addresses, ctmAddresses, chainAddresses, testTokens } = addresses;
+
+    // Start all chains with --load-state pointing to their state file
+    await Promise.all(
+      config.chains.map((chainConfig) => {
+        const stateFile = path.join(stateDir, `${chainConfig.chainId}.json`);
+        if (!fs.existsSync(stateFile)) {
+          throw new Error(`State file not found: ${stateFile}`);
+        }
+        return anvilManager.startChain({
+          chainId: chainConfig.chainId,
+          port: chainConfig.port,
+          isL1: chainConfig.isL1,
+          loadState: stateFile,
+        });
+      })
+    );
+
+    const l1Chain = anvilManager.getL1Chain();
+    const l2Chains = anvilManager.getL2Chains();
+
+    const chainInfo: ChainInfo = {
+      l1: l1Chain || null,
+      l2: l2Chains,
+      config: config.chains,
+    };
+
+    // Populate deployment state so downstream tools (TBM, tests) work
+    const state = this.loadState();
+    state.chains = chainInfo;
+    state.l1Addresses = l1Addresses;
+    state.ctmAddresses = ctmAddresses;
+    state.chainAddresses = chainAddresses;
+    if (testTokens) {
+      state.testTokens = testTokens;
+    }
+    this.saveState(state);
+
+    console.log(`  L1: chain ${l1Chain?.chainId} at ${l1Chain?.rpcUrl}`);
+    for (const l2 of l2Chains) {
+      console.log(`  L2: chain ${l2.chainId} at ${l2.rpcUrl}`);
+    }
+    console.log(`\n=== Chain States Loaded ===\n`);
+
+    return { chains: chainInfo, l1Addresses, ctmAddresses, chainAddresses };
+  }
+
+  /** Resolve the chain-states directory for the current protocol version. */
+  getChainStatesDir(): string {
+    const version = this.getProtocolVersionString();
+    return path.resolve(this.configDir, "..", "chain-states", version);
+  }
+
+  /** Check whether pre-generated chain states exist for the current protocol version. */
+  hasChainStates(): boolean {
+    const stateDir = this.getChainStatesDir();
+    return fs.existsSync(path.join(stateDir, "addresses.json"));
+  }
+
+  async dumpState(rpcUrl: string, outputPath: string): Promise<void> {
+    const provider = new providers.JsonRpcProvider(rpcUrl);
+    const state = await provider.send("anvil_dumpState", []);
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    fs.writeFileSync(outputPath, JSON.stringify(state));
+  }
+
+  async dumpAllStates(outputDir: string): Promise<void> {
+    const config = this.getConfig();
+    fs.mkdirSync(outputDir, { recursive: true });
+    console.log("\n=== Dumping Chain States ===\n");
+    for (const chainConfig of config.chains) {
+      const rpcUrl = `http://127.0.0.1:${chainConfig.port}`;
+      const statePath = path.join(outputDir, `${chainConfig.chainId}.json`);
+      await this.dumpState(rpcUrl, statePath);
+      console.log(`  Chain ${chainConfig.chainId} state saved to ${statePath}`);
+    }
+  }
+
+  async runFullDeployment(
+    anvilManager: AnvilManager,
+    startChainOptions?: StartChainOptions
+  ): Promise<FullDeploymentResult> {
+    const config = this.getConfig();
+
+    // Step 1: Start all chains
+    const { chains } = await this.step1StartChains(anvilManager, startChainOptions);
+    if (!chains.l1) {
+      throw new Error("L1 chain not found");
+    }
+
+    // Step 2: Deploy L1 contracts
+    const { l1Addresses, ctmAddresses } = await this.step2DeployL1(chains.l1.rpcUrl);
+
+    // Step 3+4: Register & initialize all L2 chains
+    const { chainAddresses } = await this.step3And4RegisterAndInitChains(
+      chains.l1.rpcUrl,
+      chains.l2,
+      chains.config,
+      l1Addresses,
+      ctmAddresses
+    );
+
+    // Step 5: Setup gateway if configured
+    const gatewayConfig = config.chains.find((c) => c.isGateway);
+    if (gatewayConfig) {
+      const gwChain = chains.l2.find((c) => c.chainId === gatewayConfig.chainId);
+      const l2ChainRpcUrls = new Map<number, string>();
+      for (const l2Chain of chains.l2) {
+        l2ChainRpcUrls.set(l2Chain.chainId, l2Chain.rpcUrl);
+      }
+      const gwSettledChainIds = getGwSettledChainIds(config.chains);
+      await this.step5SetupGateway(
+        chains.l1.rpcUrl,
+        gatewayConfig.chainId,
+        l1Addresses,
+        ctmAddresses,
+        gwChain?.rpcUrl,
+        gwSettledChainIds,
+        l2ChainRpcUrls
+      );
+    }
+
+    return { chains, l1Addresses, ctmAddresses, chainAddresses };
   }
 
   async step5SetupGateway(

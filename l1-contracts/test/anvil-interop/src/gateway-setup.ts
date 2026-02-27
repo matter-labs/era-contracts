@@ -21,6 +21,12 @@ import { migrateTokenBalanceToGW } from "./token-balance-migration-helper";
 import { prepareMergedToml, prepareGatewayChainConfig } from "./toml-handling";
 import { runForgeScript } from "./forge";
 
+function timeIt(label: string): () => void {
+  const start = Date.now();
+  console.log(`   ⏱️  [GW] Starting: ${label}`);
+  return () => console.log(`   ⏱️  [GW] Finished: ${label} in ${((Date.now() - start) / 1000).toFixed(1)}s`);
+}
+
 export class GatewaySetup {
   private l1Addresses: CoreDeployedAddresses;
   private ctmAddresses: CTMDeployedAddresses;
@@ -55,22 +61,25 @@ export class GatewaySetup {
 
     // Step 1: Verify GW chain has all required system contracts
     if (gwRpcUrl) {
+      let done = timeIt("verifyGatewayContracts");
       const deployer = new GatewayDeployer(gwRpcUrl, chainId);
       await deployer.verifyGatewayContracts();
+      done();
     }
 
     // Step 2: Transfer bridgehub ownership to Governance contract.
-    // DeployL1CoreContracts.updateOwners() calls transferOwnership(governance) which sets
-    // pendingOwner = governance. We need to accept it so Utils.executeCalls (which calls
-    // IGovernance.scheduleTransparent + execute) works correctly.
+    let done = timeIt("transferBridgehubOwnershipToGovernance");
     await this.transferBridgehubOwnershipToGovernance();
+    done();
 
     // Step 3: Prepare config files for Forge scripts
     prepareMergedToml(this.outputDir);
     prepareGatewayChainConfig(this.outputDir, chainId);
 
     // Step 4: Register GW as settlement layer on L1 (pure L1 call via Governance)
+    done = timeIt("forge: runGovernanceRegisterGateway");
     await this.runForgeGatewayScript("runGovernanceRegisterGateway()");
+    done();
     console.log(`   Settlement layer status set for chain ${chainId}`);
 
     // Step 5: Full gateway registration (includes L1→L2 governance calls)
@@ -82,9 +91,12 @@ export class GatewaySetup {
       console.log(`   GW diamond proxy on L1: ${gwDiamondProxy}`);
 
       const startBlock = await l1Provider.getBlockNumber();
+      done = timeIt("forge: runFullRegistration");
       await this.runForgeGatewayScript("runFullRegistration()");
+      done();
 
       // Relay L1→L2 priority requests to GW chain
+      done = timeIt("relay: fullRegistration → GW");
       const latestBlock = await l1Provider.getBlockNumber();
       await scanAndRelayPriorityRequests(
         l1Provider,
@@ -94,13 +106,18 @@ export class GatewaySetup {
         latestBlock,
         (line) => console.log(line)
       );
+      done();
     } else {
+      done = timeIt("forge: runFullRegistration");
       await this.runForgeGatewayScript("runFullRegistration()");
+      done();
     }
 
     // Step 6: Pre-register chains on GW Bridgehub (before migration relay)
     if (gwRpcUrl && gwSettledChainIds && gwSettledChainIds.length > 0) {
+      done = timeIt("registerChainsOnGateway");
       await this.registerChainsOnGateway(gwRpcUrl, gwSettledChainIds);
+      done();
     }
 
     // Step 7: Migrate chains to gateway via Forge scripts
@@ -145,13 +162,11 @@ export class GatewaySetup {
   /**
    * Migrate chains to gateway using Forge scripts + L1→L2 relay.
    *
-   * The Forge script (runPauseAndMigrateChain) handles:
-   * 1. Pausing deposits on the chain diamond proxy
-   * 2. Calling requestL2TransactionTwoBridges to initiate migration (sets isMigrationInProgress)
-   * 3. Confirming migration via L1Nullifier.bridgeConfirmTransferResult (clears isMigrationInProgress
-   *    and unpauses deposits via _unpauseDeposits)
-   *
-   * After that, we relay the L1→L2 priority requests to the GW chain and run TBM for ETH.
+   * Structured in phases to maximize parallelism:
+   * Phase 1 (L1, sequential): Forge scripts for pause+migrate and confirm for each chain
+   * Phase 2 (GW, sequential): Relay L1→L2 priority requests to GW chain
+   * Phase 3 (L2, parallel): Notify L2 chains about settlement layer change
+   * Phase 4 (mixed, sequential): ETH TBM for each chain (L1 nonce shared)
    */
   private async migrateChains(
     gatewayChainId: number,
@@ -163,56 +178,61 @@ export class GatewaySetup {
     const l1Bridgehub = new Contract(this.l1Addresses.bridgehub, l1BridgehubAbi(), l1Provider);
     const gwDiamondProxy: string = await l1Bridgehub.getZKChain(gatewayChainId);
 
+    // Phase 1: All L1 forge scripts (sequential — shared L1 nonce)
+    const overallStartBlock = await l1Provider.getBlockNumber();
     for (const chainId of gwSettledChainIds) {
       console.log(`   Migrating chain ${chainId} to gateway...`);
 
-      const startBlock = await l1Provider.getBlockNumber();
-
       // Run forge script: pause deposits + initiate migration.
-      // This sets isMigrationInProgress[chainId] = true on L1ChainAssetHandler.
+      let done = timeIt(`forge: runPauseAndMigrateChain(${chainId})`);
       await this.runForgeGatewayScript(
         "runPauseAndMigrateChain(uint256)",
         String(chainId)
       );
+      done();
 
-      // Confirm migration on L1: the forge script only initiates the migration (sets
-      // isMigrationInProgress=true). We need to call bridgeConfirmTransferResult from TS
-      // because the canonical L2 tx hash changes between Forge simulation and broadcast,
-      // so the forge script can't do it reliably.
+      // Confirm migration on L1
+      const startBlock = overallStartBlock + 1;
       const latestBlockAfterMigrate = await l1Provider.getBlockNumber();
-      await this.confirmMigrationOnL1(l1Provider, chainId, gatewayChainId, startBlock + 1, latestBlockAfterMigrate);
+      done = timeIt(`forge: runConfirmMigration(${chainId})`);
+      await this.confirmMigrationOnL1(l1Provider, chainId, gatewayChainId, startBlock, latestBlockAfterMigrate);
+      done();
+    }
 
-      // Relay L1→L2 priority requests to GW chain.
-      // The migration creates a priority request that calls L2AssetRouter.finalizeDeposit
-      // on the GW, which triggers ChainAssetHandlerBase.bridgeMint → sets migrationNumber on GW.
-      if (gwRpcUrl) {
-        const gwProvider = new providers.JsonRpcProvider(gwRpcUrl);
-        const latestBlock = await l1Provider.getBlockNumber();
-        await scanAndRelayPriorityRequests(
-          l1Provider,
-          gwDiamondProxy,
-          gwProvider,
-          startBlock + 1,
-          latestBlock,
-          (line) => console.log(line)
-        );
-      }
+    // Phase 2: Relay L1→L2 priority requests to GW chain (sequential — same GW impersonated addresses)
+    if (gwRpcUrl) {
+      const done = timeIt(`relay: migration → GW (all chains)`);
+      const gwProvider = new providers.JsonRpcProvider(gwRpcUrl);
+      const latestBlock = await l1Provider.getBlockNumber();
+      await scanAndRelayPriorityRequests(
+        l1Provider,
+        gwDiamondProxy,
+        gwProvider,
+        overallStartBlock + 1,
+        latestBlock,
+        (line) => console.log(line)
+      );
+      done();
+    }
 
-      // Notify the L2 chain about its settlement layer change.
-      // On a real ZK chain, the bootloader calls SystemContext.setSettlementLayerChainId()
-      // at the start of each batch. On Anvil, we simulate this by impersonating the bootloader.
-      // This sets currentSettlementLayerChainId on SystemContext and increments
-      // migrationNumber on L2ChainAssetHandler — both required for TBM to work.
-      if (l2ChainRpcUrls?.has(chainId)) {
-        const l2Provider = new providers.JsonRpcProvider(l2ChainRpcUrls.get(chainId)!);
-        await this.notifyL2SettlementLayerChange(l2Provider, gatewayChainId, chainId);
-      }
+    // Phase 3: Notify L2 chains about settlement layer change (parallel — different L2 chains)
+    {
+      const done = timeIt(`notifyL2SettlementLayerChange (${gwSettledChainIds.length} chains, parallel)`);
+      await Promise.all(
+        gwSettledChainIds
+          .filter((chainId) => l2ChainRpcUrls?.has(chainId))
+          .map(async (chainId) => {
+            const l2Provider = new providers.JsonRpcProvider(l2ChainRpcUrls!.get(chainId)!);
+            await this.notifyL2SettlementLayerChange(l2Provider, gatewayChainId, chainId);
+          })
+      );
+      done();
+    }
 
-      // Run real Token Balance Migration (TBM) for ETH so that
-      // assetMigrationNumber == migrationNumber on the L2 chain.
-      // Deposits are now unpaused (via confirmMigrationOnL1 above),
-      // so requestL2ServiceTransaction succeeds on the chain's diamond proxy.
+    // Phase 4: ETH TBM for each chain (sequential — L1 nonce + GW relay conflicts)
+    for (const chainId of gwSettledChainIds) {
       if (l2ChainRpcUrls?.has(chainId) && gwRpcUrl) {
+        const done = timeIt(`ETH TBM chain ${chainId}`);
         const l2Provider = new providers.JsonRpcProvider(l2ChainRpcUrls.get(chainId)!);
         const gwProvider = new providers.JsonRpcProvider(gwRpcUrl);
         const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
@@ -230,6 +250,7 @@ export class GatewaySetup {
           logger: (line) => console.log(line),
         });
         console.log(`   ETH TBM complete for chain ${chainId}`);
+        done();
       }
     }
   }

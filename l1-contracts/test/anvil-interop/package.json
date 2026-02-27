@@ -7,7 +7,7 @@
     "start": "ts-node index.ts",
     "dev": "ts-node index.ts",
     "build": "tsc",
-    "clean": "rm -rf dist outputs",
+    "clean": "rm -rf dist outputs chain-states",
     "cleanup": "bash cleanup.sh",
     "step1": "ts-node step1-start-chains.ts",
     "step2": "ts-node step2-deploy-l1.ts",
@@ -20,7 +20,8 @@
     "send:interop": "ts-node send-interop-tx.ts",
     "send:l2-to-l2": "ts-node send-l2-to-l2.ts",
     "deploy:test-token": "ts-node deploy-test-token.ts",
-    "send:token": "ts-node send-token-simple.ts"
+    "send:token": "ts-node send-token-simple.ts",
+    "setup-and-dump": "ts-node setup-and-dump-state.ts"
   },
   "keywords": [
     "anvil",

@@ -117,6 +117,13 @@ export async function impersonateAndRun<T>(
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function loadAbiFromOut(artifactRelativePath: string): any[] {
+  // Prefer zkstack-out/ (committed, ABI-only files) over out/ (forge build output).
+  // zkstack-out files are raw ABI arrays; out/ files wrap them as { abi: [...] }.
+  const zkstackOutRoot = path.resolve(__dirname, "../../../zkstack-out");
+  const zkstackPath = path.join(zkstackOutRoot, artifactRelativePath);
+  if (fs.existsSync(zkstackPath)) {
+    return JSON.parse(fs.readFileSync(zkstackPath, "utf-8"));
+  }
   return loadArtifactFromOut(artifactRelativePath).abi;
 }
 
@@ -270,42 +277,47 @@ export async function extractAndRelayNewPriorityRequests(
   logger?: (line: string) => void,
 ): Promise<string[]> {
   const log = logger || console.log;
-  const txHashes: string[] = [];
 
-  for (const chain of chains) {
-    const requests = extractNewPriorityRequests(receipt, chain.diamondProxy);
-    for (const req of requests) {
-      log(`   Relaying priority request from ${req.from} to ${req.to} via proxy ${chain.diamondProxy}`);
-      const result = await relayTx(chain.provider, req.from, req.to, req.calldata, req.value);
-      if (result.success) {
-        txHashes.push(result.txHash);
-        log(`   Relay tx: ${result.txHash}`);
+  // Relay across different target chains in parallel (different providers = no nonce conflicts).
+  // Within each chain, requests are relayed sequentially (same impersonated sender).
+  const perChainResults = await Promise.all(
+    chains.map(async (chain) => {
+      const hashes: string[] = [];
+      const requests = extractNewPriorityRequests(receipt, chain.diamondProxy);
+      for (const req of requests) {
+        log(`   Relaying priority request from ${req.from} to ${req.to} via proxy ${chain.diamondProxy}`);
+        const result = await relayTx(chain.provider, req.from, req.to, req.calldata, req.value);
+        if (result.success) {
+          hashes.push(result.txHash);
+          log(`   Relay tx: ${result.txHash}`);
 
-        // GW relay: if this chain has relayChains, extract NewPriorityRequest events
-        // from the relay receipt and relay them to the next-hop chains.
-        if (chain.relayChains && result.receipt) {
-          const nextRequests = extractNewPriorityRequests(result.receipt);
-          log(`   Found ${nextRequests.length} next-hop priority request(s)`);
-          for (const nextReq of nextRequests) {
-            for (const relayChain of chain.relayChains) {
-              log(`   Relaying next-hop from ${nextReq.from} to ${nextReq.to}`);
-              const nextResult = await relayTx(relayChain.provider, nextReq.from, nextReq.to, nextReq.calldata, nextReq.value);
-              if (nextResult.success) {
-                txHashes.push(nextResult.txHash);
-                log(`   Next-hop relay tx: ${nextResult.txHash}`);
-              } else {
-                throw new Error(`Next-hop relay tx failed: from=${nextReq.from} to=${nextReq.to}`);
+          // GW relay: if this chain has relayChains, extract NewPriorityRequest events
+          // from the relay receipt and relay them to the next-hop chains.
+          if (chain.relayChains && result.receipt) {
+            const nextRequests = extractNewPriorityRequests(result.receipt);
+            log(`   Found ${nextRequests.length} next-hop priority request(s)`);
+            for (const nextReq of nextRequests) {
+              for (const relayChain of chain.relayChains) {
+                log(`   Relaying next-hop from ${nextReq.from} to ${nextReq.to}`);
+                const nextResult = await relayTx(relayChain.provider, nextReq.from, nextReq.to, nextReq.calldata, nextReq.value);
+                if (nextResult.success) {
+                  hashes.push(nextResult.txHash);
+                  log(`   Next-hop relay tx: ${nextResult.txHash}`);
+                } else {
+                  throw new Error(`Next-hop relay tx failed: from=${nextReq.from} to=${nextReq.to}`);
+                }
               }
             }
           }
+        } else {
+          throw new Error(`Relay tx failed: from=${req.from} to=${req.to} via proxy ${chain.diamondProxy}`);
         }
-      } else {
-        throw new Error(`Relay tx failed: from=${req.from} to=${req.to} via proxy ${chain.diamondProxy}`);
       }
-    }
-  }
+      return hashes;
+    })
+  );
 
-  return txHashes;
+  return perChainResults.flat();
 }
 
 /**

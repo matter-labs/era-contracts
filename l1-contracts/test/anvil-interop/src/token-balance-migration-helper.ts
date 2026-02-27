@@ -168,19 +168,28 @@ export async function registerAndMigrateTestTokens(params: {
   const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
   const gwProvider = new providers.JsonRpcProvider(gwRpcUrl);
 
-  for (const chainId of gwSettledChainIds) {
-    const rpcUrl = l2ChainRpcUrls.get(chainId);
-    if (!rpcUrl) continue;
+  // Build chain configs, skipping chains without necessary data
+  const chainConfigs = gwSettledChainIds
+    .map((chainId) => {
+      const rpcUrl = l2ChainRpcUrls.get(chainId);
+      const l2DiamondProxy = chainAddresses.find((c) => c.chainId === chainId)?.diamondProxy;
+      const tokenAddr = testTokens[chainId];
+      if (!rpcUrl || !l2DiamondProxy || !tokenAddr) return null;
+      return { chainId, rpcUrl, l2DiamondProxy, tokenAddr };
+    })
+    .filter((c): c is NonNullable<typeof c> => c !== null);
 
+  // Phase 1: Register test tokens on L2NTV in parallel (different L2 chains)
+  await Promise.all(
+    chainConfigs.map(async ({ chainId, rpcUrl, tokenAddr }) => {
+      const l2Provider = new providers.JsonRpcProvider(rpcUrl);
+      await registerTestTokenOnL2NTV(l2Provider, tokenAddr, chainId, log);
+    })
+  );
+
+  // Phase 2: TBM for each chain (sequential — L1 nonce + GW relay conflicts)
+  for (const { chainId, rpcUrl, l2DiamondProxy, tokenAddr } of chainConfigs) {
     const l2Provider = new providers.JsonRpcProvider(rpcUrl);
-    const l2DiamondProxy = chainAddresses.find((c) => c.chainId === chainId)?.diamondProxy;
-    if (!l2DiamondProxy) continue;
-
-    const tokenAddr = testTokens[chainId];
-    if (!tokenAddr) continue;
-
-    await registerTestTokenOnL2NTV(l2Provider, tokenAddr, chainId, log);
-
     const assetId = encodeNtvAssetId(chainId, tokenAddr);
     await migrateTokenBalanceToGW({
       l2Provider,
