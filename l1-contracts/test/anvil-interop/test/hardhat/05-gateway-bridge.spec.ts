@@ -50,8 +50,8 @@ describe("05 - Gateway Bridge (Chain 12, via GW)", function () {
         chainId: L2A_CHAIN_ID,
         l1Addresses: state.l1Addresses!,
         amount,
+        l1DiamondProxy: gwDiamondProxy,
         gwRpcUrl: gwChain.rpcUrl,
-        gwDiamondProxy,
       });
 
       expect(result.l1TxHash).to.match(/^0x[0-9a-fA-F]{64}$/);
