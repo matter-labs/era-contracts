@@ -53,7 +53,10 @@ import {
 } from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
+} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
 import {IL2BaseTokenZKOS} from "../../../l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
 
@@ -456,12 +459,13 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (s.baseTokenHasTotalSupply) {
             revert BaseTokenPreV31TotalSupplyAlreadySet();
         }
+        // Service transactions cannot fail, so this is safe to set eagerly.
+        s.baseTokenHasTotalSupply = true;
+
         canonicalTxHash = IMailbox(address(this)).requestL2ServiceTransaction(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             abi.encodeCall(IL2BaseTokenZKOS.setZKsyncOSPreV31TotalSupply, (_totalSupply))
         );
-        // We can set this on the SL side directly since service transactions cannot fail.
-        s.baseTokenHasTotalSupply = true;
         emit ZKsyncOSPreV31TotalSupplySet(_totalSupply);
     }
 

@@ -595,7 +595,7 @@ library L2GenesisForceDeploymentsHelper {
         if (_isGenesisUpgrade) {
             IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initializeBaseTokenHolderBalance();
         }
-        
+
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
 
         emit PerformForceDeployedContractsInitCompleted();

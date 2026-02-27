@@ -99,7 +99,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     function backFillZKSyncOSBaseTokenV31MigrationData(uint256 _amount) external onlyL2BaseToken {
         if (!needBaseTokenTotalSupplyBackfill) {
             revert BaseTokenTotalSupplyBackfillNotNeeded();
-        } 
+        }
 
         // We expect that for all registered tokens, the zero `totalPreV31TotalSupply` should be saved.
 
@@ -233,10 +233,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @dev This function is specifically for the chain's native base token used for gas payments.
     /// @param _toChainId The chain ID which the funds are sent to.
     /// @param _amount The amount of base tokens being bridged out.
-    function handleInitiateBaseTokenBridgingOnL2(
-        uint256 _toChainId,
-        uint256 _amount
-    ) external onlyBaseTokenHolder {
+    function handleInitiateBaseTokenBridgingOnL2(uint256 _toChainId, uint256 _amount) external onlyBaseTokenHolder {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         uint256 baseTokenOriginChainId = L2_NATIVE_TOKEN_VAULT.originChainId(baseTokenAssetId);
         _handleInitiateBridgingOnL2Inner(_toChainId, baseTokenAssetId, _amount, baseTokenOriginChainId);

@@ -10,6 +10,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
@@ -724,11 +725,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         // onlyL2BaseTokenSystemContract modifier rejects BaseTokenHolder (0x10011 != 0x800A).
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(
-                IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector,
-                toChainId,
-                burnAmount
-            )
+            abi.encodeWithSelector(IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector, toChainId, burnAmount)
         );
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);

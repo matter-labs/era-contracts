@@ -1951,7 +1951,7 @@
   },
   {
     "type": "function",
-    "name": "SetZKsyncOSPreV31TotalSupply",
+    "name": "setZKsyncOSPreV31TotalSupply",
     "inputs": [
       {
         "name": "_totalSupply",
@@ -2843,19 +2843,6 @@
   },
   {
     "type": "event",
-    "name": "SetZKsyncOSPreV31TotalSupply",
-    "inputs": [
-      {
-        "name": "totalSupply",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "Unfreeze",
     "inputs": [],
     "anonymous": false
@@ -2875,6 +2862,19 @@
         "type": "bool",
         "indexed": false,
         "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ZKsyncOSPreV31TotalSupplySet",
+    "inputs": [
+      {
+        "name": "totalSupply",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false

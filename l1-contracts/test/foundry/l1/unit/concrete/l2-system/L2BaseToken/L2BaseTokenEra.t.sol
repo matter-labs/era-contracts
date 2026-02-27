@@ -8,7 +8,16 @@ import {L2BaseTokenEra} from "contracts/l2-system/era/L2BaseTokenEra.sol";
 import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.sol";
 import {IL2BaseTokenEra} from "contracts/l2-system/era/interfaces/IL2BaseTokenEra.sol";
 import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
-import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MSG_VALUE_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_TRACKER_ADDR,
+    L2_BASE_TOKEN_HOLDER_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_BOOTLOADER_ADDRESS,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    MSG_VALUE_SYSTEM_CONTRACT
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {InsufficientFunds, Unauthorized} from "contracts/common/L1ContractErrors.sol";
@@ -52,11 +61,7 @@ contract L2BaseTokenEraTest is Test {
             abi.encodeWithSignature("handleFinalizeBaseTokenBridgingOnL2(uint256)"),
             abi.encode()
         );
-        vm.mockCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("L1_CHAIN_ID()"),
-            abi.encode(uint256(1))
-        );
+        vm.mockCall(L2_ASSET_TRACKER_ADDR, abi.encodeWithSignature("L1_CHAIN_ID()"), abi.encode(uint256(1)));
 
         // Mock L1Messenger to accept calls and return a hash
         vm.mockCall(
@@ -163,11 +168,7 @@ contract L2BaseTokenEraTest is Test {
         // Pass uint256 with upper bits set - should be truncated to alice's address
         uint256 accountWithUpperBits = uint256(uint160(alice)) | (uint256(0xDEAD) << 160);
 
-        assertEq(
-            l2BaseToken.balanceOf(accountWithUpperBits),
-            amount,
-            "balanceOf should truncate upper bits"
-        );
+        assertEq(l2BaseToken.balanceOf(accountWithUpperBits), amount, "balanceOf should truncate upper bits");
     }
 
     function testFuzz_balanceOf_variousAmounts(uint256 amount) public {
@@ -197,11 +198,7 @@ contract L2BaseTokenEraTest is Test {
             ALICE_INITIAL_BALANCE - transferAmount,
             "Alice balance should decrease"
         );
-        assertEq(
-            l2BaseToken.balanceOf(uint256(uint160(bob))),
-            transferAmount,
-            "Bob should receive tokens"
-        );
+        assertEq(l2BaseToken.balanceOf(uint256(uint160(bob))), transferAmount, "Bob should receive tokens");
     }
 
     function test_transferFromTo_successFromMsgValueSimulator() public {
@@ -315,11 +312,7 @@ contract L2BaseTokenEraTest is Test {
             ALICE_INITIAL_BALANCE - amount,
             "Alice balance should decrease by exact amount"
         );
-        assertEq(
-            l2BaseToken.balanceOf(uint256(uint160(bob))),
-            amount,
-            "Bob should receive exact amount"
-        );
+        assertEq(l2BaseToken.balanceOf(uint256(uint160(bob))), amount, "Bob should receive exact amount");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -677,10 +670,7 @@ contract L2BaseTokenEraTest is Test {
         l2BaseToken.withdrawWithMessage{value: WITHDRAW_AMOUNT}(l1Receiver, "data");
     }
 
-    function testFuzz_withdrawWithMessage_variousAmountsAndData(
-        uint256 amount,
-        bytes calldata additionalData
-    ) public {
+    function testFuzz_withdrawWithMessage_variousAmountsAndData(uint256 amount, bytes calldata additionalData) public {
         vm.assume(amount > 0 && amount < type(uint128).max);
 
         address sender = makeAddr("sender");
@@ -727,11 +717,7 @@ contract L2BaseTokenEraTest is Test {
             mintAmount - transferAmount,
             "Alice should have mint - transfer"
         );
-        assertEq(
-            l2BaseToken.balanceOf(uint256(uint160(bob))),
-            transferAmount,
-            "Bob should have transfer amount"
-        );
+        assertEq(l2BaseToken.balanceOf(uint256(uint160(bob))), transferAmount, "Bob should have transfer amount");
     }
 
     function test_mintMultipleAccounts_totalSupplyCorrect() public {
@@ -748,11 +734,7 @@ contract L2BaseTokenEraTest is Test {
 
         // totalSupply = INITIAL - holderBalance. Minting decreases holder balance,
         // so totalSupply increases by the minted amounts.
-        assertEq(
-            l2BaseToken.totalSupply(),
-            mint1 + mint2,
-            "totalSupply should equal total minted amount"
-        );
+        assertEq(l2BaseToken.totalSupply(), mint1 + mint2, "totalSupply should equal total minted amount");
     }
 
     /*//////////////////////////////////////////////////////////////

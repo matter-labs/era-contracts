@@ -4,7 +4,12 @@ pragma solidity 0.8.28;
 
 import {L2BaseTokenBase} from "../L2BaseTokenBase.sol";
 import {IL2BaseTokenEra} from "./interfaces/IL2BaseTokenEra.sol";
-import {L2_BASE_TOKEN_HOLDER_ADDR, L2_BOOTLOADER_ADDRESS, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, MSG_VALUE_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BASE_TOKEN_HOLDER_ADDR,
+    L2_BOOTLOADER_ADDRESS,
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    MSG_VALUE_SYSTEM_CONTRACT
+} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2_ASSET_TRACKER} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "../../common/Config.sol";
 import {InsufficientFunds, Unauthorized} from "../../common/L1ContractErrors.sol";

@@ -8,11 +8,24 @@ import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol
 import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.sol";
 import {IL2BaseTokenZKOS} from "contracts/l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
 import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
-import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MINT_BASE_TOKEN_HOOK} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_TRACKER_ADDR,
+    L2_BASE_TOKEN_HOLDER_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    MINT_BASE_TOKEN_HOOK
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_BASE_TOKEN_HOLDER} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
-import {BaseTokenHolderMintFailed, BaseTokenPreV31TotalSupplyNotSet, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {
+    BaseTokenHolderMintFailed,
+    BaseTokenPreV31TotalSupplyNotSet,
+    Unauthorized
+} from "contracts/common/L1ContractErrors.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 
@@ -567,7 +580,11 @@ contract L2BaseTokenZKOSTest is Test {
         // Expect the AssetTracker to NOT be called during initialization
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 0, INITIAL_BASE_TOKEN_HOLDER_BALANCE),
+            abi.encodeWithSignature(
+                "handleInitiateBaseTokenBridgingOnL2(uint256,uint256)",
+                0,
+                INITIAL_BASE_TOKEN_HOLDER_BALANCE
+            ),
             0 // count = 0 means we expect it NOT to be called
         );
 

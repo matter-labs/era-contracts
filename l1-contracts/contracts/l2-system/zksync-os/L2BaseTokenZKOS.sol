@@ -9,7 +9,11 @@ import {IL2BaseTokenZKOS} from "./interfaces/IL2BaseTokenZKOS.sol";
 import {L2_BASE_TOKEN_HOLDER_ADDR, MINT_BASE_TOKEN_HOOK} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2_ASSET_TRACKER} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE, SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
-import {BaseTokenHolderMintFailed, BaseTokenPreV31TotalSupplyNotSet, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {
+    BaseTokenHolderMintFailed,
+    BaseTokenPreV31TotalSupplyNotSet,
+    Unauthorized
+} from "../../common/L1ContractErrors.sol";
 
 /**
  * @title L2BaseTokenZKOS
