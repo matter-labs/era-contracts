@@ -1,7 +1,12 @@
 import { expect } from "chai";
 import { BigNumber, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { createBalanceTrackerFromState, queryEthAssetId, assertDepositBalances, assertWithdrawalBalances } from "../../src/balance-tracker";
+import {
+  createBalanceTrackerFromState,
+  queryEthAssetId,
+  assertDepositBalances,
+  assertWithdrawalBalances,
+} from "../../src/balance-tracker";
 import { depositETHToL2 } from "../../src/l1-deposit-helper";
 import { withdrawETHFromL2 } from "../../src/l2-withdrawal-helper";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR } from "../../src/const";
@@ -54,14 +59,7 @@ describe("02 - Direct L1<->L2 Bridge (Chain 10)", function () {
       expect(result.l1TxHash).to.match(/^0x[0-9a-fA-F]{64}$/);
 
       // Snapshot after
-      const after = await tracker.takeSnapshot(
-        CHAIN_ID,
-        assetId,
-        undefined,
-        undefined,
-        walletAddr,
-        false
-      );
+      const after = await tracker.takeSnapshot(CHAIN_ID, assetId, undefined, undefined, walletAddr, false);
 
       // Verify L1AssetTracker.chainBalance increased by mintValue
       // (chainBalance tracks the full amount sent to the chain, including gas)
@@ -85,14 +83,7 @@ describe("02 - Direct L1<->L2 Bridge (Chain 10)", function () {
       const l2Chain = state.chains!.l2.find((c) => c.chainId === CHAIN_ID)!;
 
       // Snapshot before
-      const before = await tracker.takeSnapshot(
-        CHAIN_ID,
-        assetId,
-        undefined,
-        undefined,
-        walletAddr,
-        false
-      );
+      const before = await tracker.takeSnapshot(CHAIN_ID, assetId, undefined, undefined, walletAddr, false);
 
       // Execute withdrawal
       const result = await withdrawETHFromL2({
@@ -106,14 +97,7 @@ describe("02 - Direct L1<->L2 Bridge (Chain 10)", function () {
       expect(result.l2TxHash).to.match(/^0x[0-9a-fA-F]{64}$/);
 
       // Snapshot after
-      const after = await tracker.takeSnapshot(
-        CHAIN_ID,
-        assetId,
-        undefined,
-        undefined,
-        walletAddr,
-        false
-      );
+      const after = await tracker.takeSnapshot(CHAIN_ID, assetId, undefined, undefined, walletAddr, false);
 
       // Verify L1AssetTracker.chainBalance decreased
       const { l1ChainBalanceDelta } = assertWithdrawalBalances(before, after, amount);

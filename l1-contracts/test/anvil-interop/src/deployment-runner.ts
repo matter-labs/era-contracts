@@ -277,10 +277,7 @@ export class DeploymentRunner {
    * Uses --load-state CLI for maximum compatibility across anvil versions.
    * State files from --dump-state are hex-gzip; we decompress to native JSON first.
    */
-  async loadChainStates(
-    anvilManager: AnvilManager,
-    stateDir: string
-  ): Promise<FullDeploymentResult> {
+  async loadChainStates(anvilManager: AnvilManager, stateDir: string): Promise<FullDeploymentResult> {
     console.log(`\n=== Loading Pre-Generated Chain States from ${stateDir} ===\n`);
 
     const config = this.getConfig();
@@ -351,7 +348,7 @@ export class DeploymentRunner {
     for (const l2 of l2Chains) {
       console.log(`  L2: chain ${l2.chainId} at ${l2.rpcUrl}`);
     }
-    console.log(`\n=== Chain States Loaded ===\n`);
+    console.log("\n=== Chain States Loaded ===\n");
 
     return { chains: chainInfo, l1Addresses, ctmAddresses, chainAddresses };
   }

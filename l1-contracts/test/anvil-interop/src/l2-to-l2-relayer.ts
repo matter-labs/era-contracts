@@ -278,5 +278,4 @@ export class L2ToL2Relayer {
       throw new Error(`Failed to execute bundle: ${(error as Error).message}`);
     }
   }
-
 }

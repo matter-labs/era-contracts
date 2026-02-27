@@ -1,6 +1,11 @@
 import { Contract, ethers, providers, Wallet } from "ethers";
 import { l1AssetTrackerAbi, l2AssetTrackerAbi, l2NativeTokenVaultAbi } from "./contracts";
-import { ANVIL_DEFAULT_PRIVATE_KEY, L1_MESSAGE_SENT_EVENT_SIG, L2_ASSET_TRACKER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR } from "./const";
+import {
+  ANVIL_DEFAULT_PRIVATE_KEY,
+  L1_MESSAGE_SENT_EVENT_SIG,
+  L2_ASSET_TRACKER_ADDR,
+  L2_NATIVE_TOKEN_VAULT_ADDR,
+} from "./const";
 import { buildFinalizeWithdrawalParams, extractAndRelayNewPriorityRequests } from "./utils";
 import { encodeNtvAssetId } from "./data-encoding";
 
@@ -28,9 +33,14 @@ export async function migrateTokenBalanceToGW(params: {
 }): Promise<void> {
   const log = params.logger || console.log;
   const {
-    l2Provider, l1Provider, gwProvider,
-    chainId, assetId,
-    l1AssetTrackerAddr, gwDiamondProxyAddr, l2DiamondProxyAddr,
+    l2Provider,
+    l1Provider,
+    gwProvider,
+    chainId,
+    assetId,
+    l1AssetTrackerAddr,
+    gwDiamondProxyAddr,
+    l2DiamondProxyAddr,
   } = params;
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
@@ -50,9 +60,7 @@ export async function migrateTokenBalanceToGW(params: {
   // Check if the migration was already completed (no L1MessageSent event emitted).
   // The L2 contract returns early when assetMigrationNumber == chainMigrationNumber.
   const l1MessageSentTopic = ethers.utils.id(L1_MESSAGE_SENT_EVENT_SIG);
-  const hasL1Message = l2Receipt.logs.some(
-    (l: { topics: string[] }) => l.topics[0] === l1MessageSentTopic
-  );
+  const hasL1Message = l2Receipt.logs.some((l: { topics: string[] }) => l.topics[0] === l1MessageSentTopic);
   if (!hasL1Message) {
     log(`   [TBM] Migration already completed for asset ${assetId} on chain ${chainId}, skipping L1 steps`);
     return;
@@ -60,7 +68,7 @@ export async function migrateTokenBalanceToGW(params: {
 
   // ── Step 2: Build finalization params and call receiveL1ToGatewayMigrationOnL1 on L1 ──
 
-  log(`   [TBM] Step 2: Calling receiveL1ToGatewayMigrationOnL1 on L1...`);
+  log("   [TBM] Step 2: Calling receiveL1ToGatewayMigrationOnL1 on L1...");
 
   const finalizeParams = buildFinalizeWithdrawalParams(l2Receipt, chainId);
   log(`   [TBM] Captured L2→L1 message (${finalizeParams.message.length} chars)`);
@@ -93,7 +101,7 @@ export async function migrateTokenBalanceToGW(params: {
 
   // ── Step 3: Extract and relay all NewPriorityRequest events to target chains ──
 
-  log(`   [TBM] Step 3: Extracting and relaying NewPriorityRequest events...`);
+  log("   [TBM] Step 3: Extracting and relaying NewPriorityRequest events...");
 
   const txHashes = await extractAndRelayNewPriorityRequests(
     l1Receipt,
@@ -101,13 +109,12 @@ export async function migrateTokenBalanceToGW(params: {
       { diamondProxy: gwDiamondProxyAddr, provider: gwProvider },
       { diamondProxy: l2DiamondProxyAddr, provider: l2Provider },
     ],
-    log,
+    log
   );
 
   if (txHashes.length === 0) {
     throw new Error(
-      `No NewPriorityRequest events found in L1 receipt. ` +
-        `TX: ${l1Receipt.transactionHash}, chain: ${chainId}`
+      "No NewPriorityRequest events found in L1 receipt. " + `TX: ${l1Receipt.transactionHash}, chain: ${chainId}`
     );
   }
 
@@ -121,7 +128,7 @@ export async function registerTestTokenOnL2NTV(
   l2Provider: providers.JsonRpcProvider,
   tokenAddr: string,
   chainId: number,
-  logger?: (line: string) => void,
+  logger?: (line: string) => void
 ): Promise<void> {
   const log = logger || console.log;
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
@@ -161,8 +168,13 @@ export async function registerAndMigrateTestTokens(params: {
 }): Promise<void> {
   const log = params.logger || console.log;
   const {
-    gwSettledChainIds, l2ChainRpcUrls, testTokens,
-    l1RpcUrl, gwRpcUrl, l1AssetTrackerAddr, gwDiamondProxyAddr,
+    gwSettledChainIds,
+    l2ChainRpcUrls,
+    testTokens,
+    l1RpcUrl,
+    gwRpcUrl,
+    l1AssetTrackerAddr,
+    gwDiamondProxyAddr,
     chainAddresses,
   } = params;
 

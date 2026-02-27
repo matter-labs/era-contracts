@@ -60,7 +60,15 @@ export class ChainRegistry {
       PERMANENT_VALUES_INPUT: "/test/anvil-interop/config/permanent-values.toml",
     };
 
-    await runForgeScript({ scriptPath, envVars, rpcUrl: this.l1RpcUrl, privateKey: this.privateKey, projectRoot: this.projectRoot, sig, args });
+    await runForgeScript({
+      scriptPath,
+      envVars,
+      rpcUrl: this.l1RpcUrl,
+      privateKey: this.privateKey,
+      projectRoot: this.projectRoot,
+      sig,
+      args,
+    });
 
     const output = parseForgeScriptOutput(outputPath);
 
@@ -82,7 +90,7 @@ export class ChainRegistry {
 
     const chainIds = configs.map((c) => c.chainId);
     const scriptPath = "deploy-scripts/ctm/RegisterZKChain.s.sol:RegisterZKChainScript";
-    const sig = `runForTestBatch(address,uint256[])`;
+    const sig = "runForTestBatch(address,uint256[])";
     // Encode chainIds array as ABI: [id1,id2,id3]
     const chainIdsArg = `[${chainIds.join(",")}]`;
     const args = `${this.ctmAddresses.chainTypeManager} ${chainIdsArg}`;
@@ -92,7 +100,15 @@ export class ChainRegistry {
       PERMANENT_VALUES_INPUT: "/test/anvil-interop/config/permanent-values.toml",
     };
 
-    await runForgeScript({ scriptPath, envVars, rpcUrl: this.l1RpcUrl, privateKey: this.privateKey, projectRoot: this.projectRoot, sig, args });
+    await runForgeScript({
+      scriptPath,
+      envVars,
+      rpcUrl: this.l1RpcUrl,
+      privateKey: this.privateKey,
+      projectRoot: this.projectRoot,
+      sig,
+      args,
+    });
 
     // Parse per-chain outputs
     const results: ChainAddresses[] = [];
@@ -168,5 +184,4 @@ export class ChainRegistry {
 
     return configPath;
   }
-
 }

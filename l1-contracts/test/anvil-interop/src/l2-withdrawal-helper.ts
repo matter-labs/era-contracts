@@ -1,4 +1,5 @@
-import { BigNumber, Contract, providers, Wallet, ethers } from "ethers";
+import type { BigNumber } from "ethers";
+import { Contract, providers, Wallet, ethers } from "ethers";
 import { impersonateAndRun } from "./utils";
 import { encodeNtvAssetId, encodeBridgeBurnData } from "./data-encoding";
 import {
@@ -101,8 +102,8 @@ export async function withdrawETHFromL2(params: WithdrawETHParams): Promise<With
     // bridgeBurn(chainId, l2MsgValue=0, assetId, originalCaller, data) with value=amount
     // The NTV checks require(_depositAmount == msg.value) for the base token
     const l2Tx = await l2NtvAsRouter.bridgeBurn(
-      L1_CHAIN_ID,  // destination: L1
-      0,            // l2MsgValue: must be 0 (requireZeroValue modifier)
+      L1_CHAIN_ID, // destination: L1
+      0, // l2MsgValue: must be 0 (requireZeroValue modifier)
       l2EthAssetId,
       l2Wallet.address, // originalCaller
       withdrawalData,
@@ -147,7 +148,7 @@ export async function withdrawERC20FromL2(params: WithdrawERC20Params): Promise<
   // Approve L2NativeTokenVault to spend tokens
   const l2Token = new Contract(l2TokenAddress, testnetERC20TokenAbi(), l2Wallet);
 
-  console.log(`   Approving L2NativeTokenVault for withdrawal...`);
+  console.log("   Approving L2NativeTokenVault for withdrawal...");
   const approveTx = await l2Token.approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount);
   await approveTx.wait();
 
@@ -272,10 +273,9 @@ async function finalizeWithdrawalOnL1(
   );
 
   try {
-    const tx = await l1Nullifier.finalizeDeposit(
-      [chainId, l2BatchNumber, 0, l2Sender, 0, message, merkleProof],
-      { gasLimit: 5_000_000 }
-    );
+    const tx = await l1Nullifier.finalizeDeposit([chainId, l2BatchNumber, 0, l2Sender, 0, message, merkleProof], {
+      gasLimit: 5_000_000,
+    });
     const receipt = await tx.wait();
     console.log(`   L1 finalize tx: cast run ${receipt.transactionHash} -r ${l1Provider.connection.url}`);
     return receipt.transactionHash;

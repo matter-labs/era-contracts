@@ -23,12 +23,7 @@ export async function runForgeScript(params: {
     ...envVars,
   };
 
-  const commandArgs = [
-    "script",
-    scriptPath,
-    "--rpc-url",
-    rpcUrl,
-  ];
+  const commandArgs = ["script", scriptPath, "--rpc-url", rpcUrl];
 
   if (privateKey) {
     commandArgs.push("--private-key", privateKey);
@@ -36,13 +31,7 @@ export async function runForgeScript(params: {
     commandArgs.push("--unlocked", "--sender", senderAddress!);
   }
 
-  commandArgs.push(
-    "--broadcast",
-    "--legacy",
-    "--ffi",
-    "--sig",
-    sig || "runForTest()",
-  );
+  commandArgs.push("--broadcast", "--legacy", "--ffi", "--sig", sig || "runForTest()");
 
   if (args) {
     commandArgs.push(...args.split(" "));

@@ -123,10 +123,9 @@ describe("01 - Deployment Verification", function () {
     it("test tokens deployed on all L2 chains", () => {
       expect(state.testTokens).to.exist;
       for (const l2Chain of state.chains!.l2) {
-        expect(
-          state.testTokens![l2Chain.chainId],
-          `Test token not deployed on chain ${l2Chain.chainId}`
-        ).to.be.a("string");
+        expect(state.testTokens![l2Chain.chainId], `Test token not deployed on chain ${l2Chain.chainId}`).to.be.a(
+          "string"
+        );
       }
     });
 

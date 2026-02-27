@@ -3,11 +3,7 @@ import { BigNumber, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { executeTokenTransfer } from "../../src/token-transfer";
 import type { MultiChainTokenTransferResult } from "../../src/types";
-import {
-  buildInteropBundleLog,
-  callProcessLogsAndMessages,
-  getGWChainBalance,
-} from "../../src/process-logs-helper";
+import { buildInteropBundleLog, callProcessLogsAndMessages, getGWChainBalance } from "../../src/process-logs-helper";
 import { migrateTokenBalanceToGW } from "../../src/token-balance-migration-helper";
 import { interopCenterAbi } from "../../src/contracts";
 import { L2_NATIVE_TOKEN_VAULT_ADDR } from "../../src/const";
@@ -93,9 +89,7 @@ describe("06 - Gateway Interop (L2A <-> L2B)", function () {
 
     // Verify token balances changed correctly
     const sourceBalanceDelta = BigNumber.from(result.sourceBalanceBefore).sub(result.sourceBalanceAfter);
-    const destinationBalanceDelta = BigNumber.from(result.destinationBalanceAfter).sub(
-      result.destinationBalanceBefore
-    );
+    const destinationBalanceDelta = BigNumber.from(result.destinationBalanceAfter).sub(result.destinationBalanceBefore);
     expect(sourceBalanceDelta.eq(result.amountWei), "source chain burned amount mismatch").to.eq(true);
     expect(destinationBalanceDelta.eq(result.amountWei), "destination chain minted amount mismatch").to.eq(true);
 

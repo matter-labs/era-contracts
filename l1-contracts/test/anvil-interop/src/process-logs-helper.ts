@@ -1,4 +1,5 @@
-import { BigNumber, Contract, ethers, providers } from "ethers";
+import type { BigNumber, providers } from "ethers";
+import { Contract, ethers } from "ethers";
 import { gwAssetTrackerAbi, l2BridgehubAbi, l2MessageRootAbi } from "./contracts";
 import { impersonateAndRun } from "./utils";
 import { encodeTokenData, encodeBridgeMintData } from "./data-encoding";
@@ -120,9 +121,7 @@ export function buildLogsMerkleRoot(logs: L2Log[]): string {
         updatedSides = true;
       }
 
-      currentLevelHash = isLeft
-        ? efficientHash(currentLevelHash, zeros[i])
-        : efficientHash(sides[i], currentLevelHash);
+      currentLevelHash = isLeft ? efficientHash(currentLevelHash, zeros[i]) : efficientHash(sides[i], currentLevelHash);
 
       currentIndex >>= 1;
     }
@@ -178,10 +177,7 @@ export function computeEmptyMessageRoot(chainId: number): string {
 
   // chainIdLeafHash(initialChainTreeHash, chainId)
   const leafHash = ethers.utils.keccak256(
-    ethers.utils.solidityPack(
-      ["bytes32", "bytes32", "uint256"],
-      [CHAIN_ID_LEAF_PADDING, initialChainTreeHash, chainId]
-    )
+    ethers.utils.solidityPack(["bytes32", "bytes32", "uint256"], [CHAIN_ID_LEAF_PADDING, initialChainTreeHash, chainId])
   );
 
   // FullMerkle createTree(1) → maxLeafNumber=1, height=0
@@ -250,10 +246,10 @@ export function buildAssetRouterWithdrawalLog(params: {
  * The message format is: 0x01 ++ abi.encode(InteropBundle)
  * The log key is bytes32(uint256(uint160(INTEROP_CENTER_ADDR)))
  */
-export function buildInteropBundleLog(params: {
-  txNumberInBatch: number;
-  interopBundle: unknown;
-}): { log: L2Log; message: string } {
+export function buildInteropBundleLog(params: { txNumberInBatch: number; interopBundle: unknown }): {
+  log: L2Log;
+  message: string;
+} {
   const abiCoder = ethers.utils.defaultAbiCoder;
 
   // BUNDLE_IDENTIFIER = 0x01
@@ -280,16 +276,11 @@ export function buildInteropBundleLog(params: {
  * Look up the chain's ZKChain address on GW Bridgehub.
  * Chains must be registered during setup (step 5) via gateway-setup.ts.
  */
-async function getZKChainAddressOnGW(
-  gwProvider: providers.JsonRpcProvider,
-  chainId: number
-): Promise<string> {
+async function getZKChainAddressOnGW(gwProvider: providers.JsonRpcProvider, chainId: number): Promise<string> {
   const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbi(), gwProvider);
   const addr: string = await bridgehub.getZKChain(chainId);
   if (addr === ethers.constants.AddressZero) {
-    throw new Error(
-      `Chain ${chainId} not registered on GW Bridgehub. Ensure step 5 (gateway setup) ran correctly.`
-    );
+    throw new Error(`Chain ${chainId} not registered on GW Bridgehub. Ensure step 5 (gateway setup) ran correctly.`);
   }
   return addr;
 }
@@ -395,10 +386,7 @@ export async function getGWChainBalance(
 /**
  * Query the ETH asset ID from the Bridgehub on GW (baseTokenAssetId for a chain).
  */
-export async function getBaseTokenAssetId(
-  gwProvider: providers.JsonRpcProvider,
-  chainId: number
-): Promise<string> {
+export async function getBaseTokenAssetId(gwProvider: providers.JsonRpcProvider, chainId: number): Promise<string> {
   const bridgehubAbi = l2BridgehubAbi();
   const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, bridgehubAbi, gwProvider);
   return bridgehub.baseTokenAssetId(chainId);

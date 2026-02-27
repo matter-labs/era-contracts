@@ -1,4 +1,5 @@
-import { BigNumber, Contract, providers, Wallet, ethers } from "ethers";
+import type { BigNumber } from "ethers";
+import { Contract, providers, Wallet, ethers } from "ethers";
 import type { CoreDeployedAddresses } from "./types";
 import { impersonateAndRun, extractAndRelayNewPriorityRequests } from "./utils";
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "./data-encoding";
@@ -95,24 +96,22 @@ export async function depositETHToL2(params: DepositETHParams): Promise<DepositE
   if (params.gwRpcUrl) {
     // GW-settled: relay L1 → GW → L2
     const gwProvider = new providers.JsonRpcProvider(params.gwRpcUrl);
-    const txHashes = await extractAndRelayNewPriorityRequests(
-      l1Receipt,
-      [{
+    const txHashes = await extractAndRelayNewPriorityRequests(l1Receipt, [
+      {
         diamondProxy: l1DiamondProxy,
         provider: gwProvider,
         relayChains: [{ provider: l2Provider }],
-      }],
-    );
+      },
+    ]);
     l2TxHash = txHashes.length > 0 ? txHashes[txHashes.length - 1] : null;
   } else {
     // Direct chain: relay L1 → L2
-    const txHashes = await extractAndRelayNewPriorityRequests(
-      l1Receipt,
-      [{
+    const txHashes = await extractAndRelayNewPriorityRequests(l1Receipt, [
+      {
         diamondProxy: l1DiamondProxy,
         provider: l2Provider,
-      }],
-    );
+      },
+    ]);
     l2TxHash = txHashes.length > 0 ? txHashes[txHashes.length - 1] : null;
   }
 
@@ -166,7 +165,12 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
   const secondBridgeCalldata = encodeAssetRouterBridgehubDepositData(assetId, transferData);
 
   // We need to send ETH for L2 gas
-  const baseCost = await bridgehub.l2TransactionBaseCost(chainId, 50_000_000_000n, l2GasLimit, l2GasPerPubdataByteLimit);
+  const baseCost = await bridgehub.l2TransactionBaseCost(
+    chainId,
+    50_000_000_000n,
+    l2GasLimit,
+    l2GasPerPubdataByteLimit
+  );
   const mintValue = baseCost.add(ethers.utils.parseEther("0.01")); // some margin
 
   const request = {

@@ -5,7 +5,8 @@
  * contracts/common/libraries/DataEncoding.sol so that off-chain
  * test helpers produce data the contracts can decode.
  */
-import { ethers, BigNumber } from "ethers";
+import type { BigNumber } from "ethers";
+import { ethers } from "ethers";
 import { L2_NATIVE_TOKEN_VAULT_ADDR } from "./const";
 
 const abiCoder = ethers.utils.defaultAbiCoder;

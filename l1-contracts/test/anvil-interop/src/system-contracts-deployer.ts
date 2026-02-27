@@ -3,7 +3,15 @@ import * as path from "path";
 import { providers, Contract, Wallet, utils } from "ethers";
 import { impersonateAndRun } from "./utils";
 import { encodeNtvAssetId } from "./data-encoding";
-import { l2BridgehubAbi, interopCenterAbi, interopHandlerAbi, l2AssetRouterAbi, l2AssetTrackerAbi, l2NativeTokenVaultAbi, l2NativeTokenVaultDevAbi } from "./contracts";
+import {
+  l2BridgehubAbi,
+  interopCenterAbi,
+  interopHandlerAbi,
+  l2AssetRouterAbi,
+  l2AssetTrackerAbi,
+  l2NativeTokenVaultAbi,
+  l2NativeTokenVaultDevAbi,
+} from "./contracts";
 import {
   ETH_TOKEN_ADDRESS,
   INTEROP_CENTER_ADDR,
@@ -547,7 +555,11 @@ export class SystemContractsDeployer {
         "L2NativeTokenVaultDev"
       );
 
-      const l2NativeTokenVaultDev = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultDevAbiData, this.l2Wallet);
+      const l2NativeTokenVaultDev = new Contract(
+        L2_NATIVE_TOKEN_VAULT_ADDR,
+        l2NativeTokenVaultDevAbiData,
+        this.l2Wallet
+      );
 
       const ownerAddress = await this.l2Wallet.getAddress();
       const abiCoder = new utils.AbiCoder();

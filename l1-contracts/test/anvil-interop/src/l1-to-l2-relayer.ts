@@ -188,5 +188,4 @@ export class L1ToL2Relayer {
       console.log(`      Note: ${factoryDeps.length} factory deps were included but not deployed`);
     }
   }
-
 }

@@ -24,12 +24,7 @@ export class TokenBalanceMigration {
   private l1Addresses: CoreDeployedAddresses;
   private gwChainId: number;
 
-  constructor(
-    l1RpcUrl: string,
-    gwRpcUrl: string,
-    l1Addresses: CoreDeployedAddresses,
-    gwChainId: number
-  ) {
+  constructor(l1RpcUrl: string, gwRpcUrl: string, l1Addresses: CoreDeployedAddresses, gwChainId: number) {
     this.l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
     this.gwProvider = new providers.JsonRpcProvider(gwRpcUrl);
     this.l1Addresses = l1Addresses;

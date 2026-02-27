@@ -39,7 +39,14 @@ export class ForgeDeployer {
     };
 
     // Use runForAnvil() which skips the acceptAdmin() step
-    await runForgeScript({ scriptPath, envVars, rpcUrl: this.rpcUrl, senderAddress: this.senderAddress, projectRoot: this.projectRoot, sig: "runForAnvil()" });
+    await runForgeScript({
+      scriptPath,
+      envVars,
+      rpcUrl: this.rpcUrl,
+      senderAddress: this.senderAddress,
+      projectRoot: this.projectRoot,
+      sig: "runForAnvil()",
+    });
 
     const fullOutputPath = path.join(this.projectRoot, outputPath);
     const output = parseForgeScriptOutput(fullOutputPath);
@@ -88,7 +95,15 @@ export class ForgeDeployer {
     const sig = "runForAnvilTest(address,bool)";
     const args = `${bridgehubAddr} false`;
 
-    await runForgeScript({ scriptPath, envVars, rpcUrl: this.rpcUrl, senderAddress: this.senderAddress, projectRoot: this.projectRoot, sig, args });
+    await runForgeScript({
+      scriptPath,
+      envVars,
+      rpcUrl: this.rpcUrl,
+      senderAddress: this.senderAddress,
+      projectRoot: this.projectRoot,
+      sig,
+      args,
+    });
 
     const fullOutputPath = path.join(this.projectRoot, outputPath);
     const output = parseForgeScriptOutput(fullOutputPath);
@@ -126,7 +141,15 @@ export class ForgeDeployer {
       CTM_ADDR: ctmAddr,
     };
 
-    await runForgeScript({ scriptPath, envVars, rpcUrl: this.rpcUrl, senderAddress: this.senderAddress, projectRoot: this.projectRoot, sig, args });
+    await runForgeScript({
+      scriptPath,
+      envVars,
+      rpcUrl: this.rpcUrl,
+      senderAddress: this.senderAddress,
+      projectRoot: this.projectRoot,
+      sig,
+      args,
+    });
 
     console.log("✅ ChainTypeManager registered");
   }
@@ -171,5 +194,4 @@ export class ForgeDeployer {
       throw error;
     }
   }
-
 }

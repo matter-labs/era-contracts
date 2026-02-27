@@ -73,10 +73,9 @@ describe("04 - Gateway Setup", function () {
 
       for (const chainId of [10, 11, 12, 13]) {
         const baseTokenAssetId = await l2Bridgehub.baseTokenAssetId(chainId);
-        expect(
-          baseTokenAssetId,
-          `Chain ${chainId} should be registered on GW L2Bridgehub`
-        ).to.not.equal("0x0000000000000000000000000000000000000000000000000000000000000000");
+        expect(baseTokenAssetId, `Chain ${chainId} should be registered on GW L2Bridgehub`).to.not.equal(
+          "0x0000000000000000000000000000000000000000000000000000000000000000"
+        );
       }
     });
   });

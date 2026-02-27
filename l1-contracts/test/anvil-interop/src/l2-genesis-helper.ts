@@ -1,11 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { utils } from "ethers";
-import {
-  ETH_TOKEN_ADDRESS,
-  L1_CHAIN_ID,
-  ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE,
-} from "./const";
+import { ETH_TOKEN_ADDRESS, L1_CHAIN_ID, ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE } from "./const";
 import { applyL1ToL2Alias } from "./utils";
 import { encodeNtvAssetId } from "./data-encoding";
 
@@ -333,4 +329,3 @@ export function buildAdditionalForceDeploymentsData(baseTokenL1Address: string):
     ]
   );
 }
-

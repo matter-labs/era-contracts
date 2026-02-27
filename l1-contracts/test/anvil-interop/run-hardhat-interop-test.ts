@@ -79,17 +79,13 @@ async function main(): Promise<void> {
       if (!freshDeploy && runner.hasChainStates()) {
         const stateDir = runner.getChainStatesDir();
         console.log(`\nFound pre-generated chain states at ${stateDir}`);
-        const result = await timedAsync("load chain states", () =>
-          runner.loadChainStates(anvilManager, stateDir)
-        );
+        const result = await timedAsync("load chain states", () => runner.loadChainStates(anvilManager, stateDir));
         chains = result.chains;
         l1Addresses = result.l1Addresses;
         ctmAddresses = result.ctmAddresses;
       } else {
         console.log("\nNo pre-generated chain states found, running full deployment...");
-        const result = await timedAsync("full deployment (steps 1-5)", () =>
-          runner.runFullDeployment(anvilManager)
-        );
+        const result = await timedAsync("full deployment (steps 1-5)", () => runner.runFullDeployment(anvilManager));
         chains = result.chains;
         l1Addresses = result.l1Addresses;
         ctmAddresses = result.ctmAddresses;
@@ -125,9 +121,7 @@ async function main(): Promise<void> {
       if (gwSettledChainIds.length > 0 && gwChain?.rpcUrl) {
         const freshState = runner.loadState();
         if (freshState.testTokens && Object.keys(freshState.testTokens).length > 0) {
-          const gwDiamondProxy = freshState.chainAddresses!.find(
-            (c) => c.chainId === gatewayChainId
-          )!.diamondProxy;
+          const gwDiamondProxy = freshState.chainAddresses!.find((c) => c.chainId === gatewayChainId)!.diamondProxy;
 
           await timedAsync("TBM for test tokens on GW-settled chains", () =>
             registerAndMigrateTestTokens({
@@ -144,7 +138,6 @@ async function main(): Promise<void> {
           );
         }
       }
-
     }
 
     timedRun(

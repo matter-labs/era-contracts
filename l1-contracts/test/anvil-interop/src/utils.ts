@@ -2,7 +2,13 @@ import { ethers, providers, utils } from "ethers";
 import { parse as parseToml } from "toml";
 import * as fs from "fs";
 import * as path from "path";
-import { ANVIL_FUND_BALANCE, L1_MESSAGE_SENT_EVENT_SIG, L1_TO_L2_ALIAS_OFFSET, L2_ASSET_TRACKER_ADDR, NEW_PRIORITY_REQUEST_EVENT_SIG } from "./const";
+import {
+  ANVIL_FUND_BALANCE,
+  L1_MESSAGE_SENT_EVENT_SIG,
+  L1_TO_L2_ALIAS_OFFSET,
+  L2_ASSET_TRACKER_ADDR,
+  NEW_PRIORITY_REQUEST_EVENT_SIG,
+} from "./const";
 import type { FinalizeWithdrawalParams, PriorityRequestData } from "./types";
 
 export async function waitForChainReady(rpcUrl: string, maxAttempts = 30): Promise<boolean> {
@@ -74,16 +80,13 @@ export function ensureDirectoryExists(dirPath: string): void {
   }
 }
 
-
 /**
  * Get chain IDs of chains settled on the gateway (not L1, not GW itself, not direct-settled chain 10).
  */
 export function getGwSettledChainIds(
   chains: Array<{ chainId: number; isL1?: boolean; isGateway?: boolean }>
 ): number[] {
-  return chains
-    .filter((c) => !c.isL1 && !c.isGateway && c.chainId !== 10)
-    .map((c) => c.chainId);
+  return chains.filter((c) => !c.isL1 && !c.isGateway && c.chainId !== 10).map((c) => c.chainId);
 }
 
 export function formatChainInfo(chainId: number, port: number, isL1: boolean): string {
@@ -97,7 +100,7 @@ export function formatChainInfo(chainId: number, port: number, isL1: boolean): s
 export async function impersonateAndRun<T>(
   provider: providers.JsonRpcProvider,
   account: string,
-  fn: (signer: providers.JsonRpcSigner) => Promise<T>,
+  fn: (signer: providers.JsonRpcSigner) => Promise<T>
 ): Promise<T> {
   await provider.send("anvil_impersonateAccount", [account]);
   await provider.send("anvil_setBalance", [account, ANVIL_FUND_BALANCE]);
@@ -137,7 +140,9 @@ function loadArtifactFromOut(artifactRelativePath: string): any {
  * Apply L1-to-L2 address alias (AddressAliasHelper.applyL1ToL2Alias).
  */
 export function applyL1ToL2Alias(l1Address: string): string {
-  const result = ethers.BigNumber.from(l1Address).add(ethers.BigNumber.from(L1_TO_L2_ALIAS_OFFSET)).mod(ethers.BigNumber.from(2).pow(160));
+  const result = ethers.BigNumber.from(l1Address)
+    .add(ethers.BigNumber.from(L1_TO_L2_ALIAS_OFFSET))
+    .mod(ethers.BigNumber.from(2).pow(160));
   return ethers.utils.getAddress(ethers.utils.hexZeroPad(result.toHexString(), 20));
 }
 
@@ -228,7 +233,7 @@ export async function relayTx(
   from: string,
   to: string,
   calldata: string,
-  value?: ethers.BigNumber,
+  value?: ethers.BigNumber
 ): Promise<{ txHash: string; success: boolean; receipt?: ethers.providers.TransactionReceipt }> {
   try {
     return await impersonateAndRun(provider, from, async (signer) => {
@@ -268,7 +273,7 @@ export async function extractAndRelayNewPriorityRequests(
     provider: providers.JsonRpcProvider;
     relayChains?: Array<{ provider: providers.JsonRpcProvider }>;
   }>,
-  logger?: (line: string) => void,
+  logger?: (line: string) => void
 ): Promise<string[]> {
   const log = logger || console.log;
 
@@ -293,7 +298,13 @@ export async function extractAndRelayNewPriorityRequests(
             for (const nextReq of nextRequests) {
               for (const relayChain of chain.relayChains) {
                 log(`   Relaying next-hop from ${nextReq.from} to ${nextReq.to}`);
-                const nextResult = await relayTx(relayChain.provider, nextReq.from, nextReq.to, nextReq.calldata, nextReq.value);
+                const nextResult = await relayTx(
+                  relayChain.provider,
+                  nextReq.from,
+                  nextReq.to,
+                  nextReq.calldata,
+                  nextReq.value
+                );
                 if (nextResult.success) {
                   hashes.push(nextResult.txHash);
                   log(`   Next-hop relay tx: ${nextResult.txHash}`);
@@ -325,7 +336,7 @@ export async function scanAndRelayPriorityRequests(
   gwProvider: providers.JsonRpcProvider,
   fromBlock: number,
   toBlock: number | "latest",
-  logger?: (line: string) => void,
+  logger?: (line: string) => void
 ): Promise<string[]> {
   const log = logger || console.log;
   const newPriorityRequestTopic = ethers.utils.id(NEW_PRIORITY_REQUEST_EVENT_SIG);
@@ -363,7 +374,7 @@ export async function scanAndRelayPriorityRequests(
       txHashes.push(result.txHash);
       log(`   Relay tx: ${result.txHash}`);
     } else {
-      log(`   Relay tx failed (non-fatal)`);
+      log("   Relay tx failed (non-fatal)");
     }
   }
 

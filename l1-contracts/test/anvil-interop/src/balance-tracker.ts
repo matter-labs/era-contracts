@@ -73,11 +73,7 @@ export class BalanceTracker {
   /**
    * Read an ERC20 token balance for an address on a given L2 chain.
    */
-  async getL2TokenBalance(
-    chainId: number,
-    tokenAddress: string,
-    walletAddress: string
-  ): Promise<BigNumber> {
+  async getL2TokenBalance(chainId: number, tokenAddress: string, walletAddress: string): Promise<BigNumber> {
     const provider = this.getL2Provider(chainId);
     const token = new Contract(tokenAddress, testnetERC20TokenAbi(), provider);
     return token.balanceOf(walletAddress);

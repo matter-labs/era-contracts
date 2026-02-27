@@ -12,10 +12,7 @@ import {
   SYSTEM_CONTEXT_ADDR,
   L2_BOOTLOADER_ADDR,
 } from "./const";
-import {
-  impersonateAndRun,
-  scanAndRelayPriorityRequests,
-} from "./utils";
+import { impersonateAndRun, scanAndRelayPriorityRequests } from "./utils";
 import { encodeNtvAssetId } from "./data-encoding";
 import { migrateTokenBalanceToGW } from "./token-balance-migration-helper";
 import { prepareMergedToml, prepareGatewayChainConfig } from "./toml-handling";
@@ -61,7 +58,7 @@ export class GatewaySetup {
 
     // Step 1: Verify GW chain has all required system contracts
     if (gwRpcUrl) {
-      let done = timeIt("verifyGatewayContracts");
+      const done = timeIt("verifyGatewayContracts");
       const deployer = new GatewayDeployer(gwRpcUrl, chainId);
       await deployer.verifyGatewayContracts();
       done();
@@ -98,13 +95,8 @@ export class GatewaySetup {
       // Relay L1→L2 priority requests to GW chain
       done = timeIt("relay: fullRegistration → GW");
       const latestBlock = await l1Provider.getBlockNumber();
-      await scanAndRelayPriorityRequests(
-        l1Provider,
-        gwDiamondProxy,
-        gwProvider,
-        startBlock + 1,
-        latestBlock,
-        (line) => console.log(line)
+      await scanAndRelayPriorityRequests(l1Provider, gwDiamondProxy, gwProvider, startBlock + 1, latestBlock, (line) =>
+        console.log(line)
       );
       done();
     } else {
@@ -135,8 +127,7 @@ export class GatewaySetup {
    * Run a Forge script function on _GatewayPreparationForTests.
    */
   private async runForgeGatewayScript(sig: string, args?: string): Promise<string> {
-    const scriptPath =
-      "test/foundry/l1/integration/_GatewayPreparationForTests.sol:GatewayPreparationForTests";
+    const scriptPath = "test/foundry/l1/integration/_GatewayPreparationForTests.sol:GatewayPreparationForTests";
 
     // Paths relative to project root (with leading /)
     const mergedOutputRelative = "/test/anvil-interop/outputs/gateway-merged-output.toml";
@@ -185,10 +176,7 @@ export class GatewaySetup {
 
       // Run forge script: pause deposits + initiate migration.
       let done = timeIt(`forge: runPauseAndMigrateChain(${chainId})`);
-      await this.runForgeGatewayScript(
-        "runPauseAndMigrateChain(uint256)",
-        String(chainId)
-      );
+      await this.runForgeGatewayScript("runPauseAndMigrateChain(uint256)", String(chainId));
       done();
 
       // Confirm migration on L1
@@ -201,7 +189,7 @@ export class GatewaySetup {
 
     // Phase 2: Relay L1→L2 priority requests to GW chain (sequential — same GW impersonated addresses)
     if (gwRpcUrl) {
-      const done = timeIt(`relay: migration → GW (all chains)`);
+      const done = timeIt("relay: migration → GW (all chains)");
       const gwProvider = new providers.JsonRpcProvider(gwRpcUrl);
       const latestBlock = await l1Provider.getBlockNumber();
       await scanAndRelayPriorityRequests(
@@ -299,10 +287,7 @@ export class GatewaySetup {
     console.log(`   Found BridgehubDepositFinalized: canonicalTxHash = ${canonicalTxHash}`);
 
     // Call forge script to confirm migration using the actual on-chain canonical tx hash
-    await this.runForgeGatewayScript(
-      "runConfirmMigration(uint256,bytes32)",
-      `${chainId} ${canonicalTxHash}`
-    );
+    await this.runForgeGatewayScript("runConfirmMigration(uint256,bytes32)", `${chainId} ${canonicalTxHash}`);
   }
 
   /**
@@ -367,9 +352,9 @@ export class GatewaySetup {
         if (existingAddr === ethers.constants.AddressZero) {
           // Create a deterministic fake diamond proxy address for this chain
           const fakeProxy = ethers.utils.getAddress(
-            ethers.utils.keccak256(
-              ethers.utils.defaultAbiCoder.encode(["string", "uint256"], ["fakeZKChain", chainId])
-            ).slice(0, 42)
+            ethers.utils
+              .keccak256(ethers.utils.defaultAbiCoder.encode(["string", "uint256"], ["fakeZKChain", chainId]))
+              .slice(0, 42)
           );
           // Deploy minimal code at the fake proxy so it's a "contract"
           await gwProvider.send("anvil_setCode", [fakeProxy, "0x00"]);
@@ -423,5 +408,4 @@ export class GatewaySetup {
       console.log(`   Notified chain ${chainId}: settlement layer changed to ${gwChainId}`);
     });
   }
-
 }
