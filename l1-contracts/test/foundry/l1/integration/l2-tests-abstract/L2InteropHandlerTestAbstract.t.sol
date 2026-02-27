@@ -750,4 +750,3 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(toChainId);
     }
 }
-
