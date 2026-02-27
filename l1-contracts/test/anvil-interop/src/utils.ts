@@ -283,7 +283,7 @@ export async function extractAndRelayNewPriorityRequests(
         const result = await relayTx(chain.provider, req.from, req.to, req.calldata, req.value);
         if (result.success) {
           hashes.push(result.txHash);
-          log(`   Relay tx: ${result.txHash}`);
+          log(`   Relay tx: cast run ${result.txHash} -r ${chain.provider.connection.url}`);
 
           // GW relay: if this chain has relayChains, extract NewPriorityRequest events
           // from the relay receipt and relay them to the next-hop chains.
@@ -296,7 +296,7 @@ export async function extractAndRelayNewPriorityRequests(
                 const nextResult = await relayTx(relayChain.provider, nextReq.from, nextReq.to, nextReq.calldata, nextReq.value);
                 if (nextResult.success) {
                   hashes.push(nextResult.txHash);
-                  log(`   Next-hop relay tx: ${nextResult.txHash}`);
+                  log(`   Next-hop relay tx: cast run ${nextResult.txHash} -r ${relayChain.provider.connection.url}`);
                 } else {
                   throw new Error(`Next-hop relay tx failed: from=${nextReq.from} to=${nextReq.to}`);
                 }
@@ -361,7 +361,7 @@ export async function scanAndRelayPriorityRequests(
     const result = await relayTx(gwProvider, from, to, calldata);
     if (result.success) {
       txHashes.push(result.txHash);
-      log(`   Relay tx: ${result.txHash}`);
+      log(`   Relay tx: cast run ${result.txHash} -r ${gwProvider.connection.url}`);
     } else {
       log(`   Relay tx failed (non-fatal)`);
     }
