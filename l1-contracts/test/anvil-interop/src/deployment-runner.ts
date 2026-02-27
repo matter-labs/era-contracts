@@ -278,23 +278,22 @@ export class DeploymentRunner {
       )
     );
 
-    // Load state into each chain via anvil_loadState RPC
-    await Promise.all(
-      config.chains.map(async (chainConfig) => {
-        const stateFile = path.join(stateDir, `${chainConfig.chainId}.json`);
-        if (!fs.existsSync(stateFile)) {
-          throw new Error(`State file not found: ${stateFile}`);
-        }
-        const stateData = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
-        const rpcUrl = `http://127.0.0.1:${chainConfig.port}`;
-        const provider = new providers.JsonRpcProvider(rpcUrl);
-        const success = await provider.send("anvil_loadState", [stateData]);
-        if (!success) {
-          throw new Error(`Failed to load state for chain ${chainConfig.chainId}`);
-        }
-        console.log(`  Loaded state for chain ${chainConfig.chainId}`);
-      })
-    );
+    // Load state into each chain sequentially via anvil_loadState RPC.
+    // Sequential to avoid OOM on memory-constrained CI runners (state files can be large).
+    for (const chainConfig of config.chains) {
+      const stateFile = path.join(stateDir, `${chainConfig.chainId}.json`);
+      if (!fs.existsSync(stateFile)) {
+        throw new Error(`State file not found: ${stateFile}`);
+      }
+      const stateData = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
+      const rpcUrl = `http://127.0.0.1:${chainConfig.port}`;
+      const provider = new providers.JsonRpcProvider(rpcUrl);
+      const success = await provider.send("anvil_loadState", [stateData]);
+      if (!success) {
+        throw new Error(`Failed to load state for chain ${chainConfig.chainId}`);
+      }
+      console.log(`  Loaded state for chain ${chainConfig.chainId}`);
+    }
 
     const l1Chain = anvilManager.getL1Chain();
     const l2Chains = anvilManager.getL2Chains();
