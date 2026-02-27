@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import * as zlib from "zlib";
 import { Contract, Wallet, providers } from "ethers";
 import type { AnvilManager } from "./anvil-manager";
 import { ForgeDeployer } from "./deployer";
@@ -249,11 +250,32 @@ export class DeploymentRunner {
   }
 
   /**
+   * Decompress a hex-gzip state file (produced by --dump-state) into native JSON
+   * that --load-state CLI accepts. Writes a temp file and returns its path.
+   *
+   * State files from --dump-state contain a hex-encoded gzip string ("0x1f8b08...").
+   * The --load-state CLI expects native JSON (SerializableState struct), so we
+   * decompress on the fly. This avoids anvil version issues with anvil_loadState RPC.
+   */
+  private decompressStateFile(hexGzipFile: string, outputFile: string): void {
+    const raw = JSON.parse(fs.readFileSync(hexGzipFile, "utf-8"));
+    if (typeof raw === "string" && raw.startsWith("0x1f8b")) {
+      // Hex-encoded gzip: decode hex → decompress gzip → native JSON
+      const gzipBuf = Buffer.from(raw.slice(2), "hex");
+      const nativeJson = zlib.gunzipSync(gzipBuf);
+      fs.writeFileSync(outputFile, nativeJson);
+    } else {
+      // Already native JSON — copy as-is
+      fs.copyFileSync(hexGzipFile, outputFile);
+    }
+  }
+
+  /**
    * Start all chains from pre-generated Anvil state files.
    * Skips deployment steps 2-5 entirely — chains boot with state already loaded.
    *
-   * Uses anvil_loadState RPC (not --load-state CLI) for format compatibility
-   * with states produced by anvil_dumpState.
+   * Uses --load-state CLI for maximum compatibility across anvil versions.
+   * State files from --dump-state are hex-gzip; we decompress to native JSON first.
    */
   async loadChainStates(
     anvilManager: AnvilManager,
@@ -271,36 +293,39 @@ export class DeploymentRunner {
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
     const { l1Addresses, ctmAddresses, chainAddresses, testTokens } = addresses;
 
-    // Start all chains normally (no --load-state), then load state via RPC.
-    // The state files are hex-encoded gzip (from anvil_dumpState RPC), which
-    // anvil_loadState RPC accepts but --load-state CLI does not.
+    // Decompress hex-gzip state files to native JSON for --load-state CLI.
+    // This is more portable than anvil_loadState RPC across anvil versions.
+    const tmpDir = path.join(stateDir, ".tmp");
+    fs.mkdirSync(tmpDir, { recursive: true });
+
+    const loadStatePaths: Record<number, string> = {};
+    for (const chainConfig of config.chains) {
+      const stateFile = path.join(stateDir, `${chainConfig.chainId}.json`);
+      if (!fs.existsSync(stateFile)) {
+        throw new Error(`State file not found: ${stateFile}`);
+      }
+      const nativeFile = path.join(tmpDir, `${chainConfig.chainId}.json`);
+      this.decompressStateFile(stateFile, nativeFile);
+      loadStatePaths[chainConfig.chainId] = nativeFile;
+    }
+
+    // Start all chains with --load-state pointing to the decompressed native JSON
     await Promise.all(
       config.chains.map((chainConfig) =>
         anvilManager.startChain({
           chainId: chainConfig.chainId,
           port: chainConfig.port,
           isL1: chainConfig.isL1,
+          loadStatePath: loadStatePaths[chainConfig.chainId],
         })
       )
     );
 
-    // Load state into each chain via anvil_loadState RPC
-    await Promise.all(
-      config.chains.map(async (chainConfig) => {
-        const stateFile = path.join(stateDir, `${chainConfig.chainId}.json`);
-        if (!fs.existsSync(stateFile)) {
-          throw new Error(`State file not found: ${stateFile}`);
-        }
-        const stateData = JSON.parse(fs.readFileSync(stateFile, "utf-8"));
-        const rpcUrl = `http://127.0.0.1:${chainConfig.port}`;
-        const provider = new providers.JsonRpcProvider(rpcUrl);
-        const success = await provider.send("anvil_loadState", [stateData]);
-        if (!success) {
-          throw new Error(`Failed to load state for chain ${chainConfig.chainId}`);
-        }
-        console.log(`  Loaded state for chain ${chainConfig.chainId}`);
-      })
-    );
+    // Clean up temp files
+    for (const tmpFile of Object.values(loadStatePaths)) {
+      fs.unlinkSync(tmpFile);
+    }
+    fs.rmdirSync(tmpDir);
 
     const l1Chain = anvilManager.getL1Chain();
     const l2Chains = anvilManager.getL2Chains();
