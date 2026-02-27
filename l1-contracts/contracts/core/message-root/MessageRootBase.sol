@@ -58,7 +58,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @dev The incremental merkle tree storing the chain message roots.
     /// @dev On L1, these are empty leaves and are populated only during the addition of the chain
     /// are not updated thereafter.
-    mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) public chainTree;
+    mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
 
     /// @notice The mapping from block number to the global message root.
     /// @dev Each block might have multiple txs that change the historical root. You can safely use the final root in the block,
@@ -340,5 +340,9 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         }
         uint256 index = chainIndex[_chainId];
         return sharedTree.merklePath(index);
+    }
+
+    function getChainTree(uint256 chainId) external view returns (DynamicIncrementalMerkle.Bytes32PushTree memory) {
+        return chainTree[chainId];
     }
 }

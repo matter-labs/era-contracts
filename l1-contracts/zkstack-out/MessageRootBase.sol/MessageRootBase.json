@@ -175,25 +175,6 @@
   },
   {
     "type": "function",
-    "name": "chainTree",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "_nextLeafIndex",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "currentChainBatchNumber",
     "inputs": [
       {
@@ -239,6 +220,42 @@
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getChainTree",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct DynamicIncrementalMerkle.Bytes32PushTree",
+        "components": [
+          {
+            "name": "_nextLeafIndex",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "_sides",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
+          },
+          {
+            "name": "_zeros",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
