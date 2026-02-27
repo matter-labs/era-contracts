@@ -4,18 +4,42 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {GatewayToL1TokenBalanceMigrationData, L1ToGatewayTokenBalanceMigrationData, MigrationConfirmationData} from "../../common/Messaging.sol";
+import {
+    GatewayToL1TokenBalanceMigrationData,
+    L1ToGatewayTokenBalanceMigrationData,
+    MigrationConfirmationData
+} from "../../common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {InvalidProof, ZeroAddress, InvalidChainId, Unauthorized} from "../../common/L1ContractErrors.sol";
-import {IMessageRootBase, V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "../../core/message-root/IMessageRoot.sol";
+import {InvalidChainId, InvalidProof, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {
+    IMessageRootBase,
+    V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE
+} from "../../core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {AmountToKeepOnL1NotUint256, AssetIdNotRegistered, AssetNotMigratedFromNTV, ChainBalanceMustBeZeroBeforeMigration, InvalidAssetMigrationNumber, InvalidChainMigrationNumber, InvalidMigrationAmount, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidVersion, InvalidWithdrawalChainId, AssetAlreadyRegistered, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet} from "./AssetTrackerErrors.sol";
+import {
+    AmountToKeepOnL1NotUint256,
+    AssetIdNotRegistered,
+    AssetNotMigratedFromNTV,
+    ChainBalanceMustBeZeroBeforeMigration,
+    InvalidAssetMigrationNumber,
+    InvalidChainMigrationNumber,
+    InvalidMigrationAmount,
+    InvalidMigrationNumber,
+    InvalidSender,
+    InvalidSettlementLayer,
+    InvalidVersion,
+    InvalidWithdrawalChainId,
+    AssetAlreadyRegistered,
+    NotMigratedChain,
+    OnlyWhitelistedSettlementLayer,
+    TransientBalanceChangeAlreadySet
+} from "./AssetTrackerErrors.sol";
 import {V31UpgradeChainBatchNumberNotSet} from "../../core/bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";

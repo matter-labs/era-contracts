@@ -2,12 +2,34 @@
 
 pragma solidity 0.8.28;
 
-import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, L2_INTEROP_CENTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    GW_ASSET_TRACKER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
+    L2_ASSET_ROUTER_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_BASE_TOKEN_HOLDER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_INTEROP_HANDLER_ADDR,
+    L2_MESSAGE_ROOT_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_NTV_BEACON_DEPLOYER_ADDR,
+    L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
+    L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
+    L2_INTEROP_CENTER_ADDR
+} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
-import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {
+    FixedForceDeploymentsData,
+    ZKChainSpecificForceDeploymentsData
+} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL2WrappedBaseToken} from "../bridge/interfaces/IL2WrappedBaseToken.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {
+    ITransparentUpgradeableProxy,
+    TransparentUpgradeableProxy
+} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SystemContractProxyAdmin} from "./SystemContractProxyAdmin.sol";
 import {IZKOSContractDeployer} from "contracts/l2-system/zksync-os/interfaces/IZKOSContractDeployer.sol";
 import {L2NativeTokenVault} from "../bridge/ntv/L2NativeTokenVault.sol";
@@ -20,7 +42,13 @@ import {L2ChainAssetHandler} from "../core/chain-asset-handler/L2ChainAssetHandl
 import {InteropHandler} from "../interop/InteropHandler.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol";
-import {DeployFailed, UnsupportedUpgradeType, ZKsyncOSNotForceDeployForExistingContract, ZKsyncOSNotForceDeployToPrecompileAddress, NonCanonicalRepresentation} from "../common/L1ContractErrors.sol";
+import {
+    DeployFailed,
+    UnsupportedUpgradeType,
+    ZKsyncOSNotForceDeployForExistingContract,
+    ZKsyncOSNotForceDeployToPrecompileAddress,
+    NonCanonicalRepresentation
+} from "../common/L1ContractErrors.sol";
 
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
@@ -30,10 +58,9 @@ import {InteropCenter} from "../interop/InteropCenter.sol";
 
 import {UpgradeableBeaconDeployer} from "../bridge/UpgradeableBeaconDeployer.sol";
 import {ISystemContractProxy} from "./ISystemContractProxy.sol";
-import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 
-import {ZKSyncOSBytecodeInfo, BYTECODE_INFO_LENGTH} from "../common/libraries/ZKSyncOSBytecodeInfo.sol";
+import {BYTECODE_INFO_LENGTH, ZKSyncOSBytecodeInfo} from "../common/libraries/ZKSyncOSBytecodeInfo.sol";
 
 /// @title L2GenesisForceDeploymentsHelper
 /// @author Matter Labs

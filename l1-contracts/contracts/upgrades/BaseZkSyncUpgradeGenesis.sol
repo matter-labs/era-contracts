@@ -5,7 +5,14 @@ pragma solidity 0.8.28;
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
-import {GenesisUpgradeExpectedOnSettlementLayer, PreviousUpgradeBatchNotCleared, PreviousUpgradeNotFinalized, ProtocolMajorVersionNotZero, ProtocolVersionDeltaTooLarge, ProtocolVersionTooSmall} from "./ZkSyncUpgradeErrors.sol";
+import {
+    GenesisUpgradeExpectedOnSettlementLayer,
+    PreviousUpgradeBatchNotCleared,
+    PreviousUpgradeNotFinalized,
+    ProtocolMajorVersionNotZero,
+    ProtocolVersionDeltaTooLarge,
+    ProtocolVersionTooSmall
+} from "./ZkSyncUpgradeErrors.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 

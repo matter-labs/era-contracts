@@ -2,9 +2,20 @@
 
 pragma solidity ^0.8.20;
 
-import {L2Log, InteropBundle, InteropCall, BundleAttributes, BUNDLE_IDENTIFIER, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION} from "contracts/common/Messaging.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "contracts/common/Config.sol";
+import {
+    L2Log,
+    InteropBundle,
+    InteropCall,
+    BundleAttributes,
+    BUNDLE_IDENTIFIER,
+    INTEROP_BUNDLE_VERSION,
+    INTEROP_CALL_VERSION
+} from "contracts/common/Messaging.sol";
+import {
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    L2_INTEROP_CENTER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "contracts/common/Config.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -95,7 +106,7 @@ library ProcessLogsTestHelper {
     }
 
     /// @notice Builds a complete ProcessLogsInput with correct Merkle root and chainBatchRoot.
-    /// @param _gwAssetTracker The GWAssetTrackerTestHelper instance (needed for getEmptyMessageRoot).
+    /// @param _gwAssetTracker The GWAssetTrackerTestHelper instance (needed for getEmptyMultichainBatchRoot).
     /// @param _chainId The settling chain ID.
     /// @param _batchNumber Batch number.
     /// @param _logs Array of L2Log entries.
@@ -109,9 +120,9 @@ library ProcessLogsTestHelper {
         bytes[] memory _messages,
         address _settlementFeePayer
     ) internal returns (ProcessLogsInput memory) {
-        bytes32 emptyMessageRoot = _gwAssetTracker.getEmptyMessageRoot(_chainId);
+        bytes32 emptyMultichainBatchRoot = _gwAssetTracker.getEmptyMultichainBatchRoot(_chainId);
         bytes32 logsRoot = buildLogsMerkleRoot(_logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         return
             ProcessLogsInput({
@@ -120,7 +131,7 @@ library ProcessLogsTestHelper {
                 logs: _logs,
                 messages: _messages,
                 chainBatchRoot: chainBatchRoot,
-                messageRoot: emptyMessageRoot,
+                multichainBatchRoot: emptyMultichainBatchRoot,
                 settlementFeePayer: _settlementFeePayer
             });
     }

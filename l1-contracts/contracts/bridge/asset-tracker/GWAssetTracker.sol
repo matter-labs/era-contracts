@@ -4,20 +4,76 @@ pragma solidity 0.8.28;
 
 import {BALANCE_CHANGE_VERSION, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 
-import {BUNDLE_IDENTIFIER, BalanceChange, GatewayToL1TokenBalanceMigrationData, InteropBundle, InteropCall, L2Log, MigrationConfirmationData, TxStatus, TokenBridgingData} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR, L2_ASSET_ROUTER, L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractInterfaces.sol";
+import {
+    BUNDLE_IDENTIFIER,
+    BalanceChange,
+    GatewayToL1TokenBalanceMigrationData,
+    InteropBundle,
+    InteropCall,
+    L2Log,
+    MigrationConfirmationData,
+    TxStatus,
+    TokenBridgingData
+} from "../../common/Messaging.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_BOOTLOADER_ADDRESS,
+    L2_BRIDGEHUB,
+    L2_CHAIN_ASSET_HANDLER,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_COMPRESSOR_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
+    L2_MESSAGE_ROOT,
+    L2_NATIVE_TOKEN_VAULT,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    MAX_BUILT_IN_CONTRACT_ADDR,
+    L2_ASSET_ROUTER,
+    L2_BRIDGEHUB_ADDR
+} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {ChainIdNotRegistered, InvalidInteropCalldata, InvalidMessage, ReconstructionMismatch, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRootBase, SHARED_ROOT_TREE_EMPTY_HASH} from "../../core/message-root/IMessageRoot.sol";
+import {
+    ChainIdNotRegistered,
+    InvalidInteropCalldata,
+    InvalidMessage,
+    ReconstructionMismatch,
+    Unauthorized,
+    ZeroAddress
+} from "../../common/L1ContractErrors.sol";
+import {
+    CHAIN_TREE_EMPTY_ENTRY_HASH,
+    IMessageRootBase,
+    SHARED_ROOT_TREE_EMPTY_HASH
+} from "../../core/message-root/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
-import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER, MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1} from "../../common/Config.sol";
+import {
+    L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
+    L2_TO_L1_LOGS_MERKLE_TREE_DEPTH,
+    MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
+    MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1
+} from "../../common/Config.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAssetMigrationNumber, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidFeeRecipient, SettlementFeePayerNotAgreed} from "./AssetTrackerErrors.sol";
+import {
+    InvalidAssetMigrationNumber,
+    InvalidBuiltInContractMessage,
+    InvalidCanonicalTxHash,
+    InvalidChainMigrationNumber,
+    InvalidFunctionSignature,
+    InvalidInteropChainId,
+    InvalidL2ShardId,
+    InvalidServiceLog,
+    InvalidEmptyMultichainBatchRoot,
+    RegisterNewTokenNotAllowed,
+    InvalidFeeRecipient,
+    SettlementFeePayerNotAgreed
+} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
@@ -58,8 +114,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// On such chains, it is responsible for sending withdrawal messages.
     mapping(uint256 chainId => address legacySharedBridgeAddress) internal legacySharedBridgeAddress;
 
-    /// @notice Empty messageRoot calculated for specific chain.
-    mapping(uint256 chainId => bytes32 emptyMessageRoot) internal emptyMessageRoot;
+    /// @notice Empty multichainBatchRoot calculated for specific chain.
+    mapping(uint256 chainId => bytes32 emptyMultichainBatchRoot) internal emptyMultichainBatchRoot;
 
     /// @notice Gateway settlement fee per interop operation in ZK tokens.
     /// @dev Set by gateway governance, paid by chain operators during settlement.
@@ -296,15 +352,18 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 }
             }
         }
+        if (msgCount != _processLogsInputs.messages.length) {
+            revert InvalidMessage();
+        }
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 
-        bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
+        bytes32 expectedEmptyMultichainBatchRoot = _getEmptyMultichainBatchRoot(_processLogsInputs.chainId);
         require(
-            _processLogsInputs.messageRoot == emptyMessageRootForChain,
-            InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot)
+            _processLogsInputs.multichainBatchRoot == expectedEmptyMultichainBatchRoot,
+            InvalidEmptyMultichainBatchRoot(expectedEmptyMultichainBatchRoot, _processLogsInputs.multichainBatchRoot)
         );
-        bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.messageRoot));
+        bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.multichainBatchRoot));
 
         if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {
             revert ReconstructionMismatch(chainBatchRootHash, _processLogsInputs.chainBatchRoot);
@@ -364,10 +423,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         emit GatewaySettlementFeesCollected(_chainId, _settlementFeePayer, totalFee, _chargeableInteropCount);
     }
 
-    function _getEmptyMessageRoot(uint256 _chainId) internal returns (bytes32) {
-        bytes32 savedEmptyMessageRoot = emptyMessageRoot[_chainId];
-        if (savedEmptyMessageRoot != bytes32(0)) {
-            return savedEmptyMessageRoot;
+    function _getEmptyMultichainBatchRoot(uint256 _chainId) internal returns (bytes32) {
+        bytes32 savedEmptyMultichainBatchRoot = emptyMultichainBatchRoot[_chainId];
+        if (savedEmptyMultichainBatchRoot != bytes32(0)) {
+            return savedEmptyMultichainBatchRoot;
         }
         FullMerkleMemory.FullTree memory sharedTree;
         sharedTree.createTree(1);
@@ -378,10 +437,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         chainTree.createTree(1);
         bytes32 initialChainTreeHash = chainTree.setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
         bytes32 leafHash = MessageHashing.chainIdLeafHash(initialChainTreeHash, _chainId);
-        bytes32 emptyMessageRootCalculated = sharedTree.pushNewLeaf(leafHash);
+        bytes32 emptyMultichainBatchRootCalculated = sharedTree.pushNewLeaf(leafHash);
 
-        emptyMessageRoot[_chainId] = emptyMessageRootCalculated;
-        return emptyMessageRootCalculated;
+        emptyMultichainBatchRoot[_chainId] = emptyMultichainBatchRootCalculated;
+        return emptyMultichainBatchRootCalculated;
     }
 
     /// @notice Handles potential failed deposits. Not all L1->L2 txs are deposits.

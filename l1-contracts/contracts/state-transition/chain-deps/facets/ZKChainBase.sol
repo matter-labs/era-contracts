@@ -2,18 +2,33 @@
 
 pragma solidity 0.8.28;
 
-import {ZKChainStorage, PriorityModeInformation, FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
+import {FeeParams, PriorityModeInformation, PubdataPricingMode, ZKChainStorage} from "../ZKChainStorage.sol";
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
-import {BatchHashMismatch, BaseTokenGasPriceDenominatorNotSet, Unauthorized, OnlyNormalMode, OnlyPriorityMode} from "../../../common/L1ContractErrors.sol";
-import {L2_INTEROP_CENTER_ADDR, GW_ASSET_TRACKER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    BatchHashMismatch,
+    BaseTokenGasPriceDenominatorNotSet,
+    Unauthorized,
+    OnlyNormalMode,
+    OnlyPriorityMode,
+    MustBeEraChain
+} from "../../../common/L1ContractErrors.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
-import {L1_GAS_PER_PUBDATA_BYTE, PRIORITY_OPERATION_L2_TX_TYPE, SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE, L2DACommitmentScheme, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH} from "../../../common/Config.sol";
-import {RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch} from "../../../common/L1ContractErrors.sol";
+import {
+    L1_GAS_PER_PUBDATA_BYTE,
+    PRIORITY_OPERATION_L2_TX_TYPE,
+    SYSTEM_UPGRADE_L2_TX_TYPE,
+    ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE,
+    ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
+    L2DACommitmentScheme,
+    DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH
+} from "../../../common/Config.sol";
+import {CantRevertExecutedBatch, RevertedBatchNotAfterNewLastBatch} from "../../../common/L1ContractErrors.sol";
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {StoredBatchHashing} from "../StoredBatchHashing.sol";
@@ -53,6 +68,12 @@ contract ZKChainBase is ReentrancyGuard {
     /// @notice Ensures Priority Mode is active.
     modifier onlyPriorityMode() {
         require(s.priorityModeInfo.activated, OnlyPriorityMode());
+        _;
+    }
+
+    /// @notice Ensures that the chain uses EraVM
+    modifier onlyEra() {
+        require(!s.zksyncOS, MustBeEraChain());
         _;
     }
 
@@ -247,12 +268,10 @@ contract ZKChainBase is ReentrancyGuard {
         // slither-disable-next-line divide-before-multiply
         uint256 batchOverheadBaseToken = uint256(_feeParams.batchOverheadL1Gas) * l1GasPriceConverted;
         uint256 fullPubdataPriceBaseToken = pubdataPriceBaseToken +
-            batchOverheadBaseToken /
-            uint256(_feeParams.maxPubdataPerBatch);
+            batchOverheadBaseToken / uint256(_feeParams.maxPubdataPerBatch);
 
         uint256 l2GasPrice = _feeParams.minimalL2GasPrice +
-            batchOverheadBaseToken /
-            uint256(_feeParams.maxL2GasPerBatch);
+            batchOverheadBaseToken / uint256(_feeParams.maxL2GasPerBatch);
         uint256 minL2GasPriceBaseToken = (fullPubdataPriceBaseToken + _gasPerPubdata - 1) / _gasPerPubdata;
 
         return Math.max(l2GasPrice, minL2GasPriceBaseToken);

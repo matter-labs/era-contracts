@@ -27,8 +27,8 @@ error InvalidBuiltInContractMessage(uint256 logCount, uint256 msgCount, bytes32 
 error InvalidCanonicalTxHash(bytes32);
 // 0x05208b6d
 error InvalidChainMigrationNumber(uint256, uint256);
-// 0x24ef4f8a
-error InvalidEmptyMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoot);
+// 0xe0c8f0c6
+error InvalidEmptyMultichainBatchRoot(bytes32 expectedMultichainBatchRoot, bytes32 providedMultichainBatchRoot);
 // 0x768dc598
 error InvalidFeeRecipient();
 // 0x532a43fc

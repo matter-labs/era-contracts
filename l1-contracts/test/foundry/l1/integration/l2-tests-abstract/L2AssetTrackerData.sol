@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
+import {L2Log} from "contracts/common/Messaging.sol";
 import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "contracts/common/Config.sol";
@@ -15,10 +15,10 @@ library L2AssetTrackerData {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
     using FullMerkleMemory for FullMerkleMemory.FullTree;
 
-    /// @notice Computes the empty message root for a given chain ID
-    /// @param chainId The chain ID to compute the empty message root for
-    /// @return The computed empty message root
-    function computeEmptyMessageRoot(uint256 chainId) internal view returns (bytes32) {
+    /// @notice Computes the empty multichain batch root for a given chain ID
+    /// @param chainId The chain ID to compute the empty multichain batch root for
+    /// @return The computed empty multichain batch root for chain
+    function computeEmptyMultichainBatchRoot(uint256 chainId) internal view returns (bytes32) {
         FullMerkleMemory.FullTree memory sharedTree;
         sharedTree.createTree(1);
         sharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
@@ -27,16 +27,16 @@ library L2AssetTrackerData {
         chainTree.createTree(1);
         bytes32 initialChainTreeHash = chainTree.setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
         bytes32 leafHash = MessageHashing.chainIdLeafHash(initialChainTreeHash, chainId);
-        bytes32 emptyMessageRootCalculated = sharedTree.pushNewLeaf(leafHash);
+        bytes32 emptyMultichainBatchRootCalculated = sharedTree.pushNewLeaf(leafHash);
 
-        return emptyMessageRootCalculated;
+        return emptyMultichainBatchRootCalculated;
     }
 
-    /// @notice Computes the chainBatchRoot from logs and messageRoot
+    /// @notice Computes the chainBatchRoot from logs and multichainBatchRoot
     /// @param logs The L2 logs to compute the local logs root from
-    /// @param messageRoot The message root to combine with the local logs root
+    /// @param multichainBatchRoot The multichain batch root for chain to combine with the local logs root
     /// @return The computed chainBatchRoot
-    function computeChainBatchRoot(L2Log[] memory logs, bytes32 messageRoot) internal pure returns (bytes32) {
+    function computeChainBatchRoot(L2Log[] memory logs, bytes32 multichainBatchRoot) internal pure returns (bytes32) {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree;
         reconstructedLogsTree.createTree(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
         reconstructedLogsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
@@ -48,7 +48,7 @@ library L2AssetTrackerData {
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 
-        return keccak256(bytes.concat(localLogsRootHash, messageRoot));
+        return keccak256(bytes.concat(localLogsRootHash, multichainBatchRoot));
     }
 
     function getData2() public returns (bytes[] memory) {
@@ -71,8 +71,8 @@ library L2AssetTrackerData {
         bytes[] memory emptyMessages = new bytes[](0);
 
         // Compute message roots once for each chain ID
-        bytes32 messageRoot_260 = computeEmptyMessageRoot(260);
-        bytes32 messageRoot_271 = computeEmptyMessageRoot(271);
+        bytes32 multichainBatchRoot_260 = computeEmptyMultichainBatchRoot(260);
+        bytes32 multichainBatchRoot_271 = computeEmptyMultichainBatchRoot(271);
 
         L2Log[][] memory logs = new L2Log[][](200);
         bytes[][] memory messages = new bytes[][](200);
@@ -93,8 +93,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 5,
-                chainBatchRoot: computeChainBatchRoot(logs_batch5, messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs_batch5, multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -113,8 +113,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 2,
-                chainBatchRoot: computeChainBatchRoot(logs_batch2, messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs_batch2, multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -134,8 +134,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 7,
-                chainBatchRoot: computeChainBatchRoot(logs_batch4, messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs_batch4, multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -154,8 +154,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 6,
-                chainBatchRoot: computeChainBatchRoot(logs_batch6, messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs_batch6, multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -174,8 +174,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 14,
-                chainBatchRoot: computeChainBatchRoot(logs_batch14, messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs_batch14, multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -198,8 +198,8 @@ library L2AssetTrackerData {
                 messages: messages1,
                 chainId: 260,
                 batchNumber: 25,
-                chainBatchRoot: computeChainBatchRoot(logs_batch25, messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs_batch25, multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -276,8 +276,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 1,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -305,8 +305,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 3,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -326,8 +326,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 4,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -347,8 +347,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 21,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -380,8 +380,8 @@ library L2AssetTrackerData {
                 messages: messages[i],
                 chainId: 260,
                 batchNumber: 12,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -401,8 +401,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 8,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -422,8 +422,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 13,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -448,8 +448,8 @@ library L2AssetTrackerData {
                 messages: messages[i],
                 chainId: 260,
                 batchNumber: 19,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -474,8 +474,8 @@ library L2AssetTrackerData {
                 messages: messages[i],
                 chainId: 260,
                 batchNumber: 23,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -500,8 +500,8 @@ library L2AssetTrackerData {
                 messages: messages[i],
                 chainId: 260,
                 batchNumber: 11,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -521,8 +521,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 16,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -542,8 +542,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 28,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -563,8 +563,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 29,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -589,8 +589,8 @@ library L2AssetTrackerData {
                 messages: messages[i],
                 chainId: 260,
                 batchNumber: 24,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -610,8 +610,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 39,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -631,8 +631,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 36,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -657,8 +657,8 @@ library L2AssetTrackerData {
                 messages: messages[i],
                 chainId: 260,
                 batchNumber: 37,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -678,8 +678,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 38,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -699,8 +699,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 260,
                 batchNumber: 40,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -725,8 +725,8 @@ library L2AssetTrackerData {
                 messages: messages[i],
                 chainId: 260,
                 batchNumber: 35,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_260),
-                messageRoot: messageRoot_260,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_260),
+                multichainBatchRoot: multichainBatchRoot_260,
                 settlementFeePayer: address(0)
             });
         }
@@ -751,8 +751,8 @@ library L2AssetTrackerData {
                 messages: messages[i],
                 chainId: 271,
                 batchNumber: 7,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
+                multichainBatchRoot: multichainBatchRoot_271,
                 settlementFeePayer: address(0)
             });
         }
@@ -775,8 +775,8 @@ library L2AssetTrackerData {
                 messages: messages[i],
                 chainId: 271,
                 batchNumber: 16,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
+                multichainBatchRoot: multichainBatchRoot_271,
                 settlementFeePayer: address(0)
             });
         }
@@ -801,8 +801,8 @@ library L2AssetTrackerData {
                 messages: messages[i],
                 chainId: 271,
                 batchNumber: 8,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
+                multichainBatchRoot: multichainBatchRoot_271,
                 settlementFeePayer: address(0)
             });
         }
@@ -825,8 +825,8 @@ library L2AssetTrackerData {
                 messages: messages[i],
                 chainId: 271,
                 batchNumber: 17,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
+                multichainBatchRoot: multichainBatchRoot_271,
                 settlementFeePayer: address(0)
             });
         }
@@ -846,8 +846,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 271,
                 batchNumber: 10,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
+                multichainBatchRoot: multichainBatchRoot_271,
                 settlementFeePayer: address(0)
             });
         }
@@ -883,8 +883,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 271,
                 batchNumber: 9,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
+                multichainBatchRoot: multichainBatchRoot_271,
                 settlementFeePayer: address(0)
             });
         }
@@ -904,8 +904,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 271,
                 batchNumber: 5,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
+                multichainBatchRoot: multichainBatchRoot_271,
                 settlementFeePayer: address(0)
             });
         }
@@ -930,8 +930,8 @@ library L2AssetTrackerData {
                 messages: messages[i],
                 chainId: 271,
                 batchNumber: 15,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
+                multichainBatchRoot: multichainBatchRoot_271,
                 settlementFeePayer: address(0)
             });
         }
@@ -956,8 +956,8 @@ library L2AssetTrackerData {
                 messages: messages[i],
                 chainId: 271,
                 batchNumber: 6,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
+                multichainBatchRoot: multichainBatchRoot_271,
                 settlementFeePayer: address(0)
             });
         }
@@ -977,8 +977,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 271,
                 batchNumber: 14,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
+                multichainBatchRoot: multichainBatchRoot_271,
                 settlementFeePayer: address(0)
             });
         }
@@ -1054,8 +1054,8 @@ library L2AssetTrackerData {
                 messages: emptyMessages,
                 chainId: 271,
                 batchNumber: 100,
-                chainBatchRoot: computeChainBatchRoot(logs[i], messageRoot_271),
-                messageRoot: messageRoot_271,
+                chainBatchRoot: computeChainBatchRoot(logs[i], multichainBatchRoot_271),
+                multichainBatchRoot: multichainBatchRoot_271,
                 settlementFeePayer: address(0)
             });
         }

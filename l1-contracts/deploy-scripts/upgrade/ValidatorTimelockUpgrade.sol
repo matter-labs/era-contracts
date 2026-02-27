@@ -11,7 +11,6 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 import {Call} from "contracts/governance/Common.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Utils} from "deploy-scripts/Utils.sol";
-import {Call} from "contracts/governance/Common.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 

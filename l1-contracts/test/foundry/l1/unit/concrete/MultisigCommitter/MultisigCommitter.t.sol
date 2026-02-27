@@ -3,20 +3,26 @@ pragma solidity 0.8.28;
 
 import {Vm} from "forge-std/Vm.sol";
 import {Test} from "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
+
 import {Utils} from "../Utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {MultisigCommitter} from "contracts/state-transition/validators/MultisigCommitter.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {CommitBatchInfo, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Unauthorized, TimeNotReached, RoleAccessDenied, ChainRequiresValidatorsSignaturesForCommit, NotEnoughSigners, SignerNotAuthorized, SignersNotSorted} from "contracts/common/L1ContractErrors.sol";
+
+import {
+    Unauthorized,
+    TimeNotReached,
+    RoleAccessDenied,
+    ChainRequiresValidatorsSignaturesForCommit,
+    NotEnoughSigners,
+    SignerNotAuthorized,
+    SignersNotSorted
+} from "contracts/common/L1ContractErrors.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 
 contract MultisigCommitterTest is Test {
     MultisigCommitter multisigCommitter;

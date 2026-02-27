@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {IZKChainBase} from "./IZKChainBase.sol";
 import {L2Log} from "../../common/Messaging.sol";
 // solhint-disable-next-line no-unused-import
-import {SystemLogKey, MAX_NUMBER_OF_BLOBS} from "system-contracts/contracts/Constants.sol";
+import {MAX_NUMBER_OF_BLOBS, SystemLogKey} from "system-contracts/contracts/Constants.sol";
 
 struct LogProcessingOutput {
     uint256 numberOfLayer1Txs;
@@ -31,7 +31,7 @@ uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
 /// @param chainId The chain ID of the settling chain.
 /// @param batchNumber The batch number being processed.
 /// @param chainBatchRoot The batch root hash for verification.
-/// @param messageRoot The message root hash for verification.
+/// @param multichainBatchRoot The multichain batch root for chain for verification.
 /// @param settlementFeePayer Address that pays gateway settlement fees for interop calls in this batch.
 ///
 /// @dev Settlement Fee Payer Requirements:
@@ -51,7 +51,7 @@ struct ProcessLogsInput {
     uint256 chainId;
     uint256 batchNumber;
     bytes32 chainBatchRoot;
-    bytes32 messageRoot;
+    bytes32 multichainBatchRoot;
     address settlementFeePayer;
 }
 

@@ -8,7 +8,7 @@ import {ValidiumL1DAValidator} from "../../data-availability/ValidiumL1DAValidat
 
 import {ROLLUP_L2_DA_COMMITMENT_SCHEME} from "../../../common/Config.sol";
 
-import {GatewayDADeployerConfig, DAContracts} from "./GatewayCTMDeployer.sol";
+import {DAContracts, GatewayDADeployerConfig} from "./GatewayCTMDeployer.sol";
 
 /// @title GatewayCTMDeployerDA
 /// @author Matter Labs

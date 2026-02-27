@@ -5,7 +5,13 @@ pragma solidity ^0.8.21;
 import {IExecutor} from "../chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS, PrecommitInfo} from "../chain-interfaces/ICommitter.sol";
 import {PriorityOpsBatchInfo} from "./PriorityTree.sol";
-import {EmptyData, IncorrectBatchBounds, UnsupportedCommitBatchEncoding, UnsupportedExecuteBatchEncoding, UnsupportedProofBatchEncoding} from "../../common/L1ContractErrors.sol";
+import {
+    EmptyData,
+    IncorrectBatchBounds,
+    UnsupportedCommitBatchEncoding,
+    UnsupportedExecuteBatchEncoding,
+    UnsupportedProofBatchEncoding
+} from "../../common/L1ContractErrors.sol";
 import {InteropRoot, L2Log} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
@@ -237,7 +243,7 @@ library BatchDecoder {
     /// @return dependencyRoots Interop dependency roots for each batch.
     /// @return logs L2 logs for each batch.
     /// @return messages L2 messages for each batch.
-    /// @return messageRoots Message roots for each batch.
+    /// @return multichainBatchRoots Multichain batch roots for chain for each batch.
     /// @return settlementFeePayer Address that pays gateway settlement fees.
     function _decodeExecuteData(
         bytes calldata _executeData
@@ -250,7 +256,7 @@ library BatchDecoder {
             InteropRoot[][] memory dependencyRoots,
             L2Log[][] memory logs,
             bytes[][] memory messages,
-            bytes32[] memory messageRoots,
+            bytes32[] memory multichainBatchRoots,
             address settlementFeePayer
         )
     {
@@ -260,8 +266,15 @@ library BatchDecoder {
 
         uint8 encodingVersion = uint8(_executeData[0]);
         if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
-            (executeData, priorityOpsData, dependencyRoots, logs, messages, messageRoots, settlementFeePayer) = abi
-                .decode(
+            (
+                executeData,
+                priorityOpsData,
+                dependencyRoots,
+                logs,
+                messages,
+                multichainBatchRoots,
+                settlementFeePayer
+            ) = abi.decode(
                     _executeData[1:],
                     (
                         IExecutor.StoredBatchInfo[],
@@ -289,7 +302,7 @@ library BatchDecoder {
     /// @return dependencyRoots Interop dependency roots for each batch.
     /// @return logs L2 logs for each batch.
     /// @return messages L2 messages for each batch.
-    /// @return messageRoots Message roots for each batch.
+    /// @return multichainBatchRoots Multichain batch roots for chain for each batch.
     /// @return settlementFeePayer Address that pays gateway settlement fees.
     function decodeAndCheckExecuteData(
         bytes calldata _executeData,
@@ -304,7 +317,7 @@ library BatchDecoder {
             InteropRoot[][] memory dependencyRoots,
             L2Log[][] memory logs,
             bytes[][] memory messages,
-            bytes32[] memory messageRoots,
+            bytes32[] memory multichainBatchRoots,
             address settlementFeePayer
         )
     {
@@ -314,7 +327,7 @@ library BatchDecoder {
             dependencyRoots,
             logs,
             messages,
-            messageRoots,
+            multichainBatchRoots,
             settlementFeePayer
         ) = _decodeExecuteData(_executeData);
 

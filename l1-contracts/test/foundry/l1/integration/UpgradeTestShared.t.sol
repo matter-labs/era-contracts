@@ -14,15 +14,9 @@ import {Test} from "forge-std/Test.sol";
 // import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 import {ChainUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol";
-import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
-import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
-import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-import {SemVer} from "contracts/common/libraries/SemVer.sol";
+
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {GetDiamondCutData} from "../../../../deploy-scripts/utils/GetDiamondCutData.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 contract UpgradeIntegrationTestBase is Test {
     using stdToml for string;

@@ -3,7 +3,13 @@
 pragma solidity ^0.8.21;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {BalanceChange, BundleAttributes, CallAttributes, InteropBundle, InteropCallStarter} from "../common/Messaging.sol";
+import {
+    BalanceChange,
+    BundleAttributes,
+    CallAttributes,
+    InteropBundle,
+    InteropCallStarter
+} from "../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

@@ -260,6 +260,8 @@ error MockVerifierNotSupported();
 error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 // 0xb385a3da
 error MsgValueTooLow(uint256 required, uint256 provided);
+// 0xedd74330
+error MustBeEraChain();
 // 0x8b7e144a
 error NewDeadlineExceedsMaxDeadline();
 // 0x6eef58d1
