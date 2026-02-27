@@ -9,6 +9,7 @@ import {
   L2_INTEROP_HANDLER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "./const";
+import { encodeNtvAssetId, encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "./data-encoding";
 
 type Logger = (line: string) => void;
 
@@ -117,9 +118,7 @@ export async function executeTokenTransfer(
   }
 
   const abiCoder = ethers.utils.defaultAbiCoder;
-  const assetId = ethers.utils.keccak256(
-    abiCoder.encode(["uint256", "address", "address"], [sourceChainId, L2_NATIVE_TOKEN_VAULT_ADDR, sourceTokenAddr])
-  );
+  const assetId = encodeNtvAssetId(sourceChainId, sourceTokenAddr);
   log(`\n🔑 Asset ID: ${assetId}`);
 
   log(`⏱️  [${elapsed()}] Checking token registration...`);
@@ -141,12 +140,8 @@ export async function executeTokenTransfer(
       ? BigNumber.from(0)
       : await readTokenBalance(targetProvider, destinationTokenBefore, targetWallet.address);
 
-  const NEW_ENCODING_VERSION = "0x01";
-  const transferData = abiCoder.encode(
-    ["uint256", "address", "address"],
-    [amountWei, sourceWallet.address, sourceTokenAddr]
-  );
-  const depositData = NEW_ENCODING_VERSION + abiCoder.encode(["bytes32", "bytes"], [assetId, transferData]).slice(2);
+  const transferData = encodeBridgeBurnData(amountWei, sourceWallet.address, sourceTokenAddr);
+  const depositData = encodeAssetRouterBridgehubDepositData(assetId, transferData);
 
   log("\n📦 Encoded bridgehub deposit data");
   log(`   Target Chain: ${targetChainId}`);

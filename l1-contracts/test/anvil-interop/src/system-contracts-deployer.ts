@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { providers, Contract, Wallet, utils } from "ethers";
 import { impersonateAndRun } from "./utils";
+import { encodeNtvAssetId } from "./data-encoding";
 import { l2BridgehubAbi, interopCenterAbi, interopHandlerAbi, l2AssetRouterAbi, l2AssetTrackerAbi, l2NativeTokenVaultAbi, l2NativeTokenVaultDevAbi } from "./contracts";
 import {
   ETH_TOKEN_ADDRESS,
@@ -615,11 +616,7 @@ export class SystemContractsDeployer {
     }
 
     const tokenAddress = state.testTokens[chainId];
-    const abiCoder = new utils.AbiCoder();
-    // Asset ID format: utils.keccak256(abi.encode(chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress))
-    const assetId = utils.keccak256(
-      abiCoder.encode(["uint256", "address", "address"], [chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress])
-    );
+    const assetId = encodeNtvAssetId(chainId, tokenAddress);
 
     console.log(`   Registering asset handler for token ${tokenAddress}...`);
     console.log(`   Asset ID: ${assetId}`);

@@ -2,7 +2,7 @@ import { ethers, providers, utils } from "ethers";
 import { parse as parseToml } from "toml";
 import * as fs from "fs";
 import * as path from "path";
-import { ANVIL_FUND_BALANCE, L1_MESSAGE_SENT_EVENT_SIG, L1_TO_L2_ALIAS_OFFSET, L2_ASSET_TRACKER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, NEW_PRIORITY_REQUEST_EVENT_SIG } from "./const";
+import { ANVIL_FUND_BALANCE, L1_MESSAGE_SENT_EVENT_SIG, L1_TO_L2_ALIAS_OFFSET, L2_ASSET_TRACKER_ADDR, NEW_PRIORITY_REQUEST_EVENT_SIG } from "./const";
 import type { FinalizeWithdrawalParams, PriorityRequestData } from "./types";
 
 export async function waitForChainReady(rpcUrl: string, maxAttempts = 30): Promise<boolean> {
@@ -74,12 +74,8 @@ export function ensureDirectoryExists(dirPath: string): void {
   }
 }
 
-export function encodeNtvAssetId(chainId: number, tokenAddress: string): string {
-  const abiCoder = new utils.AbiCoder();
-  return utils.keccak256(
-    abiCoder.encode(["uint256", "address", "address"], [chainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress])
-  );
-}
+// Re-export from data-encoding for backwards compatibility
+export { encodeNtvAssetId } from "./data-encoding";
 
 /**
  * Get chain IDs of chains settled on the gateway (not L1, not GW itself, not direct-settled chain 10).

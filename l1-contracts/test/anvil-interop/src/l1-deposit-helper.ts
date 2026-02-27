@@ -1,8 +1,9 @@
 import { BigNumber, Contract, providers, Wallet, ethers } from "ethers";
 import type { CoreDeployedAddresses } from "./types";
-import { encodeNtvAssetId, impersonateAndRun, extractAndRelayNewPriorityRequests } from "./utils";
+import { impersonateAndRun, extractAndRelayNewPriorityRequests } from "./utils";
+import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "./data-encoding";
 import { l1BridgehubAbi, l2AssetRouterAbi, testnetERC20TokenAbi, l1NativeTokenVaultAbi } from "./contracts";
-import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS, L1_CHAIN_ID, L2_ASSET_ROUTER_ADDR } from "./const";
+import { ANVIL_DEFAULT_PRIVATE_KEY, L1_CHAIN_ID, L2_ASSET_ROUTER_ADDR } from "./const";
 
 export interface DepositETHParams {
   l1RpcUrl: string;
@@ -42,11 +43,11 @@ export interface DepositERC20Result {
 }
 
 /**
- * Deposit ETH from L1 to an L2 chain via Bridgehub.requestL2TransactionTwoBridges.
+ * Deposit ETH from L1 to an L2 chain via Bridgehub.requestL2TransactionDirect.
  *
- * This produces a self-finalizing priority request: L1AssetRouter.bridgehubDeposit
- * generates L2 calldata containing L2AssetRouter.finalizeDeposit(...), so relay via
- * extractAndRelayNewPriorityRequests works for both direct and GW-settled chains.
+ * For ETH-base-token chains, the base token deposit goes through the direct path
+ * (TwoBridges rejects base token deposits with AssetIdNotSupported).
+ * The Bridgehub emits a NewPriorityRequest that we relay to the target chain.
  */
 export async function depositETHToL2(params: DepositETHParams): Promise<DepositETHResult> {
   const { l1RpcUrl, l2RpcUrl, chainId, l1Addresses, amount, l1DiamondProxy } = params;
@@ -64,36 +65,25 @@ export async function depositETHToL2(params: DepositETHParams): Promise<DepositE
   const gasPrice = 50_000_000_000n; // 50 gwei
 
   const baseCost = await bridgehub.l2TransactionBaseCost(chainId, gasPrice, l2GasLimit, l2GasPerPubdataByteLimit);
-
-  // Build two-bridges calldata: ETH deposit via L1AssetRouter
-  const abiCoder = ethers.utils.defaultAbiCoder;
-  const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
-  const transferData = abiCoder.encode(
-    ["uint256", "address", "address"],
-    [amount, recipient, ETH_TOKEN_ADDRESS]
-  );
-  const secondBridgeCalldata = abiCoder.encode(
-    ["bytes32", "bytes"],
-    [ethAssetId, transferData]
-  );
+  const mintValue = baseCost.add(amount);
 
   const request = {
     chainId,
-    mintValue: baseCost,
-    l2Value: 0,
+    mintValue,
+    l2Contract: recipient,
+    l2Value: amount,
+    l2Calldata: "0x",
     l2GasLimit,
     l2GasPerPubdataByteLimit,
+    factoryDeps: [],
     refundRecipient: recipient,
-    secondBridgeAddress: l1Addresses.l1SharedBridge,
-    secondBridgeValue: amount,
-    secondBridgeCalldata,
   };
 
-  console.log(`   Depositing ${ethers.utils.formatEther(amount)} ETH to chain ${chainId} via TwoBridges...`);
+  console.log(`   Depositing ${ethers.utils.formatEther(amount)} ETH to chain ${chainId} via Direct...`);
   console.log(`   baseCost: ${baseCost.toString()}, amount: ${amount.toString()}`);
 
-  const tx = await bridgehub.requestL2TransactionTwoBridges(request, {
-    value: baseCost.add(amount),
+  const tx = await bridgehub.requestL2TransactionDirect(request, {
+    value: mintValue,
     gasLimit: 5_000_000,
   });
   const l1Receipt = await tx.wait();
@@ -172,12 +162,8 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
   const l2GasLimit = 1_000_000;
   const l2GasPerPubdataByteLimit = 800;
 
-  // Encode secondBridgeCalldata: assetId + transfer data
-  const abiCoder = ethers.utils.defaultAbiCoder;
-  const secondBridgeCalldata = abiCoder.encode(
-    ["bytes32", "bytes"],
-    [assetId, abiCoder.encode(["uint256", "address", "address"], [amount, recipient, l1TokenAddress])]
-  );
+  const transferData = encodeBridgeBurnData(amount, recipient, l1TokenAddress);
+  const secondBridgeCalldata = encodeAssetRouterBridgehubDepositData(assetId, transferData);
 
   // We need to send ETH for L2 gas
   const baseCost = await bridgehub.l2TransactionBaseCost(chainId, 50_000_000_000n, l2GasLimit, l2GasPerPubdataByteLimit);
@@ -227,13 +213,7 @@ async function finalizeERC20DepositOnL2(
   amount: BigNumber,
   recipient: string
 ): Promise<string | null> {
-  const l2AssetRouterAbiData = l2AssetRouterAbi();
-  const abiCoder = ethers.utils.defaultAbiCoder;
-
-  const transferData = abiCoder.encode(
-    ["uint256", "address", "address"],
-    [amount, recipient, l1TokenAddress]
-  );
+  const transferData = encodeBridgeBurnData(amount, recipient, l1TokenAddress);
 
   try {
     return await impersonateAndRun(l2Provider, L2_ASSET_ROUTER_ADDR, async (signer) => {

@@ -1,6 +1,7 @@
 import { BigNumber, Contract, ethers, providers } from "ethers";
 import { gwAssetTrackerAbi, l2BridgehubAbi, l2MessageRootAbi } from "./contracts";
 import { impersonateAndRun } from "./utils";
+import { encodeTokenData, encodeBridgeMintData } from "./data-encoding";
 import {
   CHAIN_ID_LEAF_PADDING,
   FINALIZE_DEPOSIT_SIG,
@@ -210,22 +211,13 @@ export function buildAssetRouterWithdrawalLog(params: {
   originalCaller: string;
   tokenOriginChainId: number;
 }): { log: L2Log; message: string } {
-  const abiCoder = ethers.utils.defaultAbiCoder;
-
-  // erc20Metadata = NEW_ENCODING_VERSION (0x01) ++ abi.encode(tokenOriginChainId, name, symbol, decimals)
-  // Matches DataEncoding.encodeTokenData format
-  const erc20MetadataInner = abiCoder.encode(
-    ["uint256", "bytes", "bytes", "bytes"],
-    [params.tokenOriginChainId, "0x", "0x", "0x"]
-  );
-  const erc20Metadata = ethers.utils.hexlify(
-    ethers.utils.concat(["0x01", erc20MetadataInner])
-  );
-
-  // transferData = abi.encode(originalCaller, receiver, originToken, amount, erc20Metadata)
-  const transferData = abiCoder.encode(
-    ["address", "address", "address", "uint256", "bytes"],
-    [params.originalCaller, params.receiver, params.originToken, params.amount, erc20Metadata]
+  const erc20Metadata = encodeTokenData(params.tokenOriginChainId);
+  const transferData = encodeBridgeMintData(
+    params.originalCaller,
+    params.receiver,
+    params.originToken,
+    params.amount,
+    erc20Metadata
   );
 
   const finalizeDepositSelector = ethers.utils.id(FINALIZE_DEPOSIT_SIG).slice(0, 10);

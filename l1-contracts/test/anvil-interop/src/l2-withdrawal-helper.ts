@@ -1,5 +1,6 @@
 import { BigNumber, Contract, providers, Wallet, ethers } from "ethers";
-import { encodeNtvAssetId, impersonateAndRun } from "./utils";
+import { impersonateAndRun } from "./utils";
+import { encodeNtvAssetId, encodeBridgeBurnData } from "./data-encoding";
 import {
   l1NativeTokenVaultAbi,
   l2NativeTokenVaultAbi,
@@ -82,11 +83,7 @@ export async function withdrawETHFromL2(params: WithdrawETHParams): Promise<With
   // On L2, ETH base token is registered at L2_BASE_TOKEN_ADDR (0x800a), not
   // ETH_TOKEN_ADDRESS (0x0001). The withdrawal data must use 0x800a so that
   // the L2NTV's _decodeBurnAndCheckAssetId finds the registered asset.
-  const abiCoder = ethers.utils.defaultAbiCoder;
-  const withdrawalData = abiCoder.encode(
-    ["uint256", "address", "address"],
-    [amount, l1Recipient, L2_BASE_TOKEN_ADDR]
-  );
+  const withdrawalData = encodeBridgeBurnData(amount, l1Recipient, L2_BASE_TOKEN_ADDR);
 
   // On Anvil, L2AssetRouter.withdraw(bytes32,bytes) is NOT payable (Solidity
   // enforces callvalue check). But the NTV's _getTokenAndBridgeToChain requires
@@ -155,11 +152,7 @@ export async function withdrawERC20FromL2(params: WithdrawERC20Params): Promise<
   await approveTx.wait();
 
   // Encode withdrawal data: (amount, l1Recipient, l2TokenAddress)
-  const abiCoder = ethers.utils.defaultAbiCoder;
-  const withdrawalData = abiCoder.encode(
-    ["uint256", "address", "address"],
-    [amount, l1Recipient, l2TokenAddress]
-  );
+  const withdrawalData = encodeBridgeBurnData(amount, l1Recipient, l2TokenAddress);
 
   // Call L2AssetRouter.withdraw on L2
   const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbi(), l2Wallet);
