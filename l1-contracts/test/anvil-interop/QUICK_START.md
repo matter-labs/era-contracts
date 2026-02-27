@@ -91,10 +91,10 @@ yarn cleanup                    # Kill Anvil processes, remove outputs
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| "L2 chains not found" | Run `yarn step1` first |
-| "Could not read [Contract]" | Run `forge build` in `l1-contracts/` |
-| Transaction reverted | Use `cast run <tx_hash> -r <rpc_url>` to trace |
-| Tests fail after contract changes | Run `yarn setup-and-dump` to regenerate state |
-| Port conflicts | Use `ANVIL_INTEROP_PORT_OFFSET=100` to shift ports |
+| Issue                             | Solution                                           |
+| --------------------------------- | -------------------------------------------------- |
+| "L2 chains not found"             | Run `yarn step1` first                             |
+| "Could not read [Contract]"       | Run `forge build` in `l1-contracts/`               |
+| Transaction reverted              | Use `cast run <tx_hash> -r <rpc_url>` to trace     |
+| Tests fail after contract changes | Run `yarn setup-and-dump` to regenerate state      |
+| Port conflicts                    | Use `ANVIL_INTEROP_PORT_OFFSET=100` to shift ports |

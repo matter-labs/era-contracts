@@ -70,9 +70,7 @@ address result = _tryAddress(target, "someFunction()");
 
 ```typescript
 // NEVER DO THIS:
-const someAbi = [
-  "function someMethod(uint256 param) view returns (address)",
-];
+const someAbi = ["function someMethod(uint256 param) view returns (address)"];
 const contract = new Contract(addr, someAbi, provider);
 ```
 

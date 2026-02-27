@@ -2,7 +2,10 @@
 pragma solidity ^0.8.24;
 
 interface IL2ChainAssetHandler {
-    function setSettlementLayerChainId(uint256 _previousSettlementLayerChainId, uint256 _currentSettlementLayerChainId) external;
+    function setSettlementLayerChainId(
+        uint256 _previousSettlementLayerChainId,
+        uint256 _currentSettlementLayerChainId
+    ) external;
 }
 
 /// @title MockSystemContext

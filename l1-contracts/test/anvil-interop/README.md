@@ -74,25 +74,25 @@ You can also add `.only` to a `describe` or `it` block in the spec file to isola
 
 ## Test Specs
 
-| Spec | What it tests |
-|------|---------------|
+| Spec                         | What it tests                                                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `01-deployment-verification` | L1 contracts deployed, CTM registered, all 4 L2 chains have diamond proxies, L2 system contracts present, test tokens deployed, initial chainBalance is zero |
-| `02-direct-bridge` | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), L1AssetTracker chainBalance tracking, balance conservation |
-| `03-interop-transfer` | L2<->L2 token transfers via InteropCenter between direct-settlement chains (10, 11, 12) |
-| `04-gateway-setup` | GW chain contracts deployed, interop chains registered on GW L2Bridgehub, GW designated as settlement layer on L1 |
-| `05-gateway-bridge` | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW), L1AssetTracker chainBalance tracking, token balance migration, processLogsAndMessages |
-| `06-gateway-interop` | L2A<->L2B interop transfers (both on GW), L2A<->GW interop transfers |
+| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), L1AssetTracker chainBalance tracking, balance conservation                    |
+| `03-interop-transfer`        | L2<->L2 token transfers via InteropCenter between direct-settlement chains (10, 11, 12)                                                                      |
+| `04-gateway-setup`           | GW chain contracts deployed, interop chains registered on GW L2Bridgehub, GW designated as settlement layer on L1                                            |
+| `05-gateway-bridge`          | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW), L1AssetTracker chainBalance tracking, token balance migration, processLogsAndMessages     |
+| `06-gateway-interop`         | L2A<->L2B interop transfers (both on GW), L2A<->GW interop transfers                                                                                         |
 
 ## Environment Variables
 
-| Variable | Effect |
-|----------|--------|
-| `ANVIL_INTEROP_SKIP_SETUP=1` | Skip deployment, run only tests (requires chains already running) |
-| `ANVIL_INTEROP_SKIP_CLEANUP=1` | Don't kill Anvil processes after tests |
-| `ANVIL_INTEROP_KEEP_CHAINS=1` | Same as `--keep-chains` flag |
-| `ANVIL_INTEROP_FRESH_DEPLOY=1` | Force full deployment even if pregenerated state exists |
-| `ANVIL_INTEROP_PORT_OFFSET=N` | Offset all chain ports by N (useful for parallel runs) |
-| `ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE=1` | Use genesis upgrade deployer for L2 initialization |
+| Variable                                 | Effect                                                            |
+| ---------------------------------------- | ----------------------------------------------------------------- |
+| `ANVIL_INTEROP_SKIP_SETUP=1`             | Skip deployment, run only tests (requires chains already running) |
+| `ANVIL_INTEROP_SKIP_CLEANUP=1`           | Don't kill Anvil processes after tests                            |
+| `ANVIL_INTEROP_KEEP_CHAINS=1`            | Same as `--keep-chains` flag                                      |
+| `ANVIL_INTEROP_FRESH_DEPLOY=1`           | Force full deployment even if pregenerated state exists           |
+| `ANVIL_INTEROP_PORT_OFFSET=N`            | Offset all chain ports by N (useful for parallel runs)            |
+| `ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE=1` | Use genesis upgrade deployer for L2 initialization                |
 
 ## Debugging
 

@@ -32,7 +32,11 @@ contract DummyL1MessageRoot is MessageRootBase, IL1MessageRoot {
     uint256 public constant ERA_GATEWAY_CHAIN_ID_STORAGE_SLOT = 53;
 
     /// @notice Initialize the stored addresses (call after anvil_setCode)
-    function setStoredAddresses(address _bridgehubAddr, address _chainAssetHandlerAddr, uint256 _eraGwChainId) external {
+    function setStoredAddresses(
+        address _bridgehubAddr,
+        address _chainAssetHandlerAddr,
+        uint256 _eraGwChainId
+    ) external {
         _storedBridgehub = _bridgehubAddr;
         _storedChainAssetHandler = _chainAssetHandlerAddr;
         _storedEraGatewayChainId = _eraGwChainId;

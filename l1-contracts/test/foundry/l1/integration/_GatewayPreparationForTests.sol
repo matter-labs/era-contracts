@@ -15,7 +15,10 @@ import {AdminFunctions} from "deploy-scripts/AdminFunctions.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {BridgehubBurnCTMAssetData, L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {
+    BridgehubBurnCTMAssetData,
+    L2TransactionRequestTwoBridgesOuter
+} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
@@ -184,17 +187,11 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         bytes memory bridgehubData = abi.encode(
             BridgehubBurnCTMAssetData({
                 chainId: chainId,
-                ctmData: abi.encode(
-                    AddressAliasHelper.applyL1ToL2Alias(chainAdmin),
-                    hex""
-                ),
+                ctmData: abi.encode(AddressAliasHelper.applyL1ToL2Alias(chainAdmin), hex""),
                 chainData: abi.encode(IZKChain(diamondProxy).getProtocolVersion())
             })
         );
-        bytes memory secondBridgeData = abi.encodePacked(
-            NEW_ENCODING_VERSION,
-            abi.encode(chainAssetId, bridgehubData)
-        );
+        bytes memory secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
 
         // Compute required value (baseCost * 2 as in Utils.prepareL1L2TransactionTwoBridges)
         uint256 l1GasPrice = _getL1GasPrice();
