@@ -55,7 +55,7 @@ export async function migrateTokenBalanceToGW(params: {
     gasLimit: 5_000_000,
   });
   const l2Receipt = await l2Tx.wait();
-  log(`   [TBM] L2 tx: ${l2Receipt.transactionHash}`);
+  log(`   [TBM] L2 tx: cast run ${l2Receipt.transactionHash} -r ${l2Provider.connection.url}`);
 
   // Check if the migration was already completed (no L1MessageSent event emitted).
   // The L2 contract returns early when assetMigrationNumber == chainMigrationNumber.
@@ -92,7 +92,7 @@ export async function migrateTokenBalanceToGW(params: {
       gasLimit: 10_000_000,
     });
     l1Receipt = await l1Tx.wait();
-    log(`   [TBM] L1 tx: ${l1Receipt.transactionHash}`);
+    log(`   [TBM] L1 tx: cast run ${l1Receipt.transactionHash} -r ${l1Provider.connection.url}`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     log(`   [TBM] ERROR in receiveL1ToGatewayMigrationOnL1: ${msg.slice(0, 1500)}`);

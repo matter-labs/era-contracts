@@ -255,7 +255,7 @@ export async function executeTokenTransfer(
       const failedTxHash = (error as { transactionHash?: string })?.transactionHash;
       if (!targetTxHash && failedTxHash) {
         targetTxHash = failedTxHash;
-        log(`   ⚠️ using reverted executeBundle tx hash: ${failedTxHash}`);
+        log(`   ⚠️ using reverted executeBundle tx: cast run ${failedTxHash} -r ${targetChain.rpcUrl}`);
       }
     }
   }
