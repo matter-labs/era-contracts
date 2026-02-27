@@ -186,8 +186,10 @@ export async function withdrawERC20FromL2(params: WithdrawERC20Params): Promise<
   };
 }
 
-// Counter to ensure unique (chainId, l2BatchNumber, l2MessageIndex) for each finalization
-let finalizationCounter = 0;
+// Counter to ensure unique (chainId, l2BatchNumber, l2MessageIndex) for each finalization.
+// Start from a high value derived from process start time to avoid collisions when
+// tests run multiple times against the same chains (--keep-chains).
+let finalizationCounter = Math.floor(Date.now() / 1000);
 
 /**
  * Finalize a withdrawal on L1 via the real L1Nullifier.

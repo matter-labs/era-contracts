@@ -23,7 +23,8 @@ End-to-end tests for ZKsync interoperability across 5 Anvil chains: L1 contract 
 ## Quick Start
 
 ```bash
-# From repo root — run all tests with pregenerated state (~85s)
+# From contracts/l1-contracts/ — run all tests with pregenerated state (~85s)
+cd contracts/l1-contracts
 yarn test:hardhat:interop
 
 # Force full deployment from scratch (~5 min)
@@ -56,7 +57,7 @@ After running once with `--keep-chains`, the Anvil chains and deployment state p
 # Run all test specs (no redeployment)
 cd contracts/l1-contracts
 ANVIL_INTEROP_SKIP_SETUP=1 ANVIL_INTEROP_SKIP_CLEANUP=1 \
-  yarn hardhat test test/anvil-interop/test/hardhat/*.spec.ts \
+  yarn hardhat test test/anvil-interop/test/hardhat/0*.spec.ts \
   --network hardhat --no-compile
 
 # Run a single spec file

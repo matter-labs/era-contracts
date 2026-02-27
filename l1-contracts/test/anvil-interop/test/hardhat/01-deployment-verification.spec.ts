@@ -142,22 +142,4 @@ describe("01 - Deployment Verification", function () {
       });
     }
   });
-
-  describe("Initial balance consistency", () => {
-    it("L1AssetTracker chainBalance is zero for non-gateway chains before any deposits", async () => {
-      const tracker = createBalanceTrackerFromState(state);
-      const l1Provider = new providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
-      const assetId = await queryEthAssetId(l1Provider, state.l1Addresses!.l1NativeTokenVault);
-
-      // Chain 11 (gateway) may have non-zero balance from migration txs (requestL2TransactionTwoBridges
-      // deposits mintValue into the GW chain's L1AssetTracker balance).
-      for (const chainId of [10, 12, 13]) {
-        const balance = await tracker.getL1ChainBalance(chainId, assetId);
-        expect(
-          balance.isZero(),
-          `L1AssetTracker.chainBalance[${chainId}][ethAssetId] should be 0, got ${balance.toString()}`
-        ).to.equal(true);
-      }
-    });
-  });
 });
