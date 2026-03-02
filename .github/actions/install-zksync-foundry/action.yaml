@@ -1,0 +1,29 @@
+name: "Install zksync-foundry"
+
+description: "Installs zksync-foundry with specified version."
+
+inputs:
+  version:
+    type: string
+    description: "Version of zksync-foundry to install."
+    required: false
+    default: "v0.1.5"
+
+runs:
+  using: composite
+  steps:
+    - name: Install zksync-foundry
+      shell: "bash -ex {0}"
+      env:
+        ZKSYNC_FOUNDRY_URL: "https://github.com/matter-labs/foundry-zksync/releases/download"
+        VERSION: "${{ inputs.version }}"
+        INSTALL_DIR: "foundry-zksync"
+      run: |
+        mkdir "${INSTALL_DIR}"
+        curl -LO ${ZKSYNC_FOUNDRY_URL}/foundry-zksync-${VERSION}/foundry_zksync_${VERSION}_linux_amd64.tar.gz
+        tar zxf foundry_zksync_${VERSION}_linux_amd64.tar.gz -C ./${INSTALL_DIR}
+        chmod +x ./${INSTALL_DIR}/forge ./${INSTALL_DIR}/cast
+        echo "${PWD}/${INSTALL_DIR}" >> "${GITHUB_PATH}"
+        ./${INSTALL_DIR}/forge --version
+        ./${INSTALL_DIR}/cast --version
+        echo "Installed zksync-foundry version: ${VERSION}"

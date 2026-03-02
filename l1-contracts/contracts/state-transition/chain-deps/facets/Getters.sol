@@ -9,7 +9,7 @@ import {PubdataPricingMode} from "../ZKChainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
-import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
+import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
@@ -27,6 +27,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
     using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZKChainBase
+    // solhint-disable-next-line const-name-snakecase
     string public constant override getName = "GettersFacet";
 
     /*//////////////////////////////////////////////////////////////
@@ -243,6 +244,11 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
         return (s.l1DAValidator, s.l2DACommitmentScheme);
     }
 
+    /// @inheritdoc IGetters
+    function baseTokenSupportsTotalSupply() external view returns (bool) {
+        return s.baseTokenHasTotalSupply;
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DIAMOND LOUPE
      //////////////////////////////////////////////////////////////*/
@@ -254,7 +260,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
         uint256 facetsLen = ds.facets.length;
         result = new Facet[](facetsLen);
 
-        for (uint256 i = 0; i < facetsLen; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < facetsLen; ++i) {
             address facetAddr = ds.facets[i];
             Diamond.FacetToSelectors memory facetToSelectors = ds.facetToSelectors[facetAddr];
 

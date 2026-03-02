@@ -5,7 +5,13 @@ pragma solidity ^0.8.21;
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 import {Merkle} from "../../common/libraries/Merkle.sol";
 import {PriorityTreeCommitment} from "../../common/Config.sol";
-import {InvalidCommitment, InvalidNextLeafIndex, InvalidStartIndex, InvalidUnprocessedIndex, NotHistoricalRoot} from "../L1StateTransitionErrors.sol";
+import {
+    InvalidCommitment,
+    InvalidNextLeafIndex,
+    InvalidStartIndex,
+    InvalidUnprocessedIndex,
+    NotHistoricalRoot
+} from "../L1StateTransitionErrors.sol";
 
 struct PriorityOpsBatchInfo {
     bytes32[] leftPath;
@@ -44,6 +50,7 @@ library PriorityTree {
 
     /// @notice Add the priority operation to the end of the priority queue
     function push(Tree storage _tree, bytes32 _hash) internal {
+        // slither-disable-next-line unused-return
         (, bytes32 newRoot) = _tree.tree.push(_hash);
         _tree.historicalRoots[newRoot] = true;
     }

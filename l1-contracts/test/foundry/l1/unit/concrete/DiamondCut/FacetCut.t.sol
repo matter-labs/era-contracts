@@ -4,12 +4,22 @@ pragma solidity 0.8.28;
 import {Utils} from "../Utils/Utils.sol";
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {AddressHasNoCode, FacetExists, NoFunctionsForDiamondCut, RemoveFunctionFacetAddressNotZero, RemoveFunctionFacetAddressZero, ReplaceFunctionFacetAddressZero, SelectorsMustAllHaveSameFreezability, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {
+    AddressHasNoCode,
+    FacetExists,
+    NoFunctionsForDiamondCut,
+    RemoveFunctionFacetAddressNotZero,
+    RemoveFunctionFacetAddressZero,
+    ReplaceFunctionFacetAddressZero,
+    SelectorsMustAllHaveSameFreezability,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
 
 contract FacetCutTest is DiamondCutTest {
     MailboxFacet private mailboxFacet;
@@ -19,9 +29,8 @@ contract FacetCutTest is DiamondCutTest {
     uint256 eraChainId;
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](4);
+        bytes4[] memory selectors = new bytes4[](3);
         uint256 i = 0;
-        selectors[i++] = executorFacet1.commitBatchesSharedBridge.selector;
         selectors[i++] = executorFacet1.proveBatchesSharedBridge.selector;
         selectors[i++] = executorFacet1.executeBatchesSharedBridge.selector;
         selectors[i++] = executorFacet1.revertBatchesSharedBridge.selector;
@@ -31,7 +40,8 @@ contract FacetCutTest is DiamondCutTest {
     function setUp() public {
         eraChainId = 9;
         diamondCutTestContract = new DiamondCutTestContract();
-        mailboxFacet = new MailboxFacet(eraChainId, block.chainid);
+        IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
+        mailboxFacet = new MailboxFacet(block.chainid, address(0), eip7702Checker, false);
         gettersFacet = new GettersFacet();
         executorFacet1 = new ExecutorFacet(block.chainid);
         executorFacet2 = new ExecutorFacet(block.chainid);

@@ -5,7 +5,8 @@ pragma solidity ^0.8.21;
 import {BytecodeError, LengthIsNotDivisibleBy32, MalformedBytecode} from "../L1ContractErrors.sol";
 
 import {UncheckedMath} from "../libraries/UncheckedMath.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "./L2ContractAddresses.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "./L2ContractInterfaces.sol";
+import {CREATE2_PREFIX, CREATE_PREFIX} from "system-contracts/contracts/Constants.sol";
 
 /**
  * @author Matter Labs
@@ -45,13 +46,6 @@ interface IContractDeployer {
  */
 library L2ContractHelper {
     using UncheckedMath for uint256;
-
-    /// @dev The prefix used to create CREATE2 addresses.
-    bytes32 private constant CREATE2_PREFIX = keccak256("zksyncCreate2");
-
-    /// @dev Prefix used during derivation of account addresses using CREATE
-    /// @dev keccak256("zksyncCreate")
-    bytes32 private constant CREATE_PREFIX = 0x63bae3a9951d38e8a3fbb7b70909afc1200610fc5bc55ade242f815974674f23;
 
     /// @notice Sends L2 -> L1 arbitrary-long message through the system contract messenger.
     /// @param _message Data to be sent to L1.
@@ -182,7 +176,7 @@ library L2ContractHelper {
     function hashFactoryDeps(bytes[] memory _factoryDeps) internal pure returns (uint256[] memory hashedFactoryDeps) {
         uint256 factoryDepsLen = _factoryDeps.length;
         hashedFactoryDeps = new uint256[](factoryDepsLen);
-        for (uint256 i = 0; i < factoryDepsLen; i = i.uncheckedInc()) {
+        for (uint256 i = 0; i < factoryDepsLen; ++i) {
             bytes32 hashedBytecode = hashL2Bytecode(_factoryDeps[i]);
 
             // Store the resulting hash sequentially in words.
@@ -191,4 +185,53 @@ library L2ContractHelper {
             }
         }
     }
+}
+
+/// @notice Structure used to represent a ZKsync transaction.
+struct Transaction {
+    // The type of the transaction.
+    uint256 txType;
+    // The caller.
+    uint256 from;
+    // The callee.
+    uint256 to;
+    // The gasLimit to pass with the transaction.
+    // It has the same meaning as Ethereum's gasLimit.
+    uint256 gasLimit;
+    // The maximum amount of gas the user is willing to pay for a byte of pubdata.
+    uint256 gasPerPubdataByteLimit;
+    // The maximum fee per gas that the user is willing to pay.
+    // It is akin to EIP1559's maxFeePerGas.
+    uint256 maxFeePerGas;
+    // The maximum priority fee per gas that the user is willing to pay.
+    // It is akin to EIP1559's maxPriorityFeePerGas.
+    uint256 maxPriorityFeePerGas;
+    // The transaction's paymaster. If there is no paymaster, it is equal to 0.
+    uint256 paymaster;
+    // The nonce of the transaction.
+    uint256 nonce;
+    // The value to pass with the transaction.
+    uint256 value;
+    // In the future, we might want to add some
+    // new fields to the struct. The `txData` struct
+    // is to be passed to account and any changes to its structure
+    // would mean a breaking change to these accounts. In order to prevent this,
+    // we should keep some fields as "reserved".
+    // It is also recommended that their length is fixed, since
+    // it would allow easier proof integration (in case we will need
+    // some special circuit for preprocessing transactions).
+    uint256[4] reserved;
+    // The transaction's calldata.
+    bytes data;
+    // The signature of the transaction.
+    bytes signature;
+    // The properly formatted hashes of bytecodes that must be published on L1
+    // with the inclusion of this transaction. Note, that a bytecode has been published
+    // before, the user won't pay fees for its republishing.
+    bytes32[] factoryDeps;
+    // The input to the paymaster.
+    bytes paymasterInput;
+    // Reserved dynamic type for the future use-case. Using it should be avoided,
+    // But it is still here, just in case we want to enable some additional functionality.
+    bytes reservedDynamic;
 }

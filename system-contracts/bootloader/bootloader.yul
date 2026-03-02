@@ -435,6 +435,33 @@ object "Bootloader" {
                 ret := mul(INTEROP_ROOT_ROLLING_HASH_SLOT(), 32)
             }
 
+            function SETTLEMENT_LAYER_CHAIN_ID_SLOT() -> ret {
+                ret := add(INTEROP_ROOT_ROLLING_HASH_SLOT(), 1)
+            }
+
+            function SETTLEMENT_LAYER_CHAIN_ID_BYTE() -> ret {
+                ret := mul(SETTLEMENT_LAYER_CHAIN_ID_SLOT(), 32)
+            }
+
+            function getSettlementLayerChainId() -> ret {
+                ret := mload(SETTLEMENT_LAYER_CHAIN_ID_BYTE())
+            }
+
+            /// @dev The slot dedicated for storing the interop fee.
+            function INTEROP_FEE_SLOT() -> ret {
+                ret := add(SETTLEMENT_LAYER_CHAIN_ID_SLOT(), 1)
+            }
+
+            /// @dev The byte starting from which the interop fee is stored.
+            function INTEROP_FEE_BYTE() -> ret {
+                ret := mul(INTEROP_FEE_SLOT(), 32)
+            }
+
+            /// @dev Returns the interop fee value for a given block index.
+            function getInteropFee() -> ret {
+                ret := mload(INTEROP_FEE_BYTE())
+            }
+
             /// @dev The slot starting from which the compressed bytecodes are located in the bootloader's memory.
             /// Each compressed bytecode is provided in the following format:
             /// - 32 byte formatted bytecode hash
@@ -446,7 +473,7 @@ object "Bootloader" {
             /// At the start of the bootloader, the value stored at the `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT` is equal to
             /// `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT + 32`, where the hash of the first compressed bytecode to publish should be stored.
             function COMPRESSED_BYTECODES_BEGIN_SLOT() -> ret {
-                ret := add(INTEROP_ROOT_ROLLING_HASH_SLOT(), 1)
+                ret := add(INTEROP_FEE_SLOT(), 1)
             }
 
             /// @dev The byte starting from which the compressed bytecodes are located in the bootloader's memory.
@@ -664,6 +691,10 @@ object "Bootloader" {
                 ret := 0x0000000000000000000000000000000000010008
             }
 
+            function L2_INTEROP_CENTER_ADDR() -> ret {
+                ret := 0x000000000000000000000000000000000001000d
+            }
+
             /// @dev The minimal allowed distance in bytes between the pointer to the compressed data
             /// and the end of the area dedicated for the compressed bytecodes.
             /// In fact, only distance of 192 should be sufficient: there it would be possible to insert
@@ -844,7 +875,7 @@ object "Bootloader" {
                 // (`assertSuccess` = true), then we should panic.
                 if iszero(success) {
                     if assertSuccess {
-                        // The call must've succeeded, but it didn't. So we revert the bootloader.
+                        // The call must have succeeded, but it didn't. So we revert the bootloader.
                         assertionError("getRawCodeHash failed")
                     }
 
@@ -1123,8 +1154,7 @@ object "Bootloader" {
                 // they were provided on L1. In the future, we may apply a new logic for it.
                 let gasPrice := getMaxFeePerGas(innerTxDataOffset)
                 let txInternalCost := safeMul(gasPrice, gasLimit, "poa")
-                let value := getValue(innerTxDataOffset)
-                if lt(getReserved0(innerTxDataOffset), safeAdd(value, txInternalCost, "ol")) {
+                if lt(getReserved0(innerTxDataOffset), txInternalCost) {
                     assertionError("deposited eth too low")
                 }
 
@@ -1179,16 +1209,16 @@ object "Bootloader" {
                         assertionError("Upgrade tx failed")
                     }
 
-                    // If the transaction reverts, then minting the msg.value to the user has been reverted
-                    // as well, so we can simply mint everything that the user has deposited to
-                    // the refund recipient
+                    // If the transaction reverts, the initial mint to the sender is reverted as well.
+                    // Refund the deposited amount minus the operator payment to the refund recipient.
                     toRefundRecipient := safeSub(getReserved0(innerTxDataOffset), payToOperator, "vji")
                 }
                 default {
-                    // If the transaction succeeds, then it is assumed that msg.value was transferred correctly. However, the remaining
-                    // ETH deposited will be given to the refund recipient.
-
-                    toRefundRecipient := safeSub(getReserved0(innerTxDataOffset), safeAdd(getValue(innerTxDataOffset), payToOperator, "kpa"), "ysl")
+                    // If the transaction succeeds, the initial mint to the sender is assumed to have happened.
+                    // We refund the unused gas (refundGas * gasPrice) to the refund recipient.
+                    // The operator payment is handled separately.
+                    let txInternalCost := safeMul(gasPrice, gasLimit, "poa")
+                    toRefundRecipient := safeSub(txInternalCost, payToOperator, "ysl")
                 }
 
                 if gt(toRefundRecipient, 0) {
@@ -1204,15 +1234,26 @@ object "Bootloader" {
 
                 debugLog("Send message to L1", success)
 
-                // Sending the L2->L1 log so users will be able to prove transaction execution result on L1.
-                sendL2LogUsingL1Messenger(true, canonicalL1TxHash, success)
+                switch isPriorityOp
+                case 1 {
+                    // Sending the L2->L1 log so users will be able to prove transaction execution result on L1.
+                    sendL2LogUsingL1Messenger(true, canonicalL1TxHash, success)
 
-                if isPriorityOp {
                     // Update priority txs L1 data
                     mstore(0, mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
                     mstore(32, canonicalL1TxHash)
                     mstore(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), keccak256(0, 64))
+                    // PRIORITY_TXS_L1_DATA[1] packs two counters into one word:
+                    // - bits 0..127   : number of processed L1→L2 priority txs
+                    // - bits 128..255 : number of processed L2 txs
+                    // Increment the L1 counter (lower 128 bits) by adding 1.  
                     mstore(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32), add(mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)), 1))
+                } 
+                default {
+                    /// We need to set the settlement layer after the genesis upgrade, so we set it after all upgrade txs.
+                    /// @notice The settlement layer chain id.
+                    let SETTLEMENT_LAYER_CHAIN_ID := getSettlementLayerChainId()
+                    setSettlementLayerChainId(SETTLEMENT_LAYER_CHAIN_ID)
                 }
             }
 
@@ -1378,6 +1419,11 @@ object "Bootloader" {
 
                 notifyAboutRefund(refund)
                 mstore(resultPtr, success)
+                // PRIORITY_TXS_L1_DATA[1] packs two counters into one word:
+                // - bits 0..127   : number of processed L1→L2 priority txs
+                // - bits 128..255 : number of processed L2 txs
+                // Increment the L2 counter (upper 128 bits) by adding 1<<128.  
+                mstore(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32), add(mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)), TWO_POW_128()))
             }
 
             /// @dev Calculates the L2 gas limit for the transaction
@@ -1725,6 +1771,25 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
+            function getCodeSize(address) -> ret {
+                mstore(0, {{GET_CODE_SIZE_SELECTOR}})
+                mstore(4, address)
+                let success := call(
+                    gas(),
+                    ACCOUNT_CODE_STORAGE_ADDR(),
+                    0,
+                    0,
+                    36,
+                    0,
+                    32
+                )
+
+                if iszero(success) {
+                    nearCallPanic()
+                }
+
+                ret := mload(0)
+            }
 
             /// @dev Used to refund the current transaction.
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
@@ -2010,9 +2075,11 @@ object "Bootloader" {
 
                 debugLog("execution itself", 0)
 
-                let value := getValue(innerTxDataOffset)
-                if value {
-                    mintEther(from, value, true)
+                let gasLimit := getGasLimit(innerTxDataOffset)
+                let txInternalCost := safeMul(gasPrice, gasLimit, "poa")
+                let toMint := safeSub(getReserved0(innerTxDataOffset), txInternalCost, "ol")
+                if toMint {
+                    mintEther(from, toMint, true)
                 }
 
                 success := executeL1Tx(innerTxDataOffset, from)
@@ -2103,11 +2170,18 @@ object "Bootloader" {
 
                 let value := getValue(innerTxDataOffset)
 
-                let success := msgValueSimulatorMimicCall(
+                let isEvmDeployment, actualTo, actualDataPtr := prepareEthCallForEvmDeployment(
                     to,
                     from,
-                    value,
+                    innerTxDataOffset,
                     dataPtr
+                )
+
+                let success := msgValueSimulatorMimicCall(
+                    actualTo,
+                    from,
+                    value,
+                    actualDataPtr
                 )
 
                 if iszero(success) {
@@ -2135,11 +2209,155 @@ object "Bootloader" {
 
                 // Store results of the call in the memory.
                 if success {
+                    if isEvmDeployment {
+                        returnEvmDeploymentBytecode()
+                    }
+
                     let returnsize := returndatasize()
                     returndatacopy(0,0,returnsize)
                     return(0,returnsize)
                 }
 
+            }
+
+            function isEvmDeploymentEthCall(to, innerTxDataOffset) -> ret {
+                ret := and(
+                    eq(to, 0),
+                    eq(getReserved1(innerTxDataOffset), 1)
+                )
+            }
+
+            function bumpNonceForEvmDeployment(from, innerTxDataOffset) {
+                let nonce := getNonce(innerTxDataOffset)
+
+                let nonceBumpDataPtr := 0
+                mstore(nonceBumpDataPtr, 36)
+                mstore(add(nonceBumpDataPtr, 32), shl(224, {{INCREMENT_MIN_NONCE_IF_EQUALS_SELECTOR}}))
+                mstore(add(nonceBumpDataPtr, 36), nonce)
+
+                let nonceBumpSuccess := mimicCallOnlyResult(
+                    NONCE_HOLDER_ADDR(),
+                    from,
+                    nonceBumpDataPtr,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0
+                )
+                if iszero(nonceBumpSuccess) {
+                    revertWithReason(
+                        ETH_CALL_ERR_CODE(),
+                        1
+                    )
+                }
+            }
+
+            function encodeCreateEvmCalldata(dataPtr) -> ret {
+                // `createEVM(bytes)` call encoding:
+                // [selector (4)][offset (32)][length (32)][initCode (N)].
+                // We place metadata right before the existing initCode bytes, so copying is not needed.
+                let initCodeLength := mload(dataPtr)
+                ret := safeSub(dataPtr, 68, "ev1")
+                mstore(ret, safeAdd(initCodeLength, 68, "ev2"))
+                mstore(add(ret, 32), shl(224, {{CREATE_EVM_SELECTOR}}))
+                mstore(add(ret, 36), 32)
+                mstore(add(ret, 68), initCodeLength)
+            }
+
+            function prepareEthCallForEvmDeployment(
+                to,
+                from,
+                innerTxDataOffset,
+                dataPtr
+            ) -> isEvmDeployment, actualTo, actualDataPtr {
+                actualTo := to
+                actualDataPtr := dataPtr
+                isEvmDeployment := isEvmDeploymentEthCall(to, innerTxDataOffset)
+
+                if isEvmDeployment {
+                    // `from` can be 0x0 if `from` isn't provided in eth_call (it is an optional field)
+                    // and in this case txOrigin also will be 0x0
+                    if or(isEOA(from), eq(from, 0x0)) {
+                        // If the `from` is EOA, we need to bump the nonce before the deployment
+                        bumpNonceForEvmDeployment(from, innerTxDataOffset)
+                    }
+                    actualDataPtr := encodeCreateEvmCalldata(dataPtr)
+                    actualTo := CONTRACT_DEPLOYER_ADDR()
+                }
+            }
+
+            function getCreateEvmDeployedAddressFromReturndata() -> deployedAddress {
+                let createEvmReturndataSize := returndatasize()
+                // createEVM returns (uint256,address), i.e. exactly 64 bytes.
+                if iszero(eq(createEvmReturndataSize, 64)) {
+                    revertWithReason(
+                        ETH_CALL_ERR_CODE(),
+                        1
+                    )
+                }
+
+                returndatacopy(0, 0, 64)
+                deployedAddress := and(mload(32), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+            }
+
+            function getVersionedCodeHashByAddress(addr) -> versionedCodeHash {
+                mstore(0, {{RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR}})
+                mstore(4, addr)
+                let getRawCodeHashSuccess := staticcall(
+                    gas(),
+                    ACCOUNT_CODE_STORAGE_ADDR(),
+                    0,
+                    36,
+                    0,
+                    32
+                )
+                if iszero(getRawCodeHashSuccess) {
+                    revertWithReason(
+                        ETH_CALL_ERR_CODE(),
+                        1
+                    )
+                }
+
+                versionedCodeHash := mload(0)
+            }
+
+            function CODE_ORACLE_ADDR() -> ret {
+                ret := 0x0000000000000000000000000000000000008012
+            }
+
+            function fetchBytecodeByVersionedHash(versionedCodeHash) -> retSize {
+                // CodeOracle expects exactly one word of calldata: versioned code hash.
+                mstore(0, versionedCodeHash)
+                let codeOracleSuccess := staticcall(
+                    gas(),
+                    CODE_ORACLE_ADDR(),
+                    0,
+                    32,
+                    0,
+                    0
+                )
+                if iszero(codeOracleSuccess) {
+                    revertWithReason(
+                        ETH_CALL_ERR_CODE(),
+                        1
+                    )
+                }
+
+                retSize := returndatasize()
+            }
+
+            function returnEvmDeploymentBytecode() {
+                let deployedAddress := getCreateEvmDeployedAddressFromReturndata()
+                let versionedCodeHash := getVersionedCodeHashByAddress(deployedAddress)
+                let deployedBytecodeSize := fetchBytecodeByVersionedHash(versionedCodeHash)
+                let runtimeBytecodeSize := extcodesize(deployedAddress)
+                if gt(deployedBytecodeSize, runtimeBytecodeSize) {
+                    deployedBytecodeSize := runtimeBytecodeSize
+                }
+
+                returndatacopy(0, 0, deployedBytecodeSize)
+                return(0, deployedBytecodeSize)
             }
             <!-- @endif -->
 
@@ -2273,6 +2491,11 @@ object "Bootloader" {
             /// @dev Returns constant that is equal to `keccak256("")`
             function EMPTY_STRING_KECCAK() -> ret {
                 ret := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
+            }
+
+            /// @dev Returns constant that is equal to 2^128
+            function TWO_POW_128() -> ret {
+                ret := shl(128,1)
             }
 
             /// @dev Returns whether x <= y
@@ -3055,6 +3278,44 @@ object "Bootloader" {
                 }
             }
 
+            function setSettlementLayerChainId(currentSettlementLayerChainId) {
+                mstore(0, {{RIGHT_PADDED_SET_SETTLEMENT_LAYER_CHAIN_ID_SELECTOR}})
+                mstore(4, currentSettlementLayerChainId)
+
+                debugLog("Setting settlement layer chain id: ", currentSettlementLayerChainId)
+
+                let success := call(
+                    gas(),
+                    SYSTEM_CONTEXT_ADDR(),
+                    0,
+                    0,
+                    36,
+                    0,
+                    0
+                )
+
+                if iszero(success) {
+                    debugLog("Failed to set new settlement layer chain id: ", currentSettlementLayerChainId)
+
+                    /// During the upgrade the setting of the settlement layer chain will fail, as the system context is not yet upgraded.
+                    revertIfPostV31Upgrade(FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE())
+                }
+            }
+
+            /// @notice Some of the functionality is supported only after v31 upgrade is complete.
+            /// @param errCode The error code to revert with if the interop center is deployed, i.e. we are post v31 upgrade.
+            /// @dev To be removed after v31 upgrade.
+            /// We want to check if the interop center is deployed or not, i.e. did we execute V31 upgrade and
+            /// only if true revert. 
+            function revertIfPostV31Upgrade(errCode) {
+                let codeSize := getCodeSize(L2_INTEROP_CENTER_ADDR())
+                debugLog("InteropCenter codeSize", codeSize)
+                
+                if iszero(iszero(codeSize)) {
+                    revertWithReason(errCode, 1)
+                }
+            }
+
             /// @notice Sets the context information for the current L2 block.
             /// @param txId The index of the transaction in the batch for which to get the L2 block information.
             function setL2Block(txId) {
@@ -3259,6 +3520,34 @@ object "Bootloader" {
                 mstore(INTEROP_ROOT_ROLLING_HASH_BYTE(), rollingHashOfProcessedRoots)
             }
 
+            /// @notice Sets the interop fee on InteropCenter for the current batch.
+            /// @dev Called once per batch, before processing transactions.
+            function setInteropFeeForBatch() {
+                let fee := getInteropFee()
+                debugLog("Setting interop fee for batch: ", fee)
+
+                // Encode: setInteropFee(uint256)
+                mstore(0, {{RIGHT_PADDED_SET_INTEROP_FEE_SELECTOR}})
+                mstore(4, fee)
+
+                let success := call(
+                    gas(),
+                    L2_INTEROP_CENTER_ADDR(),
+                    0,
+                    0,
+                    36,
+                    0,
+                    0
+                )
+
+                if iszero(success) {
+                    debugLog("Failed to set interop fee: ", fee)
+
+                    /// During the upgrade the setting of the interop fee will fail, as the interop center is not yet upgraded.
+                    revertIfPostV31Upgrade(FAILED_TO_SET_INTEROP_FEE())
+                }
+            }
+
             /// @notice Appends the transaction hash to the current L2 block.
             /// @param txHash The hash of the transaction to append.
             /// @param isL1Tx Whether the transaction is an L1 transaction. If it is an L1 transaction,
@@ -3457,6 +3746,7 @@ object "Bootloader" {
 
                         let from := getFrom(innerTxDataOffset)
                         let iseoa := isEOA(from)
+
                         assertEq(iseoa, true, "Only EIP-712 can use non-EOA")
 
                         <!-- @endif -->
@@ -3467,7 +3757,9 @@ object "Bootloader" {
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+
                         <!-- @endif -->
 
                         // reserved1 used as marker that tx doesn't have field "to"
@@ -3485,7 +3777,9 @@ object "Bootloader" {
 
                         let from := getFrom(innerTxDataOffset)
                         let iseoa := isEOA(from)
+
                         assertEq(iseoa, true, "Only EIP-712 can use non-EOA")
+
 
                         <!-- @endif -->
 
@@ -3493,8 +3787,11 @@ object "Bootloader" {
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+
                         <!-- @endif -->
+
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
                         // reserved1 used as marker that tx doesn't have field "to"
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
@@ -3510,12 +3807,16 @@ object "Bootloader" {
 
                         let from := getFrom(innerTxDataOffset)
                         let iseoa := isEOA(from)
+
                         assertEq(iseoa, true, "Only EIP-712 can use non-EOA")
+
 
                         <!-- @endif -->
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+
                         <!-- @endif -->
 
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
@@ -3535,7 +3836,9 @@ object "Bootloader" {
                         }
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+
                         <!-- @endif -->
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
                         // reserved1 used as marker that tx doesn't have field "to"
@@ -4104,6 +4407,14 @@ object "Bootloader" {
                 ret := 37
             }
 
+            function FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE() -> ret {
+                ret := 38
+            }
+
+            function FAILED_TO_SET_INTEROP_FEE() -> ret {
+                ret := 39
+            }
+
             /// @dev Accepts a 1-word literal and returns its length in bytes
             /// @param str A string literal
             function getStrLen(str) -> len {
@@ -4286,8 +4597,13 @@ object "Bootloader" {
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
-            function protocolUpgradeTxHashKey() -> ret {
+            function settlementLayerChainIdLogKey() -> ret {
                 ret := 9
+            }
+
+            /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
+            function protocolUpgradeTxHashKey() -> ret {
+                ret := 10
             }
 
             ////////////////////////////////////////////////////////////////////////////
@@ -4327,6 +4643,9 @@ object "Bootloader" {
                 /// the operator still provides it to make sure that its data is in sync.
                 let EXPECTED_BASE_FEE := mload(192)
 
+                /// @notice The settlement layer chain id.
+                let SETTLEMENT_LAYER_CHAIN_ID := getSettlementLayerChainId()
+
                 validateOperatorProvidedPrices(FAIR_L2_GAS_PRICE, FAIR_PUBDATA_PRICE)
 
 
@@ -4351,6 +4670,8 @@ object "Bootloader" {
 
                 setNewBatch(PREV_BATCH_HASH, NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
 
+                setSettlementLayerChainId(SETTLEMENT_LAYER_CHAIN_ID)
+
                 <!-- @endif -->
 
                 <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
@@ -4365,9 +4686,13 @@ object "Bootloader" {
                     setNewBatch(PREV_BATCH_HASH, NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
                 }
 
+                setSettlementLayerChainId(SETTLEMENT_LAYER_CHAIN_ID)
+
                 GAS_PRICE_PER_PUBDATA := gasPerPubdataFromBaseFee(EXPECTED_BASE_FEE, FAIR_PUBDATA_PRICE)
 
                 <!-- @endif -->
+
+                setInteropFeeForBatch()
             }
 
             // Now, we iterate over all transactions, processing each of them
@@ -4505,7 +4830,8 @@ object "Bootloader" {
             sendToL1Native(true, chainedPriorityTxnHashLogKey(), mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
             sendToL1Native(true, numberOfLayer1TxsLogKey(), mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)))
             sendToL1Native(true, txsStatusRollingHashKey(), mload(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE()))
-            
+            sendToL1Native(true, settlementLayerChainIdLogKey(), getSettlementLayerChainId())
+
             // After all of the interop roots are processed, sending hash to L1.
             let rollingHashOfProcessedRoots := mload(INTEROP_ROOT_ROLLING_HASH_BYTE())
             sendToL1Native(true, interopRootRollingHashLogKey(), rollingHashOfProcessedRoots)

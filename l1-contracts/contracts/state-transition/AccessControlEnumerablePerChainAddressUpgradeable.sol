@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/structs/EnumerableSetUpgradeable.sol";
 
-import {RoleAccessDenied, DefaultAdminTransferNotAllowed} from "../common/L1ContractErrors.sol";
+import {DefaultAdminTransferNotAllowed, RoleAccessDenied} from "../common/L1ContractErrors.sol";
 
 /// @title Chain‑Address‑Aware Role‑Based Access Control with Enumeration
 /// @notice It is an adapted version of OpenZeppelin's `AccessControlEnumerable` that keeps a completely separate

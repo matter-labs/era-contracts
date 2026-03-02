@@ -9,20 +9,34 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {FeeParams, IVerifier, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+
+import {
+    FeeParams,
+    IVerifier,
+    PubdataPricingMode,
+    VerifierParams
+} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {InteropRoot, L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {
+    IExecutor,
+    SystemLogKey,
+    MAX_NUMBER_OF_BLOBS,
+    TOTAL_BLOBS_IN_COMMITMENT
+} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo, CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {InteropRoot, L2CanonicalTransaction, L2Log} from "contracts/common/Messaging.sol";
+
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
-import {Utils as DeployUtils} from "deploy-scripts/Utils.sol";
+import {Utils as DeployUtils} from "deploy-scripts/utils/Utils.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
-import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "deploy-scripts/utils/bytecode/ContractsBytecodesLib.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -31,9 +45,10 @@ address constant L2_KNOWN_CODE_STORAGE_ADDRESS = 0x00000000000000000000000000000
 address constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008;
 // constant in tests, but can be arbitrary address in real environments
 L2DACommitmentScheme constant L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.PUBDATA_KECCAK256;
+// Owner of the RollupDAManager in tests
+address constant TEST_ROLLUP_DA_MANAGER_OWNER = address(0x1234567890DEADBEEF);
 
-uint256 constant MAX_NUMBER_OF_BLOBS = 6;
-uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
+uint256 constant EVENT_INDEX = 0;
 
 library Utils {
     function packBatchTimestampAndBlockTimestamp(
@@ -64,7 +79,7 @@ library Utils {
     }
 
     function createSystemLogs(bytes32 _outputHash) public returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](9);
+        bytes[] memory logs = new bytes[](10);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -104,7 +119,7 @@ library Utils {
         logs[6] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
             bytes32(uint256(L2_DA_COMMITMENT_SCHEME))
         );
         logs[7] = constructL2Log(
@@ -119,16 +134,22 @@ library Utils {
             uint256(SystemLogKey.L2_TXS_STATUS_ROLLING_HASH_KEY),
             bytes32("")
         );
+        logs[9] = constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.SETTLEMENT_LAYER_CHAIN_ID_KEY),
+            bytes32(uint256(uint160(block.chainid)))
+        );
 
         return logs;
     }
 
     function createSystemLogsWithNoneDAValidator() public returns (bytes[] memory) {
         bytes[] memory systemLogs = createSystemLogs(bytes32(0));
-        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)] = constructL2Log(
+        systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY)] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
-            uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
+            uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY),
             bytes32(uint256(L2DACommitmentScheme.NONE))
         );
 
@@ -191,9 +212,9 @@ library Utils {
             });
     }
 
-    function createCommitBatchInfo() public view returns (IExecutor.CommitBatchInfo memory) {
+    function createCommitBatchInfo() public view returns (CommitBatchInfo memory) {
         return
-            IExecutor.CommitBatchInfo({
+            CommitBatchInfo({
                 batchNumber: 1,
                 timestamp: uint64(uint256(randomBytes32("timestamp"))),
                 indexRepeatedStorageChanges: 0,
@@ -217,7 +238,7 @@ library Utils {
 
     function encodeCommitBatchesData(
         IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
-        IExecutor.CommitBatchInfo[] memory _newBatchesData
+        CommitBatchInfo[] memory _newBatchesData
     ) internal pure returns (uint256, uint256, bytes memory) {
         return (
             _newBatchesData[0].batchNumber,
@@ -231,7 +252,7 @@ library Utils {
 
     function encodeCommitBatchesDataZKsyncOS(
         IExecutor.StoredBatchInfo memory _lastCommittedBatchData,
-        IExecutor.CommitBatchInfoZKsyncOS[] memory _newBatchesData
+        CommitBatchInfoZKsyncOS[] memory _newBatchesData
     ) internal pure returns (uint256, uint256, bytes memory) {
         return (
             _newBatchesData[0].batchNumber,
@@ -262,19 +283,58 @@ library Utils {
         IExecutor.StoredBatchInfo[] memory _batchesData,
         PriorityOpsBatchInfo[] memory _priorityOpsData
     ) internal pure returns (uint256, uint256, bytes memory) {
-        InteropRoot[][] memory dependencyRoots = new InteropRoot[][](_batchesData.length);
+        return encodeExecuteBatchesData(_batchesData, _priorityOpsData, address(0));
+    }
+
+    function encodeExecuteBatchesData(
+        IExecutor.StoredBatchInfo[] memory _batchesData,
+        PriorityOpsBatchInfo[] memory _priorityOpsData,
+        address _settlementFeePayer
+    ) internal pure returns (uint256, uint256, bytes memory) {
+        uint256 len = _batchesData.length;
+        return _encodeExecuteBatchesDataInner(_batchesData, _priorityOpsData, _settlementFeePayer, len);
+    }
+
+    function encodeExecuteBatchesDataZeroLogs(
+        IExecutor.StoredBatchInfo[] memory _batchesData,
+        PriorityOpsBatchInfo[] memory _priorityOpsData
+    ) internal pure returns (uint256, uint256, bytes memory) {
+        return encodeExecuteBatchesDataZeroLogs(_batchesData, _priorityOpsData, address(0));
+    }
+
+    function encodeExecuteBatchesDataZeroLogs(
+        IExecutor.StoredBatchInfo[] memory _batchesData,
+        PriorityOpsBatchInfo[] memory _priorityOpsData,
+        address _settlementFeePayer
+    ) internal pure returns (uint256, uint256, bytes memory) {
+        return _encodeExecuteBatchesDataInner(_batchesData, _priorityOpsData, _settlementFeePayer, 0);
+    }
+
+    function _encodeExecuteBatchesDataInner(
+        IExecutor.StoredBatchInfo[] memory _batchesData,
+        PriorityOpsBatchInfo[] memory _priorityOpsData,
+        address _settlementFeePayer,
+        uint256 _logsLen
+    ) private pure returns (uint256, uint256, bytes memory) {
+        uint256 len = _batchesData.length;
+        bytes memory encoded = abi.encode(
+            _batchesData,
+            _priorityOpsData,
+            new InteropRoot[][](len),
+            new L2Log[](_logsLen),
+            new bytes[](_logsLen),
+            new bytes32[](_logsLen),
+            _settlementFeePayer
+        );
         return (
             _batchesData[0].batchNumber,
-            _batchesData[_batchesData.length - 1].batchNumber,
-            bytes.concat(
-                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
-                abi.encode(_batchesData, _priorityOpsData, dependencyRoots)
-            )
+            _batchesData[len - 1].batchNumber,
+            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION), encoded)
         );
     }
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](13);
+        bytes4[] memory selectors = new bytes4[](19);
         uint256 i = 0;
         selectors[i++] = AdminFacet.setPendingAdmin.selector;
         selectors[i++] = AdminFacet.acceptAdmin.selector;
@@ -283,6 +343,12 @@ library Utils {
         selectors[i++] = AdminFacet.setPriorityTxMaxGasLimit.selector;
         selectors[i++] = AdminFacet.changeFeeParams.selector;
         selectors[i++] = AdminFacet.setTokenMultiplier.selector;
+        selectors[i++] = AdminFacet.setPubdataPricingMode.selector;
+        selectors[i++] = AdminFacet.setTransactionFilterer.selector;
+        selectors[i++] = AdminFacet.setPriorityModeTransactionFilterer.selector;
+        selectors[i++] = AdminFacet.permanentlyAllowPriorityMode.selector;
+        selectors[i++] = AdminFacet.deactivatePriorityMode.selector;
+        selectors[i++] = AdminFacet.activatePriorityMode.selector;
         selectors[i++] = AdminFacet.upgradeChainFromVersion.selector;
         selectors[i++] = AdminFacet.executeUpgrade.selector;
         selectors[i++] = AdminFacet.freezeDiamond.selector;
@@ -292,13 +358,32 @@ library Utils {
         return selectors;
     }
 
-    function getExecutorSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](4);
+    function getMigratorSelectors() public pure returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](6);
         uint256 i = 0;
-        selectors[i++] = ExecutorFacet.commitBatchesSharedBridge.selector;
+        selectors[i++] = MigratorFacet.pauseDepositsBeforeInitiatingMigration.selector;
+        selectors[i++] = MigratorFacet.unpauseDeposits.selector;
+        selectors[i++] = MigratorFacet.forwardedBridgeBurn.selector;
+        selectors[i++] = MigratorFacet.forwardedBridgeMint.selector;
+        selectors[i++] = MigratorFacet.forwardedBridgeConfirmTransferResult.selector;
+        selectors[i++] = MigratorFacet.prepareChainCommitment.selector;
+        return selectors;
+    }
+
+    function getExecutorSelectors() public pure returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](3);
+        uint256 i = 0;
         selectors[i++] = ExecutorFacet.proveBatchesSharedBridge.selector;
         selectors[i++] = ExecutorFacet.executeBatchesSharedBridge.selector;
         selectors[i++] = ExecutorFacet.revertBatchesSharedBridge.selector;
+        return selectors;
+    }
+
+    function getCommitterSelectors() public pure returns (bytes4[] memory) {
+        bytes4[] memory selectors = new bytes4[](2);
+        uint256 i = 0;
+        selectors[i++] = CommitterFacet.commitBatchesSharedBridge.selector;
+        selectors[i++] = CommitterFacet.precommitSharedBridge.selector;
         return selectors;
     }
 
@@ -344,21 +429,20 @@ library Utils {
     }
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](8);
+        bytes4[] memory selectors = new bytes4[](7);
         uint256 i = 0;
         selectors[i++] = MailboxFacet.proveL2MessageInclusion.selector;
         selectors[i++] = MailboxFacet.proveL2LogInclusion.selector;
         selectors[i++] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
-        selectors[i++] = MailboxFacet.finalizeEthWithdrawal.selector;
-        selectors[i++] = MailboxFacet.requestL2Transaction.selector;
         selectors[i++] = MailboxFacet.bridgehubRequestL2Transaction.selector;
         selectors[i++] = MailboxFacet.l2TransactionBaseCost.selector;
         selectors[i++] = MailboxFacet.proveL2LeafInclusion.selector;
+        selectors[i++] = MailboxFacet.requestL2ServiceTransaction.selector;
         return selectors;
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](45);
+        bytes4[] memory selectors = new bytes4[](70);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -385,6 +469,15 @@ library Utils {
         selectors[i++] = UtilsFacet.util_getAdmin.selector;
         selectors[i++] = UtilsFacet.util_setValidator.selector;
         selectors[i++] = UtilsFacet.util_getValidator.selector;
+        selectors[i++] = UtilsFacet.util_getTransactionFilterer.selector;
+        selectors[i++] = UtilsFacet.util_setPriorityModeCanBeActivated.selector;
+        selectors[i++] = UtilsFacet.util_getPriorityModeCanBeActivated.selector;
+        selectors[i++] = UtilsFacet.util_setPriorityModeActivated.selector;
+        selectors[i++] = UtilsFacet.util_getPriorityModeActivated.selector;
+        selectors[i++] = UtilsFacet.util_setPriorityModePermissionlessValidator.selector;
+        selectors[i++] = UtilsFacet.util_getPriorityModePermissionlessValidator.selector;
+        selectors[i++] = UtilsFacet.util_setPriorityModeTransactionFilterer.selector;
+        selectors[i++] = UtilsFacet.util_getPriorityModeTransactionFilterer.selector;
         selectors[i++] = UtilsFacet.util_setZkPorterAvailability.selector;
         selectors[i++] = UtilsFacet.util_getZkPorterAvailability.selector;
         selectors[i++] = UtilsFacet.util_setChainTypeManager.selector;
@@ -406,6 +499,22 @@ library Utils {
         selectors[i++] = UtilsFacet.util_getBaseTokenGasPriceMultiplierDenominator.selector;
         selectors[i++] = UtilsFacet.util_getBaseTokenGasPriceMultiplierNominator.selector;
         selectors[i++] = UtilsFacet.util_getL2DACommimentScheme.selector;
+        selectors[i++] = UtilsFacet.util_setSettlementLayer.selector;
+        selectors[i++] = UtilsFacet.util_getSettlementLayer.selector;
+        selectors[i++] = UtilsFacet.util_setPausedDepositsTimestamp.selector;
+        selectors[i++] = UtilsFacet.util_getPausedDepositsTimestamp.selector;
+        selectors[i++] = UtilsFacet.util_setAssetTracker.selector;
+        selectors[i++] = UtilsFacet.util_setNativeTokenVault.selector;
+        selectors[i++] = UtilsFacet.util_setTotalBatchesVerified.selector;
+        selectors[i++] = UtilsFacet.util_getTotalBatchesVerified.selector;
+        selectors[i++] = UtilsFacet.util_getTotalBatchesExecuted.selector;
+        selectors[i++] = UtilsFacet.util_getTotalBatchesCommitted.selector;
+        selectors[i++] = UtilsFacet.util_setL2SystemContractsUpgradeBatchNumber.selector;
+        selectors[i++] = UtilsFacet.util_getL2SystemContractsUpgradeBatchNumber.selector;
+        selectors[i++] = UtilsFacet.util_setL2SystemContractsUpgradeTxHash.selector;
+        selectors[i++] = UtilsFacet.util_getL2SystemContractsUpgradeTxHash.selector;
+        selectors[i++] = UtilsFacet.util_setPriorityTreeNextLeafIndex.selector;
+        selectors[i++] = UtilsFacet.util_setPriorityOpsRequestTimestamp.selector;
 
         return selectors;
     }
@@ -414,66 +523,38 @@ library Utils {
         return IVerifier(testnetVerifier);
     }
 
-    function makeVerifierParams() public pure returns (VerifierParams memory) {
-        return
-            VerifierParams({recursionNodeLevelVkHash: 0, recursionLeafLevelVkHash: 0, recursionCircuitsSetVksHash: 0});
-    }
-
-    function makeFeeParams() public pure returns (FeeParams memory) {
-        return
-            FeeParams({
-                pubdataPricingMode: PubdataPricingMode.Rollup,
-                batchOverheadL1Gas: 1_000_000,
-                maxPubdataPerBatch: 110_000,
-                maxL2GasPerBatch: 80_000_000,
-                priorityTxMaxPubdata: 99_000,
-                minimalL2GasPrice: 250_000_000
-            });
-    }
-
-    function makeInitializeData(address testnetVerifier) public returns (InitializeData memory) {
-        DummyBridgehub dummyBridgehub = new DummyBridgehub();
-
+    function makeInitializeData(address bridgehub) public pure returns (InitializeData memory) {
         return
             InitializeData({
                 chainId: 1,
-                bridgehub: address(dummyBridgehub),
+                bridgehub: bridgehub,
                 chainTypeManager: address(0x1234567890876543567890),
+                interopCenter: address(0x1234567890876543567890),
                 protocolVersion: 0,
                 admin: address(0x32149872498357874258787),
                 validatorTimelock: address(0x85430237648403822345345),
                 baseTokenAssetId: bytes32(uint256(0x923645439232223445)),
                 storedBatchZero: bytes32(0),
-                verifier: makeVerifier(testnetVerifier),
-                verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                priorityTxMaxGasLimit: 500000,
-                feeParams: makeFeeParams()
+                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
             });
     }
 
-    function makeInitializeDataForNewChain(
-        address testnetVerifier
-    ) public pure returns (InitializeDataNewChain memory) {
+    function makeInitializeDataForNewChain() public pure returns (InitializeDataNewChain memory) {
         return
             InitializeDataNewChain({
-                verifier: makeVerifier(testnetVerifier),
-                verifierParams: makeVerifierParams(),
                 l2BootloaderBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
-                priorityTxMaxGasLimit: 80000000,
-                feeParams: makeFeeParams()
+                l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000
             });
     }
 
-    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address testnetVerifier) public returns (address) {
+    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address bridgehub) public returns (address) {
         DiamondInit diamondInit = new DiamondInit(false);
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,
-            makeInitializeData(testnetVerifier)
+            makeInitializeData(bridgehub)
         );
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -512,7 +593,7 @@ library Utils {
     }
 
     function createBatchCommitment(
-        IExecutor.CommitBatchInfo calldata _newBatchData,
+        CommitBatchInfo calldata _newBatchData,
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
@@ -526,7 +607,7 @@ library Utils {
         return keccak256(abi.encode(passThroughDataHash, metadataHash, auxiliaryOutputHash));
     }
 
-    function _batchPassThroughData(IExecutor.CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
+    function _batchPassThroughData(CommitBatchInfo calldata _batch) internal pure returns (bytes memory) {
         return
             // solhint-disable-next-line func-named-parameters
             abi.encodePacked(
@@ -544,7 +625,7 @@ library Utils {
     }
 
     function _batchAuxiliaryOutput(
-        IExecutor.CommitBatchInfo calldata _batch,
+        CommitBatchInfo calldata _batch,
         bytes32 _stateDiffHash,
         bytes32[] memory _blobCommitments,
         bytes32[] memory _blobHashes
@@ -668,6 +749,12 @@ library Utils {
 
     function deployL1RollupDAValidatorBytecode() internal returns (address) {
         bytes memory bytecode = ContractsBytecodesLib.getCreationCodeEVM("RollupL1DAValidator");
+
+        return deployViaCreate(bytecode);
+    }
+
+    function deployEIP7702Checker() internal returns (address) {
+        bytes memory bytecode = ContractsBytecodesLib.getCreationCodeEVM("EIP7702Checker");
 
         return deployViaCreate(bytecode);
     }

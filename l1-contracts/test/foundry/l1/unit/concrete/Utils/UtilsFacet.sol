@@ -6,6 +6,7 @@ import {FeeParams, IVerifier, VerifierParams} from "contracts/state-transition/c
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
 
 contract UtilsFacet is ZKChainBase {
     function util_setChainId(uint256 _chainId) external {
@@ -108,6 +109,42 @@ contract UtilsFacet is ZKChainBase {
         s.transactionFilterer = _filterer;
     }
 
+    function util_getTransactionFilterer() external view returns (address) {
+        return s.transactionFilterer;
+    }
+
+    function util_setPriorityModeCanBeActivated(bool _canBeActivated) external {
+        s.priorityModeInfo.canBeActivated = _canBeActivated;
+    }
+
+    function util_getPriorityModeCanBeActivated() external view returns (bool) {
+        return s.priorityModeInfo.canBeActivated;
+    }
+
+    function util_setPriorityModeActivated(bool _activated) external {
+        s.priorityModeInfo.activated = _activated;
+    }
+
+    function util_getPriorityModeActivated() external view returns (bool) {
+        return s.priorityModeInfo.activated;
+    }
+
+    function util_setPriorityModePermissionlessValidator(address _permissionlessValidator) external {
+        s.priorityModeInfo.permissionlessValidator = _permissionlessValidator;
+    }
+
+    function util_getPriorityModePermissionlessValidator() external view returns (address) {
+        return s.priorityModeInfo.permissionlessValidator;
+    }
+
+    function util_setPriorityModeTransactionFilterer(address _filterer) external {
+        s.priorityModeInfo.transactionFilterer = _filterer;
+    }
+
+    function util_getPriorityModeTransactionFilterer() external view returns (address) {
+        return s.priorityModeInfo.transactionFilterer;
+    }
+
     function util_setBaseTokenGasPriceMultiplierDenominator(uint128 _denominator) external {
         s.baseTokenGasPriceMultiplierDenominator = _denominator;
     }
@@ -188,6 +225,70 @@ contract UtilsFacet is ZKChainBase {
 
     function util_getL2DACommimentScheme() external view returns (L2DACommitmentScheme) {
         return s.l2DACommitmentScheme;
+    }
+
+    function util_setSettlementLayer(address _settlementLayer) external {
+        s.settlementLayer = _settlementLayer;
+    }
+
+    function util_getSettlementLayer() external view returns (address) {
+        return s.settlementLayer;
+    }
+
+    function util_setPausedDepositsTimestamp(uint256 _timestamp) external {
+        s.pausedDepositsTimestamp = _timestamp;
+    }
+
+    function util_getPausedDepositsTimestamp() external view returns (uint256) {
+        return s.pausedDepositsTimestamp;
+    }
+
+    function util_setAssetTracker(address _assetTracker) external {
+        s.assetTracker = _assetTracker;
+    }
+
+    function util_setNativeTokenVault(address _nativeTokenVault) external {
+        s.nativeTokenVault = _nativeTokenVault;
+    }
+
+    function util_setTotalBatchesVerified(uint256 _totalBatchesVerified) external {
+        s.totalBatchesVerified = _totalBatchesVerified;
+    }
+
+    function util_getTotalBatchesVerified() external view returns (uint256) {
+        return s.totalBatchesVerified;
+    }
+
+    function util_getTotalBatchesExecuted() external view returns (uint256) {
+        return s.totalBatchesExecuted;
+    }
+
+    function util_getTotalBatchesCommitted() external view returns (uint256) {
+        return s.totalBatchesCommitted;
+    }
+
+    function util_setL2SystemContractsUpgradeBatchNumber(uint256 _batchNumber) external {
+        s.l2SystemContractsUpgradeBatchNumber = _batchNumber;
+    }
+
+    function util_getL2SystemContractsUpgradeBatchNumber() external view returns (uint256) {
+        return s.l2SystemContractsUpgradeBatchNumber;
+    }
+
+    function util_setL2SystemContractsUpgradeTxHash(bytes32 _txHash) external {
+        s.l2SystemContractsUpgradeTxHash = _txHash;
+    }
+
+    function util_getL2SystemContractsUpgradeTxHash() external view returns (bytes32) {
+        return s.l2SystemContractsUpgradeTxHash;
+    }
+
+    function util_setPriorityTreeNextLeafIndex(uint256 _nextLeafIndex) external {
+        s.priorityTree.tree._nextLeafIndex = _nextLeafIndex;
+    }
+
+    function util_setPriorityOpsRequestTimestamp(uint256 _txIndex, uint256 _timestamp) external {
+        s.priorityOpsRequestTimestamp[_txIndex] = _timestamp;
     }
 
     // add this to be excluded from coverage report

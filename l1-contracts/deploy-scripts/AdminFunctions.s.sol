@@ -3,37 +3,41 @@ pragma solidity ^0.8.21;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
+import {IAdminFunctions} from "contracts/script-interfaces/IAdminFunctions.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {ChainInfoFromBridgehub, Utils} from "./Utils.sol";
-import {IGovernance} from "contracts/governance/IGovernance.sol";
+import {ChainInfoFromBridgehub, Utils} from "./utils/Utils.sol";
+
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {GetDiamondCutData} from "./utils/GetDiamondCutData.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehubBase.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {BridgehubBurnCTMAssetData} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
-contract AdminFunctions is Script {
+contract AdminFunctions is Script, IAdminFunctions {
     using stdToml for string;
 
     struct Config {
@@ -62,6 +66,36 @@ contract AdminFunctions is Script {
             _value: 0,
             _delay: 0
         });
+    }
+
+    // This function should be called by governance to accept ownership of all core contracts
+    // Only accepts ownership for contracts that have pendingOwner set to governance
+    function governanceAcceptOwnerAggregated(address governor, address bridgehub) public {
+        // Query contract addresses from bridgehub
+        address assetRouter = address(IL1Bridgehub(bridgehub).assetRouter());
+        address chainAssetHandler = address(IL1Bridgehub(bridgehub).chainAssetHandler());
+        address ctmDeploymentTracker = address(IL1Bridgehub(bridgehub).l1CtmDeployer());
+
+        // Query l1Nullifier from assetRouter
+        IL1AssetRouter assetRouterContract = IL1AssetRouter(assetRouter);
+        address l1Nullifier = address(assetRouterContract.L1_NULLIFIER());
+
+        // Accept ownership only for contracts with pending ownership
+        if (Ownable2Step(bridgehub).pendingOwner() == governor) {
+            governanceAcceptOwner(governor, bridgehub);
+        }
+        if (Ownable2Step(assetRouter).pendingOwner() == governor) {
+            governanceAcceptOwner(governor, assetRouter);
+        }
+        if (Ownable2Step(l1Nullifier).pendingOwner() == governor) {
+            governanceAcceptOwner(governor, l1Nullifier);
+        }
+        if (Ownable2Step(ctmDeploymentTracker).pendingOwner() == governor) {
+            governanceAcceptOwner(governor, ctmDeploymentTracker);
+        }
+        if (Ownable2Step(chainAssetHandler).pendingOwner() == governor) {
+            governanceAcceptOwner(governor, chainAssetHandler);
+        }
     }
 
     // This function should be called by the owner to accept the admin role
@@ -148,7 +182,7 @@ contract AdminFunctions is Script {
         saveAndSendAdminTx(ecosystemAdminAddr, calls, true);
     }
 
-    function adminEncodeMulticall(bytes memory callsToExecute) external {
+    function adminEncodeMulticall(bytes memory callsToExecute) external pure {
         Call[] memory calls = abi.decode(callsToExecute, (Call[]));
 
         bytes memory result = abi.encodeCall(ChainAdmin.multicall, (calls, true));
@@ -171,6 +205,49 @@ contract AdminFunctions is Script {
             abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
             0
         );
+    }
+
+    /// @notice Upgrade a chain by reading the diamond cut directly from the CTM
+    /// @dev This avoids TOML parsing issues with large hex strings
+    /// @param chainAddress The address of the chain proxy to upgrade
+    /// @param adminAddr The address of the ChainAdmin
+    /// @param accessControlRestriction The address of the AccessControlRestriction
+    function upgradeChainFromCTM(address chainAddress, address adminAddr, address accessControlRestriction) public {
+        console.log("AdminFunctions: upgrading chain", chainAddress);
+
+        IZKChain chain = IZKChain(chainAddress);
+        IChainTypeManager ctm = IChainTypeManager(chain.getChainTypeManager());
+        console.log("AdminFunctions: using CTM", address(ctm));
+
+        // Get the protocol version from CTM
+        uint256 newProtocolVersion = ctm.protocolVersion();
+        console.log("AdminFunctions: new protocol version", newProtocolVersion);
+
+        // Get the current chain protocol version
+        uint256 currentProtocolVersion = chain.getProtocolVersion();
+        console.log("AdminFunctions: current chain protocol version", currentProtocolVersion);
+
+        require(
+            newProtocolVersion > currentProtocolVersion,
+            "AdminFunctions: new protocol version must be greater than current"
+        );
+
+        // Get the upgrade data from CTM using the GetDiamondCutData library
+        Diamond.DiamondCutData memory diamondCut = GetDiamondCutData.getDiamondCutData(
+            address(ctm),
+            currentProtocolVersion
+        );
+
+        // Execute the upgrade through the admin flow
+        Utils.adminExecute(
+            adminAddr,
+            accessControlRestriction,
+            chainAddress,
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (currentProtocolVersion, diamondCut)),
+            0
+        );
+
+        console.log("AdminFunctions: upgrade completed successfully");
     }
 
     function adminScheduleUpgrade(
@@ -426,6 +503,32 @@ contract AdminFunctions is Script {
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
+    function pauseDepositsBeforeInitiatingMigration(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IMigrator.pauseDepositsBeforeInitiatingMigration, ())
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
+    function unpauseDeposits(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IMigrator.unpauseDeposits, ())
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
     function setDAValidatorPair(
         address _bridgehub,
         uint256 _chainId,
@@ -493,8 +596,7 @@ contract AdminFunctions is Script {
                 })
             );
 
-            // TODO: use constant for the 0x01
-            secondBridgeData = abi.encodePacked(bytes1(0x01), abi.encode(chainAssetId, bridgehubData));
+            secondBridgeData = abi.encodePacked(NEW_ENCODING_VERSION, abi.encode(chainAssetId, bridgehubData));
         }
 
         calls = Utils.prepareAdminL1L2TwoBridgesTransaction(

@@ -135,7 +135,7 @@ Many examples can be found in [test](test).
 
 #### Manual tests
 
-Manual tests are not part of the main test suite and are rather run manually against an anvil-zksync fork of the chain to be upgraded. Currently there is only one manual test for the [L2V29Upgrade](contracts/L2V29Upgrade.sol) that can be run by doing:
+Manual tests are not part of the main test suite and are rather run manually against an anvil-zksync fork of the chain to be upgraded. Currently there is only one manual test for the [L2V29Upgrade](contracts/upgrades/L2V29Upgrade.sol) that can be run by doing:
 
 ```
 ./bin/anvil-zksync fork --fork-url [chain-rpc-url] &> era_test_node.log.anvil &

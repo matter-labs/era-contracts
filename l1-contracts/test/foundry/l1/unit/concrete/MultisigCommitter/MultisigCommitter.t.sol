@@ -3,18 +3,26 @@ pragma solidity 0.8.28;
 
 import {Vm} from "forge-std/Vm.sol";
 import {Test} from "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
+
 import {Utils} from "../Utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {MultisigCommitter} from "contracts/state-transition/MultisigCommitter.sol";
+import {MultisigCommitter} from "contracts/state-transition/validators/MultisigCommitter.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfo, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Unauthorized, TimeNotReached, RoleAccessDenied, ChainRequiresValidatorsSignaturesForCommit, NotEnoughSigners, SignerNotAuthorized, SignersNotSorted} from "contracts/common/L1ContractErrors.sol";
+
+import {
+    Unauthorized,
+    TimeNotReached,
+    RoleAccessDenied,
+    ChainRequiresValidatorsSignaturesForCommit,
+    NotEnoughSigners,
+    SignerNotAuthorized,
+    SignersNotSorted
+} from "contracts/common/L1ContractErrors.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 
 contract MultisigCommitterTest is Test {
     MultisigCommitter multisigCommitter;
@@ -212,14 +220,14 @@ contract MultisigCommitterTest is Test {
     function prepareCommit() internal returns (uint256, uint256, bytes memory) {
         vm.mockCall(
             chainAddress,
-            abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector),
+            abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector),
             abi.encode(chainId)
         );
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
-        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
+        CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
 
-        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
+        CommitBatchInfo[] memory batchesToCommit = new CommitBatchInfo[](1);
         batchesToCommit[0] = batchToCommit;
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
@@ -367,5 +375,112 @@ contract MultisigCommitterTest is Test {
             signers,
             signatures
         );
+    }
+
+    function test_getValidatorsMember_Shared() public view {
+        address member0 = multisigCommitter.getValidatorsMember(chainAddress, 0);
+        address member1 = multisigCommitter.getValidatorsMember(chainAddress, 1);
+        // members should be in the shared validators set
+        assertTrue(multisigCommitter.isSharedValidator(member0));
+        assertTrue(multisigCommitter.isSharedValidator(member1));
+    }
+
+    function test_getValidatorsMember_Custom() public {
+        // Enable custom validator set
+        vm.prank(ecosystemOwner);
+        multisigCommitter.useCustomSigningSet(chainAddress);
+
+        address member0 = multisigCommitter.getValidatorsMember(chainAddress, 0);
+        // should be the custom validator we added
+        assertEq(member0, validator1Custom);
+    }
+
+    function test_isValidator_Custom() public {
+        // Enable custom validator set
+        vm.prank(ecosystemOwner);
+        multisigCommitter.useCustomSigningSet(chainAddress);
+
+        assertTrue(multisigCommitter.isValidator(chainAddress, validator1Custom));
+        assertFalse(multisigCommitter.isValidator(chainAddress, validator1Shared));
+    }
+
+    function test_commit_with_custom_validators() public {
+        // Enable custom validator set and set threshold
+        vm.prank(ecosystemOwner);
+        multisigCommitter.useCustomSigningSet(chainAddress);
+        vm.prank(chainAdmin);
+        multisigCommitter.setCustomSigningThreshold(chainAddress, 1);
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = prepareCommit();
+        bytes32 digest = hashCommitData(commitBatchFrom, commitBatchTo, commitData);
+
+        address[] memory signers = new address[](1);
+        signers[0] = validator1Custom;
+
+        bytes[] memory signatures = new bytes[](1);
+        signatures[0] = sign_digest(validator1CustomKey, digest);
+
+        vm.prank(sequencer);
+        multisigCommitter.commitBatchesMultisig(
+            chainAddress,
+            commitBatchFrom,
+            commitBatchTo,
+            commitData,
+            signers,
+            signatures
+        );
+    }
+
+    function test_commit_with_custom_validators_unauthorized_shared() public {
+        // Enable custom validator set
+        vm.prank(ecosystemOwner);
+        multisigCommitter.useCustomSigningSet(chainAddress);
+        vm.prank(chainAdmin);
+        multisigCommitter.setCustomSigningThreshold(chainAddress, 1);
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = prepareCommit();
+        bytes32 digest = hashCommitData(commitBatchFrom, commitBatchTo, commitData);
+
+        // Try to use shared validator when custom set is active
+        address[] memory signers = new address[](1);
+        signers[0] = validator1Shared;
+
+        bytes[] memory signatures = new bytes[](1);
+        signatures[0] = sign_digest(validator1SharedKey, digest);
+
+        vm.prank(sequencer);
+        vm.expectRevert(abi.encodeWithSelector(SignerNotAuthorized.selector, validator1Shared));
+        multisigCommitter.commitBatchesMultisig(
+            chainAddress,
+            commitBatchFrom,
+            commitBatchTo,
+            commitData,
+            signers,
+            signatures
+        );
+    }
+
+    function test_sharedValidatorsMember() public view {
+        address member0 = multisigCommitter.sharedValidatorsMember(0);
+        address member1 = multisigCommitter.sharedValidatorsMember(1);
+        assertTrue(multisigCommitter.isSharedValidator(member0));
+        assertTrue(multisigCommitter.isSharedValidator(member1));
+    }
+
+    function test_addSharedValidator_NoOp() public {
+        // Adding an existing validator should be a no-op
+        uint256 countBefore = multisigCommitter.sharedValidatorsCount();
+        vm.prank(ecosystemOwner);
+        multisigCommitter.addSharedValidator(validator1Shared);
+        assertEq(multisigCommitter.sharedValidatorsCount(), countBefore);
+    }
+
+    function test_removeSharedValidator_NoOp() public {
+        // Removing a non-existent validator should be a no-op
+        address nonValidator = makeAddr("nonValidator");
+        uint256 countBefore = multisigCommitter.sharedValidatorsCount();
+        vm.prank(ecosystemOwner);
+        multisigCommitter.removeSharedValidator(nonValidator);
+        assertEq(multisigCommitter.sharedValidatorsCount(), countBefore);
     }
 }

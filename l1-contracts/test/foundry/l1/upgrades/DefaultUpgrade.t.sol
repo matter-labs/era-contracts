@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
@@ -13,6 +13,8 @@ contract DummyDefaultUpgrade is DefaultUpgrade, BaseUpgradeUtils {}
 
 contract DefaultUpgradeTest is BaseUpgrade {
     DummyDefaultUpgrade baseZkSyncUpgrade;
+    address mockChainTypeManager = makeAddr("mockChainTypeManager");
+    address mockVerifier = makeAddr("mockVerifier");
 
     function setUp() public {
         baseZkSyncUpgrade = new DummyDefaultUpgrade();
@@ -21,6 +23,10 @@ contract DefaultUpgradeTest is BaseUpgrade {
 
         baseZkSyncUpgrade.setPriorityTxMaxGasLimit(1 ether);
         baseZkSyncUpgrade.setPriorityTxMaxPubdata(1000000);
+
+        // Set up CTM for verifier lookup
+        baseZkSyncUpgrade.setChainTypeManager(mockChainTypeManager);
+        baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
     }
 
     function test_SuccessUpgrade() public {
@@ -29,7 +35,6 @@ contract DefaultUpgradeTest is BaseUpgrade {
         assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
 
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
-        assertEq(baseZkSyncUpgrade.getVerifier(), proposedUpgrade.verifier);
         assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
         assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
     }

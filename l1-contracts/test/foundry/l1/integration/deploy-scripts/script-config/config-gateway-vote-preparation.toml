@@ -1,0 +1,16 @@
+force_deployments_data = "0x00"
+gateway_chain_id = 506
+gateway_settlement_fee = 0
+is_zk_sync_os = true
+owner_address = "0x2Ae2CC9d9344Fd83d4Ca8D0011E17407449c702a"
+refund_recipient = "0x000000000000000000000000000000000000bEEF"
+support_l2_legacy_shared_bridge_test = false
+testnet_verifier = true
+zk_token_asset_id = "0x01000000000000000000000000000000000000000000000000000000000a2a6f"
+
+[contracts]
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
+governance_min_delay = 0
+governance_security_council_address = "0x0000000000000000000000000000000000000000"
+validator_timelock_execution_delay = 0

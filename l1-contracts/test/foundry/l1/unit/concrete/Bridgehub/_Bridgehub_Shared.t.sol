@@ -12,17 +12,20 @@ import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamond
 contract BridgehubTest is Test {
     DiamondProxy internal bridgehub;
     IDiamondInit internal bridgehubDiamondInit;
-    address internal constant GOVERNOR = address(0x101010101010101010101);
-    address internal constant NON_GOVERNOR = address(0x202020202020202020202);
+    address internal GOVERNOR;
+    address internal NON_GOVERNOR;
 
     constructor() {
+        GOVERNOR = makeAddr("GOVERNOR");
+        NON_GOVERNOR = makeAddr("NON_GOVERNOR");
+
         vm.chainId(31337);
         bridgehubDiamondInit = new DiamondInit(false);
 
         bridgehub = new DiamondProxy(block.chainid, getDiamondCutData(address(bridgehubDiamondInit)));
     }
 
-    function getDiamondCutData(address diamondInit) internal pure returns (Diamond.DiamondCutData memory) {
+    function getDiamondCutData(address diamondInit) internal view returns (Diamond.DiamondCutData memory) {
         address governor = GOVERNOR;
         bytes memory initCalldata = abi.encodeWithSelector(IDiamondInit.initialize.selector, governor);
 

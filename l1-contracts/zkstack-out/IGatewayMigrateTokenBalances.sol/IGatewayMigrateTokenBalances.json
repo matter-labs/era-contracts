@@ -1,0 +1,86 @@
+[
+  {
+    "type": "function",
+    "name": "checkAllMigrated",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "l2RpcUrl",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "finishMigrationOnL1",
+    "inputs": [
+      {
+        "name": "toGateway",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "gatewayChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "l2RpcUrl",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "gwRpcUrl",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "onlyWaitForFinalization",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "txHashes",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getBridgedTokenAssetIds",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "bridgedTokenCountPlusOne",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "assetIds",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  }
+]

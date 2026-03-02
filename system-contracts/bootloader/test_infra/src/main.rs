@@ -1,33 +1,88 @@
 use crate::{test_count_tracer::TestCountTracer, tracer::BootloaderTestTracer};
 use colored::Colorize;
 use once_cell::sync::OnceCell;
+use std::fs;
 use std::process;
+use std::{env, sync::Arc};
 use zksync_multivm::interface::{
-    L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode, InspectExecutionMode, VmFactory, VmInterface,
+    InspectExecutionMode, L1BatchEnv, L2BlockEnv, SystemEnv, TxExecutionMode, VmFactory,
+    VmInterface,
 };
 use zksync_multivm::vm_latest::{HistoryDisabled, ToTracerPointer, TracerDispatcher, Vm};
 use zksync_state::interface::{
-    InMemoryStorage, StoragePtr, StorageView, IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID,
+    InMemoryStorage, StorageView, WriteStorage, IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID,
 };
 use zksync_types::fee_model::BatchFeeInput;
 
-use std::{env, sync::Arc};
 use tracing_subscriber::fmt;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use zksync_contracts::{
-    BaseSystemContracts, ContractLanguage, SystemContractCode,
-    SystemContractsRepo,
+    BaseSystemContracts, ContractLanguage, SystemContractCode, SystemContractsRepo,
 };
 use zksync_multivm::interface::{ExecutionResult, Halt};
-use zksync_types::system_contracts::get_system_smart_contracts_from_dir;
-use zksync_types::{block::L2BlockHasher, Address, L1BatchNumber, L2BlockNumber, U256, u256_to_h256, };
-use zksync_types::{L2ChainId, Transaction};
 use zksync_types::bytecode::BytecodeHash;
+use zksync_types::system_contracts::get_system_smart_contracts_from_dir;
+use zksync_types::{
+    block::L2BlockHasher, get_address_mapping_key, settlement::SettlementLayer, u256_to_h256,
+    Address, L1BatchNumber, L2BlockNumber, SLChainId, U256,
+};
+use zksync_types::{
+    AccountTreeId, L2ChainId, L2_BASE_TOKEN_ADDRESS, StorageKey, Transaction,
+};
 
 mod hook;
 mod test_count_tracer;
+mod transaction_generator;
 mod tracer;
+
+fn get_balance_key(address: Address) -> StorageKey {
+    let account_id = AccountTreeId::new(L2_BASE_TOKEN_ADDRESS);
+    let key = get_address_mapping_key(&address, Default::default());
+    StorageKey::new(account_id, key)
+}
+
+fn load_test_transactions() -> Vec<Transaction> {
+    let transactions_dir = env::current_dir()
+        .unwrap()
+        .join("src/test_transactions");
+
+    let mut fixture_files: Vec<(usize, std::path::PathBuf)> = fs::read_dir(&transactions_dir)
+        .unwrap_or_else(|e| {
+            panic!(
+                "Failed to read test transactions directory {:?}: {}",
+                transactions_dir, e
+            )
+        })
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            let extension = path.extension()?.to_str()?;
+            if extension != "json" {
+                return None;
+            }
+
+            let index = path.file_stem()?.to_str()?.parse::<usize>().ok()?;
+            Some((index, path))
+        })
+        .collect();
+
+    fixture_files.sort_by_key(|(index, _)| *index);
+    assert!(
+        !fixture_files.is_empty(),
+        "No JSON fixtures found in {:?}",
+        transactions_dir
+    );
+
+    fixture_files
+        .into_iter()
+        .map(|(_, path)| {
+            let json_str = fs::read_to_string(&path)
+                .unwrap_or_else(|e| panic!("Failed to read fixture {:?}: {}", path, e));
+            serde_json::from_str(&json_str)
+                .unwrap_or_else(|e| panic!("Failed to decode fixture {:?}: {}", path, e))
+        })
+        .collect()
+}
 
 // Executes bootloader unittests.
 fn execute_internal_bootloader_test() {
@@ -41,17 +96,30 @@ fn execute_internal_bootloader_test() {
         root: env::current_dir().unwrap().join("../../"),
     };
 
-    let bytecode = repo.read_sys_contract_bytecode(artifacts_location, "bootloader_test", Some("Bootloader"), ContractLanguage::Yul);
+    let bytecode = repo.read_sys_contract_bytecode(
+        artifacts_location,
+        "bootloader_test",
+        Some("Bootloader"),
+        ContractLanguage::Yul,
+    );
     let hash = BytecodeHash::for_bytecode(&bytecode).value();
     let bootloader = SystemContractCode {
         code: bytecode,
         hash,
     };
 
-
-    let bytecode = repo.read_sys_contract_bytecode("", "DefaultAccount", None, ContractLanguage::Sol);
+    let bytecode =
+        repo.read_sys_contract_bytecode("", "DefaultAccount", None, ContractLanguage::Sol);
     let hash = BytecodeHash::for_bytecode(&bytecode).value();
     let default_aa = SystemContractCode {
+        code: bytecode,
+        hash,
+    };
+
+    let bytecode =
+        repo.read_sys_contract_bytecode("", "EvmEmulator", None, ContractLanguage::Yul);
+    let hash = BytecodeHash::for_bytecode(&bytecode).value();
+    let evm_emulator = SystemContractCode {
         code: bytecode,
         hash,
     };
@@ -59,8 +127,14 @@ fn execute_internal_bootloader_test() {
     let base_system_contract = BaseSystemContracts {
         bootloader,
         default_aa,
-        evm_emulator: None,
+        evm_emulator: Some(evm_emulator),
     };
+
+    // The chain_id MUST be the same everywhere: SystemEnv, InMemoryStorage (SystemContext),
+    // and the transactions themselves. A mismatch causes EIP-712 signature verification
+    // to fail because the bootloader reads the chain_id from SystemContext when computing
+    // the domain separator.
+    let chain_id = L2ChainId::from(IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID);
 
     let system_env = SystemEnv {
         zk_porter_available: false,
@@ -69,7 +143,7 @@ fn execute_internal_bootloader_test() {
         bootloader_gas_limit: u32::MAX,
         execution_mode: TxExecutionMode::VerifyExecute,
         default_validation_computational_gas_limit: u32::MAX,
-        chain_id: zksync_types::L2ChainId::from(299),
+        chain_id,
     };
 
     let mut l1_batch_env = L1BatchEnv {
@@ -77,6 +151,7 @@ fn execute_internal_bootloader_test() {
         number: L1BatchNumber::from(1),
         timestamp: 14,
         fee_input: BatchFeeInput::sensible_l1_pegged_default(),
+        interop_fee: U256::zero(),
         fee_account: Address::default(),
 
         enforced_base_fee: None,
@@ -87,18 +162,16 @@ fn execute_internal_bootloader_test() {
             max_virtual_blocks_to_create: 1,
             interop_roots: vec![],
         },
+        settlement_layer: SettlementLayer::L1(SLChainId(10)),
     };
 
     // First - get the number of tests.
     let test_count = {
-        let storage: StoragePtr<StorageView<InMemoryStorage>> =
-            StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
-                L2ChainId::from(IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID),
-                get_system_smart_contracts_from_dir(
-                    env::current_dir().unwrap().join("../../"),
-                ),
-            ))
-            .to_rc_ptr();
+        let storage = StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
+            chain_id,
+            get_system_smart_contracts_from_dir(env::current_dir().unwrap().join("../../")),
+        ))
+        .to_rc_ptr();
 
         let mut vm: Vm<_, HistoryDisabled> =
             VmFactory::new(l1_batch_env.clone(), system_env.clone(), storage.clone());
@@ -121,62 +194,109 @@ fn execute_internal_bootloader_test() {
     for test_id in 1..=test_count {
         println!("\n === Running test {}", test_id);
 
-        let storage: StoragePtr<StorageView<InMemoryStorage>> =
-            StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
-                L2ChainId::from(IN_MEMORY_STORAGE_DEFAULT_NETWORK_ID),
-                get_system_smart_contracts_from_dir(
-                    env::current_dir().unwrap().join("../../"),
-                ),
-            ))
-            .to_rc_ptr();
+        let storage = StorageView::new(InMemoryStorage::with_custom_system_contracts_and_chain_id(
+            chain_id,
+            get_system_smart_contracts_from_dir(env::current_dir().unwrap().join("../../")),
+        ))
+        .to_rc_ptr();
 
         // We are passing id of the test in location (0) where we normally put the operator.
         // This is then picked up by the testing framework.
         l1_batch_env.fee_account = zksync_types::H160::from(u256_to_h256(U256::from(test_id)));
         let mut vm: Vm<_, HistoryDisabled> =
             Vm::new(l1_batch_env.clone(), system_env.clone(), storage.clone());
+
         let test_result = Arc::new(OnceCell::default());
         let requested_assert = Arc::new(OnceCell::default());
+        let requested_tx_failure = Arc::new(OnceCell::default());
+        let tx_failure_data_hex = Arc::new(OnceCell::default());
         let test_name = Arc::new(OnceCell::default());
 
         let custom_tracers = BootloaderTestTracer::new(
             test_result.clone(),
             requested_assert.clone(),
+            requested_tx_failure.clone(),
+            tx_failure_data_hex.clone(),
             test_name.clone(),
         )
         .into_tracer_pointer();
         let mut tracer_dispatcher = TracerDispatcher::from(custom_tracers);
 
-        // Let's insert transactions into slots. They are not executed, but the tests can run functions against them.
-        let json_str = include_str!("test_transactions/0.json");
-        let tx: Transaction = serde_json::from_str(json_str).unwrap();
-        vm.push_transaction(tx);
+        // Insert all fixture transactions into slots in numeric filename order.
+        for tx in load_test_transactions() {
+            // Fund the sender so each transaction can pay fees.
+            storage.borrow_mut().set_value(
+                get_balance_key(tx.initiator_account()),
+                u256_to_h256(U256::MAX),
+            );
+
+            vm.push_transaction(tx);
+        }
 
         let result = vm.inspect(&mut tracer_dispatcher, InspectExecutionMode::Bootloader);
         drop(tracer_dispatcher);
 
         let mut test_result = Arc::into_inner(test_result).unwrap().into_inner();
         let requested_assert = Arc::into_inner(requested_assert).unwrap().into_inner();
+        let requested_tx_failure = Arc::into_inner(requested_tx_failure).unwrap().into_inner();
+        let tx_failure_data_hex = Arc::into_inner(tx_failure_data_hex).unwrap().into_inner();
         let test_name = Arc::into_inner(test_name)
             .unwrap()
             .into_inner()
             .unwrap_or_default();
 
         if test_result.is_none() {
-            test_result = Some(if let Some(requested_assert) = requested_assert {
+            test_result = Some(if let Some(requested_tx_failure) = requested_tx_failure {
+                let expected_data_hex = requested_tx_failure
+                    .trim()
+                    .trim_start_matches("0x")
+                    .to_ascii_lowercase();
+                if tx_failure_data_hex.as_deref() == Some(expected_data_hex.as_str()) {
+                    Ok(())
+                } else if tx_failure_data_hex.is_none() {
+                    match &result.result {
+                        ExecutionResult::Success { .. } => Err(format!(
+                            "Should have failed with returndata `0x{}`, but transaction executed successfully.",
+                            expected_data_hex
+                        )),
+                        ExecutionResult::Revert { output } => Err(format!(
+                            "Should have failed with returndata `0x{}`, but reverted with `{}` and no tx failure returndata was captured.",
+                            expected_data_hex,
+                            output.to_user_friendly_string()
+                        )),
+                        ExecutionResult::Halt { reason } => Err(format!(
+                            "Should have failed with returndata `0x{}`, but halted with `{}` and no tx failure returndata was captured.",
+                            expected_data_hex, reason
+                        )),
+                    }
+                } else {
+                    Err(format!(
+                        "Should have failed with returndata `0x{}`, but got `0x{}`.",
+                        expected_data_hex,
+                        tx_failure_data_hex.unwrap_or_else(|| "none".to_string())
+                    ))
+                }
+            } else if let Some(requested_assert) = requested_assert {
                 match &result.result {
                     ExecutionResult::Success { .. } => Err(format!(
                         "Should have failed with {}, but run successfully.",
                         requested_assert
                     )),
-                    ExecutionResult::Revert { output } => Err(format!(
-                        "Should have failed with {}, but run reverted with {}.",
-                        requested_assert,
-                        output.to_user_friendly_string()
-                    )),
+                    ExecutionResult::Revert { output } => {
+                        let reason = output.to_user_friendly_string();
+                        if reason.contains(&requested_assert) {
+                            Ok(())
+                        } else {
+                            Err(format!(
+                                "Should have failed with `{}`, but run reverted with `{}`.",
+                                requested_assert, reason
+                            ))
+                        }
+                    }
                     ExecutionResult::Halt { reason } => {
                         if let Halt::UnexpectedVMBehavior(reason) = reason {
-                            let reason = reason.strip_prefix("Assertion error: ").unwrap_or(reason);
+                            let reason =
+                                reason.strip_prefix("Assertion error: ").unwrap_or(&reason);
                             if reason == requested_assert {
                                 Ok(())
                             } else {
@@ -224,5 +344,10 @@ fn main() {
         .with(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    execute_internal_bootloader_test();
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|a| a == "--generate-transactions") {
+        transaction_generator::generate_transactions();
+    } else {
+        execute_internal_bootloader_test();
+    }
 }

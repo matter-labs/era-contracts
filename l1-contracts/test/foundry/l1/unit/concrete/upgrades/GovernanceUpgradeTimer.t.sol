@@ -6,18 +6,25 @@ import {Test} from "forge-std/Test.sol";
 
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 
-import {CallerNotTimerAdmin, DeadlineNotYetPassed, NewDeadlineExceedsMaxDeadline, NewDeadlineNotGreaterThanCurrent, TimerAlreadyStarted, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {
+    CallerNotTimerAdmin,
+    DeadlineNotYetPassed,
+    NewDeadlineExceedsMaxDeadline,
+    NewDeadlineNotGreaterThanCurrent,
+    TimerAlreadyStarted,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
 
 contract GovernanceUpgradeTimerTest is Test {
     // Instance of the contract under test
     GovernanceUpgradeTimer timer;
 
     // Addresses used in tests
-    address owner = address(0x1);
-    address newOwner = address(0x2);
-    address timerGovernance = address(0x3);
-    address nonAdmin = address(0x4);
-    address anotherAddress = address(0x5);
+    address owner;
+    address newOwner;
+    address timerGovernance;
+    address nonAdmin;
+    address anotherAddress;
 
     // Immutable parameters for the contract
     uint256 initialDelay = 1000; // seconds
@@ -29,6 +36,12 @@ contract GovernanceUpgradeTimerTest is Test {
 
     // setUp is run before each test
     function setUp() public {
+        owner = makeAddr("owner");
+        newOwner = makeAddr("newOwner");
+        timerGovernance = makeAddr("timerGovernance");
+        nonAdmin = makeAddr("nonAdmin");
+        anotherAddress = makeAddr("anotherAddress");
+
         // Deploy the contract as the owner
         vm.startPrank(owner);
         timer = new GovernanceUpgradeTimer(initialDelay, maxAdditionalDelay, timerGovernance, owner);

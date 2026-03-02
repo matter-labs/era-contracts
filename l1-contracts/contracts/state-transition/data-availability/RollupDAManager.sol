@@ -2,7 +2,7 @@
 pragma solidity ^0.8.18;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {ZeroAddress, InvalidL2DACommitmentScheme} from "../../common/L1ContractErrors.sol";
+import {InvalidL2DACommitmentScheme, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @title The RollupManager contract
@@ -10,9 +10,16 @@ import {L2DACommitmentScheme} from "../../common/Config.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Responsible for determining which DA configurations (DAPairs) are allowed to be used
 /// for permanent rollups.
+/// @dev IMPORTANT: Rollup DA Manager must contain only compatible versions for a single protocol version.
+/// I.e. a separate `RollupDAManager` needs to be deployed per protocol version / chain type (ZKsync OS vs Era)
+/// as otherwise a malicious chain admin could switch the DA configuration to an incompatible one, causing the rollup to be unable to verify blocks and thus halt.
+/// This is an issue for stage1 since it may disable `PermissionlessValidator` from settling new batches.
+/// It is okay if two protocol versions have the same rollup DA manager if they have *exactly same* set of compatible
+/// DA validator pairs.
 contract RollupDAManager is Ownable2Step {
     /// @dev Mapping to track the status (enabled/disabled) of each DAPair.
-    mapping(address l1DAValidator => mapping(L2DACommitmentScheme => bool)) public isAllowedDAConfiguration;
+    mapping(address l1DAValidator => mapping(L2DACommitmentScheme l2DACommitmentScheme => bool))
+        public isAllowedDAConfiguration;
 
     /// @dev Emitted when a DAPair is added or updated.
     /// @param l1DAValidator Address of the L1 data availability validator.
@@ -29,7 +36,7 @@ contract RollupDAManager is Ownable2Step {
         }
 
         if (l2DACommitmentScheme == L2DACommitmentScheme.NONE) {
-            revert InvalidL2DACommitmentScheme(uint8(l2DACommitmentScheme));
+            revert InvalidL2DACommitmentScheme(l2DACommitmentScheme);
         }
         _;
     }

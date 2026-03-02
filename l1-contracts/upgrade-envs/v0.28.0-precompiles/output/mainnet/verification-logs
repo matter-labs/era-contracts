@@ -65,11 +65,11 @@ Script ran successfully.
   forge verify-contract 0x6655933e34d8FD8f6d2CC7d5175bFC06112B7474 ChainTypeManager --constructor-args 0x0000000000000000000000000000000000000000000000000000000000010002 --verifier zksync
   Ecosystem contracts for GW are deployed!
   Publishing the following bytecode:
-  0x0100099f5ca0a8b6327c30672e3e94fc56203860f4159d615463ab99cf0eeece
+  0x0100085f9382a7928dd83bfc529121827b5f29f18b9aa10d18aa68e1be7ddc35
   Publishing the following bytecode:
-  0x010005f76ff9047aa9a0caabf27b4d40c44bafa64cbcda4bb85104a46fc6210c
+  0x010005f72e443c94460f4583fb38ef5d0c5cd9897021c41df840f91465c0392e
   Publishing the following bytecode:
-  0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63
+  0x01000d83e0329d9144ad041430fafcbc2b388e5434db8cb8a96e80157738a1da
   Publishing the following bytecode:
   0x0100000741c40b7a529bf86f3e5887e1def0cd99ca7797e67404a956571dbdd0
   Publishing the following bytecode:

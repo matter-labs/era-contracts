@@ -2,55 +2,75 @@
 
 pragma solidity ^0.8.21;
 
-import {Test} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrator.sol";
+import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
-import {IChainTypeManager, ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
+import {
+    IChainTypeManager,
+    ChainCreationParams,
+    ChainTypeManagerInitializeData
+} from "contracts/state-transition/IChainTypeManager.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
+import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
+
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
+import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
+import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 
-contract ChainTypeManagerTest is Test {
+contract ChainTypeManagerTest is UtilsCallMockerTest {
+    using stdStorage for StdStorage;
+
     EraChainTypeManager internal chainTypeManager;
     EraChainTypeManager internal chainContractAddress;
     L1GenesisUpgrade internal genesisUpgradeContract;
     L1Bridgehub internal bridgehub;
-    L1MessageRoot internal messageRoot;
+    L1ChainAssetHandler internal chainAssetHandler;
+    L1MessageRoot internal messageroot;
+    PermissionlessValidator internal permissionlessValidator;
     address internal rollupL1DAValidator;
     address internal diamondInit;
-    address internal constant governor = address(0x1010101);
-    address internal constant admin = address(0x2020202);
-    address internal constant baseToken = address(0x3030303);
-    address internal constant sharedBridge = address(0x4040404);
-    address internal constant validator = address(0x5050505);
-    address internal constant l1Nullifier = address(0x6060606);
-    address internal constant serverNotifier = address(0x7070707);
+    address internal interopCenterAddress;
+    address internal governor;
+    address internal admin;
+    address internal baseToken;
+    address internal sharedBridge;
+    address internal validator;
+    address internal l1Nullifier;
+    address internal serverNotifier;
+    bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
     address internal newChainAdmin;
     uint256 l1ChainId = 5;
     uint256 chainId = 112;
@@ -63,10 +83,44 @@ contract ChainTypeManagerTest is Test {
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
+        // Avoid block.timestamp == 0 to keep paused-deposits sentinel semantics stable in tests.
+        vm.warp(1);
+
+        interopCenterAddress = makeAddr("interopCenter");
+        governor = makeAddr("governor");
+        admin = makeAddr("admin");
+        baseToken = makeAddr("baseToken");
+        sharedBridge = makeAddr("sharedBridge");
+        validator = makeAddr("validator");
+        l1Nullifier = makeAddr("l1Nullifier");
+        serverNotifier = makeAddr("serverNotifier");
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
-        L1MessageRoot messageroot = new L1MessageRoot(address(bridgehub));
+        chainAssetHandler = new L1ChainAssetHandler(governor, address(bridgehub));
+        permissionlessValidator = new PermissionlessValidator();
+        messageroot = L1MessageRoot(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(new L1MessageRoot(address(bridgehub), 1, address(chainAssetHandler))),
+                    address(uint160(1)),
+                    abi.encodeCall(L1MessageRoot.initialize, ())
+                )
+            )
+        );
+        stdstore
+            .target(address(messageroot))
+            .sig(IL1MessageRoot.v31UpgradeChainBatchNumber.selector)
+            .with_key(chainId)
+            .checked_write(uint256(1));
         vm.prank(governor);
-        bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), messageRoot, address(0));
+        bridgehub.setAddresses(
+            sharedBridge,
+            ICTMDeploymentTracker(address(0)),
+            messageroot,
+            address(chainAssetHandler),
+            address(0)
+        );
+        vm.prank(governor);
+        chainAssetHandler.setAddresses();
 
         vm.mockCall(
             address(sharedBridge),
@@ -76,8 +130,7 @@ contract ChainTypeManagerTest is Test {
 
         newChainAdmin = makeAddr("chainadmin");
 
-        vm.startPrank(address(bridgehub));
-        chainTypeManager = new EraChainTypeManager(address(IBridgehubBase(address(bridgehub))));
+        chainTypeManager = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
         diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
 
@@ -113,6 +166,32 @@ contract ChainTypeManagerTest is Test {
                 selectors: Utils.getGettersSelectors()
             })
         );
+        facetCuts.push(
+            Diamond.FacetCut({
+                facet: address(
+                    new MailboxFacet(block.chainid, address(0), IEIP7702Checker(makeAddr("eip7702Checker")), false)
+                ),
+                action: Diamond.Action.Add,
+                isFreezable: false,
+                selectors: Utils.getMailboxSelectors()
+            })
+        );
+        facetCuts.push(
+            Diamond.FacetCut({
+                facet: address(new MigratorFacet(block.chainid, false)),
+                action: Diamond.Action.Add,
+                isFreezable: false,
+                selectors: Utils.getMigratorSelectors()
+            })
+        );
+        facetCuts.push(
+            Diamond.FacetCut({
+                facet: address(new CommitterFacet(block.chainid)),
+                action: Diamond.Action.Add,
+                isFreezable: true,
+                selectors: Utils.getCommitterSelectors()
+            })
+        );
 
         ChainCreationParams memory chainCreationParams = ChainCreationParams({
             genesisUpgrade: address(genesisUpgradeContract),
@@ -128,6 +207,7 @@ contract ChainTypeManagerTest is Test {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -143,6 +223,7 @@ contract ChainTypeManagerTest is Test {
             validatorTimelock: validator,
             chainCreationParams: chainCreationParams,
             protocolVersion: 0,
+            verifier: testnetVerifier,
             serverNotifier: serverNotifier
         });
 
@@ -154,13 +235,10 @@ contract ChainTypeManagerTest is Test {
         chainContractAddress = EraChainTypeManager(address(transparentUpgradeableProxy));
 
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
-
-        vm.stopPrank();
-        vm.startPrank(governor);
     }
 
     function getDiamondCutData(address _diamondInit) internal view returns (Diamond.DiamondCutData memory) {
-        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain(testnetVerifier);
+        InitializeDataNewChain memory initializeData = Utils.makeInitializeDataForNewChain();
 
         bytes memory initCalldata = abi.encode(initializeData);
 
@@ -179,9 +257,6 @@ contract ChainTypeManagerTest is Test {
     }
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
-        vm.stopPrank();
-        vm.prank(address(bridgehub));
-
         vm.mockCall(
             address(sharedBridge),
             abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
@@ -201,23 +276,22 @@ contract ChainTypeManagerTest is Test {
         );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
+        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
 
+        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
+
+        vm.prank(address(bridgehub));
         return
             chainContractAddress.createNewChain({
                 _chainId: chainId,
-                _baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, baseToken),
+                _baseTokenAssetId: baseTokenAssetId,
                 _admin: newChainAdmin,
                 _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
                 _factoryDeps: new bytes[](0)
             });
-
-        vm.startPrank(governor);
     }
 
     function createNewChainWithId(Diamond.DiamondCutData memory _diamondCut, uint256 id) internal {
-        vm.stopPrank();
-        vm.prank(address(bridgehub));
-
         vm.mockCall(
             address(sharedBridge),
             abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
@@ -237,7 +311,9 @@ contract ChainTypeManagerTest is Test {
         );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
+        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
 
+        vm.prank(address(bridgehub));
         chainContractAddress.createNewChain({
             _chainId: id,
             _baseTokenAssetId: DataEncoding.encodeNTVAssetId(id, baseToken),
@@ -245,8 +321,6 @@ contract ChainTypeManagerTest is Test {
             _initData: abi.encode(abi.encode(_diamondCut), bytes("")),
             _factoryDeps: new bytes[](0)
         });
-
-        vm.startPrank(governor);
     }
 
     function _mockGetZKChainFromBridgehub(address _chainAddress) internal {
@@ -257,7 +331,13 @@ contract ChainTypeManagerTest is Test {
     }
 
     function _mockMigrationPausedFromBridgehub() internal {
-        vm.mockCall(address(bridgehub), abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
+        address mockChainAssetHandler = makeAddr("mockChainAssetHandler");
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSignature("chainAssetHandler()"),
+            abi.encode(mockChainAssetHandler)
+        );
+        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////

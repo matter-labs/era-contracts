@@ -4,14 +4,14 @@ pragma solidity 0.8.28;
 import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
-import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
+
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
+
+import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 
 // note, this should be the same as where hyper is disabled
 contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
@@ -46,7 +46,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
     }
 
     function test_bridgehubDeposit_Eth() public {
-        // vm.prank(bridgehubAddress);
+        // vm.prank(interopCenterAddress);
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         _setBaseTokenAssetId(tokenAssetId);
@@ -101,13 +101,13 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
-        _setNativeTokenVaultChainBalance(chainId, address(token), amount);
+        _setAssetTrackerChainBalance(chainId, address(token), amount);
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehubBase.proveL1ToL2TransactionStatus.selector,
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -122,7 +122,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit ClaimedFailedDepositAssetRouter(chainId, tokenAssetId, abi.encode(bytes32(0)));
-        vm.prank(bridgehubAddress);
+        // vm.prank(bridgehubAddress);
         l1Nullifier.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
@@ -147,10 +147,10 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         // require(address(bridgehub.deployer()) == address(31337), "BH: deployer wrong");
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehubBase.proveL1ToL2TransactionStatus.selector,
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -165,7 +165,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit ClaimedFailedDepositAssetRouter(chainId, ETH_TOKEN_ASSET_ID, abi.encode(bytes32(0)));
-        vm.prank(bridgehubAddress);
+        // vm.prank(bridgehubAddress);
         l1Nullifier.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
@@ -182,7 +182,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
     function test_finalizeWithdrawal_EthOnEth() public {
         _setBaseTokenAssetId(ETH_TOKEN_ASSET_ID);
 
-        bytes memory message = abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, alice, amount);
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -190,10 +190,10 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
+                IMessageVerification.proveL2MessageInclusionShared.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -232,10 +232,10 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
+                IMessageVerification.proveL2MessageInclusionShared.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -274,10 +274,10 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
+                IMessageVerification.proveL2MessageInclusionShared.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -303,12 +303,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
     function test_finalizeWithdrawal_BaseErcOnErc() public {
         _setBaseTokenAssetId(tokenAssetId);
 
-        bytes memory message = abi.encodePacked(
-            AssetRouterBase.finalizeDeposit.selector,
-            chainId,
-            tokenAssetId,
-            abi.encode(0, alice, 0, amount, new bytes(0))
-        );
+        bytes memory message = abi.encodePacked(IMailboxLegacy.finalizeEthWithdrawal.selector, alice, amount);
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: l2TxNumberInBatch,
             sender: L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -316,16 +311,9 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
-                chainId
-                // l2BatchNumber,
-                // l2MessageIndex,
-                // l2ToL1Message,
-                // merkleProof
-            ),
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector, chainId),
             abi.encode(true)
         );
 
@@ -357,10 +345,10 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehubBase.proveL2MessageInclusion.selector,
+                IMessageVerification.proveL2MessageInclusionShared.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,

@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -12,9 +13,10 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {InvalidSelector, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
+
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract TestFacet is ZKChainBase {
     function func() public pure returns (bool) {
@@ -25,9 +27,11 @@ contract TestFacet is ZKChainBase {
     function test() internal virtual {}
 }
 
-contract DiamondProxyTest is Test {
+contract DiamondProxyTest is UtilsCallMockerTest {
     Diamond.FacetCut[] internal facetCuts;
     address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    DummyBridgehub internal dummyBridgehub;
+    InitializeData internal initializeData;
 
     function getTestFacetSelectors() public pure returns (bytes4[] memory selectors) {
         selectors = new bytes4[](1);
@@ -51,11 +55,14 @@ contract DiamondProxyTest is Test {
                 selectors: Utils.getUtilsFacetSelectors()
             })
         );
+        dummyBridgehub = new DummyBridgehub();
+        initializeData = Utils.makeInitializeData(address(dummyBridgehub));
+
+        mockDiamondInitInteropCenterCallsWithAddress(initializeData.bridgehub, address(0), bytes32(0));
+        mockChainTypeManagerVerifier(testnetVerifier);
     }
 
     function test_revertWhen_chainIdDiffersFromBlockChainId() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
-
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
@@ -67,8 +74,6 @@ contract DiamondProxyTest is Test {
     }
 
     function test_revertWhen_calledWithEmptyMsgData() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
-
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
@@ -77,14 +82,13 @@ contract DiamondProxyTest is Test {
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
 
-        vm.expectRevert(abi.encodePacked("Ut"));
-        (bool success, ) = address(diamondProxy).call("");
-        assertEq(success, false);
+        // Empty call (length 0) is allowed but fails because no facet for selector 0x00000000
+        // Expected error: "F" (facet not found)
+        vm.expectRevert(bytes("F"));
+        address(diamondProxy).call("");
     }
 
     function test_revertWhen_calledWithFullSelectorInMsgData() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
-
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
@@ -93,14 +97,33 @@ contract DiamondProxyTest is Test {
 
         DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
 
-        vm.expectRevert(abi.encodePacked("Ut"));
-        (bool success, ) = address(diamondProxy).call(bytes.concat(bytes4(0xdeadbeef)));
-        assertEq(success, false);
+        // Call with unknown 4-byte selector fails because no facet registered
+        // Expected error: "F" (facet not found)
+        vm.expectRevert(bytes("F"));
+        address(diamondProxy).call(bytes.concat(bytes4(0xdeadbeef)));
+    }
+
+    function test_revertWhen_calledWithPartialSelector() public {
+        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: address(new DiamondInit(false)),
+            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
+        });
+
+        DiamondProxy diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
+
+        // Call with 1-3 bytes should trigger "Ut" error (incomplete selector)
+        vm.expectRevert(bytes("Ut"));
+        address(diamondProxy).call(hex"aa"); // 1 byte
+
+        vm.expectRevert(bytes("Ut"));
+        address(diamondProxy).call(hex"aabb"); // 2 bytes
+
+        vm.expectRevert(bytes("Ut"));
+        address(diamondProxy).call(hex"aabbcc"); // 3 bytes
     }
 
     function test_revertWhen_proxyHasNoFacetForSelector() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
-
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
             initAddress: address(new DiamondInit(false)),
@@ -115,8 +138,6 @@ contract DiamondProxyTest is Test {
     }
 
     function test_revertWhenFacetIsFrozen() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
-
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
@@ -134,8 +155,6 @@ contract DiamondProxyTest is Test {
     }
 
     function test_successfulExecution() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
-
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit(false)),
@@ -158,8 +177,6 @@ contract DiamondProxyTest is Test {
             isFreezable: true,
             selectors: getTestFacetSelectors()
         });
-
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: cuts,

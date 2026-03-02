@@ -8,6 +8,7 @@ l1-contracts/lib
 l1-contracts/node_modules
 l1-contracts/contracts/dev-contracts
 l1-contracts/test
+l1-contracts/snapshots/*
 l1-contracts/deploy-scripts
 !l1-contracts/deploy-scripts/DeployCTM.s.sol
 !l1-contracts/deploy-scripts/DeployUtils.s.sol
@@ -19,6 +20,7 @@ l1-contracts-foundry/lib
 # l2-contracts
 l2-contracts/cache-zk
 l2-contracts/node_modules
+l2-contracts/contracts/ConsensusRegistry.sol
 l2-contracts/contracts/dev-contracts
 l2-contracts/test
 
@@ -27,6 +29,7 @@ system-contracts/contracts/openzeppelin
 system-contracts/contracts/Constants.sol
 system-contracts/contracts/test-contracts
 system-contracts/contracts-preprocessed
+system-contracts/test/foundry/L2DAValidator.t.sol
 
 # gas-bound-caller
 gas-bound-caller

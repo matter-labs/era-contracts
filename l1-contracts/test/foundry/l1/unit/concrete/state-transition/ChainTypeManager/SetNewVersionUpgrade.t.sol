@@ -11,13 +11,20 @@ contract setNewVersionUpgradeTest is ChainTypeManagerTest {
 
     function test_SettingNewVersionUpgrade() public {
         assertEq(chainContractAddress.protocolVersion(), 0, "Initial protocol version is not correct");
-        vm.mockCall(address(bridgehub), abi.encodeWithSelector(bridgehub.migrationPaused.selector), abi.encode(true));
+        address mockChainAssetHandler = makeAddr("mockChainAssetHandler");
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSignature("chainAssetHandler()"),
+            abi.encode(mockChainAssetHandler)
+        );
+        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
 
-        address randomDiamondInit = address(0x303030303030303030303);
+        address randomDiamondInit = makeAddr("randomDiamondInit");
         Diamond.DiamondCutData memory newDiamondCutData = getDiamondCutData(address(randomDiamondInit));
         bytes32 newCutHash = keccak256(abi.encode(newDiamondCutData));
 
-        chainContractAddress.setNewVersionUpgrade(newDiamondCutData, 0, 999999999999, 1);
+        vm.prank(governor);
+        chainContractAddress.setNewVersionUpgrade(newDiamondCutData, 0, 999999999999, 1, testnetVerifier);
 
         assertEq(chainContractAddress.upgradeCutHash(0), newCutHash, "Diamond cut upgrade was not successful");
         assertEq(chainContractAddress.protocolVersion(), 1, "New protocol version is not correct");
@@ -27,5 +34,6 @@ contract setNewVersionUpgradeTest is ChainTypeManagerTest {
         assertEq(major, 0);
         assertEq(minor, 0);
         assertEq(patch, 1);
+        assertEq(chainContractAddress.protocolVersionVerifier(1), testnetVerifier, "Verifier was not set correctly");
     }
 }

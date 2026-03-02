@@ -4,55 +4,38 @@ pragma solidity ^0.8.0;
 // solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-// import {Vm} from "forge-std/Vm.sol";
-import {stdToml} from "forge-std/StdToml.sol";
 
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {Utils} from "../Utils.sol";
+import {
+    GW_ASSET_TRACKER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {Utils} from "../utils/Utils.sol";
 
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IAssetRouterBase, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {IL2AssetRouter, L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
+
+import {
+    IAssetRouterBase,
+    SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
+    NEW_ENCODING_VERSION
+} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
+
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+
 import {Call} from "contracts/governance/Common.sol";
-import {IGovernance} from "contracts/governance/IGovernance.sol";
+
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-
-import {Create2AndTransfer} from "../Create2AndTransfer.sol";
-import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
-
-import {DeployCTMScript} from "../DeployCTM.s.sol";
-
-import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
-import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
+import {IGWAssetTracker} from "contracts/bridge/asset-tracker/IGWAssetTracker.sol";
 
 abstract contract GatewayGovernanceUtils is Script {
     struct GatewayGovernanceConfig {
@@ -71,6 +54,7 @@ abstract contract GatewayGovernanceUtils is Script {
         address _gatewayServerNotifier;
         address _refundRecipient;
         uint256 _ctmRepresentativeChainId;
+        uint256 _gatewaySettlementFee;
     }
 
     GatewayGovernanceConfig internal _gatewayGovernanceConfig;
@@ -79,21 +63,21 @@ abstract contract GatewayGovernanceUtils is Script {
         _gatewayGovernanceConfig = config;
     }
 
-    function _getRegisterSettlementLayerCalls() internal view returns (Call[] memory calls) {
+    function _getSetSettlementLayerCalls() internal view returns (Call[] memory calls) {
         calls = new Call[](1);
         calls[0] = Call({
             target: _gatewayGovernanceConfig.bridgehubProxy,
             value: 0,
-            data: abi.encodeCall(IL1Bridgehub.registerSettlementLayer, (_gatewayGovernanceConfig.gatewayChainId, true))
+            data: abi.encodeCall(IL1Bridgehub.setSettlementLayerStatus, (_gatewayGovernanceConfig.gatewayChainId, true))
         });
     }
 
     function _prepareGatewayGovernanceCalls(
         PrepareGatewayGovernanceCalls memory prepareGWGovCallsStruct
-    ) internal returns (Call[] memory calls) {
+    ) internal view returns (Call[] memory calls) {
         {
             if (prepareGWGovCallsStruct._ctmRepresentativeChainId == _gatewayGovernanceConfig.gatewayChainId) {
-                calls = _getRegisterSettlementLayerCalls();
+                calls = _getSetSettlementLayerCalls();
             }
         }
 
@@ -185,7 +169,7 @@ abstract contract GatewayGovernanceUtils is Script {
         // chains that migrate from L1.
         {
             bytes memory secondBridgeData = abi.encodePacked(
-                bytes1(0x01),
+                NEW_ENCODING_VERSION,
                 abi.encode(_gatewayGovernanceConfig.chainTypeManagerProxy, prepareGWGovCallsStruct._gatewayCTMAddress)
             );
 
@@ -223,20 +207,21 @@ abstract contract GatewayGovernanceUtils is Script {
                     prepareGWGovCallsStruct._refundRecipient
                 )
             );
-            calls = Utils.mergeCalls(
-                calls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
-                    data,
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    new bytes[](0),
-                    prepareGWGovCallsStruct._gatewayValidatorTimelock,
-                    _gatewayGovernanceConfig.gatewayChainId,
-                    _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    prepareGWGovCallsStruct._refundRecipient
-                )
-            );
+            // Todo: can probably delete since ValidatorTimelock is now TUPP.
+            // calls = Utils.mergeCalls(
+            //     calls,
+            //     Utils.prepareGovernanceL1L2DirectTransaction(
+            //         prepareGWGovCallsStruct._l1GasPrice,
+            //         data,
+            //         Utils.MAX_PRIORITY_TX_GAS,
+            //         new bytes[](0),
+            //         prepareGWGovCallsStruct._gatewayValidatorTimelock,
+            //         _gatewayGovernanceConfig.gatewayChainId,
+            //         _gatewayGovernanceConfig.bridgehubProxy,
+            //         _gatewayGovernanceConfig.l1AssetRouterProxy,
+            //         prepareGWGovCallsStruct._refundRecipient
+            //     )
+            // );
             calls = Utils.mergeCalls(
                 calls,
                 Utils.prepareGovernanceL1L2DirectTransaction(
@@ -245,6 +230,28 @@ abstract contract GatewayGovernanceUtils is Script {
                     Utils.MAX_PRIORITY_TX_GAS,
                     new bytes[](0),
                     prepareGWGovCallsStruct._gatewayServerNotifier,
+                    _gatewayGovernanceConfig.gatewayChainId,
+                    _gatewayGovernanceConfig.bridgehubProxy,
+                    _gatewayGovernanceConfig.l1AssetRouterProxy,
+                    prepareGWGovCallsStruct._refundRecipient
+                )
+            );
+        }
+
+        {
+            bytes memory data = abi.encodeCall(
+                IGWAssetTracker.setGatewaySettlementFee,
+                (prepareGWGovCallsStruct._gatewaySettlementFee)
+            );
+
+            calls = Utils.mergeCalls(
+                calls,
+                Utils.prepareGovernanceL1L2DirectTransaction(
+                    prepareGWGovCallsStruct._l1GasPrice,
+                    data,
+                    Utils.MAX_PRIORITY_TX_GAS,
+                    new bytes[](0),
+                    GW_ASSET_TRACKER_ADDR,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
                     _gatewayGovernanceConfig.l1AssetRouterProxy,

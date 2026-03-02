@@ -4,30 +4,35 @@
 set -e
 
 # Expected Foundry version and commit
-EXPECTED_VERSION="forge 0.0.4"
-EXPECTED_COMMIT="ae913af"
+EXPECTED_VERSION="forge Version: 1.3.5-foundry-zksync-v0.1.5"
+EXPECTED_COMMIT="807f47ace"
 
 # Check if Foundry is installed
 if ! command -V forge &> /dev/null; then
-  echo "Foundry is not installed. Please install it using foundryup-zksync with commit ${EXPECTED_COMMIT}."
+  echo "Foundry is not installed. Please install it using \"foundryup-zksync -i 0.1.5\"."
   exit 1
 fi
 
-# Get installed Foundry version (first line only)
-FORGE_OUTPUT=$(forge --version | head -n 1)
+# Get installed Foundry version and commit
+FORGE_VERSION=$(forge --version | head -n 1)
+FORGE_COMMIT=$(forge --version | grep "Commit SHA:" | cut -d' ' -f3 | cut -c1-9)
 
-# Forge 0.0.4 version output is broken on Linux returning VERGEN_IDEMPOTENT_OUTPUT instead of the commit hash.
-# So we accept both the expected commit and VERGEN_IDEMPOTENT_OUTPUT with regex:
-# - must start with "forge 0.0.4"
-# - must have "(...)" after it
-# - inside parentheses: either the expected commit OR VERGEN_IDEMPOTENT_OUTPUT
-if [[ ! "$FORGE_OUTPUT" =~ ^${EXPECTED_VERSION}\ \(((${EXPECTED_COMMIT})|VERGEN_IDEMPOTENT_OUTPUT).* ]]; then
+# Check version and commit separately
+if [[ "$FORGE_VERSION" != "$EXPECTED_VERSION" ]]; then
   echo "Incorrect Foundry version."
-  echo "Expected:"
-  echo "  ${EXPECTED_VERSION} (${EXPECTED_COMMIT})"
-  echo "  or ${EXPECTED_VERSION} (VERGEN_IDEMPOTENT_OUTPUT ...)"
-  echo "Found:"
-  echo "  ${FORGE_OUTPUT}"
+  echo "Expected: ${EXPECTED_VERSION}"
+  echo "Found:    ${FORGE_VERSION}"
+  echo "Run: foundryup-zksync -i 0.1.5"
+  exit 1
+fi
+
+# Forge version output is broken on Linux returning VERGEN_IDEMPOTENT_OUTPUT instead of the commit hash.
+# Accept both the expected commit and VERGEN_IDEMPOTENT_OUTPUT.
+if [[ "$FORGE_COMMIT" != "$EXPECTED_COMMIT" && "$FORGE_COMMIT" != "VERGEN_ID" ]]; then
+  echo "Incorrect Foundry commit."
+  echo "Expected: ${EXPECTED_COMMIT}"
+  echo "Found:    ${FORGE_COMMIT}"
+  echo "Run: foundryup-zksync --commit ${EXPECTED_COMMIT}"
   exit 1
 fi
 

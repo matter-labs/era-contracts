@@ -136,8 +136,7 @@ library Utils {
             revert MalformedBytecode(BytecodeError.WordsMustBeOdd);
         }
         hashedBytecode =
-            EfficientCall.sha(_bytecode) &
-            0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+            EfficientCall.sha(_bytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
         // Setting the version of the hash
         hashedBytecode = (hashedBytecode | bytes32(uint256(ERA_VM_BYTECODE_FLAG) << 248));
         // Setting the length
@@ -177,8 +176,7 @@ library Utils {
         }
 
         hashedEVMBytecode =
-            EfficientCall.sha(_paddedBytecode) &
-            0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
+            EfficientCall.sha(_paddedBytecode) & 0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
         // Setting the version of the hash
         hashedEVMBytecode = (hashedEVMBytecode | bytes32(uint256(EVM_BYTECODE_FLAG) << 248));

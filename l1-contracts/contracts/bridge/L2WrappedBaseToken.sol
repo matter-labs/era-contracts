@@ -37,9 +37,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
     bytes32 public baseTokenAssetId;
 
     modifier onlyBridge() {
-        if (msg.sender != l2Bridge) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == l2Bridge, Unauthorized(msg.sender));
         _;
     }
 
@@ -69,16 +67,10 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
         address _l1Address,
         bytes32 _baseTokenAssetId
     ) external reinitializer(3) {
-        if (_l2Bridge == address(0)) {
-            revert ZeroAddress();
-        }
+        require(_l2Bridge != address(0), ZeroAddress());
 
-        if (_l1Address == address(0)) {
-            revert ZeroAddress();
-        }
-        if (_baseTokenAssetId == bytes32(0)) {
-            revert ZeroAddress();
-        }
+        require(_l1Address != address(0), ZeroAddress());
+        require(_baseTokenAssetId != bytes32(0), ZeroAddress());
         l2Bridge = _l2Bridge;
         l1Address = _l1Address;
         nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
@@ -97,7 +89,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
     /// Always reverts instead of minting anything!
     /// Note: Use `deposit`/`depositTo` methods instead.
     // solhint-disable-next-line no-unused-vars
-    function bridgeMint(address _to, uint256 _amount) external override onlyBridge {
+    function bridgeMint(address _to, uint256 _amount) external view override onlyBridge {
         revert BridgeMintNotImplemented();
     }
 
@@ -109,9 +101,7 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
         _burn(_from, _amount);
         // sends Ether to the bridge
         (bool success, ) = msg.sender.call{value: _amount}("");
-        if (!success) {
-            revert WithdrawFailed();
-        }
+        require(success, WithdrawFailed());
 
         emit BridgeBurn(_from, _amount);
     }
@@ -136,15 +126,17 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
     function withdrawTo(address _to, uint256 _amount) public override {
         _burn(msg.sender, _amount);
         (bool success, ) = _to.call{value: _amount}("");
-        if (!success) {
-            revert WithdrawFailed();
-        }
+        require(success, WithdrawFailed());
     }
 
+    /// @notice Returns the L1 address of the original token that this wrapped token represents.
+    /// @return The L1 token address.
     function originToken() external view override returns (address) {
         return l1Address;
     }
 
+    /// @notice Returns the asset ID for this base token.
+    /// @return The base token asset ID.
     function assetId() external view override returns (bytes32) {
         return baseTokenAssetId;
     }

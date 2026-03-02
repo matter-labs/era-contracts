@@ -2,9 +2,15 @@
 
 pragma solidity 0.8.28;
 
-import {COMPRESSOR_CONTRACT, PUBDATA_CHUNK_PUBLISHER, L2DACommitmentScheme, STATE_DIFF_ENTRY_SIZE, L2_TO_L1_LOG_SERIALIZE_SIZE, STATE_DIFF_COMPRESSION_VERSION_NUMBER} from "../Constants.sol";
+import {
+    L2DACommitmentScheme,
+    STATE_DIFF_ENTRY_SIZE,
+    L2_TO_L1_LOG_SERIALIZE_SIZE,
+    STATE_DIFF_COMPRESSION_VERSION_NUMBER
+} from "../Constants.sol";
+import {COMPRESSOR_CONTRACT, PUBDATA_CHUNK_PUBLISHER} from "../Contracts.sol";
 import {EfficientCall} from "../libraries/EfficientCall.sol";
-import {ReconstructionMismatch, PubdataField, InvalidDACommitmentScheme} from "../SystemContractErrors.sol";
+import {InvalidDACommitmentScheme, PubdataField, ReconstructionMismatch} from "../SystemContractErrors.sol";
 import {Utils} from "./Utils.sol";
 
 /**
@@ -74,7 +80,7 @@ library L2DAValidator {
         } else {
             // will revert if `_l2DACommitmentScheme` is:
             // - `NONE`(invalid option)
-            // - `BLOBS_ZKSYNC_OS`(not supported with Era VM
+            // - `BLOBS_ZKSYNC_OS`(not supported with Era VM)
             revert InvalidDACommitmentScheme(uint256(_l2DACommitmentScheme));
         }
     }
@@ -185,8 +191,9 @@ library L2DAValidator {
         uint32 numberOfStateDiffs = uint32(bytes4(_operatorData[calldataPtr:calldataPtr + 4]));
         calldataPtr += 4;
 
-        bytes calldata stateDiffs = _operatorData[calldataPtr:calldataPtr +
-            (numberOfStateDiffs * STATE_DIFF_ENTRY_SIZE)];
+        bytes calldata stateDiffs = _operatorData[
+            calldataPtr:calldataPtr + (numberOfStateDiffs * STATE_DIFF_ENTRY_SIZE)
+        ];
 
         uncompressedStateDiffHash = COMPRESSOR_CONTRACT.verifyCompressedStateDiffs(
             numberOfStateDiffs,

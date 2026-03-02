@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {EraDualVerifier} from "./EraDualVerifier.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
+import {IEraDualVerifier} from "../chain-interfaces/IEraDualVerifier.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -12,13 +13,14 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// @dev This contract is used to skip the zkp verification for the testnet environment.
 /// If the proof is not empty, it will verify it using the main verifier contract,
 /// otherwise, it will skip the verification.
-contract EraTestnetVerifier is IVerifier {
-    EraDualVerifier public immutable dualVerifier;
+contract EraTestnetVerifier is IVerifier, IEraDualVerifier {
+    EraDualVerifier public immutable DUAL_VERIFIER;
+    bool public constant IS_TESTNET_VERIFIER = true;
 
     constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
         assert(block.chainid != 1);
 
-        dualVerifier = new EraDualVerifier(_fflonkVerifier, _plonkVerifier);
+        DUAL_VERIFIER = new EraDualVerifier(_fflonkVerifier, _plonkVerifier);
     }
 
     /// @dev Verifies a zk-SNARK proof, skipping the verification if the proof is empty.
@@ -30,11 +32,23 @@ contract EraTestnetVerifier is IVerifier {
             return true;
         }
 
-        return dualVerifier.verify(_publicInputs, _proof);
+        return DUAL_VERIFIER.verify(_publicInputs, _proof);
     }
 
     /// @inheritdoc IVerifier
     function verificationKeyHash() external view override returns (bytes32) {
-        return dualVerifier.verificationKeyHash();
+        return DUAL_VERIFIER.verificationKeyHash();
+    }
+
+    /// @inheritdoc IEraDualVerifier
+    // solhint-disable-next-line func-name-mixedcase
+    function FFLONK_VERIFIER() external view override returns (IVerifierV2) {
+        return DUAL_VERIFIER.FFLONK_VERIFIER();
+    }
+
+    /// @inheritdoc IEraDualVerifier
+    // solhint-disable-next-line func-name-mixedcase
+    function PLONK_VERIFIER() external view override returns (IVerifier) {
+        return DUAL_VERIFIER.PLONK_VERIFIER();
     }
 }
