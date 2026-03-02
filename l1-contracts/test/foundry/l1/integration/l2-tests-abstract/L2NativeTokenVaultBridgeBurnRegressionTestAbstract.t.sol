@@ -63,7 +63,8 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         // Deal ETH to the asset router (needed because bridgeBurn is called with msg.value)
         vm.deal(L2_ASSET_ROUTER_ADDR, depositAmount);
 
-        // After the change: tokens are sent to BaseTokenHolder via burnAndStartBridging
+        // For base token bridgeBurn, the NTV sends ETH to BaseTokenHolder via burnAndStartBridging()
+        // rather than calling bridgeBurn on L2BaseToken directly, as it was done before introduction of BaseTokenHolder
         // The DummyL2BaseTokenHolder deployed in test setup already has burnAndStartBridging()
 
         // Record the BaseTokenHolder balance before

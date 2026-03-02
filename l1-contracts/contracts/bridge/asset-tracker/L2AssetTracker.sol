@@ -79,6 +79,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _;
     }
 
+    modifier onlyBaseTokenHolderOrL2BaseToken() {
+        if (msg.sender != L2_BASE_TOKEN_HOLDER_ADDR && msg.sender != address(L2_BASE_TOKEN_SYSTEM_CONTRACT)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     modifier onlyL2BaseToken() {
         if (msg.sender != address(L2_BASE_TOKEN_SYSTEM_CONTRACT)) {
             revert Unauthorized(msg.sender);
@@ -101,8 +108,11 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             revert BaseTokenTotalSupplyBackfillNotNeeded();
         }
 
-        // We expect that for all registered tokens, the zero `totalPreV31TotalSupply` should be saved.
-
+        // For genesis chains, the base token is registered during _finalizeDeployments() via
+        // L2NativeTokenVault.registerBaseTokenIfNeeded() → registerNewTokenIfNeeded(),
+        // which sets totalPreV31TotalSupply[assetId] = {isSaved: true, amount: 0}.
+        // For existing chains upgraded to V31, L2V31Upgrade calls registerBaseTokenDuringUpgrade()
+        // which also sets totalPreV31TotalSupply to {isSaved: true, amount: 0}.
         SavedTotalSupply memory baseTokenPreV31TotalSupply = totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID];
         require(baseTokenPreV31TotalSupply.isSaved, TotalPreV31SupplyNotSaved(BASE_TOKEN_ASSET_ID));
         require(
@@ -155,6 +165,23 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             // we know that it has never been bridged before v31.
             totalPreV31TotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: 0});
         }
+    }
+
+    /// @notice Registers the base token in the asset tracker during a V31 upgrade
+    /// of an existing chain.
+    /// @dev Unlike `registerNewTokenIfNeeded` (used during genesis when all tokens
+    /// are truly new), this function is for upgrading existing chains where the base
+    /// token already exists on-chain but the asset tracker is deployed during the
+    /// current upgrade. The base token originates on L1 (non-native to this chain).
+    /// The real pre-V31 total supply is backfilled later via
+    /// `backFillZKSyncOSBaseTokenV31MigrationData()`.
+    function registerBaseTokenDuringUpgrade() external onlyUpgrader {
+        bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
+        if (isAssetRegistered[baseTokenAssetId]) {
+            return;
+        }
+        isAssetRegistered[baseTokenAssetId] = true;
+        totalPreV31TotalSupply[baseTokenAssetId] = SavedTotalSupply({isSaved: true, amount: 0});
     }
 
     /// @notice Stores token total supply snapshot used for pre-v31 migration accounting.
@@ -341,7 +368,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @notice Handles the finalization of incoming base token bridging operations on L2.
     /// @dev This function is specifically for the chain's native base token used for gas payments.
     /// @param _amount The amount of base tokens being bridged into this chain.
-    function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external onlyBaseTokenHolder {
+    function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external onlyBaseTokenHolderOrL2BaseToken {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         if (_amount == 0) {
             return;

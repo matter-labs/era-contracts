@@ -46,14 +46,15 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  * go via MsgValueSimulator which calls transferFromTo. On ZK OS, standard ETH transfers work natively.
  * This allows a single implementation to work correctly on both chain types.
  *
- * ## Selfdestruct Caveat
+ * ## Force-received funds caveat
  *
  * The implicit meaning of this contract's balance is "funds that the chain can still mint".
  * On Era, totalSupply is computed as INITIAL_BASE_TOKEN_HOLDER_BALANCE - eraAccountBalance[BaseTokenHolder].
  * On ZK OS, totalSupply is computed as zkosPreV31TotalSupply + (INITIAL - holder.balance).
- * If funds were sent to this contract via selfdestruct (bypassing access controls), the holder balance
- * would increase, causing totalSupply() to undercount. On Era, selfdestruct is not supported so this
- * cannot happen. On ZK OS, selfdestruct is supported and could cause totalSupply() to undercount.
+ * If funds are force-sent to this contract (bypassing access controls), the holder balance
+ * would increase, causing totalSupply() to undercount. This can happen via:
+ * - Being the refund recipient of an L1->L2 transaction (both Era and ZK OS).
+ * - Receiving funds via selfdestruct (ZK OS only; Era does not support selfdestruct).
  * However, this is a view-only issue — no funds are at risk, as the accounting for bridging and
  * withdrawals does not rely on totalSupply().
  */
@@ -108,6 +109,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
 
         Address.sendValue(payable(_to), _amount);
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_amount);
+        emit BaseTokenMinted(_to, _amount);
     }
 
     /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
@@ -117,6 +119,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
     /// contract, so we use 0 as a placeholder to keep the initialization of the contract simpler.
     function burnAndStartBridging(uint256 _toChainId) external payable onlyBridgingCaller {
         L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2(_toChainId, msg.value);
+        emit BaseTokenBurnt(msg.sender, _toChainId, msg.value);
     }
 
     /// @notice Fallback to accept base token transfers from L2BaseToken only.

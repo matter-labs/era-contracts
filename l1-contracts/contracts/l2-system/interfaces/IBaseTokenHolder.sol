@@ -23,6 +23,17 @@ pragma solidity ^0.8.20;
 /// - The hook validates that msg.sender is L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR (0x800A)
 /// - L2BaseTokenZKOS restricts initializeBaseTokenHolderBalance() to L2_COMPLEX_UPGRADER_ADDR only
 interface IBaseTokenHolder {
+    /// @notice Emitted when base tokens are given out (minted) from the holder to a recipient.
+    /// @param to The address that received the base tokens.
+    /// @param amount The amount of base tokens given out.
+    event BaseTokenMinted(address indexed to, uint256 amount);
+
+    /// @notice Emitted when base tokens are received (burnt) and bridging is initiated.
+    /// @param from The address that sent the base tokens.
+    /// @param toChainId The destination chain ID for the bridging operation.
+    /// @param amount The amount of base tokens burnt.
+    event BaseTokenBurnt(address indexed from, uint256 toChainId, uint256 amount);
+
     /// @notice Gives out base tokens from the holder to a recipient.
     /// @param _to The address to receive the base tokens.
     /// @param _amount The amount of base tokens to give out.
