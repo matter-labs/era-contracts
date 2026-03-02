@@ -39,14 +39,8 @@ abstract contract L2BaseTokenBase is IL2BaseTokenBase {
     // slither-disable-next-line uninitialized-state
     uint256 internal __DEPRECATED_totalSupply;
 
-    /// @notice The pre-V31 total supply for ZKOS chains, set by chain admin via service transaction.
-    /// @dev On ZKOS chains, pre-V31 total supply was never tracked on-chain. This value is set after the V31 upgrade so that totalSupply() can be computed correctly.
-    /// @dev Only used by the ZKOS implementation.
-    // slither-disable-next-line uninitialized-state
-    uint256 internal _zkosPreV31TotalSupply;
-
     /// @dev Storage gap to allow adding new shared storage variables in future upgrades.
-    uint256[47] private __gap;
+    uint256[48] private __gap;
 
     /// @notice Initiate the withdrawal of the base token, funds will be available to claim on L1 `finalizeEthWithdrawal` method.
     /// @param _l1Receiver The address on L1 to receive the funds.

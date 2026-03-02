@@ -35,21 +35,27 @@ import {
  * This is done in `L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit()`.
  */
 contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
+    /// @notice The pre-V31 total supply for ZKOS chains, set by chain admin via service transaction.
+    /// @dev On ZKOS chains, pre-V31 total supply was never tracked on-chain. This value is set after
+    /// the V31 upgrade so that totalSupply() can be computed correctly.
+    // slither-disable-next-line uninitialized-state
+    uint256 public zkosPreV31TotalSupply;
+
     /// @notice Returns the total circulating supply of base tokens.
-    /// @dev Computed as: _zkosPreV31TotalSupply + (INITIAL_BASE_TOKEN_HOLDER_BALANCE - BaseTokenHolder.balance)
-    /// @dev _zkosPreV31TotalSupply captures the total supply that existed before the V31 upgrade.
+    /// @dev Computed as: zkosPreV31TotalSupply + (INITIAL_BASE_TOKEN_HOLDER_BALANCE - BaseTokenHolder.balance)
+    /// @dev zkosPreV31TotalSupply captures the total supply that existed before the V31 upgrade.
     /// @dev The delta (INITIAL - holder.balance) tracks tokens minted after V31 via the BaseTokenHolder pattern.
     /// @dev Reverts if the pre-V31 total supply has not been set yet to prevent underflow.
     function totalSupply() external view returns (uint256) {
         if (L2_ASSET_TRACKER.needBaseTokenTotalSupplyBackfill()) {
             revert BaseTokenPreV31TotalSupplyNotSet();
         }
-        return _zkosPreV31TotalSupply + (INITIAL_BASE_TOKEN_HOLDER_BALANCE - L2_BASE_TOKEN_HOLDER_ADDR.balance);
+        return zkosPreV31TotalSupply + (INITIAL_BASE_TOKEN_HOLDER_BALANCE - L2_BASE_TOKEN_HOLDER_ADDR.balance);
     }
 
     /// @notice Sets the pre-V31 total supply for ZKOS chains and backfills the L2AssetTracker.
     /// @dev Can only be called via a service transaction (triggered by the chain admin on L1).
-    /// @dev Sets _zkosPreV31TotalSupply so that totalSupply() returns the correct value,
+    /// @dev Sets zkosPreV31TotalSupply so that totalSupply() returns the correct value,
     /// then calls L2AssetTracker.backFillZKSyncOSBaseTokenV31MigrationData() to register
     /// the base token with the correct total supply.
     /// @param _totalSupply The total supply that existed before the V31 upgrade.
@@ -57,10 +63,10 @@ contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
         if (msg.sender != SERVICE_TRANSACTION_SENDER) {
             revert Unauthorized(msg.sender);
         }
-        _zkosPreV31TotalSupply = _totalSupply;
+        zkosPreV31TotalSupply = _totalSupply;
 
         // Backfill the L2AssetTracker with the correct total supply.
-        // This must happen after setting _zkosPreV31TotalSupply so that totalSupply()
+        // This must happen after setting zkosPreV31TotalSupply so that totalSupply()
         // returns the correct value when registerLegacyToken reads it.
         L2_ASSET_TRACKER.backFillZKSyncOSBaseTokenV31MigrationData(_totalSupply);
 

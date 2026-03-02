@@ -88,9 +88,9 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
         // This decreases holder balance, which increases totalSupply() automatically
         eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR] -= _amount;
         eraAccountBalance[_account] += _amount;
-        emit Mint(_account, _amount);
-
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_amount);
+
+        emit Mint(_account, _amount);
     }
 
     /// @notice Initializes the BaseTokenHolder's balance during the V31 upgrade.

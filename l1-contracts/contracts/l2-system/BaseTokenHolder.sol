@@ -50,7 +50,7 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  *
  * The implicit meaning of this contract's balance is "funds that the chain can still mint".
  * On Era, totalSupply is computed as INITIAL_BASE_TOKEN_HOLDER_BALANCE - eraAccountBalance[BaseTokenHolder].
- * On ZK OS, totalSupply is computed as _zkosPreV31TotalSupply + (INITIAL - holder.balance).
+ * On ZK OS, totalSupply is computed as zkosPreV31TotalSupply + (INITIAL - holder.balance).
  * If funds were sent to this contract via selfdestruct (bypassing access controls), the holder balance
  * would increase, causing totalSupply() to undercount. On Era, selfdestruct is not supported so this
  * cannot happen. On ZK OS, selfdestruct is supported and could cause totalSupply() to undercount.

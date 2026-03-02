@@ -45,7 +45,6 @@ import {
     MAX_BUILT_IN_CONTRACT_ADDR,
     L2_BOOTLOADER_ADDRESS
 } from "./L2ContractAddresses.sol";
-// solhint-enable no-unused-import
 
 /// @dev The address of the L2 deployer system contract.
 IL2ContractDeployer constant L2_CONTRACT_DEPLOYER = IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
