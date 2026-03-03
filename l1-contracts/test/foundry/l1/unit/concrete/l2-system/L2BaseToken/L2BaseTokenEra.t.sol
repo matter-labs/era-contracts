@@ -26,6 +26,9 @@ import {
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
+import {DummyL2AssetTracker} from "contracts/dev-contracts/test/DummyL2AssetTracker.sol";
+import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenger.sol";
+import {DummyL2BaseTokenHolder} from "contracts/dev-contracts/test/DummyL2BaseTokenHolder.sol";
 
 /// @title L2BaseTokenEraTest
 /// @notice Unit tests for L2BaseTokenEra contract
@@ -54,28 +57,13 @@ contract L2BaseTokenEraTest is Test {
         alice = makeAddr("alice");
         bob = makeAddr("bob");
 
-        // Mock L2AssetTracker to accept calls
-        vm.mockCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)"),
-            abi.encode()
-        );
-        vm.mockCall(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleFinalizeBaseTokenBridgingOnL2(uint256)"),
-            abi.encode()
-        );
-        vm.mockCall(L2_ASSET_TRACKER_ADDR, abi.encodeWithSignature("L1_CHAIN_ID()"), abi.encode(uint256(1)));
+        // Deploy dummy dependencies at system addresses (replaces broad vm.mockCall)
+        vm.etch(L2_ASSET_TRACKER_ADDR, address(new DummyL2AssetTracker()).code);
+        vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(new DummyL2L1Messenger()).code);
 
-        // Mock L1Messenger to accept calls and return a hash
-        vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSignature("sendToL1(bytes)"),
-            abi.encode(bytes32(uint256(1)))
-        );
-
-        // Make BaseTokenHolder accept ETH (etch minimal contract)
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, hex"00");
+        // Deploy dummy BaseTokenHolder that accepts ETH from any sender.
+        // Tests that need real access-control checks etch the real BaseTokenHolder instead.
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new DummyL2BaseTokenHolder()).code);
     }
 
     /// @dev Helper to set up eraAccountBalance for an address via transferFromTo from bootloader.
@@ -528,9 +516,8 @@ contract L2BaseTokenEraTest is Test {
     }
 
     function test_withdraw_callsAssetTrackerWithL1ChainId() public {
-        // Use actual BaseTokenHolder to verify AssetTracker is called
-        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
+        // Deploy real BaseTokenHolder so the full call chain reaches L2AssetTracker
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new BaseTokenHolder()).code);
 
         // Deploy at system contract address so it passes onlyBridgingCaller check
         L2BaseTokenEra l2BaseTokenAtSystemAddr = new L2BaseTokenEra();
