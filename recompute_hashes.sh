@@ -5,7 +5,7 @@ set -e
 
 # Expected Foundry version and commit
 EXPECTED_VERSION="forge 0.0.4"
-EXPECTED_COMMIT="ae913af65"
+EXPECTED_COMMIT="ae913af"
 
 # Check if Foundry is installed
 if ! command -V forge &> /dev/null; then
@@ -44,7 +44,8 @@ yarn
 # Cleanup everything and recompile
 forge clean --root da-contracts
 yarn --cwd l1-contracts clean
-forge clean --root l1-contracts
+# 0.0.4 forge deletes snapshots by default. Override directory to workaround deletion.
+FOUNDRY_SNAPSHOTS=.tmp-forge-snapshots forge clean --root l1-contracts
 yarn --cwd l2-contracts clean
 forge clean --root l2-contracts
 yarn --cwd system-contracts clean
