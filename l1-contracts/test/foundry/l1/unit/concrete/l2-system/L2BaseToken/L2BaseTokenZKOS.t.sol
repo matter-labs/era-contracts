@@ -22,7 +22,9 @@ import {L2_BASE_TOKEN_HOLDER} from "contracts/common/l2-helpers/L2ContractInterf
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE, SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {
+    BaseTokenHolderAlreadyInitialized,
     BaseTokenHolderMintFailed,
+    BaseTokenPreV31TotalSupplyAlreadySet,
     BaseTokenPreV31TotalSupplyNotSet,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
@@ -99,6 +101,17 @@ contract L2BaseTokenZKOSTest is Test {
 
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
 
+        // Expect the L1Messenger call
+        bytes memory expectedMessage = abi.encodePacked(
+            IMailboxLegacy.finalizeEthWithdrawal.selector,
+            l1Receiver,
+            WITHDRAW_AMOUNT
+        );
+        vm.expectCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSignature("sendToL1(bytes)", expectedMessage)
+        );
+
         // Expect the Withdrawal event
         vm.expectEmit(true, true, false, true);
         emit Withdrawal(sender, l1Receiver, WITHDRAW_AMOUNT);
@@ -140,6 +153,8 @@ contract L2BaseTokenZKOSTest is Test {
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
+        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
+
         // Expected message format
         bytes memory expectedMessage = abi.encodePacked(
             IMailboxLegacy.finalizeEthWithdrawal.selector,
@@ -155,6 +170,13 @@ contract L2BaseTokenZKOSTest is Test {
 
         vm.prank(sender);
         l2BaseToken.withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
+
+        // Verify BaseTokenHolder received the ETH
+        assertEq(
+            L2_BASE_TOKEN_HOLDER_ADDR.balance,
+            holderBalanceBefore + WITHDRAW_AMOUNT,
+            "BaseTokenHolder should receive ETH"
+        );
     }
 
     function test_withdraw_revertsIfBaseTokenHolderRejectsTransfer() public {
@@ -357,9 +379,9 @@ contract L2BaseTokenZKOSTest is Test {
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2BaseToken.initializeBaseTokenHolderBalance();
 
-        // Second call reverts because the contract no longer has sufficient balance
+        // Second call reverts with BaseTokenHolderAlreadyInitialized
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        vm.expectRevert("Address: insufficient balance");
+        vm.expectRevert(BaseTokenHolderAlreadyInitialized.selector);
         l2BaseToken.initializeBaseTokenHolderBalance();
     }
 
@@ -605,10 +627,15 @@ contract L2BaseTokenZKOSTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_setZkosPreV31TotalSupply_success() public {
-        uint256 totalSupply = 42 ether;
+        uint256 preV31Supply = 42 ether;
+
+        vm.expectEmit(false, false, false, true);
+        emit IL2BaseTokenZKOS.ZKsyncOSPreV31TotalSupplySet(preV31Supply);
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
+        l2BaseToken.setZKsyncOSPreV31TotalSupply(preV31Supply);
+
+        assertEq(l2BaseToken.zkosPreV31TotalSupply(), preV31Supply, "zkosPreV31TotalSupply should be set");
     }
 
     function test_setZkosPreV31TotalSupply_emitsEvent() public {
@@ -672,16 +699,9 @@ contract L2BaseTokenZKOSTest is Test {
         vm.prank(SERVICE_TRANSACTION_SENDER);
         l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
 
-        // Mock backfill to revert on second call (as L2AssetTracker would)
-        vm.mockCallRevert(
-            L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(IL2AssetTracker.backFillZKSyncOSBaseTokenV31MigrationData.selector, totalSupply),
-            abi.encodeWithSignature("BaseTokenTotalSupplyBackfillNotNeeded()")
-        );
-
-        // Second call reverts because backfill is no longer needed
+        // Second call reverts with local re-call guard
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        vm.expectRevert(abi.encodeWithSignature("BaseTokenTotalSupplyBackfillNotNeeded()"));
+        vm.expectRevert(BaseTokenPreV31TotalSupplyAlreadySet.selector);
         l2BaseToken.setZKsyncOSPreV31TotalSupply(totalSupply);
     }
 

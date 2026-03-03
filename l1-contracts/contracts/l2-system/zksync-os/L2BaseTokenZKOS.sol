@@ -10,7 +10,9 @@ import {L2_BASE_TOKEN_HOLDER_ADDR, MINT_BASE_TOKEN_HOOK} from "../../common/l2-h
 import {L2_ASSET_TRACKER} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE, SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {
+    BaseTokenHolderAlreadyInitialized,
     BaseTokenHolderMintFailed,
+    BaseTokenPreV31TotalSupplyAlreadySet,
     BaseTokenPreV31TotalSupplyNotSet,
     Unauthorized
 } from "../../common/L1ContractErrors.sol";
@@ -63,6 +65,9 @@ contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
         if (msg.sender != SERVICE_TRANSACTION_SENDER) {
             revert Unauthorized(msg.sender);
         }
+        if (zkosPreV31TotalSupply != 0) {
+            revert BaseTokenPreV31TotalSupplyAlreadySet();
+        }
         zkosPreV31TotalSupply = _totalSupply;
 
         // Backfill the L2AssetTracker with the correct total supply.
@@ -77,6 +82,11 @@ contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
     /// @dev This function mints 2^127 - 1 tokens to this contract via the mint hook, then transfers all tokens to BaseTokenHolder.
     /// @dev Can only be called by the ComplexUpgrader contract.
     function initializeBaseTokenHolderBalance() external onlyComplexUpgrader {
+        if (baseTokenHolderInitialized) {
+            revert BaseTokenHolderAlreadyInitialized();
+        }
+        baseTokenHolderInitialized = true;
+
         // Mint INITIAL_BASE_TOKEN_HOLDER_BALANCE tokens to this contract via the mint hook
         (bool mintSuccess, ) = MINT_BASE_TOKEN_HOOK.call(abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE));
         if (!mintSuccess) {

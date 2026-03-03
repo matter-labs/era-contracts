@@ -23,7 +23,7 @@ address constant SET_BYTECODE_ON_ADDRESS_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x
 
 /// @dev The address of the system hook responsible for minting base tokens on ZK OS chains.
 /// This hook can only be called from the L2_BASE_TOKEN_SYSTEM_CONTRACT (address 0x800A).
-address constant MINT_BASE_TOKEN_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x03);
+address constant MINT_BASE_TOKEN_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x100);
 
 ////////////////////////////////////////////////////////////
 // System contracts

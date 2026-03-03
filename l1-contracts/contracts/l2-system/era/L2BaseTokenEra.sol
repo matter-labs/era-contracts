@@ -12,7 +12,7 @@ import {
 } from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2_ASSET_TRACKER} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "../../common/Config.sol";
-import {InsufficientFunds, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {BaseTokenHolderAlreadyInitialized, InsufficientFunds, Unauthorized} from "../../common/L1ContractErrors.sol";
 
 /**
  * @title L2BaseTokenEra
@@ -36,7 +36,7 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// @dev Computed as: INITIAL_BASE_TOKEN_HOLDER_BALANCE - current holder balance
     /// @dev This replaces the previous storage-based totalSupply that was incremented on mint.
     /// @dev This formula is safe because selfdestruct is not supported on Era, so no funds can be force-sent to BaseTokenHolder.
-    function totalSupply() external view override returns (uint256) {
+    function totalSupply() external view returns (uint256) {
         return INITIAL_BASE_TOKEN_HOLDER_BALANCE - eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR];
     }
 
@@ -79,7 +79,7 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     }
 
     /// @notice Increase the balance of the receiver by transferring from BaseTokenHolder.
-    /// @dev This method is only callable by the bootloader or InteropHandler.
+    /// @dev This method is only callable by the bootloader.
     /// @dev The totalSupply is now computed from BaseTokenHolder balance, so we only update balances.
     /// @param _account The address which to mint the funds to.
     /// @param _amount The amount of ETH in wei to be minted.
@@ -98,6 +98,11 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// @dev Formula: eraAccountBalance[holder] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply + eraAccountBalance[holder]
     /// @dev Can only be called by the ComplexUpgrader contract.
     function initializeBaseTokenHolderBalance() external override onlyComplexUpgrader {
+        if (baseTokenHolderInitialized) {
+            revert BaseTokenHolderAlreadyInitialized();
+        }
+        baseTokenHolderInitialized = true;
+
         eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR] =
             INITIAL_BASE_TOKEN_HOLDER_BALANCE -
             __DEPRECATED_totalSupply +

@@ -39,8 +39,11 @@ abstract contract L2BaseTokenBase is IL2BaseTokenBase {
     // slither-disable-next-line uninitialized-state
     uint256 internal __DEPRECATED_totalSupply;
 
+    /// @notice Whether initializeBaseTokenHolderBalance has already been called.
+    bool internal baseTokenHolderInitialized;
+
     /// @dev Storage gap to allow adding new shared storage variables in future upgrades.
-    uint256[48] private __gap;
+    uint256[47] private __gap;
 
     /// @notice Initiate the withdrawal of the base token, funds will be available to claim on L1 `finalizeEthWithdrawal` method.
     /// @param _l1Receiver The address on L1 to receive the funds.

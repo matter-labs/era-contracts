@@ -382,14 +382,9 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
     //  registerBaseTokenDuringUpgrade
     // ═══════════════════════════════════════════════════════════════════
 
-    /// @dev Storage slots from `forge inspect L2AssetTracker storage-layout`.
-    uint256 private constant INTEROP_INFO_MAPPING_SLOT = 156;
+    /// @dev Storage slot for totalPreV31TotalSupply mapping from
+    /// `forge inspect L2AssetTracker storage-layout`.
     uint256 private constant TOTAL_PRE_V31_TOTAL_SUPPLY_SLOT = 157;
-
-    function _readTotalSuccessfulDepositsFromL1(bytes32 _assetId) internal view returns (uint256) {
-        bytes32 baseSlot = keccak256(abi.encode(_assetId, INTEROP_INFO_MAPPING_SLOT));
-        return uint256(vm.load(L2_ASSET_TRACKER_ADDR, bytes32(uint256(baseSlot) + 1)));
-    }
 
     function _readSavedTotalSupply(bytes32 _assetId) internal view returns (bool isSaved, uint256 amount) {
         bytes32 baseSlot = keccak256(abi.encode(_assetId, TOTAL_PRE_V31_TOTAL_SUPPLY_SLOT));
@@ -409,6 +404,10 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             L2AssetTracker(L2_ASSET_TRACKER_ADDR).isAssetRegistered(baseTokenAssetId),
             "Should not be registered before call"
         );
+
+        // Expect BaseTokenRegisteredDuringUpgrade event
+        vm.expectEmit(true, false, false, false, L2_ASSET_TRACKER_ADDR);
+        emit IL2AssetTracker.BaseTokenRegisteredDuringUpgrade(baseTokenAssetId);
 
         // Call as ComplexUpgrader (onlyUpgrader)
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);

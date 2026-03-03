@@ -7,6 +7,7 @@ import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
@@ -731,27 +732,6 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  Helpers: read interopInfo storage via slot calculation
-    // ═══════════════════════════════════════════════════════════════════
-
-    /// @dev The `interopInfo` mapping is at storage slot 156 in L2AssetTracker
-    /// (verified via `forge inspect L2AssetTracker storage-layout`).
-    /// InteropL2Info struct layout:
-    ///   offset 0: totalWithdrawalsToL1
-    ///   offset 1: totalSuccessfulDepositsFromL1
-    uint256 private constant INTEROP_INFO_MAPPING_SLOT = 156;
-
-    function _readTotalWithdrawalsToL1(bytes32 _assetId) internal view returns (uint256) {
-        bytes32 baseSlot = keccak256(abi.encode(_assetId, INTEROP_INFO_MAPPING_SLOT));
-        return uint256(vm.load(L2_ASSET_TRACKER_ADDR, baseSlot));
-    }
-
-    function _readTotalSuccessfulDepositsFromL1(bytes32 _assetId) internal view returns (uint256) {
-        bytes32 baseSlot = keccak256(abi.encode(_assetId, INTEROP_INFO_MAPPING_SLOT));
-        return uint256(vm.load(L2_ASSET_TRACKER_ADDR, bytes32(uint256(baseSlot) + 1)));
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
     //  Inbound flow: InteropHandler → BaseTokenHolder.give() → asset tracker
     // ═══════════════════════════════════════════════════════════════════
 
@@ -763,7 +743,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         // Deploy real BaseTokenHolder (replacing the dummy) so give() calls asset tracker
         BaseTokenHolder realHolder = new BaseTokenHolder();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(realHolder).code);
-        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, (2 ** 127) - 1);
+        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
         // Set up the real asset tracker state
         bytes32 _baseTokenAssetId = _setupAssetTrackerForBaseToken();
@@ -822,7 +802,7 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         // Deploy real BaseTokenHolder (replacing the dummy)
         BaseTokenHolder realHolder = new BaseTokenHolder();
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(realHolder).code);
-        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, (2 ** 127) - 1);
+        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
         // Set up the real asset tracker state
         bytes32 _baseTokenAssetId = _setupAssetTrackerForBaseToken();

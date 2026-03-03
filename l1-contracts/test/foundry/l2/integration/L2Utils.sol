@@ -49,7 +49,7 @@ import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
@@ -114,9 +114,9 @@ library L2Utils {
         new DummyL2BaseTokenHolder();
         forceDeployWithoutConstructor("DummyL2BaseTokenHolder", L2_BASE_TOKEN_HOLDER_ADDR);
 
-        // Initialize the BaseTokenHolder's native ETH balance with 2^127 - 1 tokens
+        // Initialize the BaseTokenHolder's native ETH balance with INITIAL_BASE_TOKEN_HOLDER_BALANCE
         // This mirrors the production setup where BaseTokenHolder starts with this balance
-        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, (2 ** 127) - 1);
+        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
     }
 
     function deployDummyInteropRecipient(address _targetAddress) internal {

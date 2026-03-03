@@ -452,7 +452,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @inheritdoc IAdmin
     function setZKsyncOSPreV31TotalSupply(
         uint256 _totalSupply
-    ) external onlyAdmin onlyL1 returns (bytes32 canonicalTxHash) {
+    ) external onlyAdmin onlyL1 notPriorityMode returns (bytes32 canonicalTxHash) {
         if (!s.zksyncOS) {
             revert NotZKsyncOS();
         }

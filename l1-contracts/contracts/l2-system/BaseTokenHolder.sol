@@ -115,8 +115,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
     /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
     /// @dev Called by InteropHandler, InteropCenter, NativeTokenVault, and L2BaseToken during bridging operations.
     /// @dev This function notifies L2AssetTracker to track the bridging operation.
-    /// @param _toChainId The chain ID which the funds are sent to. L1 chain ID is not accessible within this
-    /// contract, so we use 0 as a placeholder to keep the initialization of the contract simpler.
+    /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable onlyBridgingCaller {
         L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2(_toChainId, msg.value);
         emit BaseTokenBurnt(msg.sender, _toChainId, msg.value);

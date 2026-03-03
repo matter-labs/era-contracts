@@ -37,6 +37,8 @@ error AssetRouterAllowanceNotZero();
 error BadTransferDataLength();
 // 0x6ef9a972
 error BaseTokenGasPriceDenominatorNotSet();
+// 0x764c57db
+error BaseTokenHolderAlreadyInitialized();
 // 0xd3cd4bd2
 error BaseTokenHolderMintFailed();
 // 0x00a6b592

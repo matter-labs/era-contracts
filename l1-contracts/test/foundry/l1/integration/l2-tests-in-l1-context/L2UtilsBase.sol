@@ -39,7 +39,7 @@ import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS, INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {L2MessageVerification} from "../../../../../contracts/interop/L2MessageVerification.sol";
@@ -166,10 +166,9 @@ library L2UtilsBase {
             address l2DummyBaseTokenHolder = address(new DummyL2BaseTokenHolder());
             vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, l2DummyBaseTokenHolder.code);
 
-            // Initialize the BaseTokenHolder's native ETH balance with 2^127 - 1 tokens
+            // Initialize the BaseTokenHolder's native ETH balance with INITIAL_BASE_TOKEN_HOLDER_BALANCE
             // This mirrors the production setup where BaseTokenHolder starts with this balance
-            // Using vm.deal for ZKOS-style native ETH transfers
-            vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, (2 ** 127) - 1);
+            vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
         }
 
         // DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();

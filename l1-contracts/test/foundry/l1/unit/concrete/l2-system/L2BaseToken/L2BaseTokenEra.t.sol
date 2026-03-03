@@ -20,7 +20,11 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {INITIAL_BASE_TOKEN_HOLDER_BALANCE} from "contracts/common/Config.sol";
 import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
-import {InsufficientFunds, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {
+    BaseTokenHolderAlreadyInitialized,
+    InsufficientFunds,
+    Unauthorized
+} from "contracts/common/L1ContractErrors.sol";
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 
 /// @title L2BaseTokenEraTest
@@ -460,31 +464,18 @@ contract L2BaseTokenEraTest is Test {
         l2BaseToken.initializeBaseTokenHolderBalance();
     }
 
-    function test_initializeBaseTokenHolderBalance_idempotent() public {
+    function test_initializeBaseTokenHolderBalance_revertsOnSecondCall() public {
         uint256 existingSupply = 100 ether;
         vm.store(address(l2BaseToken), bytes32(uint256(1)), bytes32(existingSupply));
 
-        // First call
+        // First call succeeds
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2BaseToken.initializeBaseTokenHolderBalance();
 
-        uint256 holderBalanceAfterFirst = l2BaseToken.balanceOf(uint256(uint160(L2_BASE_TOKEN_HOLDER_ADDR)));
-
-        // Second call — formula: INITIAL - existingSupply + holderBalanceAfterFirst
-        // = INITIAL - existingSupply + (INITIAL - existingSupply)
-        // This is NOT idempotent — it doubles the holder balance offset.
-        // We document the behavior rather than assert idempotency.
+        // Second call reverts with BaseTokenHolderAlreadyInitialized
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        vm.expectRevert(BaseTokenHolderAlreadyInitialized.selector);
         l2BaseToken.initializeBaseTokenHolderBalance();
-
-        uint256 holderBalanceAfterSecond = l2BaseToken.balanceOf(uint256(uint160(L2_BASE_TOKEN_HOLDER_ADDR)));
-
-        // After second call: holder = INITIAL - existingSupply + holderBalanceAfterFirst
-        assertEq(
-            holderBalanceAfterSecond,
-            INITIAL_BASE_TOKEN_HOLDER_BALANCE - existingSupply + holderBalanceAfterFirst,
-            "Second init should add another INITIAL - existingSupply"
-        );
     }
 
     function testFuzz_initializeBaseTokenHolderBalance_variousSupplies(uint256 existingSupply) public {
@@ -511,6 +502,17 @@ contract L2BaseTokenEraTest is Test {
         vm.deal(sender, WITHDRAW_AMOUNT);
 
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
+
+        // Expect the L1Messenger call
+        bytes memory expectedMessage = abi.encodePacked(
+            IMailboxLegacy.finalizeEthWithdrawal.selector,
+            l1Receiver,
+            WITHDRAW_AMOUNT
+        );
+        vm.expectCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSignature("sendToL1(bytes)", expectedMessage)
+        );
 
         vm.expectEmit(true, true, false, true);
         emit Withdrawal(sender, l1Receiver, WITHDRAW_AMOUNT);
@@ -551,6 +553,8 @@ contract L2BaseTokenEraTest is Test {
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
+        uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
+
         bytes memory expectedMessage = abi.encodePacked(
             IMailboxLegacy.finalizeEthWithdrawal.selector,
             l1Receiver,
@@ -564,6 +568,12 @@ contract L2BaseTokenEraTest is Test {
 
         vm.prank(sender);
         l2BaseToken.withdraw{value: WITHDRAW_AMOUNT}(l1Receiver);
+
+        assertEq(
+            L2_BASE_TOKEN_HOLDER_ADDR.balance,
+            holderBalanceBefore + WITHDRAW_AMOUNT,
+            "BaseTokenHolder should receive ETH"
+        );
     }
 
     function test_withdraw_revertsIfBaseTokenHolderRejects() public {

@@ -173,6 +173,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// are truly new), this function is for upgrading existing chains where the base
     /// token already exists on-chain but the asset tracker is deployed during the
     /// current upgrade. The base token originates on L1 (non-native to this chain).
+    /// Returns without changes if the base token is already registered.
     /// The real pre-V31 total supply is backfilled later via
     /// `backFillZKSyncOSBaseTokenV31MigrationData()`.
     function registerBaseTokenDuringUpgrade() external onlyUpgrader {
@@ -182,6 +183,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         }
         isAssetRegistered[baseTokenAssetId] = true;
         totalPreV31TotalSupply[baseTokenAssetId] = SavedTotalSupply({isSaved: true, amount: 0});
+
+        emit BaseTokenRegisteredDuringUpgrade(baseTokenAssetId);
     }
 
     /// @notice Stores token total supply snapshot used for pre-v31 migration accounting.

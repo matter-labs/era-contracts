@@ -20,6 +20,7 @@ import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_ROUTER,
+    L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_BRIDGEHUB_ADDR,
@@ -468,6 +469,27 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
                 ),
                 proof: proof
             });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  L2AssetTracker storage helpers (shared across test contracts)
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @dev The `interopInfo` mapping is at storage slot 156 in L2AssetTracker
+    /// (verified via `forge inspect L2AssetTracker storage-layout`).
+    /// InteropL2Info struct layout:
+    ///   offset 0: totalWithdrawalsToL1
+    ///   offset 1: totalSuccessfulDepositsFromL1
+    uint256 internal constant INTEROP_INFO_MAPPING_SLOT = 156;
+
+    function _readTotalWithdrawalsToL1(bytes32 _assetId) internal view returns (uint256) {
+        bytes32 baseSlot = keccak256(abi.encode(_assetId, INTEROP_INFO_MAPPING_SLOT));
+        return uint256(vm.load(L2_ASSET_TRACKER_ADDR, baseSlot));
+    }
+
+    function _readTotalSuccessfulDepositsFromL1(bytes32 _assetId) internal view returns (uint256) {
+        bytes32 baseSlot = keccak256(abi.encode(_assetId, INTEROP_INFO_MAPPING_SLOT));
+        return uint256(vm.load(L2_ASSET_TRACKER_ADDR, bytes32(uint256(baseSlot) + 1)));
     }
 
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual;
