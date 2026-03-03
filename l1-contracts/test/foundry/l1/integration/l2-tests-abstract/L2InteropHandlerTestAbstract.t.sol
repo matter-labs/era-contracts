@@ -673,9 +673,9 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         return interopBundle;
     }
 
-    // ═══════════════════════════════════════════════════════════════════
-    //  Helper: set up real L2AssetTracker state for base token operations
-    // ═══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════
+    //  Helper: set up L2AssetTracker state for base token operations
+    // ══════════════════════════════════════════════════════════════
 
     /// @dev Initializes the L2AssetTracker with the state needed for base token
     /// bridging functions to succeed without mocks. Sets BASE_TOKEN_ASSET_ID,
@@ -735,17 +735,15 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     //  Inbound flow: InteropHandler → BaseTokenHolder.give() → asset tracker
     // ═══════════════════════════════════════════════════════════════════
 
-    /// @notice Verifies the full inbound interop flow through the real asset tracker.
+    /// @notice Verifies the full inbound interop flow through the asset tracker.
     /// @dev Executes a bundle with value > 0 through InteropHandler, which calls
     /// BaseTokenHolder.give() → L2AssetTracker.handleFinalizeBaseTokenBridgingOnL2().
-    /// No mock on the asset tracker — exercises real access control and storage updates.
+    /// No mock on the asset tracker — exercises access control and storage updates.
     function test_give_inboundFlow_notifiesAssetTracker() public {
-        // Deploy real BaseTokenHolder (replacing the dummy) so give() calls asset tracker
-        BaseTokenHolder realHolder = new BaseTokenHolder();
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(realHolder).code);
+        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
         vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        // Set up the real asset tracker state
         bytes32 _baseTokenAssetId = _setupAssetTrackerForBaseToken();
 
         uint256 callValue = 100;
@@ -794,17 +792,15 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
     //  Outbound flow: burnAndStartBridging() → asset tracker
     // ═══════════════════════════════════════════════════════════════════
 
-    /// @notice Verifies the full outbound bridging flow through the real asset tracker.
+    /// @notice Verifies the full outbound bridging flow through the asset tracker.
     /// @dev BaseTokenHolder.burnAndStartBridging() calls
     /// L2AssetTracker.handleInitiateBaseTokenBridgingOnL2().
-    /// No mock on the asset tracker — exercises real access control and storage updates.
+    /// No mock on the asset tracker — exercises access control and storage updates.
     function test_burnAndStartBridging_outboundFlow_notifiesAssetTracker() public {
-        // Deploy real BaseTokenHolder (replacing the dummy)
-        BaseTokenHolder realHolder = new BaseTokenHolder();
-        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(realHolder).code);
+        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
         vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
-        // Set up the real asset tracker state
         bytes32 _baseTokenAssetId = _setupAssetTrackerForBaseToken();
 
         uint256 burnAmount = 500;
