@@ -12,6 +12,8 @@ import {InvalidMockProofLength, InvalidProof} from "../../common/L1ContractError
 /// @notice Modified version of the main verifier contract for the testnet environment
 /// @dev This contract is used to support mock verification.
 contract ZKsyncOSTestnetVerifier is ZKsyncOSDualVerifier {
+    bool public constant IS_TESTNET_VERIFIER = true;
+
     constructor(
         IVerifierV2 _fflonkVerifier,
         IVerifier _plonkVerifier,

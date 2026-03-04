@@ -6,7 +6,16 @@ import {MessageRootBase} from "./MessageRootBase.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "./IMessageRoot.sol";
 import {IL1MessageRoot} from "./IL1MessageRoot.sol";
-import {CurrentBatchNumberAlreadySet, InvalidSettlementLayerForBatch, OnlyOnSettlementLayer, TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber, TotalBatchesExecutedZero, LocallyNoChainsAtGenesis, V31UpgradeChainBatchNumberAlreadySet, NotAllChainsOnL1} from "../bridgehub/L1BridgehubErrors.sol";
+import {
+    CurrentBatchNumberAlreadySet,
+    InvalidSettlementLayerForBatch,
+    OnlyOnSettlementLayer,
+    TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber,
+    TotalBatchesExecutedZero,
+    LocallyNoChainsAtGenesis,
+    V31UpgradeChainBatchNumberAlreadySet,
+    NotAllChainsOnL1
+} from "../bridgehub/L1BridgehubErrors.sol";
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
@@ -63,6 +72,13 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
         uint256 allZKChainsLength = allZKChains.length;
         /// locally there are no chains deployed before.
         require(allZKChainsLength == 0, LocallyNoChainsAtGenesis());
+    }
+
+    /// @notice Returns whether a chain has not finalized its v31 upgrade marker yet.
+    /// @param _chainId The chain id to query.
+    /// @return True if the chain still stores the pre-v31 placeholder value.
+    function isPreV31(uint256 _chainId) external view returns (bool) {
+        return v31UpgradeChainBatchNumber[_chainId] == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE;
     }
 
     /// @dev This initializer is used in the v31 upgrade. It is expected that it does not call `_initialize`, since

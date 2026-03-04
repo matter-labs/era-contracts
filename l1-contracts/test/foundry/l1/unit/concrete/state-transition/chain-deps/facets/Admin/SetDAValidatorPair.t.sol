@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {Unauthorized, InvalidL2DACommitmentScheme} from "contracts/common/L1ContractErrors.sol";
+import {InvalidL2DACommitmentScheme, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {L1DAValidatorAddressIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";

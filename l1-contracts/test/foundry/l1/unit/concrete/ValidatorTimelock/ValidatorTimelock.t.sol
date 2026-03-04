@@ -9,12 +9,11 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {CommitBatchInfo, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 
-import {RoleAccessDenied, TimeNotReached, NotAZKChain} from "contracts/common/L1ContractErrors.sol";
+import {NotAZKChain, RoleAccessDenied, TimeNotReached} from "contracts/common/L1ContractErrors.sol";
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";

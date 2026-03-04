@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "license": "MIT",
   "engines": {
-    "node": ">=16"
+    "node": ">=20"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.0",

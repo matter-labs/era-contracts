@@ -4,7 +4,11 @@ pragma solidity 0.8.28;
 
 import {MigratorTest} from "./_Migrator_Shared.t.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {DepositsAlreadyPaused, NotL1, TotalPriorityTxsIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {
+    DepositsAlreadyPaused,
+    NotL1,
+    TotalPriorityTxsIsZero
+} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 
 contract PauseDepositsTest is MigratorTest {

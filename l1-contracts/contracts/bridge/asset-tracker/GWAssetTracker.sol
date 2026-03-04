@@ -2,21 +2,78 @@
 
 pragma solidity 0.8.28;
 
-import {BALANCE_CHANGE_VERSION, SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, INTEROP_BALANCE_CHANGE_VERSION} from "./IAssetTrackerBase.sol";
-import {BUNDLE_IDENTIFIER, BalanceChange, InteropBalanceChange, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus, AssetBalanceChange, TokenBridgingData} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR, L2_ASSET_ROUTER, L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractInterfaces.sol";
+import {BALANCE_CHANGE_VERSION, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
+
+import {
+    BUNDLE_IDENTIFIER,
+    BalanceChange,
+    GatewayToL1TokenBalanceMigrationData,
+    InteropBundle,
+    InteropCall,
+    L2Log,
+    MigrationConfirmationData,
+    TxStatus,
+    TokenBridgingData
+} from "../../common/Messaging.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_BOOTLOADER_ADDRESS,
+    L2_BRIDGEHUB,
+    L2_CHAIN_ASSET_HANDLER,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_COMPRESSOR_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
+    L2_MESSAGE_ROOT,
+    L2_NATIVE_TOKEN_VAULT,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    MAX_BUILT_IN_CONTRACT_ADDR,
+    L2_ASSET_ROUTER,
+    L2_BRIDGEHUB_ADDR
+} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {ChainIdNotRegistered, InvalidInteropCalldata, InvalidMessage, ReconstructionMismatch, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
-import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRootBase, SHARED_ROOT_TREE_EMPTY_HASH} from "../../core/message-root/IMessageRoot.sol";
+import {
+    ChainIdNotRegistered,
+    InvalidInteropCalldata,
+    InvalidMessage,
+    ReconstructionMismatch,
+    Unauthorized,
+    ZeroAddress
+} from "../../common/L1ContractErrors.sol";
+import {
+    CHAIN_TREE_EMPTY_ENTRY_HASH,
+    IMessageRootBase,
+    SHARED_ROOT_TREE_EMPTY_HASH
+} from "../../core/message-root/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
-import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER} from "../../common/Config.sol";
+import {
+    L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
+    L2_TO_L1_LOGS_MERKLE_TREE_DEPTH,
+    MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
+    MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1
+} from "../../common/Config.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAssetMigrationNumber, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange, InvalidFeeRecipient, SettlementFeePayerNotAgreed} from "./AssetTrackerErrors.sol";
+import {
+    InvalidAssetMigrationNumber,
+    InvalidBuiltInContractMessage,
+    InvalidCanonicalTxHash,
+    InvalidChainMigrationNumber,
+    InvalidFunctionSignature,
+    InvalidInteropChainId,
+    InvalidL2ShardId,
+    InvalidServiceLog,
+    InvalidEmptyMultichainBatchRoot,
+    RegisterNewTokenNotAllowed,
+    InvalidFeeRecipient,
+    SettlementFeePayerNotAgreed
+} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
@@ -25,8 +82,6 @@ import {IMailboxLegacy} from "../../state-transition/chain-interfaces/IMailboxLe
 import {IMigrator} from "../../state-transition/chain-interfaces/IMigrator.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {LegacySharedBridgeAddresses, SharedBridgeOnChainId} from "./LegacySharedBridgeAddresses.sol";
-import {InteropDataEncoding} from "../../interop/InteropDataEncoding.sol";
-import {IInteropHandler} from "../../interop/IInteropHandler.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
@@ -59,19 +114,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// On such chains, it is responsible for sending withdrawal messages.
     mapping(uint256 chainId => address legacySharedBridgeAddress) internal legacySharedBridgeAddress;
 
-    /// @notice Empty messageRoot calculated for specific chain.
-    mapping(uint256 chainId => bytes32 emptyMessageRoot) internal emptyMessageRoot;
-
-    /// @notice We save the chainBalance which equals the chains totalSupply before the first GW->L1 migration so that it can be replayed.
-    /// @dev Note, that the balance is only saved for even migration numbers, i.e. when the chain did not settle on top of Gateway.
-    /// This is needed so that in the future after e.g. a chain migrated with number N (odd number), we would remember how much funds did it
-    /// have right before the migration (when N - 1 was the migration number).
-    mapping(uint256 chainId => mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedChainBalance)))
-        internal savedChainBalance;
-
-    /// @notice We save the interop call balance change
-    mapping(uint256 receivingChainId => mapping(bytes32 bundleHash => InteropBalanceChange interopBalanceChange))
-        internal interopBalanceChange;
+    /// @notice Empty multichainBatchRoot calculated for specific chain.
+    mapping(uint256 chainId => bytes32 emptyMultichainBatchRoot) internal emptyMultichainBatchRoot;
 
     /// @notice Gateway settlement fee per interop operation in ZK tokens.
     /// @dev Set by gateway governance, paid by chain operators during settlement.
@@ -192,7 +236,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
 
-    function registerNewToken(bytes32, uint256) public override onlyNativeTokenVault {
+    function registerNewTokenIfNeeded(bytes32, uint256) public override onlyNativeTokenVault {
         revert RegisterNewTokenNotAllowed();
     }
 
@@ -225,13 +269,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
 
         /// Note we don't decrease L1ChainBalance here, since we don't track L1 chainBalance on Gateway.
-        _increaseAndSaveChainBalance(_chainId, _balanceChange.assetId, _balanceChange.amount, chainMigrationNumber);
-        _increaseAndSaveChainBalance(
-            _chainId,
-            _balanceChange.baseTokenAssetId,
-            _balanceChange.baseTokenAmount,
-            chainMigrationNumber
-        );
+        _increaseAndSaveChainBalance(_chainId, _balanceChange.assetId, _balanceChange.amount);
+        _increaseAndSaveChainBalance(_chainId, _balanceChange.baseTokenAssetId, _balanceChange.baseTokenAmount);
 
         _registerToken(_balanceChange.assetId, _balanceChange.originToken, _balanceChange.tokenOriginChainId);
 
@@ -292,8 +331,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
                     // Handle interop message and get count of chargeable calls for settlement fees
                     chargeableInteropCount += _handleInteropCenterMessage(_processLogsInputs.chainId, message);
-                } else if (log.key == bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))) {
-                    _handleInteropHandlerReceiveMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
                 } else if (log.key == bytes32(uint256(uint160(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)))) {
                     _handleBaseTokenSystemContractMessage(_processLogsInputs.chainId, baseTokenAssetId, message);
                 } else if (log.key == bytes32(uint256(uint160(L2_ASSET_ROUTER_ADDR)))) {
@@ -315,15 +352,18 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 }
             }
         }
+        if (msgCount != _processLogsInputs.messages.length) {
+            revert InvalidMessage();
+        }
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 
-        bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
+        bytes32 expectedEmptyMultichainBatchRoot = _getEmptyMultichainBatchRoot(_processLogsInputs.chainId);
         require(
-            _processLogsInputs.messageRoot == emptyMessageRootForChain,
-            InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot)
+            _processLogsInputs.multichainBatchRoot == expectedEmptyMultichainBatchRoot,
+            InvalidEmptyMultichainBatchRoot(expectedEmptyMultichainBatchRoot, _processLogsInputs.multichainBatchRoot)
         );
-        bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.messageRoot));
+        bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.multichainBatchRoot));
 
         if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {
             revert ReconstructionMismatch(chainBatchRootHash, _processLogsInputs.chainBatchRoot);
@@ -383,10 +423,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         emit GatewaySettlementFeesCollected(_chainId, _settlementFeePayer, totalFee, _chargeableInteropCount);
     }
 
-    function _getEmptyMessageRoot(uint256 _chainId) internal returns (bytes32) {
-        bytes32 savedEmptyMessageRoot = emptyMessageRoot[_chainId];
-        if (savedEmptyMessageRoot != bytes32(0)) {
-            return savedEmptyMessageRoot;
+    function _getEmptyMultichainBatchRoot(uint256 _chainId) internal returns (bytes32) {
+        bytes32 savedEmptyMultichainBatchRoot = emptyMultichainBatchRoot[_chainId];
+        if (savedEmptyMultichainBatchRoot != bytes32(0)) {
+            return savedEmptyMultichainBatchRoot;
         }
         FullMerkleMemory.FullTree memory sharedTree;
         sharedTree.createTree(1);
@@ -397,10 +437,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         chainTree.createTree(1);
         bytes32 initialChainTreeHash = chainTree.setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
         bytes32 leafHash = MessageHashing.chainIdLeafHash(initialChainTreeHash, _chainId);
-        bytes32 emptyMessageRootCalculated = sharedTree.pushNewLeaf(leafHash);
+        bytes32 emptyMultichainBatchRootCalculated = sharedTree.pushNewLeaf(leafHash);
 
-        emptyMessageRoot[_chainId] = emptyMessageRootCalculated;
-        return emptyMessageRootCalculated;
+        emptyMultichainBatchRoot[_chainId] = emptyMultichainBatchRootCalculated;
+        return emptyMultichainBatchRootCalculated;
     }
 
     /// @notice Handles potential failed deposits. Not all L1->L2 txs are deposits.
@@ -445,13 +485,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         InteropBundle memory interopBundle = abi.decode(_message[1:], (InteropBundle));
 
-        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(_chainId, _message[1:]);
-        interopBalanceChange[interopBundle.destinationChainId][bundleHash].version = INTEROP_BALANCE_CHANGE_VERSION;
-
         uint256 totalBaseTokenAmount = 0;
 
         uint256 interopBundleCallsLength = interopBundle.calls.length;
-
         for (uint256 callCount = 0; callCount < interopBundleCallsLength; ++callCount) {
             InteropCall memory interopCall = interopBundle.calls[callCount];
 
@@ -468,19 +504,22 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 revert InvalidInteropCalldata(bytes4(interopCall.data));
             }
             // solhint-disable-next-line
-            _processInteropCall(_chainId, bundleHash, interopCall, interopBundle.destinationChainId);
+            _processInteropCall(_chainId, interopCall, interopBundle.destinationChainId);
         }
+
         // We check on the InteropHandler of the destination chain that the `destinationBaseTokenAssetId` is the correct one
         _decreaseChainBalance(_chainId, interopBundle.destinationBaseTokenAssetId, totalBaseTokenAmount);
-        interopBalanceChange[interopBundle.destinationChainId][bundleHash].baseTokenAmount = totalBaseTokenAmount;
-
+        _increaseAndSaveChainBalance(
+            interopBundle.destinationChainId,
+            interopBundle.destinationBaseTokenAssetId,
+            totalBaseTokenAmount
+        );
         // Return chargeable call count for settlement fee calculation.
         return interopBundle.calls.length;
     }
 
     function _processInteropCall(
         uint256 _chainId,
-        bytes32 _bundleHash,
         InteropCall memory _interopCall,
         uint256 _destinationChainId
     ) internal {
@@ -489,52 +528,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         require(_chainId == fromChainId, InvalidInteropChainId(fromChainId, _destinationChainId));
 
         // solhint-disable-next-line func-named-parameters
-        uint256 amount = _handleAssetRouterMessageInner(_chainId, _destinationChainId, assetId, transferData, true);
-
-        AssetBalanceChange memory change = AssetBalanceChange({assetId: assetId, amount: amount});
-        interopBalanceChange[_destinationChainId][_bundleHash].assetBalanceChanges.push(change);
-    }
-
-    // FIXME: this function is totally wrong:
-    // - it transfers funds upon `verifyBundle` call, but should only upon execute.
-    // - it treats the bundle as atomic, but it can be unbundled.
-    // We should probably delete this function entirely and come up with some future plan to solve this problem.
-    function _handleInteropHandlerReceiveMessage(
-        uint256 _chainId,
-        bytes calldata _message,
-        bytes32 _baseTokenAssetId
-    ) internal {
-        bytes4 functionSelector = bytes4(_message[0:4]);
-        require(functionSelector == IInteropHandler.verifyBundle.selector, InvalidFunctionSignature(functionSelector));
-        bytes32 bundleHash = bytes32(_message[4:36]);
-
-        InteropBalanceChange memory receivedInteropBalanceChange = interopBalanceChange[_chainId][bundleHash];
-        require(
-            receivedInteropBalanceChange.version == INTEROP_BALANCE_CHANGE_VERSION,
-            InvalidInteropBalanceChange(bundleHash)
-        );
-        interopBalanceChange[_chainId][bundleHash].version = 0;
-
-        uint256 length = receivedInteropBalanceChange.assetBalanceChanges.length;
-        uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
-        for (uint256 i = 0; i < length; ++i) {
-            uint256 amount = receivedInteropBalanceChange.assetBalanceChanges[i].amount;
-            interopBalanceChange[_chainId][bundleHash].assetBalanceChanges[i].assetId = bytes32(0);
-            interopBalanceChange[_chainId][bundleHash].assetBalanceChanges[i].amount = 0;
-            _increaseAndSaveChainBalance(
-                _chainId,
-                receivedInteropBalanceChange.assetBalanceChanges[i].assetId,
-                amount,
-                chainMigrationNumber
-            );
-        }
-        interopBalanceChange[_chainId][bundleHash].baseTokenAmount = 0;
-        _increaseAndSaveChainBalance(
-            _chainId,
-            _baseTokenAssetId,
-            receivedInteropBalanceChange.baseTokenAmount,
-            chainMigrationNumber
-        );
+        _handleAssetRouterMessageInner(_chainId, _destinationChainId, assetId, transferData);
     }
 
     /// @notice L2->L1 withdrawals go through the L2AssetRouter directly.
@@ -547,7 +541,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             InvalidFunctionSignature(functionSignature)
         );
         // solhint-disable-next-line func-named-parameters
-        _handleAssetRouterMessageInner(_chainId, L1_CHAIN_ID, assetId, transferData, false);
+        _handleAssetRouterMessageInner(_chainId, L1_CHAIN_ID, assetId, transferData);
     }
 
     /// @notice Handles the logic of the AssetRouter message.
@@ -560,8 +554,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 _sourceChainId,
         uint256 _destinationChainId,
         bytes32 _assetId,
-        bytes memory _transferData,
-        bool _isInteropCall
+        bytes memory _transferData
     ) internal returns (uint256 amount) {
         address originalToken;
         bytes memory erc20Metadata;
@@ -576,8 +569,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _sourceChainId: _sourceChainId,
             _destinationChainId: _destinationChainId,
             _assetId: _assetId,
-            _amount: amount,
-            _isInteropCall: _isInteropCall
+            _amount: amount
         });
     }
 
@@ -585,17 +577,15 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 _sourceChainId,
         uint256 _destinationChainId,
         bytes32 _assetId,
-        uint256 _amount,
-        bool _isInteropCall
+        uint256 _amount
     ) internal {
         if (_amount > 0) {
             /// Note, we don't track L1 chainBalance on Gateway.
             if (_sourceChainId != L1_CHAIN_ID) {
                 _decreaseChainBalance(_sourceChainId, _assetId, _amount);
             }
-            if (_destinationChainId != L1_CHAIN_ID && !_isInteropCall) {
-                uint256 chainMigrationNumber = _getChainMigrationNumber(_destinationChainId);
-                _increaseAndSaveChainBalance(_destinationChainId, _assetId, _amount, chainMigrationNumber);
+            if (_destinationChainId != L1_CHAIN_ID) {
+                _increaseAndSaveChainBalance(_destinationChainId, _assetId, _amount);
             }
         }
     }
@@ -621,8 +611,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _sourceChainId: _chainId,
             _destinationChainId: L1_CHAIN_ID,
             _assetId: expectedAssetId,
-            _transferData: transferData,
-            _isInteropCall: false
+            _transferData: transferData
         });
     }
 
@@ -641,13 +630,12 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _decreaseChainBalance(_chainId, _baseTokenAssetId, amount);
     }
 
-    /// @notice this function is a bit unintuitive since the Gateway AssetTracker checks the messages sent by the L2 AssetTracker,
-    /// since we check the messages from all built-in contracts.
-    /// However this is not where the receiveMigrationOnL1 function is processed, but on L1.
+    /// @notice Validates selectors for messages emitted by L2AssetTracker.
+    /// @dev Gateway only accepts selectors that L2AssetTracker can emit through L2ToL1Messenger.
     function _checkAssetTrackerMessageSelector(bytes memory _message) internal pure {
         bytes4 functionSignature = DataEncoding.getSelector(_message);
         require(
-            functionSignature == IAssetTrackerDataEncoding.receiveMigrationOnL1.selector,
+            functionSignature == IAssetTrackerDataEncoding.receiveL1ToGatewayMigrationOnL1.selector,
             InvalidFunctionSignature(functionSignature)
         );
     }
@@ -671,21 +659,29 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         // If the chain already migrated back to GW, then we need the previous migration number.
         uint256 chainMigrationNumber = _calculatePreviousChainMigrationNumber(_chainId);
         require(assetMigrationNumber[_chainId][_assetId] < chainMigrationNumber, InvalidAssetMigrationNumber());
-        // We don't save chainBalance here since it might not be the final chainBalance for this value of the chainMigrationNumber.
-        uint256 amount = _getOrSaveChainBalance(_chainId, _assetId, chainMigrationNumber);
 
-        TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
+        require(
+            chainMigrationNumber == MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1,
+            InvalidChainMigrationNumber(chainMigrationNumber, MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1)
+        );
+
+        uint256 amount = chainBalance[_chainId][_assetId];
+        GatewayToL1TokenBalanceMigrationData memory tokenBalanceMigrationData = GatewayToL1TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+            originToken: originToken[_assetId],
             chainId: _chainId,
             assetId: _assetId,
             tokenOriginChainId: tokenOriginChainId[_assetId],
             amount: amount,
             chainMigrationNumber: chainMigrationNumber,
-            assetMigrationNumber: assetMigrationNumber[_chainId][_assetId],
-            originToken: originToken[_assetId],
-            isL1ToGateway: false
+            assetMigrationNumber: assetMigrationNumber[_chainId][_assetId]
         });
-        _sendMigrationDataToL1(tokenBalanceMigrationData);
+        // slither-disable-next-line reentrancy-no-eth
+        _sendGatewayToL1MigrationDataToL1(tokenBalanceMigrationData);
+
+        // We assign chain balance to 0 and bump asset migration number for replay protection
+        chainBalance[_chainId][_assetId] = 0;
+        assetMigrationNumber[_chainId][_assetId] = chainMigrationNumber;
 
         emit GatewayToL1MigrationInitiated(_assetId, _chainId, amount);
     }
@@ -700,78 +696,27 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         return chainMigrationNumber;
     }
 
-    /// @notice Gets the chain balance for migration, saving it if this is the first time it's accessed.
-    /// @dev This function implements a "snapshot and clear" pattern for chain balances during migration.
-    /// @dev On first access, it saves the current chainBalance and sets it to 0 to prevent double-spending.
-    /// @dev Subsequent accesses return the saved value without modifying the current chainBalance.
-    /// @param _chainId The chain ID whose balance is being queried.
-    /// @param _assetId The asset ID of the token.
-    /// @param _migrationNumber The migration number for this operation.
-    /// @return The saved chain balance for this migration.
-    function _getOrSaveChainBalance(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _migrationNumber
-    ) internal returns (uint256) {
-        // Check if we've already saved the balance for this migration
-        SavedTotalSupply memory tokenSavedTotalSupply = savedChainBalance[_chainId][_migrationNumber][_assetId];
-        if (!tokenSavedTotalSupply.isSaved) {
-            // First time accessing this balance for this migration number
-            // Save the current balance and reset the chainBalance to 0
-            tokenSavedTotalSupply.amount = chainBalance[_chainId][_assetId];
-            // Persist the saved balance for this specific migration
-            savedChainBalance[_chainId][_migrationNumber][_assetId] = SavedTotalSupply({
-                isSaved: true,
-                amount: tokenSavedTotalSupply.amount
-            });
-        }
-
-        // Return the balance that was available at the time of this migration
-        return tokenSavedTotalSupply.amount;
-    }
-
     /// @inheritdoc IGWAssetTracker
-    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _data) external onlyServiceTransactionSender {
-        assetMigrationNumber[_data.chainId][_data.assetId] = _data.assetMigrationNumber;
-        // Register the token if it wasn't already
-        _registerToken(_data.assetId, _data.originToken, _data.tokenOriginChainId);
+    function confirmMigrationOnGateway(MigrationConfirmationData calldata _data) external onlyServiceTransactionSender {
         if (_data.isL1ToGateway) {
+            assetMigrationNumber[_data.chainId][_data.assetId] = _data.assetMigrationNumber;
+            // Register the token if it wasn't already
+            _registerToken(_data.assetId, _data.originToken, _data.tokenOriginChainId);
+
             /// In this case the balance might never have been migrated back to L1.
             chainBalance[_data.chainId][_data.assetId] += _data.amount;
-        } else {
-            _decreaseChainBalance(_data.chainId, _data.assetId, _data.amount);
-
-            uint256 chainMigrationNumber = _calculatePreviousChainMigrationNumber(_data.chainId);
-            SavedTotalSupply memory savedBalance = savedChainBalance[_data.chainId][chainMigrationNumber][
-                _data.assetId
-            ];
-            if (savedBalance.isSaved) {
-                savedChainBalance[_data.chainId][chainMigrationNumber][_data.assetId].amount =
-                    savedBalance.amount -
-                    _data.amount;
-            }
         }
+
+        // For migrations from GW, the chainBalance and assetMigrationNumber are updated at the initiation of the migration.
+        // Additionally, all the tokens are expected to be registered the first time they are deposited via the GWAssetTracker, i.e.
+        // the amount migrated can not be more than 0 if the token was not registered.
     }
 
     /*//////////////////////////////////////////////////////////////
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
 
-    function _increaseAndSaveChainBalance(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        uint256 _chainMigrationNumber
-    ) internal {
-        if (_chainMigrationNumber % 2 == 0) {
-            revert InvalidChainMigrationNumber(_chainMigrationNumber, _chainMigrationNumber + 1);
-        }
-
-        // We save the chainBalance for the previous migration number so that the chain balance can be migrated back to GW in case it was not migrated.
-        // Note, that for this logic to be correct, we need to ensure that `_chainMigrationNumber` is odd, i.e. the chain actually
-        // actively settles on top of Gateway.
-        _getOrSaveChainBalance(_chainId, _assetId, _chainMigrationNumber - 1);
-        // we increase the chain balance of the token.
+    function _increaseAndSaveChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
         if (_amount > 0) {
             chainBalance[_chainId][_assetId] += _amount;
         }

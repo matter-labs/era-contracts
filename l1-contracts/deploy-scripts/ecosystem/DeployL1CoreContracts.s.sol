@@ -27,9 +27,6 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
-import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
-import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
 import {Config, CoreDeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
 import {IDeployL1CoreContracts} from "contracts/script-interfaces/IDeployL1CoreContracts.sol";
@@ -213,6 +210,9 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             payable(coreAddresses.bridges.proxies.l1NativeTokenVault)
         );
         l1NativeTokenVault.transferOwnership(config.ownerAddress);
+
+        IL1Nullifier l1Nullifier = IL1Nullifier(coreAddresses.bridges.proxies.l1Nullifier);
+        IOwnable(address(l1Nullifier)).transferOwnership(coreAddresses.shared.governance);
 
         ICTMDeploymentTracker ctmDeploymentTracker = ICTMDeploymentTracker(
             coreAddresses.bridgehub.proxies.ctmDeploymentTracker

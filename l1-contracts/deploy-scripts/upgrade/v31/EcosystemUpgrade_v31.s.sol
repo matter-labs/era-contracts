@@ -10,7 +10,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
+
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -21,7 +21,6 @@ import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CoreUpgrade_v31} from "./CoreUpgrade_v31.s.sol";
 import {CTMUpgrade_v31} from "./CTMUpgrade_v31.s.sol";
-import {GatewayUpgrade_v31} from "./GatewayUpgrade_v31.s.sol";
 
 /// @notice Script used for v31 ecosystem upgrade flow (core + CTM)
 /// TODO: IMPORTANT this script should also contain the following steps:
@@ -153,7 +152,7 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
 
                 // Call AssetTracker to migrate the balance
                 vm.broadcast(getBroadcasterAddress());
-                assetTracker.migrateTokenBalanceFromNTVV31(chainId, assetId);
+                assetTracker.registerLegacyToken(assetId);
 
                 console.log("  Migration successful");
             }

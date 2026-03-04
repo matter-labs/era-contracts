@@ -3,12 +3,19 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {MessageHashing, BATCH_LEAF_PADDING, CHAIN_ID_LEAF_PADDING} from "contracts/common/libraries/MessageHashing.sol";
+import {BATCH_LEAF_PADDING, CHAIN_ID_LEAF_PADDING, MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {MerklePathEmpty, HashedLogIsDefault, InvalidProofLengthForFinalNode} from "contracts/common/L1ContractErrors.sol";
+import {
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    L2_BOOTLOADER_ADDRESS
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    MerklePathEmpty,
+    HashedLogIsDefault,
+    InvalidProofLengthForFinalNode
+} from "contracts/common/L1ContractErrors.sol";
 import {UnsupportedProofMetadataVersion} from "contracts/state-transition/L1StateTransitionErrors.sol";
-import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, SUPPORTED_PROOF_METADATA_VERSION} from "contracts/common/Config.sol";
+import {SUPPORTED_PROOF_METADATA_VERSION} from "contracts/common/Config.sol";
 
 /// @notice Unit tests for MessageHashing library
 contract MessageHashingTest is Test {

@@ -4,7 +4,12 @@ pragma solidity 0.8.28;
 
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
 import {ChainCreationParams} from "./IChainTypeManager.sol";
-import {GenesisIndexStorageZero, GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisUpgradeZero} from "../common/L1ContractErrors.sol";
+import {
+    GenesisIndexStorageZero,
+    GenesisBatchCommitmentZero,
+    GenesisBatchHashZero,
+    GenesisUpgradeZero
+} from "../common/L1ContractErrors.sol";
 
 /// @title Era Chain Type Manager contract
 /// @author Matter Labs

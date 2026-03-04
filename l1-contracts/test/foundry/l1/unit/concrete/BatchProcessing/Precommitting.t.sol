@@ -7,7 +7,7 @@ import {Vm} from "forge-std/Test.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
-import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+
 import {PrecommitInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 
 contract PrecommittingTest is ExecutorTest {

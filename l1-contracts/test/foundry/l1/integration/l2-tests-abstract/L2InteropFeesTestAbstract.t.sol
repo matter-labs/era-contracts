@@ -3,28 +3,31 @@
 pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
-import {Test} from "forge-std/Test.sol";
-import {StdStorage, stdStorage} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-
-import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 import {InteropLibrary} from "deploy-scripts/InteropLibrary.sol";
 
-import {InteropCenter, IInteropCenter} from "contracts/interop/InteropCenter.sol";
+import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {ZKTokenNotAvailable, FeeWithdrawalFailed} from "contracts/interop/InteropErrors.sol";
-import {L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {FeeWithdrawalFailed, ZKTokenNotAvailable} from "contracts/interop/InteropErrors.sol";
+import {
+    L2_INTEROP_CENTER_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_BOOTLOADER_ADDRESS
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT
+} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 /// @title L2InteropFeesTestAbstract
 /// @notice Tests for InteropCenter fee configuration and fee collection functionality

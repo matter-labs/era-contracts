@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Config, CTMDeployedAddresses} from "../../deploy-scripts/ctm/DeployCTMUtils.s.sol";
+import {CTMDeployedAddresses, Config} from "../../deploy-scripts/ctm/DeployCTMUtils.s.sol";
 
 /// @title IDeployCTM
 /// @notice Interface for the Chain Type Manager (CTM) deployment script

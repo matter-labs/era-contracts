@@ -12,7 +12,21 @@ import {TransactionValidator} from "../state-transition/libraries/TransactionVal
 import {ProposedUpgrade} from "../state-transition/libraries/ProposedUpgradeLib.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, NewProtocolMajorVersionNotZero, PatchCantSetUpgradeTxn, PatchUpgradeCantSetBootloader, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetEvmEmulator, PreviousProtocolMajorVersionNotZero, PreviousUpgradeNotCleaned, PreviousUpgradeNotFinalized, ProtocolVersionMinorDeltaTooBig, ProtocolVersionTooSmall, SettlementLayerUpgradeMustPrecedeChainUpgrade} from "./ZkSyncUpgradeErrors.sol";
+import {
+    InvalidTxType,
+    L2UpgradeNonceNotEqualToNewProtocolVersion,
+    NewProtocolMajorVersionNotZero,
+    PatchCantSetUpgradeTxn,
+    PatchUpgradeCantSetBootloader,
+    PatchUpgradeCantSetDefaultAccount,
+    PatchUpgradeCantSetEvmEmulator,
+    PreviousProtocolMajorVersionNotZero,
+    PreviousUpgradeNotCleaned,
+    PreviousUpgradeNotFinalized,
+    ProtocolVersionMinorDeltaTooBig,
+    ProtocolVersionTooSmall,
+    SettlementLayerUpgradeMustPrecedeChainUpgrade
+} from "./ZkSyncUpgradeErrors.sol";
 import {TimeNotReached, TooManyFactoryDeps, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";

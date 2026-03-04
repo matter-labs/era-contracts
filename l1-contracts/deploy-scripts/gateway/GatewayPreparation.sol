@@ -12,17 +12,19 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {BridgehubBurnCTMAssetData, IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.sol";
-import {L2TransactionRequestTwoBridgesOuter} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.sol";
+
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS} from "../Utils.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {L2_BRIDGEHUB_ADDRESS, Utils} from "../Utils.sol";
+
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {
+    SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
+    NEW_ENCODING_VERSION
+} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 import {IL2AssetRouter, L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";

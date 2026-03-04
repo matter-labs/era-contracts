@@ -16,8 +16,19 @@ import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../common/Config.sol";
-import {AdminZero, InitialForceDeploymentMismatch, NotAPatchUpgrade, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
-import {ChainAlreadyLive, HashMismatch, MigrationsNotPaused, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {
+    AdminZero,
+    InitialForceDeploymentMismatch,
+    NotAPatchUpgrade,
+    OutdatedProtocolVersion
+} from "./L1StateTransitionErrors.sol";
+import {
+    ChainAlreadyLive,
+    HashMismatch,
+    MigrationsNotPaused,
+    Unauthorized,
+    ZeroAddress
+} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {IChainAssetHandlerBase} from "../core/chain-asset-handler/IChainAssetHandler.sol";

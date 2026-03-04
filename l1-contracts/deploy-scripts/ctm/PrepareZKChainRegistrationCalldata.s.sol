@@ -11,7 +11,7 @@ import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ADDRESS_ONE, Utils} from "../../utils/Utils.sol";

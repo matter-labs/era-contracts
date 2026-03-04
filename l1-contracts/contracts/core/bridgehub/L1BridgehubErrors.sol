@@ -18,6 +18,8 @@ error ChainBatchRootAlreadyExists(uint256 chainId, uint256 batchNumber);
 error ChainBatchRootZero();
 // 0x65e8a019
 error ChainExists();
+// 0xf8d5f418
+error ChainNotReadyForMigration(uint256 chainId);
 // 0x824e4e26
 error ChainsSettlementLayerMismatch(uint256 chainToRegisterSL, uint256 chainRegisteredOnSL);
 // 0x1ed6c04f

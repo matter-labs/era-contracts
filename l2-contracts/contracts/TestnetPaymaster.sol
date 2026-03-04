@@ -7,7 +7,13 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {ExecutionResult, IPaymaster, PAYMASTER_VALIDATION_SUCCESS_MAGIC} from "./interfaces/IPaymaster.sol";
 import {IPaymasterFlow} from "./interfaces/IPaymasterFlow.sol";
 import {BOOTLOADER_ADDRESS, Transaction} from "./L2ContractHelper.sol";
-import {FailedToTransferTokens, InsufficientAllowance, InvalidInput, Unauthorized, UnsupportedPaymasterFlow} from "./errors/L2ContractErrors.sol";
+import {
+    FailedToTransferTokens,
+    InsufficientAllowance,
+    InvalidInput,
+    Unauthorized,
+    UnsupportedPaymasterFlow
+} from "./errors/L2ContractErrors.sol";
 
 // This is a dummy paymaster. It expects the paymasterInput to contain its "signature" as well as the needed exchange rate.
 // It supports only approval-based paymaster flow.

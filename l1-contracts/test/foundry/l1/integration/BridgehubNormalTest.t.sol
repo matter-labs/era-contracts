@@ -5,21 +5,12 @@ import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
-import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
-import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-
-import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {SLNotWhitelisted} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1} from "contracts/common/L1ContractErrors.sol";
 

@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {BalanceChange, TokenBalanceMigrationData, TokenBridgingData} from "../../common/Messaging.sol";
+import {BalanceChange, MigrationConfirmationData, TokenBridgingData} from "../../common/Messaging.sol";
 
 /// @title IGWAssetTracker
 /// @dev IMPORTANT - Settlement Fee Payer Setup:
@@ -106,15 +106,15 @@ interface IGWAssetTracker {
     function processLogsAndMessages(ProcessLogsInput calldata _processLogsInputs) external;
 
     /// @notice Migrates the token balance from Gateway to L1.
-    /// @dev This function can be called multiple times on the Gateway as it saves the chainBalance on the first call.
-    /// @dev This function is permissionless.
+    /// @dev This function is intended to be permissionless so that a chain that has moved out
+    /// of Gateway has an easy way to migrate its balance out of the system.
     /// @param _chainId The chain ID whose token balance is being migrated.
     /// @param _assetId The asset ID of the token being migrated.
     function initiateGatewayToL1MigrationOnGateway(uint256 _chainId, bytes32 _assetId) external;
 
     /// @notice Confirms a migration operation has been completed and updates the asset migration number.
-    /// @param _tokenBalanceMigrationData The migration confirmation data containing chain ID, asset ID, and migration number.
-    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
+    /// @param _migrationConfirmationData The migration confirmation data containing chain ID, asset ID, and migration number.
+    function confirmMigrationOnGateway(MigrationConfirmationData calldata _migrationConfirmationData) external;
 
     /// @notice Sets a legacy shared bridge address for a specific chain.
     /// @param _chainId The chain ID for which to set the legacy bridge address.

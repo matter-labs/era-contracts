@@ -6,10 +6,22 @@ import "./_Executor_Shared.t.sol";
 
 import {Utils} from "../Utils/Utils.sol";
 import {UtilsFacet} from "../Utils/UtilsFacet.sol";
-import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
-import {BatchNumberMismatch, CanOnlyProcessOneBatch, InvalidSystemLogsLength, EmptyPrecommitData, InvalidBatchNumber, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, CantExecuteUnprovenBatches, VerifiedBatchesExceedsCommittedBatches, InvalidProof, InvalidProtocolVersion} from "contracts/common/L1ContractErrors.sol";
-import {InvalidBatchesDataLength} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {
+    BatchNumberMismatch,
+    CanOnlyProcessOneBatch,
+    InvalidSystemLogsLength,
+    EmptyPrecommitData,
+    InvalidBatchNumber,
+    RevertedBatchNotAfterNewLastBatch,
+    CantRevertExecutedBatch,
+    CantExecuteUnprovenBatches,
+    VerifiedBatchesExceedsCommittedBatches,
+    InvalidProof,
+    InvalidProtocolVersion
+} from "contracts/common/L1ContractErrors.sol";
+
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";

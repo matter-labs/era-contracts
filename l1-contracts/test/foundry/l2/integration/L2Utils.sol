@@ -6,7 +6,23 @@ import {Vm} from "forge-std/Vm.sol";
 
 import "forge-std/console.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_ASSET_TRACKER_ADDR, GW_ASSET_TRACKER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_FORCE_DEPLOYER_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_HANDLER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
+    GW_ASSET_TRACKER_ADDR,
+    L2_INTEROP_ROOT_STORAGE,
+    L2_MESSAGE_ROOT_ADDR,
+    L2_MESSAGE_VERIFICATION,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
+} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {DummyL2L1Messenger} from "contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 import {DummyInteropRecipient} from "contracts/dev-contracts/test/DummyInteropRecipient.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
@@ -26,7 +42,7 @@ import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol"
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 // import {InteropAccount} from "contracts/interop/InteropAccount.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
-import {IL2Bridgehub} from "contracts/core/bridgehub/IL2Bridgehub.sol";
+
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -38,7 +54,7 @@ import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_Share
 
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
-import {TokenMetadata, TokenBridgingData} from "contracts/common/Messaging.sol";
+import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 
 library L2Utils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -74,6 +90,8 @@ library L2Utils {
         forceDeployL2L1Messenger(_args);
 
         initializeBridgehub(_args);
+
+        finalizeInitialization();
     }
 
     function forceDeployL2L1Messenger(SystemContractsArgs memory _args) internal {
@@ -169,6 +187,9 @@ library L2Utils {
         new L2AssetTracker();
 
         forceDeployWithoutConstructor("L2AssetTracker", L2_ASSET_TRACKER_ADDR);
+        bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(_args.l1ChainId, ethAssetId, false);
     }
 
     function forceDeployGWAssetTracker(SystemContractsArgs memory _args) internal {
@@ -217,6 +238,11 @@ library L2Utils {
             TokenBridgingData({assetId: ethAssetId, originChainId: _args.l1ChainId, originToken: ETH_TOKEN_ADDRESS}),
             TokenMetadata({name: "Ether", symbol: "ETH", decimals: 18})
         );
+    }
+
+    function finalizeInitialization() internal {
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
     }
 
     function forceDeployWithoutConstructor(string memory _contractName, address _address) public {

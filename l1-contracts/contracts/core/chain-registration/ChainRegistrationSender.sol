@@ -15,7 +15,13 @@ import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 
 import {Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
-import {ChainAlreadyRegistered, ChainsSettlingOnL1, ChainsSettlementLayerMismatch, NoEthAllowed, ZKChainNotRegistered} from "../bridgehub/L1BridgehubErrors.sol";
+import {
+    ChainAlreadyRegistered,
+    ChainsSettlingOnL1,
+    ChainsSettlementLayerMismatch,
+    NoEthAllowed,
+    ZKChainNotRegistered
+} from "../bridgehub/L1BridgehubErrors.sol";
 import {IL2Bridgehub} from "../bridgehub/IL2Bridgehub.sol";
 
 /// @dev The encoding version of the data.
@@ -117,6 +123,9 @@ contract ChainRegistrationSender is
     /// @return the L2 transaction calldata
     function _getL2TxCalldata(uint256 chainToBeRegistered) internal view returns (bytes memory) {
         bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(chainToBeRegistered);
+        if (baseTokenAssetId == bytes32(0)) {
+            revert ZKChainNotRegistered();
+        }
         return abi.encodeCall(IL2Bridgehub.registerChainForInterop, (chainToBeRegistered, baseTokenAssetId));
     }
 

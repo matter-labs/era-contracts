@@ -6,11 +6,7 @@ import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
-import {BaseTokenGasPriceDenominatorNotSet, InvalidChainId} from "contracts/common/L1ContractErrors.sol";
-import {L2Message, L2Log} from "contracts/common/Messaging.sol";
-import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
-import {IMessageVerification} from "contracts/common/MessageVerification.sol";
-import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
+import {BaseTokenGasPriceDenominatorNotSet} from "contracts/common/L1ContractErrors.sol";
 
 contract MailboxBaseTests is MailboxTest {
     function setUp() public virtual {

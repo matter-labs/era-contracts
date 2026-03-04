@@ -23,7 +23,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {ChainRegistrationSender} from "contracts/core/chain-registration/ChainRegistrationSender.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
-import {BridgehubAddresses, BridgesDeployedAddresses, CoreDeployedAddresses} from "../utils/Types.sol";
+import {CoreDeployedAddresses} from "../utils/Types.sol";
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 
 // solhint-disable-next-line gas-struct-packing

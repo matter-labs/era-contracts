@@ -6,8 +6,18 @@ import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
-import {IGWAssetTracker} from "contracts/bridge/asset-tracker/IGWAssetTracker.sol";
-import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_ROUTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_COMPRESSOR_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+
+import {
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_MESSAGE_ROOT_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_ASSET_ROUTER_ADDR,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    L2_COMPRESSOR_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
@@ -16,7 +26,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {GWAssetTrackerTestHelper} from "./GWAssetTracker.t.sol";
 import {ProcessLogsTestHelper} from "./ProcessLogsTestHelper.sol";
-import {L2Log, InteropBundle} from "contracts/common/Messaging.sol";
+import {InteropBundle, L2Log} from "contracts/common/Messaging.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 

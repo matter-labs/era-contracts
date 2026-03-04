@@ -30,25 +30,10 @@
     "name": "confirmMigrationOnGateway",
     "inputs": [
       {
-        "name": "_tokenBalanceMigrationData",
+        "name": "_migrationConfirmationData",
         "type": "tuple",
-        "internalType": "struct TokenBalanceMigrationData",
+        "internalType": "struct MigrationConfirmationData",
         "components": [
-          {
-            "name": "version",
-            "type": "bytes1",
-            "internalType": "bytes1"
-          },
-          {
-            "name": "isL1ToGateway",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "originToken",
-            "type": "address",
-            "internalType": "address"
-          },
           {
             "name": "chainId",
             "type": "uint256",
@@ -65,12 +50,12 @@
             "internalType": "uint256"
           },
           {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "originToken",
+            "type": "address",
+            "internalType": "address"
           },
           {
-            "name": "chainMigrationNumber",
+            "name": "amount",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -78,6 +63,11 @@
             "name": "assetMigrationNumber",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "isL1ToGateway",
+            "type": "bool",
+            "internalType": "bool"
           }
         ]
       }
@@ -324,7 +314,7 @@
             "internalType": "bytes32"
           },
           {
-            "name": "messageRoot",
+            "name": "multichainBatchRoot",
             "type": "bytes32",
             "internalType": "bytes32"
           },

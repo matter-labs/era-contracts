@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Initializable} from "@openzeppelin/contracts-upgradeable-v4/proxy/utils/Initializable.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {ZKSyncOSBytecodeInfo} from "../common/libraries/ZKSyncOSBytecodeInfo.sol";
-import {EraBytecodeAlreadyPublished, EVMBytecodeAlreadyPublished} from "../common/L1ContractErrors.sol";
+import {EVMBytecodeAlreadyPublished, EraBytecodeAlreadyPublished} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

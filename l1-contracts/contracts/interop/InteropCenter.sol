@@ -11,15 +11,44 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
-import {GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_COMPLEX_UPGRADER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractInterfaces.sol";
+import {
+    GW_ASSET_TRACKER,
+    L2_ASSET_ROUTER_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT,
+    L2_BRIDGEHUB,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_NATIVE_TOKEN_VAULT,
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
+} from "../common/l2-helpers/L2ContractInterfaces.sol";
 
 import {SETTLEMENT_LAYER_RELAY_SENDER, SUPPORTED_INTEROP_ATTRIBUTES} from "../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {BUNDLE_IDENTIFIER, BalanceChange, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
+import {
+    BUNDLE_IDENTIFIER,
+    BalanceChange,
+    BundleAttributes,
+    CallAttributes,
+    INTEROP_BUNDLE_VERSION,
+    INTEROP_CALL_VERSION,
+    InteropBundle,
+    InteropCall,
+    InteropCallStarter,
+    InteropCallStarterInternal
+} from "../common/Messaging.sol";
 import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
-import {AttributeAlreadySet, AttributeViolatesRestriction, DestinationChainNotRegistered, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty, FeeWithdrawalFailed, ZKTokenNotAvailable} from "./InteropErrors.sol";
+import {
+    AttributeAlreadySet,
+    AttributeViolatesRestriction,
+    DestinationChainNotRegistered,
+    IndirectCallValueMismatch,
+    InteroperableAddressChainReferenceNotEmpty,
+    InteroperableAddressNotEmpty,
+    FeeWithdrawalFailed,
+    ZKTokenNotAvailable
+} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -345,7 +374,7 @@ contract InteropCenter is
             // Burn user value for interop calls.
             if (_totalBurnedCallsValue > 0) {
                 // slither-disable-next-line arbitrary-send-eth
-                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}();
+                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}(_destinationChainId);
             }
         } else {
             uint256 expectedValue = _totalIndirectCallsValue + protocolFee;
@@ -649,13 +678,14 @@ contract InteropCenter is
     /// @notice Returns the attribute selectors supported by the InteropCenter.
     /// @return The attribute selectors supported by the InteropCenter.
     function _getERC7786AttributeSelectors() internal pure returns (bytes4[SUPPORTED_INTEROP_ATTRIBUTES] memory) {
-        return [
-            IERC7786Attributes.interopCallValue.selector,
-            IERC7786Attributes.indirectCall.selector,
-            IERC7786Attributes.executionAddress.selector,
-            IERC7786Attributes.unbundlerAddress.selector,
-            IERC7786Attributes.useFixedFee.selector
-        ];
+        return
+            [
+                IERC7786Attributes.interopCallValue.selector,
+                IERC7786Attributes.indirectCall.selector,
+                IERC7786Attributes.executionAddress.selector,
+                IERC7786Attributes.unbundlerAddress.selector,
+                IERC7786Attributes.useFixedFee.selector
+            ];
     }
 
     /*//////////////////////////////////////////////////////////////
