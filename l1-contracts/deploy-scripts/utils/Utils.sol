@@ -213,8 +213,7 @@ library Utils {
     }
 
     /// @notice Read function selectors for a facet directly from its build artifact's `methodIdentifiers` map.
-    /// `methodIdentifiers` maps each function signature to its 4-byte selector hex string, so no bytecode
-    /// parsing or `cast selectors` call is needed.
+    /// `methodIdentifiers` maps each function signature to its 4-byte selector hex string.
     /// @param artifactPath Path relative to the project root, e.g. "/out/Admin.sol/AdminFacet.json"
     function getSelectorsFromArtifact(string memory artifactPath) internal view returns (bytes4[] memory) {
         string memory root = vm.projectRoot();
@@ -222,6 +221,9 @@ library Utils {
         string memory json = vm.readFile(path);
         string[] memory sigs = vm.parseJsonKeys(json, ".methodIdentifiers");
 
+        // Every facet exposes getName(), so all six facets share the same selector.
+        // Registering it in the diamond would cause a duplicate-selector revert on the second facet cut.
+        // getName() is only meaningful when called directly on the facet, not through the proxy.
         uint256 count = sigs.length;
         for (uint256 i = 0; i < sigs.length; ++i) {
             if (keccak256(bytes(sigs[i])) == keccak256(bytes("getName()"))) {
@@ -232,9 +234,6 @@ library Utils {
         bytes4[] memory selectors = new bytes4[](count);
         uint256 idx = 0;
         for (uint256 i = 0; i < sigs.length; ++i) {
-            // Every facet exposes getName(), so all six facets share the same selector.
-            // Registering it in the diamond would cause a duplicate-selector revert on the second facet cut.
-            // getName() is only meaningful when called directly on the facet, not through the proxy.
             if (keccak256(bytes(sigs[i])) == keccak256(bytes("getName()"))) {
                 continue;
             }
