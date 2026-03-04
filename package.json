@@ -37,7 +37,7 @@
     "lint:md": "markdownlint \"**/*.md\"",
     "lint:sol": "solhint --noPoster --disc --max-warnings 0 \"**/*.sol\"",
     "lint:ts": "eslint .",
-    "prettier:check": "prettier --check \"**/*.{js,json,md,sol,ts,yaml}\"",
+    "prettier:check": "prettier --check --cache \"**/*.{js,json,md,sol,ts,yaml}\"",
     "prettier:fix": "prettier --write \"**/*.{js,json,md,sol,ts,yaml}\"",
     "l1": "yarn workspace l1-contracts",
     "l2": "yarn workspace l2-contracts",
