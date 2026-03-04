@@ -67,7 +67,7 @@ async function deployFacetCuts(
   return deployedFacets;
 }
 
-async function getFacetCuts(
+async function getUpgradeAddedFacetCuts(
   l1Rpc: string,
   zkSyncAddress: string,
   gettersAddress: string,
@@ -108,7 +108,7 @@ command
   .description("get facet cuts for upgrade")
   .action(async (cmd) => {
     const l1Rpc = cmd.l1Rpc ?? web3Url();
-    await getFacetCuts(
+    await getUpgradeAddedFacetCuts(
       l1Rpc,
       cmd.zkSyncAddress,
       cmd.gettersAddress,

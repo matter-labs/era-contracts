@@ -6,15 +6,15 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {Utils, ADDRESS_ONE} from "./Utils.sol";
+import {ADDRESS_ONE, Utils} from "./Utils.sol";
 
 /**
  * @title Prepare ZKChain Registration Calldata
@@ -109,7 +109,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
 
         IGovernance.Call[] memory calls;
         uint256 cnt = 0;
-        if (!IBridgehub(ecosystem.bridgehub).tokenIsRegistered(config.baseToken)) {
+        if (!IL1Bridgehub(ecosystem.bridgehub).tokenIsRegistered(config.baseToken)) {
             calls = new IGovernance.Call[](2);
             console.log("Adding a call to register base token on the bridgehub");
             IGovernance.Call memory baseTokenRegistrationCall = prepareRegisterBaseTokenCall();
@@ -143,8 +143,8 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
         config.erc20BridgeProxy = toml.readAddress("$.deployed_addresses.erc20_bridge_proxy_addr");
 
         ecosystem.bridgehub = IChainTypeManager(config.stateTransitionProxy).BRIDGE_HUB();
-        ecosystem.l1SharedBridgeProxy = address(Bridgehub(ecosystem.bridgehub).sharedBridge());
-        ecosystem.governance = Bridgehub(ecosystem.bridgehub).owner();
+        ecosystem.l1SharedBridgeProxy = address(L1Bridgehub(ecosystem.bridgehub).sharedBridge());
+        ecosystem.governance = L1Bridgehub(ecosystem.bridgehub).owner();
 
         config.chainId = toml.readUint("$.chain.chain_id");
         config.eraChainId = toml.readUint("$.chain.era_chain_id");
@@ -181,7 +181,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
     }
 
     function prepareRegisterBaseTokenCall() internal view returns (Call memory) {
-        Bridgehub bridgehub = Bridgehub(ecosystem.bridgehub);
+        L1Bridgehub bridgehub = L1Bridgehub(ecosystem.bridgehub);
 
         bytes memory data = abi.encodeCall(
             bridgehub.addTokenAssetId,
@@ -273,7 +273,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
     }
 
     function prepareRegisterZKChainCall() internal view returns (IGovernance.Call memory) {
-        Bridgehub bridgehub = Bridgehub(ecosystem.bridgehub);
+        L1Bridgehub bridgehub = L1Bridgehub(ecosystem.bridgehub);
 
         bytes memory data = abi.encodeCall(
             bridgehub.createNewChain,

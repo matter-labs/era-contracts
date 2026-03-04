@@ -3,9 +3,9 @@
 pragma solidity 0.8.28;
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
-// import {IChainTypeManager} from "../IChainTypeManager.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
+import {L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
@@ -90,7 +90,7 @@ struct ZKChainStorage {
     /// @dev Stored root hashes of L2 -> L1 logs
     mapping(uint256 batchNumber => bytes32 l2LogsRootHash) l2LogsRootHashes;
     /// @dev Container that stores transactions requested from L1
-    PriorityQueue.Queue priorityQueue;
+    PriorityQueue.Queue __DEPRECATED_priorityQueue;
     /// @dev The smart contract that manages the list with permission to call contract functions
     address __DEPRECATED_allowList;
     VerifierParams __DEPRECATED_verifierParams;
@@ -138,8 +138,7 @@ struct ZKChainStorage {
     /// charged at that level.
     FeeParams feeParams;
     /// @dev Address of the blob versioned hash getter smart contract used for EIP-4844 versioned hashes.
-    /// @dev Used only for testing.
-    address blobVersionedHashRetriever;
+    address __DEPRECATED_blobVersionedHashRetriever;
     /// @dev The chainId of the chain
     uint256 chainId;
     /// @dev The address of the bridgehub
@@ -161,7 +160,7 @@ struct ZKChainStorage {
     address l1DAValidator;
     /// @dev The address of the contract on L2 that is responsible for the data availability verification.
     /// This contract sends `l2DAValidatorOutputHash` to L1 via L2->L1 system log and it will routed to the `l1DAValidator` contract.
-    address l2DAValidator;
+    address __DEPRECATED_l2DAValidator;
     /// @dev the Asset Id of the baseToken
     bytes32 baseTokenAssetId;
     /// @dev If this ZKchain settles on this chain, then this is zero. Otherwise it is the address of the ZKchain that is a
@@ -175,4 +174,13 @@ struct ZKChainStorage {
     /// @notice Bytecode hash of evm emulator.
     /// @dev Used as an input to zkp-circuit.
     bytes32 l2EvmEmulatorBytecodeHash;
+    /// @notice The precommitment for the latest uncommitted batch (i.e. totalBatchesCommitted + 1).
+    /// @dev Whenever the `totalBatchesCommitted` changes, this variable is reset to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`
+    /// (the value of the constant can be found in Config.sol).
+    /// @dev Note, that precommitments are only supported for Era VM.
+    bytes32 precommitmentForTheLatestBatch;
+    /// @dev ZKsync OS flag, if `true` state transition is done with ZKsync OS, otherwise Era VM
+    bool zksyncOS;
+    /// @dev The scheme of L2 DA commitment. Different L1 validators may use different schemes.
+    L2DACommitmentScheme l2DACommitmentScheme;
 }

@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.28;
 
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {FeeParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams, IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 contract UtilsFacet is ZKChainBase {
     function util_setChainId(uint256 _chainId) external {
@@ -184,6 +184,10 @@ contract UtilsFacet is ZKChainBase {
 
     function util_getBaseTokenGasPriceMultiplierNominator() external view returns (uint128) {
         return s.baseTokenGasPriceMultiplierNominator;
+    }
+
+    function util_getL2DACommimentScheme() external view returns (L2DACommitmentScheme) {
+        return s.l2DACommitmentScheme;
     }
 
     // add this to be excluded from coverage report

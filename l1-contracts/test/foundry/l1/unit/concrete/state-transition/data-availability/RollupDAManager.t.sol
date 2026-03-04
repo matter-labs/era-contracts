@@ -6,8 +6,9 @@ import {Test} from "forge-std/Test.sol";
 
 // Import the RollupDAManager contract
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
-import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {ZeroAddress, InvalidL2DACommitmentScheme} from "contracts/common/L1ContractErrors.sol";
 
 contract RollupDAManagerTest is Test {
     // Instance of the contract under test
@@ -18,13 +19,11 @@ contract RollupDAManagerTest is Test {
     address newOwner = address(0x2);
     address nonOwner = address(0x3);
     address l1DAValidator1 = address(0x4);
-    address l2DAValidator1 = address(0x5);
     address l1DAValidator2 = address(0x6);
-    address l2DAValidator2 = address(0x7);
     address zeroAddress = address(0);
 
     // Events from the RollupDAManager contract
-    event DAPairUpdated(address indexed l1DAValidator, address indexed l2DAValidator, bool status);
+    event DAPairUpdated(address indexed l1DAValidator, L2DACommitmentScheme indexed l2DACommitmentScheme, bool status);
 
     // setUp is run before each test
     function setUp() public {
@@ -36,7 +35,7 @@ contract RollupDAManagerTest is Test {
 
     /* ========== Deployment Tests ========== */
 
-    function testOwnerIsSetCorrectly() public {
+    function testOwnerIsSetCorrectly() public view {
         assertEq(rollupDAManager.owner(), owner, "Owner should be set correctly");
     }
 
@@ -46,31 +45,31 @@ contract RollupDAManagerTest is Test {
         // Attempt to update DA pair as owner
         vm.startPrank(owner);
         vm.expectEmit(true, true, false, true);
-        emit DAPairUpdated(l1DAValidator1, l2DAValidator1, true);
-        rollupDAManager.updateDAPair(l1DAValidator1, l2DAValidator1, true);
+        emit DAPairUpdated(l1DAValidator1, L2DACommitmentScheme.EMPTY_NO_DA, true);
+        rollupDAManager.updateDAPair(l1DAValidator1, L2DACommitmentScheme.EMPTY_NO_DA, true);
         vm.stopPrank();
 
         // Attempt to update DA pair as non-owner
         vm.startPrank(nonOwner);
         vm.expectRevert("Ownable: caller is not the owner");
-        rollupDAManager.updateDAPair(l1DAValidator2, l2DAValidator2, true);
+        rollupDAManager.updateDAPair(l1DAValidator2, L2DACommitmentScheme.EMPTY_NO_DA, true);
         vm.stopPrank();
     }
 
-    function testUpdateDAPairRevertsOnZeroAddresses() public {
+    function testUpdateDAPairRevertsOnInvalidInput() public {
         vm.startPrank(owner);
-
-        // Both addresses zero
-        vm.expectRevert(ZeroAddress.selector);
-        rollupDAManager.updateDAPair(zeroAddress, zeroAddress, true);
 
         // L1DAValidator zero
         vm.expectRevert(ZeroAddress.selector);
-        rollupDAManager.updateDAPair(zeroAddress, l2DAValidator1, true);
+        rollupDAManager.updateDAPair(zeroAddress, L2DACommitmentScheme.EMPTY_NO_DA, true);
 
-        // L2DAValidator zero
+        // L2DACommitmentScheme NONE
+        vm.expectRevert(abi.encodeWithSelector(InvalidL2DACommitmentScheme.selector, uint8(L2DACommitmentScheme.NONE)));
+        rollupDAManager.updateDAPair(l1DAValidator1, L2DACommitmentScheme.NONE, true);
+
+        // Both inputs are invalid
         vm.expectRevert(ZeroAddress.selector);
-        rollupDAManager.updateDAPair(l1DAValidator1, zeroAddress, true);
+        rollupDAManager.updateDAPair(zeroAddress, L2DACommitmentScheme.NONE, true);
 
         vm.stopPrank();
     }
@@ -81,21 +80,21 @@ contract RollupDAManagerTest is Test {
         vm.startPrank(owner);
 
         // Initially, the pair should not be allowed
-        bool allowed = rollupDAManager.isPairAllowed(l1DAValidator1, l2DAValidator1);
+        bool allowed = rollupDAManager.isPairAllowed(l1DAValidator1, L2DACommitmentScheme.EMPTY_NO_DA);
         assertFalse(allowed, "DA pair should initially be disallowed");
 
         // Update the DA pair to allowed
         vm.expectEmit(true, true, false, true);
-        emit DAPairUpdated(l1DAValidator1, l2DAValidator1, true);
-        rollupDAManager.updateDAPair(l1DAValidator1, l2DAValidator1, true);
-        allowed = rollupDAManager.isPairAllowed(l1DAValidator1, l2DAValidator1);
+        emit DAPairUpdated(l1DAValidator1, L2DACommitmentScheme.EMPTY_NO_DA, true);
+        rollupDAManager.updateDAPair(l1DAValidator1, L2DACommitmentScheme.EMPTY_NO_DA, true);
+        allowed = rollupDAManager.isPairAllowed(l1DAValidator1, L2DACommitmentScheme.EMPTY_NO_DA);
         assertTrue(allowed, "DA pair should be allowed after update");
 
         // Update the DA pair to disallowed
         vm.expectEmit(true, true, false, true);
-        emit DAPairUpdated(l1DAValidator1, l2DAValidator1, false);
-        rollupDAManager.updateDAPair(l1DAValidator1, l2DAValidator1, false);
-        allowed = rollupDAManager.isPairAllowed(l1DAValidator1, l2DAValidator1);
+        emit DAPairUpdated(l1DAValidator1, L2DACommitmentScheme.EMPTY_NO_DA, false);
+        rollupDAManager.updateDAPair(l1DAValidator1, L2DACommitmentScheme.EMPTY_NO_DA, false);
+        allowed = rollupDAManager.isPairAllowed(l1DAValidator1, L2DACommitmentScheme.EMPTY_NO_DA);
         assertFalse(allowed, "DA pair should be disallowed after update");
 
         vm.stopPrank();
@@ -105,12 +104,12 @@ contract RollupDAManagerTest is Test {
         vm.startPrank(owner);
 
         // Update multiple DA pairs
-        rollupDAManager.updateDAPair(l1DAValidator1, l2DAValidator1, true);
-        rollupDAManager.updateDAPair(l1DAValidator2, l2DAValidator2, true);
+        rollupDAManager.updateDAPair(l1DAValidator1, L2DACommitmentScheme.EMPTY_NO_DA, true);
+        rollupDAManager.updateDAPair(l1DAValidator2, L2DACommitmentScheme.PUBDATA_KECCAK256, true);
 
         // Check both pairs
-        bool allowed1 = rollupDAManager.isPairAllowed(l1DAValidator1, l2DAValidator1);
-        bool allowed2 = rollupDAManager.isPairAllowed(l1DAValidator2, l2DAValidator2);
+        bool allowed1 = rollupDAManager.isPairAllowed(l1DAValidator1, L2DACommitmentScheme.EMPTY_NO_DA);
+        bool allowed2 = rollupDAManager.isPairAllowed(l1DAValidator2, L2DACommitmentScheme.PUBDATA_KECCAK256);
 
         assertTrue(allowed1, "First DA pair should be allowed");
         assertTrue(allowed2, "Second DA pair should be allowed");

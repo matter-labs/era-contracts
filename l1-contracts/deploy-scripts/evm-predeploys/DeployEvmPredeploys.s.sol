@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-import {stdToml} from "forge-std/StdToml.sol";
+import {stdJson} from "forge-std/StdJson.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {SYSTEM_CONTRACTS_OFFSET} from "contracts/common/L2ContractAddresses.sol";
+import {SYSTEM_CONTRACTS_OFFSET} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 address constant EVM_PREDEPLOYS_MANAGER = address(SYSTEM_CONTRACTS_OFFSET + 0x14);
 
@@ -13,11 +13,11 @@ interface IEvmPredeploysManager {
     function deployPredeployedContract(address contractAddress, bytes calldata constructorInput) external;
 }
 
-string constant DATA_PATH = "/deploy-scripts/evm-predeploys/evm-predeploy-datas/";
+string constant DATA_PATH = "/../system-contracts/scripts/evm-predeploys-data/";
 
 /// @notice Scripts that is used to deploy predefined EVM contracts on ZK Chains with EVM emulation support
 contract DeployEvmPredeploys is Script {
-    using stdToml for string;
+    using stdJson for string;
 
     function run() external {
         string memory root = vm.projectRoot();
@@ -32,10 +32,10 @@ contract DeployEvmPredeploys is Script {
 
     function deploy(string memory configPath) internal {
         console.log(configPath);
-        string memory toml = vm.readFile(configPath);
+        string memory json = vm.readFile(configPath);
 
-        address contractAddress = toml.readAddress("$.address");
-        bytes memory constructorInput = toml.readBytes("$.constructor_input");
+        address contractAddress = json.readAddress("$.address");
+        bytes memory constructorInput = json.readBytes("$.input");
 
         vm.broadcast();
         IEvmPredeploysManager(EVM_PREDEPLOYS_MANAGER).deployPredeployedContract(contractAddress, constructorInput);

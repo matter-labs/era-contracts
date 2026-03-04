@@ -20,7 +20,6 @@ import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 /// @param l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
 /// @param priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
 /// @param feeParams Fee parameters to be used for L1->L2 transactions
-/// @param blobVersionedHashRetriever Address of contract used to pull the blob versioned hash for a transaction.
 // solhint-disable-next-line gas-struct-packing
 struct InitializeData {
     uint256 chainId;
@@ -38,7 +37,6 @@ struct InitializeData {
     bytes32 l2EvmEmulatorBytecodeHash;
     uint256 priorityTxMaxGasLimit;
     FeeParams feeParams;
-    address blobVersionedHashRetriever;
 }
 
 /// @param verifier address of Verifier contract
@@ -48,7 +46,6 @@ struct InitializeData {
 /// @param l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
 /// @param priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
 /// @param feeParams Fee parameters to be used for L1->L2 transactions
-/// @param blobVersionedHashRetriever Address of contract used to pull the blob versioned hash for a transaction.
 struct InitializeDataNewChain {
     IVerifier verifier;
     VerifierParams verifierParams;
@@ -57,7 +54,6 @@ struct InitializeDataNewChain {
     bytes32 l2EvmEmulatorBytecodeHash;
     uint256 priorityTxMaxGasLimit;
     FeeParams feeParams;
-    address blobVersionedHashRetriever;
 }
 
 interface IDiamondInit {

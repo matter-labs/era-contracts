@@ -3,8 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {Utils, L2_TO_L1_MESSENGER, L2_SYSTEM_CONTEXT_ADDRESS, L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER, L2_DA_VALIDATOR_ADDRESS} from "./Utils.sol";
-import {SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, L2_TO_L1_MESSENGER, SystemLogKey, Utils, L2_DA_COMMITMENT_SCHEME} from "./Utils.sol";
 
 // solhint-enable max-line-length
 
@@ -45,7 +44,7 @@ contract UtilsTest is Test {
     function test_CreateSystemLogs() public {
         bytes[] memory logs = Utils.createSystemLogs(bytes32(0));
 
-        assertEq(logs.length, 7, "logs length should be correct");
+        assertEq(logs.length, 9, "logs length should be correct");
 
         assertEq(
             logs[0],
@@ -119,9 +118,31 @@ contract UtilsTest is Test {
                 true,
                 L2_TO_L1_MESSENGER,
                 uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
-                bytes32(uint256(uint160(L2_DA_VALIDATOR_ADDRESS)))
+                bytes32(uint256(L2_DA_COMMITMENT_SCHEME))
             ),
             "log[6] should be correct"
+        );
+
+        assertEq(
+            logs[7],
+            Utils.constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                uint256(SystemLogKey.MESSAGE_ROOT_ROLLING_HASH_KEY),
+                bytes32(uint256(uint160(0)))
+            ),
+            "log[7] should be correct"
+        );
+
+        assertEq(
+            logs[8],
+            Utils.constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                uint256(SystemLogKey.L2_TXS_STATUS_ROLLING_HASH_KEY),
+                bytes32("")
+            ),
+            "log[8] should be correct"
         );
     }
 

@@ -3,10 +3,16 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils} from "../Utils/Utils.sol";
-import {ValidatorTimelock, IExecutor} from "contracts/state-transition/ValidatorTimelock.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Unauthorized, TimeNotReached} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, TimeNotReached, RoleAccessDenied} from "contracts/common/L1ContractErrors.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 
 contract ValidatorTimelockTest is Test {
     /// @notice A new validator has been added.
@@ -21,8 +27,12 @@ contract ValidatorTimelockTest is Test {
     /// @notice Error for when an address is not a validator.
     error ValidatorDoesNotExist(uint256 _chainId);
 
+    /// @notice The default admin role identifier.
+    bytes32 constant DEFAULT_ADMIN_ROLE = bytes32(0);
+
     ValidatorTimelock validator;
     DummyChainTypeManagerForValidatorTimelock chainTypeManager;
+    DummyBridgehub dummyBridgehub;
 
     address owner;
     address zkSync;
@@ -33,6 +43,17 @@ contract ValidatorTimelockTest is Test {
     uint256 eraChainId;
     uint256 lastBatchNumber;
     uint32 executionDelay;
+
+    bytes32 precommitterRole;
+    bytes32 committerRole;
+    bytes32 reverterRole;
+    bytes32 proverRole;
+    bytes32 executorRole;
+    bytes32 precommitterAdminRole;
+    bytes32 committerAdminRole;
+    bytes32 reverterAdminRole;
+    bytes32 proverAdminRole;
+    bytes32 executorAdminRole;
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -45,47 +66,97 @@ contract ValidatorTimelockTest is Test {
         lastBatchNumber = 123;
         executionDelay = 10;
 
+        dummyBridgehub = new DummyBridgehub();
+
         chainTypeManager = new DummyChainTypeManagerForValidatorTimelock(owner, zkSync);
-        validator = new ValidatorTimelock(owner, executionDelay);
+
+        vm.mockCall(zkSync, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(owner));
+        vm.mockCall(zkSync, abi.encodeCall(IGetters.getChainId, ()), abi.encode(chainId));
+        dummyBridgehub.setZKChain(chainId, zkSync);
+
+        validator = ValidatorTimelock(_deployValidatorTimelock(owner, executionDelay));
         vm.prank(owner);
-        validator.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
+        validator.addValidatorForChainId(chainId, alice);
         vm.prank(owner);
-        validator.addValidator(chainId, alice);
-        vm.prank(owner);
-        validator.addValidator(eraChainId, dan);
+        validator.addValidatorForChainId(eraChainId, dan);
+
+        precommitterRole = validator.PRECOMMITTER_ROLE();
+        committerRole = validator.COMMITTER_ROLE();
+        reverterRole = validator.REVERTER_ROLE();
+        proverRole = validator.PROVER_ROLE();
+        executorRole = validator.EXECUTOR_ROLE();
+        precommitterAdminRole = validator.OPTIONAL_PRECOMMITTER_ADMIN_ROLE();
+        committerAdminRole = validator.OPTIONAL_COMMITTER_ADMIN_ROLE();
+        reverterAdminRole = validator.OPTIONAL_REVERTER_ADMIN_ROLE();
+        proverAdminRole = validator.OPTIONAL_PROVER_ADMIN_ROLE();
+        executorAdminRole = validator.OPTIONAL_EXECUTOR_ADMIN_ROLE();
+    }
+
+    function _deployValidatorTimelock(address _initialOwner, uint32 _initialExecutionDelay) internal returns (address) {
+        ProxyAdmin admin = new ProxyAdmin();
+        ValidatorTimelock timelockImplementation = new ValidatorTimelock(address(dummyBridgehub));
+        return
+            address(
+                new TransparentUpgradeableProxy(
+                    address(timelockImplementation),
+                    address(admin),
+                    abi.encodeCall(ValidatorTimelock.initialize, (_initialOwner, _initialExecutionDelay))
+                )
+            );
     }
 
     function test_SuccessfulConstruction() public {
-        ValidatorTimelock validator = new ValidatorTimelock(owner, executionDelay);
-
+        ValidatorTimelock validator = ValidatorTimelock(_deployValidatorTimelock(owner, executionDelay));
         assertEq(validator.owner(), owner);
         assertEq(validator.executionDelay(), executionDelay);
     }
 
-    function test_addValidator() public {
-        assert(validator.validators(chainId, bob) == false);
-
-        vm.prank(owner);
-        // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, true, address(validator));
-        emit ValidatorAdded(chainId, bob);
-        validator.addValidator(chainId, bob);
-
-        assert(validator.validators(chainId, bob) == true);
+    function _assertAllRoles(uint256 _chainId, address _addr, bool _expected) internal {
+        require(validator.hasRoleForChainId(_chainId, validator.PRECOMMITTER_ROLE(), _addr) == _expected);
+        require(validator.hasRoleForChainId(_chainId, validator.COMMITTER_ROLE(), _addr) == _expected);
+        require(validator.hasRoleForChainId(_chainId, validator.REVERTER_ROLE(), _addr) == _expected);
+        require(validator.hasRoleForChainId(_chainId, validator.PROVER_ROLE(), _addr) == _expected);
+        require(validator.hasRoleForChainId(_chainId, validator.EXECUTOR_ROLE(), _addr) == _expected);
     }
 
-    function test_removeValidator() public {
-        vm.prank(owner);
-        validator.addValidator(chainId, bob);
-        assert(validator.validators(chainId, bob) == true);
+    function test_addValidatorForChainId() public {
+        _assertAllRoles(chainId, bob, false);
 
         vm.prank(owner);
-        // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(validator));
-        emit ValidatorRemoved(chainId, bob);
-        validator.removeValidator(chainId, bob);
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, precommitterRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, committerRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, reverterRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, proverRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, executorRole, bob);
+        validator.addValidatorForChainId(chainId, bob);
 
-        assert(validator.validators(chainId, bob) == false);
+        _assertAllRoles(chainId, bob, true);
+    }
+
+    function test_removeValidatorForChainId() public {
+        vm.prank(owner);
+        validator.addValidatorForChainId(chainId, bob);
+        _assertAllRoles(chainId, bob, true);
+
+        vm.prank(owner);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, precommitterRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, committerRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, reverterRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, proverRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, executorRole, bob);
+        validator.removeValidatorForChainId(chainId, bob);
+
+        _assertAllRoles(chainId, bob, false);
     }
 
     function test_validatorCanMakeCall() public {
@@ -103,20 +174,7 @@ contract ValidatorTimelockTest is Test {
             storedBatch,
             batchesToCommit
         );
-        validator.commitBatchesSharedBridge(chainId, commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_setChainTypeManager() public {
-        assert(validator.chainTypeManager() == IChainTypeManager(address(chainTypeManager)));
-
-        DummyChainTypeManagerForValidatorTimelock newManager = new DummyChainTypeManagerForValidatorTimelock(
-            bob,
-            zkSync
-        );
-        vm.prank(owner);
-        validator.setChainTypeManager(IChainTypeManager(address(newManager)));
-
-        assert(validator.chainTypeManager() == IChainTypeManager(address(newManager)));
+        validator.commitBatchesSharedBridge(zkSync, commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_setExecutionDelay() public {
@@ -129,7 +187,7 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_getCommittedBatchTimestampEmpty() public view {
-        assert(validator.getCommittedBatchTimestamp(chainId, lastBatchNumber) == 0);
+        assert(validator.getCommittedBatchTimestamp(zkSync, lastBatchNumber) == 0);
     }
 
     function test_getCommittedBatchTimestamp() public {
@@ -155,9 +213,9 @@ contract ValidatorTimelockTest is Test {
             storedBatch,
             batchesToCommit
         );
-        validator.commitBatchesSharedBridge(chainId, commitBatchFrom, commitBatchTo, commitData);
+        validator.commitBatchesSharedBridge(zkSync, commitBatchFrom, commitBatchTo, commitData);
 
-        assert(validator.getCommittedBatchTimestamp(chainId, batchNumber) == timestamp);
+        assert(validator.getCommittedBatchTimestamp(zkSync, batchNumber) == timestamp);
     }
 
     function test_commitBatches() public {
@@ -174,14 +232,14 @@ contract ValidatorTimelockTest is Test {
             storedBatch,
             batchesToCommit
         );
-        validator.commitBatchesSharedBridge(chainId, commitBatchFrom, commitBatchTo, commitData);
+        validator.commitBatchesSharedBridge(zkSync, commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_revertBatchesSharedBridge() public {
         vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.revertBatchesSharedBridge.selector), abi.encode(chainId));
 
         vm.prank(alice);
-        validator.revertBatchesSharedBridge(chainId, lastBatchNumber);
+        validator.revertBatchesSharedBridge(zkSync, lastBatchNumber);
     }
 
     function test_proveBatchesSharedBridge() public {
@@ -195,7 +253,7 @@ contract ValidatorTimelockTest is Test {
         vm.mockCall(
             zkSync,
             abi.encodeWithSelector(IExecutor.proveBatchesSharedBridge.selector),
-            abi.encode(chainId, prevBatch, batchesToProve, proof)
+            abi.encode(zkSync, prevBatch, batchesToProve, proof)
         );
         vm.prank(alice);
         (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
@@ -203,14 +261,14 @@ contract ValidatorTimelockTest is Test {
             batchesToProve,
             proof
         );
-        validator.proveBatchesSharedBridge(chainId, proveBatchFrom, proveBatchTo, proveData);
+        validator.proveBatchesSharedBridge(zkSync, proveBatchFrom, proveBatchTo, proveData);
     }
 
     function test_executeBatchesSharedBridge() public {
         uint64 timestamp = 123456;
         uint64 batchNumber = 123;
         // Commit batches first to have the valid timestamp
-        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(chainId));
+        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.commitBatchesSharedBridge.selector), abi.encode(zkSync));
 
         IExecutor.StoredBatchInfo memory storedBatch1 = Utils.createStoredBatchInfo();
         IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
@@ -225,7 +283,7 @@ contract ValidatorTimelockTest is Test {
             storedBatch1,
             batchesToCommit
         );
-        validator.commitBatchesSharedBridge(chainId, commitBatchFrom, commitBatchTo, commitData);
+        validator.commitBatchesSharedBridge(zkSync, commitBatchFrom, commitBatchTo, commitData);
 
         // Execute batches
         IExecutor.StoredBatchInfo memory storedBatch2 = Utils.createStoredBatchInfo();
@@ -245,7 +303,7 @@ contract ValidatorTimelockTest is Test {
             storedBatches,
             Utils.emptyData()
         );
-        validator.executeBatchesSharedBridge(chainId, executeBatchFrom, executeBatchTo, executeData);
+        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData);
     }
 
     function test_RevertWhen_setExecutionDelayNotOwner() public {
@@ -255,37 +313,21 @@ contract ValidatorTimelockTest is Test {
     }
 
     function test_RevertWhen_addValidatorNotAdmin() public {
-        assert(validator.validators(chainId, bob) == false);
+        _assertAllRoles(chainId, bob, false);
 
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        validator.addValidator(chainId, bob);
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, DEFAULT_ADMIN_ROLE, address(this)));
+        validator.addValidatorForChainId(chainId, bob);
 
-        assert(validator.validators(chainId, bob) == false);
+        _assertAllRoles(chainId, bob, false);
     }
 
     function test_RevertWhen_removeValidatorNotAdmin() public {
-        assert(validator.validators(chainId, alice) == true);
+        _assertAllRoles(chainId, alice, true);
 
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        validator.removeValidator(chainId, alice);
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, DEFAULT_ADMIN_ROLE, address(this)));
+        validator.removeValidatorForChainId(chainId, alice);
 
-        assert(validator.validators(chainId, alice) == true);
-    }
-
-    function test_RevertWhen_addValidatorAddressAlreadyValidator() public {
-        assert(validator.validators(chainId, alice) == true);
-
-        vm.prank(owner);
-        vm.expectRevert(abi.encodePacked(AddressAlreadyValidator.selector, chainId));
-        validator.addValidator(chainId, alice);
-    }
-
-    function test_RevertWhen_removeValidatorAddressNotValidator() public {
-        assert(validator.validators(chainId, bob) == false);
-
-        vm.prank(owner);
-        vm.expectRevert(abi.encodePacked(ValidatorDoesNotExist.selector, chainId));
-        validator.removeValidator(chainId, bob);
+        _assertAllRoles(chainId, alice, true);
     }
 
     function test_RevertWhen_validatorCanMakeCallNotValidator() public {
@@ -296,27 +338,22 @@ contract ValidatorTimelockTest is Test {
         batchesToCommit[0] = batchToCommit;
 
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bob));
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, committerRole, bob));
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
             storedBatch,
             batchesToCommit
         );
-        validator.commitBatchesSharedBridge(chainId, commitBatchFrom, commitBatchTo, commitData);
-    }
-
-    function test_RevertWhen_setChainTypeManagerNotOwner() public {
-        vm.expectRevert("Ownable: caller is not the owner");
-        validator.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
+        validator.commitBatchesSharedBridge(zkSync, commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_revertBatchesNotValidator() public {
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        validator.revertBatchesSharedBridge(uint256(0), lastBatchNumber);
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, address(0), reverterRole, address(this)));
+        validator.revertBatchesSharedBridge(address(0), lastBatchNumber);
     }
 
     function test_RevertWhen_revertBatchesSharedBridgeNotValidator() public {
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        validator.revertBatchesSharedBridge(chainId, lastBatchNumber);
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, reverterRole, address(this)));
+        validator.revertBatchesSharedBridge(zkSync, lastBatchNumber);
     }
 
     function test_RevertWhen_proveBatchesSharedBridgeNotValidator() public {
@@ -328,13 +365,13 @@ contract ValidatorTimelockTest is Test {
         batchesToProve[0] = batchToProve;
 
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bob));
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, proverRole, bob));
         (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
             prevBatch,
             batchesToProve,
             proof
         );
-        validator.proveBatchesSharedBridge(chainId, proveBatchFrom, proveBatchTo, proveData);
+        validator.proveBatchesSharedBridge(zkSync, proveBatchFrom, proveBatchTo, proveData);
     }
 
     function test_RevertWhen_executeBatchesSharedBridgeNotValidator() public {
@@ -344,12 +381,12 @@ contract ValidatorTimelockTest is Test {
         storedBatches[0] = storedBatch;
 
         vm.prank(bob);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, bob));
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, executorRole, bob));
         (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
             storedBatches,
             Utils.emptyData()
         );
-        validator.executeBatchesSharedBridge(chainId, executeBatchFrom, executeBatchTo, executeData);
+        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData);
     }
 
     function test_RevertWhen_executeBatchesSharedBridgeTooEarly() public {
@@ -371,7 +408,7 @@ contract ValidatorTimelockTest is Test {
             storedBatch1,
             batchesToCommit
         );
-        validator.commitBatchesSharedBridge(chainId, commitBatchFrom, commitBatchTo, commitData);
+        validator.commitBatchesSharedBridge(zkSync, commitBatchFrom, commitBatchTo, commitData);
 
         // Execute batches
         IExecutor.StoredBatchInfo memory storedBatch2 = Utils.createStoredBatchInfo();
@@ -388,6 +425,6 @@ contract ValidatorTimelockTest is Test {
             storedBatches,
             Utils.emptyData()
         );
-        validator.executeBatchesSharedBridge(chainId, executeBatchFrom, executeBatchTo, executeData);
+        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData);
     }
 }

@@ -19,14 +19,14 @@ error PointEvalCallFailed(bytes);
 // 0x4daa985d
 error PointEvalFailed(bytes);
 
-// 0xf4a3e629
+// 0x885ae069
 error OperatorDAInputTooSmall(uint256 operatorDAInputLength, uint256 minAllowedLength);
 
 // 0xbeb96791
 error InvalidNumberOfBlobs(uint256 blobsProvided, uint256 maxBlobsSupported);
 
-// 0xe9e79528
-error InvalidL2DAOutputHash();
+// 0xd2531c15
+error InvalidL2DAOutputHash(bytes32 l2DAValidatorOutputHash);
 
 // 0x04e05fd1
 error OnlyOneBlobWithCalldataAllowed();
@@ -45,5 +45,12 @@ error BlobCommitmentNotPublished();
 
 // 0x5717f940
 error InvalidPubdataSource(uint8 pubdataSource);
-// 0x52595598
-error ValL1DAWrongInputLength(uint256 inputLength, uint256 expectedLength);
+
+// 0x6122198f
+error InvalidBlobsDAInputLength(uint256 pubdataInputLength);
+
+// 0x783ab813
+error BlobNotPublished();
+
+// 0x8b003a9d
+error InvalidBlobsPublished(bytes32 publishedHash, bytes32 expectedHash);

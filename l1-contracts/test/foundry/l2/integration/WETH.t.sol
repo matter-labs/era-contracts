@@ -6,12 +6,10 @@ import {Test} from "forge-std/Test.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 
-import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.sol";
-
 import {DeployIntegrationUtils} from "../../l1/integration/deploy-scripts/DeployIntegrationUtils.s.sol";
 
-import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
-import {L2WethTestAbstract} from "../../l1/integration/l2-tests-in-l1-context/L2WethTestAbstract.t.sol";
+import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
+import {L2WethTestAbstract} from "../../l1/integration/l2-tests-abstract/L2WethTestAbstract.t.sol";
 
 import {SharedL2ContractL2Deployer, SystemContractsArgs} from "./_SharedL2ContractL2Deployer.sol";
 import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";

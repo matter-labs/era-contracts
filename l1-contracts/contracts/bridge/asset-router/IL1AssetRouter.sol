@@ -3,9 +3,9 @@
 pragma solidity ^0.8.21;
 
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
-import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
-import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
 import {IL1SharedBridgeLegacy} from "../interfaces/IL1SharedBridgeLegacy.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 
@@ -77,11 +77,13 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
 
     function L1_WETH_TOKEN() external view returns (address);
 
-    function nativeTokenVault() external view returns (INativeTokenVault);
+    function ETH_TOKEN_ASSET_ID() external view returns (bytes32);
+
+    function nativeTokenVault() external view returns (INativeTokenVaultBase);
 
     function setAssetDeploymentTracker(bytes32 _assetRegistrationData, address _assetDeploymentTracker) external;
 
-    function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external;
+    function setNativeTokenVault(INativeTokenVaultBase _nativeTokenVault) external;
 
     function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external;
 

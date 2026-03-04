@@ -6,8 +6,6 @@ import {Diamond} from "./libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 
-// import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-
 /// @notice Struct that holds all data needed for initializing CTM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
 /// @param owner The address who can manage non-critical updates in the contract
@@ -62,6 +60,12 @@ interface IChainTypeManager {
     /// @notice ValidatorTimelock changed
     event NewValidatorTimelock(address indexed oldValidatorTimelock, address indexed newValidatorTimelock);
 
+    /// @notice ValidatorTimelockPostV29 changed
+    event NewValidatorTimelockPostV29(
+        address indexed oldValidatorTimelockPostV29,
+        address indexed newvalidatorTimelockPostV29
+    );
+
     /// @notice ServerNotifier changed
     event NewServerNotifier(address indexed oldServerNotifier, address indexed newServerNotifier);
 
@@ -71,7 +75,9 @@ interface IChainTypeManager {
         bytes32 genesisBatchHash,
         uint64 genesisIndexRepeatedStorageChanges,
         bytes32 genesisBatchCommitment,
+        Diamond.DiamondCutData newInitialCut,
         bytes32 newInitialCutHash,
+        bytes forceDeploymentsData,
         bytes32 forceDeploymentHash
     );
 
@@ -115,9 +121,15 @@ interface IChainTypeManager {
 
     function getProtocolVersion(uint256 _chainId) external view returns (uint256);
 
+    function serverNotifierAddress() external view returns (address);
+
+    function validatorTimelock() external view returns (address);
+
     function initialize(ChainTypeManagerInitializeData calldata _initializeData) external;
 
-    function setValidatorTimelock(address _validatorTimelock) external;
+    function setLegacyValidatorTimelock(address _validatorTimelock) external;
+
+    function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external;
 
     function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external;
 

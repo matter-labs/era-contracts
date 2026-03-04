@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity 0.8.28;
 
-import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {AccessControlEnumerablePerChainAddressUpgradeable} from "./AccessControlEnumerablePerChainAddressUpgradeable.sol";
 import {LibMap} from "./libraries/LibMap.sol";
-import {IExecutor} from "./chain-interfaces/IExecutor.sol";
-import {IChainTypeManager} from "./IChainTypeManager.sol";
-import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {IZKChain} from "./chain-interfaces/IZKChain.sol";
+import {NotAZKChain, TimeNotReached} from "../common/L1ContractErrors.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {IValidatorTimelock} from "./IValidatorTimelock.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -16,152 +17,246 @@ import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErr
 /// contract.
 /// @dev ZKsync actively monitors the chain activity and reacts to any suspicious activity by freezing the chain.
 /// This allows time for investigation and mitigation before resuming normal operations.
-/// @dev The contract overloads all of the 4 methods, that are used in state transition. When the batch is committed,
+/// @dev The contract overloads all of the 5 methods, that are used in state transition. When the batch is committed,
 /// the timestamp is stored for it. Later, when the owner calls the batch execution, the contract checks that batch
 /// was committed not earlier than X time ago.
-contract ValidatorTimelock is IExecutor, Ownable2Step {
+/// @dev Expected to be deployed as a TransparentUpgradeableProxy.
+contract ValidatorTimelock is
+    IValidatorTimelock,
+    Ownable2StepUpgradeable,
+    AccessControlEnumerablePerChainAddressUpgradeable
+{
     using LibMap for LibMap.Uint32Map;
 
-    /// @dev Part of the IBase interface. Not used in this contract.
+    /// @inheritdoc IValidatorTimelock
     string public constant override getName = "ValidatorTimelock";
 
-    /// @notice The delay between committing and executing batches is changed.
-    event NewExecutionDelay(uint256 _newExecutionDelay);
+    /// @inheritdoc IValidatorTimelock
+    bytes32 public constant override PRECOMMITTER_ROLE = keccak256("PRECOMMITTER_ROLE");
 
-    /// @notice A new validator has been added.
-    event ValidatorAdded(uint256 indexed _chainId, address _addedValidator);
+    /// @inheritdoc IValidatorTimelock
+    bytes32 public constant override COMMITTER_ROLE = keccak256("COMMITTER_ROLE");
 
-    /// @notice A validator has been removed.
-    event ValidatorRemoved(uint256 indexed _chainId, address _removedValidator);
+    /// @inheritdoc IValidatorTimelock
+    bytes32 public constant override REVERTER_ROLE = keccak256("REVERTER_ROLE");
 
-    /// @notice Error for when an address is already a validator.
-    error AddressAlreadyValidator(uint256 _chainId);
+    /// @inheritdoc IValidatorTimelock
+    bytes32 public constant override PROVER_ROLE = keccak256("PROVER_ROLE");
 
-    /// @notice Error for when an address is not a validator.
-    error ValidatorDoesNotExist(uint256 _chainId);
+    /// @inheritdoc IValidatorTimelock
+    bytes32 public constant override EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
 
-    /// @dev The chainTypeManager smart contract.
-    IChainTypeManager public chainTypeManager;
+    /// @inheritdoc IValidatorTimelock
+    bytes32 public constant override OPTIONAL_PRECOMMITTER_ADMIN_ROLE = keccak256("OPTIONAL_PRECOMMITTER_ADMIN_ROLE");
 
-    /// @dev The mapping of L2 chainId => batch number => timestamp when it was committed.
-    mapping(uint256 chainId => LibMap.Uint32Map batchNumberToTimestampMapping) internal committedBatchTimestamp;
+    /// @inheritdoc IValidatorTimelock
+    bytes32 public constant override OPTIONAL_COMMITTER_ADMIN_ROLE = keccak256("OPTIONAL_COMMITTER_ADMIN_ROLE");
 
-    /// @dev The address that can commit/revert/validate/execute batches.
-    mapping(uint256 _chainId => mapping(address _validator => bool)) public validators;
+    /// @inheritdoc IValidatorTimelock
+    bytes32 public constant override OPTIONAL_REVERTER_ADMIN_ROLE = keccak256("OPTIONAL_REVERTER_ADMIN_ROLE");
 
-    /// @dev The delay between committing and executing batches.
-    uint32 public executionDelay;
+    /// @inheritdoc IValidatorTimelock
+    bytes32 public constant override OPTIONAL_PROVER_ADMIN_ROLE = keccak256("OPTIONAL_PROVER_ADMIN_ROLE");
 
-    constructor(address _initialOwner, uint32 _executionDelay) {
+    /// @inheritdoc IValidatorTimelock
+    bytes32 public constant override OPTIONAL_EXECUTOR_ADMIN_ROLE = keccak256("OPTIONAL_EXECUTOR_ADMIN_ROLE");
+
+    /// @inheritdoc IValidatorTimelock
+    IL1Bridgehub public immutable override BRIDGE_HUB;
+
+    /// @dev The mapping of ZK chain address => batch number => timestamp when it was committed.
+    mapping(address chainAddress => LibMap.Uint32Map batchNumberToTimestampMapping) internal committedBatchTimestamp;
+
+    /// @inheritdoc IValidatorTimelock
+    uint32 public override executionDelay;
+
+    /// @dev Reserved storage space to allow for layout changes in future upgrades.
+    uint256[48] private __gap;
+
+    constructor(address _bridgehubAddr) {
+        BRIDGE_HUB = IL1Bridgehub(_bridgehubAddr);
+        // Disable initialization to prevent Parity hack.
+        _disableInitializers();
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function initialize(address _initialOwner, uint32 _initialExecutionDelay) external virtual initializer {
+        _validatorTimelockInit(_initialOwner, _initialExecutionDelay);
+    }
+
+    function _validatorTimelockInit(address _initialOwner, uint32 _initialExecutionDelay) internal onlyInitializing {
         _transferOwnership(_initialOwner);
-        executionDelay = _executionDelay;
+        executionDelay = _initialExecutionDelay;
     }
 
-    /// @notice Checks if the caller is the admin of the chain.
-    modifier onlyChainAdmin(uint256 _chainId) {
-        if (msg.sender != chainTypeManager.getChainAdmin(_chainId)) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /// @notice Checks if the caller is a validator.
-    modifier onlyValidator(uint256 _chainId) {
-        if (!validators[_chainId][msg.sender]) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /// @dev Sets a new state transition manager.
-    function setChainTypeManager(IChainTypeManager _chainTypeManager) external onlyOwner {
-        if (address(_chainTypeManager) == address(0)) {
-            revert ZeroAddress();
-        }
-        chainTypeManager = _chainTypeManager;
-    }
-
-    /// @dev Sets an address as a validator.
-    function addValidator(uint256 _chainId, address _newValidator) external onlyChainAdmin(_chainId) {
-        if (validators[_chainId][_newValidator]) {
-            revert AddressAlreadyValidator(_chainId);
-        }
-        validators[_chainId][_newValidator] = true;
-        emit ValidatorAdded(_chainId, _newValidator);
-    }
-
-    /// @dev Removes an address as a validator.
-    function removeValidator(uint256 _chainId, address _validator) external onlyChainAdmin(_chainId) {
-        if (!validators[_chainId][_validator]) {
-            revert ValidatorDoesNotExist(_chainId);
-        }
-        validators[_chainId][_validator] = false;
-        emit ValidatorRemoved(_chainId, _validator);
-    }
-
-    /// @dev Set the delay between committing and executing batches.
+    /// @inheritdoc IValidatorTimelock
     function setExecutionDelay(uint32 _executionDelay) external onlyOwner {
         executionDelay = _executionDelay;
         emit NewExecutionDelay(_executionDelay);
     }
 
-    /// @dev Returns the timestamp when `_l2BatchNumber` was committed.
-    function getCommittedBatchTimestamp(uint256 _chainId, uint256 _l2BatchNumber) external view returns (uint256) {
-        return committedBatchTimestamp[_chainId].get(_l2BatchNumber);
+    /// @inheritdoc IValidatorTimelock
+    function getCommittedBatchTimestamp(address _chainAddress, uint256 _l2BatchNumber) external view returns (uint256) {
+        return committedBatchTimestamp[_chainAddress].get(_l2BatchNumber);
     }
 
-    /// @dev Records the timestamp for all provided committed batches and make
-    /// a call to the zkChain diamond contract with the same calldata.
+    /// @inheritdoc IValidatorTimelock
+    function removeValidatorRoles(
+        address _chainAddress,
+        address _validator,
+        ValidatorRotationParams memory params
+    ) public {
+        if (params.rotatePrecommitterRole) {
+            revokeRole(_chainAddress, PRECOMMITTER_ROLE, _validator);
+        }
+        if (params.rotateCommitterRole) {
+            revokeRole(_chainAddress, COMMITTER_ROLE, _validator);
+        }
+        if (params.rotateReverterRole) {
+            revokeRole(_chainAddress, REVERTER_ROLE, _validator);
+        }
+        if (params.rotateProverRole) {
+            revokeRole(_chainAddress, PROVER_ROLE, _validator);
+        }
+        if (params.rotateExecutorRole) {
+            revokeRole(_chainAddress, EXECUTOR_ROLE, _validator);
+        }
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function removeValidator(address _chainAddress, address _validator) public {
+        removeValidatorRoles(
+            _chainAddress,
+            _validator,
+            ValidatorRotationParams({
+                rotatePrecommitterRole: true,
+                rotateCommitterRole: true,
+                rotateReverterRole: true,
+                rotateProverRole: true,
+                rotateExecutorRole: true
+            })
+        );
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function removeValidatorForChainId(uint256 _chainId, address _validator) external {
+        removeValidator(BRIDGE_HUB.getZKChain(_chainId), _validator);
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function addValidatorRoles(
+        address _chainAddress,
+        address _validator,
+        ValidatorRotationParams memory params
+    ) public {
+        if (params.rotatePrecommitterRole) {
+            grantRole(_chainAddress, PRECOMMITTER_ROLE, _validator);
+        }
+        if (params.rotateCommitterRole) {
+            grantRole(_chainAddress, COMMITTER_ROLE, _validator);
+        }
+        if (params.rotateReverterRole) {
+            grantRole(_chainAddress, REVERTER_ROLE, _validator);
+        }
+        if (params.rotateProverRole) {
+            grantRole(_chainAddress, PROVER_ROLE, _validator);
+        }
+        if (params.rotateExecutorRole) {
+            grantRole(_chainAddress, EXECUTOR_ROLE, _validator);
+        }
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function addValidator(address _chainAddress, address _validator) public {
+        addValidatorRoles(
+            _chainAddress,
+            _validator,
+            ValidatorRotationParams({
+                rotatePrecommitterRole: true,
+                rotateCommitterRole: true,
+                rotateReverterRole: true,
+                rotateProverRole: true,
+                rotateExecutorRole: true
+            })
+        );
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function addValidatorForChainId(uint256 _chainId, address _validator) external {
+        addValidator(BRIDGE_HUB.getZKChain(_chainId), _validator);
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function hasRoleForChainId(uint256 _chainId, bytes32 _role, address _address) public view returns (bool) {
+        return hasRole(BRIDGE_HUB.getZKChain(_chainId), _role, _address);
+    }
+
+    /// @inheritdoc IValidatorTimelock
+    function precommitSharedBridge(
+        address _chainAddress,
+        uint256, // _l2BlockNumber (unused in this specific implementation)
+        bytes calldata // _l2Block (unused in this specific implementation)
+    ) public onlyRole(_chainAddress, PRECOMMITTER_ROLE) {
+        _propagateToZKChain(_chainAddress);
+    }
+
+    /// @inheritdoc IValidatorTimelock
     function commitBatchesSharedBridge(
-        uint256 _chainId,
+        address _chainAddress,
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
-        bytes calldata
-    ) external onlyValidator(_chainId) {
+        bytes calldata // _batchData (unused in this specific implementation)
+    ) public virtual onlyRole(_chainAddress, COMMITTER_ROLE) {
+        _recordBatchCommitment(_chainAddress, _processBatchFrom, _processBatchTo);
+        _propagateToZKChain(_chainAddress);
+    }
+
+    /// @dev Records the timestamp of batch commitment for the given chain address.
+    /// To be used from `commitBatchesSharedBridge`
+    function _recordBatchCommitment(
+        address _chainAddress,
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo
+    ) internal {
         unchecked {
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
             uint32 timestamp = uint32(block.timestamp);
-            // We disable this check because calldata array length is cheap.
             for (uint256 i = _processBatchFrom; i <= _processBatchTo; ++i) {
-                committedBatchTimestamp[_chainId].set(i, timestamp);
+                committedBatchTimestamp[_chainAddress].set(i, timestamp);
             }
         }
-        _propagateToZKChain(_chainId);
     }
 
-    /// @dev Make a call to the zkChain diamond contract with the same calldata.
-    /// Note: If the batch is reverted, it needs to be committed first before the execution.
-    /// So it's safe to not override the committed batches.
-    function revertBatchesSharedBridge(uint256 _chainId, uint256) external onlyValidator(_chainId) {
-        _propagateToZKChain(_chainId);
+    /// @inheritdoc IValidatorTimelock
+    function revertBatchesSharedBridge(
+        address _chainAddress,
+        uint256 /*_newLastBatch*/
+    ) external onlyRole(_chainAddress, REVERTER_ROLE) {
+        _propagateToZKChain(_chainAddress);
     }
 
-    /// @dev Make a call to the zkChain diamond contract with the same calldata.
-    /// Note: We don't track the time when batches are proven, since all information about
-    /// the batch is known on the commit stage and the proved is not finalized (may be reverted).
+    /// @inheritdoc IValidatorTimelock
     function proveBatchesSharedBridge(
-        uint256 _chainId,
-        uint256, // _processBatchFrom
-        uint256, // _processBatchTo
-        bytes calldata
-    ) external onlyValidator(_chainId) {
-        _propagateToZKChain(_chainId);
+        address _chainAddress,
+        uint256, // _processBatchFrom (unused in this specific implementation)
+        uint256, // _processBatchTo (unused in this specific implementation)
+        bytes calldata // _proofData (unused in this specific implementation)
+    ) external onlyRole(_chainAddress, PROVER_ROLE) {
+        _propagateToZKChain(_chainAddress);
     }
 
-    /// @dev Check that batches were committed at least X time ago and
-    /// make a call to the zkChain diamond contract with the same calldata.
+    /// @inheritdoc IValidatorTimelock
     function executeBatchesSharedBridge(
-        uint256 _chainId,
+        address _chainAddress,
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
-        bytes calldata
-    ) external onlyValidator(_chainId) {
+        bytes calldata // _batchData (unused in this specific implementation)
+    ) external onlyRole(_chainAddress, EXECUTOR_ROLE) {
         uint256 delay = executionDelay; // uint32
         unchecked {
-            // We disable this check because calldata array length is cheap.
             for (uint256 i = _processBatchFrom; i <= _processBatchTo; ++i) {
-                uint256 commitBatchTimestamp = committedBatchTimestamp[_chainId].get(i);
+                uint256 commitBatchTimestamp = committedBatchTimestamp[_chainAddress].get(i);
 
                 // Note: if the `commitBatchTimestamp` is zero, that means either:
                 // * The batch was committed, but not through this contract.
@@ -173,24 +268,17 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 }
             }
         }
-        _propagateToZKChain(_chainId);
+        _propagateToZKChain(_chainAddress);
     }
 
     /// @dev Call the zkChain diamond contract with the same calldata as this contract was called.
     /// Note: it is called the zkChain diamond contract, not delegatecalled!
-    function _propagateToZKChain(uint256 _chainId) internal {
-        // Note, that it is important to use chain type manager and
-        // the legacy method here for obtaining the chain id in order for
-        // this contract to before the CTM upgrade is finalized.
-        address contractAddress = chainTypeManager.getHyperchain(_chainId);
-        if (contractAddress == address(0)) {
-            revert ZeroAddress();
-        }
+    function _propagateToZKChain(address _chainAddress) internal {
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())
             // Call method of the ZK chain diamond contract returns 0 on error
-            let result := call(gas(), contractAddress, 0, 0, calldatasize(), 0, 0)
+            let result := call(gas(), _chainAddress, 0, 0, calldatasize(), 0, 0)
             // Get the size of the last return data
             let size := returndatasize()
             // Copy the size length of bytes from return data at zero position to pointer position
@@ -206,5 +294,22 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 return(0, size)
             }
         }
+    }
+
+    /// @inheritdoc AccessControlEnumerablePerChainAddressUpgradeable
+    function _getChainAdmin(address _chainAddress) internal view override returns (address) {
+        // This function is expected to be rarely used and so additional checks could be added here.
+        // Since all ZK-chain related roles require that the owner of the `DEFAULT_ADMIN_ROLE` sets them,
+        // ensuring that this role is only available to chains that are part of the ecosystem is enough
+        // to ensure that this contract only works with such chains.
+
+        // Firstly, we check that the chain is indeed a part of the ecosystem
+        uint256 chainId = IZKChain(_chainAddress).getChainId();
+        if (IL1Bridgehub(BRIDGE_HUB).getZKChain(chainId) != _chainAddress) {
+            revert NotAZKChain(_chainAddress);
+        }
+
+        // Now, we can extract the admin
+        return IZKChain(_chainAddress).getAdmin();
     }
 }

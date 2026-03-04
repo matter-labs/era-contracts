@@ -12,4 +12,20 @@ interface IL2WrappedBaseToken {
     function depositTo(address _to) external payable;
 
     function withdrawTo(address _to, uint256 _amount) external;
+
+    /// @notice Initializes a contract token for later use. Expected to be used in the proxy.
+    /// @notice This function is used to integrate the previously deployed WETH token with the bridge.
+    /// @dev Sets up `name`/`symbol`/`decimals` getters.
+    /// @param name_ The name of the token.
+    /// @param symbol_ The symbol of the token.
+    /// @param _l2Bridge Address of the L2 bridge
+    /// @param _l1Address Address of the L1 token that can be deposited to mint this L2 WETH.
+    /// Note: The decimals are hardcoded to 18, the same as on Ether.
+    function initializeV3(
+        string calldata name_,
+        string calldata symbol_,
+        address _l2Bridge,
+        address _l1Address,
+        bytes32 _baseTokenAssetId
+    ) external;
 }

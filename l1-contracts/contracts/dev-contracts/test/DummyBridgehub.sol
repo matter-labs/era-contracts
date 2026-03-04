@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
@@ -41,10 +41,14 @@ contract DummyBridgehub {
     }
 
     function getZKChain(uint256) external view returns (address) {
-        return address(0);
+        return zkChain;
     }
 
     function setSharedBridge(address addr) external {
         sharedBridge = addr;
+    }
+
+    function assetRouter() external view returns (address) {
+        return sharedBridge;
     }
 }

@@ -61,12 +61,6 @@ case 0x2E { // Unused opcode
 case 0x2F { // Unused opcode
     $llvm_NoInline_llvm$_invalid()
 }
-case 0x49 { // Unused opcode
-    $llvm_NoInline_llvm$_invalid()
-}
-case 0x4A { // Unused opcode
-    $llvm_NoInline_llvm$_invalid()
-}
 case 0x4B { // Unused opcode
     $llvm_NoInline_llvm$_invalid()
 }

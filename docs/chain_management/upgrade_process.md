@@ -36,6 +36,6 @@ During upgrade, we typically need not only update the L1 contracts, but also the
 
 ## Whitelisting and executing upgrade
 
-Note, that due to how powerful the upgrades are, if we allowed any [chain admin](../chain_management/admin_role.md) to inact any upgrade it wants, it could allow malicious chains to potentially break some of the ecosystem invariants. Because of that, any upgrade should be firstly whitelisted by the decentralized governance through calling the `setNewVersionUpgrade` function of the [ChainTypeManager](../../l1-contracts/contracts/state-transition/ChainTypeManager.sol).
+Note, that due to how powerful the upgrades are, if we allowed any [chain admin](../chain_management/admin_role.md) to inact any upgrade it wants, it could allow malicious chains to potentially break some of the ecosystem invariants. Because of that, any upgrade should be firstly whitelisted by the decentralized governance through calling the `setNewVersionUpgrade` function of the [ChainTypeManager](../../l1-contracts/contracts/state-transition/EraChainTypeManager.sol).
 
 In order to execute the upgrade, the chain admin would call the `upgradeChainFromVersion` function from the [Admin](../../l1-contracts/contracts/state-transition/chain-deps/facets/Admin.sol) facet.

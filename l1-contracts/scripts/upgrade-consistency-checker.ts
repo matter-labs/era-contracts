@@ -234,8 +234,6 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
     // priorityTxMaxPubdata,
     // maxL2GasPerBatch,
     // minimalL2GasPrice,
-
-    // blobVersionedHashRetriever
   ] = ethers.utils.defaultAbiCoder.decode(
     [
       "address",
@@ -252,7 +250,6 @@ async function extractProxyInitializationData(contract: ethers.Contract, data: s
       "uint256",
       "uint256",
       "uint256",
-      "address",
     ],
     diamondCut.initCalldata
   );
@@ -494,7 +491,7 @@ async function main() {
     await checkIdenticalBytecode(gettersFacet, "GettersFacet");
     await checkIdenticalBytecode(adminFacet, "AdminFacet");
     await checkIdenticalBytecode(bridgeHubImpl, "Bridgehub");
-    await checkIdenticalBytecode(verifier, eraChainId == "324" ? "Verifier" : "TestnetVerifier");
+    await checkIdenticalBytecode(verifier, eraChainId == "324" ? "Verifier" : "EraTestnetVerifier");
     await checkIdenticalBytecode(diamondInit, "DiamondInit");
 
     await checkMailbox();

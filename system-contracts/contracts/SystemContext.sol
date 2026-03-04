@@ -6,8 +6,8 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, SystemLogKey, COMPLEX_UPGRADER_CONTRACT} from "./Constants.sol";
-import {InconsistentNewBatchTimestamp, InvalidNewL2BlockNumber, IncorrectVirtualBlockInsideMiniblock, IncorrectSameL2BlockPrevBlockHash, IncorrectSameL2BlockTimestamp, CannotReuseL2BlockNumberFromPreviousBatch, NoVirtualBlocks, L2BlockAndBatchTimestampMismatch, UpgradeTransactionMustBeFirst, L2BlockNumberZero, PreviousL2BlockHashIsIncorrect, CannotInitializeFirstVirtualBlock, IncorrectL2BlockHash, NonMonotonicL2BlockTimestamp, CurrentBatchNumberMustBeGreaterThanZero, TimestampsShouldBeIncremental, ProvidedBatchNumberIsNotCorrect} from "contracts/SystemContractErrors.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, SystemLogKey} from "./Constants.sol";
+import {CannotInitializeFirstVirtualBlock, CannotReuseL2BlockNumberFromPreviousBatch, CurrentBatchNumberMustBeGreaterThanZero, InconsistentNewBatchTimestamp, IncorrectL2BlockHash, IncorrectSameL2BlockPrevBlockHash, IncorrectSameL2BlockTimestamp, IncorrectVirtualBlockInsideMiniblock, InvalidNewL2BlockNumber, L2BlockAndBatchTimestampMismatch, L2BlockNumberZero, NoVirtualBlocks, NonMonotonicL2BlockTimestamp, PreviousL2BlockHashIsIncorrect, ProvidedBatchNumberIsNotCorrect, TimestampsShouldBeIncremental, UpgradeTransactionMustBeFirst} from "contracts/SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -164,21 +164,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
             // keccak256(abi.encodePacked(_block))
             hash = keccak256(abi.encode(_block));
         }
-    }
-
-    /// @notice Returns the hash of the given batch.
-    /// @param _batchNumber The number of the batch.
-    /// @return hash The hash of the batch.
-    function getBatchHash(uint256 _batchNumber) external view returns (bytes32 hash) {
-        hash = batchHashes[_batchNumber];
-    }
-
-    /// @notice Returns the current batch's number and timestamp.
-    /// @return batchNumber and batchTimestamp tuple of the current batch's number and the current batch's timestamp
-    function getBatchNumberAndTimestamp() public view returns (uint128 batchNumber, uint128 batchTimestamp) {
-        BlockInfo memory batchInfo = currentBatchInfo;
-        batchNumber = batchInfo.number;
-        batchTimestamp = batchInfo.timestamp;
     }
 
     /// @notice Returns the current block's number and timestamp.
@@ -409,7 +394,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
             if (_expectedPrevL2BlockHash != pendingL2BlockHash) {
                 revert IncorrectL2BlockHash(_expectedPrevL2BlockHash, pendingL2BlockHash);
             }
-            if (_l2BlockTimestamp <= currentL2BlockTimestamp) {
+            if (_l2BlockTimestamp < currentL2BlockTimestamp) {
                 revert NonMonotonicL2BlockTimestamp(_l2BlockTimestamp, currentL2BlockTimestamp);
             }
 
@@ -449,11 +434,11 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         );
     }
 
-    /// @notice Ensures that the timestamp of the batch is greater than the timestamp of the last L2 block.
+    /// @notice Ensures that the timestamp of the batch is greater than or equal to the timestamp of the last L2 block.
     /// @param _newTimestamp The timestamp of the new batch.
     function _ensureBatchConsistentWithL2Block(uint128 _newTimestamp) internal view {
         uint128 currentBlockTimestamp = currentL2BlockInfo.timestamp;
-        if (_newTimestamp <= currentBlockTimestamp) {
+        if (_newTimestamp < currentBlockTimestamp) {
             revert InconsistentNewBatchTimestamp(_newTimestamp, currentBlockTimestamp);
         }
     }
@@ -518,21 +503,48 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
                         DEPRECATED METHODS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Returns the hash of the given batch.
+    /// @param _batchNumber The number of the batch.
+    /// @return hash The hash of the batch.
+    /// @dev Deprecated to make publicly accessible methods compatible with planned releases.
+    /// @dev Please use the block function `getBlockHashEVM` if needed.
+    /// @dev The function body will be replaced with revert in the next release.
+    function getBatchHash(uint256 _batchNumber) external view returns (bytes32 hash) {
+        hash = batchHashes[_batchNumber];
+    }
+
     /// @notice Returns the current batch's number and timestamp.
-    /// @dev Deprecated in favor of getBatchNumberAndTimestamp.
+    /// @return batchNumber and batchTimestamp tuple of the current batch's number and the current batch's timestamp
+    /// @dev Deprecated for external usage to make publicly accessible methods compatible with planned releases.
+    /// @dev Please use the block function `getL2BlockNumberAndTimestamp` if needed.
+    /// @dev The function body will be replaced with revert in the next release.
+    function getBatchNumberAndTimestamp() public view returns (uint128 batchNumber, uint128 batchTimestamp) {
+        BlockInfo memory batchInfo = currentBatchInfo;
+        batchNumber = batchInfo.number;
+        batchTimestamp = batchInfo.timestamp;
+    }
+
+    /// @notice Returns the current batch's number and timestamp.
+    /// @dev Deprecated for external usage to make publicly accessible methods compatible with planned releases.
+    /// @dev Please use the block function `getL2BlockNumberAndTimestamp` if needed.
+    /// @dev The function body will be replaced with revert in the next release.
     function currentBlockInfo() external view returns (uint256 blockInfo) {
         (uint128 blockNumber, uint128 blockTimestamp) = getBatchNumberAndTimestamp();
         blockInfo = (uint256(blockNumber) << 128) | uint256(blockTimestamp);
     }
 
     /// @notice Returns the current batch's number and timestamp.
-    /// @dev Deprecated in favor of getBatchNumberAndTimestamp.
+    /// @dev Deprecated to make publicly accessible methods compatible with planned releases.
+    /// @dev Please use the block function `getL2BlockNumberAndTimestamp` if needed.
+    /// @dev The function body will be replaced with revert in the next release.
     function getBlockNumberAndTimestamp() external view returns (uint256 blockNumber, uint256 blockTimestamp) {
         (blockNumber, blockTimestamp) = getBatchNumberAndTimestamp();
     }
 
     /// @notice Returns the hash of the given batch.
-    /// @dev Deprecated in favor of getBatchHash.
+    /// @dev Deprecated to make publicly accessible methods compatible with planned releases.
+    /// @dev Please use the block function `getBlockHashEVM` if needed.
+    /// @dev The function body will be replaced with revert in the next release.
     function blockHash(uint256 _blockNumber) external view returns (bytes32 hash) {
         hash = batchHashes[_blockNumber];
     }

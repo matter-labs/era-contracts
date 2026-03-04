@@ -5,6 +5,7 @@ pragma solidity ^0.8.21;
 import {VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
 import {IZKChainBase} from "./IZKChainBase.sol";
+import {L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @title The interface of the Getters Contract that implements functions for getting contract state from outside the blockchain.
 /// @author Matter Labs
@@ -170,4 +171,7 @@ interface IGetters is IZKChainBase {
 
     /// @return The address of the current settlement layer.
     function getSettlementLayer() external view returns (address);
+
+    /// @return DA configuration.
+    function getDAValidatorPair() external view returns (address, L2DACommitmentScheme);
 }
