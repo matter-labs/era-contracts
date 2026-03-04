@@ -213,9 +213,9 @@ library Utils {
     }
 
     /// @notice Read function selectors for a facet directly from its build artifact's `methodIdentifiers` map.
-    /// The keys of `methodIdentifiers` are canonical function signatures (e.g. "acceptAdmin()"), so computing
-    /// keccak256 over the signature bytes yields the selector — no bytecode parsing or `cast selectors` needed.
-    /// @param artifactPath Absolute path within the project root, e.g. "/out/Admin.sol/AdminFacet.json"
+    /// `methodIdentifiers` maps each function signature to its 4-byte selector hex string, so no bytecode
+    /// parsing or `cast selectors` call is needed.
+    /// @param artifactPath Path relative to the project root, e.g. "/out/Admin.sol/AdminFacet.json"
     function getSelectorsFromArtifact(string memory artifactPath) internal view returns (bytes4[] memory) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, artifactPath);
@@ -238,7 +238,11 @@ library Utils {
             if (keccak256(bytes(sigs[i])) == keccak256(bytes("getName()"))) {
                 continue;
             }
-            selectors[idx++] = bytes4(keccak256(bytes(sigs[i])));
+            string memory hexSelector = vm.parseJsonString(
+                json,
+                string.concat(".methodIdentifiers[\"", sigs[i], "\"]")
+            );
+            selectors[idx++] = bytes4(vm.parseBytes(string.concat("0x", hexSelector)));
         }
         return selectors;
     }
