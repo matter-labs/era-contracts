@@ -232,16 +232,14 @@ library Utils {
         }
 
         bytes4[] memory selectors = new bytes4[](count);
-        uint256 idx = 0;
+
+        uint256 j = 0;
         for (uint256 i = 0; i < sigs.length; ++i) {
             if (keccak256(bytes(sigs[i])) == keccak256(bytes("getName()"))) {
                 continue;
             }
-            string memory hexSelector = vm.parseJsonString(
-                json,
-                string.concat(".methodIdentifiers[\"", sigs[i], "\"]")
-            );
-            selectors[idx++] = bytes4(vm.parseBytes(string.concat("0x", hexSelector)));
+            selectors[j] = bytes4(keccak256(bytes(sigs[i])));
+            ++j;
         }
         return selectors;
     }
