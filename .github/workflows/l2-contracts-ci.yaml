@@ -54,21 +54,3 @@ jobs:
             system-contracts/cache-forge
             system-contracts/zkout
 
-  lint:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-
-      - name: Use Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn
-
-      - name: Lint
-        run: yarn lint:check

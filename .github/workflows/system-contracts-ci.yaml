@@ -54,27 +54,8 @@ jobs:
             system-contracts/contracts-preprocessed
             l1-contracts/zkout
 
-  lint:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-
-      - name: Use Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn
-
-      - name: Run lint
-        run: yarn lint:check
-
   test-bootloader:
-    needs: [build, lint]
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
@@ -107,7 +88,7 @@ jobs:
           cargo run
 
   test-contracts:
-    needs: [build, lint]
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
@@ -154,7 +135,6 @@ jobs:
         run: cat anvil_zksync.log
 
   test-contracts-foundry:
-    needs: [lint]
     runs-on: ubuntu-latest
 
     steps:
