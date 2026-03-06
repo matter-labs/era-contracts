@@ -335,7 +335,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
 
         // NOTE: it is important that we always support the legacy messages formats (i.e. dont change selectors)
-        // since otherwise the messages that were sent before wont be executable.
+        // since otherwise the messages that were sent before won't be executable.
         if (selector == this.executeBundle.selector) {
             _handleExecuteBundle(payload, senderChainId, senderAddress, sender);
         } else if (selector == this.verifyBundle.selector) {

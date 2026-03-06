@@ -1286,7 +1286,7 @@ contract ExperimentalBridgeTest is Test {
         assertEq(canonicalHash, resultantHash);
     }
 
-    // This is an example how to test behaviour of 7702. Keeping it, so the logic can be re-used in the future
+    // This is an example how to test behaviour of 7702. Keeping it, so the logic can be reused in the future
     function test_requestL2TransactionDirect_NonETHCase7702(
         uint256 mockChainId,
         uint256 mockMintValue,
