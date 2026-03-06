@@ -11,7 +11,7 @@ contract DummyL2BaseTokenHolder {
     /// @dev This replaces the mint operation. Tokens are transferred from this contract's native balance.
     /// @param _to The address to receive the base tokens.
     /// @param _amount The amount of base tokens to give out.
-    function give(address _to, uint256 _amount, uint256) external {
+    function give(address _to, uint256 _amount, uint256 _fromChainId) external {
         if (_amount == 0) {
             return;
         }
