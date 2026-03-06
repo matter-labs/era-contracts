@@ -26,26 +26,12 @@ jobs:
       - name: Lint errors
         run: yarn l1 errors-lint --check
 
-  # TODO: fix codespell CI
-  # codespell:
-  #   runs-on: ubuntu-latest
+  codespell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
 
-  #   steps:
-  #     - name: Checkout the repository
-  #       uses: actions/checkout@v6
-
-  #     - name: pip cache
-  #       uses: actions/cache@v4
-  #       with:
-  #         path: ~/.cache/pip
-  #         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-  #         restore-keys: ${{ runner.os }}-pip-
-
-  #     - name: Install prerequisites
-  #       run: sudo pip install -r ./.codespell/requirements.txt
-
-  #     - name: Spell check
-  #       run: codespell --config=./.codespell/.codespellrc
+      - uses: codespell-project/actions-codespell@8f01853be192eb0f849a5c7d721450e7a467c579 # v2.2
 
   typos:
     runs-on: ubuntu-latest
