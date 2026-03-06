@@ -1,6 +1,5 @@
 .DS_Store
 .idea
-.vscode
 artifacts-forge/
 artifacts-zk/
 artifacts/
@@ -17,6 +16,7 @@ tools/data/*.sol
 typechain/
 yarn-debug.log*
 yarn-error.log*
+temp_auto_push.bat
 l1-contracts/yarn-error.log*
 l1-contracts/lcov.info
 l1-contracts/report/*
@@ -36,3 +36,5 @@ l1-contracts/test/foundry/integration/deploy-scripts/script-out/*
 l1-contracts/test/foundry/l1/integration/upgrade-envs/script-out/*.toml
 l1-contracts/zkout/*
 .lycheecache
+.gitignore
+branch_structure.json
