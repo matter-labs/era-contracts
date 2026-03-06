@@ -82,10 +82,10 @@ contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
     /// @dev This function mints 2^127 - 1 tokens to this contract via the mint hook, then transfers all tokens to BaseTokenHolder.
     /// @dev Can only be called by the ComplexUpgrader contract.
     function initializeBaseTokenHolderBalance() external onlyComplexUpgrader {
-        if (baseTokenHolderInitialized) {
+        if (baseTokenHolderBalanceInitialized) {
             revert BaseTokenHolderAlreadyInitialized();
         }
-        baseTokenHolderInitialized = true;
+        baseTokenHolderBalanceInitialized = true;
 
         // Mint INITIAL_BASE_TOKEN_HOLDER_BALANCE tokens to this contract via the mint hook
         (bool mintSuccess, ) = MINT_BASE_TOKEN_HOOK.call(abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE));

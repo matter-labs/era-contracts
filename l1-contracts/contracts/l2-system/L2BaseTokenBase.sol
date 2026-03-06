@@ -40,7 +40,7 @@ abstract contract L2BaseTokenBase is IL2BaseTokenBase {
     uint256 internal __DEPRECATED_totalSupply;
 
     /// @notice Whether initializeBaseTokenHolderBalance has already been called.
-    bool internal baseTokenHolderInitialized;
+    bool internal baseTokenHolderBalanceInitialized;
 
     /// @dev Storage gap to allow adding new shared storage variables in future upgrades.
     uint256[47] private __gap;

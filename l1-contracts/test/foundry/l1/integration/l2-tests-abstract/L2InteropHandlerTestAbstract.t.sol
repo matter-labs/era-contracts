@@ -769,23 +769,23 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
         // Verify that handleFinalizeBaseTokenBridgingOnL2 is called with the correct amount
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(IL2AssetTracker.handleFinalizeBaseTokenBridgingOnL2.selector, callValue)
+            abi.encodeWithSelector(
+                IL2AssetTracker.handleFinalizeBaseTokenBridgingOnL2.selector,
+                ERA_CHAIN_ID,
+                callValue
+            )
         );
 
-        // Verify BaseTokenMinted event is emitted (give() sends to InteropHandler)
+        // Verify BaseTokenMintedInterop event is emitted (give() sends to InteropHandler)
         vm.expectEmit(true, false, false, true, L2_BASE_TOKEN_HOLDER_ADDR);
-        emit IBaseTokenHolder.BaseTokenMinted(L2_INTEROP_HANDLER_ADDR, callValue);
+        emit IBaseTokenHolder.BaseTokenMintedInterop(L2_INTEROP_HANDLER_ADDR, callValue);
 
         vm.prank(EXECUTION_ADDRESS);
         L2_INTEROP_HANDLER.executeBundle(bundle, proof);
 
-        // Verify asset tracker storage was actually updated
+        // Interop source is ERA_CHAIN_ID (not L1), so totalSuccessfulDepositsFromL1 must NOT increase
         uint256 depositsAfter = _readTotalSuccessfulDepositsFromL1(_baseTokenAssetId);
-        assertEq(
-            depositsAfter,
-            depositsBefore + callValue,
-            "totalSuccessfulDepositsFromL1 should increase by callValue"
-        );
+        assertEq(depositsAfter, depositsBefore, "totalSuccessfulDepositsFromL1 should NOT increase for non-L1 source");
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -815,9 +815,9 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encodeWithSelector(IL2AssetTracker.handleInitiateBaseTokenBridgingOnL2.selector, toChainId, burnAmount)
         );
 
-        // Verify BaseTokenBurnt event is emitted
+        // Verify BaseTokenBurntInterop event is emitted
         vm.expectEmit(true, false, false, true, L2_BASE_TOKEN_HOLDER_ADDR);
-        emit IBaseTokenHolder.BaseTokenBurnt(L2_INTEROP_HANDLER_ADDR, toChainId, burnAmount);
+        emit IBaseTokenHolder.BaseTokenBurntInterop(L2_INTEROP_HANDLER_ADDR, toChainId, burnAmount);
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(toChainId);

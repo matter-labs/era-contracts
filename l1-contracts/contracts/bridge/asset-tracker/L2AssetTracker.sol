@@ -20,6 +20,7 @@ import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
 import {
+    AssetAlreadyRegistered,
     AssetIdNotRegistered,
     BaseTokenTotalSupplyBackfillNotNeeded,
     BaseTokenTotalSupplyBackfillRequired,
@@ -39,7 +40,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     bytes32 public BASE_TOKEN_ASSET_ID;
 
     /// @dev L2-side accounting used to compute the amount to keep on L1 during L1 -> Gateway migration.
-    mapping(bytes32 assetId => InteropL2Info info) internal interopInfo;
+    mapping(bytes32 assetId => InteropL2Info info) public interopInfo;
 
     /// @dev Token total supply snapshot captured before the first post-v31 bridge operation for each token.
     /// @dev For tokens that existed before the chain migrated to v31, it should be equal to `totalSuccessfulDeposits - totalWithdrawalsToL1`.
@@ -57,6 +58,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @dev This variable is expected to be deleted after v31 upgrade, once all the ZKsync OS chains have their base token
     /// amount backfilled.
     bool public needBaseTokenTotalSupplyBackfill;
+
+    /// @notice Returns the saved pre-V31 total supply snapshot for a given asset.
+    function savedTotalSupply(bytes32 _assetId) external view returns (bool isSaved, uint256 amount) {
+        SavedTotalSupply memory s = totalPreV31TotalSupply[_assetId];
+        return (s.isSaved, s.amount);
+    }
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -113,6 +120,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         // which sets totalPreV31TotalSupply[assetId] = {isSaved: true, amount: 0}.
         // For existing chains upgraded to V31, L2V31Upgrade calls registerBaseTokenDuringUpgrade()
         // which also sets totalPreV31TotalSupply to {isSaved: true, amount: 0}.
+        require(isAssetRegistered[BASE_TOKEN_ASSET_ID], AssetIdNotRegistered(BASE_TOKEN_ASSET_ID));
         SavedTotalSupply memory baseTokenPreV31TotalSupply = totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID];
         require(baseTokenPreV31TotalSupply.isSaved, TotalPreV31SupplyNotSaved(BASE_TOKEN_ASSET_ID));
         require(
@@ -173,14 +181,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// are truly new), this function is for upgrading existing chains where the base
     /// token already exists on-chain but the asset tracker is deployed during the
     /// current upgrade. The base token originates on L1 (non-native to this chain).
-    /// Returns without changes if the base token is already registered.
+    /// Reverts if the base token is already registered, since this is called first
+    /// during the upgrade and double-registration indicates a broken invariant.
     /// The real pre-V31 total supply is backfilled later via
     /// `backFillZKSyncOSBaseTokenV31MigrationData()`.
     function registerBaseTokenDuringUpgrade() external onlyUpgrader {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
-        if (isAssetRegistered[baseTokenAssetId]) {
-            return;
-        }
+        require(!isAssetRegistered[baseTokenAssetId], AssetAlreadyRegistered(baseTokenAssetId));
         isAssetRegistered[baseTokenAssetId] = true;
         totalPreV31TotalSupply[baseTokenAssetId] = SavedTotalSupply({isSaved: true, amount: 0});
 
@@ -370,8 +377,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @notice Handles the finalization of incoming base token bridging operations on L2.
     /// @dev This function is specifically for the chain's native base token used for gas payments.
+    /// @param _fromChainId The source chain ID of the bridging operation.
     /// @param _amount The amount of base tokens being bridged into this chain.
-    function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external onlyBaseTokenHolderOrL2BaseToken {
+    function handleFinalizeBaseTokenBridgingOnL2(
+        uint256 _fromChainId,
+        uint256 _amount
+    ) external onlyBaseTokenHolderOrL2BaseToken {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         if (_amount == 0) {
             return;
@@ -383,7 +394,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         }
 
         _handleFinalizeBridgingOnL2Inner({
-            _fromChainId: L1_CHAIN_ID,
+            _fromChainId: _fromChainId,
             _assetId: baseTokenAssetId,
             _amount: _amount,
             _tokenOriginChainId: L1_CHAIN_ID,

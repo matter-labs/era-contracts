@@ -27,7 +27,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
-import {AssetIdNotRegistered} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {AssetAlreadyRegistered, AssetIdNotRegistered} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
@@ -319,9 +319,9 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
 
         uint256 depositsBefore = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
 
-        // Call as BaseTokenHolder (onlyBaseTokenHolder modifier)
+        // Call as BaseTokenHolder (onlyBaseTokenHolderOrL2BaseToken modifier)
         vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
-        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(amount);
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, amount);
 
         // Verify chain balance did NOT increase (foreign token, not native)
         uint256 finalBalance = L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, baseTokenAssetId);
@@ -364,7 +364,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
 
         // Call as L2BaseToken (the Era flow: L2BaseTokenEra.mint() → asset tracker)
         vm.prank(address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
-        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(amount);
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, amount);
 
         // Verify totalSuccessfulDepositsFromL1 increased by amount
         uint256 depositsAfter = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
@@ -375,22 +375,12 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
     function test_handleFinalizeBaseTokenBridgingOnL2_revertUnauthorized() public {
         vm.prank(address(0xDEAD));
         vm.expectRevert();
-        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(100);
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(1, 100);
     }
 
     // ═══════════════════════════════════════════════════════════════════
     //  registerBaseTokenDuringUpgrade
     // ═══════════════════════════════════════════════════════════════════
-
-    /// @dev Storage slot for totalPreV31TotalSupply mapping from
-    /// `forge inspect L2AssetTracker storage-layout`.
-    uint256 private constant TOTAL_PRE_V31_TOTAL_SUPPLY_SLOT = 157;
-
-    function _readSavedTotalSupply(bytes32 _assetId) internal view returns (bool isSaved, uint256 amount) {
-        bytes32 baseSlot = keccak256(abi.encode(_assetId, TOTAL_PRE_V31_TOTAL_SUPPLY_SLOT));
-        isSaved = uint256(vm.load(L2_ASSET_TRACKER_ADDR, baseSlot)) != 0;
-        amount = uint256(vm.load(L2_ASSET_TRACKER_ADDR, bytes32(uint256(baseSlot) + 1)));
-    }
 
     /// @notice Verifies that registerBaseTokenDuringUpgrade registers the base token correctly.
     function test_registerBaseTokenDuringUpgrade_registersBaseToken() public {
@@ -420,37 +410,27 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         );
 
         // Verify totalPreV31TotalSupply was set to {isSaved: true, amount: 0}
-        (bool isSaved, uint256 amount) = _readSavedTotalSupply(baseTokenAssetId);
+        (bool isSaved, uint256 amount) = L2AssetTracker(L2_ASSET_TRACKER_ADDR).savedTotalSupply(baseTokenAssetId);
         assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
         assertEq(amount, 0, "totalPreV31TotalSupply.amount should be 0");
     }
 
-    /// @notice Verifies that registerBaseTokenDuringUpgrade is a no-op if already registered.
-    function test_registerBaseTokenDuringUpgrade_noopIfAlreadyRegistered() public {
+    /// @notice Verifies that registerBaseTokenDuringUpgrade reverts if already registered.
+    function test_registerBaseTokenDuringUpgrade_revertIfAlreadyRegistered() public {
         bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
 
         stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
 
-        // Pre-register the asset with a non-zero totalPreV31TotalSupply (simulating genesis registration)
+        // Pre-register the asset
         stdstore
             .target(L2_ASSET_TRACKER_ADDR)
             .sig("isAssetRegistered(bytes32)")
             .with_key(baseTokenAssetId)
             .checked_write(true);
 
-        // Write totalPreV31TotalSupply = {isSaved: true, amount: 42} via vm.store
-        bytes32 baseSlot = keccak256(abi.encode(baseTokenAssetId, TOTAL_PRE_V31_TOTAL_SUPPLY_SLOT));
-        vm.store(L2_ASSET_TRACKER_ADDR, baseSlot, bytes32(uint256(1))); // isSaved = true
-        vm.store(L2_ASSET_TRACKER_ADDR, bytes32(uint256(baseSlot) + 1), bytes32(uint256(42))); // amount = 42
-
-        // Call — should return early without overwriting totalPreV31TotalSupply
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        vm.expectRevert(abi.encodeWithSelector(AssetAlreadyRegistered.selector, baseTokenAssetId));
         L2_ASSET_TRACKER.registerBaseTokenDuringUpgrade();
-
-        // totalPreV31TotalSupply should remain {isSaved: true, amount: 42}
-        (bool isSaved, uint256 amount) = _readSavedTotalSupply(baseTokenAssetId);
-        assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should remain true");
-        assertEq(amount, 42, "totalPreV31TotalSupply.amount should remain unchanged");
     }
 
     /// @notice Verifies that only the ComplexUpgrader can call registerBaseTokenDuringUpgrade.

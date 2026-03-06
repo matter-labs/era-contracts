@@ -12,7 +12,7 @@ contract DummyL2AssetTracker {
 
     function handleInitiateBaseTokenBridgingOnL2(uint256, uint256) external {}
 
-    function handleFinalizeBaseTokenBridgingOnL2(uint256) external {}
+    function handleFinalizeBaseTokenBridgingOnL2(uint256, uint256) external {}
 
     function backFillZKSyncOSBaseTokenV31MigrationData(uint256) external {}
 }

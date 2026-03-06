@@ -347,7 +347,7 @@ contract L2BaseTokenEraTest is Test {
 
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSignature("handleFinalizeBaseTokenBridgingOnL2(uint256)", mintAmount)
+            abi.encodeWithSignature("handleFinalizeBaseTokenBridgingOnL2(uint256,uint256)", 1, mintAmount)
         );
 
         vm.prank(L2_BOOTLOADER_ADDRESS);

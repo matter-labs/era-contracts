@@ -23,21 +23,28 @@ pragma solidity ^0.8.20;
 /// - The hook validates that msg.sender is L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR (0x800A)
 /// - L2BaseTokenZKOS restricts initializeBaseTokenHolderBalance() to L2_COMPLEX_UPGRADER_ADDR only
 interface IBaseTokenHolder {
-    /// @notice Emitted when base tokens are given out (minted) from the holder to a recipient.
+    /// @notice Emitted when base tokens are given out from the holder via interop bridging.
+    /// @dev This event is only emitted for inbound bridging through BaseTokenHolder.give().
+    /// @dev On Era, L1 deposits go through L2BaseTokenEra.mint() which does NOT emit this event.
+    /// @dev Therefore, the sum of BaseTokenMintedInterop amounts may not equal the total inbound base token volume.
     /// @param to The address that received the base tokens.
     /// @param amount The amount of base tokens given out.
-    event BaseTokenMinted(address indexed to, uint256 amount);
+    event BaseTokenMintedInterop(address indexed to, uint256 amount);
 
-    /// @notice Emitted when base tokens are received (burnt) and bridging is initiated.
+    /// @notice Emitted when base tokens are received and outbound bridging is initiated.
+    /// @dev This event is only emitted for outbound bridging through BaseTokenHolder.burnAndStartBridging().
+    /// @dev On Era, L1 withdrawals go through L2BaseTokenEra which does NOT route back through this contract.
+    /// @dev Therefore, the sum of BaseTokenBurntInterop amounts may not equal the total outbound base token volume.
     /// @param from The address that sent the base tokens.
     /// @param toChainId The destination chain ID for the bridging operation.
     /// @param amount The amount of base tokens burnt.
-    event BaseTokenBurnt(address indexed from, uint256 toChainId, uint256 amount);
+    event BaseTokenBurntInterop(address indexed from, uint256 toChainId, uint256 amount);
 
     /// @notice Gives out base tokens from the holder to a recipient.
     /// @param _to The address to receive the base tokens.
     /// @param _amount The amount of base tokens to give out.
-    function give(address _to, uint256 _amount) external;
+    /// @param _fromChainId The source chain ID of the bridging operation.
+    function give(address _to, uint256 _amount, uint256 _fromChainId) external;
 
     /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
     /// @dev Called by InteropHandler, InteropCenter, NativeTokenVault, and L2BaseToken during bridging operations.

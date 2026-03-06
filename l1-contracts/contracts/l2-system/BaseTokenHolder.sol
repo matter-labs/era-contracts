@@ -102,14 +102,15 @@ contract BaseTokenHolder is IBaseTokenHolder {
     /// @dev rejects ETH. Only trusted recipients should be used to guarantee successful operation.
     /// @param _to The address to receive the base tokens.
     /// @param _amount The amount of base tokens to give out.
-    function give(address _to, uint256 _amount) external override onlyInteropHandler {
+    /// @param _fromChainId The source chain ID of the bridging operation.
+    function give(address _to, uint256 _amount, uint256 _fromChainId) external override onlyInteropHandler {
         if (_amount == 0) {
             return;
         }
 
         Address.sendValue(payable(_to), _amount);
-        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_amount);
-        emit BaseTokenMinted(_to, _amount);
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_fromChainId, _amount);
+        emit BaseTokenMintedInterop(_to, _amount);
     }
 
     /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
@@ -118,7 +119,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
     /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable onlyBridgingCaller {
         L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2(_toChainId, msg.value);
-        emit BaseTokenBurnt(msg.sender, _toChainId, msg.value);
+        emit BaseTokenBurntInterop(msg.sender, _toChainId, msg.value);
     }
 
     /// @notice Fallback to accept base token transfers from L2BaseToken only.

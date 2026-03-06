@@ -260,7 +260,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
             if (interopCall.value > 0) {
                 // Transfer base tokens from the BaseTokenHolder instead of minting.
-                L2_BASE_TOKEN_HOLDER.give(address(this), interopCall.value);
+                L2_BASE_TOKEN_HOLDER.give(address(this), interopCall.value, _sourceChainId);
             }
             // slither-disable-next-line arbitrary-send-eth
             bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({

@@ -88,7 +88,7 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
         // This decreases holder balance, which increases totalSupply() automatically
         eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR] -= _amount;
         eraAccountBalance[_account] += _amount;
-        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(_amount);
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(L2_ASSET_TRACKER.L1_CHAIN_ID(), _amount);
 
         emit Mint(_account, _amount);
     }
@@ -98,10 +98,10 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// @dev Formula: eraAccountBalance[holder] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply + eraAccountBalance[holder]
     /// @dev Can only be called by the ComplexUpgrader contract.
     function initializeBaseTokenHolderBalance() external override onlyComplexUpgrader {
-        if (baseTokenHolderInitialized) {
+        if (baseTokenHolderBalanceInitialized) {
             revert BaseTokenHolderAlreadyInitialized();
         }
-        baseTokenHolderInitialized = true;
+        baseTokenHolderBalanceInitialized = true;
 
         eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR] =
             INITIAL_BASE_TOKEN_HOLDER_BALANCE -

@@ -11,6 +11,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
@@ -475,21 +476,14 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     //  L2AssetTracker storage helpers (shared across test contracts)
     // ═══════════════════════════════════════════════════════════════════
 
-    /// @dev The `interopInfo` mapping is at storage slot 156 in L2AssetTracker
-    /// (verified via `forge inspect L2AssetTracker storage-layout`).
-    /// InteropL2Info struct layout:
-    ///   offset 0: totalWithdrawalsToL1
-    ///   offset 1: totalSuccessfulDepositsFromL1
-    uint256 internal constant INTEROP_INFO_MAPPING_SLOT = 156;
-
     function _readTotalWithdrawalsToL1(bytes32 _assetId) internal view returns (uint256) {
-        bytes32 baseSlot = keccak256(abi.encode(_assetId, INTEROP_INFO_MAPPING_SLOT));
-        return uint256(vm.load(L2_ASSET_TRACKER_ADDR, baseSlot));
+        (uint256 totalWithdrawalsToL1, ) = L2AssetTracker(L2_ASSET_TRACKER_ADDR).interopInfo(_assetId);
+        return totalWithdrawalsToL1;
     }
 
     function _readTotalSuccessfulDepositsFromL1(bytes32 _assetId) internal view returns (uint256) {
-        bytes32 baseSlot = keccak256(abi.encode(_assetId, INTEROP_INFO_MAPPING_SLOT));
-        return uint256(vm.load(L2_ASSET_TRACKER_ADDR, bytes32(uint256(baseSlot) + 1)));
+        (, uint256 totalSuccessfulDepositsFromL1) = L2AssetTracker(L2_ASSET_TRACKER_ADDR).interopInfo(_assetId);
+        return totalSuccessfulDepositsFromL1;
     }
 
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual;

@@ -50,10 +50,10 @@ contract BaseTokenHolderTest is Test {
         uint256 holderBalanceBefore = address(baseTokenHolder).balance;
 
         vm.expectEmit(true, false, false, true, address(baseTokenHolder));
-        emit IBaseTokenHolder.BaseTokenMinted(recipient, amount);
+        emit IBaseTokenHolder.BaseTokenMintedInterop(recipient, amount);
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        baseTokenHolder.give(recipient, amount);
+        baseTokenHolder.give(recipient, amount, ERA_CHAIN_ID);
 
         assertEq(recipient.balance, recipientBalanceBefore + amount, "Recipient should receive tokens");
         assertEq(address(baseTokenHolder).balance, holderBalanceBefore - amount, "Holder balance should decrease");
@@ -64,7 +64,7 @@ contract BaseTokenHolderTest is Test {
         uint256 holderBalanceBefore = address(baseTokenHolder).balance;
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        baseTokenHolder.give(recipient, 0);
+        baseTokenHolder.give(recipient, 0, ERA_CHAIN_ID);
 
         assertEq(recipient.balance, recipientBalanceBefore, "Recipient balance should not change");
         assertEq(address(baseTokenHolder).balance, holderBalanceBefore, "Holder balance should not change");
@@ -75,11 +75,11 @@ contract BaseTokenHolderTest is Test {
 
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
-            abi.encodeWithSelector(IL2AssetTracker.handleFinalizeBaseTokenBridgingOnL2.selector, amount)
+            abi.encodeWithSelector(IL2AssetTracker.handleFinalizeBaseTokenBridgingOnL2.selector, ERA_CHAIN_ID, amount)
         );
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        baseTokenHolder.give(recipient, amount);
+        baseTokenHolder.give(recipient, amount, ERA_CHAIN_ID);
     }
 
     function test_give_revertWhenRecipientRejectsETH() public {
@@ -90,7 +90,7 @@ contract BaseTokenHolderTest is Test {
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         vm.expectRevert("Address: unable to send value, recipient may have reverted");
-        baseTokenHolder.give(address(rejecting), amount);
+        baseTokenHolder.give(address(rejecting), amount, ERA_CHAIN_ID);
     }
 
     function test_give_revertWhenCalledByNonInteropHandler() public {
@@ -98,21 +98,21 @@ contract BaseTokenHolderTest is Test {
 
         vm.prank(nonInteropHandler);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonInteropHandler));
-        baseTokenHolder.give(recipient, 1 ether);
+        baseTokenHolder.give(recipient, 1 ether, ERA_CHAIN_ID);
     }
 
     function test_give_revertWhenCalledByInteropCenter() public {
         // InteropCenter can call burnAndStartBridging() but cannot call give()
         vm.prank(L2_INTEROP_CENTER_ADDR);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, L2_INTEROP_CENTER_ADDR));
-        baseTokenHolder.give(recipient, 1 ether);
+        baseTokenHolder.give(recipient, 1 ether, ERA_CHAIN_ID);
     }
 
     function test_give_revertWhenCalledByNativeTokenVault() public {
         // NTV can call burnAndStartBridging() but cannot call give()
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, L2_NATIVE_TOKEN_VAULT_ADDR));
-        baseTokenHolder.give(recipient, 1 ether);
+        baseTokenHolder.give(recipient, 1 ether, ERA_CHAIN_ID);
     }
 
     function testFuzz_give_variousAmounts(uint256 amount) public {
@@ -121,7 +121,7 @@ contract BaseTokenHolderTest is Test {
         uint256 recipientBalanceBefore = recipient.balance;
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        baseTokenHolder.give(recipient, amount);
+        baseTokenHolder.give(recipient, amount, ERA_CHAIN_ID);
 
         assertEq(recipient.balance, recipientBalanceBefore + amount, "Recipient should receive correct amount");
     }
@@ -221,7 +221,7 @@ contract BaseTokenHolderTest is Test {
         );
 
         vm.expectEmit(true, false, false, true, address(baseTokenHolder));
-        emit IBaseTokenHolder.BaseTokenBurnt(_caller, _toChainId, amount);
+        emit IBaseTokenHolder.BaseTokenBurntInterop(_caller, _toChainId, amount);
 
         vm.prank(_caller);
         baseTokenHolder.burnAndStartBridging{value: amount}(_toChainId);
@@ -304,7 +304,7 @@ contract BaseTokenHolderTest is Test {
 
         // Verify give() is callable (zero amount returns early, no mocks needed)
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-        holder.give(recipient, 0);
+        holder.give(recipient, 0, ERA_CHAIN_ID);
 
         // Verify burnAndStartBridging() is callable
         vm.deal(L2_INTEROP_HANDLER_ADDR, 1);
