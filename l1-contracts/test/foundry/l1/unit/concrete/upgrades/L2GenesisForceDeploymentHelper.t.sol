@@ -169,7 +169,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         bytes memory additionalEncoded = abi.encode(additionalData);
         _deployMockContract(GW_ASSET_TRACKER_ADDR);
 
-        // Etch L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR for initializeBaseTokenHolderBalance call during genesis
+        // Etch L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR for initL2 call during genesis
         _deployMockContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
 
         // For Era deployments, no proxy admin is needed
@@ -437,8 +437,6 @@ contract MockContract {
     }
 
     function initializeV3(string memory, string memory, address, address, bytes32) external {}
-
-    function initializeBaseTokenHolderBalance() external {}
 
     function makeAddr(string memory name) internal pure returns (address) {
         return address(uint160(uint256(keccak256(abi.encodePacked(name)))));

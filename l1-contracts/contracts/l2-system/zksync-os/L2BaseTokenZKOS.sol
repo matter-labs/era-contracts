@@ -27,9 +27,10 @@ import {
  *
  * ## Initialization (Genesis/Upgrade)
  *
- * During genesis or V31 upgrade, `initializeBaseTokenHolderBalance()` must be called to:
- * 1. Mint 2^127 - 1 tokens to this contract via the MINT_BASE_TOKEN_HOOK
- * 2. Transfer all tokens to BaseTokenHolder to establish the balance invariant
+ * During genesis or V31 upgrade, `initL2()` must be called to:
+ * 1. Set the L1 chain ID
+ * 2. Mint 2^127 - 1 tokens to this contract via the MINT_BASE_TOKEN_HOOK
+ * 3. Transfer all tokens to BaseTokenHolder to establish the balance invariant
  *
  * This function must be called via the ComplexUpgrader contract using delegatecall.
  * The ComplexUpgrader (at L2_COMPLEX_UPGRADER_ADDR) is the only authorized caller.
@@ -78,14 +79,17 @@ contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
         emit ZKsyncOSPreV31TotalSupplySet(_totalSupply);
     }
 
-    /// @notice Initializes the BaseTokenHolder's balance during genesis or V31 upgrade.
-    /// @dev This function mints 2^127 - 1 tokens to this contract via the mint hook, then transfers all tokens to BaseTokenHolder.
+    /// @notice Initializes the L2 Base Token contract during genesis or V31 upgrade.
+    /// @dev Sets the L1 chain ID, mints 2^127 - 1 tokens to this contract via the mint hook,
+    /// then transfers all tokens to BaseTokenHolder.
     /// @dev Can only be called by the ComplexUpgrader contract.
-    function initializeBaseTokenHolderBalance() external onlyComplexUpgrader {
+    /// @param _l1ChainId The chain ID of L1.
+    function initL2(uint256 _l1ChainId) external onlyComplexUpgrader {
         if (baseTokenHolderBalanceInitialized) {
             revert BaseTokenHolderAlreadyInitialized();
         }
         baseTokenHolderBalanceInitialized = true;
+        L1_CHAIN_ID = _l1ChainId;
 
         // Mint INITIAL_BASE_TOKEN_HOLDER_BALANCE tokens to this contract via the mint hook
         (bool mintSuccess, ) = MINT_BASE_TOKEN_HOOK.call(abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE));

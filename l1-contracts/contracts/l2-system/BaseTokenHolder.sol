@@ -86,7 +86,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
     }
 
     /// @notice Modifier that restricts access to L2BaseToken only.
-    /// @dev Used for receiving initial balance during initializeBaseTokenHolderBalance.
+    /// @dev Used for receiving initial balance during initL2.
     modifier onlyL2BaseToken() {
         if (msg.sender != L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR) {
             revert Unauthorized(msg.sender);
@@ -123,7 +123,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
     }
 
     /// @notice Fallback to accept base token transfers from L2BaseToken only.
-    /// @dev Only accepts transfers from L2BaseToken during initializeBaseTokenHolderBalance.
+    /// @dev Only accepts transfers from L2BaseToken during initL2.
     /// @dev For bridging operations, use burnAndStartBridging() instead.
     receive() external payable onlyL2BaseToken {}
 }

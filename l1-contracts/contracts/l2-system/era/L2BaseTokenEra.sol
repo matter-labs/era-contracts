@@ -88,20 +88,22 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
         // This decreases holder balance, which increases totalSupply() automatically
         eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR] -= _amount;
         eraAccountBalance[_account] += _amount;
-        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(L2_ASSET_TRACKER.L1_CHAIN_ID(), _amount);
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(L1_CHAIN_ID, _amount);
 
         emit Mint(_account, _amount);
     }
 
-    /// @notice Initializes the BaseTokenHolder's balance during the V31 upgrade.
-    /// @dev Sets the holder balance so that the new computed totalSupply() equals the old value.
+    /// @notice Initializes the L2 Base Token contract during the V31 upgrade.
+    /// @dev Sets the L1 chain ID and initializes the BaseTokenHolder balance.
     /// @dev Formula: eraAccountBalance[holder] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply + eraAccountBalance[holder]
     /// @dev Can only be called by the ComplexUpgrader contract.
-    function initializeBaseTokenHolderBalance() external override onlyComplexUpgrader {
+    /// @param _l1ChainId The chain ID of L1.
+    function initL2(uint256 _l1ChainId) external override onlyComplexUpgrader {
         if (baseTokenHolderBalanceInitialized) {
             revert BaseTokenHolderAlreadyInitialized();
         }
         baseTokenHolderBalanceInitialized = true;
+        L1_CHAIN_ID = _l1ChainId;
 
         eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR] =
             INITIAL_BASE_TOKEN_HOLDER_BALANCE -

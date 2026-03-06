@@ -64,6 +64,9 @@ contract L2BaseTokenEraTest is Test {
         // Deploy dummy BaseTokenHolder that accepts ETH from any sender.
         // Tests that need real access-control checks etch the real BaseTokenHolder instead.
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new DummyL2BaseTokenHolder()).code);
+
+        // Set L1_CHAIN_ID = 1 (slot 3 in L2BaseTokenBase storage layout)
+        vm.store(address(l2BaseToken), bytes32(uint256(3)), bytes32(uint256(1)));
     }
 
     /// @dev Helper to set up eraAccountBalance for an address via transferFromTo from bootloader.
@@ -107,7 +110,7 @@ contract L2BaseTokenEraTest is Test {
 
         // Initialize holder balance
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2BaseToken.initializeBaseTokenHolderBalance();
+        l2BaseToken.initL2(1);
 
         // totalSupply should equal existing supply
         // holder = INITIAL - existingSupply + 0 => totalSupply = INITIAL - (INITIAL - existingSupply) = existingSupply
@@ -383,17 +386,17 @@ contract L2BaseTokenEraTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                initializeBaseTokenHolderBalance() TESTS
+                initL2() TESTS
     //////////////////////////////////////////////////////////////*/
 
-    function test_initializeBaseTokenHolderBalance_success() public {
+    function test_initL2_success() public {
         uint256 existingSupply = 100 ether;
 
         // Set __DEPRECATED_totalSupply (slot 1)
         vm.store(address(l2BaseToken), bytes32(uint256(1)), bytes32(existingSupply));
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2BaseToken.initializeBaseTokenHolderBalance();
+        l2BaseToken.initL2(1);
 
         // holder = INITIAL - existingSupply + 0 (no prior holder balance)
         uint256 expectedHolderBalance = INITIAL_BASE_TOKEN_HOLDER_BALANCE - existingSupply;
@@ -407,7 +410,7 @@ contract L2BaseTokenEraTest is Test {
         assertEq(l2BaseToken.totalSupply(), existingSupply, "totalSupply should equal existing supply");
     }
 
-    function test_initializeBaseTokenHolderBalance_preservesExistingHolderBalance() public {
+    function test_initL2_preservesExistingHolderBalance() public {
         uint256 existingSupply = 50 ether;
         uint256 existingHolderBalance = 10 ether;
 
@@ -418,7 +421,7 @@ contract L2BaseTokenEraTest is Test {
         _setHolderBalance(existingHolderBalance);
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2BaseToken.initializeBaseTokenHolderBalance();
+        l2BaseToken.initL2(1);
 
         // holder = INITIAL - existingSupply + existingHolderBalance
         uint256 expectedHolderBalance = INITIAL_BASE_TOKEN_HOLDER_BALANCE - existingSupply + existingHolderBalance;
@@ -429,10 +432,10 @@ contract L2BaseTokenEraTest is Test {
         );
     }
 
-    function test_initializeBaseTokenHolderBalance_zeroExistingSupply() public {
+    function test_initL2_zeroExistingSupply() public {
         // __DEPRECATED_totalSupply defaults to 0
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2BaseToken.initializeBaseTokenHolderBalance();
+        l2BaseToken.initL2(1);
 
         // holder = INITIAL - 0 + 0 = INITIAL
         assertEq(
@@ -444,35 +447,35 @@ contract L2BaseTokenEraTest is Test {
         assertEq(l2BaseToken.totalSupply(), 0, "totalSupply should be 0 when no existing supply");
     }
 
-    function test_initializeBaseTokenHolderBalance_revertIfNotComplexUpgrader() public {
+    function test_initL2_revertIfNotComplexUpgrader() public {
         address nonUpgrader = makeAddr("nonUpgrader");
 
         vm.prank(nonUpgrader);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, nonUpgrader));
-        l2BaseToken.initializeBaseTokenHolderBalance();
+        l2BaseToken.initL2(1);
     }
 
-    function test_initializeBaseTokenHolderBalance_revertsOnSecondCall() public {
+    function test_initL2_revertsOnSecondCall() public {
         uint256 existingSupply = 100 ether;
         vm.store(address(l2BaseToken), bytes32(uint256(1)), bytes32(existingSupply));
 
         // First call succeeds
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2BaseToken.initializeBaseTokenHolderBalance();
+        l2BaseToken.initL2(1);
 
         // Second call reverts with BaseTokenHolderAlreadyInitialized
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         vm.expectRevert(BaseTokenHolderAlreadyInitialized.selector);
-        l2BaseToken.initializeBaseTokenHolderBalance();
+        l2BaseToken.initL2(1);
     }
 
-    function testFuzz_initializeBaseTokenHolderBalance_variousSupplies(uint256 existingSupply) public {
+    function testFuzz_initL2_variousSupplies(uint256 existingSupply) public {
         vm.assume(existingSupply <= INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
         vm.store(address(l2BaseToken), bytes32(uint256(1)), bytes32(existingSupply));
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2BaseToken.initializeBaseTokenHolderBalance();
+        l2BaseToken.initL2(1);
 
         assertEq(
             l2BaseToken.totalSupply(),
@@ -522,11 +525,13 @@ contract L2BaseTokenEraTest is Test {
         // Deploy at system contract address so it passes onlyBridgingCaller check
         L2BaseTokenEra l2BaseTokenAtSystemAddr = new L2BaseTokenEra();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
+        // Set L1_CHAIN_ID = 1 on the system-address instance
+        vm.store(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, bytes32(uint256(3)), bytes32(uint256(1)));
 
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
-        // L1_CHAIN_ID mock returns 1, so expect toChainId = 1
+        // L1_CHAIN_ID = 1, so expect toChainId = 1
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
             abi.encodeWithSignature("handleInitiateBaseTokenBridgingOnL2(uint256,uint256)", 1, WITHDRAW_AMOUNT)

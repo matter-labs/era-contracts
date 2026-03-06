@@ -22,7 +22,9 @@ contract L2V31Upgrade is V31AcrossRecovery, IL2V31Upgrade {
         // Register the base token in the asset tracker.
         IL2AssetTracker(L2_ASSET_TRACKER_ADDR).registerBaseTokenDuringUpgrade();
 
-        // Initialize the BaseTokenHolder balance in L2BaseToken.
-        IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initializeBaseTokenHolderBalance();
+        // Initialize the L2BaseToken (sets L1_CHAIN_ID and BaseTokenHolder balance).
+        IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(
+            IL2AssetTracker(L2_ASSET_TRACKER_ADDR).L1_CHAIN_ID()
+        );
     }
 }

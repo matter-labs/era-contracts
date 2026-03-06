@@ -588,12 +588,12 @@ library L2GenesisForceDeploymentsHelper {
 
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
 
-        // Initialize BaseTokenHolder balance during genesis for both Era and ZKOS chains.
-        // This mints the initial token supply and transfers it to BaseTokenHolder.
+        // Initialize L2BaseToken during genesis for both Era and ZKOS chains.
+        // Sets L1_CHAIN_ID and initializes the BaseTokenHolder balance.
         // For Era: reads __DEPRECATED_totalSupply and computes holder balance
         // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder
         if (_isGenesisUpgrade) {
-            IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initializeBaseTokenHolderBalance();
+            IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
         }
 
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();

@@ -5,11 +5,7 @@ pragma solidity 0.8.28;
 import {IL2BaseTokenBase} from "./interfaces/IL2BaseTokenBase.sol";
 import {IMailboxLegacy} from "../state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {
-    L2_ASSET_TRACKER,
-    L2_BASE_TOKEN_HOLDER,
-    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
-} from "../common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_BASE_TOKEN_HOLDER, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {Unauthorized} from "../common/L1ContractErrors.sol";
 
 /**
@@ -39,16 +35,19 @@ abstract contract L2BaseTokenBase is IL2BaseTokenBase {
     // slither-disable-next-line uninitialized-state
     uint256 internal __DEPRECATED_totalSupply;
 
-    /// @notice Whether initializeBaseTokenHolderBalance has already been called.
+    /// @notice Whether initL2 has already been called.
     bool internal baseTokenHolderBalanceInitialized;
 
+    /// @notice The chain ID of L1.
+    uint256 public L1_CHAIN_ID;
+
     /// @dev Storage gap to allow adding new shared storage variables in future upgrades.
-    uint256[47] private __gap;
+    uint256[46] private __gap;
 
     /// @notice Initiate the withdrawal of the base token, funds will be available to claim on L1 `finalizeEthWithdrawal` method.
     /// @param _l1Receiver The address on L1 to receive the funds.
     function withdraw(address _l1Receiver) external payable override {
-        uint256 amount = _burnMsgValue(L2_ASSET_TRACKER.L1_CHAIN_ID());
+        uint256 amount = _burnMsgValue(L1_CHAIN_ID);
 
         // Send the L2 log, a user could use it as proof of the withdrawal
         bytes memory message = _getL1WithdrawMessage(_l1Receiver, amount);
@@ -62,7 +61,7 @@ abstract contract L2BaseTokenBase is IL2BaseTokenBase {
     /// @param _l1Receiver The address on L1 to receive the funds.
     /// @param _additionalData Additional data to be sent to L1 with the withdrawal.
     function withdrawWithMessage(address _l1Receiver, bytes calldata _additionalData) external payable override {
-        uint256 amount = _burnMsgValue(L2_ASSET_TRACKER.L1_CHAIN_ID());
+        uint256 amount = _burnMsgValue(L1_CHAIN_ID);
 
         // Send the L2 log, a user could use it as proof of the withdrawal
         bytes memory message = _getExtendedWithdrawMessage(_l1Receiver, amount, msg.sender, _additionalData);
@@ -73,8 +72,7 @@ abstract contract L2BaseTokenBase is IL2BaseTokenBase {
     }
 
     /// @dev Burns the sent `msg.value` by sending it to BaseTokenHolder and notifying the AssetTracker.
-    /// @param _toChainId The chain ID which the funds are sent to. L1 chain ID is not accessible within this
-    /// contract, so we use 0 as a placeholder to keep the initialization of the contract simpler.
+    /// @param _toChainId The chain ID which the funds are sent to.
     /// @return amount The amount of ETH that was burned.
     function _burnMsgValue(uint256 _toChainId) internal virtual returns (uint256 amount) {
         amount = msg.value;

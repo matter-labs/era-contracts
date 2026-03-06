@@ -15,13 +15,13 @@ pragma solidity ^0.8.20;
 /// After minting, the tokens can be transferred using Address.sendValue() or regular ETH transfers.
 ///
 /// This hook is used during genesis/upgrade to initialize the BaseTokenHolder balance:
-/// 1. L2BaseTokenZKOS.initializeBaseTokenHolderBalance() calls this hook to mint 2^127-1 tokens
+/// 1. L2BaseTokenZKOS.initL2() calls this hook to mint 2^127-1 tokens
 /// 2. The minted tokens are then transferred to L2_BASE_TOKEN_HOLDER_ADDR
 /// 3. This establishes the initial token supply invariant for the chain
 ///
 /// Authorization:
 /// - The hook validates that msg.sender is L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR (0x800A)
-/// - L2BaseTokenZKOS restricts initializeBaseTokenHolderBalance() to L2_COMPLEX_UPGRADER_ADDR only
+/// - L2BaseTokenZKOS restricts initL2() to L2_COMPLEX_UPGRADER_ADDR only
 interface IBaseTokenHolder {
     /// @notice Emitted when base tokens are given out from the holder via interop bridging.
     /// @dev This event is only emitted for inbound bridging through BaseTokenHolder.give().
