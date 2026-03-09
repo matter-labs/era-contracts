@@ -8,11 +8,17 @@ import {FeeParams, PubdataPricingMode} from "../../state-transition/chain-deps/Z
 contract DummyZKChain is MailboxFacet {
     constructor(
         address bridgeHubAddress,
+        uint256 _eraChainId, //TODO remove after mailbox fn deprecation
         uint256 _l1ChainId,
         address _chainAssetHandler,
         IEIP7702Checker _eip7702Checker
-    ) MailboxFacet(_l1ChainId, _chainAssetHandler, _eip7702Checker, false) {
+    ) MailboxFacet(_eraChainId, _l1ChainId, _chainAssetHandler, _eip7702Checker, false) {
         s.bridgehub = bridgeHubAddress;
+    }
+
+    function getEraChainId() public view returns (uint256) {
+        //TODO remove after mailbox fn deprecation
+        return ERA_CHAIN_ID;
     }
 
     function setBridgeHubAddress(address bridgeHubAddress) public {

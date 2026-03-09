@@ -169,7 +169,13 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
         facetCuts.push(
             Diamond.FacetCut({
                 facet: address(
-                    new MailboxFacet(block.chainid, address(0), IEIP7702Checker(makeAddr("eip7702Checker")), false)
+                    new MailboxFacet(
+                        eraChainId,
+                        block.chainid,
+                        address(0),
+                        IEIP7702Checker(makeAddr("eip7702Checker")),
+                        false
+                    )
                 ),
                 action: Diamond.Action.Add,
                 isFreezable: false,

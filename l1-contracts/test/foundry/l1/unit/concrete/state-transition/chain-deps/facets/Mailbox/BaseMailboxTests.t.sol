@@ -16,7 +16,8 @@ contract MailboxBaseTests is MailboxTest {
     }
 
     function test_mailboxConstructor() public {
-        new DummyZKChain(address(0), block.chainid, address(0), eip7702Checker);
+        DummyZKChain h = new DummyZKChain(address(0), eraChainId, block.chainid, address(0), eip7702Checker);
+        assertEq(h.getEraChainId(), eraChainId);
     }
 
     function test_RevertWhen_badDenominatorInL2TransactionBaseCost() public {
