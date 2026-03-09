@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/cryptography/EIP712Upgradeable.sol";
 import {AddressHasNoCode} from "../../common/L1ContractErrors.sol";
+import {AlreadySigned, InitializeNotAvailable, NotEnoughSignatures, NotSigner} from "../L1StateTransitionErrors.sol";
 import {ValidatorTimelock} from "./ValidatorTimelock.sol";
 import {IValidatorTimelock} from "./interfaces/IValidatorTimelock.sol";
 import {IEraMultisigValidator} from "./interfaces/IEraMultisigValidator.sol";
@@ -17,6 +18,8 @@ import {IEraMultisigValidator} from "./interfaces/IEraMultisigValidator.sol";
 /// calls are forwarded directly, while execute calls require that enough multisig members have
 /// pre-approved the exact execution parameters via `approveHash`.
 /// @dev Expected to be deployed as a TransparentUpgradeableProxy.
+/// @dev In order for the validator to work correctly, the execution delay should be the same as in the actual validator timelock (as the server would fetch it). Note
+/// that this contract itself does NOT enforce the timelock in any way, it just forwards the calls to the underlying `ValidatorTimelock` after checking for multisig approvals.
 contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP712Upgradeable {
     /// @dev EIP-712 typehash for the ExecuteBatches struct.
     bytes32 internal constant EXECUTE_BATCHES_TYPEHASH =

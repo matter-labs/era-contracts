@@ -13,8 +13,8 @@ import {ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
-import {AddressHasNoCode} from "contracts/common/L1ContractErrors.sol";
-import {RoleAccessDenied} from "contracts/common/L1ContractErrors.sol";
+import {AddressHasNoCode, RoleAccessDenied} from "contracts/common/L1ContractErrors.sol";
+import {AlreadySigned, InitializeNotAvailable, NotEnoughSignatures, NotSigner} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract EraMultisigValidatorTest is Test {
     EraMultisigValidator eraMultisig;
@@ -327,7 +327,7 @@ contract EraMultisigValidatorTest is Test {
         bytes32 hash = _sampleHash();
 
         vm.prank(nonMember);
-        vm.expectRevert(IEraMultisigValidator.NotSigner.selector);
+        vm.expectRevert(NotSigner.selector);
         eraMultisig.approveHash(hash);
     }
 
@@ -338,7 +338,7 @@ contract EraMultisigValidatorTest is Test {
         eraMultisig.approveHash(hash);
 
         vm.prank(member1);
-        vm.expectRevert(IEraMultisigValidator.AlreadySigned.selector);
+        vm.expectRevert(AlreadySigned.selector);
         eraMultisig.approveHash(hash);
     }
 
@@ -477,7 +477,7 @@ contract EraMultisigValidatorTest is Test {
         eraMultisig.approveHash(hash);
 
         vm.prank(executor);
-        vm.expectRevert(IEraMultisigValidator.NotEnoughSignatures.selector);
+        vm.expectRevert(NotEnoughSignatures.selector);
         eraMultisig.executeBatchesSharedBridge(chainAddress, from, to, data);
     }
 
@@ -485,7 +485,7 @@ contract EraMultisigValidatorTest is Test {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
 
         vm.prank(executor);
-        vm.expectRevert(IEraMultisigValidator.NotEnoughSignatures.selector);
+        vm.expectRevert(NotEnoughSignatures.selector);
         eraMultisig.executeBatchesSharedBridge(chainAddress, from, to, data);
     }
 
@@ -518,7 +518,7 @@ contract EraMultisigValidatorTest is Test {
         eraMultisig.changeExecutionMultisigMember(toAdd, toRemove);
 
         vm.prank(executor);
-        vm.expectRevert(IEraMultisigValidator.NotEnoughSignatures.selector);
+        vm.expectRevert(NotEnoughSignatures.selector);
         eraMultisig.executeBatchesSharedBridge(chainAddress, from, to, data);
     }
 
@@ -573,7 +573,7 @@ contract EraMultisigValidatorTest is Test {
         eraMultisig.approveHash(hash);
 
         vm.prank(executor);
-        vm.expectRevert(IEraMultisigValidator.NotEnoughSignatures.selector);
+        vm.expectRevert(NotEnoughSignatures.selector);
         eraMultisig.executeBatchesSharedBridge(chainAddress, from, to, data);
     }
 

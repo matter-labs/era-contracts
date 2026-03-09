@@ -6,6 +6,8 @@ pragma solidity ^0.8.21;
 error AdminZero();
 // 0xca1c3cbc
 error AlreadyMigrated();
+// 0xb0bd6aca
+error AlreadySigned();
 // 0x125d99b0
 error BlobHashBlobCommitmentMismatchValue();
 // 0xafda12bf
@@ -24,6 +26,8 @@ error DepositsPaused();
 error ExecutedIsNotConsistentWithVerified(uint256 batchesExecuted, uint256 batchesVerified);
 // 0xc866ff2c
 error InitialForceDeploymentMismatch(bytes32 forceDeploymentHash, bytes32 initialForceDeploymentHash);
+// 0xeaeeb154
+error InitializeNotAvailable();
 // 0xfbd630b8
 error InvalidBatchesDataLength(uint256 batchesDataLength, uint256 priorityOpsDataLength);
 // 0xc06789fa
@@ -62,6 +66,8 @@ error NotAllBatchesExecuted();
 error NotAPatchUpgrade(uint256 oldProtocolVersion, uint256 newProtocolVersion);
 // 0xf05c64c6
 error NotChainAdmin(address prevMsgSender, address admin);
+// 0xe246dc63
+error NotEnoughSignatures();
 // 0x8fd63d21
 error NotEraChain();
 // 0xa7050bf6
@@ -74,12 +80,16 @@ error NotL1(uint256 blockChainId);
 error NotMigrated();
 // 0xd0266e26
 error NotSettlementLayer();
+// 0xa1b035c8
+error NotSigner();
 // 0x04e05fd1
 error OnlyOneBlobWithCalldataAllowed();
 // 0x885ae069
 error OperatorDAInputTooSmall(uint256 operatorDAInputLength, uint256 minAllowedLength);
 // 0x681150be
 error OutdatedProtocolVersion(uint256 protocolVersion, uint256 currentProtocolVersion);
+// 0x311ca4b0
+error PriorityModeAlreadyAllowed();
 // 0xfe26193e
 error PriorityQueueNotFullyProcessed();
 // 0xc59d372c
@@ -100,5 +110,3 @@ error UnsupportedProofMetadataVersion(uint256 metadataVersion);
 error ValL1DAWrongInputLength(uint256 inputLength, uint256 expectedLength);
 // 0x712d02d2
 error VerifiedIsNotConsistentWithCommitted(uint256 batchesVerified, uint256 batchesCommitted);
-// 0x311ca4b0
-error PriorityModeAlreadyAllowed();
