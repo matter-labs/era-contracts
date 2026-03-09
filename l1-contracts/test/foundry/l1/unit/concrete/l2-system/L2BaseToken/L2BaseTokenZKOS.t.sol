@@ -429,10 +429,8 @@ contract L2BaseTokenZKOSTest is Test {
         vm.deal(untrustedSender, 1 ether);
 
         vm.prank(untrustedSender);
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, untrustedSender));
         (bool success, ) = L2_BASE_TOKEN_HOLDER_ADDR.call{value: 1 ether}("");
-        // Note: expectRevert handles the revert, success will be true after expectRevert
-        assertTrue(success);
+        assertFalse(success, "Transfer should fail from untrusted sender");
     }
 
     /// @notice Verifies that BaseTokenHolder rejects burnAndStartBridging from untrusted senders

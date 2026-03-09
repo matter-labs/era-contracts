@@ -48,7 +48,6 @@ interface IBaseTokenHolder {
 
     /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
     /// @dev Called by InteropHandler, InteropCenter, NativeTokenVault, and L2BaseToken during bridging operations.
-    /// @param _toChainId The chain ID which the funds are sent to. L1 chain ID is not accessible within this
-    /// contract, so we use 0 as a placeholder to keep the initialization of the contract simpler.
+    /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable;
 }
