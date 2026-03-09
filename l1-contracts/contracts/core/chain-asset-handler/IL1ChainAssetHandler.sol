@@ -9,6 +9,8 @@ import {MigrationInterval} from "./IChainAssetHandler.sol";
 interface IL1ChainAssetHandler {
     function isMigrationInProgress(uint256 _chainId) external view returns (bool);
 
+    function isReadyForMigration(uint256 _chainId) external view returns (bool);
+
     /// @notice Returns the migration interval for a chain at a specific migration number.
     /// @param _chainId The ID of the chain.
     /// @param _migrationNumber The migration number (0 for legacy GW, 1+ for regular migrations).
@@ -33,10 +35,12 @@ interface IL1ChainAssetHandler {
     /// @param _chainId The ID of the chain.
     /// @param _batchNumber The batch number to check.
     /// @param _claimedSettlementLayer The settlement layer chain ID claimed in the proof.
+    /// @param _claimedSettlementLayerBatchNumber The batch number on the settlement layer claimed in the proof.
     /// @return True if the claimed settlement layer is valid for this chain and batch.
     function isValidSettlementLayer(
         uint256 _chainId,
         uint256 _batchNumber,
-        uint256 _claimedSettlementLayer
+        uint256 _claimedSettlementLayer,
+        uint256 _claimedSettlementLayerBatchNumber
     ) external view returns (bool);
 }

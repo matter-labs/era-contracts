@@ -447,6 +447,21 @@ object "Bootloader" {
                 ret := mload(SETTLEMENT_LAYER_CHAIN_ID_BYTE())
             }
 
+            /// @dev The slot dedicated for storing the interop fee.
+            function INTEROP_FEE_SLOT() -> ret {
+                ret := add(SETTLEMENT_LAYER_CHAIN_ID_SLOT(), 1)
+            }
+
+            /// @dev The byte starting from which the interop fee is stored.
+            function INTEROP_FEE_BYTE() -> ret {
+                ret := mul(INTEROP_FEE_SLOT(), 32)
+            }
+
+            /// @dev Returns the interop fee value for a given block index.
+            function getInteropFee() -> ret {
+                ret := mload(INTEROP_FEE_BYTE())
+            }
+
             /// @dev The slot starting from which the compressed bytecodes are located in the bootloader's memory.
             /// Each compressed bytecode is provided in the following format:
             /// - 32 byte formatted bytecode hash
@@ -458,7 +473,7 @@ object "Bootloader" {
             /// At the start of the bootloader, the value stored at the `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT` is equal to
             /// `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT + 32`, where the hash of the first compressed bytecode to publish should be stored.
             function COMPRESSED_BYTECODES_BEGIN_SLOT() -> ret {
-                ret := add(SETTLEMENT_LAYER_CHAIN_ID_SLOT(), 1)
+                ret := add(INTEROP_FEE_SLOT(), 1)
             }
 
             /// @dev The byte starting from which the compressed bytecodes are located in the bootloader's memory.
@@ -677,7 +692,7 @@ object "Bootloader" {
             }
 
             function L2_INTEROP_CENTER_ADDR() -> ret {
-                ret := 0x000000000000000000000000000000000001000b
+                ret := 0x000000000000000000000000000000000001000d
             }
 
             /// @dev The minimal allowed distance in bytes between the pointer to the compressed data
@@ -1761,7 +1776,7 @@ object "Bootloader" {
                 mstore(4, address)
                 let success := call(
                     gas(),
-                    KNOWN_CODES_CONTRACT_ADDR(),
+                    ACCOUNT_CODE_STORAGE_ADDR(),
                     0,
                     0,
                     36,
@@ -2155,11 +2170,18 @@ object "Bootloader" {
 
                 let value := getValue(innerTxDataOffset)
 
-                let success := msgValueSimulatorMimicCall(
+                let isEvmDeployment, actualTo, actualDataPtr := prepareEthCallForEvmDeployment(
                     to,
                     from,
-                    value,
+                    innerTxDataOffset,
                     dataPtr
+                )
+
+                let success := msgValueSimulatorMimicCall(
+                    actualTo,
+                    from,
+                    value,
+                    actualDataPtr
                 )
 
                 if iszero(success) {
@@ -2187,11 +2209,155 @@ object "Bootloader" {
 
                 // Store results of the call in the memory.
                 if success {
+                    if isEvmDeployment {
+                        returnEvmDeploymentBytecode()
+                    }
+
                     let returnsize := returndatasize()
                     returndatacopy(0,0,returnsize)
                     return(0,returnsize)
                 }
 
+            }
+
+            function isEvmDeploymentEthCall(to, innerTxDataOffset) -> ret {
+                ret := and(
+                    eq(to, 0),
+                    eq(getReserved1(innerTxDataOffset), 1)
+                )
+            }
+
+            function bumpNonceForEvmDeployment(from, innerTxDataOffset) {
+                let nonce := getNonce(innerTxDataOffset)
+
+                let nonceBumpDataPtr := 0
+                mstore(nonceBumpDataPtr, 36)
+                mstore(add(nonceBumpDataPtr, 32), shl(224, {{INCREMENT_MIN_NONCE_IF_EQUALS_SELECTOR}}))
+                mstore(add(nonceBumpDataPtr, 36), nonce)
+
+                let nonceBumpSuccess := mimicCallOnlyResult(
+                    NONCE_HOLDER_ADDR(),
+                    from,
+                    nonceBumpDataPtr,
+                    0,
+                    1,
+                    0,
+                    0,
+                    0
+                )
+                if iszero(nonceBumpSuccess) {
+                    revertWithReason(
+                        ETH_CALL_ERR_CODE(),
+                        1
+                    )
+                }
+            }
+
+            function encodeCreateEvmCalldata(dataPtr) -> ret {
+                // `createEVM(bytes)` call encoding:
+                // [selector (4)][offset (32)][length (32)][initCode (N)].
+                // We place metadata right before the existing initCode bytes, so copying is not needed.
+                let initCodeLength := mload(dataPtr)
+                ret := safeSub(dataPtr, 68, "ev1")
+                mstore(ret, safeAdd(initCodeLength, 68, "ev2"))
+                mstore(add(ret, 32), shl(224, {{CREATE_EVM_SELECTOR}}))
+                mstore(add(ret, 36), 32)
+                mstore(add(ret, 68), initCodeLength)
+            }
+
+            function prepareEthCallForEvmDeployment(
+                to,
+                from,
+                innerTxDataOffset,
+                dataPtr
+            ) -> isEvmDeployment, actualTo, actualDataPtr {
+                actualTo := to
+                actualDataPtr := dataPtr
+                isEvmDeployment := isEvmDeploymentEthCall(to, innerTxDataOffset)
+
+                if isEvmDeployment {
+                    // `from` can be 0x0 if `from` isn't provided in eth_call (it is an optional field)
+                    // and in this case txOrigin also will be 0x0
+                    if or(isEOA(from), eq(from, 0x0)) {
+                        // If the `from` is EOA, we need to bump the nonce before the deployment
+                        bumpNonceForEvmDeployment(from, innerTxDataOffset)
+                    }
+                    actualDataPtr := encodeCreateEvmCalldata(dataPtr)
+                    actualTo := CONTRACT_DEPLOYER_ADDR()
+                }
+            }
+
+            function getCreateEvmDeployedAddressFromReturndata() -> deployedAddress {
+                let createEvmReturndataSize := returndatasize()
+                // createEVM returns (uint256,address), i.e. exactly 64 bytes.
+                if iszero(eq(createEvmReturndataSize, 64)) {
+                    revertWithReason(
+                        ETH_CALL_ERR_CODE(),
+                        1
+                    )
+                }
+
+                returndatacopy(0, 0, 64)
+                deployedAddress := and(mload(32), 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+            }
+
+            function getVersionedCodeHashByAddress(addr) -> versionedCodeHash {
+                mstore(0, {{RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR}})
+                mstore(4, addr)
+                let getRawCodeHashSuccess := staticcall(
+                    gas(),
+                    ACCOUNT_CODE_STORAGE_ADDR(),
+                    0,
+                    36,
+                    0,
+                    32
+                )
+                if iszero(getRawCodeHashSuccess) {
+                    revertWithReason(
+                        ETH_CALL_ERR_CODE(),
+                        1
+                    )
+                }
+
+                versionedCodeHash := mload(0)
+            }
+
+            function CODE_ORACLE_ADDR() -> ret {
+                ret := 0x0000000000000000000000000000000000008012
+            }
+
+            function fetchBytecodeByVersionedHash(versionedCodeHash) -> retSize {
+                // CodeOracle expects exactly one word of calldata: versioned code hash.
+                mstore(0, versionedCodeHash)
+                let codeOracleSuccess := staticcall(
+                    gas(),
+                    CODE_ORACLE_ADDR(),
+                    0,
+                    32,
+                    0,
+                    0
+                )
+                if iszero(codeOracleSuccess) {
+                    revertWithReason(
+                        ETH_CALL_ERR_CODE(),
+                        1
+                    )
+                }
+
+                retSize := returndatasize()
+            }
+
+            function returnEvmDeploymentBytecode() {
+                let deployedAddress := getCreateEvmDeployedAddressFromReturndata()
+                let versionedCodeHash := getVersionedCodeHashByAddress(deployedAddress)
+                let deployedBytecodeSize := fetchBytecodeByVersionedHash(versionedCodeHash)
+                let runtimeBytecodeSize := extcodesize(deployedAddress)
+                if gt(deployedBytecodeSize, runtimeBytecodeSize) {
+                    deployedBytecodeSize := runtimeBytecodeSize
+                }
+
+                returndatacopy(0, 0, deployedBytecodeSize)
+                return(0, deployedBytecodeSize)
             }
             <!-- @endif -->
 
@@ -3131,16 +3297,22 @@ object "Bootloader" {
                 if iszero(success) {
                     debugLog("Failed to set new settlement layer chain id: ", currentSettlementLayerChainId)
 
-                    /// here during the upgrade the setting of the settlement layer chain will fail, as the system context is not yet upgraded.
-                    /// todo remove after v31 upgrade.
-                    /// We want to check if the interop center is deployed or not, i.e. did we execute V31 upgrade.
-                    let codeSize := getCodeSize(L2_INTEROP_CENTER_ADDR())
-                    debugLog("codeSize", codeSize)
-                    /// nothing is deployed at this address.
-                    let codeSize2 := getCodeSize(add(L2_INTEROP_ROOT_STORAGE(), 10))
-                    if iszero(eq(codeSize, codeSize2)) {
-                        revertWithReason(FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE(), 1)
-                    }
+                    /// During the upgrade the setting of the settlement layer chain will fail, as the system context is not yet upgraded.
+                    revertIfPostV31Upgrade(FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE())
+                }
+            }
+
+            /// @notice Some of the functionality is supported only after v31 upgrade is complete.
+            /// @param errCode The error code to revert with if the interop center is deployed, i.e. we are post v31 upgrade.
+            /// @dev To be removed after v31 upgrade.
+            /// We want to check if the interop center is deployed or not, i.e. did we execute V31 upgrade and
+            /// only if true revert. 
+            function revertIfPostV31Upgrade(errCode) {
+                let codeSize := getCodeSize(L2_INTEROP_CENTER_ADDR())
+                debugLog("InteropCenter codeSize", codeSize)
+                
+                if iszero(iszero(codeSize)) {
+                    revertWithReason(errCode, 1)
                 }
             }
 
@@ -3346,6 +3518,34 @@ object "Bootloader" {
                 mstore(sub(132, 96), rollingHashOfProcessedRoots)
                 rollingHashOfProcessedRoots := keccak256(36, add(32, add(64, mul(sidesLength, 32))))
                 mstore(INTEROP_ROOT_ROLLING_HASH_BYTE(), rollingHashOfProcessedRoots)
+            }
+
+            /// @notice Sets the interop fee on InteropCenter for the current batch.
+            /// @dev Called once per batch, before processing transactions.
+            function setInteropFeeForBatch() {
+                let fee := getInteropFee()
+                debugLog("Setting interop fee for batch: ", fee)
+
+                // Encode: setInteropFee(uint256)
+                mstore(0, {{RIGHT_PADDED_SET_INTEROP_FEE_SELECTOR}})
+                mstore(4, fee)
+
+                let success := call(
+                    gas(),
+                    L2_INTEROP_CENTER_ADDR(),
+                    0,
+                    0,
+                    36,
+                    0,
+                    0
+                )
+
+                if iszero(success) {
+                    debugLog("Failed to set interop fee: ", fee)
+
+                    /// During the upgrade the setting of the interop fee will fail, as the interop center is not yet upgraded.
+                    revertIfPostV31Upgrade(FAILED_TO_SET_INTEROP_FEE())
+                }
             }
 
             /// @notice Appends the transaction hash to the current L2 block.
@@ -4211,6 +4411,10 @@ object "Bootloader" {
                 ret := 38
             }
 
+            function FAILED_TO_SET_INTEROP_FEE() -> ret {
+                ret := 39
+            }
+
             /// @dev Accepts a 1-word literal and returns its length in bytes
             /// @param str A string literal
             function getStrLen(str) -> len {
@@ -4487,6 +4691,8 @@ object "Bootloader" {
                 GAS_PRICE_PER_PUBDATA := gasPerPubdataFromBaseFee(EXPECTED_BASE_FEE, FAIR_PUBDATA_PRICE)
 
                 <!-- @endif -->
+
+                setInteropFeeForBatch()
             }
 
             // Now, we iterate over all transactions, processing each of them

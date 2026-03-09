@@ -2,12 +2,16 @@
 
 pragma solidity 0.8.28;
 
-import {InvalidL2DAOutputHash, InvalidNumberOfBlobs, InvalidPubdataHash, OnlyOneBlobWithCalldataAllowed, OperatorDAInputTooSmall, PubdataInputTooSmall, PubdataLengthTooBig} from "../L1StateTransitionErrors.sol";
-
-/// @dev Total number of bytes in a blob. Blob = 4096 field elements * 31 bytes per field element
-/// @dev EIP-4844 defines it as 131_072 but we use 4096 * 31 within our circuits to always fit within a field element
-/// @dev Our circuits will prove that a EIP-4844 blob and our internal blob are the same.
-uint256 constant BLOB_SIZE_BYTES = 126_976;
+import {
+    InvalidL2DAOutputHash,
+    InvalidNumberOfBlobs,
+    InvalidPubdataHash,
+    OnlyOneBlobWithCalldataAllowed,
+    OperatorDAInputTooSmall,
+    PubdataInputTooSmall,
+    PubdataLengthTooBig
+} from "../L1StateTransitionErrors.sol";
+import {BLOB_SIZE_BYTES} from "system-contracts/contracts/Constants.sol";
 
 /// @dev The state diff hash, hash of pubdata + the number of blobs.
 uint256 constant BLOB_DATA_OFFSET = 65;

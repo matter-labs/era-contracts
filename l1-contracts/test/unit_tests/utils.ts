@@ -579,12 +579,33 @@ export function encodeProveBatchesData(
 
 export function encodeExecuteBatchesData(
   batchesData: Array<StoredBatchInfo>,
-  priorityOpsBatchInfo: Array<PriorityOpsBatchInfo>
+  priorityOpsBatchInfo: Array<PriorityOpsBatchInfo>,
+  settlementFeePayer: string = ethers.constants.AddressZero
 ): [BigNumberish, BigNumberish, string] {
+  const emptyInteropRoots = batchesData.map(() => []);
+  const emptyLogs = batchesData.map(() => []);
+  const emptyMessages = batchesData.map(() => []);
+  const emptyMultichainBatchRoots = batchesData.map(() => ethers.constants.HashZero);
   const encodedExecuteDataWithoutVersion = defaultAbiCoder.encode(
-    [`${STORED_BATCH_INFO_ABI_STRING}[]`, `${PRIORITY_OPS_BATCH_INFO_ABI_STRING}[]`],
-    [batchesData, priorityOpsBatchInfo]
+    [
+      `${STORED_BATCH_INFO_ABI_STRING}[]`,
+      `${PRIORITY_OPS_BATCH_INFO_ABI_STRING}[]`,
+      "tuple(uint256 chainId, uint256 blockOrBatchNumber, bytes32[] sides)[][]",
+      "tuple(uint8 l2ShardId, bool isService, uint16 txNumberInBatch, address sender, bytes32 key, bytes32 value)[][]",
+      "bytes[][]",
+      "bytes32[]",
+      "address",
+    ],
+    [
+      batchesData,
+      priorityOpsBatchInfo,
+      emptyInteropRoots,
+      emptyLogs,
+      emptyMessages,
+      emptyMultichainBatchRoots,
+      settlementFeePayer,
+    ]
   );
-  const executeData = hexConcat(["0x00", encodedExecuteDataWithoutVersion]);
+  const executeData = hexConcat(["0x01", encodedExecuteDataWithoutVersion]);
   return [batchesData[0].batchNumber, batchesData[batchesData.length - 1].batchNumber, executeData];
 }

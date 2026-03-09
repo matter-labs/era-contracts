@@ -11,6 +11,10 @@ pub enum ContractSource {
     Bytecode(&'static [u8]),
 }
 
+pub const BASE_TOKEN_HOLDER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "0000000000000000000000000000000000010011"
+)));
+
 pub const L2_COMPLEX_UPGRADER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "000000000000000000000000000000000000800f"
 )));

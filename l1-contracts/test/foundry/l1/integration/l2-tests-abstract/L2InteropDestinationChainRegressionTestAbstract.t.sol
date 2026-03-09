@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
@@ -11,9 +11,12 @@ import {InteropCallStarter} from "contracts/common/Messaging.sol";
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {DestinationChainNotRegistered} from "contracts/interop/InteropErrors.sol";
-import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_INTEROP_CENTER
+} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 import {L2InteropTestUtils} from "./L2InteropTestUtils.sol";
 
@@ -47,7 +50,8 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
             callAttributes: callAttributes
         });
 
-        bytes[] memory bundleAttributes = new bytes[](0);
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         // Attempt to send the bundle - should revert with DestinationChainNotRegistered
         vm.expectRevert(abi.encodeWithSelector(DestinationChainNotRegistered.selector, UNREGISTERED_CHAIN_ID));
@@ -77,7 +81,8 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
             callAttributes: callAttributes
         });
 
-        bytes[] memory bundleAttributes = new bytes[](0);
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         vm.deal(address(this), interopCallValue);
 
@@ -103,7 +108,8 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
             callAttributes: callAttributes
         });
 
-        bytes[] memory bundleAttributes = new bytes[](0);
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         // This should NOT revert (chain is registered)
         bytes32 bundleHash = L2_INTEROP_CENTER.sendBundle(
@@ -127,7 +133,8 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
             data: hex"1234",
             callAttributes: callAttributes
         });
-        bytes[] memory bundleAttributes = new bytes[](0);
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         // Send to registered chain - should succeed
         bytes32 bundleHash1 = L2_INTEROP_CENTER.sendBundle(
@@ -172,7 +179,8 @@ abstract contract L2InteropDestinationChainRegressionTestAbstract is L2InteropTe
             data: hex"1234",
             callAttributes: callAttributes
         });
-        bytes[] memory bundleAttributes = new bytes[](0);
+        bytes[] memory bundleAttributes = new bytes[](1);
+        bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.useFixedFee, (false));
 
         vm.expectRevert(abi.encodeWithSelector(DestinationChainNotRegistered.selector, randomChainId));
         L2_INTEROP_CENTER.sendBundle(InteroperableAddress.formatEvmV1(randomChainId), calls, bundleAttributes);

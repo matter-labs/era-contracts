@@ -11,7 +11,7 @@ import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainType
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DummyChainAssetHandler} from "contracts/dev-contracts/test/DummyChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {InvalidProtocolVersion, SlotOccupied, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {InvalidProtocolVersion, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract ServerNotifierTest is Test {
     ServerNotifier internal serverNotifier;

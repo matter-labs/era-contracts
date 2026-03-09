@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {FullMerkle} from "contracts/common/libraries/FullMerkle.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
-import {MerkleWrongIndex, MerkleWrongLength} from "contracts/common/L1ContractErrors.sol";
+import {MerkleWrongIndex} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Unit tests for FullMerkle library
 contract FullMerkleTest is Test {
@@ -187,71 +187,6 @@ contract FullMerkleTest is Test {
         bytes32 hash12 = Merkle.efficientHash(leaf1, leaf2);
         bytes32 hashNew4 = Merkle.efficientHash(newLeaf, leaf4);
         bytes32 expectedRoot = Merkle.efficientHash(hash12, hashNew4);
-
-        assertEq(newRoot, expectedRoot);
-    }
-
-    // ============ updateAllLeaves Tests ============
-
-    function test_updateAllLeaves_singleLeaf() public {
-        tree.setup(ZERO);
-        tree.pushNewLeaf(keccak256("original"));
-
-        bytes32[] memory newLeaves = new bytes32[](1);
-        newLeaves[0] = keccak256("updated");
-
-        bytes32 newRoot = tree.updateAllLeaves(newLeaves);
-
-        assertEq(newRoot, newLeaves[0]);
-    }
-
-    function test_updateAllLeaves_twoLeaves() public {
-        tree.setup(ZERO);
-        tree.pushNewLeaf(keccak256("original1"));
-        tree.pushNewLeaf(keccak256("original2"));
-
-        bytes32[] memory newLeaves = new bytes32[](2);
-        newLeaves[0] = keccak256("updated1");
-        newLeaves[1] = keccak256("updated2");
-
-        bytes32 newRoot = tree.updateAllLeaves(newLeaves);
-
-        bytes32 expectedRoot = Merkle.efficientHash(newLeaves[0], newLeaves[1]);
-        assertEq(newRoot, expectedRoot);
-    }
-
-    function test_updateAllLeaves_revertsOnWrongLength() public {
-        tree.setup(ZERO);
-        tree.pushNewLeaf(keccak256("leaf1"));
-        tree.pushNewLeaf(keccak256("leaf2"));
-
-        bytes32[] memory newLeaves = new bytes32[](3); // Wrong length
-        newLeaves[0] = keccak256("a");
-        newLeaves[1] = keccak256("b");
-        newLeaves[2] = keccak256("c");
-
-        vm.expectRevert(abi.encodeWithSelector(MerkleWrongLength.selector, 3, 2));
-        tree.updateAllLeaves(newLeaves);
-    }
-
-    function test_updateAllLeaves_fourLeaves() public {
-        tree.setup(ZERO);
-        tree.pushNewLeaf(keccak256("original1"));
-        tree.pushNewLeaf(keccak256("original2"));
-        tree.pushNewLeaf(keccak256("original3"));
-        tree.pushNewLeaf(keccak256("original4"));
-
-        bytes32[] memory newLeaves = new bytes32[](4);
-        newLeaves[0] = keccak256("new1");
-        newLeaves[1] = keccak256("new2");
-        newLeaves[2] = keccak256("new3");
-        newLeaves[3] = keccak256("new4");
-
-        bytes32 newRoot = tree.updateAllLeaves(newLeaves);
-
-        bytes32 hash12 = Merkle.efficientHash(newLeaves[0], newLeaves[1]);
-        bytes32 hash34 = Merkle.efficientHash(newLeaves[2], newLeaves[3]);
-        bytes32 expectedRoot = Merkle.efficientHash(hash12, hash34);
 
         assertEq(newRoot, expectedRoot);
     }

@@ -42,6 +42,9 @@ interface IGetters is IZKChainBase {
     /// @return The address of the base token
     function getBaseTokenAssetId() external view returns (bytes32);
 
+    /// @return Whether the chain's base token exposes total supply in a trusted way.
+    function baseTokenSupportsTotalSupply() external view returns (bool);
+
     /// @return The total number of batches that were committed
     function getTotalBatchesCommitted() external view returns (uint256);
 

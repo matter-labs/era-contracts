@@ -63,11 +63,20 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         IMessageRootBase messageRoot = IMessageRootBase(bridgehub.messageRoot());
 
         if (s.settlementLayer == address(0)) {
+            // slither-disable-next-line reentrancy-no-eth
             IL1MessageRoot(address(messageRoot)).saveV31UpgradeChainBatchNumber(s.chainId);
         }
 
         if (bridgehub.whitelistedSettlementLayers(s.chainId)) {
             require(IGetters(address(this)).getPriorityQueueSize() == 0, PriorityQueueNotReady());
+        }
+
+        // Era chains automatically have it tracked.
+        // ZKsync OS chains havent been tracking this value until the v31 upgrade.
+        // It will have to be backfilled.
+        // FIXME The actual logic for backfilling will be introduced in a separate PR.
+        if (!s.zksyncOS) {
+            s.baseTokenHasTotalSupply = true;
         }
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;

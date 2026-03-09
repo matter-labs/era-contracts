@@ -11,10 +11,8 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
-import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {Unauthorized, AlreadyPermanentRollup, InvalidDAForPermanentRollup} from "contracts/common/L1ContractErrors.sol";
+
+import {AlreadyPermanentRollup, InvalidDAForPermanentRollup, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract MakePermanentRollupTest is AdminTest {
     RollupDAManager internal rollupDAManager;

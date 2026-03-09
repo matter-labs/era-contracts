@@ -13,7 +13,13 @@ import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
-import {AssetRouterAllowanceNotZero, ETHDepositNotSupported, EmptyDeposit, TokensWithFeesNotSupported, WithdrawalAlreadyFinalized} from "../common/L1ContractErrors.sol";
+import {
+    AssetRouterAllowanceNotZero,
+    ETHDepositNotSupported,
+    EmptyDeposit,
+    TokensWithFeesNotSupported,
+    WithdrawalAlreadyFinalized
+} from "../common/L1ContractErrors.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 
 /// @author Matter Labs

@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {PrividiumTransactionFilterer} from "../contracts/transactionFilterer/PrividiumTransactionFilterer.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {AdminFunctions} from "./AdminFunctions.s.sol";
-import {Utils, ChainInfoFromBridgehub} from "./Utils.sol";
+import {ChainInfoFromBridgehub, Utils} from "./Utils.sol";
 import {console} from "forge-std/console.sol";
 
 contract DeployPrividiumTransactionFilterer is AdminFunctions {

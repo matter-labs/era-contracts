@@ -16,7 +16,11 @@ contract RegisterOnAllChainsScript is Script, IRegisterOnAllChains {
         ChainRegistrationSender chainRegistrationSender = ChainRegistrationSender(bridgehub.chainRegistrationSender());
 
         for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
-            if (chainRegistrationSender.chainRegisteredOnChain(chainsToRegisterOn[i], _chainId)) {
+            if (
+                chainRegistrationSender.chainRegisteredOnChain(chainsToRegisterOn[i], _chainId) ||
+                !_sameSettlementLayerNotL1(bridgehub, chainsToRegisterOn[i], _chainId) ||
+                chainsToRegisterOn[i] == _chainId
+            ) {
                 continue;
             }
             vm.startBroadcast();
@@ -26,6 +30,7 @@ contract RegisterOnAllChainsScript is Script, IRegisterOnAllChains {
         for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
             if (
                 chainRegistrationSender.chainRegisteredOnChain(_chainId, chainsToRegisterOn[i]) ||
+                !_sameSettlementLayerNotL1(bridgehub, _chainId, chainsToRegisterOn[i]) ||
                 chainsToRegisterOn[i] == _chainId
             ) {
                 continue;
@@ -49,5 +54,15 @@ contract RegisterOnAllChainsScript is Script, IRegisterOnAllChains {
         address zkChain = bridgehub.getZKChain(chainToRegisterOn);
         IMailbox mailbox = IMailbox(zkChain);
         return mailbox.depositsPaused();
+    }
+
+    function _sameSettlementLayerNotL1(
+        IBridgehubBase bridgehub,
+        uint256 chainToBeRegistered,
+        uint256 chainToRegisterOn
+    ) internal view returns (bool) {
+        return
+            bridgehub.settlementLayer(chainToBeRegistered) == bridgehub.settlementLayer(chainToRegisterOn) &&
+            bridgehub.settlementLayer(chainToBeRegistered) != block.chainid;
     }
 }

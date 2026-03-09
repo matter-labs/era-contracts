@@ -2,11 +2,18 @@
 pragma solidity 0.8.28;
 
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {GatewayVotePreparation} from "deploy-scripts/gateway/GatewayVotePreparation.s.sol";
-import {GatewayCTMDeployerHelper, DeployerCreate2Calldata, DeployerAddresses, DirectCreate2Calldata} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
-import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {
+    GatewayCTMDeployerHelper,
+    DeployerCreate2Calldata,
+    DeployerAddresses,
+    DirectCreate2Calldata
+} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
+import {
+    DeployedContracts,
+    GatewayCTMDeployerConfig
+} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -273,6 +280,12 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         vm.serializeAddress("gw_vote_prep", "refund_recipient", address(0xBEEF));
         vm.serializeUint("gw_vote_prep", "gateway_chain_id", GATEWAY_CHAIN_ID);
         vm.serializeBytes("gw_vote_prep", "force_deployments_data", hex"00");
+        vm.serializeBytes32(
+            "gw_vote_prep",
+            "zk_token_asset_id",
+            bytes32(0x01000000000000000000000000000000000000000000000000000000000a2a6f)
+        );
+        vm.serializeUint("gw_vote_prep", "gateway_settlement_fee", 0);
         string memory toml = vm.serializeString("gw_vote_prep", "contracts", contractsToml);
 
         string memory path = string.concat(

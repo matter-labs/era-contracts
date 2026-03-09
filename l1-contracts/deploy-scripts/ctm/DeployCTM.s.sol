@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {StateTransitionDeployedAddresses} from "../utils/Types.sol";
+
 import {Utils} from "../utils/Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
@@ -15,11 +15,10 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
+
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
 import {L2LegacySharedBridgeTestHelper} from "../dev/L2LegacySharedBridgeTestHelper.sol";
@@ -36,12 +35,6 @@ import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
-import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
-
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -51,15 +44,14 @@ import {MigratorFacet} from "contracts/state-transition/chain-deps/facets/Migrat
 import {CommitterFacet} from "contracts/state-transition/chain-deps/facets/Committer.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
-import {Config, CTMDeployedAddresses, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
+import {CTMDeployedAddresses, Config, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+
 import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
 
 // TODO: pass this value from zkstack_cli
@@ -540,7 +532,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
                 coreAddresses.bridgehub.proxies.chainRegistrationSender
             ),
-            dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
+            dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon,
+            zkTokenAssetId: config.zkTokenAssetId
         });
     }
 

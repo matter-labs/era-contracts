@@ -4,7 +4,11 @@ pragma solidity 0.8.28;
 
 import {ChainTypeManagerBase} from "./ChainTypeManagerBase.sol";
 import {ChainCreationParams} from "./IChainTypeManager.sol";
-import {GenesisBatchHashZero, GenesisBatchCommitmentIncorrect, GenesisUpgradeZero} from "../common/L1ContractErrors.sol";
+import {
+    GenesisBatchHashZero,
+    GenesisBatchCommitmentIncorrect,
+    GenesisUpgradeZero
+} from "../common/L1ContractErrors.sol";
 
 /// @title ZKsync OS Chain Type Manager contract
 /// @author Matter Labs
@@ -17,6 +21,11 @@ contract ZKsyncOSChainTypeManager is ChainTypeManagerBase {
         address _l1BytecodesSupplier,
         address _permissionlessValidator
     ) ChainTypeManagerBase(_bridgehub, _interopCenter, _l1BytecodesSupplier, _permissionlessValidator) {}
+
+    /// @return flag whether CTM is for ZKsync OS or Era VM.
+    function isZKsyncOS() external pure override returns (bool) {
+        return true;
+    }
 
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters

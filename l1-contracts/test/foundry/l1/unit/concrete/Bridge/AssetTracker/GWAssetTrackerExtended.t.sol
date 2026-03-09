@@ -6,30 +6,72 @@ import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 
-import {BalanceChange, TokenBalanceMigrationData, L2Log, TxStatus, InteropBundle, InteropCall} from "contracts/common/Messaging.sol";
-import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_HANDLER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_COMPRESSOR_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER, MAX_BUILT_IN_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR as INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    BalanceChange,
+    MigrationConfirmationData,
+    L2Log,
+    TxStatus,
+    InteropBundle,
+    InteropCall
+} from "contracts/common/Messaging.sol";
+import {
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_MESSAGE_ROOT_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_BOOTLOADER_ADDRESS,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    L2_INTEROP_HANDLER_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
+    L2_COMPRESSOR_ADDR,
+    L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
+    L2_ASSET_ROUTER,
+    MAX_BUILT_IN_CONTRACT_ADDR,
+    L2_INTEROP_CENTER_ADDR as INTEROP_CENTER_ADDR
+} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
-import {BALANCE_CHANGE_VERSION, TOKEN_BALANCE_MIGRATION_DATA_VERSION, INTEROP_BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {
+    BALANCE_CHANGE_VERSION,
+    INTEROP_BALANCE_CHANGE_VERSION
+} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
-import {InvalidCanonicalTxHash, RegisterNewTokenNotAllowed, InvalidFunctionSignature, InvalidBuiltInContractMessage, InvalidEmptyMessageRoot, InvalidL2ShardId, InvalidServiceLog, InvalidInteropBalanceChange} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
-import {Unauthorized, ChainIdNotRegistered, InvalidMessage, ReconstructionMismatch, InvalidInteropCalldata} from "contracts/common/L1ContractErrors.sol";
+import {
+    InvalidCanonicalTxHash,
+    RegisterNewTokenNotAllowed,
+    InvalidFunctionSignature,
+    InvalidBuiltInContractMessage,
+    InvalidEmptyMultichainBatchRoot,
+    InvalidL2ShardId,
+    InvalidServiceLog
+} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {
+    Unauthorized,
+    ChainIdNotRegistered,
+    InvalidMessage,
+    ReconstructionMismatch,
+    InvalidInteropCalldata
+} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+
 import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
 import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
+import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
-import {L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "contracts/common/Config.sol";
-import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {GWAssetTrackerTestHelper} from "./GWAssetTracker.t.sol";
+import {ProcessLogsTestHelper} from "./ProcessLogsTestHelper.sol";
 
 contract GWAssetTrackerExtendedTest is Test {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
@@ -72,9 +114,16 @@ contract GWAssetTrackerExtendedTest is Test {
         vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, address(mockChainAssetHandler).code);
         vm.etch(L2_ASSET_ROUTER_ADDR, address(mockAssetRouter).code);
 
+        // Mock the WETH_TOKEN() call on NativeTokenVault (required by initL2)
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeWithSelector(IL2NativeTokenVault.WETH_TOKEN.selector),
+            abi.encode(makeAddr("wrappedZKToken"))
+        );
+
         // Set up the contract
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        gwAssetTracker.setAddresses(L1_CHAIN_ID);
+        gwAssetTracker.initL2(L1_CHAIN_ID, address(this));
 
         vm.mockCall(
             L2_CHAIN_ASSET_HANDLER_ADDR,
@@ -83,19 +132,9 @@ contract GWAssetTrackerExtendedTest is Test {
         );
     }
 
-    // Helper function to build proper merkle tree root
+    // Helper function to build proper merkle tree root (delegates to shared library)
     function _buildLogsMerkleRoot(L2Log[] memory logs) internal pure returns (bytes32) {
-        DynamicIncrementalMerkleMemory.Bytes32PushTree memory tree;
-        tree.createTree(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
-        tree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
-
-        for (uint256 i = 0; i < logs.length; i++) {
-            bytes32 hashedLog = MessageHashing.getLeafHashFromLog(logs[i]);
-            tree.push(hashedLog);
-        }
-
-        tree.extendUntilEnd();
-        return tree.root();
+        return ProcessLogsTestHelper.buildLogsMerkleRoot(logs);
     }
 
     // Test onlyChain modifier - unauthorized case (line 78)
@@ -106,7 +145,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: new L2Log[](0),
             messages: new bytes[](0),
             chainBatchRoot: bytes32(0),
-            messageRoot: bytes32(0)
+            multichainBatchRoot: bytes32(0),
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain to return a different address
@@ -138,9 +178,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = correctMessage;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -148,7 +188,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            multichainBatchRoot: emptyMultichainBatchRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -187,9 +228,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -197,7 +238,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            multichainBatchRoot: emptyMultichainBatchRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -236,9 +278,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -246,7 +288,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            multichainBatchRoot: emptyMultichainBatchRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -287,9 +330,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -297,7 +340,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            multichainBatchRoot: emptyMultichainBatchRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -322,7 +366,14 @@ contract GWAssetTrackerExtendedTest is Test {
         );
 
         vm.prank(mockZKChain);
-        vm.expectRevert(abi.encodeWithSelector(InvalidInteropBalanceChange.selector, bundleHash));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                InvalidBuiltInContractMessage.selector,
+                uint256(0),
+                uint256(0),
+                bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))
+            )
+        );
         gwAssetTracker.processLogsAndMessages(input);
     }
 
@@ -351,9 +402,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -361,7 +412,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            multichainBatchRoot: emptyMultichainBatchRoot,
+            settlementFeePayer: address(0)
         });
 
         // Need to set up initial balance for the chain first
@@ -424,9 +476,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -434,7 +486,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            multichainBatchRoot: emptyMultichainBatchRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -479,9 +532,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -489,7 +542,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            multichainBatchRoot: emptyMultichainBatchRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -535,9 +589,9 @@ contract GWAssetTrackerExtendedTest is Test {
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -545,7 +599,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: messages,
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            multichainBatchRoot: emptyMultichainBatchRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -593,9 +648,9 @@ contract GWAssetTrackerExtendedTest is Test {
             value: bytes32(uint256(TxStatus.Failure))
         });
 
-        bytes32 emptyMessageRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
         bytes32 logsRoot = _buildLogsMerkleRoot(logs);
-        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMessageRoot));
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
 
         ProcessLogsInput memory input = ProcessLogsInput({
             chainId: CHAIN_ID,
@@ -603,7 +658,8 @@ contract GWAssetTrackerExtendedTest is Test {
             logs: logs,
             messages: new bytes[](0),
             chainBatchRoot: chainBatchRoot,
-            messageRoot: emptyMessageRoot
+            multichainBatchRoot: emptyMultichainBatchRoot,
+            settlementFeePayer: address(0)
         });
 
         // Mock getZKChain
@@ -630,9 +686,11 @@ contract GWAssetTrackerExtendedTest is Test {
         vm.prank(mockZKChain);
         gwAssetTracker.processLogsAndMessages(input);
 
-        // Verify balances were decreased (lines 318, 322)
+        // Verify asset balance was decreased (line 338)
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), 0);
-        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), 0);
+        // Base token balance is NOT decreased for failed deposits,
+        // as the funds stay on L2 inside the refundRecipient's balance.
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), BASE_TOKEN_AMOUNT);
     }
 
     // Test requestPauseDepositsForChain success (line 543)
@@ -651,8 +709,8 @@ contract GWAssetTrackerExtendedTest is Test {
         gwAssetTracker.requestPauseDepositsForChain(CHAIN_ID);
     }
 
-    // Test confirmMigrationOnGateway with saved balance (lines 630-631)
-    function test_ConfirmMigrationOnGateway_GatewayToL1_WithSavedBalance() public {
+    // Test Gateway->L1 confirmation does not modify chain balance on Gateway.
+    function test_ConfirmMigrationOnGateway_GatewayToL1_LeavesBalanceUnchanged() public {
         // First increase chain balance
         BalanceChange memory balanceChange = BalanceChange({
             version: BALANCE_CHANGE_VERSION,
@@ -687,15 +745,13 @@ contract GWAssetTrackerExtendedTest is Test {
         );
 
         // Confirm migration
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+        MigrationConfirmationData memory data = MigrationConfirmationData({
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             assetMigrationNumber: MIGRATION_NUMBER,
-            chainMigrationNumber: 0,
             isL1ToGateway: false
         });
 
@@ -704,8 +760,8 @@ contract GWAssetTrackerExtendedTest is Test {
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.confirmMigrationOnGateway(data);
 
-        // Verify balance was decreased (lines 624, 630-631)
-        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), balanceBefore - AMOUNT);
+        // Gateway state changes for this flow happen at migration initiation, not confirmation.
+        assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), balanceBefore);
         // Verify token data
         assertEq(gwAssetTracker.getOriginToken(ASSET_ID), ORIGIN_TOKEN);
         assertEq(gwAssetTracker.getTokenOriginChainId(ASSET_ID), ORIGIN_CHAIN_ID);

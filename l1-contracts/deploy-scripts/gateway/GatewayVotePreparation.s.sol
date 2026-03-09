@@ -16,8 +16,6 @@ import {Utils} from "../utils/Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-
 import {Call} from "contracts/governance/Common.sol";
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
@@ -27,22 +25,32 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
-import {DeployCTMScript} from "../ctm/DeployCTM.s.sol";
-import {StateTransitionDeployedAddresses, StateTransitionContracts, Verifiers, Facets} from "../utils/Types.sol";
+import {
+    CTMDeployedAddresses,
+    StateTransitionContracts,
+    StateTransitionDeployedAddresses,
+    Verifiers
+} from "../utils/Types.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
-import {GatewayCTMDeployerHelper, DeployerCreate2Calldata, DeployerAddresses, DirectDeployedAddresses, DirectCreate2Calldata} from "./GatewayCTMDeployerHelper.sol";
-import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
-import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {
+    GatewayCTMDeployerHelper,
+    DirectCreate2Calldata,
+    DeployerCreate2Calldata,
+    DeployerAddresses,
+    DirectDeployedAddresses
+} from "./GatewayCTMDeployerHelper.sol";
+import {
+    DeployedContracts,
+    GatewayCTMDeployerConfig
+} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
 import {DeployCTMUtils} from "../ctm/DeployCTMUtils.s.sol";
-import {BridgehubAddresses, CTMDeployedAddresses} from "../utils/Types.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
@@ -67,6 +75,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
+    uint256 internal gatewaySettlementFee;
 
     address internal serverNotifier;
     address internal refundRecipient;
@@ -87,6 +96,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
         gatewayChainId = toml.readUint("$.gateway_chain_id");
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
+        gatewaySettlementFee = toml.readUint("$.gateway_settlement_fee");
 
         setAddressesBasedOnBridgehub(ctmRepresentativeChainId, bridgehubProxy);
         // Get eraChainId from AssetRouter
@@ -326,7 +336,8 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 _gatewayValidatorTimelock: output.gatewayStateTransition.proxies.validatorTimelock,
                 _gatewayServerNotifier: output.gatewayStateTransition.proxies.serverNotifier,
                 _refundRecipient: refundRecipient,
-                _ctmRepresentativeChainId: ctmRepresentativeChainId
+                _ctmRepresentativeChainId: ctmRepresentativeChainId,
+                _gatewaySettlementFee: gatewaySettlementFee
             })
         );
 

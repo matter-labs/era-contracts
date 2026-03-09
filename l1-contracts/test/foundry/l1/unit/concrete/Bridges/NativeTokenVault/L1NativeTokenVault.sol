@@ -59,7 +59,7 @@ contract L1NativeTokenVaultTest is Test {
         bytes[] memory zeros = new bytes[](2);
         zeros[0] = abi.encode(0);
         zeros[1] = abi.encode(0);
-        vm.mockCalls(assetTracker, abi.encodeWithSelector(AssetTrackerBase.registerNewToken.selector), zeros);
+        vm.mockCalls(assetTracker, abi.encodeWithSelector(AssetTrackerBase.registerNewTokenIfNeeded.selector), zeros);
         ntv.registerToken(address(token));
 
         vm.expectRevert(AssetIdAlreadyRegistered.selector);
@@ -117,7 +117,7 @@ contract L1NativeTokenVaultTest is Test {
         bytes[] memory zeros = new bytes[](2);
         zeros[0] = abi.encode(0);
         zeros[1] = abi.encode(0);
-        vm.mockCalls(assetTracker, abi.encodeWithSelector(AssetTrackerBase.registerNewToken.selector), zeros);
+        vm.mockCalls(assetTracker, abi.encodeWithSelector(AssetTrackerBase.registerNewTokenIfNeeded.selector), zeros);
 
         ntv.registerEthToken();
     }
@@ -192,7 +192,7 @@ contract L1NativeTokenVaultTest is Test {
         bytes[] memory zeros = new bytes[](2);
         zeros[0] = abi.encode(0);
         zeros[1] = abi.encode(0);
-        vm.mockCalls(assetTracker, abi.encodeWithSelector(AssetTrackerBase.registerNewToken.selector), zeros);
+        vm.mockCalls(assetTracker, abi.encodeWithSelector(AssetTrackerBase.registerNewTokenIfNeeded.selector), zeros);
         ntv.registerToken(address(token));
 
         // Get the asset id

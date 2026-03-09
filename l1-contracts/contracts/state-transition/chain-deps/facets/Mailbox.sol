@@ -11,16 +11,39 @@ import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.
 import {IEIP7702Checker} from "../../chain-interfaces/IEIP7702Checker.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
-import {BalanceChange, BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Log, L2Message, TxStatus, WritePriorityOpParams} from "../../../common/Messaging.sol";
+import {
+    BalanceChange,
+    BridgehubL2TransactionRequest,
+    L2CanonicalTransaction,
+    L2Log,
+    L2Message,
+    TxStatus,
+    WritePriorityOpParams
+} from "../../../common/Messaging.sol";
 import {MessageHashing} from "../../../common/libraries/MessageHashing.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER, PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET, PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET, PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET} from "../../../common/Config.sol";
+import {
+    MAX_NEW_FACTORY_DEPS,
+    REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    SERVICE_TRANSACTION_SENDER,
+    SETTLEMENT_LAYER_RELAY_SENDER,
+    PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
+    PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET
+} from "../../../common/Config.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {AddressNotZero, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {
+    AddressNotZero,
+    GasPerPubdataMismatch,
+    InvalidChainId,
+    MsgValueTooLow,
+    TooManyFactoryDeps,
+    TransactionNotAllowed,
+    ZeroAddress
+} from "../../../common/L1ContractErrors.sol";
 import {DepositsPaused, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -55,8 +78,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
     uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_START;
 
-    uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_END;
-
     modifier onlyL1() {
         if (block.chainid != L1_CHAIN_ID) {
             revert NotL1(block.chainid);
@@ -84,9 +105,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         PAUSE_DEPOSITS_TIME_WINDOW_START = _isTestnet
             ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET
             : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
-        PAUSE_DEPOSITS_TIME_WINDOW_END = _isTestnet
-            ? PAUSE_DEPOSITS_TIME_WINDOW_END_TESTNET
-            : PAUSE_DEPOSITS_TIME_WINDOW_END_MAINNET;
     }
 
     /// @inheritdoc IMailboxImpl
@@ -279,6 +297,11 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         }
         // Note during the upgrade to V31 no chain will be on GW.
 
+        bytes32 baseTokenAssetId = IBridgehubBase(s.bridgehub).baseTokenAssetId(_chainId);
+        if (_baseTokenAmount > 0 && baseTokenAssetId == bytes32(0)) {
+            revert InvalidChainId();
+        }
+
         BalanceChange memory balanceChange;
         if (_getBalanceChange) {
             IL1AssetTracker assetTracker = IL1AssetTracker(s.assetTracker);
@@ -289,8 +312,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             address originToken = nativeTokenVault.originToken(assetId);
             balanceChange = BalanceChange({
                 version: BALANCE_CHANGE_VERSION,
-                // baseTokenAssetId is known on Gateway.
-                baseTokenAssetId: bytes32(0),
+                baseTokenAssetId: baseTokenAssetId,
                 baseTokenAmount: _baseTokenAmount,
                 assetId: assetId,
                 amount: amount,
@@ -300,8 +322,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         } else {
             balanceChange = BalanceChange({
                 version: BALANCE_CHANGE_VERSION,
-                // baseTokenAssetId is known on Gateway.
-                baseTokenAssetId: bytes32(0),
+                baseTokenAssetId: baseTokenAssetId,
                 baseTokenAmount: _baseTokenAmount,
                 assetId: bytes32(0),
                 amount: 0,
@@ -544,7 +565,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// @notice Deposits are paused when a chain migrates to/from GW.
     function depositsPaused() public view returns (bool) {
         return
-            _isInDepositsPausedWindow(PAUSE_DEPOSITS_TIME_WINDOW_START, PAUSE_DEPOSITS_TIME_WINDOW_END) ||
+            _isInDepositsPausedWindow(PAUSE_DEPOSITS_TIME_WINDOW_START) ||
             (block.chainid == L1_CHAIN_ID &&
                 IL1ChainAssetHandler(CHAIN_ASSET_HANDLER).isMigrationInProgress(s.chainId));
     }
