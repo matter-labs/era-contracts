@@ -62,9 +62,14 @@ contract L2BaseTokenZKOSTest is Test {
         // Deploy dummy BaseTokenHolder that accepts ETH from any sender.
         // Tests that need real access-control checks etch the real BaseTokenHolder instead.
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new DummyL2BaseTokenHolder()).code);
+    }
 
-        // Set L1_CHAIN_ID = 1 (slot 3 in L2BaseTokenBase storage layout)
-        vm.store(address(l2BaseToken), bytes32(uint256(3)), bytes32(uint256(1)));
+    /// @dev Helper to initialize l2BaseToken via initL2() — sets L1_CHAIN_ID and transfers to BaseTokenHolder.
+    function _initL2() internal {
+        vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
+        vm.deal(address(l2BaseToken), INITIAL_BASE_TOKEN_HOLDER_BALANCE);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        l2BaseToken.initL2(1);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -72,6 +77,7 @@ contract L2BaseTokenZKOSTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_withdraw_success() public {
+        _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
@@ -111,8 +117,11 @@ contract L2BaseTokenZKOSTest is Test {
         // Deploy L2BaseTokenZKOS at the expected system contract address so it passes onlyBridgingCaller check
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
-        // Set L1_CHAIN_ID = 1 on the system-address instance
-        vm.store(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, bytes32(uint256(3)), bytes32(uint256(1)));
+        // Initialize L1_CHAIN_ID on the system-address instance via initL2()
+        vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
+        vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(1);
 
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
@@ -128,6 +137,7 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function test_withdraw_callsL1Messenger() public {
+        _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
@@ -158,6 +168,7 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function test_withdraw_revertsIfBaseTokenHolderRejectsTransfer() public {
+        _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
@@ -171,6 +182,7 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function testFuzz_withdraw_variousAmounts(uint256 amount) public {
+        _initL2();
         vm.assume(amount > 0 && amount < type(uint128).max);
 
         address sender = makeAddr("sender");
@@ -193,6 +205,7 @@ contract L2BaseTokenZKOSTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_withdrawWithMessage_success() public {
+        _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
         bytes memory additionalData = "test message";
@@ -222,8 +235,11 @@ contract L2BaseTokenZKOSTest is Test {
         // Deploy L2BaseTokenZKOS at the expected system contract address so it passes onlyBridgingCaller check
         L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
-        // Set L1_CHAIN_ID = 1 on the system-address instance
-        vm.store(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, bytes32(uint256(3)), bytes32(uint256(1)));
+        // Initialize L1_CHAIN_ID on the system-address instance via initL2()
+        vm.mockCall(MINT_BASE_TOKEN_HOOK, abi.encode(INITIAL_BASE_TOKEN_HOLDER_BALANCE), abi.encode());
+        vm.deal(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(1);
 
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
@@ -243,6 +259,7 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function test_withdrawWithMessage_callsL1MessengerWithExtendedMessage() public {
+        _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
         bytes memory additionalData = "test message";
@@ -267,6 +284,7 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function test_withdrawWithMessage_emptyAdditionalData() public {
+        _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
         bytes memory additionalData = "";
@@ -284,6 +302,7 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function test_withdrawWithMessage_revertsIfBaseTokenHolderRejectsTransfer() public {
+        _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
         bytes memory additionalData = "test message";
@@ -298,6 +317,7 @@ contract L2BaseTokenZKOSTest is Test {
     }
 
     function testFuzz_withdrawWithMessage_variousAmountsAndData(uint256 amount, bytes calldata additionalData) public {
+        _initL2();
         vm.assume(amount > 0 && amount < type(uint128).max);
 
         address sender = makeAddr("sender");

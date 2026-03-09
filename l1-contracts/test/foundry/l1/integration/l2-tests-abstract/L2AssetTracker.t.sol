@@ -410,7 +410,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         );
 
         // Verify totalPreV31TotalSupply was set to {isSaved: true, amount: 0}
-        (bool isSaved, uint256 amount) = L2AssetTracker(L2_ASSET_TRACKER_ADDR).savedTotalSupply(baseTokenAssetId);
+        (bool isSaved, uint256 amount) = L2AssetTracker(L2_ASSET_TRACKER_ADDR).totalPreV31TotalSupply(baseTokenAssetId);
         assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
         assertEq(amount, 0, "totalPreV31TotalSupply.amount should be 0");
     }

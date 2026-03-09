@@ -64,9 +64,12 @@ contract L2BaseTokenEraTest is Test {
         // Deploy dummy BaseTokenHolder that accepts ETH from any sender.
         // Tests that need real access-control checks etch the real BaseTokenHolder instead.
         vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(new DummyL2BaseTokenHolder()).code);
+    }
 
-        // Set L1_CHAIN_ID = 1 (slot 3 in L2BaseTokenBase storage layout)
-        vm.store(address(l2BaseToken), bytes32(uint256(3)), bytes32(uint256(1)));
+    /// @dev Helper to initialize l2BaseToken via initL2() — sets L1_CHAIN_ID and baseTokenHolderBalanceInitialized.
+    function _initL2() internal {
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        l2BaseToken.initL2(1);
     }
 
     /// @dev Helper to set up eraAccountBalance for an address via transferFromTo from bootloader.
@@ -315,10 +318,8 @@ contract L2BaseTokenEraTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_mint_successFromBootloader() public {
+        _initL2();
         uint256 mintAmount = 5 ether;
-
-        // Set up holder balance so it has enough to "give"
-        _setHolderBalance(INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
         uint256 holderBalanceBefore = l2BaseToken.balanceOf(uint256(uint160(L2_BASE_TOKEN_HOLDER_ADDR)));
         uint256 totalSupplyBefore = l2BaseToken.totalSupply();
@@ -345,8 +346,8 @@ contract L2BaseTokenEraTest is Test {
     }
 
     function test_mint_callsAssetTracker() public {
+        _initL2();
         uint256 mintAmount = 1 ether;
-        _setHolderBalance(INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
         vm.expectCall(
             L2_ASSET_TRACKER_ADDR,
@@ -366,7 +367,9 @@ contract L2BaseTokenEraTest is Test {
     }
 
     function test_mint_revertOnInsufficientHolderBalance() public {
-        // Holder has 0 balance, so minting any amount should underflow
+        _initL2();
+        // Set holder balance to 0 so minting any amount should underflow
+        _setHolderBalance(0);
         uint256 mintAmount = 1 ether;
 
         vm.prank(L2_BOOTLOADER_ADDRESS);
@@ -375,9 +378,8 @@ contract L2BaseTokenEraTest is Test {
     }
 
     function testFuzz_mint_variousAmounts(uint256 amount) public {
+        _initL2();
         vm.assume(amount > 0 && amount <= 1000 ether);
-
-        _setHolderBalance(INITIAL_BASE_TOKEN_HOLDER_BALANCE);
 
         vm.prank(L2_BOOTLOADER_ADDRESS);
         l2BaseToken.mint(alice, amount);
@@ -489,6 +491,7 @@ contract L2BaseTokenEraTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_withdraw_successTransfersToHolder() public {
+        _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
@@ -525,8 +528,9 @@ contract L2BaseTokenEraTest is Test {
         // Deploy at system contract address so it passes onlyBridgingCaller check
         L2BaseTokenEra l2BaseTokenAtSystemAddr = new L2BaseTokenEra();
         vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
-        // Set L1_CHAIN_ID = 1 on the system-address instance
-        vm.store(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, bytes32(uint256(3)), bytes32(uint256(1)));
+        // Initialize L1_CHAIN_ID on the system-address instance via initL2()
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2BaseTokenEra(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(1);
 
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
@@ -542,6 +546,7 @@ contract L2BaseTokenEraTest is Test {
     }
 
     function test_withdraw_callsL1Messenger() public {
+        _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
@@ -569,6 +574,7 @@ contract L2BaseTokenEraTest is Test {
     }
 
     function test_withdraw_revertsIfBaseTokenHolderRejects() public {
+        _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
@@ -581,6 +587,7 @@ contract L2BaseTokenEraTest is Test {
     }
 
     function testFuzz_withdraw_variousAmounts(uint256 amount) public {
+        _initL2();
         vm.assume(amount > 0 && amount < type(uint128).max);
 
         address sender = makeAddr("sender");
@@ -603,6 +610,7 @@ contract L2BaseTokenEraTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_withdrawWithMessage_successTransfersToHolder() public {
+        _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
         bytes memory additionalData = "test message";
@@ -623,6 +631,7 @@ contract L2BaseTokenEraTest is Test {
     }
 
     function test_withdrawWithMessage_callsL1MessengerWithExtendedMessage() public {
+        _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
         bytes memory additionalData = "test message";
@@ -645,6 +654,7 @@ contract L2BaseTokenEraTest is Test {
     }
 
     function test_withdrawWithMessage_emptyAdditionalData() public {
+        _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
@@ -661,6 +671,7 @@ contract L2BaseTokenEraTest is Test {
     }
 
     function test_withdrawWithMessage_revertsIfBaseTokenHolderRejects() public {
+        _initL2();
         address sender = makeAddr("sender");
         vm.deal(sender, WITHDRAW_AMOUNT);
 
@@ -673,6 +684,7 @@ contract L2BaseTokenEraTest is Test {
     }
 
     function testFuzz_withdrawWithMessage_variousAmountsAndData(uint256 amount, bytes calldata additionalData) public {
+        _initL2();
         vm.assume(amount > 0 && amount < type(uint128).max);
 
         address sender = makeAddr("sender");
@@ -695,7 +707,7 @@ contract L2BaseTokenEraTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function test_mintThenTransfer_balancesAndSupplyConsistent() public {
-        _setHolderBalance(INITIAL_BASE_TOKEN_HOLDER_BALANCE);
+        _initL2();
 
         uint256 mintAmount = 10 ether;
         uint256 transferAmount = 3 ether;
@@ -723,7 +735,7 @@ contract L2BaseTokenEraTest is Test {
     }
 
     function test_mintMultipleAccounts_totalSupplyCorrect() public {
-        _setHolderBalance(INITIAL_BASE_TOKEN_HOLDER_BALANCE);
+        _initL2();
 
         uint256 mint1 = 5 ether;
         uint256 mint2 = 7 ether;

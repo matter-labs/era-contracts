@@ -51,19 +51,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @dev For native tokens, it is expected to be populated automatically with `isAssetRegistered[block.chainid]`.
     /// @dev IMPORTANT: for base token this value may not be correct for ZKsync OS chains until the totalSupply for the base
     /// token has been backfilled, so before using this value for the base token, one should check that it was set (`needBaseTokenTotalSupplyBackfill = false`).
-    mapping(bytes32 assetId => SavedTotalSupply snapshot) internal totalPreV31TotalSupply;
+    mapping(bytes32 assetId => SavedTotalSupply snapshot) public totalPreV31TotalSupply;
 
     /// @dev On ZKsync OS chains, the `totalSupply()` of the base token is not available by default,
     /// so before we ever use it to do any migrations, we need to backfill it.
     /// @dev This variable is expected to be deleted after v31 upgrade, once all the ZKsync OS chains have their base token
     /// amount backfilled.
     bool public needBaseTokenTotalSupplyBackfill;
-
-    /// @notice Returns the saved pre-V31 total supply snapshot for a given asset.
-    function savedTotalSupply(bytes32 _assetId) external view returns (bool isSaved, uint256 amount) {
-        SavedTotalSupply memory s = totalPreV31TotalSupply[_assetId];
-        return (s.isSaved, s.amount);
-    }
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
