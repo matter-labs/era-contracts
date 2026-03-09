@@ -14,7 +14,12 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {AddressHasNoCode, RoleAccessDenied} from "contracts/common/L1ContractErrors.sol";
-import {AlreadySigned, InitializeNotAvailable, NotEnoughSignatures, NotSigner} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {
+    AlreadySigned,
+    InitializeNotAvailable,
+    NotEnoughSignatures,
+    NotSigner
+} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract EraMultisigValidatorTest is Test {
     EraMultisigValidator eraMultisig;
