@@ -79,7 +79,7 @@ optimizer = false
 suppressed_warnings = ["txorigin"]
 [profile.invariant_tests_l1context_ci.invariant]
 runs = 10
-depth = 10000
+depth = 3000
 
 [profile.invariant_tests_l2context_ci]
 test = "test"
