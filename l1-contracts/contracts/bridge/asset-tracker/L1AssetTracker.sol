@@ -439,7 +439,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // We only allow whitelisted settlement layers' messages to be processed by this function, since
         // it updates various chain-related parameters such as assetMigrationNumber.
         // It does mean that if a past settlement layer does not have this status anymore, such messages
-        // wont be processable. This limitation will be fixed in the future releases.
+        // won't be processable. This limitation will be fixed in the future releases.
         require(BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId), InvalidWithdrawalChainId());
 
         // From all the requirements at the start of the file it follows that `assetMigrationNumber[data.chainId][data.assetId] < chainMigrationNumber = MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1`,

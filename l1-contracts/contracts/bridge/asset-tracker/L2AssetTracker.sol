@@ -325,7 +325,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             totalPreV31TotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: totalSupply});
         } else {
             // Save pre-v31 supply for bridged legacy tokens.
-            // Note, that here we assume that `totalSupply()` wont be affected in any way
+            // Note, that here we assume that `totalSupply()` won't be affected in any way
             // until it is used here, i.e. all deposits or withdrawals should firstly record the previous totalSupply.
             totalSupply = IERC20(_tokenAddress).totalSupply();
             totalPreV31TotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: totalSupply});

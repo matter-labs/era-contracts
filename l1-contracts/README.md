@@ -51,7 +51,7 @@ If you identify a false positive in your code, please make sure to highlight thi
 ### Typos
 
 We also utilize `typos` and `codespell` spell checkers to minimize the occurrence of accidental typos.
-If you need to add a word to the databases of these tools please insert it into `../codespell/wordlist.txt` and `../_typos.toml`.
+If you need to add a word to the databases of these tools please insert it into the `ignore-words-list` in `../.codespellrc` and into `../_typos.toml`.
 
 ### Verifying contracts on L2
 
