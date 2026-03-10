@@ -11,7 +11,7 @@ ctm_proxy_addr = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"
 l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
 rollup_da_manager = "0x064ac968CCad1948fceE025fD59c20b153c88072"
 
-# Legacy Gateway configurastion for settlement layer validation
+# Legacy Gateway configuration for settlement layer validation
 # This section contains historical data about chains that settled on the legacy Gateway
 [legacy_gateway]
 # The chain ID of the legacy Gateway (9075 for mainnet)

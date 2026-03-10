@@ -12,7 +12,7 @@ l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
-# Legacy Gateway configurastion for settlement layer validation
+# Legacy Gateway configuration for settlement layer validation
 # This section contains historical data about chains that settled on the legacy Gateway
 [legacy_gateway]
 # The chain ID of the legacy Gateway (9075 for mainnet)
