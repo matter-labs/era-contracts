@@ -66,10 +66,7 @@ import {BYTECODE_INFO_LENGTH, ZKSyncOSBytecodeInfo} from "../common/libraries/ZK
 /// the genesis after the gateway protocol upgrade.
 library L2GenesisForceDeploymentsHelper {
     /// @notice Emitted when a contract upgrade (deploy or proxy update) is performed via `conductContractUpgrade`.
-    event ContractUpgraded(
-        IComplexUpgrader.ContractUpgradeType indexed upgradeType,
-        address indexed targetAddress
-    );
+    event ContractUpgraded(IComplexUpgrader.ContractUpgradeType indexed upgradeType, address indexed targetAddress);
 
     /// @notice Emitted when the full force-deployed contracts initialization completes.
     event ForceDeployedContractsInitialized(bool isZKsyncOS, bool isGenesisUpgrade);
