@@ -17,7 +17,7 @@ rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
 # The chain ID of the legacy Gateway (9075 for mainnet)
 chain_id = 9075
 
-# Historical migration intervals for chains that used the legacy GW
+# TODO(EVM-1221) Historical migration intervals for chains that used the legacy GW
 # Each entry represents a chain that settled on the legacy GW before V31
 # Format: chain_id, migrate_to_sl_batch, migrate_from_sl_batch
 # Note: migrate_from_sl_batch must be > migrate_to_sl_batch
