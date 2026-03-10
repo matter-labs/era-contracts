@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {ICommitter} from "../../chain-interfaces/ICommitter.sol";
+import {IChainUpgrader} from "../../chain-interfaces/IChainUpgrader.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 
 /// @author Matter Labs
@@ -11,7 +12,7 @@ import {Diamond} from "../../libraries/Diamond.sol";
 /// @dev Note: In our CTM we have a single implementation of ValidatorTimelock for everyone,
 /// so the interface must remain backwards compatible as the same timelock is utilized
 /// for chains with different protocol versions.
-interface IValidatorTimelock is IExecutor, ICommitter {
+interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     /// @notice Struct specifying which validator roles to grant or revoke in a single call.
     /// @param rotatePrecommitterRole Whether to rotate the PRECOMMITTER_ROLE.
     /// @param rotateCommitterRole Whether to rotate the COMMITTER_ROLE.
@@ -152,11 +153,5 @@ interface IValidatorTimelock is IExecutor, ICommitter {
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _batchData
-    ) external;
-    /// @dev Make a call to the zkChain diamond contract to upgrade from a specific protocol version.
-    function upgradeChainFromVersion(
-        address _chainAddress,
-        uint256 _oldProtocolVersion,
-        Diamond.DiamondCutData calldata _diamondCut
     ) external;
 }

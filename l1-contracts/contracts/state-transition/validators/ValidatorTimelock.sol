@@ -9,6 +9,7 @@ import {IZKChain} from "../chain-interfaces/IZKChain.sol";
 import {NotAZKChain, TimeNotReached} from "../../common/L1ContractErrors.sol";
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IValidatorTimelock} from "./interfaces/IValidatorTimelock.sol";
+import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -287,7 +288,7 @@ contract ValidatorTimelock is
         _propagateToZKChain(_chainAddress);
     }
 
-    /// @inheritdoc IValidatorTimelock
+    /// @inheritdoc IChainUpgrader
     function upgradeChainFromVersion(
         address _chainAddress,
         uint256, // _oldProtocolVersion (unused in this specific implementation)

@@ -3,6 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "../chain-interfaces/IZKChainBase.sol";
+import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {FeeParams, PubdataPricingMode} from "../chain-deps/ZKChainStorage.sol";
@@ -11,7 +12,7 @@ import {L2DACommitmentScheme} from "../../common/Config.sol";
 /// @title The interface of the Admin Contract that controls access rights for contract management.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IAdmin is IZKChainBase {
+interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
     /// @param _newPendingAdmin Address of the new admin
@@ -70,15 +71,12 @@ interface IAdmin is IZKChainBase {
     ///      2. A priority transaction has been outstanding for at least `PRIORITY_EXPIRATION` since it was requested.
     function activatePriorityMode() external;
 
-    /// @notice Perform the upgrade from the current protocol version with the corresponding upgrade data
-    /// @param _chainAddress The address of the chain being upgraded
-    /// @param _protocolVersion The current protocol version from which upgrade is executed
-    /// @param _cutData The diamond cut parameters that is executed in the upgrade
+    /// @inheritdoc IChainUpgrader
     function upgradeChainFromVersion(
         address _chainAddress,
         uint256 _protocolVersion,
         Diamond.DiamondCutData calldata _cutData
-    ) external;
+    ) external override;
 
     /// @notice Executes a proposed governor upgrade
     /// @dev Only the ChainTypeManager contract can execute the upgrade

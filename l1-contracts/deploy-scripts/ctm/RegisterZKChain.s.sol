@@ -409,7 +409,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
                 rotateReverterRole: true,
                 rotateProverRole: true,
                 rotateExecutorRole: true,
-                rotateUpgraderRole: false
+                rotateUpgraderRole: true
             })
         );
 
