@@ -457,6 +457,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Determines if a token's migration number should be force-set during bridging operations.
+    /// @dev For the base token, L2BaseTokenEra.mint() decreases the BaseTokenHolder balance (increasing
+    /// @dev totalSupply) BEFORE calling handleFinalizeBaseTokenBridgingOnL2. So by the time this check
+    /// @dev runs, totalSupply is already > 0 even on the very first deposit. Meanwhile L1's chainBalance
+    /// @dev was 0 before this deposit, so L1/GW force-set assetMigrationNumber via
+    /// @dev _tokenCanSkipMigrationOnSettlementLayer. We skip the totalSupply check for the base token
+    /// @dev to keep L2 in sync with L1/GW.
     /// @param _assetId The asset ID of the token to check.
     /// @param _tokenOriginChainId The chain ID where this token originated.
     /// @param _tokenAddress The contract address of the token on this chain.
@@ -470,9 +476,20 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             return false;
         }
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
-        uint256 amount = IERC20(_tokenAddress).totalSupply();
+        if (savedAssetMigrationNumber != 0) {
+            return false;
+        }
 
-        return savedAssetMigrationNumber == 0 && amount == 0;
+        // For the base token, mint() increases totalSupply before calling this function,
+        // so totalSupply is already > 0 even on the first deposit. We cannot use it as a
+        // proxy for "nothing was deposited". Instead, rely solely on assetMigrationNumber == 0.
+        if (_assetId == BASE_TOKEN_ASSET_ID) {
+            return true;
+        }
+
+        // For other tokens, totalSupply == 0 implies chainBalance == 0 on L1,
+        // meaning there is nothing to migrate.
+        return IERC20(_tokenAddress).totalSupply() == 0;
     }
 
     /// @notice Retrieves the token contract address for a given asset ID.
