@@ -102,14 +102,11 @@ library L2GenesisForceDeploymentsHelper {
     /// @param _bytecodeInfo ABI-encoded tuple of (bytecodeHash, bytecodeLength, observableBytecodeHash).
     /// @param _newAddress The target address for the deployment.
     function unsafeForceDeployZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
-        // Validate canonical encoding for (bytes32, uint32, bytes32)
         require(_bytecodeInfo.length == BYTECODE_INFO_LENGTH, NonCanonicalRepresentation());
 
-        // Decode the bytecode info using the library
         (bytes32 bytecodeHash, uint256 bytecodeLength256, bytes32 observableBytecodeHash) = ZKSyncOSBytecodeInfo
             .decodeZKSyncOSBytecodeInfo(_bytecodeInfo);
 
-        // Convert to uint32 for the contract deployer interface
         uint32 bytecodeLength = uint32(bytecodeLength256);
 
         bytes memory data = abi.encodeCall(
@@ -130,7 +127,6 @@ library L2GenesisForceDeploymentsHelper {
     function forceDeployOnAddressZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
         require(_newAddress.code.length == 0, ZKsyncOSNotForceDeployForExistingContract(_newAddress));
 
-        // Block deployment to precompile addresses (0x01-0xFF) and zero address.
         uint160 addr = uint160(_newAddress);
         require(addr > 0xFF, ZKsyncOSNotForceDeployToPrecompileAddress(_newAddress));
 
@@ -190,7 +186,6 @@ library L2GenesisForceDeploymentsHelper {
             ISystemContractProxy(_newAddress).forceInitAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR);
         }
 
-        // Point the proxy to the (new) implementation.
         SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).upgrade(
             ITransparentUpgradeableProxy(_newAddress),
             implAddress
@@ -235,7 +230,6 @@ library L2GenesisForceDeploymentsHelper {
         bytes memory _additionalForceDeploymentsData,
         bool _isGenesisUpgrade
     ) internal {
-        // Decode the fixed and additional force deployments data.
         FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
             _fixedForceDeploymentsData,
             (FixedForceDeploymentsData)
@@ -385,7 +379,6 @@ library L2GenesisForceDeploymentsHelper {
             ? bytes32(0)
             : L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).L2_TOKEN_PROXY_BYTECODE_HASH();
 
-        // Ensure the WETH token is deployed and retrieve its address.
         address wrappedBaseTokenAddress = _ensureWethToken({
             _predeployedWethToken: predeployedL2WethAddress,
             _aliasedL1Governance: fixedForceDeploymentsData.aliasedL1Governance,
