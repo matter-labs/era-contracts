@@ -461,8 +461,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @dev totalSupply) BEFORE calling handleFinalizeBaseTokenBridgingOnL2. So by the time this check
     /// @dev runs, totalSupply is already > 0 even on the very first deposit. Meanwhile L1's chainBalance
     /// @dev was 0 before this deposit, so L1/GW force-set assetMigrationNumber via
-    /// @dev _tokenCanSkipMigrationOnSettlementLayer. We skip the totalSupply check for the base token
-    /// @dev to keep L2 in sync with L1/GW.
+    /// @dev _tokenCanSkipMigrationOnSettlementLayer. We use totalSuccessfulDepositsFromL1 == 0 as the
+    /// @dev proxy instead of totalSupply == 0. This field is only incremented when deposits arrive while
+    /// @dev the chain settles on L1, so it stays 0 for chains that migrate to gateway before any deposits
+    /// @dev (--skip-priority-txs), matching L1's chainBalance == 0 condition. For chains that received
+    /// @dev deposits before migration, totalSuccessfulDepositsFromL1 > 0 prevents the force-set, ensuring
+    /// @dev TBM handles the base token balance migration properly.
     /// @param _assetId The asset ID of the token to check.
     /// @param _tokenOriginChainId The chain ID where this token originated.
     /// @param _tokenAddress The contract address of the token on this chain.
@@ -482,9 +486,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
         // For the base token, mint() increases totalSupply before calling this function,
         // so totalSupply is already > 0 even on the first deposit. We cannot use it as a
-        // proxy for "nothing was deposited". Instead, rely solely on assetMigrationNumber == 0.
+        // proxy for "nothing was deposited". Instead, check totalSuccessfulDepositsFromL1:
+        // this is only incremented when deposits arrive while settling on L1, so it's 0
+        // for chains that migrated to gateway before receiving any deposits. This matches
+        // L1's chainBalance == 0 condition in _tokenCanSkipMigrationOnSettlementLayer.
         if (_assetId == BASE_TOKEN_ASSET_ID) {
-            return true;
+            return interopInfo[_assetId].totalSuccessfulDepositsFromL1 == 0;
         }
 
         // For other tokens, totalSupply == 0 implies chainBalance == 0 on L1,
