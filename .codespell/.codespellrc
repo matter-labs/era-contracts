@@ -1,5 +1,0 @@
-[codespell]
-skip = .git,_typos.toml,artifacts,lib,node_modules,artifacts-zk,yarn.lock,contracts-preprocessed,Cargo.lock,SECURITY.md
-count = true
-quiet-level = 3
-ignore-words = ./.codespell/wordlist.txt

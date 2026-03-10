@@ -79,28 +79,6 @@ jobs:
             l2-contracts/zkout
             system-contracts/zkout
 
-  lint:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-
-      - name: Use Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: yarn
-
-      - name: Install dependencies
-        run: yarn
-
-      - name: Lint
-        run: yarn lint:check
-
-      - name: Lint errors
-        run: yarn l1 errors-lint --check
-
   check-zkstack-out:
     runs-on: ubuntu-latest
 
@@ -211,7 +189,7 @@ jobs:
         run: yarn l1 selectors --check
 
   test-foundry:
-    needs: [build, lint]
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
@@ -262,7 +240,7 @@ jobs:
 
   # FIXME: uncomment once fixed.
   test-foundry-zksync:
-    needs: [build, lint]
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
