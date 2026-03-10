@@ -1,0 +1,25 @@
+l1_asset_router_address = "0xfD3130Ea0e8B7Dd61Ac3663328a66d97eb02f84b"
+
+[[chains]]
+chain_id = 270
+legacy_shared_bridge_address = "0xCEB8d4888d2025aEaAD0272175281e0CaFC33152"
+
+[[chains]]
+chain_id = 37111
+legacy_shared_bridge_address = "0x427373Be173120D7A042b44D0804E37F25E7330b"
+
+[[chains]]
+chain_id = 6474
+legacy_shared_bridge_address = "0x74F54C4BB12B3AADe5b541Be2Ab586F02cfB3BD6"
+
+[[chains]]
+chain_id = 6475
+legacy_shared_bridge_address = "0x74F54C4BB12B3AADe5b541Be2Ab586F02cfB3BD6"
+
+[[chains]]
+chain_id = 11123
+legacy_shared_bridge_address = "0xB5C8E55273718B24066880f8fBdBEcd00f9f55DC"
+
+[[chains]]
+chain_id = 1381491
+legacy_shared_bridge_address = "0x01ABA2F5BC2B540adBA2BcE1cbb2bA6D64CEAee6"

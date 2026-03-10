@@ -1,0 +1,35 @@
+[permanent_contracts]
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+# this salt can be changed from run to run to. Todo: move this to input of script.
+create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
+
+[core_contracts]
+bridgehub_proxy_addr = "0xc4fd2580c3487bba18d63f50301020132342fdbd"
+
+
+# TODO(EVM-1200): The CTM below is for ZKsync OS and NOT Era (the way it was done in the other envs).
+# This is due to the fact that no canonical Era chain is present on testnet. This will have to be resolved
+# together with zksync os support for upgrades.
+[ctm_contracts]
+ctm_proxy_addr = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
+l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
+rollup_da_manager = "0x064ac968CCad1948fceE025fD59c20b153c88072"
+
+# Legacy Gateway configurastion for settlement layer validation
+# This section contains historical data about chains that settled on the legacy Gateway
+[legacy_gateway]
+# The chain ID of the legacy Gateway (9075 for mainnet)
+# TODO(EVM-1200): The new ZKsync OS testnet does NOT have a legacy Gateway, so just a random valid chain id
+# is provided here. 
+chain_id = 531050204
+
+# Historical migration intervals for chains that used the legacy GW
+# Each entry represents a chain that settled on the legacy GW before V31
+# Format: chain_id, migrate_to_sl_batch, migrate_from_sl_batch
+# Note: migrate_from_sl_batch must be > migrate_to_sl_batch
+# These values should be filled in before V31 deployment based on actual historical data
+# Example for Era on mainnet (chain_id = 270):
+# [[legacy_gateway.chain_intervals]]
+# chain_id = 270
+# migrate_to_sl_batch = 0  # Set to actual batch number when Era migrated to legacy GW (0 is valid if migration happened before any batches)
+# migrate_from_sl_batch = 0  # Set to actual batch number when Era migrated back (must be > migrate_to_sl_batch)
