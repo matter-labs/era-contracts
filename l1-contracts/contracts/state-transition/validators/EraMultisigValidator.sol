@@ -140,40 +140,15 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
     }
 
     /// @inheritdoc IValidatorTimelock
-    function precommitSharedBridge(
-        address _chainAddress,
-        uint256,
-        bytes calldata
-    ) public override(ValidatorTimelock, IValidatorTimelock) onlyRole(_chainAddress, PRECOMMITTER_ROLE) {
-        _propagateToValidatorTimelock();
-    }
-
-    /// @inheritdoc IValidatorTimelock
-    function revertBatchesSharedBridge(
-        address _chainAddress,
-        uint256
-    ) public override(ValidatorTimelock, IValidatorTimelock) onlyRole(_chainAddress, REVERTER_ROLE) {
-        _propagateToValidatorTimelock();
-    }
-
-    /// @inheritdoc IValidatorTimelock
+    /// @dev Skips `_recordBatchCommitment` since this contract is upstream of the downstream
+    /// `ValidatorTimelock` which records and enforces the timelock itself.
     function commitBatchesSharedBridge(
         address _chainAddress,
         uint256,
         uint256,
         bytes calldata
     ) public override(ValidatorTimelock, IValidatorTimelock) onlyRole(_chainAddress, COMMITTER_ROLE) {
-        _propagateToValidatorTimelock();
-    }
-
-    /// @inheritdoc IValidatorTimelock
-    function proveBatchesSharedBridge(
-        address _chainAddress,
-        uint256,
-        uint256,
-        bytes calldata
-    ) public override(ValidatorTimelock, IValidatorTimelock) onlyRole(_chainAddress, PROVER_ROLE) {
-        _propagateToValidatorTimelock();
+        _propagateToAddress(_getPropagationAddress(_chainAddress));
     }
 
     /// @inheritdoc IValidatorTimelock
@@ -189,7 +164,13 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
         if (getApprovals(approvedHash) < threshold) {
             revert NotEnoughSignatures();
         }
-        _propagateToValidatorTimelock();
+        _propagateToAddress(_getPropagationAddress(_chainAddress));
+    }
+
+    /// @dev Returns `validatorTimelock` so that all inherited forwarding functions route calls
+    /// to the downstream `ValidatorTimelock` rather than directly to the ZK chain.
+    function _getPropagationAddress(address) internal view override returns (address) {
+        return validatorTimelock;
     }
 
     /// @inheritdoc IEraMultisigValidator
@@ -213,28 +194,4 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
             );
     }
 
-    /// @dev Forwards the current calldata to the downstream `ValidatorTimelock`.
-    function _propagateToValidatorTimelock() internal {
-        address validatorTimelock_ = validatorTimelock;
-        assembly {
-            // Copy function signature and arguments from calldata at zero position into memory at pointer position
-            calldatacopy(0, 0, calldatasize())
-            // Call the ValidatorTimelock contract, returns 0 on error
-            let result := call(gas(), validatorTimelock_, 0, 0, calldatasize(), 0, 0)
-            // Get the size of the last return data
-            let size := returndatasize()
-            // Copy the size length of bytes from return data at zero position to pointer position
-            returndatacopy(0, 0, size)
-            // Depending on the result value
-            switch result
-            case 0 {
-                // End execution and revert state changes
-                revert(0, size)
-            }
-            default {
-                // Return data with length of size at pointers position
-                return(0, size)
-            }
-        }
-    }
 }
