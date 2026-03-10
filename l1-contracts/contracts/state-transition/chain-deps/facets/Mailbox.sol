@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
+import {IMailboxLegacy} from "../../chain-interfaces/IMailboxLegacy.sol";
 import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 
@@ -61,7 +62,7 @@ import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAs
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
+contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailboxLegacy {
     using UncheckedMath for uint256;
     using PriorityTree for PriorityTree.Tree;
 
@@ -613,7 +614,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ///////////////////////////////////////////////////////
     //////// Legacy Era functions
 
-    /// @inheritdoc IMailboxImpl
+    /// @inheritdoc IMailboxLegacy
     function finalizeEthWithdrawal(
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex,
@@ -621,7 +622,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant onlyL1 {
-        if (s.chainId != ERA_CHAIN_ID) {
+        if (s.chainId != ERA_CHAIN_ID) { //TODO remove after mailbox fn deprecation
             revert OnlyEraSupported();
         }
         address sharedBridge = address(IBridgehubBase(s.bridgehub).assetRouter());
@@ -635,7 +636,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         });
     }
 
-    /// @inheritdoc IMailboxImpl
+    /// @inheritdoc IMailboxLegacy
     function requestL2Transaction(
         address _contractL2,
         uint256 _l2Value,
@@ -644,7 +645,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
         address _refundRecipient
-    ) external payable onlyL1 returns (bytes32 canonicalTxHash) {
+    ) external payable onlyL1 returns (bytes32 canonicalTxHash) {  //TODO remove after mailbox fn deprecation
         if (s.chainId != ERA_CHAIN_ID) {
             revert OnlyEraSupported();
         }

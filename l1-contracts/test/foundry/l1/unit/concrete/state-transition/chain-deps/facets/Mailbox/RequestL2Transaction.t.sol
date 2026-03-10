@@ -15,7 +15,7 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-contract MailboxRequestL2TransactionTest is MailboxTest {
+contract MailboxRequestL2TransactionTest is MailboxTest {  //TODO delete test file after mailbox fn deprecation
     address tempAddress;
     bytes[] tempBytesArr;
     bytes tempBytes;
