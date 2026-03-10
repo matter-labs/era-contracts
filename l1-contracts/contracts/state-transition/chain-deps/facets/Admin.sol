@@ -47,6 +47,7 @@ import {
     TokenMultiplierChangeTooFrequent,
     TooMuchGas,
     Unauthorized,
+    UpgradeTimestampNotReached,
     NotCompatibleWithPriorityMode
 } from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
@@ -466,8 +467,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // Check that the auto upgrade timestamp has passed if the sender is not admin or chainTypeManager
         if (msg.sender != s.admin && msg.sender != s.chainTypeManager) {
             uint256 timestamp = IChainAdmin(s.admin).protocolVersionToUpgradeTimestamp(_oldProtocolVersion);
-            if (block.timestamp < timestamp) {
-                revert Unauthorized(msg.sender);
+            if (timestamp == 0 || block.timestamp < timestamp) {
+                revert UpgradeTimestampNotReached(timestamp, block.timestamp);
             }
         }
         _executeDiamondCut(_diamondCut);

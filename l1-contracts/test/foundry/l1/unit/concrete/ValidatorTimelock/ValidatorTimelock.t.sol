@@ -53,11 +53,13 @@ contract ValidatorTimelockTest is Test {
     bytes32 reverterRole;
     bytes32 proverRole;
     bytes32 executorRole;
+    bytes32 upgraderRole;
     bytes32 precommitterAdminRole;
     bytes32 committerAdminRole;
     bytes32 reverterAdminRole;
     bytes32 proverAdminRole;
     bytes32 executorAdminRole;
+    bytes32 upgraderAdminRole;
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -89,11 +91,13 @@ contract ValidatorTimelockTest is Test {
         reverterRole = validator.REVERTER_ROLE();
         proverRole = validator.PROVER_ROLE();
         executorRole = validator.EXECUTOR_ROLE();
+        upgraderRole = validator.UPGRADER_ROLE();
         precommitterAdminRole = validator.OPTIONAL_PRECOMMITTER_ADMIN_ROLE();
         committerAdminRole = validator.OPTIONAL_COMMITTER_ADMIN_ROLE();
         reverterAdminRole = validator.OPTIONAL_REVERTER_ADMIN_ROLE();
         proverAdminRole = validator.OPTIONAL_PROVER_ADMIN_ROLE();
         executorAdminRole = validator.OPTIONAL_EXECUTOR_ADMIN_ROLE();
+        upgraderAdminRole = validator.OPTIONAL_UPGRADER_ADMIN_ROLE();
     }
 
     function _deployValidatorTimelock(address _initialOwner, uint32 _initialExecutionDelay) internal returns (address) {
@@ -115,12 +119,13 @@ contract ValidatorTimelockTest is Test {
         assertEq(validator.executionDelay(), executionDelay);
     }
 
-    function _assertAllRoles(uint256 _chainId, address _addr, bool _expected) internal {
+    function _assertAllRoles(uint256 _chainId, address _addr, bool _expected) internal view {
         require(validator.hasRoleForChainId(_chainId, validator.PRECOMMITTER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.COMMITTER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.REVERTER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.PROVER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.EXECUTOR_ROLE(), _addr) == _expected);
+        require(validator.hasRoleForChainId(_chainId, validator.UPGRADER_ROLE(), _addr) == _expected);
     }
 
     function test_addValidatorForChainId() public {
@@ -137,6 +142,8 @@ contract ValidatorTimelockTest is Test {
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, proverRole, bob);
         vm.expectEmit(true, true, true, true, address(validator));
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, executorRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, upgraderRole, bob);
         validator.addValidatorForChainId(chainId, bob);
 
         _assertAllRoles(chainId, bob, true);
@@ -158,6 +165,8 @@ contract ValidatorTimelockTest is Test {
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, proverRole, bob);
         vm.expectEmit(true, true, true, true, address(validator));
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, executorRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, upgraderRole, bob);
         validator.removeValidatorForChainId(chainId, bob);
 
         _assertAllRoles(chainId, bob, false);
@@ -283,6 +292,19 @@ contract ValidatorTimelockTest is Test {
         );
 
         vm.prank(alice);
+        validator.upgradeChainFromVersion(zkSync, oldProtocolVersion, diamondCut);
+    }
+
+    function test_RevertWhen_upgradeChainFromVersionNotUpgrader() public {
+        uint256 oldProtocolVersion = 1;
+        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: address(0),
+            initCalldata: bytes("")
+        });
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, upgraderRole, bob));
         validator.upgradeChainFromVersion(zkSync, oldProtocolVersion, diamondCut);
     }
 
