@@ -82,6 +82,9 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         // Mock the SystemContractProxyAdmin.owner() call to return the expected owner
         vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
 
+        // Record events to catch deployments
+        vm.recordLogs();
+
         // Etch all deferred mock contracts now that deployment is complete
         _etchAllDeferredContracts();
         // Execute the deployment

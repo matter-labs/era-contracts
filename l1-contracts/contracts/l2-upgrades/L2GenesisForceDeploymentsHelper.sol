@@ -65,6 +65,15 @@ import {BYTECODE_INFO_LENGTH, ZKSyncOSBytecodeInfo} from "../common/libraries/ZK
 /// @notice A helper library for initializing and managing force-deployed contracts during either the L2 gateway upgrade or
 /// the genesis after the gateway protocol upgrade.
 library L2GenesisForceDeploymentsHelper {
+    /// @notice Emitted when a contract upgrade (deploy or proxy update) is performed via `conductContractUpgrade`.
+    event ContractUpgraded(
+        IComplexUpgrader.ContractUpgradeType indexed upgradeType,
+        address indexed targetAddress
+    );
+
+    /// @notice Emitted when the full force-deployed contracts initialization completes.
+    event ForceDeployedContractsInitialized(bool isZKsyncOS, bool isGenesisUpgrade);
+
     function forceDeployEra(bytes memory _bytecodeInfo, address _newAddress) internal {
         bytes32 bytecodeHash = abi.decode(_bytecodeInfo, (bytes32));
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments = new IL2ContractDeployer.ForceDeployment[](1);
@@ -187,6 +196,7 @@ library L2GenesisForceDeploymentsHelper {
         } else {
             revert UnsupportedUpgradeType();
         }
+        emit ContractUpgraded(_upgradeType, _newAddress);
     }
 
     /// @notice Initializes force-deployed contracts.
@@ -242,6 +252,8 @@ library L2GenesisForceDeploymentsHelper {
             _isZKsyncOS: _isZKsyncOS,
             _isGenesisUpgrade: _isGenesisUpgrade
         });
+
+        emit ForceDeployedContractsInitialized(_isZKsyncOS, _isGenesisUpgrade);
     }
 
     function _setupProxyAdmin() private {
