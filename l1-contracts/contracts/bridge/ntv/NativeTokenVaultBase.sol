@@ -310,7 +310,7 @@ abstract contract NativeTokenVaultBase is
         // This token has not been registered within this NTV yet. Usually this means that the
         // token is native to the chain and the user would prefer to get it registered as such.
         // However, there are exceptions (e.g. bridged legacy ERC20 tokens on L2) when the
-        // assetId has not been stored yet. We will ask the implementor to double check that the token
+        // assetId has not been stored yet. We will ask the implementer to double check that the token
         // is not legacy.
 
         // We try to register it as legacy token. If it fails, we know
