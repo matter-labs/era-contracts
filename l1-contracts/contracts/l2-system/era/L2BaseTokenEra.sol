@@ -84,11 +84,14 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// @param _account The address which to mint the funds to.
     /// @param _amount The amount of ETH in wei to be minted.
     function mint(address _account, uint256 _amount) external override onlyBootloader {
+        // Notify the asset tracker BEFORE changing balances/totalSupply, so that
+        // _needToForceSetAssetMigrationOnL2 can use totalSupply() == 0 consistently.
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(L1_CHAIN_ID, _amount);
+
         // Transfer from BaseTokenHolder to the recipient
         // This decreases holder balance, which increases totalSupply() automatically
         eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR] -= _amount;
         eraAccountBalance[_account] += _amount;
-        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(L1_CHAIN_ID, _amount);
 
         emit Mint(_account, _amount);
     }

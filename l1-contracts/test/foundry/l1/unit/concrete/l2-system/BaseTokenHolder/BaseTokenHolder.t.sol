@@ -296,6 +296,40 @@ contract BaseTokenHolderTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
+                    ORDERING INVARIANT TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Verifies that handleFinalizeBaseTokenBridgingOnL2 is called BEFORE the ETH transfer.
+    /// @dev This ordering is critical: _needToForceSetAssetMigrationOnL2 reads totalSupply() to decide
+    /// whether to force-set the migration number. If the transfer happens first, totalSupply changes
+    /// before the tracker is notified, giving wrong results. The same ordering must be enforced in zksync-os.
+    function test_give_callsAssetTrackerBeforeTransfer() public {
+        uint256 amount = 1 ether;
+        uint256 recipientBalanceBefore = recipient.balance;
+
+        // Deploy a recording tracker that snapshots recipient balance when called
+        RecordingBalanceTracker recorder = new RecordingBalanceTracker(recipient);
+        vm.etch(L2_ASSET_TRACKER_ADDR, address(recorder).code);
+
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        baseTokenHolder.give(recipient, amount, ERA_CHAIN_ID);
+
+        // Read from the etched address
+        bool wasCalled = RecordingBalanceTracker(L2_ASSET_TRACKER_ADDR).wasCalled();
+        uint256 recordedBalance = RecordingBalanceTracker(L2_ASSET_TRACKER_ADDR).recordedRecipientBalance();
+
+        assertTrue(wasCalled, "Asset tracker should have been called");
+        assertEq(
+            recordedBalance,
+            recipientBalanceBefore,
+            "handleFinalizeBaseTokenBridgingOnL2 must be called BEFORE ETH transfer"
+        );
+
+        // Confirm transfer actually happened
+        assertEq(recipient.balance, recipientBalanceBefore + amount, "Recipient should have received ETH after call");
+    }
+
+    /*//////////////////////////////////////////////////////////////
                         INTERFACE COMPLIANCE
     //////////////////////////////////////////////////////////////*/
 
@@ -318,4 +352,34 @@ contract RejectingETHContract {
     receive() external payable {
         revert("Rejected");
     }
+}
+
+/// @notice Mock asset tracker that records recipient balance at the moment handleFinalizeBaseTokenBridgingOnL2 is called.
+/// @dev Uses immutables so values survive vm.etch (immutables are baked into bytecode).
+contract RecordingBalanceTracker {
+    address public immutable trackedRecipient;
+    uint256 public immutable l1ChainId = 1;
+    bool public immutable needBaseTokenTotalSupplyBackfill = false;
+
+    // Storage slot 0: recipient balance snapshot recorded during callback
+    uint256 public recordedRecipientBalance;
+    // Storage slot 1: flag indicating callback was invoked
+    bool public wasCalled;
+
+    constructor(address _recipient) {
+        trackedRecipient = _recipient;
+    }
+
+    function handleFinalizeBaseTokenBridgingOnL2(uint256, uint256) external {
+        recordedRecipientBalance = trackedRecipient.balance;
+        wasCalled = true;
+    }
+
+    function handleInitiateBaseTokenBridgingOnL2(uint256, uint256) external {}
+
+    function L1_CHAIN_ID() external pure returns (uint256) {
+        return 1;
+    }
+
+    function backFillZKSyncOSBaseTokenV31MigrationData(uint256) external {}
 }

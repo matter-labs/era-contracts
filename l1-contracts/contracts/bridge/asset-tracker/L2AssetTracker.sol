@@ -457,16 +457,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Determines if a token's migration number should be force-set during bridging operations.
-    /// @dev For the base token, L2BaseTokenEra.mint() decreases the BaseTokenHolder balance (increasing
-    /// @dev totalSupply) BEFORE calling handleFinalizeBaseTokenBridgingOnL2. So by the time this check
-    /// @dev runs, totalSupply is already > 0 even on the very first deposit. Meanwhile L1's chainBalance
-    /// @dev was 0 before this deposit, so L1/GW force-set assetMigrationNumber via
-    /// @dev _tokenCanSkipMigrationOnSettlementLayer. We use totalSuccessfulDepositsFromL1 == 0 as the
-    /// @dev proxy instead of totalSupply == 0. This field is only incremented when deposits arrive while
-    /// @dev the chain settles on L1, so it stays 0 for chains that migrate to gateway before any deposits
-    /// @dev (--skip-priority-txs), matching L1's chainBalance == 0 condition. For chains that received
-    /// @dev deposits before migration, totalSuccessfulDepositsFromL1 > 0 prevents the force-set, ensuring
-    /// @dev TBM handles the base token balance migration properly.
+    /// @dev IMPORTANT: All callers of handleFinalizeBaseTokenBridgingOnL2 MUST invoke the asset tracker
+    /// @dev BEFORE changing totalSupply/balances. This ensures totalSupply() == 0 is a reliable proxy
+    /// @dev for "no deposits have been finalized yet", giving uniform behavior for both base tokens and
+    /// @dev ERC20 tokens. The same ordering must be enforced in zksync-os.
     /// @param _assetId The asset ID of the token to check.
     /// @param _tokenOriginChainId The chain ID where this token originated.
     /// @param _tokenAddress The contract address of the token on this chain.
@@ -484,18 +478,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             return false;
         }
 
-        // For the base token, mint() increases totalSupply before calling this function,
-        // so totalSupply is already > 0 even on the first deposit. We cannot use it as a
-        // proxy for "nothing was deposited". Instead, check totalSuccessfulDepositsFromL1:
-        // this is only incremented when deposits arrive while settling on L1, so it's 0
-        // for chains that migrated to gateway before receiving any deposits. This matches
-        // L1's chainBalance == 0 condition in _tokenCanSkipMigrationOnSettlementLayer.
-        if (_assetId == BASE_TOKEN_ASSET_ID) {
-            return interopInfo[_assetId].totalSuccessfulDepositsFromL1 == 0;
-        }
-
-        // For other tokens, totalSupply == 0 implies chainBalance == 0 on L1,
-        // meaning there is nothing to migrate.
+        // totalSupply == 0 implies chainBalance == 0 on L1, meaning there is nothing to migrate.
+        // This works uniformly for both base tokens and ERC20 tokens because the asset tracker
+        // is always notified before totalSupply changes.
         return IERC20(_tokenAddress).totalSupply() == 0;
     }
 

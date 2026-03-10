@@ -786,6 +786,46 @@ contract L2BaseTokenEraTest is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
+                    ORDERING INVARIANT TESTS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Verifies that handleFinalizeBaseTokenBridgingOnL2 is called BEFORE totalSupply changes.
+    /// @dev This ordering is critical: _needToForceSetAssetMigrationOnL2 reads totalSupply() to decide
+    /// whether to force-set the migration number. If totalSupply changed before the tracker is notified,
+    /// the check would give wrong results (totalSupply > 0 even on the very first deposit).
+    function test_mint_callsAssetTrackerBeforeTotalSupplyChange() public {
+        _initL2();
+        uint256 mintAmount = 5 ether;
+
+        uint256 totalSupplyBefore = l2BaseToken.totalSupply();
+
+        // Deploy a recording asset tracker that snapshots totalSupply when called
+        RecordingAssetTracker recorder = new RecordingAssetTracker(address(l2BaseToken));
+        vm.etch(L2_ASSET_TRACKER_ADDR, address(recorder).code);
+
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        l2BaseToken.mint(alice, mintAmount);
+
+        // Read wasCalled (slot 1) and recordedTotalSupply (slot 0) from the etched address
+        bool wasCalled = RecordingAssetTracker(L2_ASSET_TRACKER_ADDR).wasCalled();
+        uint256 recordedTotalSupply = RecordingAssetTracker(L2_ASSET_TRACKER_ADDR).recordedTotalSupply();
+
+        assertTrue(wasCalled, "Asset tracker should have been called");
+        assertEq(
+            recordedTotalSupply,
+            totalSupplyBefore,
+            "handleFinalizeBaseTokenBridgingOnL2 must be called BEFORE totalSupply changes"
+        );
+
+        // Confirm totalSupply actually changed after the call
+        assertEq(
+            l2BaseToken.totalSupply(),
+            totalSupplyBefore + mintAmount,
+            "totalSupply should have increased after mint completes"
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
                         INTERFACE COMPLIANCE
     //////////////////////////////////////////////////////////////*/
 
@@ -809,4 +849,34 @@ contract RejectingBurnAndStartBridgingContract {
     receive() external payable {
         revert("Rejected");
     }
+}
+
+/// @notice Mock asset tracker that records totalSupply at the moment handleFinalizeBaseTokenBridgingOnL2 is called.
+/// @dev Uses immutables so values survive vm.etch (immutables are baked into bytecode).
+contract RecordingAssetTracker {
+    address public immutable baseToken;
+    uint256 public immutable l1ChainId = 1;
+    bool public immutable needBaseTokenTotalSupplyBackfill = false;
+
+    // Storage slot 0: totalSupply snapshot recorded during callback
+    uint256 public recordedTotalSupply;
+    // Storage slot 1: flag indicating callback was invoked
+    bool public wasCalled;
+
+    constructor(address _baseToken) {
+        baseToken = _baseToken;
+    }
+
+    function handleFinalizeBaseTokenBridgingOnL2(uint256, uint256) external {
+        recordedTotalSupply = L2BaseTokenEra(baseToken).totalSupply();
+        wasCalled = true;
+    }
+
+    function handleInitiateBaseTokenBridgingOnL2(uint256, uint256) external {}
+
+    function L1_CHAIN_ID() external pure returns (uint256) {
+        return 1;
+    }
+
+    function backFillZKSyncOSBaseTokenV31MigrationData(uint256) external {}
 }
