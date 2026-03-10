@@ -5,7 +5,6 @@ import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {ICommitter} from "../../chain-interfaces/ICommitter.sol";
 import {IChainUpgrader} from "../../chain-interfaces/IChainUpgrader.sol";
-import {Diamond} from "../../libraries/Diamond.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
