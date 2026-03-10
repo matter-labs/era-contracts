@@ -10,21 +10,21 @@ pragma solidity 0.8.28;
 import {InvalidL1AssetRouter} from "./AssetTrackerErrors.sol";
 
 /// @dev Associates a ZK chain ID with its legacy L2 shared bridge address.
-/// @dev Chains that deployed an L2SharedBridge before the V31 upgrade are recorded here so
+/// @dev Chains that deployed an L2SharedBridge before the V26 upgrade are recorded here so
 /// that GWAssetTracker can initialise legacy withdrawal support for them after the upgrade.
 struct SharedBridgeOnChainId {
     /// @dev The chain ID of the ZK chain.
     uint256 chainId;
-    /// @dev The address of the legacy L2SharedBridge deployed on that chain prior to V31.
+    /// @dev The address of the legacy L2SharedBridge deployed on that chain prior to V26.
     address legacySharedBridgeAddress;
 }
 
 /// @title LegacySharedBridgeAddresses
 /// @notice Hardcoded registry of legacy L2SharedBridge addresses for every ZK chain that
-/// had one deployed prior to the V31 upgrade, grouped by ecosystem.
+/// had one deployed prior to the V26 upgrade, grouped by ecosystem.
 ///
-/// @dev Prior to V31, each ZK chain that supported ERC-20 bridging deployed its own
-/// L2SharedBridge contract. After V31, these bridges were deprecated in favour of the
+/// @dev Prior to V26, each ZK chain that supported ERC-20 bridging deployed its own
+/// L2SharedBridge contract. After V26, these bridges were deprecated in favour of the
 /// unified L2AssetRouter. This library preserves the pre-upgrade addresses so that the
 /// GWAssetTracker can call setLegacySharedBridgeAddress() and keep legacy withdrawal
 /// proofs valid.
@@ -69,47 +69,48 @@ library LegacySharedBridgeAddresses {
     ///
     /// @param _l1AssetRouter The L1AssetRouter address of the calling ecosystem.
     /// @return An array of {chainId, legacySharedBridgeAddress} pairs for every chain in
-    ///         the ecosystem that had a legacy L2SharedBridge deployed before V31.
+    ///         the ecosystem that had a legacy L2SharedBridge deployed before V26.
     ///         Returns an empty array for ecosystems where no chains had a legacy bridge.
     function getLegacySharedBridgeAddressOnGateway(
         address _l1AssetRouter
     ) internal pure returns (SharedBridgeOnChainId[] memory) {
-        SharedBridgeOnChainId[] memory stageLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](
-            STAGE_LEGACY_BRIDGES
-        );
-        SharedBridgeOnChainId[] memory testnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](
-            TESTNET_LEGACY_BRIDGES
-        );
-        SharedBridgeOnChainId[] memory mainnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](
-            MAINNET_LEGACY_BRIDGES
-        );
-
-        stageLegacySharedBridgeAddresses[0] = SharedBridgeOnChainId({chainId: 270, legacySharedBridgeAddress: 0xCEB8d4888d2025aEaAD0272175281e0CaFC33152});
-        stageLegacySharedBridgeAddresses[1] = SharedBridgeOnChainId({chainId: 37111, legacySharedBridgeAddress: 0x427373Be173120D7A042b44D0804E37F25E7330b});
-        stageLegacySharedBridgeAddresses[2] = SharedBridgeOnChainId({chainId: 6474, legacySharedBridgeAddress: 0x74F54C4BB12B3AADe5b541Be2Ab586F02cfB3BD6});
-        stageLegacySharedBridgeAddresses[3] = SharedBridgeOnChainId({chainId: 6475, legacySharedBridgeAddress: 0x74F54C4BB12B3AADe5b541Be2Ab586F02cfB3BD6});
-        stageLegacySharedBridgeAddresses[4] = SharedBridgeOnChainId({chainId: 11123, legacySharedBridgeAddress: 0xB5C8E55273718B24066880f8fBdBEcd00f9f55DC});
-        stageLegacySharedBridgeAddresses[5] = SharedBridgeOnChainId({chainId: 1381491, legacySharedBridgeAddress: 0x01ABA2F5BC2B540adBA2BcE1cbb2bA6D64CEAee6});
-
-        mainnetLegacySharedBridgeAddresses[0] = SharedBridgeOnChainId({chainId: 324, legacySharedBridgeAddress: 0x11f943b2c77b743AB90f4A0Ae7d5A4e7FCA3E102});
-        mainnetLegacySharedBridgeAddresses[1] = SharedBridgeOnChainId({chainId: 388, legacySharedBridgeAddress: 0x309429DE3621992Cb0ab8982A448c9Cc5c38405b});
-        mainnetLegacySharedBridgeAddresses[2] = SharedBridgeOnChainId({chainId: 50104, legacySharedBridgeAddress: 0x954ba8223a6BFEC1Cc3867139243A02BA0Bc66e4});
-        mainnetLegacySharedBridgeAddresses[3] = SharedBridgeOnChainId({chainId: 543210, legacySharedBridgeAddress: 0x954ba8223a6BFEC1Cc3867139243A02BA0Bc66e4});
-        mainnetLegacySharedBridgeAddresses[4] = SharedBridgeOnChainId({chainId: 2741, legacySharedBridgeAddress: 0x954ba8223a6BFEC1Cc3867139243A02BA0Bc66e4});
-        mainnetLegacySharedBridgeAddresses[5] = SharedBridgeOnChainId({chainId: 325, legacySharedBridgeAddress: 0xe73c3F9dB17CEcb05cE7A18fBcC810fC5D675c77});
-        mainnetLegacySharedBridgeAddresses[6] = SharedBridgeOnChainId({chainId: 61166, legacySharedBridgeAddress: 0xfC1d5dCD080121DaAF366625581ad490414EF294});
-        mainnetLegacySharedBridgeAddresses[7] = SharedBridgeOnChainId({chainId: 1345, legacySharedBridgeAddress: 0xFb07A45D72DBE6E09Fd07eA4A22BAB4f85295C27});
-        mainnetLegacySharedBridgeAddresses[8] = SharedBridgeOnChainId({chainId: 9637, legacySharedBridgeAddress: 0xFb07A45D72DBE6E09Fd07eA4A22BAB4f85295C27});
-        mainnetLegacySharedBridgeAddresses[9] = SharedBridgeOnChainId({chainId: 320, legacySharedBridgeAddress: 0xFb07A45D72DBE6E09Fd07eA4A22BAB4f85295C27});
-        mainnetLegacySharedBridgeAddresses[10] = SharedBridgeOnChainId({chainId: 232, legacySharedBridgeAddress: 0x8116A750e2091B2bA0D94223e7b20a6A65A279f4});
-
         if (_l1AssetRouter == STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS) {
-            return stageLegacySharedBridgeAddresses;
+            return _getStageLegacyBridges();
         } else if (_l1AssetRouter == TESTNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS) {
-            return testnetLegacySharedBridgeAddresses;
+            return _getTestnetLegacyBridges();
         } else if (_l1AssetRouter == MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS) {
-            return mainnetLegacySharedBridgeAddresses;
+            return _getMainnetLegacyBridges();
         }
         revert InvalidL1AssetRouter(_l1AssetRouter);
+    }
+
+    function _getStageLegacyBridges() private pure returns (SharedBridgeOnChainId[] memory bridges) {
+        bridges = new SharedBridgeOnChainId[](STAGE_LEGACY_BRIDGES);
+        bridges[0] = SharedBridgeOnChainId({chainId: 270, legacySharedBridgeAddress: 0xCEB8d4888d2025aEaAD0272175281e0CaFC33152});
+        bridges[1] = SharedBridgeOnChainId({chainId: 37111, legacySharedBridgeAddress: 0x427373Be173120D7A042b44D0804E37F25E7330b});
+        bridges[2] = SharedBridgeOnChainId({chainId: 6474, legacySharedBridgeAddress: 0x74F54C4BB12B3AADe5b541Be2Ab586F02cfB3BD6});
+        bridges[3] = SharedBridgeOnChainId({chainId: 6475, legacySharedBridgeAddress: 0x74F54C4BB12B3AADe5b541Be2Ab586F02cfB3BD6});
+        bridges[4] = SharedBridgeOnChainId({chainId: 11123, legacySharedBridgeAddress: 0xB5C8E55273718B24066880f8fBdBEcd00f9f55DC});
+        bridges[5] = SharedBridgeOnChainId({chainId: 1381491, legacySharedBridgeAddress: 0x01ABA2F5BC2B540adBA2BcE1cbb2bA6D64CEAee6});
+    }
+
+    /// @dev Testnet has no chains with legacy bridges. This function exists for consistency.
+    function _getTestnetLegacyBridges() private pure returns (SharedBridgeOnChainId[] memory bridges) {
+        bridges = new SharedBridgeOnChainId[](TESTNET_LEGACY_BRIDGES);
+    }
+
+    function _getMainnetLegacyBridges() private pure returns (SharedBridgeOnChainId[] memory bridges) {
+        bridges = new SharedBridgeOnChainId[](MAINNET_LEGACY_BRIDGES);
+        bridges[0] = SharedBridgeOnChainId({chainId: 324, legacySharedBridgeAddress: 0x11f943b2c77b743AB90f4A0Ae7d5A4e7FCA3E102});
+        bridges[1] = SharedBridgeOnChainId({chainId: 388, legacySharedBridgeAddress: 0x309429DE3621992Cb0ab8982A448c9Cc5c38405b});
+        bridges[2] = SharedBridgeOnChainId({chainId: 50104, legacySharedBridgeAddress: 0x954ba8223a6BFEC1Cc3867139243A02BA0Bc66e4});
+        bridges[3] = SharedBridgeOnChainId({chainId: 543210, legacySharedBridgeAddress: 0x954ba8223a6BFEC1Cc3867139243A02BA0Bc66e4});
+        bridges[4] = SharedBridgeOnChainId({chainId: 2741, legacySharedBridgeAddress: 0x954ba8223a6BFEC1Cc3867139243A02BA0Bc66e4});
+        bridges[5] = SharedBridgeOnChainId({chainId: 325, legacySharedBridgeAddress: 0xe73c3F9dB17CEcb05cE7A18fBcC810fC5D675c77});
+        bridges[6] = SharedBridgeOnChainId({chainId: 61166, legacySharedBridgeAddress: 0xfC1d5dCD080121DaAF366625581ad490414EF294});
+        bridges[7] = SharedBridgeOnChainId({chainId: 1345, legacySharedBridgeAddress: 0xFb07A45D72DBE6E09Fd07eA4A22BAB4f85295C27});
+        bridges[8] = SharedBridgeOnChainId({chainId: 9637, legacySharedBridgeAddress: 0xFb07A45D72DBE6E09Fd07eA4A22BAB4f85295C27});
+        bridges[9] = SharedBridgeOnChainId({chainId: 320, legacySharedBridgeAddress: 0xFb07A45D72DBE6E09Fd07eA4A22BAB4f85295C27});
+        bridges[10] = SharedBridgeOnChainId({chainId: 232, legacySharedBridgeAddress: 0x8116A750e2091B2bA0D94223e7b20a6A65A279f4});
     }
 }

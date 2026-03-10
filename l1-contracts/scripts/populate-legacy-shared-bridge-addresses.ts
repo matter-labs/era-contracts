@@ -181,6 +181,15 @@ function generateSolidityFile(strict: boolean): void {
     console.log(`Loaded ${env}: ${envData[env].chains.length} chains with legacy bridges`);
   }
 
+  // The new Testnet ecosystem was launched after V26 and never had a legacy shared bridge,
+  // so we expect no chains to have one.
+  if (envData["testnet"].chains.length !== 0) {
+    throw new Error(
+      `Expected 0 legacy bridges for testnet, got ${envData["testnet"].chains.length}. ` +
+        `The new Testnet ecosystem should not have any legacy L2SharedBridge deployments.`
+    );
+  }
+
   const content = buildSolidityContent(envData["stage"], envData["testnet"], envData["mainnet"]);
   fs.writeFileSync(SOLIDITY_OUTPUT_FILE, content);
   console.log(`\nGenerated: ${SOLIDITY_OUTPUT_FILE}`);
@@ -189,35 +198,28 @@ function generateSolidityFile(strict: boolean): void {
 // ─── Solidity code generation ─────────────────────────────────────────────────
 
 /**
- * Emits the assignments that populate a SharedBridgeOnChainId[] variable.
- *
- * @param chains   List of chain entries to emit.
- * @param varName  Name of the Solidity local variable (already allocated).
- * @param indent   Whitespace prefix for each line.
+ * Emits the body of a per-ecosystem private helper function.
+ * Uses `bridges` as the named return variable (already declared by the caller template).
  */
-function emitArrayAssignments(chains: ChainBridgeEntry[], varName: string, indent: string): string {
-  return chains
+function emitHelperBody(chains: ChainBridgeEntry[], count: string, indent: string): string {
+  const alloc = `${indent}bridges = new SharedBridgeOnChainId[](${count});`;
+  if (chains.length === 0) return alloc;
+  const assignments = chains
     .map(
       (c, i) =>
-        `${indent}${varName}[${i}] = SharedBridgeOnChainId({` +
+        `${indent}bridges[${i}] = SharedBridgeOnChainId({` +
         `chainId: ${c.chainId}, ` +
         `legacySharedBridgeAddress: ${c.legacySharedBridgeAddress}` +
         `});`
     )
     .join("\n");
+  return alloc + "\n" + assignments;
 }
 
 function buildSolidityContent(stage: EnvBridgeData, testnet: EnvBridgeData, mainnet: EnvBridgeData): string {
-  const stageAssign = emitArrayAssignments(stage.chains, "stageLegacySharedBridgeAddresses", "        ");
-  const testnetAssign = emitArrayAssignments(testnet.chains, "testnetLegacySharedBridgeAddresses", "        ");
-  const mainnetAssign = emitArrayAssignments(mainnet.chains, "mainnetLegacySharedBridgeAddresses", "        ");
-
-  // Blank-line-separated population blocks (only emitted when there is data).
-  const populationBlocks = [stageAssign, testnetAssign, mainnetAssign]
-    .filter((block) => block.length > 0)
-    .join("\n\n");
-
-  const populationSection = populationBlocks.length > 0 ? "\n" + populationBlocks + "\n" : "";
+  const stageBody = emitHelperBody(stage.chains, "STAGE_LEGACY_BRIDGES", "        ");
+  const testnetBody = emitHelperBody(testnet.chains, "TESTNET_LEGACY_BRIDGES", "        ");
+  const mainnetBody = emitHelperBody(mainnet.chains, "MAINNET_LEGACY_BRIDGES", "        ");
 
   // prettier-ignore
   return (
@@ -233,21 +235,21 @@ function buildSolidityContent(stage: EnvBridgeData, testnet: EnvBridgeData, main
     `import {InvalidL1AssetRouter} from "./AssetTrackerErrors.sol";\n` +
     `\n` +
     `/// @dev Associates a ZK chain ID with its legacy L2 shared bridge address.\n` +
-    `/// @dev Chains that deployed an L2SharedBridge before the V31 upgrade are recorded here so\n` +
+    `/// @dev Chains that deployed an L2SharedBridge before the V26 upgrade are recorded here so\n` +
     `/// that GWAssetTracker can initialise legacy withdrawal support for them after the upgrade.\n` +
     `struct SharedBridgeOnChainId {\n` +
     `    /// @dev The chain ID of the ZK chain.\n` +
     `    uint256 chainId;\n` +
-    `    /// @dev The address of the legacy L2SharedBridge deployed on that chain prior to V31.\n` +
+    `    /// @dev The address of the legacy L2SharedBridge deployed on that chain prior to V26.\n` +
     `    address legacySharedBridgeAddress;\n` +
     `}\n` +
     `\n` +
     `/// @title LegacySharedBridgeAddresses\n` +
     `/// @notice Hardcoded registry of legacy L2SharedBridge addresses for every ZK chain that\n` +
-    `/// had one deployed prior to the V31 upgrade, grouped by ecosystem.\n` +
+    `/// had one deployed prior to the V26 upgrade, grouped by ecosystem.\n` +
     `///\n` +
-    `/// @dev Prior to V31, each ZK chain that supported ERC-20 bridging deployed its own\n` +
-    `/// L2SharedBridge contract. After V31, these bridges were deprecated in favour of the\n` +
+    `/// @dev Prior to V26, each ZK chain that supported ERC-20 bridging deployed its own\n` +
+    `/// L2SharedBridge contract. After V26, these bridges were deprecated in favour of the\n` +
     `/// unified L2AssetRouter. This library preserves the pre-upgrade addresses so that the\n` +
     `/// GWAssetTracker can call setLegacySharedBridgeAddress() and keep legacy withdrawal\n` +
     `/// proofs valid.\n` +
@@ -292,30 +294,32 @@ function buildSolidityContent(stage: EnvBridgeData, testnet: EnvBridgeData, main
     `    ///\n` +
     `    /// @param _l1AssetRouter The L1AssetRouter address of the calling ecosystem.\n` +
     `    /// @return An array of {chainId, legacySharedBridgeAddress} pairs for every chain in\n` +
-    `    ///         the ecosystem that had a legacy L2SharedBridge deployed before V31.\n` +
+    `    ///         the ecosystem that had a legacy L2SharedBridge deployed before V26.\n` +
     `    ///         Returns an empty array for ecosystems where no chains had a legacy bridge.\n` +
     `    function getLegacySharedBridgeAddressOnGateway(\n` +
     `        address _l1AssetRouter\n` +
     `    ) internal pure returns (SharedBridgeOnChainId[] memory) {\n` +
-    `        SharedBridgeOnChainId[] memory stageLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](\n` +
-    `            STAGE_LEGACY_BRIDGES\n` +
-    `        );\n` +
-    `        SharedBridgeOnChainId[] memory testnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](\n` +
-    `            TESTNET_LEGACY_BRIDGES\n` +
-    `        );\n` +
-    `        SharedBridgeOnChainId[] memory mainnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](\n` +
-    `            MAINNET_LEGACY_BRIDGES\n` +
-    `        );\n` +
-    populationSection +
-    `\n` +
     `        if (_l1AssetRouter == STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS) {\n` +
-    `            return stageLegacySharedBridgeAddresses;\n` +
+    `            return _getStageLegacyBridges();\n` +
     `        } else if (_l1AssetRouter == TESTNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS) {\n` +
-    `            return testnetLegacySharedBridgeAddresses;\n` +
+    `            return _getTestnetLegacyBridges();\n` +
     `        } else if (_l1AssetRouter == MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS) {\n` +
-    `            return mainnetLegacySharedBridgeAddresses;\n` +
+    `            return _getMainnetLegacyBridges();\n` +
     `        }\n` +
     `        revert InvalidL1AssetRouter(_l1AssetRouter);\n` +
+    `    }\n` +
+    `\n` +
+    `    function _getStageLegacyBridges() private pure returns (SharedBridgeOnChainId[] memory bridges) {\n` +
+    stageBody + `\n` +
+    `    }\n` +
+    `\n` +
+    `    /// @dev Testnet has no chains with legacy bridges. This function exists for consistency.\n` +
+    `    function _getTestnetLegacyBridges() private pure returns (SharedBridgeOnChainId[] memory bridges) {\n` +
+    testnetBody + `\n` +
+    `    }\n` +
+    `\n` +
+    `    function _getMainnetLegacyBridges() private pure returns (SharedBridgeOnChainId[] memory bridges) {\n` +
+    mainnetBody + `\n` +
     `    }\n` +
     `}\n`
   );
