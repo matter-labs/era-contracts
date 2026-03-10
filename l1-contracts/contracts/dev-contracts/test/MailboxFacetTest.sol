@@ -12,7 +12,7 @@ contract MailboxFacetTest is MailboxFacet {
     function test() internal virtual {}
 
     constructor(
-        uint256 _eraChainId, //TODO remove after mailbox deprecation
+        uint256 _eraChainId, // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
         uint256 _l1ChainId,
         address _chainAssetHandler,
         IEIP7702Checker _eip7702Checker
