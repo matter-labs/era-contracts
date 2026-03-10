@@ -193,5 +193,4 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
                 )
             );
     }
-
 }
