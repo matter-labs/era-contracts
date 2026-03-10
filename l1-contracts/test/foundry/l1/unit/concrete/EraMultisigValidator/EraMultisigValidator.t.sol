@@ -17,6 +17,8 @@ import {AddressHasNoCode, RoleAccessDenied} from "contracts/common/L1ContractErr
 import {
     AlreadySigned,
     InitializeNotAvailable,
+    MemberAlreadyExists,
+    MemberDoesNotExist,
     NotEnoughSignatures,
     NotSigner
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
@@ -278,6 +280,27 @@ contract EraMultisigValidatorTest is Test {
         eraMultisig.changeExecutionMultisigMember(toAdd, toRemove);
     }
 
+    function test_changeMembers_revertsIfAddingExistingMember() public {
+        address[] memory toAdd = new address[](1);
+        toAdd[0] = member1; // already a member
+        address[] memory toRemove = new address[](0);
+
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(MemberAlreadyExists.selector, member1));
+        eraMultisig.changeExecutionMultisigMember(toAdd, toRemove);
+    }
+
+    function test_changeMembers_revertsIfRemovingNonMember() public {
+        address nonMember_ = makeAddr("nonMember2");
+        address[] memory toAdd = new address[](0);
+        address[] memory toRemove = new address[](1);
+        toRemove[0] = nonMember_;
+
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(MemberDoesNotExist.selector, nonMember_));
+        eraMultisig.changeExecutionMultisigMember(toAdd, toRemove);
+    }
+
     function test_changeMembers_addAndRemoveInSameCall() public {
         address newMember = makeAddr("newMember");
         address[] memory toAdd = new address[](1);
@@ -292,18 +315,17 @@ contract EraMultisigValidatorTest is Test {
         assertFalse(eraMultisig.executionMultisigMember(member1));
     }
 
-    function test_changeMembers_addThenRemoveSameAddress() public {
-        // Add and then remove the same address in one call — remove wins (executed second)
-        address target = makeAddr("target");
+    function test_changeMembers_removeAndAddSameAddress() public {
+        // Remove and then add the same address in one call — add wins (executed second)
         address[] memory toAdd = new address[](1);
-        toAdd[0] = target;
+        toAdd[0] = member1;
         address[] memory toRemove = new address[](1);
-        toRemove[0] = target;
+        toRemove[0] = member1;
 
         vm.prank(owner);
         eraMultisig.changeExecutionMultisigMember(toAdd, toRemove);
 
-        assertFalse(eraMultisig.executionMultisigMember(target));
+        assertTrue(eraMultisig.executionMultisigMember(member1));
     }
 
     // ═══════════════════════════════════════════════════════════════════

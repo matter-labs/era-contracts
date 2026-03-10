@@ -3,7 +3,14 @@ pragma solidity 0.8.28;
 
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/cryptography/EIP712Upgradeable.sol";
 import {AddressHasNoCode} from "../../common/L1ContractErrors.sol";
-import {AlreadySigned, InitializeNotAvailable, NotEnoughSignatures, NotSigner} from "../L1StateTransitionErrors.sol";
+import {
+    AlreadySigned,
+    InitializeNotAvailable,
+    MemberAlreadyExists,
+    MemberDoesNotExist,
+    NotEnoughSignatures,
+    NotSigner
+} from "../L1StateTransitionErrors.sol";
 import {ValidatorTimelock} from "./ValidatorTimelock.sol";
 import {IValidatorTimelock} from "./interfaces/IValidatorTimelock.sol";
 import {IEraMultisigValidator} from "./interfaces/IEraMultisigValidator.sol";
@@ -112,15 +119,23 @@ contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP71
         address[] calldata _addressesToAdd,
         address[] calldata _addressesToRemove
     ) external onlyOwner {
-        uint256 addLength = _addressesToAdd.length;
-        for (uint256 i = 0; i < addLength; ++i) {
-            executionMultisigMember[_addressesToAdd[i]] = true;
-            emit MultisigMemberChanged(_addressesToAdd[i], true);
-        }
         uint256 removeLength = _addressesToRemove.length;
         for (uint256 i = 0; i < removeLength; ++i) {
-            executionMultisigMember[_addressesToRemove[i]] = false;
-            emit MultisigMemberChanged(_addressesToRemove[i], false);
+            address member = _addressesToRemove[i];
+            if (!executionMultisigMember[member]) {
+                revert MemberDoesNotExist(member);
+            }
+            executionMultisigMember[member] = false;
+            emit MultisigMemberChanged(member, false);
+        }
+        uint256 addLength = _addressesToAdd.length;
+        for (uint256 i = 0; i < addLength; ++i) {
+            address member = _addressesToAdd[i];
+            if (executionMultisigMember[member]) {
+                revert MemberAlreadyExists(member);
+            }
+            executionMultisigMember[member] = true;
+            emit MultisigMemberChanged(member, true);
         }
     }
 

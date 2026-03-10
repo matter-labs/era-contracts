@@ -52,6 +52,10 @@ error InvalidUnprocessedIndex(uint256 treeUnprocessedIndex, uint256 commitmentUn
 error L1DAValidatorAddressIsZero();
 // 0x7fbff2dd
 error L1DAValidatorInvalidSender(address msgSender);
+// 0xe0150952
+error MemberAlreadyExists(address member);
+// 0x7384f7ad
+error MemberDoesNotExist(address member);
 // 0x9b5f85eb
 error MessageRootIsZero();
 // 0xf148c8da
