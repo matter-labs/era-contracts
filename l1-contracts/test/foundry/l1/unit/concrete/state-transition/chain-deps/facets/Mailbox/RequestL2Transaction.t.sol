@@ -15,7 +15,8 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-contract MailboxRequestL2TransactionTest is MailboxTest {  //TODO delete test file after mailbox fn deprecation
+// TODO(EVM-1216): delete test file after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
+contract MailboxRequestL2TransactionTest is MailboxTest {
     address tempAddress;
     bytes[] tempBytesArr;
     bytes tempBytes;

@@ -10,7 +10,8 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {OnlyEraSupported} from "contracts/common/L1ContractErrors.sol";
 
-contract MailboxFinalizeWithdrawal is MailboxTest { //TODO delete test file after mailbox fn deprecation  
+// TODO(EVM-1216): delete test file after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
+contract MailboxFinalizeWithdrawal is MailboxTest {
     bytes32[] proof;
     bytes message;
     DummySharedBridge L1AssetRouter;

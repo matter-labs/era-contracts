@@ -303,7 +303,7 @@ error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
 // 0xdf17e316
 error NotWhitelisted(address);
 // 0xf3ed9dfa
-error OnlyEraSupported();
+error OnlyEraSupported(); // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
 // 0x9d7bb13f
 error OnlyNormalMode();
 // 0xd702c443

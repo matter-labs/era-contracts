@@ -8,7 +8,7 @@ import {FeeParams, PubdataPricingMode} from "../../state-transition/chain-deps/Z
 contract DummyZKChain is MailboxFacet {
     constructor(
         address bridgeHubAddress,
-        uint256 _eraChainId, //TODO remove after mailbox fn deprecation
+        uint256 _eraChainId, // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
         uint256 _l1ChainId,
         address _chainAssetHandler,
         IEIP7702Checker _eip7702Checker
@@ -17,7 +17,7 @@ contract DummyZKChain is MailboxFacet {
     }
 
     function getEraChainId() public view returns (uint256) {
-        //TODO remove after mailbox fn deprecation
+        // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
         return ERA_CHAIN_ID;
     }
 

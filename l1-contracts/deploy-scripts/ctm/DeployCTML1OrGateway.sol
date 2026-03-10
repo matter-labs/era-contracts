@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 struct CTMCoreDeploymentConfig {
     bool isZKsyncOS;
     bool testnetVerifier;
-    uint256 eraChainId; //TODO remove after mailbox fn deprecation
+    uint256 eraChainId; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
     uint256 l1ChainId;
     address bridgehubProxy;
     address interopCenterProxy;

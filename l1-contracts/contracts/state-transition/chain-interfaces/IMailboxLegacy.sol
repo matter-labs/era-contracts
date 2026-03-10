@@ -46,5 +46,5 @@ interface IMailboxLegacy {
         uint256 _l2GasPerPubdataByteLimit,
         bytes[] calldata _factoryDeps,
         address _refundRecipient
-    ) external payable returns (bytes32 canonicalTxHash); //TODO remove after mailbox fn deprecation    
+    ) external payable returns (bytes32 canonicalTxHash); // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
 }

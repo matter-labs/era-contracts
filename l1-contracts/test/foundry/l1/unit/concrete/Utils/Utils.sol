@@ -434,8 +434,8 @@ library Utils {
         selectors[i++] = MailboxFacet.proveL2MessageInclusion.selector;
         selectors[i++] = MailboxFacet.proveL2LogInclusion.selector;
         selectors[i++] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
-        selectors[i++] = MailboxFacet.finalizeEthWithdrawal.selector; //TODO remove after mailbox fn deprecation
-        selectors[i++] = MailboxFacet.requestL2Transaction.selector; //TODO remove after mailbox fn deprecation
+        selectors[i++] = MailboxFacet.finalizeEthWithdrawal.selector; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
+        selectors[i++] = MailboxFacet.requestL2Transaction.selector; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
         selectors[i++] = MailboxFacet.bridgehubRequestL2Transaction.selector;
         selectors[i++] = MailboxFacet.l2TransactionBaseCost.selector;
         selectors[i++] = MailboxFacet.proveL2LeafInclusion.selector;

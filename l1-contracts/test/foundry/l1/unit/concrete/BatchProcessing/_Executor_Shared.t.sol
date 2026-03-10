@@ -169,8 +169,8 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = mailbox.proveL2MessageInclusion.selector;
         selectors[i++] = mailbox.proveL2LogInclusion.selector;
         selectors[i++] = mailbox.proveL1ToL2TransactionStatus.selector;
-        selectors[i++] = mailbox.finalizeEthWithdrawal.selector; //TODO remove after mailbox fn deprecation
-        selectors[i++] = mailbox.requestL2Transaction.selector; //TODO remove after mailbox fn deprecation
+        selectors[i++] = mailbox.finalizeEthWithdrawal.selector; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
+        selectors[i++] = mailbox.requestL2Transaction.selector; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
         selectors[i++] = mailbox.bridgehubRequestL2Transaction.selector;
         selectors[i++] = mailbox.l2TransactionBaseCost.selector;
         return selectors;
