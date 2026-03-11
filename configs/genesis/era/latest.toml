@@ -1,9 +1,9 @@
 protocol_semantic_version = 133143986176
-genesis_root = "0x29b737d0c805488d22037961612c913cdd1916563d4d0ffdc9bcd1bc90a3bc7c"
-genesis_rollup_leaf_index = 104
-genesis_batch_commitment = "0x69e3619d4d81b4ca62b92a0d92f0aecb6e1521c4695de3fa76f43b38f88043f9"
+genesis_root = "0x9ff8b25b4346c6b8d633605c7f0b3bdb5dc3d9319009c05793cd93e1fcd83cd3"
+genesis_rollup_leaf_index = 106
+genesis_batch_commitment = "0x545daea07095bf9650041912d1047cfc1233bef3c795c3f5557c4da3d0b10efc"
 bootloader_hash = "0x0100099b799188da75411d9c2815a792e60e031bc5f89c2938b6deced048ad83"
-default_aa_hash = "0x010005f9ffcf2471de535c03a1ac9da1ff92fedd96b40895aaf27a961400d403"
+default_aa_hash = "0x010005f9940f6a710cc4332b8a31ad37fb661083e86104e9eb233e8fd745f39c"
 evm_emulator_hash = "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63"
 
 [prover]
