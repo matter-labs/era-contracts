@@ -444,7 +444,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](70);
+        bytes4[] memory selectors = new bytes4[](72);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -517,6 +517,8 @@ library Utils {
         selectors[i++] = UtilsFacet.util_getL2SystemContractsUpgradeTxHash.selector;
         selectors[i++] = UtilsFacet.util_setPriorityTreeNextLeafIndex.selector;
         selectors[i++] = UtilsFacet.util_setPriorityOpsRequestTimestamp.selector;
+        selectors[i++] = UtilsFacet.util_setZksyncOS.selector;
+        selectors[i++] = UtilsFacet.util_setBaseTokenHasTotalSupply.selector;
 
         return selectors;
     }

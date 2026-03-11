@@ -19,7 +19,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_BASE_TOKEN_HOLDER} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 
 import {EmptyToken, TokenAlreadyInBridgedTokensList} from "../L1BridgeContractErrors.sol";
 import {
@@ -463,8 +463,8 @@ abstract contract NativeTokenVaultBase is
         if (_assetId == _baseTokenAssetId()) {
             require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
             if (_isBridgedToken) {
-                // slither-disable-next-line arbitrary-send-eth
-                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: msg.value}(_chainId);
+                // Send tokens to BaseTokenHolder and notify L2AssetTracker via burnAndStartBridging
+                L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: msg.value}(_chainId);
             }
         } else {
             require(msg.value == 0, NonEmptyMsgValue());

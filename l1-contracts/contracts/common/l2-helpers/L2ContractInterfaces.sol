@@ -15,6 +15,7 @@ import {IInteropHandler} from "../../interop/IInteropHandler.sol";
 import {IL2AssetRouter} from "../../bridge/asset-router/IL2AssetRouter.sol";
 import {IL2AssetTracker} from "../../bridge/asset-tracker/IL2AssetTracker.sol";
 import {IGWAssetTracker} from "../../bridge/asset-tracker/IGWAssetTracker.sol";
+import {IBaseTokenHolder} from "../../l2-system/interfaces/IBaseTokenHolder.sol";
 import {ISystemContext} from "../interfaces/ISystemContext.sol";
 import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 
@@ -40,10 +41,10 @@ import {
     L2_INTEROP_HANDLER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     GW_ASSET_TRACKER_ADDR,
+    L2_BASE_TOKEN_HOLDER_ADDR,
     MAX_BUILT_IN_CONTRACT_ADDR,
     L2_BOOTLOADER_ADDRESS
 } from "./L2ContractAddresses.sol";
-// solhint-enable no-unused-import
 
 /// @dev The address of the L2 deployer system contract.
 IL2ContractDeployer constant L2_CONTRACT_DEPLOYER = IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
@@ -91,3 +92,6 @@ IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(L2_ASSET_TRACKER_ADD
 
 /// @dev the GW asset tracker
 IGWAssetTracker constant GW_ASSET_TRACKER = IGWAssetTracker(GW_ASSET_TRACKER_ADDR);
+
+/// @dev The base token holder contract that holds chain's base token reserves.
+IBaseTokenHolder constant L2_BASE_TOKEN_HOLDER = IBaseTokenHolder(payable(L2_BASE_TOKEN_HOLDER_ADDR));
