@@ -10,18 +10,14 @@ import { encodeNtvAssetId } from "./data-encoding";
 import { l2ComplexUpgraderAbi, l2GenesisUpgradeAbi, l2BridgehubAbi } from "./contracts";
 import {
   ETH_TOKEN_ADDRESS,
-  GW_ASSET_TRACKER_ADDR,
-  INTEROP_CENTER_ADDR,
   L1_CHAIN_ID,
   L2_ASSET_ROUTER_ADDR,
-  L2_ASSET_TRACKER_ADDR,
   L2_BASE_TOKEN_ADDR,
   L2_BRIDGEHUB_ADDR,
   L2_CHAIN_ASSET_HANDLER_ADDR,
   L2_COMPLEX_UPGRADER_ADDR,
   L2_FORCE_DEPLOYER_ADDR,
   L2_GENESIS_UPGRADE_ADDR,
-  L2_INTEROP_HANDLER_ADDR,
   L2_MESSAGE_ROOT_ADDR,
   L2_MESSAGE_VERIFICATION_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
@@ -109,26 +105,6 @@ const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
     artifactPath: "L2ChainAssetHandler.sol/L2ChainAssetHandler.json",
   },
   {
-    address: L2_ASSET_TRACKER_ADDR,
-    name: "L2AssetTracker",
-    artifactPath: "L2AssetTracker.sol/L2AssetTracker.json",
-  },
-  {
-    address: GW_ASSET_TRACKER_ADDR,
-    name: "GWAssetTracker",
-    artifactPath: "GWAssetTracker.sol/GWAssetTracker.json",
-  },
-  {
-    address: INTEROP_CENTER_ADDR,
-    name: "InteropCenter",
-    artifactPath: "InteropCenter.sol/InteropCenter.json",
-  },
-  {
-    address: L2_INTEROP_HANDLER_ADDR,
-    name: "InteropHandler",
-    artifactPath: "InteropHandler.sol/InteropHandler.json",
-  },
-  {
     address: L2_MESSAGE_VERIFICATION_ADDR,
     name: "MockL2MessageVerification",
     artifactPath: "MockL2MessageVerification.sol/MockL2MessageVerification.json",
@@ -150,8 +126,6 @@ export class L2GenesisUpgradeDeployer {
   private ctmDeployerAddress: string;
   private l1AssetRouterAddress: string;
   private governanceAddress: string;
-  private chainRegistrationSender: string;
-  private gatewayChainId: number;
   private l1ChainId: number;
 
   constructor(
@@ -160,8 +134,6 @@ export class L2GenesisUpgradeDeployer {
     l1AssetRouterAddress: string,
     ctmDeployerAddress: string,
     governanceAddress: string,
-    chainRegistrationSender: string,
-    gatewayChainId: number,
     l1ChainId: number = L1_CHAIN_ID
   ) {
     this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
@@ -169,8 +141,6 @@ export class L2GenesisUpgradeDeployer {
     this.l1AssetRouterAddress = l1AssetRouterAddress;
     this.ctmDeployerAddress = ctmDeployerAddress;
     this.governanceAddress = governanceAddress;
-    this.chainRegistrationSender = chainRegistrationSender;
-    this.gatewayChainId = gatewayChainId;
     this.l1ChainId = l1ChainId;
   }
 
@@ -208,7 +178,6 @@ export class L2GenesisUpgradeDeployer {
     const l2GenesisUpgradeAbiData = l2GenesisUpgradeAbi();
     const l2GenesisUpgradeInterface = new utils.Interface(l2GenesisUpgradeAbiData);
     const genesisUpgradeCalldata = l2GenesisUpgradeInterface.encodeFunctionData("genesisUpgrade", [
-      true,
       chainId,
       this.ctmDeployerAddress,
       fixedData,
@@ -227,31 +196,6 @@ export class L2GenesisUpgradeDeployer {
     });
   }
 
-  private async registerInteropChains(currentChainId: number): Promise<void> {
-    const l2BridgehubAbiData = l2BridgehubAbi();
-    const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbiData, this.l2Provider);
-    const ethAssetId = encodeNtvAssetId(this.l1ChainId, ETH_TOKEN_ADDRESS);
-
-    const chainIds = Array.from(new Set([...INTEROP_TEST_CHAIN_IDS, currentChainId, this.gatewayChainId]));
-
-    await impersonateAndRun(this.l2Provider, SERVICE_TX_SENDER_ADDR, async (serviceTxSenderSigner) => {
-      const l2BridgehubWithSigner = l2Bridgehub.connect(serviceTxSenderSigner);
-
-      for (const chainId of chainIds) {
-        const existingAssetId = await l2Bridgehub.baseTokenAssetId(chainId);
-        if (existingAssetId !== ZERO_HASH) {
-          console.log(`   ✅ Chain ${chainId} already registered on L2Bridgehub`);
-          continue;
-        }
-
-        console.log(`   Registering chain ${chainId} on L2Bridgehub...`);
-        const registerTx = await l2BridgehubWithSigner.registerChainForInterop(chainId, ethAssetId);
-        await registerTx.wait();
-        console.log(`   ✅ Chain ${chainId} registered on L2Bridgehub`);
-      }
-    });
-  }
-
   private async assertCodePresent(address: string, name: string): Promise<void> {
     const code = await this.l2Provider.getCode(address);
     if (code === "0x" || code === "0x0") {
@@ -266,11 +210,7 @@ export class L2GenesisUpgradeDeployer {
       { addr: L2_NATIVE_TOKEN_VAULT_ADDR, name: "L2NativeTokenVault" },
       { addr: L2_MESSAGE_ROOT_ADDR, name: "L2MessageRoot" },
       { addr: L2_CHAIN_ASSET_HANDLER_ADDR, name: "L2ChainAssetHandler" },
-      { addr: INTEROP_CENTER_ADDR, name: "InteropCenter" },
-      { addr: L2_INTEROP_HANDLER_ADDR, name: "InteropHandler" },
-      { addr: L2_ASSET_TRACKER_ADDR, name: "L2AssetTracker" },
       { addr: L2_MESSAGE_VERIFICATION_ADDR, name: "L2MessageVerification" },
-      { addr: GW_ASSET_TRACKER_ADDR, name: "GWAssetTracker" },
     ];
 
     await Promise.all(expectedContracts.map((c) => this.assertCodePresent(c.addr, c.name)));
@@ -284,16 +224,13 @@ export class L2GenesisUpgradeDeployer {
       chainId,
       this.l1AssetRouterAddress,
       bytecodeInfo,
-      this.gatewayChainId,
       this.governanceAddress,
-      this.chainRegistrationSender,
       this.l1ChainId
     );
     const additionalData = buildAdditionalForceDeploymentsData(ETH_TOKEN_ADDRESS);
 
     await this.ensurePredeployedContracts();
     await this.callGenesisUpgradeViaComplexUpgrader(chainId, fixedData, additionalData);
-    await this.registerInteropChains(chainId);
     await this.assertPostDeploymentCode();
 
     console.log(`✅ L2GenesisUpgrade deployment flow completed for chain ${chainId}`);

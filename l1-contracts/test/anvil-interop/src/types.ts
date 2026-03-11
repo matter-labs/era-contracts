@@ -23,8 +23,6 @@ export interface CoreDeployedAddresses {
   blobVersionedHashRetriever: string;
   messageRoot: string;
   ctmDeploymentTracker: string;
-  l1ChainAssetHandler: string;
-  chainRegistrationSender: string;
 }
 
 export interface BalanceSnapshot {

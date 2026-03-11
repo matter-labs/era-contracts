@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as zlib from "zlib";
-import { Contract, Wallet, providers } from "ethers";
+import { providers } from "ethers";
 import type { AnvilManager } from "./anvil-manager";
 import { ForgeDeployer } from "./deployer";
 import { ChainRegistry } from "./chain-registry";
@@ -17,8 +17,7 @@ import type {
   CTMDeployedAddresses,
   DeploymentState,
 } from "./types";
-import { loadBytecodeFromOut, getGwSettledChainIds } from "./utils";
-import { dummyL1MessageRootAbi, migratorFacetAbi } from "./contracts";
+import { getGwSettledChainIds } from "./utils";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./const";
 
 export interface StartChainOptions {
@@ -62,12 +61,9 @@ export class DeploymentRunner {
     return config;
   }
 
-  /** Read protocol version from configs/genesis/era/latest.json (the source of truth). */
+  /** Return protocol version string for the current branch. */
   getProtocolVersionString(): string {
-    const genesisPath = path.resolve(this.configDir, "../../../../configs/genesis/era/latest.json");
-    const genesis = JSON.parse(fs.readFileSync(genesisPath, "utf-8"));
-    const { major, minor, patch } = genesis.protocol_semantic_version;
-    return `v${major}.${minor}.${patch}`;
+    return "v0.29.0";
   }
 
   loadState(): DeploymentState {
@@ -135,10 +131,8 @@ export class DeploymentRunner {
     console.log(`  Bridgehub: ${l1Addresses.bridgehub}`);
     console.log(`  L1SharedBridge: ${l1Addresses.l1SharedBridge}`);
 
-    // Accept bridgehub admin (required for Anvil)
-    done = timeIt("acceptBridgehubAdmin");
+    // Accept bridgehub admin (done via cast since the chainAdmin contract needs ETH for gas)
     await deployer.acceptBridgehubAdmin(l1Addresses.bridgehub);
-    done();
 
     done = timeIt("deployCTM (forge script)");
     const ctmAddresses = await deployer.deployCTM(l1Addresses.bridgehub);
@@ -150,26 +144,7 @@ export class DeploymentRunner {
     await deployer.registerCTM(l1Addresses.bridgehub, ctmAddresses.chainTypeManager);
     done();
 
-    // Replace L1MessageRoot proxy code with DummyL1MessageRoot
-    // This preserves all storage (chain registrations, batch roots) but bypasses proof verification
-    if (l1Addresses.messageRoot) {
-      const dummyBytecode = loadBytecodeFromOut("DummyL1MessageRoot.sol/DummyL1MessageRoot.json");
-      const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
-      await l1Provider.send("anvil_setCode", [l1Addresses.messageRoot, dummyBytecode]);
-
-      // Set stored addresses since immutables are lost after code replacement
-      const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
-      const wallet = new Wallet(privateKey, l1Provider);
-      const dummy = new Contract(l1Addresses.messageRoot, dummyL1MessageRootAbi(), wallet);
-      const setAddrTx = await dummy.setStoredAddresses(
-        l1Addresses.bridgehub,
-        l1Addresses.l1AssetTracker,
-        11, // ERA_GATEWAY_CHAIN_ID
-        { gasLimit: 500_000 }
-      );
-      await setAddrTx.wait();
-      console.log(`   Replaced L1MessageRoot proxy (${l1Addresses.messageRoot}) with DummyL1MessageRoot`);
-    }
+    // V29 doesn't need DummyL1MessageRoot replacement (no gateway/interop proof verification).
 
     const state = this.loadState();
     state.l1Addresses = l1Addresses;
@@ -228,19 +203,7 @@ export class DeploymentRunner {
       })
     );
 
-    // Unpause deposits on all chains in parallel using explicit nonces
-    console.log("\nUnpausing deposits on all chains...");
-    const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
-    const wallet = new Wallet(privateKey, l1Provider);
-    const baseNonce = await wallet.getTransactionCount();
-    await Promise.all(
-      chainAddresses.map(async (chain, i) => {
-        const migrator = new Contract(chain.diamondProxy, migratorFacetAbi(), wallet);
-        const tx = await migrator.unpauseDeposits({ gasLimit: 500_000, nonce: baseNonce + i });
-        await tx.wait();
-        console.log(`  Deposits unpaused on chain ${chain.chainId}`);
-      })
-    );
+    // V29 doesn't have unpauseDeposits — deposits are active by default.
 
     const state = this.loadState();
     state.chainAddresses = chainAddresses;

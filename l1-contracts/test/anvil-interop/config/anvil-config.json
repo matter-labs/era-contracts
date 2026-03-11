@@ -13,8 +13,7 @@
     {
       "chainId": 11,
       "port": 4051,
-      "isL1": false,
-      "isGateway": true
+      "isL1": false
     },
     {
       "chainId": 12,
