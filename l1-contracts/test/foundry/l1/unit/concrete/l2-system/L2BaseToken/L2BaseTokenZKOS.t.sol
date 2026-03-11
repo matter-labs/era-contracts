@@ -56,7 +56,10 @@ contract L2BaseTokenZKOSTest is Test {
         l1Receiver = makeAddr("l1Receiver");
 
         // Deploy dummy dependencies at system addresses (replaces broad vm.mockCall)
-        vm.etch(L2_ASSET_TRACKER_ADDR, address(new DummyL2AssetTracker()).code);
+        vm.etch(
+            L2_ASSET_TRACKER_ADDR,
+            address(new DummyL2AssetTracker(address(0), DummyL2AssetTracker.RecordMode.None)).code
+        );
         vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(new DummyL2L1Messenger()).code);
 
         // Deploy dummy BaseTokenHolder that accepts ETH from any sender.

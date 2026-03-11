@@ -34,7 +34,10 @@ contract BaseTokenHolderTest is Test {
         recipient = makeAddr("recipient");
 
         // Deploy dummy L2AssetTracker at system address (replaces per-test vm.mockCall)
-        vm.etch(L2_ASSET_TRACKER_ADDR, address(new DummyL2AssetTracker()).code);
+        vm.etch(
+            L2_ASSET_TRACKER_ADDR,
+            address(new DummyL2AssetTracker(address(0), DummyL2AssetTracker.RecordMode.None)).code
+        );
 
         // Fund the BaseTokenHolder contract
         vm.deal(address(baseTokenHolder), INITIAL_BALANCE);
@@ -307,20 +310,18 @@ contract BaseTokenHolderTest is Test {
         uint256 amount = 1 ether;
         uint256 recipientBalanceBefore = recipient.balance;
 
-        // Deploy a recording tracker that snapshots recipient balance when called
-        RecordingBalanceTracker recorder = new RecordingBalanceTracker(recipient);
+        // Deploy DummyL2AssetTracker in recording mode — snapshots recipient balance when called
+        DummyL2AssetTracker recorder = new DummyL2AssetTracker(recipient, DummyL2AssetTracker.RecordMode.Balance);
         vm.etch(L2_ASSET_TRACKER_ADDR, address(recorder).code);
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         baseTokenHolder.give(recipient, amount, ERA_CHAIN_ID);
 
-        // Read from the etched address
-        bool wasCalled = RecordingBalanceTracker(L2_ASSET_TRACKER_ADDR).wasCalled();
-        uint256 recordedBalance = RecordingBalanceTracker(L2_ASSET_TRACKER_ADDR).recordedRecipientBalance();
-
-        assertTrue(wasCalled, "Asset tracker should have been called");
+        // Read recorded values from the etched address
+        DummyL2AssetTracker etched = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertTrue(etched.wasCalled(), "Asset tracker should have been called");
         assertEq(
-            recordedBalance,
+            etched.recordedValue(),
             recipientBalanceBefore,
             "handleFinalizeBaseTokenBridgingOnL2 must be called BEFORE ETH transfer"
         );
@@ -352,34 +353,4 @@ contract RejectingETHContract {
     receive() external payable {
         revert("Rejected");
     }
-}
-
-/// @notice Mock asset tracker that records recipient balance at the moment handleFinalizeBaseTokenBridgingOnL2 is called.
-/// @dev Uses immutables so values survive vm.etch (immutables are baked into bytecode).
-contract RecordingBalanceTracker {
-    address public immutable trackedRecipient;
-    uint256 public immutable l1ChainId = 1;
-    bool public immutable needBaseTokenTotalSupplyBackfill = false;
-
-    // Storage slot 0: recipient balance snapshot recorded during callback
-    uint256 public recordedRecipientBalance;
-    // Storage slot 1: flag indicating callback was invoked
-    bool public wasCalled;
-
-    constructor(address _recipient) {
-        trackedRecipient = _recipient;
-    }
-
-    function handleFinalizeBaseTokenBridgingOnL2(uint256, uint256) external {
-        recordedRecipientBalance = trackedRecipient.balance;
-        wasCalled = true;
-    }
-
-    function handleInitiateBaseTokenBridgingOnL2(uint256, uint256) external {}
-
-    function L1_CHAIN_ID() external pure returns (uint256) {
-        return 1;
-    }
-
-    function backFillZKSyncOSBaseTokenV31MigrationData(uint256) external {}
 }

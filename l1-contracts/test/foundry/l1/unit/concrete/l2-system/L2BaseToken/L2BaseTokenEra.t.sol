@@ -58,7 +58,10 @@ contract L2BaseTokenEraTest is Test {
         bob = makeAddr("bob");
 
         // Deploy dummy dependencies at system addresses (replaces broad vm.mockCall)
-        vm.etch(L2_ASSET_TRACKER_ADDR, address(new DummyL2AssetTracker()).code);
+        vm.etch(
+            L2_ASSET_TRACKER_ADDR,
+            address(new DummyL2AssetTracker(address(0), DummyL2AssetTracker.RecordMode.None)).code
+        );
         vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(new DummyL2L1Messenger()).code);
 
         // Deploy dummy BaseTokenHolder that accepts ETH from any sender.
@@ -799,20 +802,21 @@ contract L2BaseTokenEraTest is Test {
 
         uint256 totalSupplyBefore = l2BaseToken.totalSupply();
 
-        // Deploy a recording asset tracker that snapshots totalSupply when called
-        RecordingAssetTracker recorder = new RecordingAssetTracker(address(l2BaseToken));
+        // Deploy DummyL2AssetTracker in recording mode — snapshots totalSupply when called
+        DummyL2AssetTracker recorder = new DummyL2AssetTracker(
+            address(l2BaseToken),
+            DummyL2AssetTracker.RecordMode.TotalSupply
+        );
         vm.etch(L2_ASSET_TRACKER_ADDR, address(recorder).code);
 
         vm.prank(L2_BOOTLOADER_ADDRESS);
         l2BaseToken.mint(alice, mintAmount);
 
-        // Read wasCalled (slot 1) and recordedTotalSupply (slot 0) from the etched address
-        bool wasCalled = RecordingAssetTracker(L2_ASSET_TRACKER_ADDR).wasCalled();
-        uint256 recordedTotalSupply = RecordingAssetTracker(L2_ASSET_TRACKER_ADDR).recordedTotalSupply();
-
-        assertTrue(wasCalled, "Asset tracker should have been called");
+        // Read recorded values from the etched address
+        DummyL2AssetTracker etched = DummyL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertTrue(etched.wasCalled(), "Asset tracker should have been called");
         assertEq(
-            recordedTotalSupply,
+            etched.recordedValue(),
             totalSupplyBefore,
             "handleFinalizeBaseTokenBridgingOnL2 must be called BEFORE totalSupply changes"
         );
@@ -849,34 +853,4 @@ contract RejectingBurnAndStartBridgingContract {
     receive() external payable {
         revert("Rejected");
     }
-}
-
-/// @notice Mock asset tracker that records totalSupply at the moment handleFinalizeBaseTokenBridgingOnL2 is called.
-/// @dev Uses immutables so values survive vm.etch (immutables are baked into bytecode).
-contract RecordingAssetTracker {
-    address public immutable baseToken;
-    uint256 public immutable l1ChainId = 1;
-    bool public immutable needBaseTokenTotalSupplyBackfill = false;
-
-    // Storage slot 0: totalSupply snapshot recorded during callback
-    uint256 public recordedTotalSupply;
-    // Storage slot 1: flag indicating callback was invoked
-    bool public wasCalled;
-
-    constructor(address _baseToken) {
-        baseToken = _baseToken;
-    }
-
-    function handleFinalizeBaseTokenBridgingOnL2(uint256, uint256) external {
-        recordedTotalSupply = L2BaseTokenEra(baseToken).totalSupply();
-        wasCalled = true;
-    }
-
-    function handleInitiateBaseTokenBridgingOnL2(uint256, uint256) external {}
-
-    function L1_CHAIN_ID() external pure returns (uint256) {
-        return 1;
-    }
-
-    function backFillZKSyncOSBaseTokenV31MigrationData(uint256) external {}
 }
