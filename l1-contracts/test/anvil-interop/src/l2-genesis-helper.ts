@@ -24,37 +24,27 @@ import { encodeNtvAssetId } from "./data-encoding";
  */
 
 interface BytecodeInfo {
-  messageRootBytecodeInfo: string;
-  l2NtvBytecodeInfo: string;
-  l2AssetRouterBytecodeInfo: string;
-  bridgehubBytecodeInfo: string;
-  chainAssetHandlerBytecodeInfo: string;
-  beaconDeployerBytecodeInfo: string;
-  interopCenterBytecodeInfo: string;
-  interopHandlerBytecodeInfo: string;
-  assetTrackerBytecodeInfo: string;
+  messageRootBytecodeHash: string;
+  l2NtvBytecodeHash: string;
+  l2AssetRouterBytecodeHash: string;
+  bridgehubBytecodeHash: string;
+  chainAssetHandlerBytecodeHash: string;
 }
 
 interface FixedForceDeploymentsData {
   l1ChainId: bigint;
-  gatewayChainId: bigint;
   eraChainId: bigint;
   l1AssetRouter: string;
   l2TokenProxyBytecodeHash: string;
   aliasedL1Governance: string;
   maxNumberOfZKChains: bigint;
-  bridgehubBytecodeInfo: string;
-  l2AssetRouterBytecodeInfo: string;
-  l2NtvBytecodeInfo: string;
-  messageRootBytecodeInfo: string;
-  chainAssetHandlerBytecodeInfo: string;
-  interopCenterBytecodeInfo: string;
-  interopHandlerBytecodeInfo: string;
-  assetTrackerBytecodeInfo: string;
-  beaconDeployerInfo: string;
+  bridgehubBytecodeHash: string;
+  l2AssetRouterBytecodeHash: string;
+  l2NtvBytecodeHash: string;
+  messageRootBytecodeHash: string;
+  chainAssetHandlerBytecodeHash: string;
   l2SharedBridgeLegacyImpl: string;
   l2BridgedStandardERC20Impl: string;
-  aliasedChainRegistrationSender: string;
   dangerousTestOnlyForcedBeacon: string;
 }
 
@@ -184,39 +174,24 @@ function readSolcBytecode(contractsRoot: string, fileName: string, contractName:
  */
 export function getBytecodeInfo(contractsRoot: string): BytecodeInfo {
   const info: BytecodeInfo = {
-    messageRootBytecodeInfo: "",
-    l2NtvBytecodeInfo: "",
-    l2AssetRouterBytecodeInfo: "",
-    bridgehubBytecodeInfo: "",
-    chainAssetHandlerBytecodeInfo: "",
-    beaconDeployerBytecodeInfo: "",
-    interopCenterBytecodeInfo: "",
-    interopHandlerBytecodeInfo: "",
-    assetTrackerBytecodeInfo: "",
+    messageRootBytecodeHash: "",
+    l2NtvBytecodeHash: "",
+    l2AssetRouterBytecodeHash: "",
+    bridgehubBytecodeHash: "",
+    chainAssetHandlerBytecodeHash: "",
   };
 
   const contracts = [
-    { file: "L2MessageRoot.sol", name: "L2MessageRoot", key: "messageRootBytecodeInfo" as const },
-    { file: "L2NativeTokenVault.sol", name: "L2NativeTokenVault", key: "l2NtvBytecodeInfo" as const },
-    { file: "L2AssetRouter.sol", name: "L2AssetRouter", key: "l2AssetRouterBytecodeInfo" as const },
-    { file: "L2Bridgehub.sol", name: "L2Bridgehub", key: "bridgehubBytecodeInfo" as const },
-    { file: "L2ChainAssetHandler.sol", name: "L2ChainAssetHandler", key: "chainAssetHandlerBytecodeInfo" as const },
-    {
-      file: "UpgradeableBeaconDeployer.sol",
-      name: "UpgradeableBeaconDeployer",
-      key: "beaconDeployerBytecodeInfo" as const,
-    },
-    { file: "InteropCenter.sol", name: "InteropCenter", key: "interopCenterBytecodeInfo" as const },
-    { file: "InteropHandler.sol", name: "InteropHandler", key: "interopHandlerBytecodeInfo" as const },
-    { file: "L2AssetTracker.sol", name: "L2AssetTracker", key: "assetTrackerBytecodeInfo" as const },
+    { file: "L2MessageRoot.sol", name: "L2MessageRoot", key: "messageRootBytecodeHash" as const },
+    { file: "L2NativeTokenVault.sol", name: "L2NativeTokenVault", key: "l2NtvBytecodeHash" as const },
+    { file: "L2AssetRouter.sol", name: "L2AssetRouter", key: "l2AssetRouterBytecodeHash" as const },
+    { file: "L2Bridgehub.sol", name: "L2Bridgehub", key: "bridgehubBytecodeHash" as const },
+    { file: "L2ChainAssetHandler.sol", name: "L2ChainAssetHandler", key: "chainAssetHandlerBytecodeHash" as const },
   ];
 
   for (const contract of contracts) {
     const bytecode = readSolcBytecode(contractsRoot, contract.file, contract.name);
-    const hash = hashL2Bytecode(bytecode); // Pads and hashes Solc bytecode
-    // Encode as bytes32 for L2GenesisUpgrade
-    const abiCoder = new utils.AbiCoder();
-    info[contract.key] = abiCoder.encode(["bytes32"], [hash]);
+    info[contract.key] = hashL2Bytecode(bytecode); // V29 uses bytes32 directly, not ABI-encoded
   }
 
   return info;
@@ -229,60 +204,46 @@ export function buildFixedForceDeploymentsData(
   chainId: number,
   l1AssetRouter: string,
   bytecodeInfo: BytecodeInfo,
-  gatewayChainId: number,
   l1Governance: string,
-  l1ChainRegistrationSender: string,
   l1ChainId: number = L1_CHAIN_ID
 ): string {
   const data: FixedForceDeploymentsData = {
     l1ChainId: BigInt(l1ChainId),
-    gatewayChainId: BigInt(gatewayChainId),
     eraChainId: BigInt(chainId),
     l1AssetRouter: l1AssetRouter,
     l2TokenProxyBytecodeHash: "0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70",
     aliasedL1Governance: applyL1ToL2Alias(l1Governance),
     maxNumberOfZKChains: BigInt(100),
-    bridgehubBytecodeInfo: bytecodeInfo.bridgehubBytecodeInfo,
-    l2AssetRouterBytecodeInfo: bytecodeInfo.l2AssetRouterBytecodeInfo,
-    l2NtvBytecodeInfo: bytecodeInfo.l2NtvBytecodeInfo,
-    messageRootBytecodeInfo: bytecodeInfo.messageRootBytecodeInfo,
-    chainAssetHandlerBytecodeInfo: bytecodeInfo.chainAssetHandlerBytecodeInfo,
-    interopCenterBytecodeInfo: bytecodeInfo.interopCenterBytecodeInfo,
-    interopHandlerBytecodeInfo: bytecodeInfo.interopHandlerBytecodeInfo,
-    assetTrackerBytecodeInfo: bytecodeInfo.assetTrackerBytecodeInfo,
-    beaconDeployerInfo: bytecodeInfo.beaconDeployerBytecodeInfo,
+    bridgehubBytecodeHash: bytecodeInfo.bridgehubBytecodeHash,
+    l2AssetRouterBytecodeHash: bytecodeInfo.l2AssetRouterBytecodeHash,
+    l2NtvBytecodeHash: bytecodeInfo.l2NtvBytecodeHash,
+    messageRootBytecodeHash: bytecodeInfo.messageRootBytecodeHash,
+    chainAssetHandlerBytecodeHash: bytecodeInfo.chainAssetHandlerBytecodeHash,
     l2SharedBridgeLegacyImpl: "0x0000000000000000000000000000000000000000",
     l2BridgedStandardERC20Impl: "0x0000000000000000000000000000000000000000",
-    aliasedChainRegistrationSender: applyL1ToL2Alias(l1ChainRegistrationSender),
     dangerousTestOnlyForcedBeacon: "0x0000000000000000000000000000000000000000",
   };
 
   const abiCoder = new utils.AbiCoder();
   return abiCoder.encode(
     [
-      "tuple(uint256 l1ChainId, uint256 gatewayChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes bridgehubBytecodeInfo, bytes l2AssetRouterBytecodeInfo, bytes l2NtvBytecodeInfo, bytes messageRootBytecodeInfo, bytes chainAssetHandlerBytecodeInfo, bytes interopCenterBytecodeInfo, bytes interopHandlerBytecodeInfo, bytes assetTrackerBytecodeInfo, bytes beaconDeployerInfo, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address aliasedChainRegistrationSender, address dangerousTestOnlyForcedBeacon)",
+      "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash, bytes32 chainAssetHandlerBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address dangerousTestOnlyForcedBeacon)",
     ],
     [
       [
         data.l1ChainId,
-        data.gatewayChainId,
         data.eraChainId,
         data.l1AssetRouter,
         data.l2TokenProxyBytecodeHash,
         data.aliasedL1Governance,
         data.maxNumberOfZKChains,
-        data.bridgehubBytecodeInfo,
-        data.l2AssetRouterBytecodeInfo,
-        data.l2NtvBytecodeInfo,
-        data.messageRootBytecodeInfo,
-        data.chainAssetHandlerBytecodeInfo,
-        data.interopCenterBytecodeInfo,
-        data.interopHandlerBytecodeInfo,
-        data.assetTrackerBytecodeInfo,
-        data.beaconDeployerInfo,
+        data.bridgehubBytecodeHash,
+        data.l2AssetRouterBytecodeHash,
+        data.l2NtvBytecodeHash,
+        data.messageRootBytecodeHash,
+        data.chainAssetHandlerBytecodeHash,
         data.l2SharedBridgeLegacyImpl,
         data.l2BridgedStandardERC20Impl,
-        data.aliasedChainRegistrationSender,
         data.dangerousTestOnlyForcedBeacon,
       ],
     ]
