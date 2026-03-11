@@ -1,6 +1,6 @@
 use crate::commands::{
     chain::ChainCommands, ctm::CtmCommands, ecosystem::EcosystemCommands,
-    hub::HubCommands,
+    genesis::GenesisCommands, hub::HubCommands,
 };
 use clap::{command, Parser, Subcommand};
 use crate::common::{
@@ -46,6 +46,9 @@ pub enum ProtocolCliSubcommands {
     /// Chain Type Manager related commands
     #[command(subcommand)]
     Ctm(Box<CtmCommands>),
+    /// Genesis generation
+    #[command(subcommand)]
+    Genesis(Box<GenesisCommands>),
 }
 
 #[derive(Parser, Debug)]
@@ -86,6 +89,7 @@ async fn run_subcommand(cli_args: ProtocolCli) -> anyhow::Result<()> {
         ProtocolCliSubcommands::Chain(args) => commands::chain::run(&shell, *args).await?,
         ProtocolCliSubcommands::Hub(args) => commands::hub::run(&shell, *args).await?,
         ProtocolCliSubcommands::Ctm(args) => commands::ctm::run(&shell, *args).await?,
+        ProtocolCliSubcommands::Genesis(args) => commands::genesis::run(&shell, *args).await?,
     }
     Ok(())
 }

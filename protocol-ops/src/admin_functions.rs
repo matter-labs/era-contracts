@@ -498,6 +498,36 @@ pub async fn set_da_validator_pair(
     .await
 }
 
+pub async fn unpause_deposits(
+    shell: &Shell,
+    runner: &mut ForgeRunner,
+    forge_args: &ForgeScriptArgs,
+    foundry_contracts_path: &Path,
+    mode: AdminScriptMode,
+    chain_id: u64,
+    bridgehub: Address,
+    l1_rpc_url: String,
+) -> anyhow::Result<AdminScriptOutput> {
+    let calldata = ADMIN_FUNCTIONS
+        .encode(
+            "unpauseDeposits",
+            (bridgehub, U256::from(chain_id), mode.should_send()),
+        )
+        .unwrap();
+
+    call_script(
+        shell,
+        runner,
+        forge_args,
+        foundry_contracts_path,
+        mode,
+        calldata,
+        l1_rpc_url,
+        &format!("unpausing deposits for chain {}", chain_id),
+    )
+    .await
+}
+
 // #[allow(clippy::too_many_arguments)]
 // pub(crate) async fn grant_gateway_whitelist(
 //     shell: &Shell,
