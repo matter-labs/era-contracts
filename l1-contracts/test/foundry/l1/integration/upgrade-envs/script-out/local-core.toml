@@ -5,10 +5,10 @@ chain_upgrade_diamond_cut = "0x0000000000000000000000000000000000000000000000000
 deployer_addr = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38"
 diamond_proxy_addr = "0xe1BE6B642964609A7373a527c53D84b29E9e241b"
 era_chain_id = 9
-governance_addr = "0x2Ae2CC9d9344Fd83d4Ca8D0011E17407449c702a"
+governance_addr = "0x440dE863c5119786B63e1d93aF6C6F7f7c69b59e"
 is_zk_sync_os = false
 l1_chain_id = 31337
-multicall3_addr = "0x6A93b00e032A7Dbd9ecCFce777342C6a3da3eF0f"
+multicall3_addr = "0x962BD50403f6C3fe555f4585114296753c84c651"
 owner_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
 
 [chain]
@@ -107,7 +107,7 @@ verifier_fflonk_addr = "0x0b2F2c5F602Cf4B9b9111D6B314F19bbCB46f1C6"
 verifier_plonk_addr = "0x53075a7EF9A2B6D6Abd9d82F37BD765Ff67c8687"
 
 [tokens.DAI]
-address = "0x74E61F07c647359434cbcB1A39970bEf695b9dDa"
+address = "0x3e8fA85969fDEb3d93702E7f16B8595AB91A6CD1"
 decimals = 18
 implementation = "TestnetERC20Token.sol"
 mint = "0x2540be400"
@@ -115,7 +115,7 @@ name = "DAI"
 symbol = "DAI"
 
 [tokens.USDC]
-address = "0xeFB5BA91cd199E6c8b8eB6c1238ABa5Be3bA016F"
+address = "0x0110c9c89bc4f39e1577ddDE45202Bc2F5c3Ed40"
 decimals = 18
 implementation = "TestnetERC20Token.sol"
 mint = "0x2540be400"
