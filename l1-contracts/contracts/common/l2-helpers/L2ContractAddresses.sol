@@ -21,6 +21,10 @@ address constant L1_MESSENGER_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x01);
 /// @dev The address of the system hook responsible for setting bytecode on address. Can only be called from L2_COMPLEX_UPGRADER address
 address constant SET_BYTECODE_ON_ADDRESS_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x02);
 
+/// @dev The address of the system hook responsible for minting base tokens on ZK OS chains.
+/// This hook can only be called from the L2_BASE_TOKEN_SYSTEM_CONTRACT (address 0x800A).
+address constant MINT_BASE_TOKEN_HOOK = address(SYSTEM_HOOKS_OFFSET + 0x100);
+
 ////////////////////////////////////////////////////////////
 // System contracts
 ////////////////////////////////////////////////////////////
@@ -124,10 +128,13 @@ address constant L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR = address(BUILT_IN_CONTRACT
 address constant L2_INTEROP_CENTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0d);
 
 /// @dev the address of the L2 interop handler
-address constant L2_INTEROP_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0e);
+address payable constant L2_INTEROP_HANDLER_ADDR = payable(address(BUILT_IN_CONTRACTS_OFFSET + 0x0e));
 
 /// @dev the address of the L2 asset tracker
 address constant L2_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0f);
 
 /// @dev the address of the GW asset tracker
 address constant GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x10);
+
+/// @dev The address of the base token holder contract that holds chain's base token reserves.
+address constant L2_BASE_TOKEN_HOLDER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x11);
