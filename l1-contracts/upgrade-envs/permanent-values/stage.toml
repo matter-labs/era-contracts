@@ -1,0 +1,29 @@
+[permanent_contracts]
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+# this salt can be changed from run to run to. Todo: move this to input of script.
+create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
+
+[core_contracts]
+bridgehub_proxy_addr = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
+
+[ctm_contracts]
+ctm_proxy_addr = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"
+l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
+rollup_da_manager = "0x064ac968CCad1948fceE025fD59c20b153c88072"
+
+# Legacy Gateway configuration for settlement layer validation
+# This section contains historical data about chains that settled on the legacy Gateway
+[legacy_gateway]
+# The chain ID of the legacy Gateway (9075 for mainnet)
+chain_id = 123
+
+# TODO(EVM-1221) Historical migration intervals for chains that used the legacy GW
+# Each entry represents a chain that settled on the legacy GW before V31
+# Format: chain_id, migrate_to_sl_batch, migrate_from_sl_batch
+# Note: migrate_from_sl_batch must be > migrate_to_sl_batch
+# These values should be filled in before V31 deployment based on actual historical data
+# Example for Era on mainnet (chain_id = 270):
+# [[legacy_gateway.chain_intervals]]
+# chain_id = 270
+# migrate_to_sl_batch = 0  # Set to actual batch number when Era migrated to legacy GW (0 is valid if migration happened before any batches)
+# migrate_from_sl_batch = 0  # Set to actual batch number when Era migrated back (must be > migrate_to_sl_batch)
