@@ -92,6 +92,8 @@
     "upgrade-scripts": "ts-node scripts/upgrade-scripts.ts",
     "token-migration": "ts-node scripts/token-migration.ts",
     "setup-legacy-bridge-era": "ts-node scripts/setup-legacy-bridge-era.ts",
+    "populate-legacy-bridge-addresses": "ts-node scripts/populate-legacy-shared-bridge-addresses.ts",
+    "check-legacy-bridge-sol": "ts-node scripts/populate-legacy-shared-bridge-addresses.ts generate --strict && git diff --exit-code contracts/bridge/asset-tracker/LegacySharedBridgeAddresses.sol",
     "upgrade-consistency-checker": "ts-node scripts/upgrade-consistency-checker.ts",
     "upgrade-yaml-output-generator": "ts-node scripts/upgrade-yaml-output-generator.ts",
     "governance-accept-ownership": "ts-node scripts/governance-accept-ownership.ts",
