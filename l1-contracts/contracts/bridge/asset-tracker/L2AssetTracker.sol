@@ -478,7 +478,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             return false;
         }
 
-        // totalSupply == 0 implies chainBalance == 0 on L1, meaning there is nothing to migrate.
         // This works uniformly for both base tokens and ERC20 tokens because the asset tracker
         // is always notified before totalSupply changes.
         return IERC20(_tokenAddress).totalSupply() == 0;
