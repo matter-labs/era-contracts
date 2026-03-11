@@ -31,7 +31,7 @@ use serde_json::json;
 use xshell::Shell;
 
 use crate::abi::IREGISTERZKCHAINABI_ABI;
-use crate::admin_functions::{accept_admin, set_da_validator_pair, AdminScriptMode};
+use crate::admin_functions::{accept_admin, set_da_validator_pair, unpause_deposits, AdminScriptMode};
 use crate::utils::paths;
 
 lazy_static! {
@@ -382,6 +382,21 @@ pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
             bridgehub,
             args.l1_da_validator,
             commitment_scheme,
+            effective_rpc.to_string(),
+        )
+        .await?;
+    }
+
+    logger::info("Unpausing deposits...");
+    {
+        unpause_deposits(
+            shell,
+            &mut runner,
+            &args.forge_args.script,
+            foundry_scripts_path.as_path(),
+            AdminScriptMode::Broadcast(owner_wallet.clone()),
+            chain_id,
+            bridgehub,
             effective_rpc.to_string(),
         )
         .await?;

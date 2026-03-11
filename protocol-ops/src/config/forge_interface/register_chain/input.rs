@@ -35,6 +35,8 @@ pub struct ChainL1Config {
     pub validium_mode: bool,
     pub validator_sender_operator_eth: Address,
     pub validator_sender_operator_blobs_eth: Address,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub validator_sender_operator_execute: Option<Address>,
     pub base_token_gas_price_multiplier_nominator: u64,
     pub base_token_gas_price_multiplier_denominator: u64,
     pub governance_security_council_address: Address,
@@ -61,8 +63,10 @@ impl RegisterChainL1Config {
                 // TODO verify
                 bridgehub_create_new_chain_salt: rand::thread_rng().gen_range(0..=i64::MAX) as u64,
                 validium_mode: chain_params.da_mode == DAValidatorType::NoDA || chain_params.da_mode == DAValidatorType::Avail,
-                validator_sender_operator_eth: chain_params.commit_operator,
-                validator_sender_operator_blobs_eth: chain_params.prove_operator,
+                // For ZKsync OS with blobs, committer role goes to blobs_eth; server uses operator_commit_sk for commit.
+                validator_sender_operator_eth: chain_params.prove_operator,
+                validator_sender_operator_blobs_eth: chain_params.commit_operator,
+                validator_sender_operator_execute: chain_params.execute_operator,
                 allow_evm_emulator: true,
             },
             owner_address: chain_params.owner,
