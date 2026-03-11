@@ -49,3 +49,5 @@ error WrongDestinationBaseTokenAssetId(bytes32 bundleHash, bytes32 expected, byt
 error WrongSourceChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
 // 0x92196069
 error ZKTokenNotAvailable();
+// solhint-disable-next-line
+error CannotClaimInteropOnL1Settlement();

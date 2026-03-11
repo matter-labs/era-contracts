@@ -10,6 +10,7 @@ import {
     GatewayToL1TokenBalanceMigrationData,
     InteropBundle,
     InteropCall,
+    InteropCallExecutedMessage,
     L2Log,
     MigrationConfirmationData,
     TxStatus,
@@ -25,6 +26,7 @@ import {
     L2_COMPLEX_UPGRADER_ADDR,
     L2_COMPRESSOR_ADDR,
     L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_HANDLER_ADDR,
     L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
     L2_MESSAGE_ROOT,
     L2_NATIVE_TOKEN_VAULT,
@@ -68,6 +70,7 @@ import {
     InvalidFunctionSignature,
     InvalidInteropChainId,
     InvalidL2ShardId,
+    InsufficientPendingInteropBalance,
     InvalidServiceLog,
     InvalidEmptyMultichainBatchRoot,
     RegisterNewTokenNotAllowed,
@@ -131,6 +134,13 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @dev This prevents front-running attacks where a malicious operator could make another chain's
     /// fee payer pay for their settlement by specifying their address as settlementFeePayer.
     mapping(address payer => mapping(uint256 chainId => bool)) public settlementFeePayerAgreement;
+
+    /// @notice Tracks token balances sent via interop that have not yet been confirmed as executed on the destination chain.
+    /// @dev When a source chain settles and its interop bundle is processed, the destination chain's balance moves
+    /// here rather than directly to chainBalance. When the destination chain settles and confirms execution via
+    /// InteropHandler messages, balances are moved from here to chainBalance.
+    /// @dev This separation ensures chainBalance always equals the totalSupply of the token inside the chain.
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public pendingInteropBalance;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -341,6 +351,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                     // No further action is required in this case.
                 } else if (log.key == bytes32(uint256(uint160(L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR)))) {
                     // No further action is required in this case.
+                } else if (log.key == bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))) {
+                    _handleInteropHandlerMessage(_processLogsInputs.chainId, message);
                 } else if (uint256(log.key) <= MAX_BUILT_IN_CONTRACT_ADDR) {
                     // This Log is not supported
                     revert InvalidBuiltInContractMessage(logCount, msgCount - 1, log.key);
@@ -471,6 +483,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     /// @notice Handles an interop center message and returns the number of chargeable calls for settlement fees.
+    /// @dev Instead of immediately crediting the destination chain, balances are moved to pendingInteropBalance.
+    /// They will be moved to chainBalance when the destination chain settles and confirms execution via
+    /// an InteropHandler message that includes the full bundle preimage.
     /// @param _chainId The source chain ID.
     /// @param _message The message data from InteropCenter.
     /// @return chargeableCallCount Number of calls that should incur gateway settlement fees.
@@ -503,13 +518,15 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             if (bytes4(interopCall.data) != AssetRouterBase.finalizeDeposit.selector) {
                 revert InvalidInteropCalldata(bytes4(interopCall.data));
             }
-            // solhint-disable-next-line
+            // solhint-disable-next-line func-named-parameters
             _processInteropCall(_chainId, interopCall, interopBundle.destinationChainId);
         }
 
-        // We check on the InteropHandler of the destination chain that the `destinationBaseTokenAssetId` is the correct one
+        // We check on the InteropHandler of the destination chain that the `destinationBaseTokenAssetId` is the correct one.
         _decreaseChainBalance(_chainId, interopBundle.destinationBaseTokenAssetId, totalBaseTokenAmount);
-        _increaseAndSaveChainBalance(
+        // Increase destination chain pending interop balance for base token.
+        // Balance will be moved to chainBalance when the destination chain confirms execution.
+        _increaseAndSavePendingInteropBalance(
             interopBundle.destinationChainId,
             interopBundle.destinationBaseTokenAssetId,
             totalBaseTokenAmount
@@ -518,17 +535,55 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         return interopBundle.calls.length;
     }
 
+    /// @notice Handles a per-call message from InteropHandler confirming a single interop call was executed.
+    /// @dev One such message is emitted for each successfully executed call. Moves the call's balances
+    /// from pendingInteropBalance to chainBalance.
+    /// @param _chainId The chain ID that is settling (destination chain of the interop bundle).
+    /// @param _message The message data from InteropHandler.
+    function _handleInteropHandlerMessage(uint256 _chainId, bytes calldata _message) internal {
+        bytes4 functionSignature = DataEncoding.getSelector(_message);
+        require(
+            functionSignature == IAssetTrackerDataEncoding.receiveInteropCallExecuted.selector,
+            InvalidFunctionSignature(functionSignature)
+        );
+
+        InteropCallExecutedMessage memory executionMsg = abi.decode(_message[4:], (InteropCallExecutedMessage));
+
+        // Move base token balance from pending to confirmed chainBalance.
+        if (executionMsg.interopCall.value > 0) {
+            _confirmPendingInteropBalance(_chainId, executionMsg.destinationBaseTokenAssetId, executionMsg.interopCall.value);
+        }
+
+        // Move asset balance from pending to confirmed chainBalance (for asset router calls).
+        if (executionMsg.interopCall.from == L2_ASSET_ROUTER_ADDR) {
+            (, bytes32 assetId, , uint256 assetAmount, ) = this.parseAssetRouterInteropCall(
+                executionMsg.interopCall.data
+            );
+            if (assetAmount > 0) {
+                _confirmPendingInteropBalance(_chainId, assetId, assetAmount);
+            }
+        }
+    }
+
     function _processInteropCall(
         uint256 _chainId,
         InteropCall memory _interopCall,
         uint256 _destinationChainId
     ) internal {
-        (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(_interopCall.data);
+        (uint256 fromChainId, bytes32 assetId, address originalToken, uint256 assetAmount, bytes memory erc20Metadata) =
+            this.parseAssetRouterInteropCall(_interopCall.data);
 
         require(_chainId == fromChainId, InvalidInteropChainId(fromChainId, _destinationChainId));
 
-        // solhint-disable-next-line func-named-parameters
-        _handleAssetRouterMessageInner(_chainId, _destinationChainId, assetId, transferData);
+        // slither-disable-next-line unused-return
+        (uint256 tokenOriginalChainId, , , ) = this.parseTokenData(erc20Metadata);
+        DataEncoding.assetIdCheck(tokenOriginalChainId, assetId, originalToken);
+        _registerToken(assetId, originalToken, tokenOriginalChainId);
+
+        if (assetAmount > 0 && _chainId != L1_CHAIN_ID) {
+            _decreaseChainBalance(_chainId, assetId, assetAmount);
+            _increaseAndSavePendingInteropBalance(_destinationChainId, assetId, assetAmount);
+        }
     }
 
     /// @notice L2->L1 withdrawals go through the L2AssetRouter directly.
@@ -722,6 +777,24 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
     }
 
+    function _increaseAndSavePendingInteropBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
+        if (_amount > 0) {
+            pendingInteropBalance[_chainId][_assetId] += _amount;
+        }
+    }
+
+    function _decreasePendingInteropBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
+        if (pendingInteropBalance[_chainId][_assetId] < _amount) {
+            revert InsufficientPendingInteropBalance(_chainId, _assetId, _amount);
+        }
+        pendingInteropBalance[_chainId][_assetId] -= _amount;
+    }
+
+    function _confirmPendingInteropBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
+        _decreasePendingInteropBalance(_chainId, _assetId, _amount);
+        _increaseAndSaveChainBalance(_chainId, _assetId, _amount);
+    }
+
     /// @notice Registers a token's original details if it hasn't been registered yet.
     /// @dev Note, that we do not double check the correctness of the data provided here, so it must come from a trusted source.
     /// - In case of deposits, the should come from the Mailbox of Gateway.
@@ -740,6 +813,29 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes calldata _callData
     ) external pure returns (uint256 fromChainId, bytes32 assetId, bytes memory transferData) {
         (fromChainId, assetId, transferData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
+    }
+
+    /// @notice Parses an asset router interop call, combining chain/asset extraction with bridge mint data decoding.
+    /// @dev Combines the logic of `parseInteropCall` and `decodeBridgeMintData` into a single step.
+    /// Must be called via `this.` when the argument is `bytes memory`, so Solidity ABI-encodes it
+    /// into calldata and the internal `[4:]` slice works correctly.
+    function parseAssetRouterInteropCall(
+        bytes calldata _callData
+    )
+        external
+        pure
+        returns (
+            uint256 fromChainId,
+            bytes32 assetId,
+            address originalToken,
+            uint256 assetAmount,
+            bytes memory erc20Metadata
+        )
+    {
+        bytes memory transferData;
+        (fromChainId, assetId, transferData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
+        // slither-disable-next-line unused-return
+        (, , originalToken, assetAmount, erc20Metadata) = DataEncoding.decodeBridgeMintData(transferData);
     }
 
     /// @inheritdoc IGWAssetTracker

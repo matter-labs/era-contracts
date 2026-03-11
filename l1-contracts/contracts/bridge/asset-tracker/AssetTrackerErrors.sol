@@ -19,6 +19,8 @@ error BaseTokenTotalSupplyBackfillRequired();
 error ChainBalanceMustBeZeroBeforeMigration(uint256 _chainId, bytes32 _assetId, uint256 _chainBalance);
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
+// solhint-disable-next-line
+error InsufficientPendingInteropBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
 // 0x95bddd6c
 error InvalidAssetMigrationNumber();
 // 0xd24c490f
