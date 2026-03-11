@@ -42,8 +42,9 @@ export const INTEROP_BUNDLE_SENT_TOPIC = "0x593b2515b718ee761cd2a586d8613d22833a
 // AddressAliasHelper offset: uint160(0x1111000000000000000000000000000000001111)
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
 
+// V29 struct (matches system-contracts/contracts/interfaces/IL2GenesisUpgrade.sol)
 export const ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE =
-  "tuple(address l2LegacySharedBridge, address predeployedL2WethAddress, address baseTokenL1Address, tuple(string name, string symbol, uint256 decimals) baseTokenMetadata, tuple(bytes32 assetId, uint256 originChainId, address originToken) baseTokenBridgingData)";
+  "tuple(bytes32 baseTokenAssetId, address l2LegacySharedBridge, address predeployedL2WethAddress, address baseTokenL1Address, string baseTokenName, string baseTokenSymbol)";
 
 // Merkle tree constants for processLogsAndMessages
 // From system-contracts/contracts/Constants.sol: L2_TO_L1_LOGS_MERKLE_TREE_DEPTH = 14 + 1

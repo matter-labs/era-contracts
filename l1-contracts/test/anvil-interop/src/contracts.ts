@@ -10,32 +10,35 @@ import { loadAbiFromOut, loadBytecodeFromOut } from "./utils";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function gwAssetTrackerAbi(): any[] {
-  return loadAbiFromOut("GWAssetTracker.sol/GWAssetTracker.json");
+  // V31-only: GWAssetTracker doesn't exist in v29.
+  return [];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function l2BridgehubAbi(): any[] {
-  return loadAbiFromOut("L2Bridgehub.sol/L2Bridgehub.json");
+  return loadAbiFromOut("Bridgehub.sol/Bridgehub.json");
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function interopCenterAbi(): any[] {
-  return loadAbiFromOut("InteropCenter.sol/InteropCenter.json");
+  // V31-only: InteropCenter doesn't exist in v29. Return empty ABI.
+  return [];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function l1AssetTrackerAbi(): any[] {
-  return loadAbiFromOut("L1AssetTracker.sol/L1AssetTracker.json");
+  // V31-only: L1AssetTracker doesn't exist in v29. Return empty ABI.
+  return [];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function l1BridgehubAbi(): any[] {
-  return loadAbiFromOut("L1Bridgehub.sol/L1Bridgehub.json");
+  return loadAbiFromOut("Bridgehub.sol/Bridgehub.json");
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function il1BridgehubAbi(): any[] {
-  return loadAbiFromOut("IL1Bridgehub.sol/IL1Bridgehub.json");
+  return loadAbiFromOut("IBridgehub.sol/IBridgehub.json");
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,7 +58,8 @@ export function l2NativeTokenVaultDevAbi(): any[] {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function l2AssetTrackerAbi(): any[] {
-  return loadAbiFromOut("L2AssetTracker.sol/L2AssetTracker.json");
+  // V31-only: L2AssetTracker doesn't exist in v29. Return empty ABI.
+  return [];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -80,7 +84,8 @@ export function l1AssetRouterAbi(): any[] {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function interopHandlerAbi(): any[] {
-  return loadAbiFromOut("InteropHandler.sol/InteropHandler.json");
+  // V31-only: InteropHandler doesn't exist in v29. Return empty ABI.
+  return [];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -95,7 +100,7 @@ export function l2GenesisUpgradeAbi(): any[] {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function l2MessageRootAbi(): any[] {
-  return loadAbiFromOut("L2MessageRoot.sol/L2MessageRoot.json");
+  return loadAbiFromOut("MessageRoot.sol/MessageRoot.json");
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,7 +110,7 @@ export function mailboxFacetAbi(): any[] {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function systemContextAbi(): any[] {
-  return loadAbiFromOut("SystemContext.sol/SystemContext.json");
+  return loadAbiFromOut("MockSystemContext.sol/MockSystemContext.json");
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -115,12 +120,13 @@ export function ownable2StepAbi(): any[] {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function dummyL1MessageRootAbi(): any[] {
-  return loadAbiFromOut("DummyL1MessageRoot.sol/DummyL1MessageRoot.json");
+  return loadAbiFromOut("MessageRoot.sol/MessageRoot.json");
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function migratorFacetAbi(): any[] {
-  return loadAbiFromOut("Migrator.sol/MigratorFacet.json");
+  // V31-only: Migrator doesn't exist in v29. Return empty ABI.
+  return [];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

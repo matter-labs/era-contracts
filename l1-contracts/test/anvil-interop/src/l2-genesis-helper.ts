@@ -48,20 +48,14 @@ interface FixedForceDeploymentsData {
   dangerousTestOnlyForcedBeacon: string;
 }
 
+// V29 struct (matches system-contracts/contracts/interfaces/IL2GenesisUpgrade.sol)
 interface ZKChainSpecificForceDeploymentsData {
+  baseTokenAssetId: string;
   l2LegacySharedBridge: string;
   predeployedL2WethAddress: string;
   baseTokenL1Address: string;
-  baseTokenMetadata: {
-    name: string;
-    symbol: string;
-    decimals: number;
-  };
-  baseTokenBridgingData: {
-    assetId: string;
-    originChainId: bigint;
-    originToken: string;
-  };
+  baseTokenName: string;
+  baseTokenSymbol: string;
 }
 
 /**
@@ -181,12 +175,13 @@ export function getBytecodeInfo(contractsRoot: string): BytecodeInfo {
     chainAssetHandlerBytecodeHash: "",
   };
 
+  // V29: L2 contracts use the same implementation as L1 (Bridgehub, MessageRoot, ChainAssetHandler)
   const contracts = [
-    { file: "L2MessageRoot.sol", name: "L2MessageRoot", key: "messageRootBytecodeHash" as const },
+    { file: "MessageRoot.sol", name: "MessageRoot", key: "messageRootBytecodeHash" as const },
     { file: "L2NativeTokenVault.sol", name: "L2NativeTokenVault", key: "l2NtvBytecodeHash" as const },
     { file: "L2AssetRouter.sol", name: "L2AssetRouter", key: "l2AssetRouterBytecodeHash" as const },
-    { file: "L2Bridgehub.sol", name: "L2Bridgehub", key: "bridgehubBytecodeHash" as const },
-    { file: "L2ChainAssetHandler.sol", name: "L2ChainAssetHandler", key: "chainAssetHandlerBytecodeHash" as const },
+    { file: "Bridgehub.sol", name: "Bridgehub", key: "bridgehubBytecodeHash" as const },
+    { file: "ChainAssetHandler.sol", name: "ChainAssetHandler", key: "chainAssetHandlerBytecodeHash" as const },
   ];
 
   for (const contract of contracts) {
@@ -257,35 +252,26 @@ export function buildAdditionalForceDeploymentsData(baseTokenL1Address: string):
   const abiCoder = new utils.AbiCoder();
   const baseTokenAssetId = encodeNtvAssetId(L1_CHAIN_ID, baseTokenL1Address);
 
+  // V29 struct: (bytes32, address, address, address, string, string)
   const data: ZKChainSpecificForceDeploymentsData = {
+    baseTokenAssetId: baseTokenAssetId,
     l2LegacySharedBridge: "0x0000000000000000000000000000000000000000",
     predeployedL2WethAddress: ETH_TOKEN_ADDRESS,
     baseTokenL1Address: baseTokenL1Address,
-    baseTokenMetadata: {
-      name: "Ether",
-      symbol: "ETH",
-      decimals: 18,
-    },
-    baseTokenBridgingData: {
-      assetId: baseTokenAssetId,
-      originChainId: BigInt(L1_CHAIN_ID),
-      originToken: baseTokenL1Address,
-    },
+    baseTokenName: "Ether",
+    baseTokenSymbol: "ETH",
   };
 
   return abiCoder.encode(
     [ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE],
     [
       [
+        data.baseTokenAssetId,
         data.l2LegacySharedBridge,
         data.predeployedL2WethAddress,
         data.baseTokenL1Address,
-        [data.baseTokenMetadata.name, data.baseTokenMetadata.symbol, data.baseTokenMetadata.decimals],
-        [
-          data.baseTokenBridgingData.assetId,
-          data.baseTokenBridgingData.originChainId,
-          data.baseTokenBridgingData.originToken,
-        ],
+        data.baseTokenName,
+        data.baseTokenSymbol,
       ],
     ]
   );

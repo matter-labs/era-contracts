@@ -128,11 +128,9 @@ export class SystemContractsDeployer {
     // 5. L2MessageVerification at 0x10009
     await this.deployL2MessageVerification();
 
-    // 6. InteropCenter at 0x1000d
-    await this.deployInteropCenter();
-
-    // 7. L2InteropHandler at 0x1000e
-    await this.deployL2InteropHandler();
+    // 6-7. InteropCenter and InteropHandler are V31-only, skip in v29
+    console.log("   ⏭️  Skipping InteropCenter (v31-only)");
+    console.log("   ⏭️  Skipping L2InteropHandler (v31-only)");
 
     // 8. L2AssetRouter at 0x010003
     await this.deployL2AssetRouter();
@@ -140,8 +138,8 @@ export class SystemContractsDeployer {
     // 9. L2ChainAssetHandler at 0x1000a
     await this.deployL2ChainAssetHandler();
 
-    // 10. L2AssetTracker at 0x1000f
-    await this.deployL2AssetTracker(chainId);
+    // 10. L2AssetTracker is V31-only, skip in v29
+    console.log("   ⏭️  Skipping L2AssetTracker (v31-only)");
 
     // 11. L2NativeTokenVault at 0x010004
     await this.deployL2NativeTokenVault();
@@ -261,8 +259,8 @@ export class SystemContractsDeployer {
     if (!isInitialized) {
       await this.deploySystemContract(
         L2_BRIDGEHUB_ADDR,
-        "l1-contracts/out/L2Bridgehub.sol/L2Bridgehub.json",
-        "L2Bridgehub"
+        "l1-contracts/out/Bridgehub.sol/Bridgehub.json",
+        "Bridgehub (as L2Bridgehub)"
       );
 
       const ownerAddress = await this.l2Wallet.getAddress();
@@ -332,11 +330,8 @@ export class SystemContractsDeployer {
     }
 
     if (!isInitialized) {
-      await this.deploySystemContract(
-        INTEROP_CENTER_ADDR,
-        "l1-contracts/out/InteropCenter.sol/InteropCenter.json",
-        "InteropCenter"
-      );
+      // V31-only: InteropCenter not available in v29
+      console.log("   ⏭️  InteropCenter deployment skipped (v31-only)");
 
       const ownerAddress = await this.l2Wallet.getAddress();
       await this.initializeContract(
@@ -366,11 +361,8 @@ export class SystemContractsDeployer {
    * Deploy and initialize L2InteropHandler
    */
   private async deployL2InteropHandler(): Promise<void> {
-    await this.deploySystemContract(
-      L2_INTEROP_HANDLER_ADDR,
-      "l1-contracts/out/InteropHandler.sol/InteropHandler.json",
-      "L2InteropHandler"
-    );
+    // V31-only: InteropHandler not available in v29
+    console.log("   ⏭️  InteropHandler deployment skipped (v31-only)");
 
     // Initialize L2InteropHandler
     const interopHandlerAbiData = interopHandlerAbi();
@@ -469,8 +461,8 @@ export class SystemContractsDeployer {
     if (!isDeployed) {
       await this.deploySystemContract(
         L2_CHAIN_ASSET_HANDLER_ADDR,
-        "l1-contracts/out/L2ChainAssetHandler.sol/L2ChainAssetHandler.json",
-        "L2ChainAssetHandler"
+        "l1-contracts/out/ChainAssetHandler.sol/ChainAssetHandler.json",
+        "ChainAssetHandler (as L2ChainAssetHandler)"
       );
 
       // For now, just deploy without initialization
@@ -501,11 +493,8 @@ export class SystemContractsDeployer {
     }
 
     if (!isInitialized) {
-      await this.deploySystemContract(
-        L2_ASSET_TRACKER_ADDR,
-        "l1-contracts/out/L2AssetTracker.sol/L2AssetTracker.json",
-        "L2AssetTracker"
-      );
+      // V31-only: L2AssetTracker not available in v29
+      console.log("   ⏭️  L2AssetTracker deployment skipped (v31-only)");
 
       // Initialize via L2ComplexUpgrader
       const abiCoder = new utils.AbiCoder();
