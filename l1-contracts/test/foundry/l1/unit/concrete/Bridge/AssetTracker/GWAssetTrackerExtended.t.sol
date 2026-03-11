@@ -323,7 +323,7 @@ contract GWAssetTrackerExtendedTest is Test {
             isService: true,
             txNumberInBatch: 0,
             sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            key: bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR))),
+            key: bytes32(uint256(uint160(address(L2_INTEROP_HANDLER_ADDR)))),
             value: keccak256(message)
         });
 
@@ -371,7 +371,7 @@ contract GWAssetTrackerExtendedTest is Test {
                 InvalidBuiltInContractMessage.selector,
                 uint256(0),
                 uint256(0),
-                bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))
+                bytes32(uint256(uint160(address(L2_INTEROP_HANDLER_ADDR))))
             )
         );
         gwAssetTracker.processLogsAndMessages(input);

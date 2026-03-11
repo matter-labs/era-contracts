@@ -7,6 +7,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
 import {L1ToGatewayTokenBalanceMigrationData, MigrationConfirmationData} from "../../common/Messaging.sol";
 import {
+    L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
     L2_BRIDGEHUB,
     L2_CHAIN_ASSET_HANDLER,
@@ -19,8 +20,8 @@ import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 
 import {
+    AssetAlreadyRegistered,
     AssetIdNotRegistered,
-    BaseTokenTotalSupplyBackfillFailed,
     BaseTokenTotalSupplyBackfillNotNeeded,
     BaseTokenTotalSupplyBackfillRequired,
     ChainBalanceMustBeZeroBeforeMigration,
@@ -39,7 +40,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     bytes32 public BASE_TOKEN_ASSET_ID;
 
     /// @dev L2-side accounting used to compute the amount to keep on L1 during L1 -> Gateway migration.
-    mapping(bytes32 assetId => InteropL2Info info) internal interopInfo;
+    mapping(bytes32 assetId => InteropL2Info info) public interopInfo;
 
     /// @dev Token total supply snapshot captured before the first post-v31 bridge operation for each token.
     /// @dev For tokens that existed before the chain migrated to v31, it should be equal to `totalSuccessfulDeposits - totalWithdrawalsToL1`.
@@ -50,7 +51,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @dev For native tokens, it is expected to be populated automatically with `isAssetRegistered[block.chainid]`.
     /// @dev IMPORTANT: for base token this value may not be correct for ZKsync OS chains until the totalSupply for the base
     /// token has been backfilled, so before using this value for the base token, one should check that it was set (`needBaseTokenTotalSupplyBackfill = false`).
-    mapping(bytes32 assetId => SavedTotalSupply snapshot) internal totalPreV31TotalSupply;
+    mapping(bytes32 assetId => SavedTotalSupply snapshot) public totalPreV31TotalSupply;
 
     /// @dev On ZKsync OS chains, the `totalSupply()` of the base token is not available by default,
     /// so before we ever use it to do any migrations, we need to backfill it.
@@ -72,7 +73,21 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _;
     }
 
-    modifier onlyL2BaseTokenSystemContract() {
+    modifier onlyBaseTokenHolder() {
+        if (msg.sender != L2_BASE_TOKEN_HOLDER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    modifier onlyBaseTokenHolderOrL2BaseToken() {
+        if (msg.sender != L2_BASE_TOKEN_HOLDER_ADDR && msg.sender != address(L2_BASE_TOKEN_SYSTEM_CONTRACT)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    modifier onlyL2BaseToken() {
         if (msg.sender != address(L2_BASE_TOKEN_SYSTEM_CONTRACT)) {
             revert Unauthorized(msg.sender);
         }
@@ -86,28 +101,20 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _;
     }
 
-    // FIXME: this function will have to be called by the chain admin after the v31 upgrade to backfill the data.
-    // It will be fixed in a separate PR with the base token holder PR.
-    function backFillZKSyncOSBaseTokenV31MigrationData(uint256 _amount) external onlyUpgrader {
+    /// @notice Backfills the base token's pre-V31 total supply for ZKOS chains.
+    /// @dev Called by L2BaseTokenZKOS.setZKsyncOSPreV31TotalSupply() after setting the total supply.
+    /// @param _amount The pre-V31 total supply amount.
+    function backFillZKSyncOSBaseTokenV31MigrationData(uint256 _amount) external onlyL2BaseToken {
         if (!needBaseTokenTotalSupplyBackfill) {
             revert BaseTokenTotalSupplyBackfillNotNeeded();
         }
 
-        // We expect that method to be called after the `totalSupply()` has been already updated
-        // to the correct one, so we can just register the token.
-        if (!isAssetRegistered[BASE_TOKEN_ASSET_ID]) {
-            registerLegacyToken(BASE_TOKEN_ASSET_ID);
-            needBaseTokenTotalSupplyBackfill = false;
-
-            if (totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID].amount != _amount) {
-                // We should never catch this revert in production, this is just an invariant check.
-                revert BaseTokenTotalSupplyBackfillFailed();
-            }
-            return;
-        }
-
-        // We expect that for all registered tokens, the zero `totalPreV31TotalSupply` should be saved.
-
+        // For genesis chains, the base token is registered during _finalizeDeployments() via
+        // L2NativeTokenVault.registerBaseTokenIfNeeded() → registerNewTokenIfNeeded(),
+        // which sets totalPreV31TotalSupply[assetId] = {isSaved: true, amount: 0}.
+        // For existing chains upgraded to V31, L2V31Upgrade calls registerBaseTokenDuringUpgrade()
+        // which also sets totalPreV31TotalSupply to {isSaved: true, amount: 0}.
+        require(isAssetRegistered[BASE_TOKEN_ASSET_ID], AssetIdNotRegistered(BASE_TOKEN_ASSET_ID));
         SavedTotalSupply memory baseTokenPreV31TotalSupply = totalPreV31TotalSupply[BASE_TOKEN_ASSET_ID];
         require(baseTokenPreV31TotalSupply.isSaved, TotalPreV31SupplyNotSaved(BASE_TOKEN_ASSET_ID));
         require(
@@ -160,6 +167,25 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             // we know that it has never been bridged before v31.
             totalPreV31TotalSupply[_assetId] = SavedTotalSupply({isSaved: true, amount: 0});
         }
+    }
+
+    /// @notice Registers the base token in the asset tracker during a V31 upgrade
+    /// of an existing chain.
+    /// @dev Unlike `registerNewTokenIfNeeded` (used during genesis when all tokens
+    /// are truly new), this function is for upgrading existing chains where the base
+    /// token already exists on-chain but the asset tracker is deployed during the
+    /// current upgrade. The base token originates on L1 (non-native to this chain).
+    /// Reverts if the base token is already registered, since this is called first
+    /// during the upgrade and double-registration indicates a broken invariant.
+    /// The real pre-V31 total supply is backfilled later via
+    /// `backFillZKSyncOSBaseTokenV31MigrationData()`.
+    function registerBaseTokenDuringUpgrade() external onlyUpgrader {
+        bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
+        require(!isAssetRegistered[baseTokenAssetId], AssetAlreadyRegistered(baseTokenAssetId));
+        isAssetRegistered[baseTokenAssetId] = true;
+        totalPreV31TotalSupply[baseTokenAssetId] = SavedTotalSupply({isSaved: true, amount: 0});
+
+        emit BaseTokenRegisteredDuringUpgrade(baseTokenAssetId);
     }
 
     /// @notice Stores token total supply snapshot used for pre-v31 migration accounting.
@@ -238,10 +264,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @dev This function is specifically for the chain's native base token used for gas payments.
     /// @param _toChainId The chain ID which the funds are sent to.
     /// @param _amount The amount of base tokens being bridged out.
-    function handleInitiateBaseTokenBridgingOnL2(
-        uint256 _toChainId,
-        uint256 _amount
-    ) external onlyL2BaseTokenSystemContract {
+    function handleInitiateBaseTokenBridgingOnL2(uint256 _toChainId, uint256 _amount) external onlyBaseTokenHolder {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         uint256 baseTokenOriginChainId = L2_NATIVE_TOKEN_VAULT.originChainId(baseTokenAssetId);
         _handleInitiateBridgingOnL2Inner(_toChainId, baseTokenAssetId, _amount, baseTokenOriginChainId);
@@ -348,8 +371,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @notice Handles the finalization of incoming base token bridging operations on L2.
     /// @dev This function is specifically for the chain's native base token used for gas payments.
+    /// @param _fromChainId The source chain ID of the bridging operation.
     /// @param _amount The amount of base tokens being bridged into this chain.
-    function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external onlyL2BaseTokenSystemContract {
+    function handleFinalizeBaseTokenBridgingOnL2(
+        uint256 _fromChainId,
+        uint256 _amount
+    ) external onlyBaseTokenHolderOrL2BaseToken {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         if (_amount == 0) {
             return;
@@ -361,7 +388,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         }
 
         _handleFinalizeBridgingOnL2Inner({
-            _fromChainId: L1_CHAIN_ID,
+            _fromChainId: _fromChainId,
             _assetId: baseTokenAssetId,
             _amount: _amount,
             _tokenOriginChainId: L1_CHAIN_ID,
@@ -430,6 +457,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Determines if a token's migration number should be force-set during bridging operations.
+    /// @dev IMPORTANT: All callers of handleFinalizeBaseTokenBridgingOnL2 MUST invoke the asset tracker
+    /// @dev BEFORE changing totalSupply/balances. This ensures totalSupply() == 0 is a reliable proxy
+    /// @dev for "no deposits have been finalized yet", giving uniform behavior for both base tokens and
+    /// @dev ERC20 tokens. The same ordering must be enforced in zksync-os.
     /// @param _assetId The asset ID of the token to check.
     /// @param _tokenOriginChainId The chain ID where this token originated.
     /// @param _tokenAddress The contract address of the token on this chain.
@@ -443,9 +474,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             return false;
         }
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
-        uint256 amount = IERC20(_tokenAddress).totalSupply();
+        if (savedAssetMigrationNumber != 0) {
+            return false;
+        }
 
-        return savedAssetMigrationNumber == 0 && amount == 0;
+        // This works uniformly for both base tokens and ERC20 tokens because the asset tracker
+        // is always notified before totalSupply changes.
+        return IERC20(_tokenAddress).totalSupply() == 0;
     }
 
     /// @notice Retrieves the token contract address for a given asset ID.

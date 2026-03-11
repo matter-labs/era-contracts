@@ -6,6 +6,8 @@ import {
     GW_ASSET_TRACKER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_ASSET_ROUTER_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
@@ -17,6 +19,7 @@ import {
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
     L2_INTEROP_CENTER_ADDR
 } from "../common/l2-helpers/L2ContractAddresses.sol";
+import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {
     FixedForceDeploymentsData,
@@ -541,6 +544,12 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.interopHandlerBytecodeInfo,
                 L2_INTEROP_HANDLER_ADDR
             );
+
+            conductContractUpgrade(
+                expectedUpgradeType,
+                fixedForceDeploymentsData.baseTokenHolderBytecodeInfo,
+                L2_BASE_TOKEN_HOLDER_ADDR
+            );
         }
     }
 
@@ -578,6 +587,14 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
+
+        // Initialize L2BaseToken during genesis for both Era and ZKOS chains.
+        // Sets L1_CHAIN_ID and initializes the BaseTokenHolder balance.
+        // For Era: reads __DEPRECATED_totalSupply and computes holder balance
+        // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder
+        if (_isGenesisUpgrade) {
+            IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
+        }
 
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
 

@@ -15,6 +15,12 @@ interface IL2AssetTracker {
     /// @param chainId The chain ID from which the migration is initiated
     event L1ToGatewayMigrationInitiated(bytes32 indexed assetId, uint256 chainId);
 
+    /// @notice Emitted when the base token is registered during a V31 upgrade.
+    /// @param assetId The base token asset ID that was registered.
+    event BaseTokenRegisteredDuringUpgrade(bytes32 indexed assetId);
+
+    function L1_CHAIN_ID() external view returns (uint256);
+
     function initL2(uint256 _l1ChainId, bytes32 _baseTokenAssetId, bool _needBaseTokenTotalSupplyBackfill) external;
 
     function handleInitiateBridgingOnL2(
@@ -26,7 +32,7 @@ interface IL2AssetTracker {
 
     function handleInitiateBaseTokenBridgingOnL2(uint256 _maybeToBlockChainId, uint256 _amount) external;
 
-    function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external;
+    function handleFinalizeBaseTokenBridgingOnL2(uint256 _fromChainId, uint256 _amount) external;
 
     function handleFinalizeBridgingOnL2(
         uint256 _fromChainId,
@@ -41,4 +47,10 @@ interface IL2AssetTracker {
     function confirmMigrationOnL2(MigrationConfirmationData calldata _migrationConfirmationData) external;
 
     function registerLegacyToken(bytes32 _assetId) external;
+
+    function registerBaseTokenDuringUpgrade() external;
+
+    function needBaseTokenTotalSupplyBackfill() external view returns (bool);
+
+    function backFillZKSyncOSBaseTokenV31MigrationData(uint256 _amount) external;
 }
