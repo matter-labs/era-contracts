@@ -112,14 +112,7 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
 
         bytes memory bytecode = abi.encodePacked(
             type(L1NullifierDev).creationCode,
-            abi.encode(
-                addresses.bridgehub,
-                bridgehub.messageRoot(),
-                // This value ignored now, but supposed to be interop center
-                address(0),
-                config.chainId,
-                addresses.diamondProxy
-            )
+            abi.encode(addresses.bridgehub, bridgehub.messageRoot(), config.chainId, addresses.diamondProxy)
         );
         address contractAddress = deployViaCreate2(bytecode);
 
