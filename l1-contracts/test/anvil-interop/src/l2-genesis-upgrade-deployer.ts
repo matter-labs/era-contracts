@@ -81,13 +81,13 @@ const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
   },
   {
     address: L2_MESSAGE_ROOT_ADDR,
-    name: "L2MessageRoot",
-    artifactPath: "L2MessageRoot.sol/L2MessageRoot.json",
+    name: "MessageRoot",
+    artifactPath: "MessageRoot.sol/MessageRoot.json",
   },
   {
     address: L2_BRIDGEHUB_ADDR,
-    name: "L2Bridgehub",
-    artifactPath: "L2Bridgehub.sol/L2Bridgehub.json",
+    name: "Bridgehub",
+    artifactPath: "Bridgehub.sol/Bridgehub.json",
   },
   {
     address: L2_ASSET_ROUTER_ADDR,
@@ -96,13 +96,13 @@ const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
   },
   {
     address: L2_NATIVE_TOKEN_VAULT_ADDR,
-    name: "L2NativeTokenVaultZKOS",
-    artifactPath: "L2NativeTokenVaultZKOS.sol/L2NativeTokenVaultZKOS.json",
+    name: "L2NativeTokenVaultDev",
+    artifactPath: "L2NativeTokenVaultDev.sol/L2NativeTokenVaultDev.json",
   },
   {
     address: L2_CHAIN_ASSET_HANDLER_ADDR,
-    name: "L2ChainAssetHandler",
-    artifactPath: "L2ChainAssetHandler.sol/L2ChainAssetHandler.json",
+    name: "ChainAssetHandler",
+    artifactPath: "ChainAssetHandler.sol/ChainAssetHandler.json",
   },
   {
     address: L2_MESSAGE_VERIFICATION_ADDR,
