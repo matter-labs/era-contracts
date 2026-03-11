@@ -1,13 +1,13 @@
 use crate::consts::{
-    BASE_TOKEN_HOLDER_ADDR, ContractSource, EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT, INITIAL_CONTRACTS,
-    L2_COMPLEX_UPGRADER_ADDR, L2_COMPLEX_UPGRADER_IMPL_ADDR, SYSTEM_CONTRACT_PROXY_ADMIN,
-    SYSTEM_PROXY_ADMIN_OWNER_SLOT,
+    ContractSource, EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT, INITIAL_CONTRACTS,
+    L2_BASE_TOKEN_HOLDER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_COMPLEX_UPGRADER_IMPL_ADDR,
+    SYSTEM_CONTRACT_PROXY_ADMIN, SYSTEM_PROXY_ADMIN_OWNER_SLOT,
 };
 use crate::types::{InitialGenesisInput, LeafInfo, MAX_B256_VALUE, MERKLE_TREE_DEPTH};
 use crate::utils::{address_to_b256, da_contract_name_to_code, l1_contract_name_to_code};
 use alloy::consensus::{Header, EMPTY_OMMER_ROOT_HASH};
 use alloy::eips::eip1559::INITIAL_BASE_FEE;
-use alloy::primitives::{Address, Bloom, B256, B64, U256, Uint};
+use alloy::primitives::{Address, Bloom, B256, B64, U256};
 use blake2::{Blake2s256, Digest};
 use std::collections::BTreeMap;
 use zk_os_api::helpers::{set_properties_code, set_properties_nonce};
@@ -175,6 +175,10 @@ pub fn build_genesis_root_hash(genesis_input: &InitialGenesisInput) -> anyhow::R
         // When contracts are deployed, they have a nonce of 1.
         set_properties_nonce(&mut account_properties, 1);
         set_properties_code(&mut account_properties, &deployed_code);
+        // The base token holder contract should hold a large balance
+        if *address == L2_BASE_TOKEN_HOLDER_ADDR {
+            account_properties.balance = alloy::primitives::Uint::from(u128::MAX);
+        }
 
         let flat_storage_key = account_properties_flat_key(*address);
         let account_properties_hash = account_properties.compute_hash();
@@ -259,16 +263,6 @@ fn construct_additional_storage() -> BTreeMap<Address, BTreeMap<B256, B256>> {
         address_to_b256(&SYSTEM_CONTRACT_PROXY_ADMIN),
     );
     map.insert(L2_COMPLEX_UPGRADER_ADDR, l2_complex_upgrader_storage);
-
-    let mut account_properties_storage = BTreeMap::new();
-    account_properties_storage.insert(
-        address_to_b256(&BASE_TOKEN_HOLDER_ADDR),
-        AccountProperties {
-            balance: Uint::from(u128::MAX),
-            ..Default::default()
-        }.compute_hash().as_u8_array().into(),
-    );
-    map.insert(ACCOUNT_PROPERTIES_STORAGE_ADDRESS.to_be_bytes().into(), account_properties_storage);
 
     map
 }
