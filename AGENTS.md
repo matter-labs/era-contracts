@@ -1,5 +1,13 @@
 # General guidelines
 
+## NEVER kill Anvil processes globally
+
+**THIS IS AN ABSOLUTE RULE - NO EXCEPTIONS**
+
+Never run `pkill -f anvil`, `killall anvil`, or any blanket kill command for Anvil processes. Multiple Anvil sessions may be running in parallel (e.g., interop tests, local development chains). Killing all Anvil processes can destroy other users' or sessions' work.
+
+Instead, use the `cleanup.sh` script in the anvil-interop directory, which targets only processes on known ports.
+
 ## ⚠️ CRITICAL SOLIDITY CODE RULES ⚠️
 
 ### NEVER USE try-catch OR staticcall
