@@ -130,7 +130,8 @@ export class BalanceTracker {
         ? await this.getL2TokenBalance(chainId, l2TokenAddress, walletAddress)
         : await this.getL2EthBalance(chainId, walletAddress);
 
-    // For GW-settled chains, the L1AssetTracker tracks balance under GW chainId
+    // For GW-settled chains, L1AssetTracker tracks balance under the GW chainId.
+    // We store the L1 chain balance under the appropriate key (GW chainId for GW-settled).
     const l1ChainBalanceChainId = isGWSettled && this.gwChainId ? this.gwChainId : chainId;
     const l1ChainBalance = await this.getL1ChainBalance(l1ChainBalanceChainId, assetId);
 
@@ -140,6 +141,7 @@ export class BalanceTracker {
       l1ChainBalance: l1ChainBalance.toString(),
     };
 
+    // For GW-settled chains, also track GWAssetTracker.chainBalance[chainId]
     if (isGWSettled && this.gwChainId) {
       const gwChainBalance = await this.getGWChainBalance(chainId, assetId);
       snapshot.gwChainBalance = gwChainBalance.toString();
@@ -173,33 +175,58 @@ export class BalanceTracker {
 }
 
 /**
- * Assert that a deposit shifted balances correctly.
- * - L2 balance should increase by amount
- * - L1AssetTracker chainBalance should increase by amount
+ * Compute deltas between two balance snapshots.
+ * Returns all deltas (l1Token, l2Token, l1ChainBalance, gwChainBalance if present).
+ */
+export function computeBalanceDeltas(
+  before: BalanceSnapshot,
+  after: BalanceSnapshot
+): {
+  l1TokenDelta: BigNumber;
+  l2TokenDelta: BigNumber;
+  l1ChainBalanceDelta: BigNumber;
+  gwChainBalanceDelta?: BigNumber;
+} {
+  const l1TokenDelta = BigNumber.from(after.l1TokenBalance).sub(before.l1TokenBalance);
+  const l2TokenDelta = BigNumber.from(after.l2TokenBalance).sub(before.l2TokenBalance);
+  const l1ChainBalanceDelta = BigNumber.from(after.l1ChainBalance).sub(before.l1ChainBalance);
+
+  const result: ReturnType<typeof computeBalanceDeltas> = {
+    l1TokenDelta,
+    l2TokenDelta,
+    l1ChainBalanceDelta,
+  };
+
+  if (before.gwChainBalance && after.gwChainBalance) {
+    result.gwChainBalanceDelta = BigNumber.from(after.gwChainBalance).sub(before.gwChainBalance);
+  }
+
+  return result;
+}
+
+/**
+ * @deprecated Use computeBalanceDeltas instead for full comparison.
+ * Kept for backward compatibility.
  */
 export function assertDepositBalances(
   before: BalanceSnapshot,
   after: BalanceSnapshot
 ): { l2BalanceDelta: BigNumber; l1ChainBalanceDelta: BigNumber } {
-  const l2BalanceDelta = BigNumber.from(after.l2TokenBalance).sub(before.l2TokenBalance);
-  const l1ChainBalanceDelta = BigNumber.from(after.l1ChainBalance).sub(before.l1ChainBalance);
-
-  return { l2BalanceDelta, l1ChainBalanceDelta };
+  const deltas = computeBalanceDeltas(before, after);
+  return { l2BalanceDelta: deltas.l2TokenDelta, l1ChainBalanceDelta: deltas.l1ChainBalanceDelta };
 }
 
 /**
- * Assert that a withdrawal shifted balances correctly.
- * - L2 balance should decrease by amount
- * - L1AssetTracker chainBalance should decrease by amount
+ * @deprecated Use computeBalanceDeltas instead for full comparison.
+ * Kept for backward compatibility.
  */
 export function assertWithdrawalBalances(
   before: BalanceSnapshot,
   after: BalanceSnapshot
 ): { l2BalanceDelta: BigNumber; l1ChainBalanceDelta: BigNumber } {
-  const l2BalanceDelta = BigNumber.from(before.l2TokenBalance).sub(after.l2TokenBalance);
-  const l1ChainBalanceDelta = BigNumber.from(before.l1ChainBalance).sub(after.l1ChainBalance);
-
-  return { l2BalanceDelta, l1ChainBalanceDelta };
+  const deltas = computeBalanceDeltas(before, after);
+  // For withdrawals, return positive values representing the decrease
+  return { l2BalanceDelta: deltas.l2TokenDelta.mul(-1), l1ChainBalanceDelta: deltas.l1ChainBalanceDelta.mul(-1) };
 }
 
 /**
@@ -244,6 +271,17 @@ export async function queryEthAssetId(
 ): Promise<string> {
   const ntv = new Contract(l1NativeTokenVaultAddr, l1NativeTokenVaultAbi(), l1Provider);
   return ntv.assetId(ETH_TOKEN_ADDRESS);
+}
+
+/**
+ * Query the ETH asset ID directly from deployment state (convenience wrapper).
+ */
+export async function queryEthAssetIdFromState(state: DeploymentState): Promise<string> {
+  if (!state.chains?.l1 || !state.l1Addresses) {
+    throw new Error("Deployment state missing chains or l1Addresses");
+  }
+  const l1Provider = new providers.JsonRpcProvider(state.chains.l1.rpcUrl);
+  return queryEthAssetId(l1Provider, state.l1Addresses.l1NativeTokenVault);
 }
 
 /**

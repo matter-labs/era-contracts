@@ -104,7 +104,10 @@ contract DeployL1CoreUtils is DeployUtils {
             return abi.encode(coreAddresses.bridges.bridgedStandardERC20Implementation);
         } else if (compareStrings(contractName, "L1Bridgehub")) {
             return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
-        } else if (compareStrings(contractName, "L1MessageRoot")) {
+        } else if (
+            compareStrings(contractName, "L1MessageRoot") ||
+            compareStrings(contractName, "DummyL1MessageRoot")
+        ) {
             return
                 abi.encode(
                     coreAddresses.bridgehub.proxies.bridgehub,
@@ -248,7 +251,10 @@ contract DeployL1CoreUtils is DeployUtils {
         if (!isZKBytecode) {
             if (compareStrings(contractName, "L1Bridgehub")) {
                 return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1MessageRoot")) {
+            } else if (
+                compareStrings(contractName, "L1MessageRoot") ||
+                compareStrings(contractName, "DummyL1MessageRoot")
+            ) {
                 return abi.encodeCall(L1MessageRoot.initialize, ());
             } else if (compareStrings(contractName, "ChainRegistrationSender")) {
                 return abi.encodeCall(ChainRegistrationSender.initialize, (config.deployerAddress));

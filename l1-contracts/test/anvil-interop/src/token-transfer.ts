@@ -3,6 +3,7 @@ import { DeploymentRunner } from "./deployment-runner";
 import type { MultiChainTokenTransferParams, MultiChainTokenTransferResult } from "./types";
 import { testnetERC20TokenAbi, interopCenterAbi, l2NativeTokenVaultAbi, interopHandlerAbi } from "./contracts";
 import {
+  ANVIL_DEFAULT_PRIVATE_KEY,
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
@@ -69,13 +70,13 @@ export async function executeTokenTransfer(
     throw new Error(`Chain not found. Available: ${state.chains.l2.map((chain) => chain.chainId).join(", ")}`);
   }
 
-  const sourceTokenAddr = state.testTokens[sourceChainId];
+  const sourceTokenAddr = options.sourceTokenAddress || state.testTokens[sourceChainId];
   const targetTokenAddr = state.testTokens[targetChainId];
-  if (!sourceTokenAddr || !targetTokenAddr) {
-    throw new Error("Test tokens not found. Run 'yarn deploy:test-token' first.");
+  if (!sourceTokenAddr) {
+    throw new Error(`Source token not found for chain ${sourceChainId}. Run 'yarn deploy:test-token' or pass sourceTokenAddress.`);
   }
 
-  const privateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+  const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
   const sourceProvider = new providers.JsonRpcProvider(sourceChain.rpcUrl);
   const targetProvider = new providers.JsonRpcProvider(targetChain.rpcUrl);
   const sourceWallet = new Wallet(privateKey, sourceProvider);
@@ -168,7 +169,6 @@ export async function executeTokenTransfer(
   log(`   InteropCenter: ${INTEROP_CENTER_ADDR}`);
   log(`   Target: L2AssetRouter at ${L2_ASSET_ROUTER_ADDR}`);
 
-  const startBlock = await targetProvider.getBlockNumber();
   const sourceTx = await interopCenter.sendBundle(destinationChainIdBytes, [callStarter], [], {
     gasLimit: 500000,
     value: 0,
@@ -199,35 +199,9 @@ export async function executeTokenTransfer(
     throw new Error("InteropBundleSent event not found in source transaction receipt");
   }
 
-  log(`⏱️  [${elapsed()}] Checking if relay already delivered bundle on target chain...`);
   let targetTxHash: string | null = null;
-  // Quick check: only a few attempts to see if an external relayer already delivered.
-  // If not, we fall through to direct executeBundle below.
-  for (let attempt = 0; attempt < 3 && !targetTxHash; attempt++) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    const currentBlock = await targetProvider.getBlockNumber();
-    for (let blockNum = startBlock; blockNum <= currentBlock; blockNum++) {
-      const block = await targetProvider.getBlock(blockNum);
-      if (!block) {
-        continue;
-      }
-      for (const txHash of block.transactions) {
-        const tx = await targetProvider.getTransaction(txHash);
-        const txTo = tx?.to?.toLowerCase();
-        if (txTo === L2_ASSET_ROUTER_ADDR.toLowerCase() || txTo === L2_INTEROP_HANDLER_ADDR.toLowerCase()) {
-          targetTxHash = txHash;
-          break;
-        }
-      }
-      if (targetTxHash) {
-        break;
-      }
-    }
-  }
 
-  if (targetTxHash) {
-    log(`ℹ️ Bundle already appears on destination chain; skipping direct executeBundle call. [${elapsed()}]`);
-  } else {
+  {
     log(`⏱️  [${elapsed()}] Executing bundle directly on destination chain via L2InteropHandler...`);
     const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi(), targetWallet);
 

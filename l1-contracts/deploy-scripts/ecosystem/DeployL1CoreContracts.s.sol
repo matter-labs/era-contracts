@@ -102,10 +102,15 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridgehub.implementations.chainAssetHandler,
             coreAddresses.bridgehub.proxies.chainAssetHandler
         ) = deployTuppWithContract("L1ChainAssetHandler", false);
-        (
-            coreAddresses.bridgehub.implementations.messageRoot,
-            coreAddresses.bridgehub.proxies.messageRoot
-        ) = deployTuppWithContract("L1MessageRoot", false);
+        {
+            string memory messageRootContract = vm.envOr("USE_DUMMY_MESSAGE_ROOT", false)
+                ? "DummyL1MessageRoot"
+                : "L1MessageRoot";
+            (
+                coreAddresses.bridgehub.implementations.messageRoot,
+                coreAddresses.bridgehub.proxies.messageRoot
+            ) = deployTuppWithContract(messageRootContract, false);
+        }
 
         (
             coreAddresses.bridges.implementations.l1Nullifier,

@@ -114,11 +114,6 @@ export function ownable2StepAbi(): any[] {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function dummyL1MessageRootAbi(): any[] {
-  return loadAbiFromOut("DummyL1MessageRoot.sol/DummyL1MessageRoot.json");
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function migratorFacetAbi(): any[] {
   return loadAbiFromOut("Migrator.sol/MigratorFacet.json");
 }
@@ -126,6 +121,11 @@ export function migratorFacetAbi(): any[] {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function l1NullifierAbi(): any[] {
   return loadAbiFromOut("L1Nullifier.sol/L1Nullifier.json");
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function iBaseTokenAbi(): any[] {
+  return loadAbiFromOut("IBaseToken.sol/IBaseToken.json");
 }
 
 // ── Bytecodes ───────────────────────────────────────────────────

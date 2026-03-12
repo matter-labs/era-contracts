@@ -4,6 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 import {
   ANVIL_FUND_BALANCE,
+  L1_CHAIN_ID,
   L1_MESSAGE_SENT_EVENT_SIG,
   L1_TO_L2_ALIAS_OFFSET,
   L2_ASSET_TRACKER_ADDR,
@@ -81,12 +82,61 @@ export function ensureDirectoryExists(dirPath: string): void {
 }
 
 /**
- * Get chain IDs of chains settled on the gateway (not L1, not GW itself, not direct-settled chain 10).
+ * Get chain IDs of chains settled on the gateway, derived from the anvil config.
  */
 export function getGwSettledChainIds(
-  chains: Array<{ chainId: number; isL1?: boolean; isGateway?: boolean }>
+  chains: Array<{ chainId: number; isL1?: boolean; isGateway?: boolean; settlement?: string }>
 ): number[] {
-  return chains.filter((c) => !c.isL1 && !c.isGateway && c.chainId !== 10).map((c) => c.chainId);
+  return chains.filter((c) => c.settlement === "gateway").map((c) => c.chainId);
+}
+
+/**
+ * Find an L2 chain by chain ID in the deployment state, or throw.
+ */
+export function getL2Chain(
+  chains: { l2: Array<{ chainId: number; rpcUrl: string }> },
+  chainId: number
+): { chainId: number; rpcUrl: string } {
+  const chain = chains.l2.find((c) => c.chainId === chainId);
+  if (!chain) {
+    throw new Error(`L2 chain ${chainId} not found. Available: ${chains.l2.map((c) => c.chainId).join(", ")}`);
+  }
+  return chain;
+}
+
+/**
+ * Find a chain's diamond proxy address by chain ID, or throw.
+ */
+export function getChainDiamondProxy(chainAddresses: Array<{ chainId: number; diamondProxy: string }>, chainId: number): string {
+  const addr = chainAddresses.find((c) => c.chainId === chainId);
+  if (!addr) {
+    throw new Error(`Chain addresses for ${chainId} not found`);
+  }
+  return addr.diamondProxy;
+}
+
+/**
+ * Find the chain ID with a given role from the anvil config.
+ */
+export function getChainIdByRole(
+  config: Array<{ chainId: number; role?: string }>,
+  role: string
+): number {
+  const chain = config.find((c) => c.role === role);
+  if (!chain) {
+    throw new Error(`No chain with role '${role}' found in config`);
+  }
+  return chain.chainId;
+}
+
+/**
+ * Find all chain IDs with a given role from the anvil config.
+ */
+export function getChainIdsByRole(
+  config: Array<{ chainId: number; role?: string }>,
+  role: string
+): number[] {
+  return config.filter((c) => c.role === role).map((c) => c.chainId);
 }
 
 export function formatChainInfo(chainId: number, port: number, isL1: boolean): string {
@@ -144,6 +194,52 @@ export function applyL1ToL2Alias(l1Address: string): string {
     .add(ethers.BigNumber.from(L1_TO_L2_ALIAS_OFFSET))
     .mod(ethers.BigNumber.from(2).pow(160));
   return ethers.utils.getAddress(ethers.utils.hexZeroPad(result.toHexString(), 20));
+}
+
+/**
+ * Build the merkle proof for withdrawal finalization.
+ *
+ * DummyL1MessageRoot bypasses verification, but getProofData() still parses the
+ * proof structure to extract settlementLayerChainId (used by L1AssetTracker to
+ * update the correct chainBalance).
+ *
+ * For direct settlement (chain on L1): old format → settlementLayerChainId = 0
+ * For gateway settlement: new format → settlementLayerChainId = GW chain ID
+ */
+export function buildWithdrawalMerkleProof(settlementLayerChainId: number): string[] {
+  if (settlementLayerChainId > 0) {
+    // New format: metadata + logLeafSibling + batchLeafProofMask + packedBatchInfo + slChainId
+    // Metadata: version=0x01, logLeafProofLen=1, batchLeafProofLen=0, finalProofNode=0
+    return [
+      "0x0101000000000000000000000000000000000000000000000000000000000000",
+      ethers.constants.HashZero, // log leaf merkle sibling (dummy)
+      ethers.constants.HashZero, // batchLeafProofMask = 0
+      ethers.constants.HashZero, // packed(settlementLayerBatchNumber=0, batchRootMask=0)
+      ethers.utils.hexZeroPad(ethers.utils.hexlify(settlementLayerChainId), 32),
+    ];
+  } else {
+    // Old format: single non-zero element → finalProofNode=true → settlementLayerChainId=0
+    return ["0x0000000100000001000000010000000100000001000000010000000100000001"];
+  }
+}
+
+/**
+ * Determine the settlement layer chain ID for a given chain.
+ * Returns 0 for direct L1 settlement, or the GW chain ID for gateway settlement.
+ */
+export async function getSettlementLayerChainId(
+  l1Provider: providers.JsonRpcProvider,
+  bridgehubAddr: string,
+  chainId: number
+): Promise<number> {
+  // Lazy import to avoid circular deps
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { il1BridgehubAbi } = require("./contracts");
+  const bridgehub = new ethers.Contract(bridgehubAddr, il1BridgehubAbi(), l1Provider);
+  const slChainId = await bridgehub.settlementLayer(chainId);
+  const slChainIdNum = slChainId.toNumber();
+  const isGatewaySettled = slChainIdNum !== 0 && slChainIdNum !== L1_CHAIN_ID;
+  return isGatewaySettled ? slChainIdNum : 0;
 }
 
 /**

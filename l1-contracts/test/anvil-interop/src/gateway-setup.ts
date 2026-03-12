@@ -92,7 +92,9 @@ export class GatewaySetup {
       await this.runForgeGatewayScript("runFullRegistration()");
       done();
 
-      // Relay L1→L2 priority requests to GW chain
+      // Relay L1→L2 priority requests to GW chain.
+      // TODO: Consider using the batch settler daemon for this instead of inline scanning,
+      // once the settler supports relaying priority requests during setup.
       done = timeIt("relay: fullRegistration → GW");
       const latestBlock = await l1Provider.getBlockNumber();
       await scanAndRelayPriorityRequests(l1Provider, gwDiamondProxy, gwProvider, startBlock + 1, latestBlock, (line) =>

@@ -1,8 +1,7 @@
 import { expect } from "chai";
-import { Contract, providers } from "ethers";
+import { Contract, ethers, providers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { l1BridgehubAbi } from "../../src/contracts";
-import { createBalanceTrackerFromState, queryEthAssetId } from "../../src/balance-tracker";
 import {
   L2_BRIDGEHUB_ADDR,
   L2_ASSET_ROUTER_ADDR,
@@ -72,10 +71,10 @@ describe("01 - Deployment Verification", function () {
       l1Provider = new providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
     });
 
-    for (const expectedChainId of [10, 11, 12, 13]) {
-      it(`chain ${expectedChainId} has diamond proxy on L1`, async () => {
-        const chainAddr = state.chainAddresses!.find((c) => c.chainId === expectedChainId);
-        expect(chainAddr, `Chain ${expectedChainId} not found in chainAddresses`).to.exist;
+    for (const chainConfig of runner.getConfig().chains.filter((c) => !c.isL1)) {
+      it(`chain ${chainConfig.chainId} (${chainConfig.role}) has diamond proxy on L1`, async () => {
+        const chainAddr = state.chainAddresses!.find((c) => c.chainId === chainConfig.chainId);
+        expect(chainAddr, `Chain ${chainConfig.chainId} not found in chainAddresses`).to.exist;
         const code = await l1Provider.getCode(chainAddr!.diamondProxy);
         expect(code).to.not.equal("0x");
       });
@@ -96,14 +95,15 @@ describe("01 - Deployment Verification", function () {
       { addr: GW_ASSET_TRACKER_ADDR, name: "GWAssetTracker" },
     ];
 
-    for (const l2Chain of [10, 11, 12, 13]) {
-      describe(`chain ${l2Chain}`, () => {
+    const config = runner.getConfig();
+    for (const chainConfig of config.chains.filter((c) => !c.isL1)) {
+      describe(`chain ${chainConfig.chainId} (${chainConfig.role})`, () => {
         let l2Provider: providers.JsonRpcProvider;
 
         before(() => {
-          const chain = state.chains!.l2.find((c) => c.chainId === l2Chain);
+          const chain = state.chains!.l2.find((c) => c.chainId === chainConfig.chainId);
           if (!chain) {
-            throw new Error(`L2 chain ${l2Chain} not found`);
+            throw new Error(`L2 chain ${chainConfig.chainId} not found`);
           }
           l2Provider = new providers.JsonRpcProvider(chain.rpcUrl);
         });
@@ -111,7 +111,7 @@ describe("01 - Deployment Verification", function () {
         for (const contract of expectedContracts) {
           it(`has ${contract.name} at ${contract.addr}`, async () => {
             const code = await l2Provider.getCode(contract.addr);
-            expect(code, `${contract.name} not deployed on chain ${l2Chain}`).to.not.equal("0x");
+            expect(code, `${contract.name} not deployed on chain ${chainConfig.chainId}`).to.not.equal("0x");
             expect(code).to.not.equal("0x0");
           });
         }
@@ -129,13 +129,14 @@ describe("01 - Deployment Verification", function () {
       }
     });
 
-    for (const l2Chain of [10, 11, 12, 13]) {
-      it(`test token on chain ${l2Chain} has code`, async () => {
-        const tokenAddr = state.testTokens![l2Chain];
+    const config = runner.getConfig();
+    for (const chainConfig of config.chains.filter((c) => !c.isL1)) {
+      it(`test token on chain ${chainConfig.chainId} (${chainConfig.role}) has code`, async () => {
+        const tokenAddr = state.testTokens![chainConfig.chainId];
         if (!tokenAddr) {
           return; // Skip if token wasn't deployed (will be caught by prior test)
         }
-        const chain = state.chains!.l2.find((c) => c.chainId === l2Chain);
+        const chain = state.chains!.l2.find((c) => c.chainId === chainConfig.chainId);
         const provider = new providers.JsonRpcProvider(chain!.rpcUrl);
         const code = await provider.getCode(tokenAddr);
         expect(code).to.not.equal("0x");

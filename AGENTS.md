@@ -222,6 +222,33 @@ cd system-contracts
 yarn test:foundry
 ```
 
+### Running Anvil Interop Tests
+
+```bash
+cd l1-contracts
+
+# Run with pre-generated chain states (fastest, ~180s)
+yarn test:hardhat:interop
+
+# Use port offset to avoid conflicts with other Anvil instances
+ANVIL_INTEROP_PORT_OFFSET=100 yarn test:hardhat:interop
+
+# Force fresh deployment (skips pre-generated states, ~330s)
+ANVIL_INTEROP_FRESH_DEPLOY=1 yarn test:hardhat:interop
+
+# Keep chains running after tests (for debugging with cast)
+ANVIL_INTEROP_KEEP_CHAINS=1 yarn test:hardhat:interop
+```
+
+After modifying mock system contracts (e.g., `MockL2BaseToken`, `MockL2ToL1Messenger`), regenerate chain states:
+
+```bash
+cd l1-contracts
+forge build
+cd test/anvil-interop
+npx ts-node setup-and-dump-state.ts
+```
+
 ### Common Issues
 
 1. **Missing zkout files**: If tests fail with "zkout/BeaconProxy.sol/BeaconProxy.json not found", ensure you've built all artifacts with the steps above.
