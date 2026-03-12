@@ -92,7 +92,7 @@ jobs:
       - name: Install Foundry (for Anvil only, no compilation needed)
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: v1.5.1
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -137,7 +137,7 @@ jobs:
       - name: Install Foundry (includes Anvil)
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: v1.5.1
 
       - name: Install foundry-zksync
         uses: ./.github/actions/install-zksync-foundry
