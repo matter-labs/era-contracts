@@ -376,6 +376,13 @@ export class DeploymentRunner {
       if (!fs.existsSync(statePath)) {
         throw new Error(`State file not written: ${statePath}`);
       }
+      // Strip transactions and historical_states to reduce file size.
+      // --load-state needs block, accounts, best_block_number, and blocks (for block hash lookup).
+      const raw = JSON.parse(fs.readFileSync(statePath, "utf-8"));
+      delete raw.transactions;
+      delete raw.historical_states;
+      fs.writeFileSync(statePath, JSON.stringify(raw, null, 2));
+
       const size = fs.statSync(statePath).size;
       console.log(`  Chain ${chainConfig.chainId} state saved (${(size / 1024).toFixed(0)} KB)`);
     }

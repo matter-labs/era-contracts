@@ -16,7 +16,7 @@
     "chainTypeManager": "0x227a61d8Eb874523564a9C130f24A01e2b37Bec2",
     "chainAdmin": "0xA20ab66F3e220a23c1e9f0303ea1FA9FB7F16e6e",
     "verifier": "0x08B0d081456940c04e541fBaB31A2c4a1dA4BEA7",
-    "rollupL1DAValidator": "0x5Be9468566A91E9979Cc432a07998424B2f8c264"
+    "rollupL1DAValidator": "0xe894D6c36e5070d4a3fBBe34f41480d05365D891"
   },
   "chainAddresses": [
     {
