@@ -292,6 +292,21 @@ async function main(): Promise<void> {
     await executeGovernanceCalls(provider, governanceAddr, stage1Calls, "Stage 1");
     await executeGovernanceCalls(provider, governanceAddr, stage2Calls, "Stage 2");
 
+    // ── Step 3.5: Clear pending genesis upgrade tx hash ────────────
+    // The v29 state has l2SystemContractsUpgradeTxHash set from genesis, but no
+    // batches were ever executed to finalize it. Clear it so ChainUpgrade_v31
+    // doesn't revert with PreviousUpgradeNotFinalized.
+    console.log(`\n=== Step 3.5: Clearing pending upgrade tx hashes (${elapsed()}) ===\n`);
+    const L2_SYSTEM_CONTRACTS_UPGRADE_TX_HASH_SLOT = "0x22"; // storage slot 34
+    for (const chain of chainAddresses) {
+      await provider.send("anvil_setStorageAt", [
+        chain.diamondProxy,
+        L2_SYSTEM_CONTRACTS_UPGRADE_TX_HASH_SLOT,
+        ethers.constants.HashZero,
+      ]);
+      console.log(`  Chain ${chain.chainId}: cleared l2SystemContractsUpgradeTxHash`);
+    }
+
     // ── Step 4: Upgrade each chain individually ─────────────────
     console.log(`\n=== Step 4: Upgrading individual chains (${elapsed()}) ===\n`);
 
