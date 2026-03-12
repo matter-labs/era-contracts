@@ -137,7 +137,7 @@ jobs:
       - name: Install Foundry (includes Anvil + forge for compilation)
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: v1.5.1
 
       - name: Use Node.js
         uses: actions/setup-node@v4
