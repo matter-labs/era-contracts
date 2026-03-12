@@ -260,15 +260,5 @@ fn construct_additional_storage() -> BTreeMap<Address, BTreeMap<B256, B256>> {
     );
     map.insert(L2_COMPLEX_UPGRADER_ADDR, l2_complex_upgrader_storage);
 
-    let mut account_properties_storage = BTreeMap::new();
-    account_properties_storage.insert(
-        address_to_b256(&BASE_TOKEN_HOLDER_ADDR),
-        AccountProperties {
-            balance: Uint::from(u128::MAX),
-            ..Default::default()
-        }.compute_hash().as_u8_array().into(),
-    );
-    map.insert(ACCOUNT_PROPERTIES_STORAGE_ADDRESS.to_be_bytes().into(), account_properties_storage);
-
     map
 }
