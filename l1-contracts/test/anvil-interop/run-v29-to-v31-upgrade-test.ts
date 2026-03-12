@@ -292,19 +292,43 @@ async function main(): Promise<void> {
     await executeGovernanceCalls(provider, governanceAddr, stage1Calls, "Stage 1");
     await executeGovernanceCalls(provider, governanceAddr, stage2Calls, "Stage 2");
 
-    // ── Step 3.5: Clear pending genesis upgrade tx hash ────────────
-    // The v29 state has l2SystemContractsUpgradeTxHash set from genesis, but no
-    // batches were ever executed to finalize it. Clear it so ChainUpgrade_v31
-    // doesn't revert with PreviousUpgradeNotFinalized.
-    console.log(`\n=== Step 3.5: Clearing pending upgrade tx hashes (${elapsed()}) ===\n`);
+    // ── Step 3.5: Patch v29 chain storage for v31 upgrade compatibility ─
+    // The v29 chains were created on Anvil with state dumps (no real L2 execution),
+    // so several storage slots need patching for the v31 upgrade to succeed:
+    // 1. Clear l2SystemContractsUpgradeTxHash (slot 34/0x22): set from genesis but
+    //    never finalized (no batches executed). Without clearing, ChainUpgrade_v31
+    //    reverts with PreviousUpgradeNotFinalized.
+    // 2. Set zksyncOS = true (slot 60/0x3c): v29 chains predate the zksyncOS flag
+    //    (defaults to false), but the v31 upgrade generates tx type 126 (zksyncOS).
+    //    Without this, the chain rejects the upgrade tx with InvalidTxType(126).
+    // 3. Set totalBatchesExecuted/Verified/Committed (slots 11-13) to 1: v29 chains
+    //    have zero batches. SettlementLayerV31Upgrade requires totalBatchesExecuted > 0
+    //    (TotalBatchesExecutedZero) and totalBatchesCommitted == totalBatchesExecuted
+    //    (NotAllBatchesExecuted).
+    //
+    // NOTE: Eventually the v29 state generation branch should be rebased on
+    // zksync-os-stable, which would eliminate most of these patches.
+    console.log(`\n=== Step 3.5: Patching v29 chain storage (${elapsed()}) ===\n`);
+    const TOTAL_BATCHES_EXECUTED_SLOT = "0x0b"; // storage slot 11
+    const TOTAL_BATCHES_VERIFIED_SLOT = "0x0c"; // storage slot 12
+    const TOTAL_BATCHES_COMMITTED_SLOT = "0x0d"; // storage slot 13
     const L2_SYSTEM_CONTRACTS_UPGRADE_TX_HASH_SLOT = "0x22"; // storage slot 34
+    const ZKSYNC_OS_SLOT = "0x3c"; // storage slot 60
+    const ONE = ethers.utils.hexZeroPad("0x01", 32);
     for (const chain of chainAddresses) {
+      // Set batch counts to 1 so upgrade checks pass
+      await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_EXECUTED_SLOT, ONE]);
+      await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_VERIFIED_SLOT, ONE]);
+      await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_COMMITTED_SLOT, ONE]);
+      // Clear pending upgrade tx hash
       await provider.send("anvil_setStorageAt", [
         chain.diamondProxy,
         L2_SYSTEM_CONTRACTS_UPGRADE_TX_HASH_SLOT,
         ethers.constants.HashZero,
       ]);
-      console.log(`  Chain ${chain.chainId}: cleared l2SystemContractsUpgradeTxHash`);
+      // Enable zksyncOS flag
+      await provider.send("anvil_setStorageAt", [chain.diamondProxy, ZKSYNC_OS_SLOT, ONE]);
+      console.log(`  Chain ${chain.chainId}: patched batch counts, cleared upgradeTxHash, set zksyncOS=true`);
     }
 
     // ── Step 4: Upgrade each chain individually ─────────────────
