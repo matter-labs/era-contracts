@@ -199,10 +199,10 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Build da-contracts artifacts
-        run: yarn da build:foundry
+      - name: Build da-contracts artifacts (no CBOR metadata for determinism)
+        run: FOUNDRY_PROFILE=anvil-interop yarn da build:foundry
 
-      - name: Build l1-contracts artifacts (solc only, no zksolc, no CBOR metadata for determinism)
+      - name: Build l1-contracts artifacts (no CBOR metadata for determinism)
         working-directory: l1-contracts
         run: FOUNDRY_PROFILE=anvil-interop forge build
 
