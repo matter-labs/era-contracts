@@ -1,0 +1,92 @@
+use std::path::{Path, PathBuf};
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct ForgeScriptParams {
+    input: &'static str,
+    output: &'static str,
+    script_path: &'static str,
+}
+
+impl ForgeScriptParams {
+    // Path to the input file for forge script
+    pub fn input(&self, path_to_l1_foundry: &Path) -> PathBuf {
+        path_to_l1_foundry.join(self.input)
+    }
+
+    // Path to the output file for forge script
+    pub fn output(&self, path_to_l1_foundry: &Path) -> PathBuf {
+        path_to_l1_foundry.join(self.output)
+    }
+
+    // Path to the script
+    pub fn script(&self) -> PathBuf {
+        PathBuf::from(self.script_path)
+    }
+}
+
+pub const DEPLOY_CTM_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/config-deploy-ctm.toml",
+    output: "script-out/output-deploy-ctm.toml",
+    script_path: "deploy-scripts/ctm/DeployCTM.s.sol",
+};
+
+pub const DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/config-deploy-l1.toml",
+    output: "script-out/output-deploy-l1.toml",
+    script_path: "deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol",
+};
+
+pub const REGISTER_CTM_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/config-register-ctm-l1.toml",
+    output: "script-out/register-ctm-l1.toml",
+    script_path: "deploy-scripts/ecosystem/RegisterCTM.s.sol",
+};
+
+pub const ACCEPT_GOVERNANCE_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/config-admin-functions.toml",
+    output: "script-out/output-admin-functions.toml",
+    script_path: "deploy-scripts/AdminFunctions.s.sol",
+};
+
+pub const DEPLOY_L2_CONTRACTS_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/config-deploy-l2-contracts.toml",
+    output: "script-out/output-deploy-l2-contracts.toml",
+    script_path: "deploy-scripts/chain/DeployL2Contracts.sol",
+};
+
+pub const REGISTER_CHAIN_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/register-zk-chain.toml",
+    output: "script-out/output-register-zk-chain.toml",
+    script_path: "deploy-scripts/ctm/RegisterZKChain.s.sol",
+};
+
+pub const DEPLOY_ERC20_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/config-deploy-erc20.toml",
+    output: "script-out/output-deploy-erc20.toml",
+    script_path: "deploy-scripts/tokens/DeployErc20.s.sol",
+};
+
+pub const DEPLOY_PAYMASTER_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/config-deploy-paymaster.toml",
+    output: "script-out/output-deploy-paymaster.toml",
+    script_path: "deploy-scripts/chain/DeployPaymaster.s.sol",
+};
+
+pub const SETUP_LEGACY_BRIDGE: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/setup-legacy-bridge.toml",
+    output: "script-out/setup-legacy-bridge.toml",
+    script_path: "deploy-scripts/dev/SetupLegacyBridge.s.sol",
+};
+
+pub const ENABLE_EVM_EMULATOR_PARAMS: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/enable-evm-emulator.toml",
+    output: "script-out/output-enable-evm-emulator.toml",
+    script_path: "deploy-scripts/chain/EnableEvmEmulator.s.sol",
+};
+
+pub const REGISTER_ON_ALL_CHAINS_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
+    input: "script-config/register-on-all-chains.toml",
+    output: "script-out/output-register-on-all-chains.toml",
+    script_path: "deploy-scripts/ecosystem/RegisterOnAllChains.s.sol",
+};
+

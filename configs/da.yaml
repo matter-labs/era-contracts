@@ -1,0 +1,13 @@
+# DA (Data Availability) validator addresses per L1 network.
+#
+# These are pre-deployed contract addresses for external DA providers.
+# Addresses deployed during ecosystem/CTM init (rollup, no-DA, etc.) are NOT listed here
+# because they are created dynamically.
+
+avail:
+  # Sepolia: https://sepolia.etherscan.io/address/0x73d59fe232fce421d1365d6a5beec49acde3d0d9
+  sepolia: "0x73d59fe232fce421d1365d6a5beec49acde3d0d9"
+  # Holesky: same contract as Sepolia
+  holesky: "0x73d59fe232fce421d1365d6a5beec49acde3d0d9"
+  # Mainnet: not yet deployed
+  # mainnet: "0x..."
