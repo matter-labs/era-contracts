@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use alloy::primitives::{Address, FixedBytes, B256};
+use alloy::primitives::{Address, B256, FixedBytes};
 
 use blake2::{Blake2s256, Digest};
 
