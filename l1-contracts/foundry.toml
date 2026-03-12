@@ -64,6 +64,7 @@ allow_internal_expect_revert = true
 # Usage: FOUNDRY_PROFILE=anvil-interop forge build
 [profile.anvil-interop]
 cbor_metadata = false
+bytecode_hash = "none"
 
 [profile.default.zksync]
 enable_eravm_extensions = true
