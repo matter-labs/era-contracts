@@ -62,12 +62,7 @@ async function main() {
       }
     }
 
-    const { settler: batchSettler } = await runner.startDaemons(
-      l1Provider,
-      l2Providers,
-      chainAddressesMap,
-      config
-    );
+    const { settler: batchSettler } = await runner.startDaemons(l1Provider, l2Providers, chainAddressesMap, config);
     settler = batchSettler;
 
     console.log("\n=== ✅ Multi-Chain Environment Ready ===\n");

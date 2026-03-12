@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { Contract, ethers, providers } from "ethers";
+import { Contract, providers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { l1BridgehubAbi } from "../../src/contracts";
 import {

@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { createBalanceTrackerFromState, queryEthAssetId, computeBalanceDeltas } from "../../src/balance-tracker";
+import { createBalanceTrackerFromState, queryEthAssetId } from "../../src/balance-tracker";
 import { depositETHToL2 } from "../../src/l1-deposit-helper";
 import { withdrawETHFromL2 } from "../../src/l2-withdrawal-helper";
 import {

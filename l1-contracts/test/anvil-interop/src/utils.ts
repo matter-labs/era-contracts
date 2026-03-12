@@ -107,7 +107,10 @@ export function getL2Chain(
 /**
  * Find a chain's diamond proxy address by chain ID, or throw.
  */
-export function getChainDiamondProxy(chainAddresses: Array<{ chainId: number; diamondProxy: string }>, chainId: number): string {
+export function getChainDiamondProxy(
+  chainAddresses: Array<{ chainId: number; diamondProxy: string }>,
+  chainId: number
+): string {
   const addr = chainAddresses.find((c) => c.chainId === chainId);
   if (!addr) {
     throw new Error(`Chain addresses for ${chainId} not found`);
@@ -118,10 +121,7 @@ export function getChainDiamondProxy(chainAddresses: Array<{ chainId: number; di
 /**
  * Find the chain ID with a given role from the anvil config.
  */
-export function getChainIdByRole(
-  config: Array<{ chainId: number; role?: string }>,
-  role: string
-): number {
+export function getChainIdByRole(config: Array<{ chainId: number; role?: string }>, role: string): number {
   const chain = config.find((c) => c.role === role);
   if (!chain) {
     throw new Error(`No chain with role '${role}' found in config`);
@@ -132,10 +132,7 @@ export function getChainIdByRole(
 /**
  * Find all chain IDs with a given role from the anvil config.
  */
-export function getChainIdsByRole(
-  config: Array<{ chainId: number; role?: string }>,
-  role: string
-): number[] {
+export function getChainIdsByRole(config: Array<{ chainId: number; role?: string }>, role: string): number[] {
   return config.filter((c) => c.role === role).map((c) => c.chainId);
 }
 

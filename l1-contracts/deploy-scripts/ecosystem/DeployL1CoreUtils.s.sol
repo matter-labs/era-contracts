@@ -106,8 +106,7 @@ contract DeployL1CoreUtils is DeployUtils {
         } else if (compareStrings(contractName, "L1Bridgehub")) {
             return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
         } else if (
-            compareStrings(contractName, "L1MessageRoot") ||
-            compareStrings(contractName, "DummyL1MessageRoot")
+            compareStrings(contractName, "L1MessageRoot") || compareStrings(contractName, "DummyL1MessageRoot")
         ) {
             return
                 abi.encode(
@@ -255,8 +254,7 @@ contract DeployL1CoreUtils is DeployUtils {
             if (compareStrings(contractName, "L1Bridgehub")) {
                 return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
             } else if (
-                compareStrings(contractName, "L1MessageRoot") ||
-                compareStrings(contractName, "DummyL1MessageRoot")
+                compareStrings(contractName, "L1MessageRoot") || compareStrings(contractName, "DummyL1MessageRoot")
             ) {
                 return abi.encodeCall(L1MessageRoot.initialize, ());
             } else if (compareStrings(contractName, "ChainRegistrationSender")) {

@@ -185,8 +185,8 @@ export class L1ToL2Relayer {
     const factoryDeps = request.factoryDeps;
     if (factoryDeps && factoryDeps.length > 0) {
       throw new Error(
-        `Factory deps deployment not implemented in L1ToL2Relayer. ` +
-        `Transaction included ${factoryDeps.length} factory dep(s) that were not deployed on L2.`
+        "Factory deps deployment not implemented in L1ToL2Relayer. " +
+          `Transaction included ${factoryDeps.length} factory dep(s) that were not deployed on L2.`
       );
     }
   }

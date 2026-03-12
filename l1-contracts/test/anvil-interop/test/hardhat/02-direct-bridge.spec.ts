@@ -1,11 +1,7 @@
 import { expect } from "chai";
 import { BigNumber, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import {
-  createBalanceTrackerFromState,
-  queryEthAssetId,
-  computeBalanceDeltas,
-} from "../../src/balance-tracker";
+import { createBalanceTrackerFromState, queryEthAssetId, computeBalanceDeltas } from "../../src/balance-tracker";
 import { depositETHToL2 } from "../../src/l1-deposit-helper";
 import { withdrawETHFromL2 } from "../../src/l2-withdrawal-helper";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR } from "../../src/const";
@@ -64,7 +60,9 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
         `L1AssetTracker.chainBalance should increase by ${result.mintValue.toString()}, got ${deltas.l1ChainBalanceDelta.toString()}`
       ).to.equal(true);
 
-      console.log(`   L1AssetTracker.chainBalance[${directSettledChainId}]: ${BigNumber.from(after.l1ChainBalance).toString()}`);
+      console.log(
+        `   L1AssetTracker.chainBalance[${directSettledChainId}]: ${BigNumber.from(after.l1ChainBalance).toString()}`
+      );
     });
   });
 
@@ -109,7 +107,9 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
       // Check direct-settled chain: we deposited 1 ETH + gas and withdrew 0.5 ETH
       // The chain balance should reflect the net (deposit mintValue - withdrawal amount)
       const chainBalance = await tracker.getL1ChainBalance(directSettledChainId, assetId);
-      expect(chainBalance.gt(0), "Direct-settled chain should have positive chain balance after deposit").to.equal(true);
+      expect(chainBalance.gt(0), "Direct-settled chain should have positive chain balance after deposit").to.equal(
+        true
+      );
 
       // Verify total across all chains is positive
       let totalChainBalance = BigNumber.from(0);
@@ -119,7 +119,10 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
           totalChainBalance = totalChainBalance.add(balance);
         }
       }
-      expect(totalChainBalance.gt(0), "Total chain balance should be > 0 (we've deposited more than withdrawn)").to.equal(true);
+      expect(
+        totalChainBalance.gt(0),
+        "Total chain balance should be > 0 (we've deposited more than withdrawn)"
+      ).to.equal(true);
       console.log(`   Total L1AssetTracker chain balance (ETH): ${ethers.utils.formatEther(totalChainBalance)}`);
     });
   });

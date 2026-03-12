@@ -211,10 +211,7 @@ async function main(): Promise<void> {
       console.log(`  Chain ${chain.chainId}: current admin = ${currentAdmin}`);
 
       // Deploy a new ChainAdminOwnable owned by the deployer
-      const chainAdmin = await chainAdminFactory.deploy(
-        ANVIL_DEFAULT_ACCOUNT_ADDR,
-        ANVIL_DEFAULT_ACCOUNT_ADDR
-      );
+      const chainAdmin = await chainAdminFactory.deploy(ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_DEFAULT_ACCOUNT_ADDR);
       await chainAdmin.deployed();
       console.log(`  Chain ${chain.chainId}: deployed ChainAdminOwnable at ${chainAdmin.address}`);
 
@@ -222,8 +219,9 @@ async function main(): Promise<void> {
       await provider.send("anvil_impersonateAccount", [currentAdmin]);
       await provider.send("anvil_setBalance", [currentAdmin, "0x56BC75E2D63100000"]);
       const adminSigner = provider.getSigner(currentAdmin);
-      const setPendingAdminData = new ethers.utils.Interface(adminFacetAbi())
-        .encodeFunctionData("setPendingAdmin", [chainAdmin.address]);
+      const setPendingAdminData = new ethers.utils.Interface(adminFacetAbi()).encodeFunctionData("setPendingAdmin", [
+        chainAdmin.address,
+      ]);
       const tx = await adminSigner.sendTransaction({
         to: chain.diamondProxy,
         data: setPendingAdminData,
@@ -233,8 +231,7 @@ async function main(): Promise<void> {
       await provider.send("anvil_stopImpersonatingAccount", [currentAdmin]);
 
       // Accept admin via ChainAdminOwnable.multicall → diamondProxy.acceptAdmin()
-      const acceptAdminData = new ethers.utils.Interface(adminFacetAbi())
-        .encodeFunctionData("acceptAdmin", []);
+      const acceptAdminData = new ethers.utils.Interface(adminFacetAbi()).encodeFunctionData("acceptAdmin", []);
       const chainAdminContract = new ethers.Contract(chainAdmin.address, chainAdminOwnableAbi(), defaultSigner);
       const multicallTx = await chainAdminContract.multicall(
         [{ target: chain.diamondProxy, value: 0, data: acceptAdminData }],

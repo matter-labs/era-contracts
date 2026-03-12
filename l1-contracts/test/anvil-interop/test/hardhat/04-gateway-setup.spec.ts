@@ -87,7 +87,9 @@ describe("04 - Gateway State Verification", function () {
       // A non-existent chain should have zero base token asset ID
       const unregisteredChainId = 999999;
       const baseTokenAssetId = await l2Bridgehub.baseTokenAssetId(unregisteredChainId);
-      expect(baseTokenAssetId, "Unregistered chain should have zero baseTokenAssetId").to.equal(ethers.constants.HashZero);
+      expect(baseTokenAssetId, "Unregistered chain should have zero baseTokenAssetId").to.equal(
+        ethers.constants.HashZero
+      );
     });
   });
 

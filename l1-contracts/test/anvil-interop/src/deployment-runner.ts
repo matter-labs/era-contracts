@@ -150,8 +150,6 @@ export class DeploymentRunner {
     await deployer.registerCTM(l1Addresses.bridgehub, ctmAddresses.chainTypeManager);
     done();
 
-
-
     const state = this.loadState();
     state.l1Addresses = l1Addresses;
     state.ctmAddresses = ctmAddresses;

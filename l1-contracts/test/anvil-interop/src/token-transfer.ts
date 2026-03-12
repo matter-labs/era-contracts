@@ -73,7 +73,9 @@ export async function executeTokenTransfer(
   const sourceTokenAddr = options.sourceTokenAddress || state.testTokens[sourceChainId];
   const targetTokenAddr = state.testTokens[targetChainId];
   if (!sourceTokenAddr) {
-    throw new Error(`Source token not found for chain ${sourceChainId}. Run 'yarn deploy:test-token' or pass sourceTokenAddress.`);
+    throw new Error(
+      `Source token not found for chain ${sourceChainId}. Run 'yarn deploy:test-token' or pass sourceTokenAddress.`
+    );
   }
 
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
