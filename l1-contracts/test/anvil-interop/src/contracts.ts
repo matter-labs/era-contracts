@@ -3,6 +3,10 @@
  *
  * All loadAbiFromOut / loadBytecodeFromOut calls should go through this module
  * so artifact paths are defined in one place and typos are caught at compile time.
+ *
+ * TODO: Replace individual functions with a generic approach based on contract name strings,
+ * e.g. getAbi("ChainAdminOwnable"), getBytecode("ChainAdminOwnable"), getInterface("ChainAdminOwnable").
+ * Store the valid contract names as constants and derive artifact paths from them.
  */
 import { loadAbiFromOut, loadBytecodeFromOut } from "./utils";
 
@@ -128,7 +132,16 @@ export function l1NullifierAbi(): any[] {
   return loadAbiFromOut("L1Nullifier.sol/L1Nullifier.json");
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function chainAdminOwnableAbi(): any[] {
+  return loadAbiFromOut("ChainAdminOwnable.sol/ChainAdminOwnable.json");
+}
+
 // ── Bytecodes ───────────────────────────────────────────────────
+
+export function chainAdminOwnableBytecode(): string {
+  return loadBytecodeFromOut("ChainAdminOwnable.sol/ChainAdminOwnable.json");
+}
 
 export function l2NativeTokenVaultDevBytecode(): string {
   return loadBytecodeFromOut("L2NativeTokenVaultDev.sol/L2NativeTokenVaultDev.json");

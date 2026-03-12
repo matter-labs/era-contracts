@@ -122,6 +122,54 @@ jobs:
         run: |
           pkill -9 anvil 2>/dev/null || true
 
+  # V29 → V31 upgrade test: loads v29 chain states, runs the v31 ecosystem upgrade,
+  # executes governance calls, and verifies protocol version is updated.
+  v29-to-v31-upgrade-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Foundry (includes Anvil + forge for compilation)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
+
+      - name: Build l1-contracts artifacts
+        working-directory: l1-contracts
+        run: forge build --optimizer-runs 200
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      - name: Run V29 to V31 upgrade test
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          echo "Running V29 -> V31 upgrade test..."
+          npx ts-node run-v29-to-v31-upgrade-test.ts
+
+      - name: Cleanup
+        if: always()
+        run: |
+          pkill -9 anvil 2>/dev/null || true
+
   # Parallel job: rebuilds chain state from scratch and verifies determinism.
   # This ensures the committed chain-states stay reproducible.
   state-generation-check:
