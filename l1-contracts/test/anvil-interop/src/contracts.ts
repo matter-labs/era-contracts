@@ -146,6 +146,11 @@ export function gettersFacetAbi(): any[] {
   return loadAbiFromOut("Getters.sol/GettersFacet.json");
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function adminFacetAbi(): any[] {
+  return loadAbiFromOut("Admin.sol/AdminFacet.json");
+}
+
 // ── Bytecodes ───────────────────────────────────────────────────
 
 export function chainAdminOwnableBytecode(): string {

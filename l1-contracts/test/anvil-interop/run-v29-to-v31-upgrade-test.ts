@@ -16,7 +16,13 @@ import { AnvilManager } from "./src/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { runForgeScript } from "./src/forge";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_DEFAULT_PRIVATE_KEY } from "./src/const";
-import { chainAdminOwnableAbi, chainAdminOwnableBytecode } from "./src/contracts";
+import {
+  adminFacetAbi,
+  chainAdminOwnableAbi,
+  chainAdminOwnableBytecode,
+  ownable2StepAbi,
+  gettersFacetAbi,
+} from "./src/contracts";
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");
@@ -66,6 +72,7 @@ function swapConfigFiles(): () => void {
 function decodeGovernanceCalls(hexBytes: string): Array<{ target: string; value: ethers.BigNumber; data: string }> {
   const abiCoder = ethers.utils.defaultAbiCoder;
   const [calls] = abiCoder.decode(["tuple(address,uint256,bytes)[]"], hexBytes);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return calls.map((c: any) => ({
     target: c[0],
     value: c[1],
@@ -113,6 +120,42 @@ async function executeGovernanceCalls(
   console.log(`  ${stageName}: ${calls.length} calls executed successfully`);
 }
 
+/**
+ * Transfer ownership of an Ownable2StepUpgradeable contract to the governance address.
+ * Two-step: transferOwnership (from current owner) + acceptOwnership (from new owner).
+ */
+async function transferOwnership2Step(
+  provider: ethers.providers.JsonRpcProvider,
+  defaultSigner: ethers.Wallet,
+  governanceAddr: string,
+  contractAddr: string,
+  label: string
+): Promise<void> {
+  const ownableContract = new ethers.Contract(contractAddr, ownable2StepAbi(), provider);
+
+  const currentOwner = await ownableContract.owner();
+  if (currentOwner.toLowerCase() === governanceAddr.toLowerCase()) {
+    console.log(`  ${label}: already owned by governance`);
+    return;
+  }
+
+  console.log(`  ${label}: transferring ownership from ${currentOwner} to ${governanceAddr}`);
+
+  // Step 1: transferOwnership (from current owner, which is the deployer EOA)
+  const tx1 = await ownableContract.connect(defaultSigner).transferOwnership(governanceAddr);
+  await tx1.wait();
+
+  // Step 2: acceptOwnership (from governance, impersonated)
+  await provider.send("anvil_impersonateAccount", [governanceAddr]);
+  await provider.send("anvil_setBalance", [governanceAddr, "0x56BC75E2D63100000"]);
+  const govSigner = provider.getSigner(governanceAddr);
+  const tx2 = await ownableContract.connect(govSigner).acceptOwnership();
+  await tx2.wait();
+  await provider.send("anvil_stopImpersonatingAccount", [governanceAddr]);
+
+  console.log(`  ${label}: ownership transferred`);
+}
+
 async function main(): Promise<void> {
   const anvilManager = new AnvilManager();
   const runner = new DeploymentRunner();
@@ -127,19 +170,82 @@ async function main(): Promise<void> {
       throw new Error("v0.29.0 chain states not found. Generate them first.");
     }
 
-    const { l1Addresses } = await runner.loadChainStates(anvilManager, v29StateDir);
+    const { l1Addresses, ctmAddresses, chainAddresses } = await runner.loadChainStates(anvilManager, v29StateDir);
     const l1Chain = anvilManager.getL1Chain();
     if (!l1Chain) throw new Error("L1 chain not started");
 
     const provider = new ethers.providers.JsonRpcProvider(l1Chain.rpcUrl);
+    const defaultSigner = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
+    const governanceAddr = l1Addresses.governance;
+    const ctmAddress = ctmAddresses.chainTypeManager;
 
     console.log(`  L1 RPC: ${l1Chain.rpcUrl}`);
     console.log(`  Bridgehub: ${l1Addresses.bridgehub}`);
-    console.log(`  Governance: ${l1Addresses.governance}`);
+    console.log(`  Governance: ${governanceAddr}`);
+    console.log(`  CTM: ${ctmAddress}`);
 
     // Ensure script-out directory exists
     const scriptOutDir = path.join(l1ContractsDir, "script-out");
     fs.mkdirSync(scriptOutDir, { recursive: true });
+
+    // ── Step 1.5: Transfer ownership to Governance ──────────────────
+    console.log(`\n=== Step 1.5: Transferring contract ownership to Governance (${elapsed()}) ===\n`);
+
+    await transferOwnership2Step(provider, defaultSigner, governanceAddr, l1Addresses.bridgehub, "Bridgehub");
+    await transferOwnership2Step(provider, defaultSigner, governanceAddr, l1Addresses.l1SharedBridge, "L1AssetRouter");
+    await transferOwnership2Step(provider, defaultSigner, governanceAddr, ctmAddress, "CTM");
+    await transferOwnership2Step(provider, defaultSigner, governanceAddr, l1Addresses.l1AssetTracker, "L1AssetTracker");
+
+    // ── Step 1.6: Deploy ChainAdminOwnable for each chain ───────────
+    console.log(`\n=== Step 1.6: Deploying ChainAdminOwnable per chain (${elapsed()}) ===\n`);
+
+    const chainAdminFactory = new ethers.ContractFactory(
+      chainAdminOwnableAbi(),
+      chainAdminOwnableBytecode(),
+      defaultSigner
+    );
+
+    for (const chain of chainAddresses) {
+      const diamondProxy = new ethers.Contract(chain.diamondProxy, gettersFacetAbi(), provider);
+      const currentAdmin = await diamondProxy.getAdmin();
+      console.log(`  Chain ${chain.chainId}: current admin = ${currentAdmin}`);
+
+      // Deploy a new ChainAdminOwnable owned by the deployer
+      const chainAdmin = await chainAdminFactory.deploy(
+        ANVIL_DEFAULT_ACCOUNT_ADDR,
+        ANVIL_DEFAULT_ACCOUNT_ADDR
+      );
+      await chainAdmin.deployed();
+      console.log(`  Chain ${chain.chainId}: deployed ChainAdminOwnable at ${chainAdmin.address}`);
+
+      // Set the new admin on the diamond proxy (must be called by current admin)
+      await provider.send("anvil_impersonateAccount", [currentAdmin]);
+      await provider.send("anvil_setBalance", [currentAdmin, "0x56BC75E2D63100000"]);
+      const adminSigner = provider.getSigner(currentAdmin);
+      const setPendingAdminData = new ethers.utils.Interface(adminFacetAbi())
+        .encodeFunctionData("setPendingAdmin", [chainAdmin.address]);
+      const tx = await adminSigner.sendTransaction({
+        to: chain.diamondProxy,
+        data: setPendingAdminData,
+        gasLimit: 1_000_000,
+      });
+      await tx.wait();
+      await provider.send("anvil_stopImpersonatingAccount", [currentAdmin]);
+
+      // Accept admin via ChainAdminOwnable.multicall → diamondProxy.acceptAdmin()
+      const acceptAdminData = new ethers.utils.Interface(adminFacetAbi())
+        .encodeFunctionData("acceptAdmin", []);
+      const chainAdminContract = new ethers.Contract(chainAdmin.address, chainAdminOwnableAbi(), defaultSigner);
+      const multicallTx = await chainAdminContract.multicall(
+        [{ target: chain.diamondProxy, value: 0, data: acceptAdminData }],
+        true
+      );
+      await multicallTx.wait();
+
+      // Verify new admin
+      const newAdmin = await diamondProxy.getAdmin();
+      console.log(`  Chain ${chain.chainId}: new admin = ${newAdmin}`);
+    }
 
     // ── Step 2: Swap configs and run EcosystemUpgrade_v31 ─────────
     console.log(`\n=== Step 2: Running v31 ecosystem upgrade (${elapsed()}) ===\n`);
@@ -167,6 +273,7 @@ async function main(): Promise<void> {
       throw new Error(`Ecosystem output not found at ${ecosystemOutputPath}`);
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const outputToml = parseToml(fs.readFileSync(ecosystemOutputPath, "utf-8")) as any;
     const govCalls = outputToml.governance_calls;
     if (!govCalls) {
@@ -181,7 +288,6 @@ async function main(): Promise<void> {
     console.log(`  Stage 1: ${stage1Calls.length} calls`);
     console.log(`  Stage 2: ${stage2Calls.length} calls`);
 
-    const governanceAddr = l1Addresses.governance;
     await executeGovernanceCalls(provider, governanceAddr, stage0Calls, "Stage 0");
     await executeGovernanceCalls(provider, governanceAddr, stage1Calls, "Stage 1");
     await executeGovernanceCalls(provider, governanceAddr, stage2Calls, "Stage 2");
@@ -189,7 +295,7 @@ async function main(): Promise<void> {
     // ── Step 4: Upgrade each chain individually ─────────────────
     console.log(`\n=== Step 4: Upgrading individual chains (${elapsed()}) ===\n`);
 
-    for (const chain of addressesJson.chainAddresses) {
+    for (const chain of chainAddresses) {
       console.log(`  Upgrading chain ${chain.chainId}...`);
       await runForgeScript({
         scriptPath: "deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol:ChainUpgrade_v31",
@@ -225,12 +331,8 @@ async function main(): Promise<void> {
 
     const expectedVersion = ethers.BigNumber.from("0x1f00000000"); // v31
 
-    for (const chain of addressesJson.chainAddresses) {
-      const diamondProxy = new ethers.Contract(
-        chain.diamondProxy,
-        ["function getProtocolVersion() view returns (uint256)"],
-        provider
-      );
+    for (const chain of chainAddresses) {
+      const diamondProxy = new ethers.Contract(chain.diamondProxy, gettersFacetAbi(), provider);
       const protocolVersion = await diamondProxy.getProtocolVersion();
       const versionHex = "0x" + protocolVersion.toHexString().replace("0x", "").padStart(10, "0");
       console.log(`  Chain ${chain.chainId} (${chain.diamondProxy}): protocol version ${versionHex}`);
