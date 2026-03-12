@@ -113,12 +113,13 @@ test/anvil-interop/
 ├── run-hardhat-interop-test.ts    # Main entry: deployment + hardhat test runner
 ├── setup-and-dump-state.ts        # Generate pregenerated chain state snapshots
 ├── index.ts                       # Interactive multi-chain environment (yarn start)
-├── step1-start-chains.ts          # Step 1: start Anvil chains
-├── step2-deploy-l1.ts             # Step 2: deploy L1 contracts
-├── step3-register-chains.ts       # Step 3: register L2 chains on L1
-├── step4-initialize-l2.ts         # Step 4: initialize L2 system contracts
-├── step5-setup-gateway.ts         # Step 5: setup gateway
-├── step6-start-settler.ts         # Step 6: start batch settler daemon
+├── steps/
+│   ├── step1-start-chains.ts      # Step 1: start Anvil chains
+│   ├── step2-deploy-l1.ts         # Step 2: deploy L1 contracts
+│   ├── step3-register-chains.ts   # Step 3: register L2 chains on L1
+│   ├── step4-initialize-l2.ts     # Step 4: initialize L2 system contracts
+│   ├── step5-setup-gateway.ts     # Step 5: setup gateway
+│   └── step6-start-settler.ts     # Step 6: start batch settler daemon
 ├── deploy-test-token.ts           # Deploy test ERC20 tokens
 ├── cleanup.sh                     # Kill Anvil processes, reset state
 ├── config/
