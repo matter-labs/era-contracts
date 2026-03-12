@@ -1,13 +1,13 @@
 use crate::consts::{
-    BASE_TOKEN_HOLDER_ADDR, ContractSource, EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT,
-    INITIAL_CONTRACTS, L2_COMPLEX_UPGRADER_ADDR, L2_COMPLEX_UPGRADER_IMPL_ADDR,
-    SYSTEM_CONTRACT_PROXY_ADMIN, SYSTEM_PROXY_ADMIN_OWNER_SLOT,
+    ContractSource, EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT, INITIAL_CONTRACTS,
+    L2_COMPLEX_UPGRADER_ADDR, L2_COMPLEX_UPGRADER_IMPL_ADDR, SYSTEM_CONTRACT_PROXY_ADMIN,
+    SYSTEM_PROXY_ADMIN_OWNER_SLOT,
 };
 use crate::types::{InitialGenesisInput, LeafInfo, MAX_B256_VALUE, MERKLE_TREE_DEPTH};
 use crate::utils::{address_to_b256, da_contract_name_to_code, l1_contract_name_to_code};
 use alloy::consensus::{EMPTY_OMMER_ROOT_HASH, Header};
 use alloy::eips::eip1559::INITIAL_BASE_FEE;
-use alloy::primitives::{Address, B64, B256, Bloom, U256, Uint};
+use alloy::primitives::{Address, B64, B256, Bloom, U256};
 use blake2::{Blake2s256, Digest};
 use std::collections::BTreeMap;
 use zk_os_api::helpers::{set_properties_code, set_properties_nonce};
