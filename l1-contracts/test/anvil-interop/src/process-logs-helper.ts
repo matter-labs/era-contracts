@@ -344,6 +344,7 @@ export async function callProcessLogsAndMessages(params: {
   const solidityLogs = logs.map((l) => [l.l2ShardId, l.isService, l.txNumberInBatch, l.sender, l.key, l.value]);
 
   // 6. Impersonate the diamond proxy address (passes onlyChain modifier)
+  // TODO: In a future release, impersonate the operator instead of the diamond proxy.
   const gwAssetTracker = new Contract(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAbi(), gwProvider);
 
   const txHash = await impersonateAndRun(gwProvider, zkChainAddr, async (signer) => {

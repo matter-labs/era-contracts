@@ -1,7 +1,7 @@
 import { expect } from "chai";
-import { ethers } from "ethers";
+import { BigNumber, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { createBalanceTrackerFromState, queryEthAssetId } from "../../src/balance-tracker";
+import { createBalanceTrackerFromState, queryEthAssetIdFromState } from "../../src/balance-tracker";
 import { depositETHToL2 } from "../../src/l1-deposit-helper";
 import { withdrawETHFromL2 } from "../../src/l2-withdrawal-helper";
 import {
@@ -34,15 +34,14 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
   describe("ETH deposits L1 -> GW-settled chain through gateway", () => {
     it("deposits ETH from L1 to GW-settled chain", async () => {
       const tracker = createBalanceTrackerFromState(state);
-      const l1Provider = new ethers.providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
-      const assetId = await queryEthAssetId(l1Provider, state.l1Addresses!.l1NativeTokenVault);
+      const assetId = await queryEthAssetIdFromState(state);
       const amount = ethers.utils.parseEther("0.5");
       const l2Chain = getL2Chain(state.chains!, gwSettledChainId);
       const gwChain = getL2Chain(state.chains!, gwChainId);
       const gwDiamondProxy = getChainDiamondProxy(state.chainAddresses!, gwChainId);
 
       // For gateway-settled chains, L1AssetTracker tracks balance under the GW chain ID
-      const l1ChainBalanceBefore = await tracker.getL1ChainBalance(gwChainId, assetId);
+      const before = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
 
       const result = await depositETHToL2({
         l1RpcUrl: state.chains!.l1!.rpcUrl,
@@ -56,27 +55,26 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
 
       expect(result.l1TxHash).to.not.be.null;
 
-      const l1ChainBalanceAfter = await tracker.getL1ChainBalance(gwChainId, assetId);
+      const after = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
 
-      const l1ChainBalanceDelta = l1ChainBalanceAfter.sub(l1ChainBalanceBefore);
+      const l1ChainBalanceDelta = BigNumber.from(after.l1ChainBalance).sub(before.l1ChainBalance);
       expect(
         l1ChainBalanceDelta.eq(result.mintValue),
         `L1AssetTracker.chainBalance[GW] should increase by ${result.mintValue.toString()}, got ${l1ChainBalanceDelta.toString()}`
       ).to.equal(true);
 
-      console.log(`   L1AssetTracker.chainBalance[${gwChainId}]: ${l1ChainBalanceAfter.toString()}`);
+      console.log(`   L1AssetTracker.chainBalance[${gwChainId}]: ${BigNumber.from(after.l1ChainBalance).toString()}`);
     });
   });
 
   describe("ETH withdrawals GW-settled chain -> L1 through gateway", () => {
     it("withdraws ETH from GW-settled chain to L1", async () => {
       const tracker = createBalanceTrackerFromState(state);
-      const l1Provider = new ethers.providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
-      const assetId = await queryEthAssetId(l1Provider, state.l1Addresses!.l1NativeTokenVault);
+      const assetId = await queryEthAssetIdFromState(state);
       const amount = ethers.utils.parseEther("0.2");
       const l2Chain = getL2Chain(state.chains!, gwSettledChainId);
 
-      const l1ChainBalanceBefore = await tracker.getL1ChainBalance(gwChainId, assetId);
+      const before = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
 
       const result = await withdrawETHFromL2({
         l1RpcUrl: state.chains!.l1!.rpcUrl,
@@ -88,15 +86,15 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
 
       expect(result.l2TxHash).to.not.be.null;
 
-      const l1ChainBalanceAfter = await tracker.getL1ChainBalance(gwChainId, assetId);
+      const after = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
 
-      const l1ChainBalanceDelta = l1ChainBalanceBefore.sub(l1ChainBalanceAfter);
+      const l1ChainBalanceDelta = BigNumber.from(before.l1ChainBalance).sub(after.l1ChainBalance);
       expect(
         l1ChainBalanceDelta.eq(amount),
         `L1AssetTracker.chainBalance[GW] should decrease by ${amount.toString()}, got ${l1ChainBalanceDelta.toString()}`
       ).to.equal(true);
 
-      console.log(`   L1AssetTracker.chainBalance[${gwChainId}]: ${l1ChainBalanceAfter.toString()}`);
+      console.log(`   L1AssetTracker.chainBalance[${gwChainId}]: ${BigNumber.from(after.l1ChainBalance).toString()}`);
     });
   });
 

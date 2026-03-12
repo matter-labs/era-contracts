@@ -11,6 +11,7 @@ import {
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "./const";
 import { encodeNtvAssetId, encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "./data-encoding";
+import { createBalanceTrackerFromState } from "./balance-tracker";
 
 type Logger = (line: string) => void;
 
@@ -39,15 +40,6 @@ function encodeEvmAddress(address: string): string {
 
 function defaultLogger(line: string): void {
   console.log(line);
-}
-
-async function readTokenBalance(
-  provider: providers.JsonRpcProvider,
-  tokenAddress: string,
-  walletAddress: string
-): Promise<BigNumber> {
-  const token = new Contract(tokenAddress, testnetERC20TokenAbi(), provider);
-  return token.balanceOf(walletAddress);
 }
 
 export async function executeTokenTransfer(
@@ -83,6 +75,7 @@ export async function executeTokenTransfer(
   const targetProvider = new providers.JsonRpcProvider(targetChain.rpcUrl);
   const sourceWallet = new Wallet(privateKey, sourceProvider);
   const targetWallet = new Wallet(privateKey, targetProvider);
+  const tracker = createBalanceTrackerFromState(state);
 
   const sourceToken = new Contract(sourceTokenAddr, testnetERC20TokenAbi(), sourceWallet);
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, interopCenterAbi(), sourceWallet);
@@ -102,7 +95,7 @@ export async function executeTokenTransfer(
   log("");
 
   log(`⏱️  [${elapsed()}] Checking source balance...`);
-  const sourceBalanceBefore = await sourceToken.balanceOf(sourceWallet.address);
+  const sourceBalanceBefore = await tracker.getL2TokenBalance(sourceChainId, sourceTokenAddr, sourceWallet.address);
   log(`💰 Source balance: ${sourceBalanceBefore.toString()} TEST tokens`);
   const amountWei = ethers.utils.parseUnits(amount, 18);
   if (sourceBalanceBefore.lt(amountWei)) {
@@ -141,7 +134,7 @@ export async function executeTokenTransfer(
   const destinationBalanceBefore =
     destinationTokenBefore === ethers.constants.AddressZero
       ? BigNumber.from(0)
-      : await readTokenBalance(targetProvider, destinationTokenBefore, targetWallet.address);
+      : await tracker.getL2TokenBalance(targetChainId, destinationTokenBefore, targetWallet.address);
 
   const transferData = encodeBridgeBurnData(amountWei, sourceWallet.address, sourceTokenAddr);
   const depositData = encodeAssetRouterBridgehubDepositData(assetId, transferData);
@@ -237,12 +230,12 @@ export async function executeTokenTransfer(
   }
 
   log(`⏱️  [${elapsed()}] Reading final balances...`);
-  const sourceBalanceAfter = await sourceToken.balanceOf(sourceWallet.address);
+  const sourceBalanceAfter = await tracker.getL2TokenBalance(sourceChainId, sourceTokenAddr, sourceWallet.address);
   const destinationToken = await targetVault.tokenAddress(assetId);
   const destinationBalanceAfter =
     destinationToken === ethers.constants.AddressZero
       ? BigNumber.from(0)
-      : await readTokenBalance(targetProvider, destinationToken, targetWallet.address);
+      : await tracker.getL2TokenBalance(targetChainId, destinationToken, targetWallet.address);
 
   log(`Target Chain: ${targetChainId}`);
   log(`Target Tx:    ${targetTxHash || "not found yet (relay may still be pending)"}`);

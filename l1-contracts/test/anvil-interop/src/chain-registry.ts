@@ -1,7 +1,7 @@
 import * as path from "path";
 import * as fs from "fs";
 import { providers, Wallet } from "ethers";
-import type { ChainConfig, ChainAddresses, CoreDeployedAddresses, CTMDeployedAddresses } from "./types";
+import type { ChainConfig, ChainAddresses, CoreDeployedAddresses, CTMDeployedAddresses, AnvilConfig } from "./types";
 import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig } from "./utils";
 import { SystemContractsDeployer } from "./system-contracts-deployer";
 import { L2GenesisUpgradeDeployer } from "./l2-genesis-upgrade-deployer";
@@ -124,15 +124,31 @@ export class ChainRegistry {
     return results;
   }
 
+  private computeInteropChainIds(chainId: number, config: AnvilConfig): number[] {
+    const l2Chains = config.chains.filter((c) => !c.isL1);
+    const thisChain = l2Chains.find((c) => c.chainId === chainId);
+    const gwChain = l2Chains.find((c) => c.isGateway);
+
+    if (thisChain?.isGateway) {
+      // GW chain: only GW-settled chains + itself
+      return l2Chains.filter((c) => c.settlement === "gateway" || c.chainId === chainId).map((c) => c.chainId);
+    }
+
+    // Non-GW L2 chains: all other L2 chain IDs + GW
+    return l2Chains.map((c) => c.chainId);
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async initializeL2SystemContracts(chainId: number, _chainProxy: string, l2RpcUrl: string): Promise<void> {
     console.log(`🔧 Initializing L2 system contracts for chain ${chainId}...`);
 
     const configPath = path.join(__dirname, "../config/anvil-config.json");
     let gatewayChainId = 1;
+    let interopChainIds: number[] | undefined;
     if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-      gatewayChainId = config.chains?.find((chain: { isGateway?: boolean }) => chain.isGateway)?.chainId ?? 1;
+      const config: AnvilConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+      gatewayChainId = config.chains?.find((chain) => chain.isGateway)?.chainId ?? 1;
+      interopChainIds = this.computeInteropChainIds(chainId, config);
     }
 
     const useGenesisUpgradeDeployer = process.env.ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE !== "0";
@@ -153,7 +169,7 @@ export class ChainRegistry {
     } else {
       console.log("   Using direct SystemContractsDeployer path");
     }
-    await deployer.deployAllSystemContracts(chainId);
+    await deployer.deployAllSystemContracts(chainId, interopChainIds);
 
     console.log(`✅ L2 system contracts initialized for chain ${chainId}`);
   }

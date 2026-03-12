@@ -233,12 +233,13 @@ export class L2GenesisUpgradeDeployer {
     });
   }
 
-  private async registerInteropChains(currentChainId: number): Promise<void> {
+  private async registerInteropChains(currentChainId: number, interopChainIds?: number[]): Promise<void> {
     const l2BridgehubAbiData = l2BridgehubAbi();
     const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbiData, this.l2Provider);
     const ethAssetId = encodeNtvAssetId(this.l1ChainId, ETH_TOKEN_ADDRESS);
 
-    const chainIds = Array.from(new Set([...INTEROP_TEST_CHAIN_IDS, currentChainId, this.gatewayChainId]));
+    const baseChainIds = interopChainIds ?? INTEROP_TEST_CHAIN_IDS;
+    const chainIds = Array.from(new Set([...baseChainIds, currentChainId, this.gatewayChainId]));
 
     await impersonateAndRun(this.l2Provider, SERVICE_TX_SENDER_ADDR, async (serviceTxSenderSigner) => {
       const l2BridgehubWithSigner = l2Bridgehub.connect(serviceTxSenderSigner);
@@ -283,7 +284,7 @@ export class L2GenesisUpgradeDeployer {
     await Promise.all(expectedContracts.map((c) => this.assertCodePresent(c.addr, c.name)));
   }
 
-  async deployAllSystemContracts(chainId: number): Promise<void> {
+  async deployAllSystemContracts(chainId: number, interopChainIds?: number[]): Promise<void> {
     console.log(`\n🔧 Deploying system contracts for chain ${chainId} via L2GenesisUpgrade...`);
 
     const bytecodeInfo = getBytecodeInfo(this.contractsRoot);
@@ -300,7 +301,7 @@ export class L2GenesisUpgradeDeployer {
 
     await this.ensurePredeployedContracts();
     await this.callGenesisUpgradeViaComplexUpgrader(chainId, fixedData, additionalData);
-    await this.registerInteropChains(chainId);
+    await this.registerInteropChains(chainId, interopChainIds);
     await this.assertPostDeploymentCode();
 
     console.log(`✅ L2GenesisUpgrade deployment flow completed for chain ${chainId}`);

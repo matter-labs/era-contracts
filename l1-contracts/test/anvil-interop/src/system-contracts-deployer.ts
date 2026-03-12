@@ -106,7 +106,7 @@ export class SystemContractsDeployer {
   /**
    * Deploy all system contracts needed for InteropCenter
    */
-  async deployAllSystemContracts(chainId: number): Promise<void> {
+  async deployAllSystemContracts(chainId: number, interopChainIds?: number[]): Promise<void> {
     console.log(`\n🔧 Deploying system contracts for chain ${chainId}...`);
 
     // 1. MockSystemContext at 0x800b
@@ -123,7 +123,7 @@ export class SystemContractsDeployer {
     await this.deployL2BaseToken();
 
     // 4. L2Bridgehub at 0x010002
-    await this.deployL2Bridgehub(chainId);
+    await this.deployL2Bridgehub(chainId, interopChainIds);
 
     // 5. L2MessageVerification at 0x10009
     await this.deployL2MessageVerification();
@@ -242,7 +242,7 @@ export class SystemContractsDeployer {
    * Deploy and initialize L2Bridgehub
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private async deployL2Bridgehub(_chainId: number): Promise<void> {
+  private async deployL2Bridgehub(_chainId: number, interopChainIds?: number[]): Promise<void> {
     const l2BridgehubAbiData = l2BridgehubAbi();
 
     // Check if already initialized
@@ -277,14 +277,14 @@ export class SystemContractsDeployer {
     }
 
     // Register chains
-    await this.registerChainsOnBridgehub(l2Bridgehub);
+    await this.registerChainsOnBridgehub(l2Bridgehub, interopChainIds);
   }
 
   /**
    * Register chains on L2Bridgehub
    */
-  private async registerChainsOnBridgehub(l2Bridgehub: Contract): Promise<void> {
-    const chains = [10, 11, 12];
+  private async registerChainsOnBridgehub(l2Bridgehub: Contract, interopChainIds?: number[]): Promise<void> {
+    const chains = interopChainIds ?? [10, 11, 12];
     const abiCoder = new utils.AbiCoder();
     const ethAssetId = utils.keccak256(abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS]));
 
