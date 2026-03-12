@@ -70,6 +70,7 @@ const REQUIRED_CONTRACTS = [
   "DummyL1MessageRoot.sol",
   "Migrator.sol",
   "L1Nullifier.sol",
+  "IBaseToken.sol",
 ];
 
 async function copyContractAbi(src: string, dest: string): Promise<void> {
