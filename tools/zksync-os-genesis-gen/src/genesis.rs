@@ -175,10 +175,6 @@ pub fn build_genesis_root_hash(genesis_input: &InitialGenesisInput) -> anyhow::R
         // When contracts are deployed, they have a nonce of 1.
         set_properties_nonce(&mut account_properties, 1);
         set_properties_code(&mut account_properties, &deployed_code);
-        // The base token holder contract should hold a large balance
-        if *address == L2_BASE_TOKEN_HOLDER_ADDR {
-            account_properties.balance = alloy::primitives::Uint::from(u128::MAX);
-        }
 
         let flat_storage_key = account_properties_flat_key(*address);
         let account_properties_hash = account_properties.compute_hash();
