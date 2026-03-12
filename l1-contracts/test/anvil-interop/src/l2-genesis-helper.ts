@@ -33,6 +33,7 @@ interface BytecodeInfo {
   interopCenterBytecodeInfo: string;
   interopHandlerBytecodeInfo: string;
   assetTrackerBytecodeInfo: string;
+  baseTokenHolderBytecodeInfo: string;
 }
 
 interface FixedForceDeploymentsData {
@@ -52,10 +53,12 @@ interface FixedForceDeploymentsData {
   interopHandlerBytecodeInfo: string;
   assetTrackerBytecodeInfo: string;
   beaconDeployerInfo: string;
+  baseTokenHolderBytecodeInfo: string;
   l2SharedBridgeLegacyImpl: string;
   l2BridgedStandardERC20Impl: string;
   aliasedChainRegistrationSender: string;
   dangerousTestOnlyForcedBeacon: string;
+  zkTokenAssetId: string;
 }
 
 interface ZKChainSpecificForceDeploymentsData {
@@ -193,6 +196,7 @@ export function getBytecodeInfo(contractsRoot: string): BytecodeInfo {
     interopCenterBytecodeInfo: "",
     interopHandlerBytecodeInfo: "",
     assetTrackerBytecodeInfo: "",
+    baseTokenHolderBytecodeInfo: "",
   };
 
   const contracts = [
@@ -209,6 +213,7 @@ export function getBytecodeInfo(contractsRoot: string): BytecodeInfo {
     { file: "InteropCenter.sol", name: "InteropCenter", key: "interopCenterBytecodeInfo" as const },
     { file: "InteropHandler.sol", name: "InteropHandler", key: "interopHandlerBytecodeInfo" as const },
     { file: "L2AssetTracker.sol", name: "L2AssetTracker", key: "assetTrackerBytecodeInfo" as const },
+    { file: "BaseTokenHolder.sol", name: "BaseTokenHolder", key: "baseTokenHolderBytecodeInfo" as const },
   ];
 
   for (const contract of contracts) {
@@ -251,16 +256,19 @@ export function buildFixedForceDeploymentsData(
     interopHandlerBytecodeInfo: bytecodeInfo.interopHandlerBytecodeInfo,
     assetTrackerBytecodeInfo: bytecodeInfo.assetTrackerBytecodeInfo,
     beaconDeployerInfo: bytecodeInfo.beaconDeployerBytecodeInfo,
+    baseTokenHolderBytecodeInfo: bytecodeInfo.baseTokenHolderBytecodeInfo,
     l2SharedBridgeLegacyImpl: "0x0000000000000000000000000000000000000000",
     l2BridgedStandardERC20Impl: "0x0000000000000000000000000000000000000000",
     aliasedChainRegistrationSender: applyL1ToL2Alias(l1ChainRegistrationSender),
     dangerousTestOnlyForcedBeacon: "0x0000000000000000000000000000000000000000",
+    // Placeholder ZK token asset ID for testing — InteropCenter.initL2 requires non-zero
+    zkTokenAssetId: encodeNtvAssetId(l1ChainId, ETH_TOKEN_ADDRESS),
   };
 
   const abiCoder = new utils.AbiCoder();
   return abiCoder.encode(
     [
-      "tuple(uint256 l1ChainId, uint256 gatewayChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes bridgehubBytecodeInfo, bytes l2AssetRouterBytecodeInfo, bytes l2NtvBytecodeInfo, bytes messageRootBytecodeInfo, bytes chainAssetHandlerBytecodeInfo, bytes interopCenterBytecodeInfo, bytes interopHandlerBytecodeInfo, bytes assetTrackerBytecodeInfo, bytes beaconDeployerInfo, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address aliasedChainRegistrationSender, address dangerousTestOnlyForcedBeacon)",
+      "tuple(uint256 l1ChainId, uint256 gatewayChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes bridgehubBytecodeInfo, bytes l2AssetRouterBytecodeInfo, bytes l2NtvBytecodeInfo, bytes messageRootBytecodeInfo, bytes chainAssetHandlerBytecodeInfo, bytes interopCenterBytecodeInfo, bytes interopHandlerBytecodeInfo, bytes assetTrackerBytecodeInfo, bytes beaconDeployerInfo, bytes baseTokenHolderBytecodeInfo, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address aliasedChainRegistrationSender, address dangerousTestOnlyForcedBeacon, bytes32 zkTokenAssetId)",
     ],
     [
       [
@@ -280,10 +288,12 @@ export function buildFixedForceDeploymentsData(
         data.interopHandlerBytecodeInfo,
         data.assetTrackerBytecodeInfo,
         data.beaconDeployerInfo,
+        data.baseTokenHolderBytecodeInfo,
         data.l2SharedBridgeLegacyImpl,
         data.l2BridgedStandardERC20Impl,
         data.aliasedChainRegistrationSender,
         data.dangerousTestOnlyForcedBeacon,
+        data.zkTokenAssetId,
       ],
     ]
   );
