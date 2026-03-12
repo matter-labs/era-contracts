@@ -7,6 +7,10 @@ import {AdminTest} from "./_Admin_Shared.t.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
+import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
+import {IDefaultUpgrade} from "contracts/upgrades/IDefaultUpgrade.sol";
+import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {
     HashMismatch,
     ProtocolIdMismatch,
@@ -106,12 +110,8 @@ contract UpgradeChainFromVersionTest is AdminTest {
             abi.encode(cutHashInput)
         );
 
-        vm.expectRevert(ProtocolIdNotGreater.selector);
-        // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, true, address(adminFacet));
-        emit ExecuteUpgrade(diamondCutData);
-
         vm.startPrank(admin);
+        vm.expectRevert(ProtocolIdNotGreater.selector);
         adminFacet.upgradeChainFromVersion(address(adminFacet), oldProtocolVersion, diamondCutData);
     }
 
@@ -194,12 +194,19 @@ contract UpgradeChainFromVersionTest is AdminTest {
         address admin = utilsFacet.util_getAdmin();
         address chainTypeManager = makeAddr("chainTypeManager");
         address validatorAddr = makeAddr("validator");
+        address mockVerifier = makeAddr("mockVerifier");
 
         uint256 oldProtocolVersion = 1;
+        uint256 newProtocolVersion = SemVer.packSemVer(0, 1, 0);
+
+        // Build a real upgrade via DefaultUpgrade that bumps the protocol version
+        DefaultUpgrade defaultUpgrade = new DefaultUpgrade();
+        ProposedUpgrade memory proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(newProtocolVersion);
+
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
-            initAddress: address(0),
-            initCalldata: new bytes(0)
+            initAddress: address(defaultUpgrade),
+            initCalldata: abi.encodeCall(IDefaultUpgrade.upgrade, (proposedUpgrade))
         });
 
         utilsFacet.util_setProtocolVersion(oldProtocolVersion);
@@ -209,11 +216,16 @@ contract UpgradeChainFromVersionTest is AdminTest {
         bytes32 cutHashInput = keccak256(abi.encode(diamondCutData));
         vm.mockCall(
             chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector),
+            abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector, oldProtocolVersion),
             abi.encode(cutHashInput)
         );
+        vm.mockCall(
+            chainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, newProtocolVersion),
+            abi.encode(mockVerifier)
+        );
 
-        // Set upgrade timestamp to 1000, current time is 1000 (at timestamp)
+        // Set upgrade timestamp to 1000, warp to exactly that time
         uint256 upgradeTimestamp = 1000;
         vm.warp(upgradeTimestamp);
         vm.mockCall(
@@ -222,14 +234,11 @@ contract UpgradeChainFromVersionTest is AdminTest {
             abi.encode(upgradeTimestamp)
         );
 
-        // The diamond cut is a no-op so it will revert with ProtocolIdNotGreater
-        // (protocol version doesn't change). This proves we passed the time-gate check.
-        vm.expectRevert(ProtocolIdNotGreater.selector);
-        vm.expectEmit(true, true, true, true, address(adminFacet));
-        emit ExecuteUpgrade(diamondCutData);
-
         vm.startPrank(validatorAddr);
         adminFacet.upgradeChainFromVersion(address(adminFacet), oldProtocolVersion, diamondCutData);
+
+        // Verify the protocol version was actually bumped
+        assertEq(utilsFacet.util_getProtocolVersion(), newProtocolVersion);
     }
 
     function test_adminBypassesTimeGate() public {
@@ -259,11 +268,8 @@ contract UpgradeChainFromVersionTest is AdminTest {
 
         // The diamond cut is a no-op so it will revert with ProtocolIdNotGreater.
         // This proves admin bypasses the time-gate check.
-        vm.expectRevert(ProtocolIdNotGreater.selector);
-        vm.expectEmit(true, true, true, true, address(adminFacet));
-        emit ExecuteUpgrade(diamondCutData);
-
         vm.startPrank(admin);
+        vm.expectRevert(ProtocolIdNotGreater.selector);
         adminFacet.upgradeChainFromVersion(address(adminFacet), oldProtocolVersion, diamondCutData);
     }
 
@@ -290,11 +296,8 @@ contract UpgradeChainFromVersionTest is AdminTest {
         vm.warp(0);
 
         // ChainTypeManager should also bypass the time-gate.
-        vm.expectRevert(ProtocolIdNotGreater.selector);
-        vm.expectEmit(true, true, true, true, address(adminFacet));
-        emit ExecuteUpgrade(diamondCutData);
-
         vm.startPrank(chainTypeManager);
+        vm.expectRevert(ProtocolIdNotGreater.selector);
         adminFacet.upgradeChainFromVersion(address(adminFacet), oldProtocolVersion, diamondCutData);
     }
 }

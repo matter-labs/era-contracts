@@ -491,7 +491,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert ProtocolIdMismatch(s.protocolVersion, _oldProtocolVersion);
         }
 
-        // Check that the auto upgrade timestamp has passed if the sender is not admin or chainTypeManager
+        // Check that the auto upgrade timestamp has passed if the sender is not admin or chainTypeManager.
+        // The timestamp is keyed on _oldProtocolVersion (the version we are upgrading *from*), because
+        // the new version is not known until the diamond cut is executed.
         if (msg.sender != s.admin && msg.sender != s.chainTypeManager) {
             uint256 timestamp = IChainAdmin(s.admin).protocolVersionToUpgradeTimestamp(_oldProtocolVersion);
             if (timestamp == 0 || block.timestamp < timestamp) {
