@@ -127,7 +127,6 @@ export class ChainRegistry {
   private computeInteropChainIds(chainId: number, config: AnvilConfig): number[] {
     const l2Chains = config.chains.filter((c) => !c.isL1);
     const thisChain = l2Chains.find((c) => c.chainId === chainId);
-    const gwChain = l2Chains.find((c) => c.isGateway);
 
     if (thisChain?.isGateway) {
       // GW chain: only GW-settled chains + itself

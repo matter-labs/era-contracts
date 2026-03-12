@@ -644,7 +644,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(
             1,
-            1,
+            block.chainid,
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             IEIP7702Checker(address(1)),
             false
