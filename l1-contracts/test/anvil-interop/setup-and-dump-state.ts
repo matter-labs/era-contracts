@@ -8,6 +8,10 @@ import { DeploymentRunner } from "./src/deployment-runner";
 import { deployTestTokens } from "./deploy-test-token";
 
 async function main(): Promise<void> {
+  // Use the anvil-interop Foundry profile which disables CBOR metadata,
+  // producing deterministic bytecode across platforms (macOS vs Linux CI).
+  process.env.FOUNDRY_PROFILE = "anvil-interop";
+
   const runner = new DeploymentRunner();
   const anvilManager = new AnvilManager();
 

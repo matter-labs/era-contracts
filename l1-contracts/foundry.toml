@@ -58,6 +58,13 @@ optimizer_runs = 9999999
 allow_internal_expect_revert = true
 
 
+# Profile for anvil-interop state generation: disables CBOR metadata to produce
+# deterministic bytecode across platforms (macOS vs Linux CI). Without this,
+# the CBOR metadata hash differs → CREATE2 addresses differ → storage differs.
+# Usage: FOUNDRY_PROFILE=anvil-interop forge build
+[profile.anvil-interop]
+cbor_metadata = false
+
 [profile.default.zksync]
 enable_eravm_extensions = true
 zksolc = "1.5.11"

@@ -154,9 +154,9 @@ jobs:
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
 
-      - name: Build l1-contracts artifacts (solc only, no zksolc)
+      - name: Build l1-contracts artifacts (solc only, no zksolc, no CBOR metadata for determinism)
         working-directory: l1-contracts
-        run: forge build
+        run: FOUNDRY_PROFILE=anvil-interop forge build
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
@@ -176,12 +176,12 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: |
           echo "Comparing generated state against committed chain-states..."
-          if python3 compare-chain-states.py chain-states-committed/. chain-states/.; then
-            echo "✅ Chain states match"
+          if python3 compare-chain-states.py chain-states-committed chain-states; then
+            echo "Committed chain states are up to date"
           else
             echo ""
             echo "Committed chain-states differ from freshly generated state."
-            echo "Run 'npx ts-node setup-and-dump-state.ts' locally and commit the updated chain-states."
+            echo "Run 'FOUNDRY_PROFILE=anvil-interop forge build && cd test/anvil-interop && npx ts-node setup-and-dump-state.ts' locally and commit the updated chain-states."
             exit 1
           fi
 
