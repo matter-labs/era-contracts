@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { providers } from "ethers";
-import { DeploymentRunner } from "./src/deployment-runner";
-import { sleep } from "./src/utils";
+import { DeploymentRunner } from "../src/deployment-runner";
+import { sleep } from "../src/utils";
 
 async function main() {
   const runner = new DeploymentRunner();

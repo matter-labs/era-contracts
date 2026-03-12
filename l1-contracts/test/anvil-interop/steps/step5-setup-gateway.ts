@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { DeploymentRunner } from "./src/deployment-runner";
-import { getGwSettledChainIds } from "./src/utils";
+import { DeploymentRunner } from "../src/deployment-runner";
+import { getGwSettledChainIds } from "../src/utils";
 
 async function main() {
   const runner = new DeploymentRunner();

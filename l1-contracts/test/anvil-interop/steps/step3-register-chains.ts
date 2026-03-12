@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { DeploymentRunner } from "./src/deployment-runner";
+import { DeploymentRunner } from "../src/deployment-runner";
 
 async function main() {
   const runner = new DeploymentRunner();

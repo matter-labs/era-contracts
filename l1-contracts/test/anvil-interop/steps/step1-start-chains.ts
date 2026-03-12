@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { AnvilManager } from "./src/anvil-manager";
-import { DeploymentRunner } from "./src/deployment-runner";
+import { AnvilManager } from "../src/anvil-manager";
+import { DeploymentRunner } from "../src/deployment-runner";
 
 async function main() {
   const runner = new DeploymentRunner();
