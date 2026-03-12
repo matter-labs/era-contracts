@@ -67,6 +67,11 @@ contract GWAssetTrackerTestHelper is GWAssetTracker {
         chainBalance[_chainId][_assetId] = _amount;
     }
 
+    /// @notice Helper to set pending interop balance directly for testing
+    function setPendingInteropBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount) external {
+        pendingInteropBalance[_chainId][_assetId] = _amount;
+    }
+
     /// @notice Exposes internal _handleLegacySharedBridgeMessage for testing
     function handleLegacySharedBridgeMessage(uint256 _chainId, bytes memory _message) external {
         _handleLegacySharedBridgeMessage(_chainId, _message);

@@ -13,8 +13,11 @@ import {
 } from "contracts/common/Messaging.sol";
 import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-    L2_INTEROP_CENTER_ADDR
+    L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
+import {InteropCallExecutedMessage} from "contracts/common/Messaging.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "contracts/common/Config.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/DynamicIncrementalMerkleMemory.sol";
@@ -103,6 +106,63 @@ library ProcessLogsTestHelper {
     /// @dev Prepends BUNDLE_IDENTIFIER (0x01) to the ABI-encoded bundle.
     function encodeInteropCenterMessage(InteropBundle memory _bundle) internal pure returns (bytes memory) {
         return bytes.concat(BUNDLE_IDENTIFIER, abi.encode(_bundle));
+    }
+
+    /// @notice Creates a minimal InteropBundle whose calls each carry a non-zero base-token value.
+    /// @dev Calls have `from` set to address(1) (not L2_ASSET_ROUTER_ADDR), so asset-router
+    ///      processing is skipped.  The entire value is counted as base-token transfer.
+    function createInteropBundleWithBaseTokenValue(
+        uint256 _sourceChainId,
+        uint256 _destinationChainId,
+        bytes32 _destinationBaseTokenAssetId,
+        uint256 _numCalls,
+        uint256 _valuePerCall,
+        bytes32 _salt
+    ) internal pure returns (InteropBundle memory bundle) {
+        InteropCall[] memory calls = new InteropCall[](_numCalls);
+        for (uint256 i = 0; i < _numCalls; i++) {
+            calls[i] = InteropCall({
+                version: INTEROP_CALL_VERSION,
+                shadowAccount: false,
+                to: address(0xdead),
+                from: address(1), // Not L2_ASSET_ROUTER_ADDR => asset processing skipped
+                value: _valuePerCall,
+                data: ""
+            });
+        }
+        bundle = InteropBundle({
+            version: INTEROP_BUNDLE_VERSION,
+            sourceChainId: _sourceChainId,
+            destinationChainId: _destinationChainId,
+            destinationBaseTokenAssetId: _destinationBaseTokenAssetId,
+            interopBundleSalt: _salt,
+            calls: calls,
+            bundleAttributes: BundleAttributes({executionAddress: "", unbundlerAddress: "", useFixedFee: false})
+        });
+    }
+
+    /// @notice Creates an L2Log for an InteropHandler message (via L2_TO_L1_MESSENGER).
+    function createInteropHandlerLog(
+        uint16 _txNumberInBatch,
+        bytes memory _message
+    ) internal pure returns (L2Log memory) {
+        return
+            L2Log({
+                l2ShardId: 0,
+                isService: true,
+                txNumberInBatch: _txNumberInBatch,
+                sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+                key: bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR))),
+                value: keccak256(_message)
+            });
+    }
+
+    /// @notice Encodes an InteropCallExecutedMessage into the L2→L1 message format expected by
+    ///         processLogsAndMessages when handling InteropHandler logs.
+    function encodeInteropCallExecutedMessage(
+        InteropCallExecutedMessage memory _msg
+    ) internal pure returns (bytes memory) {
+        return abi.encodeCall(IAssetTrackerDataEncoding.receiveInteropCallExecuted, (_msg));
     }
 
     /// @notice Builds a complete ProcessLogsInput with correct Merkle root and chainBatchRoot.

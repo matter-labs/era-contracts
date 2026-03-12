@@ -368,10 +368,8 @@ contract GWAssetTrackerExtendedTest is Test {
         vm.prank(mockZKChain);
         vm.expectRevert(
             abi.encodeWithSelector(
-                InvalidBuiltInContractMessage.selector,
-                uint256(0),
-                uint256(0),
-                bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))
+                InvalidFunctionSignature.selector,
+                IInteropHandler.verifyBundle.selector
             )
         );
         gwAssetTracker.processLogsAndMessages(input);
