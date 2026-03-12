@@ -82,15 +82,6 @@ export function ensureDirectoryExists(dirPath: string): void {
 }
 
 /**
- * Get chain IDs of chains settled on the gateway, derived from the anvil config.
- */
-export function getGwSettledChainIds(
-  chains: Array<{ chainId: number; isL1?: boolean; isGateway?: boolean; settlement?: string }>
-): number[] {
-  return chains.filter((c) => c.settlement === "gateway").map((c) => c.chainId);
-}
-
-/**
  * Find an L2 chain by chain ID in the deployment state, or throw.
  */
 export function getL2Chain(

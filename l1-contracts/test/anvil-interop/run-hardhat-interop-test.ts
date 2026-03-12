@@ -5,7 +5,7 @@ import * as path from "path";
 import { AnvilManager } from "./src/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { deployTestTokens } from "./deploy-test-token";
-import { getGwSettledChainIds } from "./src/utils";
+import { getChainIdsByRole } from "./src/utils";
 import { registerAndMigrateTestTokens } from "./src/token-balance-migration-helper";
 
 const anvilInteropDir = __dirname;
@@ -95,7 +95,7 @@ async function main(): Promise<void> {
       const gatewayConfig = config.chains.find((c) => c.isGateway);
       const gatewayChainId = gatewayConfig?.chainId;
       const gwChain = chains.l2.find((c) => c.chainId === gatewayChainId);
-      const gwSettledChainIds = getGwSettledChainIds(config.chains);
+      const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
 
       // Build L2 chain RPC URL map for migration preconditions
       const l2ChainRpcUrls = new Map<number, string>();

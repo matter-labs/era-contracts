@@ -17,7 +17,7 @@ import type {
   CTMDeployedAddresses,
   DeploymentState,
 } from "./types";
-import { getGwSettledChainIds } from "./utils";
+import { getChainIdsByRole } from "./utils";
 import { migratorFacetAbi } from "./contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./const";
 
@@ -418,7 +418,7 @@ export class DeploymentRunner {
       for (const l2Chain of chains.l2) {
         l2ChainRpcUrls.set(l2Chain.chainId, l2Chain.rpcUrl);
       }
-      const gwSettledChainIds = getGwSettledChainIds(config.chains);
+      const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
       await this.step5SetupGateway(
         chains.l1.rpcUrl,
         gatewayConfig.chainId,

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { DeploymentRunner } from "../src/deployment-runner";
-import { getGwSettledChainIds } from "../src/utils";
+import { getChainIdsByRole } from "../src/utils";
 
 async function main() {
   const runner = new DeploymentRunner();
@@ -25,7 +25,7 @@ async function main() {
   }
 
   const gwChain = state.chains.l2?.find((c) => c.chainId === gatewayChainId);
-  const gwSettledChainIds = getGwSettledChainIds(config.chains);
+  const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
 
   // Build L2 chain RPC URL map for migration preconditions
   const l2ChainRpcUrls = new Map<number, string>();

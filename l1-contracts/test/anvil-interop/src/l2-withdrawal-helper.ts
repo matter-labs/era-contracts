@@ -6,7 +6,7 @@ import {
   iBaseTokenAbi,
   l1NativeTokenVaultAbi,
   testnetERC20TokenAbi,
-  l2AssetRouterAbi,
+  il2AssetRouterAbi,
   l1NullifierAbi,
 } from "./contracts";
 import {
@@ -123,12 +123,11 @@ export async function withdrawERC20FromL2(params: WithdrawERC20Params): Promise<
   // Encode withdrawal data: (amount, l1Recipient, l2TokenAddress)
   const withdrawalData = encodeBridgeBurnData(amount, l1Recipient, l2TokenAddress);
 
-  // Call L2AssetRouter.withdraw on L2
-  const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbi(), l2Wallet);
+  // Use IL2AssetRouter interface (no overloaded withdraw) for cleaner call syntax
+  const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, il2AssetRouterAbi(), l2Wallet);
 
   console.log(`   Initiating ERC20 withdrawal from chain ${chainId}...`);
-  // Explicit signature needed: L2AssetRouter has overloaded withdraw(bytes32,bytes) and withdraw(address,address,uint256)
-  const l2Tx = await l2AssetRouter["withdraw(bytes32,bytes)"](assetId, withdrawalData, {
+  const l2Tx = await l2AssetRouter.withdraw(assetId, withdrawalData, {
     gasLimit: 5_000_000,
   });
   await l2Tx.wait();

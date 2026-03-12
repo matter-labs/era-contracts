@@ -52,6 +52,11 @@ export function l2AssetRouterAbi(): any[] {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function il2AssetRouterAbi(): any[] {
+  return loadAbiFromOut("IL2AssetRouter.sol/IL2AssetRouter.json");
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function l2NativeTokenVaultAbi(): any[] {
   return loadAbiFromOut("L2NativeTokenVault.sol/L2NativeTokenVault.json");
 }

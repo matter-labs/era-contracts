@@ -69,9 +69,9 @@ describe("04 - Gateway State Verification", function () {
       const l2BhAbi = l2BridgehubAbi();
       const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BhAbi, gwProvider);
 
-      // All L2 chains should be registered
+      // Only GW-settled chains should be registered on the GW L2Bridgehub
       for (const chainConfig of state.chains!.config) {
-        if (chainConfig.isL1) continue;
+        if (chainConfig.isL1 || chainConfig.settlement !== "gateway") continue;
         const baseTokenAssetId = await l2Bridgehub.baseTokenAssetId(chainConfig.chainId);
         expect(
           baseTokenAssetId,
@@ -80,14 +80,14 @@ describe("04 - Gateway State Verification", function () {
       }
     });
 
-    it("returns zero for unregistered chain on GW L2Bridgehub", async () => {
+    it("returns zero for L1-settled chain on GW L2Bridgehub", async () => {
       const l2BhAbi = l2BridgehubAbi();
       const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BhAbi, gwProvider);
 
-      // A non-existent chain should have zero base token asset ID
-      const unregisteredChainId = 999999;
-      const baseTokenAssetId = await l2Bridgehub.baseTokenAssetId(unregisteredChainId);
-      expect(baseTokenAssetId, "Unregistered chain should have zero baseTokenAssetId").to.equal(
+      // The direct-settled chain (settling on L1, not GW) should not be registered on the GW
+      const directSettledChainId = getChainIdByRole(state.chains!.config, "directSettled");
+      const baseTokenAssetId = await l2Bridgehub.baseTokenAssetId(directSettledChainId);
+      expect(baseTokenAssetId, "L1-settled chain should not be registered on GW L2Bridgehub").to.equal(
         ethers.constants.HashZero
       );
     });
