@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
 import {
-    L2_BASE_TOKEN_SYSTEM_CONTRACT,
+    L2_BASE_TOKEN_HOLDER,
     L2_INTEROP_CENTER_ADDR,
     L2_NATIVE_TOKEN_VAULT,
     L2_MESSAGE_VERIFICATION,
@@ -74,29 +74,9 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @inheritdoc IInteropHandler
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
-        (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
-            _bundle,
-            _proof.chainId
-        );
+        (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        // Verify that the source chainId of the bundle matches the proof's chainId
-        require(
-            interopBundle.sourceChainId == _proof.chainId,
-            WrongSourceChainId(bundleHash, interopBundle.sourceChainId, _proof.chainId)
-        );
-
-        // Verify that the destination chainId of the bundle is equal to the chainId where it's trying to get executed
-        require(
-            interopBundle.destinationChainId == block.chainid,
-            WrongDestinationChainId(bundleHash, interopBundle.destinationChainId, block.chainid)
-        );
-
-        // Verify that the destination base token asset ID of the bundle is equal to the base token asset ID of the chain
-        bytes32 baseTokenAssetId = L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
-        require(
-            interopBundle.destinationBaseTokenAssetId == baseTokenAssetId,
-            WrongDestinationBaseTokenAssetId(bundleHash, baseTokenAssetId, interopBundle.destinationBaseTokenAssetId)
-        );
+        _validateBundleDestinationContext(bundleHash, interopBundle, _proof.chainId);
 
         // If the execution address is not specified then the execution is permissionless.
         if (interopBundle.bundleAttributes.executionAddress.length != 0) {
@@ -156,29 +136,9 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @inheritdoc IInteropHandler
     function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
-        (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
-            _bundle,
-            _proof.chainId
-        );
+        (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        // Verify that the source chainId of the bundle matches the proof's chainId
-        require(
-            interopBundle.sourceChainId == _proof.chainId,
-            WrongSourceChainId(bundleHash, interopBundle.sourceChainId, _proof.chainId)
-        );
-
-        // Verify that the destination chainId of the bundle is equal to the chainId where it's trying to get verified
-        require(
-            interopBundle.destinationChainId == block.chainid,
-            WrongDestinationChainId(bundleHash, interopBundle.destinationChainId, block.chainid)
-        );
-
-        // Verify that the destination base token asset ID of the bundle is equal to the base token asset ID of the chain
-        bytes32 baseTokenAssetId = L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
-        require(
-            interopBundle.destinationBaseTokenAssetId == baseTokenAssetId,
-            WrongDestinationBaseTokenAssetId(bundleHash, baseTokenAssetId, interopBundle.destinationBaseTokenAssetId)
-        );
+        _validateBundleDestinationContext(bundleHash, interopBundle, _proof.chainId);
 
         // If the bundle was already fully executed or unbundled, we revert stating that it was processed already.
         require(status == BundleStatus.Unreceived, BundleAlreadyProcessed(bundleHash));
@@ -188,28 +148,9 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     }
 
     /// @inheritdoc IInteropHandler
-    function unbundleBundle(
-        uint256 _sourceChainId,
-        bytes memory _bundle,
-        CallStatus[] calldata _providedCallStatus
-    ) public {
+    function unbundleBundle(bytes memory _bundle, CallStatus[] calldata _providedCallStatus) public {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
-        (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
-            _bundle,
-            _sourceChainId
-        );
-
-        // Verify that the source chainId of the bundle matches the provided source chainId
-        require(
-            interopBundle.sourceChainId == _sourceChainId,
-            WrongSourceChainId(bundleHash, interopBundle.sourceChainId, _sourceChainId)
-        );
-
-        // Verify that the destination chainId of the bundle is equal to the chainId where it's trying to get unbundled
-        require(
-            interopBundle.destinationChainId == block.chainid,
-            WrongDestinationChainId(bundleHash, interopBundle.destinationChainId, block.chainid)
-        );
+        (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
         (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(
             interopBundle.bundleAttributes.unbundlerAddress
@@ -235,7 +176,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         );
 
         // The bundle status have to be either verified (we know that it's received, but not processed yet), or unbundled.
-        // Note, that on the first call to unbundle the status of the bundle should be verified.
+        // Note, that on the first call to unbundle the status of the bundle should be verified, which validates bundle correctness.
         require(status == BundleStatus.Verified || status == BundleStatus.Unbundled, CanNotUnbundle(bundleHash));
 
         // Mark the given bundle as unbundled, following CEI pattern.
@@ -263,7 +204,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         }
 
         _executeCalls({
-            _sourceChainId: _sourceChainId,
+            _sourceChainId: interopBundle.sourceChainId,
             _bundleHash: bundleHash,
             _interopBundle: interopBundle,
             _executeAllCalls: false,
@@ -280,17 +221,15 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
     /// @notice Decode an ABI-encoded bundle, compute its hash, and fetch its current status.
     /// @param _bundle ABI-encoded InteropBundle.
-    /// @param _sourceChainId Origin chain ID.
     /// @return interopBundle The decoded InteropBundle struct.
     /// @return bundleHash Hash corresponding to the bundle that gets decoded.
     /// @return currentStatus The current BundleStatus of the bundle that gets decoded.
     function _getBundleData(
-        bytes memory _bundle,
-        uint256 _sourceChainId
+        bytes memory _bundle
     ) internal view returns (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus currentStatus) {
         interopBundle = abi.decode(_bundle, (InteropBundle));
         require(interopBundle.version == INTEROP_BUNDLE_VERSION, InvalidInteropBundleVersion());
-        bundleHash = InteropDataEncoding.encodeInteropBundleHash(_sourceChainId, _bundle);
+        bundleHash = InteropDataEncoding.encodeInteropBundleHash(interopBundle.sourceChainId, _bundle);
         currentStatus = bundleStatus[bundleHash];
     }
 
@@ -320,7 +259,8 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             require(interopCall.version == INTEROP_CALL_VERSION, InvalidInteropCallVersion());
 
             if (interopCall.value > 0) {
-                L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
+                // Transfer base tokens from the BaseTokenHolder instead of minting.
+                L2_BASE_TOKEN_HOLDER.give(address(this), interopCall.value, _sourceChainId);
             }
             // slither-disable-next-line arbitrary-send-eth
             bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({
@@ -374,7 +314,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @dev Implements ERC-7786 recipient interface. The payload must be encoded using abi.encodeCall
     ///      with one of the following function selectors:
     ///      - executeBundle: payload = abi.encodeCall(InteropHandler.executeBundle, (bundle, proof))
-    ///      - unbundleBundle: payload = abi.encodeCall(InteropHandler.unbundleBundle, (sourceChainId, bundle, providedCallStatus))
+    ///      - unbundleBundle: payload = abi.encodeCall(InteropHandler.unbundleBundle, (bundle, providedCallStatus))
     ///      The sender must have appropriate permissions (executionAddress or unbundlerAddress) which are
     ///      validated before calling the respective internal functions. Since this function validates
     ///      permissions, the called functions (executeBundle/unbundleBundle) will bypass their own
@@ -396,7 +336,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
 
         // NOTE: it is important that we always support the legacy messages formats (i.e. dont change selectors)
-        // since otherwise the messages that were sent before wont be executable.
+        // since otherwise the messages that were sent before won't be executable.
         if (selector == this.executeBundle.selector) {
             _handleExecuteBundle(payload, senderChainId, senderAddress, sender);
         } else if (selector == this.verifyBundle.selector) {
@@ -422,7 +362,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         );
 
         // Decode the bundle to get execution permissions
-        (InteropBundle memory interopBundle, , ) = _getBundleData(bundle, proof.chainId);
+        (InteropBundle memory interopBundle, , ) = _getBundleData(bundle);
 
         // If the execution address is not specified then the execution is permissionless.
         if (interopBundle.bundleAttributes.executionAddress.length != 0) {
@@ -456,13 +396,10 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         address senderAddress,
         bytes calldata sender
     ) internal {
-        (uint256 sourceChainId, bytes memory bundle, CallStatus[] memory providedCallStatus) = abi.decode(
-            payload[4:],
-            (uint256, bytes, CallStatus[])
-        );
+        (bytes memory bundle, CallStatus[] memory providedCallStatus) = abi.decode(payload[4:], (bytes, CallStatus[]));
 
         // Decode the bundle to get unbundling permissions
-        (InteropBundle memory interopBundle, , ) = _getBundleData(bundle, sourceChainId);
+        (InteropBundle memory interopBundle, , ) = _getBundleData(bundle);
 
         (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(
             interopBundle.bundleAttributes.unbundlerAddress
@@ -474,6 +411,40 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             UnbundlingNotAllowed(keccak256(bundle), sender, interopBundle.bundleAttributes.unbundlerAddress)
         );
 
-        this.unbundleBundle(sourceChainId, bundle, providedCallStatus);
+        this.unbundleBundle(bundle, providedCallStatus);
+    }
+
+    function _validateBundleDestinationContext(
+        bytes32 bundleHash,
+        InteropBundle memory interopBundle,
+        uint256 proofChainId
+    ) internal view {
+        // Verify that the source chainId of the bundle matches the proof's chainId
+        require(
+            interopBundle.sourceChainId == proofChainId,
+            WrongSourceChainId(bundleHash, interopBundle.sourceChainId, proofChainId)
+        );
+
+        // Verify that the destination chainId of the bundle is equal to the chainId where it's trying to get executed
+        require(
+            interopBundle.destinationChainId == block.chainid,
+            WrongDestinationChainId(bundleHash, interopBundle.destinationChainId, block.chainid)
+        );
+
+        // Verify that the destination base token asset ID of the bundle is equal to the base token asset ID of the chain
+        bytes32 baseTokenAssetId = L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
+        require(
+            interopBundle.destinationBaseTokenAssetId == baseTokenAssetId,
+            WrongDestinationBaseTokenAssetId(bundleHash, baseTokenAssetId, interopBundle.destinationBaseTokenAssetId)
+        );
+    }
+
+    /// @notice Allows the contract to receive native ETH from L2_BASE_TOKEN_HOLDER.
+    /// @dev This is required because L2_BASE_TOKEN_HOLDER.give() transfers ETH to this contract
+    ///      before forwarding it to the interop call recipient.
+    receive() external payable {
+        if (msg.sender != address(L2_BASE_TOKEN_HOLDER)) {
+            revert Unauthorized(msg.sender);
+        }
     }
 }

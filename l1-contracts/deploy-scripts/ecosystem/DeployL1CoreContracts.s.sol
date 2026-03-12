@@ -225,6 +225,9 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         );
         l1NativeTokenVault.transferOwnership(config.ownerAddress);
 
+        IL1Nullifier l1Nullifier = IL1Nullifier(coreAddresses.bridges.proxies.l1Nullifier);
+        IOwnable(address(l1Nullifier)).transferOwnership(coreAddresses.shared.governance);
+
         ICTMDeploymentTracker ctmDeploymentTracker = ICTMDeploymentTracker(
             coreAddresses.bridgehub.proxies.ctmDeploymentTracker
         );

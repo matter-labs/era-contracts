@@ -30,6 +30,7 @@ contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
     UtilsFacet internal utilsFacet;
     DummyBridgehub internal dummyBridgehub;
     address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    uint256 constant eraChainId = 9;
 
     function getAdminSelectors() internal pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](16);
@@ -75,7 +76,13 @@ contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
         });
         facetCuts[3] = Diamond.FacetCut({
             facet: address(
-                new MailboxFacet(block.chainid, address(0), IEIP7702Checker(makeAddr("eip7702Checker")), false)
+                new MailboxFacet(
+                    eraChainId,
+                    block.chainid,
+                    address(0),
+                    IEIP7702Checker(makeAddr("eip7702Checker")),
+                    false
+                )
             ),
             action: Diamond.Action.Add,
             isFreezable: false,

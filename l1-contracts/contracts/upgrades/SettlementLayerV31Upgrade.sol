@@ -72,7 +72,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         }
 
         // Era chains automatically have it tracked.
-        // ZKsync OS chains havent been tracking this value until the v31 upgrade.
+        // ZKsync OS chains haven't been tracking this value until the v31 upgrade.
         // It will have to be backfilled.
         // FIXME The actual logic for backfilling will be introduced in a separate PR.
         if (!s.zksyncOS) {

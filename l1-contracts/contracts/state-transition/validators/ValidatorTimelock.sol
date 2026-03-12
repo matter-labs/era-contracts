@@ -197,8 +197,8 @@ contract ValidatorTimelock is
         address _chainAddress,
         uint256, // _l2BlockNumber (unused in this specific implementation)
         bytes calldata // _l2Block (unused in this specific implementation)
-    ) public onlyRole(_chainAddress, PRECOMMITTER_ROLE) {
-        _propagateToZKChain(_chainAddress);
+    ) public virtual onlyRole(_chainAddress, PRECOMMITTER_ROLE) {
+        _propagateToAddress(_getPropagationAddress(_chainAddress));
     }
 
     /// @inheritdoc IValidatorTimelock
@@ -209,7 +209,7 @@ contract ValidatorTimelock is
         bytes calldata // _batchData (unused in this specific implementation)
     ) public virtual onlyRole(_chainAddress, COMMITTER_ROLE) {
         _recordBatchCommitment(_chainAddress, _processBatchFrom, _processBatchTo);
-        _propagateToZKChain(_chainAddress);
+        _propagateToAddress(_getPropagationAddress(_chainAddress));
     }
 
     /// @dev Records the timestamp of batch commitment for the given chain address.
@@ -233,8 +233,8 @@ contract ValidatorTimelock is
     function revertBatchesSharedBridge(
         address _chainAddress,
         uint256 /*_newLastBatch*/
-    ) external onlyRole(_chainAddress, REVERTER_ROLE) {
-        _propagateToZKChain(_chainAddress);
+    ) public virtual onlyRole(_chainAddress, REVERTER_ROLE) {
+        _propagateToAddress(_getPropagationAddress(_chainAddress));
     }
 
     /// @inheritdoc IValidatorTimelock
@@ -243,8 +243,8 @@ contract ValidatorTimelock is
         uint256, // _processBatchFrom (unused in this specific implementation)
         uint256, // _processBatchTo (unused in this specific implementation)
         bytes calldata // _proofData (unused in this specific implementation)
-    ) external onlyRole(_chainAddress, PROVER_ROLE) {
-        _propagateToZKChain(_chainAddress);
+    ) public virtual onlyRole(_chainAddress, PROVER_ROLE) {
+        _propagateToAddress(_getPropagationAddress(_chainAddress));
     }
 
     /// @inheritdoc IValidatorTimelock
@@ -252,8 +252,8 @@ contract ValidatorTimelock is
         address _chainAddress,
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
-        bytes calldata // _batchData (unused in this specific implementation, forwarded via calldata)
-    ) external onlyRole(_chainAddress, EXECUTOR_ROLE) {
+        bytes calldata // _batchData (unused in this specific implementation)
+    ) public virtual onlyRole(_chainAddress, EXECUTOR_ROLE) {
         uint256 delay = executionDelay; // uint32
         unchecked {
             for (uint256 i = _processBatchFrom; i <= _processBatchTo; ++i) {
@@ -269,17 +269,24 @@ contract ValidatorTimelock is
                 }
             }
         }
-        _propagateToZKChain(_chainAddress);
+        _propagateToAddress(_getPropagationAddress(_chainAddress));
     }
 
-    /// @dev Call the zkChain diamond contract with the same calldata as this contract was called.
-    /// Note: it is called the zkChain diamond contract, not delegatecalled!
-    function _propagateToZKChain(address _chainAddress) internal {
+    /// @dev Returns the address to which calldata should be forwarded.
+    /// In `ValidatorTimelock` this is the ZK chain diamond itself; subclasses may override
+    /// (e.g. `EraMultisigValidator` forwards to a downstream `ValidatorTimelock`).
+    function _getPropagationAddress(address _chainAddress) internal view virtual returns (address) {
+        return _chainAddress;
+    }
+
+    /// @dev Forwards the current calldata to `_target`.
+    /// Note: it is called, not delegatecalled!
+    function _propagateToAddress(address _target) internal {
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())
-            // Call method of the ZK chain diamond contract returns 0 on error
-            let result := call(gas(), _chainAddress, 0, 0, calldatasize(), 0, 0)
+            // Call the target contract, returns 0 on error
+            let result := call(gas(), _target, 0, 0, calldatasize(), 0, 0)
             // Get the size of the last return data
             let size := returndatasize()
             // Copy the size length of bytes from return data at zero position to pointer position

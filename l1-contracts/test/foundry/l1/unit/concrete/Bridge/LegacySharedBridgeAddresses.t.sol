@@ -22,36 +22,49 @@ contract LegacySharedBridgeAddressesWrapper {
 contract LegacySharedBridgeAddressesTest is Test {
     LegacySharedBridgeAddressesWrapper internal wrapper;
 
-    // The constant addresses from the library
-    address constant STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS = address(0);
-    address constant TESTNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS = address(0);
-    address constant MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS = address(0);
+    address constant STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS =
+        LegacySharedBridgeAddresses.STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS;
+    address constant TESTNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS =
+        LegacySharedBridgeAddresses.TESTNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS;
+    address constant MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS =
+        LegacySharedBridgeAddresses.MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS;
 
     function setUp() public {
         wrapper = new LegacySharedBridgeAddressesWrapper();
     }
 
     function test_getLegacySharedBridgeAddressOnGateway_stageEcosystem() public view {
-        // Since all addresses are 0, first branch (stage) will match
         SharedBridgeOnChainId[] memory result = wrapper.getLegacySharedBridgeAddressOnGateway(
             STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS
         );
+        assertEq(result.length, LegacySharedBridgeAddresses.STAGE_LEGACY_BRIDGES);
+    }
 
-        // Should return empty array since STAGE_LEGACY_BRIDGES = 0
-        assertEq(result.length, 0);
+    function test_getLegacySharedBridgeAddressOnGateway_testnetEcosystem() public view {
+        SharedBridgeOnChainId[] memory result = wrapper.getLegacySharedBridgeAddressOnGateway(
+            TESTNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS
+        );
+        assertEq(result.length, LegacySharedBridgeAddresses.TESTNET_LEGACY_BRIDGES);
+    }
+
+    function test_getLegacySharedBridgeAddressOnGateway_mainnetEcosystem() public view {
+        SharedBridgeOnChainId[] memory result = wrapper.getLegacySharedBridgeAddressOnGateway(
+            MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS
+        );
+        assertEq(result.length, LegacySharedBridgeAddresses.MAINNET_LEGACY_BRIDGES);
     }
 
     function test_getLegacySharedBridgeAddressOnGateway_invalidAddress() public {
-        // Any non-zero address should revert since all ecosystem addresses are 0
         address invalidAddress = makeAddr("invalid");
 
         vm.expectRevert(abi.encodeWithSelector(InvalidL1AssetRouter.selector, invalidAddress));
         wrapper.getLegacySharedBridgeAddressOnGateway(invalidAddress);
     }
 
-    function testFuzz_getLegacySharedBridgeAddressOnGateway_revertsForNonZeroAddress(address randomAddress) public {
-        // Skip address(0) since that matches the ecosystem addresses
-        vm.assume(randomAddress != address(0));
+    function testFuzz_getLegacySharedBridgeAddressOnGateway_revertsForUnknownAddress(address randomAddress) public {
+        vm.assume(randomAddress != STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS);
+        vm.assume(randomAddress != TESTNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS);
+        vm.assume(randomAddress != MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS);
 
         vm.expectRevert(abi.encodeWithSelector(InvalidL1AssetRouter.selector, randomAddress));
         wrapper.getLegacySharedBridgeAddressOnGateway(randomAddress);

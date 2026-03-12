@@ -19,7 +19,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_BASE_TOKEN_HOLDER} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 
 import {EmptyToken, TokenAlreadyInBridgedTokensList} from "../L1BridgeContractErrors.sol";
 import {
@@ -310,7 +310,7 @@ abstract contract NativeTokenVaultBase is
         // This token has not been registered within this NTV yet. Usually this means that the
         // token is native to the chain and the user would prefer to get it registered as such.
         // However, there are exceptions (e.g. bridged legacy ERC20 tokens on L2) when the
-        // assetId has not been stored yet. We will ask the implementor to double check that the token
+        // assetId has not been stored yet. We will ask the implementer to double check that the token
         // is not legacy.
 
         // We try to register it as legacy token. If it fails, we know
@@ -463,8 +463,8 @@ abstract contract NativeTokenVaultBase is
         if (_assetId == _baseTokenAssetId()) {
             require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
             if (_isBridgedToken) {
-                // slither-disable-next-line arbitrary-send-eth
-                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: msg.value}(_chainId);
+                // Send tokens to BaseTokenHolder and notify L2AssetTracker via burnAndStartBridging
+                L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: msg.value}(_chainId);
             }
         } else {
             require(msg.value == 0, NonEmptyMsgValue());
