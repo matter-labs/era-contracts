@@ -5,7 +5,7 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "./../utils/Utils.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
-import {BridgehubAddresses} from "../utils/Types.sol";
+import {CoreDeployedAddresses} from "../utils/Types.sol";
 import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -52,10 +52,10 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
         deploySharedBridgeImplementation();
         upgradeImplementation(addresses.sharedBridgeProxy, addresses.sharedBridgeProxyImpl);
         deployDummyErc20Bridge();
-        upgradeImplementation(addresses.proxies.erc20Bridge, addresses.proxies.erc20BridgeImpl);
+        upgradeImplementation(addresses.erc20BridgeProxy, addresses.erc20BridgeProxyImpl);
         setParamsForDummyBridge();
         deployL1NullifierImplementation();
-        upgradeImplementation(addresses.l1Nullifier, addresses.proxies.l1NullifierImpl);
+        upgradeImplementation(addresses.l1Nullifier, addresses.l1NullifierProxyImpl);
     }
 
     function initializeConfig(address bridgehub, uint256 chainId) internal {
@@ -71,13 +71,13 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
         config.create2FactorySalt = create2FactorySalt;
 
         // Use AddressIntrospector to get addresses from deployed contracts
-        BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(IL1Bridgehub(bridgehub));
-        addresses.l1Nullifier = bhAddresses.assetRouterAddresses.l1Nullifier;
-        addresses.sharedBridgeProxy = bhAddresses.assetRouter;
-        addresses.l1NativeTokenVault = bhAddresses.assetRouterAddresses.nativeTokenVault;
-        addresses.transparentProxyAdmin = bhAddresses.transparentProxyAdmin;
-        addresses.tokenWethAddress = bhAddresses.assetRouterAddresses.l1WethToken;
-        addresses.proxies.erc20Bridge = AddressIntrospector.getLegacyBridgeAddress(bhAddresses.assetRouter);
+        CoreDeployedAddresses memory coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehub);
+        addresses.l1Nullifier = coreAddresses.bridges.proxies.l1Nullifier;
+        addresses.sharedBridgeProxy = coreAddresses.bridges.proxies.l1AssetRouter;
+        addresses.l1NativeTokenVault = coreAddresses.bridges.proxies.l1NativeTokenVault;
+        addresses.transparentProxyAdmin = coreAddresses.shared.transparentProxyAdmin;
+        addresses.tokenWethAddress = coreAddresses.bridges.l1WethToken;
+        addresses.erc20BridgeProxy = coreAddresses.bridges.proxies.erc20Bridge;
     }
 
     // We need to deploy new shared bridge for changing chain id and diamond proxy address
@@ -105,7 +105,7 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
             abi.encode(addresses.l1Nullifier, addresses.sharedBridgeProxy, addresses.l1NativeTokenVault, config.chainId)
         );
         address contractAddress = deployViaCreate2(bytecode);
-        addresses.proxies.erc20BridgeImpl = contractAddress;
+        addresses.erc20BridgeProxyImpl = contractAddress;
     }
 
     function deployL1NullifierImplementation() internal {
@@ -117,7 +117,7 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
         );
         address contractAddress = deployViaCreate2(bytecode);
 
-        addresses.proxies.l1NullifierImpl = contractAddress;
+        addresses.l1NullifierProxyImpl = contractAddress;
     }
 
     function upgradeImplementation(address proxy, address implementation) internal {
@@ -141,18 +141,18 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
     function setParamsForDummyBridge() internal {
         (address l2TokenBeacon, bytes32 l2TokenBeaconProxyHash) = L2LegacySharedBridgeTestHelper
             .calculateTestL2TokenBeaconAddress(
-                addresses.proxies.erc20Bridge,
+                addresses.erc20BridgeProxy,
                 addresses.l1Nullifier,
                 Ownable2StepUpgradeable(addresses.l1Nullifier).owner()
             );
 
         address l2LegacySharedBridgeAddress = L2LegacySharedBridgeTestHelper.calculateL2LegacySharedBridgeProxyAddr(
-            addresses.proxies.erc20Bridge,
+            addresses.erc20BridgeProxy,
             addresses.l1Nullifier,
             Ownable2StepUpgradeable(addresses.l1Nullifier).owner()
         );
 
-        DummyL1ERC20Bridge bridge = DummyL1ERC20Bridge(addresses.proxies.erc20Bridge);
+        DummyL1ERC20Bridge bridge = DummyL1ERC20Bridge(addresses.erc20BridgeProxy);
         vm.broadcast();
         bridge.setValues(l2LegacySharedBridgeAddress, l2TokenBeacon, l2TokenBeaconProxyHash);
     }
