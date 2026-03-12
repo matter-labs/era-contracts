@@ -2,6 +2,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import { execSync } from "child_process";
 import { AnvilManager } from "./src/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { deployTestTokens } from "./deploy-test-token";
@@ -40,6 +41,11 @@ async function main(): Promise<void> {
   const addresses = { l1Addresses, ctmAddresses, chainAddresses, testTokens };
   fs.writeFileSync(path.join(stateDir, "addresses.json"), JSON.stringify(addresses, null, 2));
   console.log(`Addresses saved to ${path.join(stateDir, "addresses.json")}`);
+
+  // Format generated JSON files so CI formatting checks pass
+  const l1ContractsDir = path.resolve(__dirname, "../..");
+  console.log("\nFormatting generated files...");
+  execSync("yarn fmt", { cwd: l1ContractsDir, stdio: "inherit" });
 
   console.log(`\nDone. All chain states saved to chain-states/${version}/`);
 }
