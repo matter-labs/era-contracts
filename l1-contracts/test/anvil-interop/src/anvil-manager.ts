@@ -48,6 +48,14 @@ export class AnvilManager {
 
     console.log(`🚀 Starting ${formatChainInfo(chainId, port, isL1)}...`);
     const anvilBinary = this.resolveAnvilBinary();
+
+    // Log resolved binary for debugging CI issues
+    const binaryExists = fs.existsSync(anvilBinary);
+    console.log(`   anvil binary: ${anvilBinary} (exists: ${binaryExists})`);
+    if (!binaryExists && anvilBinary !== "anvil") {
+      console.error(`❌ Anvil binary not found at ${anvilBinary}`);
+    }
+
     const homeDir = process.env.HOME;
     const foundryBinPath = homeDir ? path.join(homeDir, ".foundry/bin") : "";
     const enrichedPath = foundryBinPath ? `${foundryBinPath}:${process.env.PATH || ""}` : process.env.PATH;
@@ -83,13 +91,28 @@ export class AnvilManager {
       args.push("--load-state", loadStatePath);
     }
 
+    // Use pipe for stderr to capture error output, ignore stdin/stdout for detach
     const childProcess = spawn(anvilBinary, args, {
-      stdio: "ignore", // Must ignore all streams for detached process to truly detach
+      stdio: ["ignore", "ignore", "pipe"],
       detached: true, // Detach from parent process
       env: {
         ...process.env,
         PATH: enrichedPath,
       },
+    });
+
+    // Collect stderr output for diagnostics
+    let stderrOutput = "";
+    if (childProcess.stderr) {
+      childProcess.stderr.on("data", (data: Buffer) => {
+        stderrOutput += data.toString();
+      });
+    }
+
+    // Track early exit
+    let exitCode: number | null = null;
+    childProcess.once("exit", (code) => {
+      exitCode = code;
     });
 
     await new Promise<void>((resolve, reject) => {
@@ -117,6 +140,14 @@ export class AnvilManager {
 
     const isReady = await waitForChainReady(rpcUrl);
     if (!isReady) {
+      // Log diagnostics to help debug CI failures
+      if (exitCode !== null) {
+        console.error(`   anvil process exited early with code ${exitCode}`);
+      }
+      if (stderrOutput) {
+        console.error(`   anvil stderr: ${stderrOutput.trim()}`);
+      }
+      console.error(`   anvil command: ${anvilBinary} ${args.join(" ")}`);
       throw new Error(`Failed to start ${formatChainInfo(chainId, port, isL1)}`);
     }
 

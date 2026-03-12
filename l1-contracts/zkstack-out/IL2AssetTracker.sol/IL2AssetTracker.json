@@ -1,32 +1,6 @@
 [
   {
     "type": "function",
-    "name": "L1_CHAIN_ID",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "backFillZKSyncOSBaseTokenV31MigrationData",
-    "inputs": [
-      {
-        "name": "_amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "confirmMigrationOnL2",
     "inputs": [
       {
@@ -79,11 +53,6 @@
     "type": "function",
     "name": "handleFinalizeBaseTokenBridgingOnL2",
     "inputs": [
-      {
-        "name": "_fromChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
       {
         "name": "_amount",
         "type": "uint256",
@@ -210,26 +179,6 @@
   },
   {
     "type": "function",
-    "name": "needBaseTokenTotalSupplyBackfill",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "registerBaseTokenDuringUpgrade",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "registerLegacyToken",
     "inputs": [
       {
@@ -240,19 +189,6 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "event",
-    "name": "BaseTokenRegisteredDuringUpgrade",
-    "inputs": [
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
-      }
-    ],
-    "anonymous": false
   },
   {
     "type": "event",
