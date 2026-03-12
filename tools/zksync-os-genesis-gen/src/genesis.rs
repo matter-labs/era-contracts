@@ -6,6 +6,7 @@ use crate::consts::{
 use crate::types::{InitialGenesisInput, LeafInfo, MAX_B256_VALUE, MERKLE_TREE_DEPTH};
 use crate::utils::{address_to_b256, da_contract_name_to_code, l1_contract_name_to_code};
 use alloy::consensus::{EMPTY_OMMER_ROOT_HASH, Header};
+use alloy::consensus::{EMPTY_OMMER_ROOT_HASH, Header};
 use alloy::eips::eip1559::INITIAL_BASE_FEE;
 use alloy::primitives::{Address, B64, B256, Bloom, U256, Uint};
 use blake2::{Blake2s256, Digest};

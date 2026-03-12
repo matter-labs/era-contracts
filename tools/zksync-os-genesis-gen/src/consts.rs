@@ -6,14 +6,11 @@ pub enum ContractSource {
     /// Load bytecode from a compiled contract artifact by name from l1-contracts.
     L1ContractName(&'static str),
     /// Load bytecode from a compiled contract artifact by name from da-contracts.
+    #[allow(dead_code)]
     DAContractName(&'static str),
     /// Use bytecode directly.
     Bytecode(&'static [u8]),
 }
-
-pub const BASE_TOKEN_HOLDER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
-    "0000000000000000000000000000000000010011"
-)));
 
 pub const L2_COMPLEX_UPGRADER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "000000000000000000000000000000000000800f"
