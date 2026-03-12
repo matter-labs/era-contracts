@@ -1,0 +1,5 @@
+[codespell]
+skip = _typos.toml,./lib,node_modules,yarn.lock,tools,out,zkout,./l1-contracts/scripts/base-verification-request-v26.json
+count = true
+quiet-level = 3
+ignore-words-list = FOT,vise,AAs,archType,correctY,reAdd

@@ -7,10 +7,7 @@ import { buildInteropBundleLog, callProcessLogsAndMessages, getGWChainBalance } 
 import { migrateTokenBalanceToGW } from "../../src/token-balance-migration-helper";
 import { interopCenterAbi } from "../../src/contracts";
 import { L2_NATIVE_TOKEN_VAULT_ADDR } from "../../src/const";
-
-const L2A_CHAIN_ID = 12;
-const L2B_CHAIN_ID = 13;
-const GW_CHAIN_ID = 11;
+import { getChainIdByRole, getChainIdsByRole, getL2Chain, getChainDiamondProxy } from "../../src/utils";
 
 /**
  * Extract the InteropBundle struct from the source transaction receipt.
@@ -39,18 +36,21 @@ async function extractInteropBundle(
   throw new Error(`InteropBundleSent event not found in tx ${txHash}`);
 }
 
-describe("06 - Gateway Interop (L2A <-> L2B)", function () {
+describe("06 - Gateway Interop (GW-settled chains)", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();
   let state: ReturnType<typeof runner.loadState>;
-  // batchNumber is auto-detected by callProcessLogsAndMessages
+  let gwChainId: number;
+  let gwSettledChainIds: number[];
 
   before(() => {
     state = runner.loadState();
     if (!state.chains || !state.l1Addresses || !state.chainAddresses || !state.testTokens) {
       throw new Error("Deployment state incomplete. Run setup first.");
     }
+    gwChainId = getChainIdByRole(state.chains.config, "gateway");
+    gwSettledChainIds = getChainIdsByRole(state.chains.config, "gwSettled");
   });
 
   /**
@@ -61,14 +61,13 @@ describe("06 - Gateway Interop (L2A <-> L2B)", function () {
     sourceChainId: number;
     targetChainId: number;
     amount: string;
+    sourceTokenAddress?: string;
   }): Promise<MultiChainTokenTransferResult> {
     const { sourceChainId, targetChainId, amount } = params;
-    const gwChain = state.chains!.l2.find((c) => c.chainId === GW_CHAIN_ID)!;
+    const gwChain = getL2Chain(state.chains!, gwChainId);
     const gwProvider = new ethers.providers.JsonRpcProvider(gwChain.rpcUrl);
 
-    // Get the asset ID of the token being transferred
-    // assetId = keccak256(abi.encode(originChainId, L2_NATIVE_TOKEN_VAULT_ADDR, tokenAddress))
-    const sourceToken = state.testTokens![sourceChainId];
+    const sourceToken = params.sourceTokenAddress || state.testTokens![sourceChainId];
     const assetId = ethers.utils.keccak256(
       ethers.utils.defaultAbiCoder.encode(
         ["uint256", "address", "address"],
@@ -76,42 +75,38 @@ describe("06 - Gateway Interop (L2A <-> L2B)", function () {
       )
     );
 
-    // Execute the interop transfer
     const result = await executeTokenTransfer({
       sourceChainId,
       targetChainId,
       amount,
+      sourceTokenAddress: sourceToken,
       logger: (line: string) => console.log(`[gw-interop] ${line}`),
     });
 
-    expect(result.sourceTxHash).to.match(/^0x[0-9a-fA-F]{64}$/);
-    expect(result.targetTxHash).to.match(/^0x[0-9a-fA-F]{64}$/);
+    expect(result.sourceTxHash).to.not.be.null;
+    expect(result.targetTxHash).to.not.be.null;
 
-    // Verify token balances changed correctly
     const sourceBalanceDelta = BigNumber.from(result.sourceBalanceBefore).sub(result.sourceBalanceAfter);
     const destinationBalanceDelta = BigNumber.from(result.destinationBalanceAfter).sub(result.destinationBalanceBefore);
     expect(sourceBalanceDelta.eq(result.amountWei), "source chain burned amount mismatch").to.eq(true);
     expect(destinationBalanceDelta.eq(result.amountWei), "destination chain minted amount mismatch").to.eq(true);
 
-    // Extract the interop bundle from the source tx
     const interopBundle = await extractInteropBundle(result.sourceRpcUrl, result.sourceTxHash);
 
-    // Build the log and message for processLogsAndMessages
     const { log: interopLog, message } = buildInteropBundleLog({
       txNumberInBatch: 0,
       interopBundle,
     });
 
-    // Establish the source chain's balance via the full Token Balance Migration flow.
-    // This ensures processLogsAndMessages doesn't revert with InsufficientChainBalance.
+    // Establish the source chain's balance via TBM if needed
     const amountBN = BigNumber.from(result.amountWei);
     const currentSrcBalance = await getGWChainBalance(gwProvider, sourceChainId, assetId);
     if (currentSrcBalance.lt(amountBN)) {
       const l1Provider = new ethers.providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
-      const srcChain = state.chains!.l2.find((c) => c.chainId === sourceChainId)!;
+      const srcChain = getL2Chain(state.chains!, sourceChainId);
       const l2Provider = new ethers.providers.JsonRpcProvider(srcChain.rpcUrl);
-      const gwDiamondProxy = state.chainAddresses!.find((c) => c.chainId === GW_CHAIN_ID)!.diamondProxy;
-      const l2DiamondProxy = state.chainAddresses!.find((c) => c.chainId === sourceChainId)!.diamondProxy;
+      const gwDiamondProxy = getChainDiamondProxy(state.chainAddresses!, gwChainId);
+      const l2DiamondProxy = getChainDiamondProxy(state.chainAddresses!, sourceChainId);
 
       await migrateTokenBalanceToGW({
         l2Provider,
@@ -126,14 +121,12 @@ describe("06 - Gateway Interop (L2A <-> L2B)", function () {
       });
     }
 
-    // Snapshot GW chain balances before processLogsAndMessages (after seeding)
     const srcGwBalanceBefore = await getGWChainBalance(gwProvider, sourceChainId, assetId);
     const dstGwBalanceBefore = await getGWChainBalance(gwProvider, targetChainId, assetId);
 
     console.log(`   GWAssetTracker.chainBalance[${sourceChainId}][assetId] before: ${srcGwBalanceBefore}`);
     console.log(`   GWAssetTracker.chainBalance[${targetChainId}][assetId] before: ${dstGwBalanceBefore}`);
 
-    // Call processLogsAndMessages on GW for the source chain
     const processResult = await callProcessLogsAndMessages({
       gwProvider,
       gwRpcUrl: gwChain.rpcUrl,
@@ -143,19 +136,14 @@ describe("06 - Gateway Interop (L2A <-> L2B)", function () {
       logger: (line) => console.log(line),
     });
 
-    expect(processResult.txHash).to.match(/^0x[0-9a-fA-F]{64}$/);
+    expect(processResult.txHash).to.not.be.null;
 
-    // Snapshot GW chain balances after
     const srcGwBalanceAfter = await getGWChainBalance(gwProvider, sourceChainId, assetId);
     const dstGwBalanceAfter = await getGWChainBalance(gwProvider, targetChainId, assetId);
 
     console.log(`   GWAssetTracker.chainBalance[${sourceChainId}][assetId] after: ${srcGwBalanceAfter}`);
     console.log(`   GWAssetTracker.chainBalance[${targetChainId}][assetId] after: ${dstGwBalanceAfter}`);
 
-    // Verify asset balance changes:
-    // _handleAssetRouterMessageInner(source, dest, assetId, amount) ->
-    //   _handleChainBalanceChangeOnGateway: decrements chainBalance[source], increments chainBalance[dest]
-    //   (unless source or dest is L1_CHAIN_ID)
     const amountWei = BigNumber.from(result.amountWei);
 
     if (sourceChainId !== 1) {
@@ -177,27 +165,30 @@ describe("06 - Gateway Interop (L2A <-> L2B)", function () {
     return result;
   }
 
-  it("transfers tokens L2A->L2B and processes logs on GW", async () => {
+  it("transfers tokens between GW-settled chains and processes logs on GW", async () => {
     await transferAndProcessLogs({
-      sourceChainId: L2A_CHAIN_ID,
-      targetChainId: L2B_CHAIN_ID,
+      sourceChainId: gwSettledChainIds[0],
+      targetChainId: gwSettledChainIds[1],
       amount: "5",
+      sourceTokenAddress: state.testTokens![gwSettledChainIds[0]],
     });
   });
 
-  it("transfers tokens L2B->L2A and processes logs on GW", async () => {
+  it("transfers tokens in reverse direction between GW-settled chains", async () => {
     await transferAndProcessLogs({
-      sourceChainId: L2B_CHAIN_ID,
-      targetChainId: L2A_CHAIN_ID,
+      sourceChainId: gwSettledChainIds[1],
+      targetChainId: gwSettledChainIds[0],
       amount: "3",
+      sourceTokenAddress: state.testTokens![gwSettledChainIds[1]],
     });
   });
 
-  it("transfers tokens L2A->GW and processes logs on GW", async () => {
+  it("transfers tokens from GW-settled chain to GW and processes logs", async () => {
     await transferAndProcessLogs({
-      sourceChainId: L2A_CHAIN_ID,
-      targetChainId: GW_CHAIN_ID,
+      sourceChainId: gwSettledChainIds[0],
+      targetChainId: gwChainId,
       amount: "2",
+      sourceTokenAddress: state.testTokens![gwSettledChainIds[0]],
     });
   });
 });

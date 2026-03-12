@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { Contract, providers } from "ethers";
+import { Contract, ethers, providers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { l1BridgehubAbi, l2BridgehubAbi } from "../../src/contracts";
 import {
@@ -10,30 +10,28 @@ import {
   INTEROP_CENTER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
 } from "../../src/const";
+import { getChainIdByRole, getL2Chain } from "../../src/utils";
 
-const GW_CHAIN_ID = 11;
-
-describe("04 - Gateway Setup", function () {
+describe("04 - Gateway State Verification", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();
   let state: ReturnType<typeof runner.loadState>;
+  let gwChainId: number;
 
   before(() => {
     state = runner.loadState();
     if (!state.chains || !state.l1Addresses || !state.ctmAddresses) {
       throw new Error("Deployment state incomplete. Run setup first.");
     }
+    gwChainId = getChainIdByRole(state.chains.config, "gateway");
   });
 
   describe("Gateway chain contracts", () => {
     let gwProvider: providers.JsonRpcProvider;
 
     before(() => {
-      const gwChain = state.chains!.l2.find((c) => c.chainId === GW_CHAIN_ID);
-      if (!gwChain) {
-        throw new Error(`GW chain ${GW_CHAIN_ID} not found`);
-      }
+      const gwChain = getL2Chain(state.chains!, gwChainId);
       gwProvider = new providers.JsonRpcProvider(gwChain.rpcUrl);
     });
 
@@ -67,16 +65,29 @@ describe("04 - Gateway Setup", function () {
       expect(code).to.not.equal("0x");
     });
 
-    it("has all interop chains registered on GW L2Bridgehub", async () => {
+    it("has registered chains on GW L2Bridgehub", async () => {
       const l2BhAbi = l2BridgehubAbi();
       const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BhAbi, gwProvider);
 
-      for (const chainId of [10, 11, 12, 13]) {
-        const baseTokenAssetId = await l2Bridgehub.baseTokenAssetId(chainId);
-        expect(baseTokenAssetId, `Chain ${chainId} should be registered on GW L2Bridgehub`).to.not.equal(
-          "0x0000000000000000000000000000000000000000000000000000000000000000"
-        );
+      // All L2 chains should be registered
+      for (const chainConfig of state.chains!.config) {
+        if (chainConfig.isL1) continue;
+        const baseTokenAssetId = await l2Bridgehub.baseTokenAssetId(chainConfig.chainId);
+        expect(
+          baseTokenAssetId,
+          `Chain ${chainConfig.chainId} (${chainConfig.role}) should be registered on GW L2Bridgehub`
+        ).to.not.equal(ethers.constants.HashZero);
       }
+    });
+
+    it("returns zero for unregistered chain on GW L2Bridgehub", async () => {
+      const l2BhAbi = l2BridgehubAbi();
+      const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BhAbi, gwProvider);
+
+      // A non-existent chain should have zero base token asset ID
+      const unregisteredChainId = 999999;
+      const baseTokenAssetId = await l2Bridgehub.baseTokenAssetId(unregisteredChainId);
+      expect(baseTokenAssetId, "Unregistered chain should have zero baseTokenAssetId").to.equal(ethers.constants.HashZero);
     });
   });
 
@@ -88,8 +99,8 @@ describe("04 - Gateway Setup", function () {
     });
 
     it("GW chain has diamond proxy on L1", async () => {
-      const chainAddr = state.chainAddresses!.find((c) => c.chainId === GW_CHAIN_ID);
-      expect(chainAddr, `GW chain ${GW_CHAIN_ID} not found in chainAddresses`).to.exist;
+      const chainAddr = state.chainAddresses!.find((c) => c.chainId === gwChainId);
+      expect(chainAddr, `GW chain ${gwChainId} not found in chainAddresses`).to.exist;
       const code = await l1Provider.getCode(chainAddr!.diamondProxy);
       expect(code).to.not.equal("0x");
     });

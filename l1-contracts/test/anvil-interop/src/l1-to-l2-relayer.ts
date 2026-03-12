@@ -182,10 +182,12 @@ export class L1ToL2Relayer {
     const receipt = await tx.wait();
     console.log(`      Confirmed in L2 block ${receipt?.blockNumber}`);
 
-    // TODO: Handle factory deps if needed
     const factoryDeps = request.factoryDeps;
     if (factoryDeps && factoryDeps.length > 0) {
-      console.log(`      Note: ${factoryDeps.length} factory deps were included but not deployed`);
+      throw new Error(
+        `Factory deps deployment not implemented in L1ToL2Relayer. ` +
+        `Transaction included ${factoryDeps.length} factory dep(s) that were not deployed on L2.`
+      );
     }
   }
 }

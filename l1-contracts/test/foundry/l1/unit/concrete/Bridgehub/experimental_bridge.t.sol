@@ -158,7 +158,7 @@ contract ExperimentalBridgeTest is Test {
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
-        mockChainContract = new DummyZKChain(address(bridgehub), block.chainid, address(0), eip7702Checker);
+        mockChainContract = new DummyZKChain(address(bridgehub), eraChainId, block.chainid, address(0), eip7702Checker);
 
         mockL2Contract = makeAddr("mockL2Contract");
         // mocks to use in bridges instead of using a dummy one
@@ -874,6 +874,7 @@ contract ExperimentalBridgeTest is Test {
         chainId = bound(chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
         vm.assume(randomCaller != deployerAddress && randomCaller != bridgeOwner);
+        vm.assume(newChainAddress != address(0));
 
         _initializeBridgehub();
 
@@ -1285,7 +1286,7 @@ contract ExperimentalBridgeTest is Test {
         assertEq(canonicalHash, resultantHash);
     }
 
-    // This is an example how to test behaviour of 7702. Keeping it, so the logic can be re-used in the future
+    // This is an example how to test behaviour of 7702. Keeping it, so the logic can be reused in the future
     function test_requestL2TransactionDirect_NonETHCase7702(
         uint256 mockChainId,
         uint256 mockMintValue,

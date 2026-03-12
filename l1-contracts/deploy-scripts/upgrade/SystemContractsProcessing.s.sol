@@ -5,6 +5,7 @@ import {console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../utils/Utils.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
+    L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
     L2_INTEROP_ROOT_STORAGE,
@@ -37,7 +38,7 @@ struct SystemContract {
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
 uint256 constant SYSTEM_CONTRACTS_COUNT = 30;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
-uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 8;
+uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 9;
 
 library SystemContractsProcessing {
     /// @notice Retrieves the entire list of system contracts as a memory array
@@ -314,7 +315,10 @@ library SystemContractsProcessing {
             if (systemContracts[i].isPrecompile) {
                 result[i] = Utils.readPrecompileBytecode(systemContracts[i].codeName);
             } else {
-                if (systemContracts[i].lang == Language.Solidity) {
+                // L2BaseToken is now in l1-contracts as L2BaseTokenEra
+                if (Utils.compareStrings(systemContracts[i].codeName, "L2BaseToken")) {
+                    result[i] = Utils.readZKFoundryBytecodeL1("L2BaseTokenEra.sol", "L2BaseTokenEra");
+                } else if (systemContracts[i].lang == Language.Solidity) {
                     result[i] = Utils.readSystemContractsBytecode(systemContracts[i].codeName);
                 } else {
                     result[i] = Utils.readSystemContractsYulBytecode(systemContracts[i].codeName);
@@ -354,6 +358,7 @@ library SystemContractsProcessing {
         result[5] = ContractsBytecodesLib.getCreationCode("L2MessageVerification");
         result[6] = ContractsBytecodesLib.getCreationCode("L2ChainAssetHandler");
         result[7] = ContractsBytecodesLib.getCreationCode("L2InteropRootStorage");
+        result[8] = ContractsBytecodesLib.getCreationCode("BaseTokenHolder");
     }
 
     /// Note, that while proper initialization may require multiple steps,
@@ -424,6 +429,13 @@ library SystemContractsProcessing {
         forceDeployments[7] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[7]),
             newAddress: address(L2_INTEROP_ROOT_STORAGE),
+            callConstructor: false,
+            value: 0,
+            input: ""
+        });
+        forceDeployments[8] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[8]),
+            newAddress: L2_BASE_TOKEN_HOLDER_ADDR,
             callConstructor: false,
             value: 0,
             input: ""

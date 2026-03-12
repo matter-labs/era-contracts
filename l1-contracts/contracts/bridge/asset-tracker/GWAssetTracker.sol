@@ -69,7 +69,7 @@ import {
     InvalidInteropChainId,
     InvalidL2ShardId,
     InvalidServiceLog,
-    InvalidEmptyMessageRoot,
+    InvalidEmptyMultichainBatchRoot,
     RegisterNewTokenNotAllowed,
     InvalidFeeRecipient,
     SettlementFeePayerNotAgreed
@@ -114,8 +114,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// On such chains, it is responsible for sending withdrawal messages.
     mapping(uint256 chainId => address legacySharedBridgeAddress) internal legacySharedBridgeAddress;
 
-    /// @notice Empty messageRoot calculated for specific chain.
-    mapping(uint256 chainId => bytes32 emptyMessageRoot) internal emptyMessageRoot;
+    /// @notice Empty multichainBatchRoot calculated for specific chain.
+    mapping(uint256 chainId => bytes32 emptyMultichainBatchRoot) internal emptyMultichainBatchRoot;
 
     /// @notice Gateway settlement fee per interop operation in ZK tokens.
     /// @dev Set by gateway governance, paid by chain operators during settlement.
@@ -352,15 +352,18 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 }
             }
         }
+        if (msgCount != _processLogsInputs.messages.length) {
+            revert InvalidMessage();
+        }
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 
-        bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
+        bytes32 expectedEmptyMultichainBatchRoot = _getEmptyMultichainBatchRoot(_processLogsInputs.chainId);
         require(
-            _processLogsInputs.messageRoot == emptyMessageRootForChain,
-            InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot)
+            _processLogsInputs.multichainBatchRoot == expectedEmptyMultichainBatchRoot,
+            InvalidEmptyMultichainBatchRoot(expectedEmptyMultichainBatchRoot, _processLogsInputs.multichainBatchRoot)
         );
-        bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.messageRoot));
+        bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.multichainBatchRoot));
 
         if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {
             revert ReconstructionMismatch(chainBatchRootHash, _processLogsInputs.chainBatchRoot);
@@ -420,10 +423,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         emit GatewaySettlementFeesCollected(_chainId, _settlementFeePayer, totalFee, _chargeableInteropCount);
     }
 
-    function _getEmptyMessageRoot(uint256 _chainId) internal returns (bytes32) {
-        bytes32 savedEmptyMessageRoot = emptyMessageRoot[_chainId];
-        if (savedEmptyMessageRoot != bytes32(0)) {
-            return savedEmptyMessageRoot;
+    function _getEmptyMultichainBatchRoot(uint256 _chainId) internal returns (bytes32) {
+        bytes32 savedEmptyMultichainBatchRoot = emptyMultichainBatchRoot[_chainId];
+        if (savedEmptyMultichainBatchRoot != bytes32(0)) {
+            return savedEmptyMultichainBatchRoot;
         }
         FullMerkleMemory.FullTree memory sharedTree;
         sharedTree.createTree(1);
@@ -434,10 +437,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         chainTree.createTree(1);
         bytes32 initialChainTreeHash = chainTree.setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
         bytes32 leafHash = MessageHashing.chainIdLeafHash(initialChainTreeHash, _chainId);
-        bytes32 emptyMessageRootCalculated = sharedTree.pushNewLeaf(leafHash);
+        bytes32 emptyMultichainBatchRootCalculated = sharedTree.pushNewLeaf(leafHash);
 
-        emptyMessageRoot[_chainId] = emptyMessageRootCalculated;
-        return emptyMessageRootCalculated;
+        emptyMultichainBatchRoot[_chainId] = emptyMultichainBatchRootCalculated;
+        return emptyMultichainBatchRootCalculated;
     }
 
     /// @notice Handles potential failed deposits. Not all L1->L2 txs are deposits.

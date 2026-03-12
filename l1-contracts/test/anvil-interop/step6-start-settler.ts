@@ -35,7 +35,7 @@ async function main() {
 
   console.log("\n=== Step 6: Starting Daemons ===\n");
 
-  const { settler, l1ToL2Relayer, l2ToL2Relayer } = await runner.step6StartBatchSettler(
+  const { settler, l1ToL2Relayer, l2ToL2Relayer } = await runner.startDaemons(
     l1Provider,
     l2Providers,
     chainAddressesMap,

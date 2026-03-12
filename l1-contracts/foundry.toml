@@ -17,6 +17,7 @@ fs_permissions = [
     { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/permanent-values/" },
     { access = "read-write", path = "./script-config/permanent-values.toml" },
     { access = "read-write", path = "./upgrade-envs/permanent-values/local.toml" },
+    { access = "read-write", path = "./script-out" },
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
     { access = "read", path = "../system-contracts/artifacts-zk/" },
     { access = "read", path = "../system-contracts/contracts-preprocessed/precompiles/artifacts" },

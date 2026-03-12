@@ -3,28 +3,37 @@
     {
       "chainId": 31337,
       "port": 9545,
-      "isL1": true
+      "isL1": true,
+      "role": "l1"
     },
     {
       "chainId": 10,
       "port": 4050,
-      "isL1": false
+      "isL1": false,
+      "role": "directSettled",
+      "settlement": "l1"
     },
     {
       "chainId": 11,
       "port": 4051,
       "isL1": false,
-      "isGateway": true
+      "isGateway": true,
+      "role": "gateway",
+      "settlement": "l1"
     },
     {
       "chainId": 12,
       "port": 4052,
-      "isL1": false
+      "isL1": false,
+      "role": "gwSettled",
+      "settlement": "gateway"
     },
     {
       "chainId": 13,
       "port": 4053,
-      "isL1": false
+      "isL1": false,
+      "role": "gwSettled",
+      "settlement": "gateway"
     }
   ],
   "batchSettler": {

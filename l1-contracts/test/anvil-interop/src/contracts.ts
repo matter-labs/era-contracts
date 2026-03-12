@@ -7,8 +7,12 @@
  * TODO: Replace individual functions with a generic approach based on contract name strings,
  * e.g. getAbi("ChainAdminOwnable"), getBytecode("ChainAdminOwnable"), getInterface("ChainAdminOwnable").
  * Store the valid contract names as constants and derive artifact paths from them.
+ *
+ * TODO: Replace individual functions with a generic approach based on contract name strings,
+ * e.g. getAbi("ChainAdminOwnable"), getBytecode("ChainAdminOwnable"), getInterface("ChainAdminOwnable").
+ * Store the valid contract names as constants and derive artifact paths from them.
  */
-import { loadAbiFromOut, loadBytecodeFromOut } from "./utils";
+import { loadAbiFromOut, loadBytecodeFromOut, loadCreationBytecodeFromOut } from "./utils";
 
 // ── ABIs ────────────────────────────────────────────────────────
 
@@ -118,11 +122,6 @@ export function ownable2StepAbi(): any[] {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function dummyL1MessageRootAbi(): any[] {
-  return loadAbiFromOut("DummyL1MessageRoot.sol/DummyL1MessageRoot.json");
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function migratorFacetAbi(): any[] {
   return loadAbiFromOut("Migrator.sol/MigratorFacet.json");
 }
@@ -137,10 +136,20 @@ export function chainAdminOwnableAbi(): any[] {
   return loadAbiFromOut("ChainAdminOwnable.sol/ChainAdminOwnable.json");
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function iBaseTokenAbi(): any[] {
+  return loadAbiFromOut("IBaseToken.sol/IBaseToken.json");
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function gettersFacetAbi(): any[] {
+  return loadAbiFromOut("Getters.sol/GettersFacet.json");
+}
+
 // ── Bytecodes ───────────────────────────────────────────────────
 
 export function chainAdminOwnableBytecode(): string {
-  return loadBytecodeFromOut("ChainAdminOwnable.sol/ChainAdminOwnable.json");
+  return loadCreationBytecodeFromOut("ChainAdminOwnable.sol/ChainAdminOwnable.json");
 }
 
 export function l2NativeTokenVaultDevBytecode(): string {

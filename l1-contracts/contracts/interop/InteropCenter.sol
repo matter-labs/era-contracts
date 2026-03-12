@@ -14,7 +14,7 @@ import {IInteropCenter} from "./IInteropCenter.sol";
 import {
     GW_ASSET_TRACKER,
     L2_ASSET_ROUTER_ADDR,
-    L2_BASE_TOKEN_SYSTEM_CONTRACT,
+    L2_BASE_TOKEN_HOLDER,
     L2_BRIDGEHUB,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_NATIVE_TOKEN_VAULT,
@@ -373,8 +373,8 @@ contract InteropCenter is
 
             // Burn user value for interop calls.
             if (_totalBurnedCallsValue > 0) {
-                // slither-disable-next-line arbitrary-send-eth
-                L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}(_destinationChainId);
+                // Send tokens to BaseTokenHolder and notify L2AssetTracker via burnAndStartBridging
+                L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: _totalBurnedCallsValue}(_destinationChainId);
             }
         } else {
             uint256 expectedValue = _totalIndirectCallsValue + protocolFee;

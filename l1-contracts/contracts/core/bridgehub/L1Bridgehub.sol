@@ -132,6 +132,11 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             _initData: _initData,
             _factoryDeps: _factoryDeps
         });
+        // It is an additional protection against a malicious chain type manager
+        if (chainAddress == address(0)) {
+            revert ZeroAddress();
+        }
+
         _registerNewZKChain(_chainId, chainAddress, true);
         messageRoot.addNewChain(_chainId, 0);
 

@@ -36,6 +36,7 @@ export class ForgeDeployer {
       L1_CONFIG: configPath,
       L1_OUTPUT: outputPath,
       PERMANENT_VALUES_INPUT: "/test/anvil-interop/config/permanent-values.toml",
+      USE_DUMMY_MESSAGE_ROOT: "true",
     };
 
     // Use runForAnvil() which skips the acceptAdmin() step

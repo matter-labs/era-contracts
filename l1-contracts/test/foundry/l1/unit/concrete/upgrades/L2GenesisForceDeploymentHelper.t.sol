@@ -158,7 +158,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         MockSystemContractProxyAdmin etchedProxyAdmin = MockSystemContractProxyAdmin(
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
         );
-        assertEq(etchedProxyAdmin.upgradeCallCount(), 8);
+        assertEq(etchedProxyAdmin.upgradeCallCount(), 9);
     }
 
     function testEraForceDeployment() public {
@@ -168,6 +168,9 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         bytes memory fixedEncoded = abi.encode(fixedData);
         bytes memory additionalEncoded = abi.encode(additionalData);
         _deployMockContract(GW_ASSET_TRACKER_ADDR);
+
+        // Etch L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR for initL2 call during genesis
+        _deployMockContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
 
         // For Era deployments, no proxy admin is needed
         vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
@@ -188,6 +191,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         assertEq(etchedDeployer.deploymentCount(L2_NATIVE_TOKEN_VAULT_ADDR), 1);
         assertEq(etchedDeployer.deploymentCount(L2_CHAIN_ASSET_HANDLER_ADDR), 1);
         assertEq(etchedDeployer.deploymentCount(L2_NTV_BEACON_DEPLOYER_ADDR), 1);
+        assertEq(etchedDeployer.deploymentCount(L2_BASE_TOKEN_HOLDER_ADDR), 1);
 
         // No proxy upgrades for Era
         MockSystemContractProxyAdmin etchedProxyAdmin = MockSystemContractProxyAdmin(
@@ -240,6 +244,11 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             abi.encode(keccak256("assetTracker_proxy"), uint32(0), bytes32(0))
         );
 
+        data.baseTokenHolderBytecodeInfo = abi.encode(
+            abi.encode(keccak256("baseTokenHolder_impl"), uint32(0), bytes32(0)),
+            abi.encode(keccak256("baseTokenHolder_proxy"), uint32(0), bytes32(0))
+        );
+
         if (isGenesis) {
             data.beaconDeployerInfo = abi.encode(
                 abi.encode(keccak256("beaconDeployer_impl"), uint32(0), bytes32(0)),
@@ -272,6 +281,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         data.interopHandlerBytecodeInfo = abi.encode(keccak256("interopHandler"));
         data.assetTrackerBytecodeInfo = abi.encode(keccak256("assetTracker"));
         data.beaconDeployerInfo = abi.encode(keccak256("beaconDeployer"));
+        data.baseTokenHolderBytecodeInfo = abi.encode(keccak256("baseTokenHolder"));
         data.zkTokenAssetId = DataEncoding.encodeNTVAssetId(ERA_CHAIN_ID, makeAddr("zkToken"));
 
         return data;
@@ -300,7 +310,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
     function _etchAllDeferredContracts() internal {
         // Etch contracts to addresses that need function calls to work
-        address[] memory addressesToEtch = new address[](9);
+        address[] memory addressesToEtch = new address[](10);
         addressesToEtch[0] = L2_MESSAGE_ROOT_ADDR;
         addressesToEtch[1] = L2_BRIDGEHUB_ADDR;
         addressesToEtch[2] = L2_ASSET_ROUTER_ADDR;
@@ -310,6 +320,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         addressesToEtch[6] = L2_INTEROP_CENTER_ADDR;
         addressesToEtch[7] = L2_INTEROP_HANDLER_ADDR;
         addressesToEtch[8] = L2_ASSET_TRACKER_ADDR;
+        addressesToEtch[9] = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
 
         for (uint256 i = 0; i < addressesToEtch.length; i++) {
             if (addressesToEtch[i].code.length == 0) {

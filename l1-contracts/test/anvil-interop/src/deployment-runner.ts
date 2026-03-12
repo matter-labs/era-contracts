@@ -17,8 +17,8 @@ import type {
   CTMDeployedAddresses,
   DeploymentState,
 } from "./types";
-import { loadBytecodeFromOut, getGwSettledChainIds } from "./utils";
-import { dummyL1MessageRootAbi, migratorFacetAbi } from "./contracts";
+import { getGwSettledChainIds } from "./utils";
+import { migratorFacetAbi } from "./contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./const";
 
 export interface StartChainOptions {
@@ -150,26 +150,7 @@ export class DeploymentRunner {
     await deployer.registerCTM(l1Addresses.bridgehub, ctmAddresses.chainTypeManager);
     done();
 
-    // Replace L1MessageRoot proxy code with DummyL1MessageRoot
-    // This preserves all storage (chain registrations, batch roots) but bypasses proof verification
-    if (l1Addresses.messageRoot) {
-      const dummyBytecode = loadBytecodeFromOut("DummyL1MessageRoot.sol/DummyL1MessageRoot.json");
-      const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
-      await l1Provider.send("anvil_setCode", [l1Addresses.messageRoot, dummyBytecode]);
 
-      // Set stored addresses since immutables are lost after code replacement
-      const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
-      const wallet = new Wallet(privateKey, l1Provider);
-      const dummy = new Contract(l1Addresses.messageRoot, dummyL1MessageRootAbi(), wallet);
-      const setAddrTx = await dummy.setStoredAddresses(
-        l1Addresses.bridgehub,
-        l1Addresses.l1AssetTracker,
-        11, // ERA_GATEWAY_CHAIN_ID
-        { gasLimit: 500_000 }
-      );
-      await setAddrTx.wait();
-      console.log(`   Replaced L1MessageRoot proxy (${l1Addresses.messageRoot}) with DummyL1MessageRoot`);
-    }
 
     const state = this.loadState();
     state.l1Addresses = l1Addresses;
@@ -473,13 +454,13 @@ export class DeploymentRunner {
     return { gatewayCTMAddr };
   }
 
-  async step6StartBatchSettler(
+  async startDaemons(
     l1Provider: providers.JsonRpcProvider,
     l2Providers: Map<number, providers.JsonRpcProvider>,
     chainAddresses: Map<number, ChainAddresses>,
     config: AnvilConfig
   ): Promise<{ settler: BatchSettler; l1ToL2Relayer: L1ToL2Relayer; l2ToL2Relayer: L2ToL2Relayer }> {
-    console.log("\n=== Step 6: Starting Daemons ===\n");
+    console.log("\n=== Starting Daemons ===\n");
 
     const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 

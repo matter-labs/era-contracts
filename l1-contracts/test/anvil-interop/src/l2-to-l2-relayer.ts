@@ -12,14 +12,12 @@ import {
 /**
  * L2→L2 Cross-Chain Relayer
  *
- * Monitors L2 chains for special cross-chain message transactions and relays them
- * through L1 to the target L2 chain.
+ * Monitors L2 chains for InteropBundleSent events from InteropCenter and directly
+ * executes the bundle on the target L2 chain via L2InteropHandler.executeBundle().
  *
- * Flow: L2 Source → L1 Bridgehub → L2 Target
- *
- * To send a cross-chain message from L2, send a transaction to a special marker address:
- * - To: 0x0000000000000000000000000000000000000420 (CROSS_CHAIN_MESSENGER)
- * - Data: ABI-encoded (targetChainId, targetAddress, targetCalldata)
+ * For Anvil testing, bundles are relayed directly between L2 chains (bypassing L1).
+ * In production, batches go through settlement on the gateway and the
+ * interop message root is imported by the destination chain before execution.
  */
 export class L2ToL2Relayer {
   private l2Providers: Map<number, providers.JsonRpcProvider>;

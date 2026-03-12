@@ -429,11 +429,13 @@ library Utils {
     }
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](7);
+        bytes4[] memory selectors = new bytes4[](9);
         uint256 i = 0;
         selectors[i++] = MailboxFacet.proveL2MessageInclusion.selector;
         selectors[i++] = MailboxFacet.proveL2LogInclusion.selector;
         selectors[i++] = MailboxFacet.proveL1ToL2TransactionStatus.selector;
+        selectors[i++] = MailboxFacet.finalizeEthWithdrawal.selector; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
+        selectors[i++] = MailboxFacet.requestL2Transaction.selector; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
         selectors[i++] = MailboxFacet.bridgehubRequestL2Transaction.selector;
         selectors[i++] = MailboxFacet.l2TransactionBaseCost.selector;
         selectors[i++] = MailboxFacet.proveL2LeafInclusion.selector;
@@ -442,7 +444,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](70);
+        bytes4[] memory selectors = new bytes4[](72);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -515,6 +517,8 @@ library Utils {
         selectors[i++] = UtilsFacet.util_getL2SystemContractsUpgradeTxHash.selector;
         selectors[i++] = UtilsFacet.util_setPriorityTreeNextLeafIndex.selector;
         selectors[i++] = UtilsFacet.util_setPriorityOpsRequestTimestamp.selector;
+        selectors[i++] = UtilsFacet.util_setZksyncOS.selector;
+        selectors[i++] = UtilsFacet.util_setBaseTokenHasTotalSupply.selector;
 
         return selectors;
     }

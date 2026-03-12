@@ -167,7 +167,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             InteropRoot[][] memory dependencyRoots,
             L2Log[][] memory logs,
             bytes[][] memory messages,
-            bytes32[] memory messageRoots,
+            bytes32[] memory multichainBatchRoots,
             address settlementFeePayer
         ) = BatchDecoder.decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
@@ -177,11 +177,16 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (block.chainid == L1_CHAIN_ID) {
             require(logs.length == 0, InvalidBatchesDataLength(0, logs.length));
             require(messages.length == 0, InvalidBatchesDataLength(0, messages.length));
+            require(multichainBatchRoots.length == 0, InvalidBatchesDataLength(0, multichainBatchRoots.length));
         } else {
             require(batchesData.length == logs.length, InvalidBatchesDataLength(batchesData.length, logs.length));
             require(
                 batchesData.length == messages.length,
                 InvalidBatchesDataLength(batchesData.length, messages.length)
+            );
+            require(
+                batchesData.length == multichainBatchRoots.length,
+                InvalidBatchesDataLength(batchesData.length, multichainBatchRoots.length)
             );
         }
 
@@ -197,7 +202,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     chainId: s.chainId,
                     batchNumber: batchesData[i].batchNumber,
                     chainBatchRoot: batchesData[i].l2LogsTreeRoot,
-                    messageRoot: messageRoots[i],
+                    multichainBatchRoot: multichainBatchRoots[i],
                     settlementFeePayer: settlementFeePayer
                 });
                 GW_ASSET_TRACKER.processLogsAndMessages(processLogsInput);

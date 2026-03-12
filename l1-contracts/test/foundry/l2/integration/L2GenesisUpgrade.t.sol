@@ -96,6 +96,7 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
                     _hashL1(names.bridgehub),
                     _hashL1(names.chainAssetHandler),
                     _hashL1(names.beaconDeployer),
+                    _hashL1(names.baseTokenHolder),
                     _hashL1(names.interopCenter),
                     _hashL1(names.interopHandler),
                     _hashL1(names.assetTracker)

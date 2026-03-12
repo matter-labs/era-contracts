@@ -63,9 +63,6 @@ export interface ChainConfig {
 export interface ChainAddresses {
   chainId: number;
   diamondProxy: string;
-  l2Bridgehub?: string;
-  l2AssetRouter?: string;
-  l2NativeTokenVault?: string;
 }
 
 export interface L2Transaction {
@@ -118,13 +115,23 @@ export interface ProofInput {
   serializedProof: Uint8Array;
 }
 
+/** Role of a chain in the test environment. */
+export type ChainRole = "l1" | "directSettled" | "gateway" | "gwSettled";
+
+/** Settlement type: where this chain settles. */
+export type SettlementType = "l1" | "gateway";
+
+export interface AnvilChainConfig {
+  chainId: number;
+  port: number;
+  isL1: boolean;
+  isGateway?: boolean;
+  role: ChainRole;
+  settlement?: SettlementType;
+}
+
 export interface AnvilConfig {
-  chains: {
-    chainId: number;
-    port: number;
-    isL1: boolean;
-    isGateway?: boolean;
-  }[];
+  chains: AnvilChainConfig[];
   batchSettler: {
     pollingIntervalMs: number;
     batchSizeLimit: number;
@@ -146,7 +153,7 @@ interface L2ChainInfo {
 export interface ChainInfo {
   l1: L1ChainInfo | null;
   l2: L2ChainInfo[];
-  config: AnvilConfig["chains"];
+  config: AnvilChainConfig[];
 }
 
 export interface DeploymentState {
@@ -161,6 +168,8 @@ export interface MultiChainTokenTransferParams {
   sourceChainId?: number;
   targetChainId?: number;
   amount?: string;
+  /** Token address on the source chain. If omitted, uses the test token for sourceChainId. */
+  sourceTokenAddress?: string;
 }
 
 export interface FinalizeWithdrawalParams {

@@ -585,7 +585,7 @@ export function encodeExecuteBatchesData(
   const emptyInteropRoots = batchesData.map(() => []);
   const emptyLogs = batchesData.map(() => []);
   const emptyMessages = batchesData.map(() => []);
-  const emptyMessageRoots = batchesData.map(() => ethers.constants.HashZero);
+  const emptyMultichainBatchRoots = batchesData.map(() => ethers.constants.HashZero);
   const encodedExecuteDataWithoutVersion = defaultAbiCoder.encode(
     [
       `${STORED_BATCH_INFO_ABI_STRING}[]`,
@@ -602,7 +602,7 @@ export function encodeExecuteBatchesData(
       emptyInteropRoots,
       emptyLogs,
       emptyMessages,
-      emptyMessageRoots,
+      emptyMultichainBatchRoots,
       settlementFeePayer,
     ]
   );

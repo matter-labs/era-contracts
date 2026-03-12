@@ -62,7 +62,7 @@ async function main() {
       }
     }
 
-    const { settler: batchSettler } = await runner.step6StartBatchSettler(
+    const { settler: batchSettler } = await runner.startDaemons(
       l1Provider,
       l2Providers,
       chainAddressesMap,

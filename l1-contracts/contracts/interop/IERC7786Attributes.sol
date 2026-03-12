@@ -20,6 +20,6 @@ interface IERC7786Attributes {
     /// @notice Specifies fee payment method for interop calls
     /// @param _useFixed true = pay fixed ZK amount, false = pay operator-set base token amount
     /// @dev This attribute is optional and defaults to `false` (base token fees) when not provided.
-    /// @dev Contracts should be able to toggle this flag for Stage1/Stage2 compatibility, this is due to the fact that operator-set base token amount is dependant on operator of the chain, while fixed ZK option is not.
+    /// @dev Contracts should be able to toggle this flag for Stage1/Stage2 compatibility, this is due to the fact that operator-set base token amount is dependent on operator of the chain, while fixed ZK option is not.
     function useFixedFee(bool _useFixed) external pure;
 }

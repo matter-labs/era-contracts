@@ -21,6 +21,7 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -222,13 +223,9 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         BridgedStandardERC20 bridgedToken = BridgedStandardERC20(
             addresses.l1NativeTokenVault.tokenAddress(l2TokenAssetId)
         );
-
-        // Verify initial token properties before reinit
-        string memory nameBefore = bridgedToken.name();
-        string memory symbolBefore = bridgedToken.symbol();
-
-        address owner = addresses.l1NativeTokenVault.owner();
-        vm.broadcast(owner);
+        address beaconAddress = address(addresses.l1NativeTokenVault.bridgedTokenBeacon());
+        address beaconOwner = UpgradeableBeacon(beaconAddress).owner();
+        vm.prank(beaconOwner);
         bridgedToken.reinitializeToken(
             BridgedStandardERC20.ERC20Getters({ignoreName: false, ignoreSymbol: false, ignoreDecimals: false}),
             "TestnetERC20Token",
