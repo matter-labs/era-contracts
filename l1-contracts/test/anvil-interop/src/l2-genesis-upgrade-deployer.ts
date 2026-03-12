@@ -16,6 +16,7 @@ import {
   L2_ASSET_ROUTER_ADDR,
   L2_ASSET_TRACKER_ADDR,
   L2_BASE_TOKEN_ADDR,
+  L2_BASE_TOKEN_HOLDER_ADDR,
   L2_BRIDGEHUB_ADDR,
   L2_CHAIN_ASSET_HANDLER_ADDR,
   L2_COMPLEX_UPGRADER_ADDR,
@@ -117,6 +118,11 @@ const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
     address: GW_ASSET_TRACKER_ADDR,
     name: "GWAssetTracker",
     artifactPath: "GWAssetTracker.sol/GWAssetTracker.json",
+  },
+  {
+    address: L2_BASE_TOKEN_HOLDER_ADDR,
+    name: "BaseTokenHolder",
+    artifactPath: "BaseTokenHolder.sol/BaseTokenHolder.json",
   },
   {
     address: INTEROP_CENTER_ADDR,
@@ -271,6 +277,7 @@ export class L2GenesisUpgradeDeployer {
       { addr: L2_ASSET_TRACKER_ADDR, name: "L2AssetTracker" },
       { addr: L2_MESSAGE_VERIFICATION_ADDR, name: "L2MessageVerification" },
       { addr: GW_ASSET_TRACKER_ADDR, name: "GWAssetTracker" },
+      { addr: L2_BASE_TOKEN_HOLDER_ADDR, name: "BaseTokenHolder" },
     ];
 
     await Promise.all(expectedContracts.map((c) => this.assertCodePresent(c.addr, c.name)));

@@ -15,6 +15,7 @@ import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
+import {DummyL1MessageRoot} from "contracts/dev-contracts/test/DummyL1MessageRoot.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
@@ -211,6 +212,8 @@ contract DeployL1CoreUtils is DeployUtils {
                 return type(ChainRegistrationSender).creationCode;
             } else if (compareStrings(contractName, "L1MessageRoot")) {
                 return type(L1MessageRoot).creationCode;
+            } else if (compareStrings(contractName, "DummyL1MessageRoot")) {
+                return type(DummyL1MessageRoot).creationCode;
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return type(CTMDeploymentTracker).creationCode;
             } else if (compareStrings(contractName, "L1Nullifier")) {
