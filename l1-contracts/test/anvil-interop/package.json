@@ -21,7 +21,8 @@
     "send:l2-to-l2": "ts-node send-l2-to-l2.ts",
     "deploy:test-token": "ts-node deploy-test-token.ts",
     "send:token": "ts-node send-token-simple.ts",
-    "setup-and-dump": "ts-node setup-and-dump-state.ts"
+    "setup-and-dump": "ts-node setup-and-dump-state.ts",
+    "test:v29-to-v31": "ts-node run-v29-to-v31-upgrade-test.ts"
   },
   "keywords": [
     "anvil",

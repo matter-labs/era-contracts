@@ -179,6 +179,12 @@ export function loadBytecodeFromOut(artifactRelativePath: string): string {
   return artifact.deployedBytecode?.object || artifact.bytecode?.object || "0x";
 }
 
+/** Load creation (init) bytecode — needed for ContractFactory.deploy(). */
+export function loadCreationBytecodeFromOut(artifactRelativePath: string): string {
+  const artifact = loadArtifactFromOut(artifactRelativePath);
+  return artifact.bytecode?.object || "0x";
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function loadArtifactFromOut(artifactRelativePath: string): any {
   const outRoot = path.resolve(__dirname, "../../../out");

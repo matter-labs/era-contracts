@@ -3,8 +3,16 @@
  *
  * All loadAbiFromOut / loadBytecodeFromOut calls should go through this module
  * so artifact paths are defined in one place and typos are caught at compile time.
+ *
+ * TODO: Replace individual functions with a generic approach based on contract name strings,
+ * e.g. getAbi("ChainAdminOwnable"), getBytecode("ChainAdminOwnable"), getInterface("ChainAdminOwnable").
+ * Store the valid contract names as constants and derive artifact paths from them.
+ *
+ * TODO: Replace individual functions with a generic approach based on contract name strings,
+ * e.g. getAbi("ChainAdminOwnable"), getBytecode("ChainAdminOwnable"), getInterface("ChainAdminOwnable").
+ * Store the valid contract names as constants and derive artifact paths from them.
  */
-import { loadAbiFromOut, loadBytecodeFromOut } from "./utils";
+import { loadAbiFromOut, loadBytecodeFromOut, loadCreationBytecodeFromOut } from "./utils";
 
 // ── ABIs ────────────────────────────────────────────────────────
 
@@ -124,11 +132,30 @@ export function l1NullifierAbi(): any[] {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function chainAdminOwnableAbi(): any[] {
+  return loadAbiFromOut("ChainAdminOwnable.sol/ChainAdminOwnable.json");
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function iBaseTokenAbi(): any[] {
   return loadAbiFromOut("IBaseToken.sol/IBaseToken.json");
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function gettersFacetAbi(): any[] {
+  return loadAbiFromOut("Getters.sol/GettersFacet.json");
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function adminFacetAbi(): any[] {
+  return loadAbiFromOut("Admin.sol/AdminFacet.json");
+}
+
 // ── Bytecodes ───────────────────────────────────────────────────
+
+export function chainAdminOwnableBytecode(): string {
+  return loadCreationBytecodeFromOut("ChainAdminOwnable.sol/ChainAdminOwnable.json");
+}
 
 export function l2NativeTokenVaultDevBytecode(): string {
   return loadBytecodeFromOut("L2NativeTokenVaultDev.sol/L2NativeTokenVaultDev.json");
