@@ -105,7 +105,14 @@ pub const EIP1967_ADMIN_SLOT: B256 = FixedBytes::<32>(hex_literal::hex!(
     "b53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103"
 ));
 
-pub const INITIAL_CONTRACTS: [(Address, ContractSource); 20] = [
+const L2_INTEROP_ROOT_STORAGE: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "0000000000000000000000000000000000010008"
+)));
+const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "0000000000000000000000000000000000010009"
+)));
+
+pub const INITIAL_CONTRACTS: [(Address, ContractSource); 22] = [
     (
         L2_COMPLEX_UPGRADER_ADDR,
         ContractSource::L1ContractName("SystemContractProxy"),
@@ -187,5 +194,13 @@ pub const INITIAL_CONTRACTS: [(Address, ContractSource); 20] = [
     (
         DETERMINISTIC_CREATE2_ADDRESS,
         ContractSource::Bytecode(CREATE2_FACTORY_RUNTIME_BYTECODE),
+    ),
+    (
+        L2_INTEROP_ROOT_STORAGE,
+        ContractSource::L1ContractName("L2InteropRootStorage"),
+    ),
+    (
+        L2_MESSAGE_VERIFICATION,
+        ContractSource::L1ContractName("L2MessageVerification"),
     ),
 ];
