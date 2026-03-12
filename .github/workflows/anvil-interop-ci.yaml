@@ -182,13 +182,10 @@ jobs:
         with:
           submodules: true
 
-      - name: Install Foundry (includes Anvil)
+      - name: Install Foundry (no foundry-zksync — deterministic bytecode)
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.5.1
-
-      - name: Install foundry-zksync
-        uses: ./.github/actions/install-zksync-foundry
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -229,7 +226,7 @@ jobs:
           else
             echo ""
             echo "Committed chain-states differ from freshly generated state."
-            echo "Run 'FOUNDRY_PROFILE=anvil-interop forge build && cd test/anvil-interop && npx ts-node setup-and-dump-state.ts' locally and commit the updated chain-states."
+            echo "Run the 'Regenerate Anvil Interop Chain States' workflow from the Actions tab to update them."
             exit 1
           fi
 
