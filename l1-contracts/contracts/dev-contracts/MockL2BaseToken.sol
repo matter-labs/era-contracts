@@ -15,6 +15,12 @@ contract MockL2BaseToken {
 
     event Withdrawal(address indexed l2Sender, address indexed l1Receiver, uint256 amount);
 
+    /// @notice Initializes the L2 Base Token during genesis upgrade.
+    /// @dev No-op in the mock — real implementation sets L1 chain ID and BaseTokenHolder balance.
+    function initL2(uint256 /* _l1ChainId */) external {
+        // No-op for Anvil testing
+    }
+
     /// @notice Burns msg.value amount of ETH from the user (called by InteropCenter/NTV)
     function burnMsgValue(uint256 /* _toChainId */) external payable {
         // Anvil tracks ETH natively; no explicit burn needed
