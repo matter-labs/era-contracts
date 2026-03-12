@@ -71,6 +71,7 @@ const REQUIRED_CONTRACTS = [
   "Migrator.sol",
   "L1Nullifier.sol",
   "IBaseToken.sol",
+  "BaseTokenHolder.sol",
 ];
 
 async function copyContractAbi(src: string, dest: string): Promise<void> {
