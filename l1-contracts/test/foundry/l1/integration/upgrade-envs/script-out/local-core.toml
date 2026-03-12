@@ -5,7 +5,11 @@ chain_upgrade_diamond_cut = "0x0000000000000000000000000000000000000000000000000
 deployer_addr = "0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38"
 diamond_proxy_addr = "0x1De9D45175fF5c3Ef5e89371632aC3a114Cb0373"
 era_chain_id = 9
+<<<<<<< HEAD
 governance_addr = "0x14c2Ab60f3A568Ff62B2F64dB401312bbe949E64"
+=======
+governance_addr = "0x440dE863c5119786B63e1d93aF6C6F7f7c69b59e"
+>>>>>>> @{-1}
 is_zk_sync_os = false
 l1_chain_id = 31337
 multicall3_addr = "0x962BD50403f6C3fe555f4585114296753c84c651"

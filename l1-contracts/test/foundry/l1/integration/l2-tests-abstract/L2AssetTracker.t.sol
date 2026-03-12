@@ -12,9 +12,11 @@ import {
     GW_ASSET_TRACKER_ADDR,
     L2_ASSET_TRACKER,
     L2_ASSET_TRACKER_ADDR,
+    L2_BASE_TOKEN_HOLDER_ADDR,
     L2_CHAIN_ASSET_HANDLER,
     L2_BOOTLOADER_ADDRESS,
     L2_BRIDGEHUB,
+    L2_COMPLEX_UPGRADER_ADDR,
     L2_MESSAGE_ROOT_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
@@ -25,7 +27,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {MAX_TOKEN_BALANCE} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
-import {AssetIdNotRegistered} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {AssetAlreadyRegistered, AssetIdNotRegistered} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
@@ -308,13 +310,134 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             abi.encode(1000)
         );
 
-        // Call as L2 Base Token System Contract
-        vm.prank(address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
-        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(amount);
+        // Mock currentSettlementLayerChainId to return L1 (not in gateway mode)
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
+            abi.encode(l1ChainId)
+        );
+
+        uint256 depositsBefore = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
+
+        // Call as BaseTokenHolder (onlyBaseTokenHolderOrL2BaseToken modifier)
+        vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, amount);
 
         // Verify chain balance did NOT increase (foreign token, not native)
         uint256 finalBalance = L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, baseTokenAssetId);
         assertEq(finalBalance, 0, "Chain balance should remain 0 for foreign tokens");
+
+        // Verify totalSuccessfulDepositsFromL1 increased by amount
+        uint256 depositsAfter = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
+        assertEq(depositsAfter - depositsBefore, amount, "totalSuccessfulDepositsFromL1 should increase by amount");
+    }
+
+    /// @notice On Era, L2BaseTokenEra.mint() calls handleFinalizeBaseTokenBridgingOnL2 directly
+    /// (msg.sender = L2_BASE_TOKEN_SYSTEM_CONTRACT). This must be allowed by access control.
+    function test_handleFinalizeBaseTokenBridgingOnL2_calledByL2BaseToken() public {
+        bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
+        uint256 amount = 300;
+        uint256 l1ChainId = 1;
+
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(l1ChainId);
+        stdstore
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig("originChainId(bytes32)")
+            .with_key(baseTokenAssetId)
+            .checked_write(l1ChainId);
+
+        vm.mockCall(
+            address(L2_BASE_TOKEN_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(IERC20.totalSupply.selector),
+            abi.encode(1000)
+        );
+
+        // Mock currentSettlementLayerChainId to return L1 (not in gateway mode)
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
+            abi.encode(l1ChainId)
+        );
+
+        uint256 depositsBefore = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
+
+        // Call as L2BaseToken (the Era flow: L2BaseTokenEra.mint() → asset tracker)
+        vm.prank(address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, amount);
+
+        // Verify totalSuccessfulDepositsFromL1 increased by amount
+        uint256 depositsAfter = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
+        assertEq(depositsAfter - depositsBefore, amount, "totalSuccessfulDepositsFromL1 should increase by amount");
+    }
+
+    /// @notice A random address must not be able to call handleFinalizeBaseTokenBridgingOnL2.
+    function test_handleFinalizeBaseTokenBridgingOnL2_revertUnauthorized() public {
+        vm.prank(address(0xDEAD));
+        vm.expectRevert();
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(1, 100);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  registerBaseTokenDuringUpgrade
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// @notice Verifies that registerBaseTokenDuringUpgrade registers the base token correctly.
+    function test_registerBaseTokenDuringUpgrade_registersBaseToken() public {
+        bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
+
+        // Set BASE_TOKEN_ASSET_ID (the function reads it internally)
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
+
+        // Verify not registered yet
+        assertFalse(
+            L2AssetTracker(L2_ASSET_TRACKER_ADDR).isAssetRegistered(baseTokenAssetId),
+            "Should not be registered before call"
+        );
+
+        // Expect BaseTokenRegisteredDuringUpgrade event
+        vm.expectEmit(true, false, false, false, L2_ASSET_TRACKER_ADDR);
+        emit IL2AssetTracker.BaseTokenRegisteredDuringUpgrade(baseTokenAssetId);
+
+        // Call as ComplexUpgrader (onlyUpgrader)
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2_ASSET_TRACKER.registerBaseTokenDuringUpgrade();
+
+        // Verify registered
+        assertTrue(
+            L2AssetTracker(L2_ASSET_TRACKER_ADDR).isAssetRegistered(baseTokenAssetId),
+            "Should be registered after call"
+        );
+
+        // Verify totalPreV31TotalSupply was set to {isSaved: true, amount: 0}
+        (bool isSaved, uint256 amount) = L2AssetTracker(L2_ASSET_TRACKER_ADDR).totalPreV31TotalSupply(baseTokenAssetId);
+        assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
+        assertEq(amount, 0, "totalPreV31TotalSupply.amount should be 0");
+    }
+
+    /// @notice Verifies that registerBaseTokenDuringUpgrade reverts if already registered.
+    function test_registerBaseTokenDuringUpgrade_revertIfAlreadyRegistered() public {
+        bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
+
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
+
+        // Pre-register the asset
+        stdstore
+            .target(L2_ASSET_TRACKER_ADDR)
+            .sig("isAssetRegistered(bytes32)")
+            .with_key(baseTokenAssetId)
+            .checked_write(true);
+
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        vm.expectRevert(abi.encodeWithSelector(AssetAlreadyRegistered.selector, baseTokenAssetId));
+        L2_ASSET_TRACKER.registerBaseTokenDuringUpgrade();
+    }
+
+    /// @notice Verifies that only the ComplexUpgrader can call registerBaseTokenDuringUpgrade.
+    function test_registerBaseTokenDuringUpgrade_revertUnauthorized() public {
+        vm.prank(address(0xDEAD));
+        vm.expectRevert();
+        L2_ASSET_TRACKER.registerBaseTokenDuringUpgrade();
     }
 
     function test_initiateL1ToGatewayMigrationOnL2() public {

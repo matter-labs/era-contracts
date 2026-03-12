@@ -513,6 +513,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             beaconDeployerInfo: config.isZKsyncOS
                 ? Utils.getZKOSProxyUpgradeBytecodeInfo("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
                 : abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            baseTokenHolderBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSProxyUpgradeBytecodeInfo("BaseTokenHolder.sol", "BaseTokenHolder")
+                : abi.encode(getL2BytecodeHash("BaseTokenHolder")),
             chainAssetHandlerBytecodeInfo: config.isZKsyncOS
                 ? Utils.getZKOSProxyUpgradeBytecodeInfo("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
                 : abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
@@ -548,6 +551,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)));
         GettersFacet gettersFacet = new GettersFacet();
         MailboxFacet mailboxFacet = new MailboxFacet(
+            1,
             1,
             coreAddresses.bridgehub.proxies.chainAssetHandler,
             IEIP7702Checker(address(0)),

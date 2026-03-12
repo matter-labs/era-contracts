@@ -9,8 +9,6 @@ error AssetAlreadyRegistered(bytes32 assetId);
 error AssetIdNotRegistered(bytes32 _assetId);
 // 0xffaa9b75
 error AssetNotMigratedFromNTV(bytes32 _assetId);
-// 0x29b39a2b
-error BaseTokenTotalSupplyBackfillFailed();
 // 0xca9bc458
 error BaseTokenTotalSupplyBackfillNotNeeded();
 // 0xaab1af2a

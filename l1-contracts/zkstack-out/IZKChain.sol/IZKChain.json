@@ -400,6 +400,39 @@
   },
   {
     "type": "function",
+    "name": "finalizeEthWithdrawal",
+    "inputs": [
+      {
+        "name": "_l2BatchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2MessageIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2TxNumberInBatch",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "_message",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_merkleProof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "forwardedBridgeBurn",
     "inputs": [
       {
@@ -1762,6 +1795,55 @@
   },
   {
     "type": "function",
+    "name": "requestL2Transaction",
+    "inputs": [
+      {
+        "name": "_contractL2",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_l2Value",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_calldata",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_l2GasLimit",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2GasPerPubdataByteLimit",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_factoryDeps",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      },
+      {
+        "name": "_refundRecipient",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "canonicalTxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
     "name": "requestL2TransactionToGatewayMailboxWithBalanceChange",
     "inputs": [
       {
@@ -1947,6 +2029,25 @@
       }
     ],
     "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setZKsyncOSPreV31TotalSupply",
+    "inputs": [
+      {
+        "name": "_totalSupply",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "canonicalTxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
     "stateMutability": "nonpayable"
   },
   {
@@ -2843,6 +2944,19 @@
         "type": "bool",
         "indexed": false,
         "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ZKsyncOSPreV31TotalSupplySet",
+    "inputs": [
+      {
+        "name": "totalSupply",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false

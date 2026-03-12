@@ -80,6 +80,8 @@ error NotHistoricalRoot(bytes32);
 error NotHyperchain();
 // 0x87470e36
 error NotL1(uint256 blockChainId);
+// 0x1e9f6a9e
+error NotZKsyncOS();
 // 0xd7b2559b
 error NotMigrated();
 // 0xd0266e26

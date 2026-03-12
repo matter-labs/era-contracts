@@ -5,8 +5,8 @@ pragma solidity ^0.8.24;
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
 import {
-    L2_BASE_TOKEN_SYSTEM_CONTRACT,
     L2_BRIDGEHUB,
+    L2_BASE_TOKEN_HOLDER,
     L2_INTEROP_CENTER_ADDR,
     L2_NATIVE_TOKEN_VAULT,
     L2_MESSAGE_VERIFICATION,
@@ -292,7 +292,8 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             require(interopCall.version == INTEROP_CALL_VERSION, InvalidInteropCallVersion());
 
             if (interopCall.value > 0) {
-                L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
+                // Transfer base tokens from the BaseTokenHolder instead of minting.
+                L2_BASE_TOKEN_HOLDER.give(address(this), interopCall.value, _sourceChainId);
             }
             // slither-disable-next-line arbitrary-send-eth
             bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({
@@ -473,5 +474,14 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             interopBundle.destinationBaseTokenAssetId == baseTokenAssetId,
             WrongDestinationBaseTokenAssetId(bundleHash, baseTokenAssetId, interopBundle.destinationBaseTokenAssetId)
         );
+    }
+
+    /// @notice Allows the contract to receive native ETH from L2_BASE_TOKEN_HOLDER.
+    /// @dev This is required because L2_BASE_TOKEN_HOLDER.give() transfers ETH to this contract
+    ///      before forwarding it to the interop call recipient.
+    receive() external payable {
+        if (msg.sender != address(L2_BASE_TOKEN_HOLDER)) {
+            revert Unauthorized(msg.sender);
+        }
     }
 }

@@ -22,6 +22,7 @@ import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {
     L1DAValidatorAddressIsZero,
     NotL1,
+    NotZKsyncOS,
     PriorityModeAlreadyAllowed,
     ExecutedIsNotConsistentWithVerified,
     VerifiedIsNotConsistentWithCommitted,
@@ -29,6 +30,7 @@ import {
 } from "../../L1StateTransitionErrors.sol";
 import {
     AlreadyPermanentRollup,
+    BaseTokenPreV31TotalSupplyAlreadySet,
     DenominatorIsZero,
     DiamondAlreadyFrozen,
     DiamondNotFrozen,
@@ -51,8 +53,12 @@ import {
 } from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
+} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
+import {IL2BaseTokenZKOS} from "../../../l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -441,6 +447,26 @@ contract AdminFacet is ZKChainBase, IAdmin {
             abi.encodeCall(IL2ContractDeployer.setAllowedBytecodeTypesToDeploy, AllowedBytecodeTypes.EraVmAndEVM)
         );
         emit EnableEvmEmulator();
+    }
+
+    /// @inheritdoc IAdmin
+    function setZKsyncOSPreV31TotalSupply(
+        uint256 _totalSupply
+    ) external onlyAdmin onlyL1 notPriorityMode returns (bytes32 canonicalTxHash) {
+        if (!s.zksyncOS) {
+            revert NotZKsyncOS();
+        }
+        if (s.baseTokenHasTotalSupply) {
+            revert BaseTokenPreV31TotalSupplyAlreadySet();
+        }
+        // Service transactions cannot fail, so this is safe to set eagerly.
+        s.baseTokenHasTotalSupply = true;
+
+        canonicalTxHash = IMailbox(address(this)).requestL2ServiceTransaction(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            abi.encodeCall(IL2BaseTokenZKOS.setZKsyncOSPreV31TotalSupply, (_totalSupply))
+        );
+        emit ZKsyncOSPreV31TotalSupplySet(_totalSupply);
     }
 
     /*//////////////////////////////////////////////////////////////
