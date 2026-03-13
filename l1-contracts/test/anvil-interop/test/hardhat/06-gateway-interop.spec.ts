@@ -3,7 +3,11 @@ import { BigNumber, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { executeTokenTransfer } from "../../src/helpers/token-transfer";
 import type { MultiChainTokenTransferResult } from "../../src/core/types";
-import { buildInteropBundleLog, callProcessLogsAndMessages, getGWChainBalance } from "../../src/helpers/process-logs-helper";
+import {
+  buildInteropBundleLog,
+  callProcessLogsAndMessages,
+  getGWChainBalance,
+} from "../../src/helpers/process-logs-helper";
 import { migrateTokenBalanceToGW } from "../../src/helpers/token-balance-migration-helper";
 import { interopCenterAbi } from "../../src/core/contracts";
 import { L2_NATIVE_TOKEN_VAULT_ADDR } from "../../src/core/const";

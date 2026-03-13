@@ -455,5 +455,4 @@ export class DeploymentRunner {
 
     return { gatewayCTMAddr };
   }
-
 }

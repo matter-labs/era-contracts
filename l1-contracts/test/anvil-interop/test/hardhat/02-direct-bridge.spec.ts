@@ -1,7 +1,11 @@
 import { expect } from "chai";
 import { BigNumber, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { createBalanceTrackerFromState, queryEthAssetId, computeBalanceDeltas } from "../../src/helpers/balance-tracker";
+import {
+  createBalanceTrackerFromState,
+  queryEthAssetId,
+  computeBalanceDeltas,
+} from "../../src/helpers/balance-tracker";
 import { depositETHToL2 } from "../../src/helpers/l1-deposit-helper";
 import { withdrawETHFromL2 } from "../../src/helpers/l2-withdrawal-helper";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR } from "../../src/core/const";
