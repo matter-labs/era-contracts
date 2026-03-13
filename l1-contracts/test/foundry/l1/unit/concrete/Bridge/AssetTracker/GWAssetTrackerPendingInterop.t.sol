@@ -122,10 +122,12 @@ contract GWAssetTrackerPendingInteropTest is Test {
     //  Helpers
     // =========================================================================
 
-    /// @dev Builds and submits a processLogsAndMessages call for the source chain
-    ///      containing a single interop bundle whose calls each carry _valuePerCall
-    ///      base-token value (no asset-router calls).
-    function _processSourceBundleWithValue(uint256 _numCalls, uint256 _valuePerCall) internal {
+    /// @dev Builds a ProcessLogsInput for the source chain containing a single interop bundle
+    ///      whose calls each carry _valuePerCall base-token value (no asset-router calls).
+    function _buildSourceBundleInput(
+        uint256 _numCalls,
+        uint256 _valuePerCall
+    ) internal returns (ProcessLogsInput memory) {
         InteropBundle memory bundle = ProcessLogsTestHelper.createInteropBundleWithBaseTokenValue(
             SOURCE_CHAIN_ID,
             DEST_CHAIN_ID,
@@ -139,35 +141,32 @@ contract GWAssetTrackerPendingInteropTest is Test {
         logs[0] = ProcessLogsTestHelper.createInteropCenterLog(0, message);
         bytes[] memory messages = new bytes[](1);
         messages[0] = message;
+        return ProcessLogsTestHelper.buildProcessLogsInput(gwAssetTracker, SOURCE_CHAIN_ID, 1, logs, messages, address(0));
+    }
 
-        ProcessLogsInput memory input = ProcessLogsTestHelper.buildProcessLogsInput(
-            gwAssetTracker,
-            SOURCE_CHAIN_ID,
-            1,
-            logs,
-            messages,
-            address(0)
-        );
+    /// @dev Builds and submits a processLogsAndMessages call for the source chain
+    ///      containing a single interop bundle whose calls each carry _valuePerCall
+    ///      base-token value (no asset-router calls).
+    function _processSourceBundleWithValue(uint256 _numCalls, uint256 _valuePerCall) internal {
+        ProcessLogsInput memory input = _buildSourceBundleInput(_numCalls, _valuePerCall);
         vm.prank(mockSourceZKChain);
         gwAssetTracker.processLogsAndMessages(input);
+    }
+
+    /// @dev Builds a ProcessLogsInput for the destination chain containing a single
+    ///      InteropHandler confirmation message.
+    function _buildDestHandlerInput(bytes memory _handlerMessage) internal returns (ProcessLogsInput memory) {
+        L2Log[] memory logs = new L2Log[](1);
+        logs[0] = ProcessLogsTestHelper.createInteropHandlerLog(0, _handlerMessage);
+        bytes[] memory messages = new bytes[](1);
+        messages[0] = _handlerMessage;
+        return ProcessLogsTestHelper.buildProcessLogsInput(gwAssetTracker, DEST_CHAIN_ID, 1, logs, messages, address(0));
     }
 
     /// @dev Builds and submits a processLogsAndMessages call for the destination chain
     ///      containing a single InteropHandler confirmation message.
     function _processDestHandlerMessage(bytes memory _handlerMessage) internal {
-        L2Log[] memory logs = new L2Log[](1);
-        logs[0] = ProcessLogsTestHelper.createInteropHandlerLog(0, _handlerMessage);
-        bytes[] memory messages = new bytes[](1);
-        messages[0] = _handlerMessage;
-
-        ProcessLogsInput memory input = ProcessLogsTestHelper.buildProcessLogsInput(
-            gwAssetTracker,
-            DEST_CHAIN_ID,
-            1,
-            logs,
-            messages,
-            address(0)
-        );
+        ProcessLogsInput memory input = _buildDestHandlerInput(_handlerMessage);
         vm.prank(mockDestZKChain);
         gwAssetTracker.processLogsAndMessages(input);
     }
@@ -233,28 +232,7 @@ contract GWAssetTrackerPendingInteropTest is Test {
         // Source chain has less than the bundle requires.
         gwAssetTracker.setChainBalance(SOURCE_CHAIN_ID, DEST_BASE_TOKEN_ASSET_ID, BASE_TOKEN_AMOUNT - 1);
 
-        InteropBundle memory bundle = ProcessLogsTestHelper.createInteropBundleWithBaseTokenValue(
-            SOURCE_CHAIN_ID,
-            DEST_CHAIN_ID,
-            DEST_BASE_TOKEN_ASSET_ID,
-            1,
-            BASE_TOKEN_AMOUNT,
-            keccak256("salt")
-        );
-        bytes memory message = ProcessLogsTestHelper.encodeInteropCenterMessage(bundle);
-        L2Log[] memory logs = new L2Log[](1);
-        logs[0] = ProcessLogsTestHelper.createInteropCenterLog(0, message);
-        bytes[] memory messages = new bytes[](1);
-        messages[0] = message;
-
-        ProcessLogsInput memory input = ProcessLogsTestHelper.buildProcessLogsInput(
-            gwAssetTracker,
-            SOURCE_CHAIN_ID,
-            1,
-            logs,
-            messages,
-            address(0)
-        );
+        ProcessLogsInput memory input = _buildSourceBundleInput(1, BASE_TOKEN_AMOUNT);
         vm.prank(mockSourceZKChain);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -373,19 +351,7 @@ contract GWAssetTrackerPendingInteropTest is Test {
         });
         bytes memory handlerMsg = ProcessLogsTestHelper.encodeInteropCallExecutedMessage(executionMsg);
 
-        L2Log[] memory logs = new L2Log[](1);
-        logs[0] = ProcessLogsTestHelper.createInteropHandlerLog(0, handlerMsg);
-        bytes[] memory messages = new bytes[](1);
-        messages[0] = handlerMsg;
-
-        ProcessLogsInput memory input = ProcessLogsTestHelper.buildProcessLogsInput(
-            gwAssetTracker,
-            DEST_CHAIN_ID,
-            1,
-            logs,
-            messages,
-            address(0)
-        );
+        ProcessLogsInput memory input = _buildDestHandlerInput(handlerMsg);
         vm.prank(mockDestZKChain);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -421,19 +387,7 @@ contract GWAssetTrackerPendingInteropTest is Test {
         });
         bytes memory handlerMsg = ProcessLogsTestHelper.encodeInteropCallExecutedMessage(executionMsg);
 
-        L2Log[] memory logs = new L2Log[](1);
-        logs[0] = ProcessLogsTestHelper.createInteropHandlerLog(0, handlerMsg);
-        bytes[] memory messages = new bytes[](1);
-        messages[0] = handlerMsg;
-
-        ProcessLogsInput memory input = ProcessLogsTestHelper.buildProcessLogsInput(
-            gwAssetTracker,
-            DEST_CHAIN_ID,
-            1,
-            logs,
-            messages,
-            address(0)
-        );
+        ProcessLogsInput memory input = _buildDestHandlerInput(handlerMsg);
         vm.prank(mockDestZKChain);
         vm.expectRevert(
             abi.encodeWithSelector(
