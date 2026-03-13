@@ -7,10 +7,6 @@
  * TODO: Replace individual functions with a generic approach based on contract name strings,
  * e.g. getAbi("ChainAdminOwnable"), getBytecode("ChainAdminOwnable"), getInterface("ChainAdminOwnable").
  * Store the valid contract names as constants and derive artifact paths from them.
- *
- * TODO: Replace individual functions with a generic approach based on contract name strings,
- * e.g. getAbi("ChainAdminOwnable"), getBytecode("ChainAdminOwnable"), getInterface("ChainAdminOwnable").
- * Store the valid contract names as constants and derive artifact paths from them.
  */
 import { loadAbiFromOut, loadBytecodeFromOut, loadCreationBytecodeFromOut } from "./utils";
 

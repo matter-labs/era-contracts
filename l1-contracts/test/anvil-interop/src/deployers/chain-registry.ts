@@ -167,7 +167,7 @@ export class ChainRegistry {
           this.l1Addresses.chainRegistrationSender,
           gatewayChainId
         )
-      : new SystemContractsDeployer(l2RpcUrl, this.privateKey);
+      : new SystemContractsDeployer(l2RpcUrl, this.privateKey, this.l1Addresses.l1SharedBridge);
 
     if (useGenesisUpgradeDeployer) {
       console.log("   Using L2GenesisUpgrade deployer path");

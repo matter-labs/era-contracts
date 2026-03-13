@@ -78,11 +78,11 @@ You can also add `.only` to a `describe` or `it` block in the spec file to isola
 | Spec                         | What it tests                                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `01-deployment-verification` | L1 contracts deployed, CTM registered, all 4 L2 chains have diamond proxies, L2 system contracts present, test tokens deployed, initial chainBalance is zero |
-| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), L1AssetTracker chainBalance tracking, balance conservation                    |
-| `03-interop-transfer`        | L2<->L2 token transfers via InteropCenter between direct-settlement chains (10, 11, 12)                                                                      |
+| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), L1AssetTracker chainBalance tracking, balance conservation                   |
+| `03-interop-transfer`        | L2<->L2 token transfers via InteropCenter between direct-settlement chains (10, 11, 12)                                                                     |
 | `04-gateway-setup`           | GW chain contracts deployed, interop chains registered on GW L2Bridgehub, GW designated as settlement layer on L1                                            |
-| `05-gateway-bridge`          | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW), L1AssetTracker chainBalance tracking, token balance migration, processLogsAndMessages     |
-| `06-gateway-interop`         | L2A<->L2B interop transfers (both on GW), L2A<->GW interop transfers                                                                                         |
+| `05-gateway-bridge`          | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW), L1AssetTracker chainBalance tracking, token balance migration, processLogsAndMessages    |
+| `06-gateway-interop`         | L2A<->L2B interop transfers (both on GW), L2A<->GW interop transfers                                                                                        |
 
 ## Environment Variables
 
@@ -112,22 +112,14 @@ Copy-paste into a terminal (while chains are still running) to get the full exec
 test/anvil-interop/
 ├── run-hardhat-interop-test.ts    # Main entry: deployment + hardhat test runner
 ├── setup-and-dump-state.ts        # Generate pregenerated chain state snapshots
-├── index.ts                       # Interactive multi-chain environment (yarn start)
-├── steps/
-│   ├── step1-start-chains.ts      # Step 1: start Anvil chains
-│   ├── step2-deploy-l1.ts         # Step 2: deploy L1 contracts
-│   ├── step3-register-chains.ts   # Step 3: register L2 chains on L1
-│   ├── step4-initialize-l2.ts     # Step 4: initialize L2 system contracts
-│   ├── step5-setup-gateway.ts     # Step 5: setup gateway
-│   └── step6-start-settler.ts     # Step 6: start batch settler daemon
-├── deploy-test-token.ts           # Deploy test ERC20 tokens
+├── run-v29-to-v31-upgrade-test.ts # V29 → V31 upgrade test
 ├── cleanup.sh                     # Kill Anvil processes, reset state
 ├── config/
 │   ├── anvil-config.json          # Chain IDs, ports, gateway designation
 │   ├── l1-deployment.toml         # L1 contract deployment params
 │   ├── ctm-deployment.toml        # ChainTypeManager params
 │   ├── permanent-values.toml      # Immutable protocol values
-│   └── chain-{10,11,12,13}.toml   # Per-chain deployment params
+│   └── chain-{10,11,12,13}.toml   # Per-chain deployment params (generated)
 ├── chain-states/
 │   └── v0.31.0/                   # Pregenerated Anvil state snapshots
 │       ├── 31337.json             # L1 state dump
@@ -135,38 +127,40 @@ test/anvil-interop/
 │       └── addresses.json         # All contract addresses + test tokens
 ├── src/
 │   ├── deployment-runner.ts       # Orchestrates all deployment steps
-│   ├── anvil-manager.ts           # Start/stop Anvil processes
-│   ├── deployer.ts                # Execute forge deployment scripts
-│   ├── forge.ts                   # Forge command wrapper
-│   ├── chain-registry.ts          # Register L2 chains on L1
-│   ├── l2-genesis-helper.ts       # L2 genesis contract setup
-│   ├── l2-genesis-upgrade-deployer.ts  # Deploy L2 system contracts via anvil_setCode
-│   ├── system-contracts-deployer.ts    # L2 system contracts deployment
-│   ├── gateway-setup.ts           # Gateway designation + chain migration
-│   ├── gateway-deployer.ts        # Pre-deploy GW CTM contracts
-│   ├── l1-deposit-helper.ts       # L1->L2 ETH/ERC20 deposits (via TwoBridges)
-│   ├── l2-withdrawal-helper.ts    # L2->L1 ETH/ERC20 withdrawals
-│   ├── token-transfer.ts          # L2<->L2 interop token transfers
-│   ├── token-balance-migration.ts         # Token balance migration during gateway migration
-│   ├── token-balance-migration-helper.ts  # TBM helper (L2->L1->GW relay)
-│   ├── process-logs-helper.ts     # Build and process withdrawal logs on GW
-│   ├── balance-tracker.ts         # L1AssetTracker balance snapshots
-│   ├── batch-settler.ts           # Batch commit/prove/execute on L1
-│   ├── l1-to-l2-relayer.ts        # Relay L1->L2 transactions
-│   ├── l2-to-l2-relayer.ts        # Relay L2->L2 interop messages
-│   ├── data-encoding.ts           # Encode/decode L1/L2 data formats
-│   ├── toml-handling.ts           # TOML file parsing
-│   ├── contracts.ts               # ABI imports and contract definitions
-│   ├── const.ts                   # System contract addresses
-│   ├── types.ts                   # TypeScript interfaces
-│   └── utils.ts                   # Helpers (ABI loading, asset ID encoding, relay)
+│   ├── core/
+│   │   ├── const.ts               # System contract addresses, chain IDs
+│   │   ├── types.ts               # TypeScript interfaces
+│   │   ├── contracts.ts           # ABI loading from compiled artifacts
+│   │   ├── utils.ts               # Helpers (relay, merkle proofs, ABI loading)
+│   │   ├── data-encoding.ts       # Encode/decode L1/L2 data formats
+│   │   ├── forge.ts               # Forge command wrapper
+│   │   └── toml-handling.ts       # TOML file parsing/merging
+│   ├── deployers/
+│   │   ├── deployer.ts            # L1 contract deployment via forge scripts
+│   │   ├── chain-registry.ts      # Register L2 chains on L1 CTM
+│   │   ├── system-contracts-deployer.ts    # L2 system contracts via anvil_setCode
+│   │   ├── l2-genesis-upgrade-deployer.ts  # L2 contracts via L2GenesisUpgrade
+│   │   ├── l2-genesis-helper.ts   # Bytecode hashing for genesis upgrade
+│   │   ├── gateway-setup.ts       # Gateway designation + chain migration
+│   │   └── gateway-deployer.ts    # Verify GW system contracts
+│   ├── daemons/
+│   │   └── anvil-manager.ts       # Start/stop Anvil processes
+│   └── helpers/
+│       ├── l1-deposit-helper.ts   # L1->L2 ETH/ERC20 deposits
+│       ├── l2-withdrawal-helper.ts          # L2->L1 ETH/ERC20 withdrawals
+│       ├── token-transfer.ts                # L2<->L2 interop token transfers
+│       ├── token-balance-migration-helper.ts # Token balance migration (L2->L1->GW)
+│       ├── process-logs-helper.ts           # Build/process withdrawal logs on GW
+│       ├── balance-tracker.ts               # L1AssetTracker balance snapshots
+│       └── deploy-test-token.ts             # Deploy ERC20 test tokens to L2 chains
 ├── test/hardhat/
 │   ├── 01-deployment-verification.spec.ts
 │   ├── 02-direct-bridge.spec.ts
 │   ├── 03-interop-transfer.spec.ts
 │   ├── 04-gateway-setup.spec.ts
 │   ├── 05-gateway-bridge.spec.ts
-│   └── 06-gateway-interop.spec.ts
+│   ├── 06-gateway-interop.spec.ts
+│   └── token-transfer.spec.ts
 └── outputs/                       # Deployment outputs (gitignored)
 ```
 

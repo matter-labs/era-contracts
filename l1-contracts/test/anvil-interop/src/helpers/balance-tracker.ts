@@ -205,63 +205,6 @@ export function computeBalanceDeltas(
 }
 
 /**
- * @deprecated Use computeBalanceDeltas instead for full comparison.
- * Kept for backward compatibility.
- */
-export function assertDepositBalances(
-  before: BalanceSnapshot,
-  after: BalanceSnapshot
-): { l2BalanceDelta: BigNumber; l1ChainBalanceDelta: BigNumber } {
-  const deltas = computeBalanceDeltas(before, after);
-  return { l2BalanceDelta: deltas.l2TokenDelta, l1ChainBalanceDelta: deltas.l1ChainBalanceDelta };
-}
-
-/**
- * @deprecated Use computeBalanceDeltas instead for full comparison.
- * Kept for backward compatibility.
- */
-export function assertWithdrawalBalances(
-  before: BalanceSnapshot,
-  after: BalanceSnapshot
-): { l2BalanceDelta: BigNumber; l1ChainBalanceDelta: BigNumber } {
-  const deltas = computeBalanceDeltas(before, after);
-  // For withdrawals, return positive values representing the decrease
-  return { l2BalanceDelta: deltas.l2TokenDelta.mul(-1), l1ChainBalanceDelta: deltas.l1ChainBalanceDelta.mul(-1) };
-}
-
-/**
- * Assert interop transfer balance shifts.
- */
-export function assertInteropBalances(
-  srcBefore: BalanceSnapshot,
-  srcAfter: BalanceSnapshot,
-  dstBefore: BalanceSnapshot,
-  dstAfter: BalanceSnapshot
-): {
-  srcL2BalanceDelta: BigNumber;
-  dstL2BalanceDelta: BigNumber;
-  srcGwBalanceDelta?: BigNumber;
-  dstGwBalanceDelta?: BigNumber;
-} {
-  const srcL2BalanceDelta = BigNumber.from(srcBefore.l2TokenBalance).sub(srcAfter.l2TokenBalance);
-  const dstL2BalanceDelta = BigNumber.from(dstAfter.l2TokenBalance).sub(dstBefore.l2TokenBalance);
-
-  const result: ReturnType<typeof assertInteropBalances> = {
-    srcL2BalanceDelta,
-    dstL2BalanceDelta,
-  };
-
-  if (srcBefore.gwChainBalance && srcAfter.gwChainBalance) {
-    result.srcGwBalanceDelta = BigNumber.from(srcBefore.gwChainBalance).sub(srcAfter.gwChainBalance);
-  }
-  if (dstBefore.gwChainBalance && dstAfter.gwChainBalance) {
-    result.dstGwBalanceDelta = BigNumber.from(dstAfter.gwChainBalance).sub(dstBefore.gwChainBalance);
-  }
-
-  return result;
-}
-
-/**
  * Query the ETH asset ID from the L1NativeTokenVault contract.
  * The asset ID is deployment-specific (depends on the L1NTV address).
  */

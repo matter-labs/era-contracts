@@ -50,36 +50,6 @@ ANVIL_INTEROP_SKIP_SETUP=1 ANVIL_INTEROP_SKIP_CLEANUP=1 \
   --network hardhat --no-compile --grep "deposits ETH"
 ```
 
-## Interactive Environment
-
-```bash
-cd contracts/l1-contracts/test/anvil-interop
-
-# Start all chains + deploy + keep running (Ctrl+C to stop)
-yarn start
-```
-
-Then in another terminal:
-
-```bash
-cd contracts/l1-contracts/test/anvil-interop
-yarn send:l2-to-l2              # L2->L2 interop message
-yarn deploy:test-token           # Deploy ERC20 test token
-yarn send:token                  # Token transfer
-```
-
-## Step-by-Step Deployment
-
-```bash
-cd contracts/l1-contracts/test/anvil-interop
-yarn step1  # Start Anvil chains
-yarn step2  # Deploy L1 contracts
-yarn step3  # Register L2 chains
-yarn step4  # Initialize L2 (L2GenesisUpgrade)
-yarn step5  # Setup gateway
-yarn step6  # Start batch settler daemon
-```
-
 ## Regenerate Pregenerated State
 
 After changing contracts, regenerate the chain state snapshots:
@@ -100,7 +70,7 @@ yarn cleanup                    # Kill Anvil processes, remove outputs
 
 | Issue                             | Solution                                           |
 | --------------------------------- | -------------------------------------------------- |
-| "L2 chains not found"             | Run `yarn step1` first                             |
+| "L2 chains not found"             | Run full deployment first                          |
 | "Could not read [Contract]"       | Run `forge build` in `l1-contracts/`               |
 | Transaction reverted              | Use `cast run <tx_hash> -r <rpc_url>` to trace     |
 | Tests fail after contract changes | Run `yarn setup-and-dump` to regenerate state      |

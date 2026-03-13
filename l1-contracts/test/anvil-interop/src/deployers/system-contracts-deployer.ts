@@ -41,11 +41,13 @@ export class SystemContractsDeployer {
   private l2Provider: providers.JsonRpcProvider;
   private l2Wallet: Wallet;
   private contractsRoot: string;
+  private l1AssetRouter: string;
 
-  constructor(l2RpcUrl: string, privateKey: string) {
+  constructor(l2RpcUrl: string, privateKey: string, l1AssetRouter: string) {
     this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
     this.l2Wallet = new Wallet(privateKey, this.l2Provider);
     this.contractsRoot = path.resolve(__dirname, "../../../../..");
+    this.l1AssetRouter = l1AssetRouter;
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -439,7 +441,7 @@ export class SystemContractsDeployer {
         [
           1, // L1 chain ID
           270, // Era chain ID
-          "0x0000000000000000000000000000000000000001", // L1AssetRouter (dummy)
+          this.l1AssetRouter, // L1AssetRouter
           LEGACY_SHARED_BRIDGE_PLACEHOLDER,
           ethAssetId, // Base token asset ID
           ownerAddress,

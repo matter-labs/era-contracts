@@ -49,8 +49,6 @@ export async function runForgeScript(params: {
     });
 
     let stdout = "";
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    let _stderr = "";
 
     forgeProcess.stdout.on("data", (data: Buffer) => {
       const text = data.toString();
@@ -60,7 +58,6 @@ export async function runForgeScript(params: {
 
     forgeProcess.stderr.on("data", (data: Buffer) => {
       const text = data.toString();
-      _stderr += text;
       const lines = text.split("\n");
       const nonWarningLines = lines.filter((line: string) => !line.includes("Warning"));
       if (nonWarningLines.length > 0 && nonWarningLines.join("").trim()) {
