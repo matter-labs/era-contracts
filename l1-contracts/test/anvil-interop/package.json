@@ -15,12 +15,8 @@
     "step4": "ts-node steps/step4-initialize-l2.ts",
     "step5": "ts-node steps/step5-setup-gateway.ts",
     "step6": "ts-node steps/step6-start-settler.ts",
-    "test:interop": "ts-node test-interop.ts",
     "test:hardhat": "yarn --cwd ../.. test:hardhat:interop",
-    "send:interop": "ts-node send-interop-tx.ts",
-    "send:l2-to-l2": "ts-node send-l2-to-l2.ts",
     "deploy:test-token": "ts-node deploy-test-token.ts",
-    "send:token": "ts-node send-token-simple.ts",
     "setup-and-dump": "ts-node setup-and-dump-state.ts",
     "test:v29-to-v31": "ts-node run-v29-to-v31-upgrade-test.ts"
   },

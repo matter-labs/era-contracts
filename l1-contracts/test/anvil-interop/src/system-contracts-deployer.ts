@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { providers, Contract, Wallet, utils } from "ethers";
+import { ethers, providers, Contract, Wallet, utils } from "ethers";
 import { impersonateAndRun } from "./utils";
 import { encodeNtvAssetId } from "./data-encoding";
 import {
@@ -285,13 +285,13 @@ export class SystemContractsDeployer {
    */
   private async registerChainsOnBridgehub(l2Bridgehub: Contract, interopChainIds?: number[]): Promise<void> {
     const chains = interopChainIds ?? [10, 11, 12];
-    const abiCoder = new utils.AbiCoder();
+    const abiCoder = utils.defaultAbiCoder;
     const ethAssetId = utils.keccak256(abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS]));
 
     for (const targetChainId of chains) {
       try {
         const existingAssetId = await l2Bridgehub.baseTokenAssetId(targetChainId);
-        if (existingAssetId !== "0x0000000000000000000000000000000000000000000000000000000000000000") {
+        if (existingAssetId !== ethers.constants.HashZero) {
           console.log(`   ✅ Chain ${targetChainId} already registered on L2Bridgehub`);
           continue;
         }
@@ -429,7 +429,7 @@ export class SystemContractsDeployer {
       );
 
       const ownerAddress = await this.l2Wallet.getAddress();
-      const abiCoder = new utils.AbiCoder();
+      const abiCoder = utils.defaultAbiCoder;
       const ethAssetId = utils.keccak256(abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS]));
 
       await this.initializeContract(
@@ -508,7 +508,7 @@ export class SystemContractsDeployer {
       );
 
       // Initialize via L2ComplexUpgrader
-      const abiCoder = new utils.AbiCoder();
+      const abiCoder = utils.defaultAbiCoder;
 
       // Calculate ETH asset ID (utils.keccak256(abi.encode(1, 0x0000...0001)))
       const ethAssetId = utils.keccak256(abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS]));
@@ -562,24 +562,23 @@ export class SystemContractsDeployer {
       );
 
       const ownerAddress = await this.l2Wallet.getAddress();
-      const abiCoder = new utils.AbiCoder();
+      const abiCoder = utils.defaultAbiCoder;
       const ethAssetId = utils.keccak256(abiCoder.encode(["uint256", "address"], [1, ETH_TOKEN_ADDRESS]));
 
       const l2TokenProxyBytecodeHash = utils.keccak256(utils.toUtf8Bytes("anvil-l2-token-proxy"));
       const legacyBridgeAddress = LEGACY_SHARED_BRIDGE_PLACEHOLDER;
-      const zeroAddress = "0x0000000000000000000000000000000000000000";
       const baseTokenBridgingData: [string, number, string] = [ethAssetId, 1, ETH_TOKEN_ADDRESS];
       const baseTokenMetadata: [string, string, number] = ["Ether", "ETH", 18];
       const initializationGasLimit = 30_000_000;
 
       // Ensure a non-empty beacon address exists before initL2 so initialization remains single-path.
       let bridgedTokenBeacon = await l2NativeTokenVaultDev.bridgedTokenBeacon();
-      if (bridgedTokenBeacon === zeroAddress) {
+      if (bridgedTokenBeacon === ethers.constants.AddressZero) {
         const deployBridgedTokenTx = await l2NativeTokenVaultDev.deployBridgedStandardERC20(ownerAddress);
         await deployBridgedTokenTx.wait();
         bridgedTokenBeacon = await l2NativeTokenVaultDev.bridgedTokenBeacon();
       }
-      if (bridgedTokenBeacon === zeroAddress) {
+      if (bridgedTokenBeacon === ethers.constants.AddressZero) {
         throw new Error("Failed to set bridged token beacon before initL2");
       }
 
@@ -593,7 +592,7 @@ export class SystemContractsDeployer {
           l2TokenProxyBytecodeHash,
           legacyBridgeAddress,
           bridgedTokenBeacon,
-          zeroAddress, // no WETH token in anvil setup
+          ethers.constants.AddressZero, // no WETH token in anvil setup
           baseTokenBridgingData,
           baseTokenMetadata,
         ],
@@ -639,7 +638,7 @@ export class SystemContractsDeployer {
 
     // Check if asset handler already registered
     const currentHandler = await l2AssetRouter.assetHandlerAddress(assetId);
-    if (currentHandler === "0x0000000000000000000000000000000000000000") {
+    if (currentHandler === ethers.constants.AddressZero) {
       // Register L2NativeTokenVault as the handler
       // We need to impersonate L2NativeTokenVault to call setLegacyTokenAssetHandler
       await impersonateAndRun(this.l2Provider, L2_NATIVE_TOKEN_VAULT_ADDR, async (signer) => {
@@ -661,7 +660,7 @@ export class SystemContractsDeployer {
 
     // Check if token is already registered
     const registeredAssetId = await l2NativeTokenVault.assetId(tokenAddress);
-    if (registeredAssetId !== "0x0000000000000000000000000000000000000000000000000000000000000000") {
+    if (registeredAssetId !== ethers.constants.HashZero) {
       console.log("   ✅ Token already registered in L2NativeTokenVault");
       return;
     }

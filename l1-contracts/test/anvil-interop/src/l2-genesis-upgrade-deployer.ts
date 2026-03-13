@@ -1,5 +1,5 @@
 import * as path from "path";
-import { Contract, providers, utils } from "ethers";
+import { ethers, Contract, providers, utils } from "ethers";
 import {
   buildAdditionalForceDeploymentsData,
   buildFixedForceDeploymentsData,
@@ -40,7 +40,6 @@ interface PredeployedContractSpec {
   artifactPath: string;
 }
 
-const ZERO_HASH = "0x0000000000000000000000000000000000000000000000000000000000000000";
 const INTEROP_TEST_CHAIN_IDS = [10, 11, 12, 13];
 
 const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
@@ -246,7 +245,7 @@ export class L2GenesisUpgradeDeployer {
 
       for (const chainId of chainIds) {
         const existingAssetId = await l2Bridgehub.baseTokenAssetId(chainId);
-        if (existingAssetId !== ZERO_HASH) {
+        if (existingAssetId !== ethers.constants.HashZero) {
           console.log(`   ✅ Chain ${chainId} already registered on L2Bridgehub`);
           continue;
         }

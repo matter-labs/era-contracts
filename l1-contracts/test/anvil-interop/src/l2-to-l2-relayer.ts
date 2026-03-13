@@ -177,7 +177,7 @@ export class L2ToL2Relayer {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async relayCrossChainMessage(sourceChainId: number, interopEventLog: any): Promise<void> {
     // Parse InteropBundleSent event to extract destination chain and calls
-    const abiCoder = new utils.AbiCoder();
+    const abiCoder = utils.defaultAbiCoder;
 
     // InteropBundleSent event structure:
     // event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle interopBundle)

@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { utils } from "ethers";
+import { ethers, utils } from "ethers";
 import { ETH_TOKEN_ADDRESS, L1_CHAIN_ID, ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE } from "./const";
 import { applyL1ToL2Alias } from "./utils";
 import { encodeNtvAssetId } from "./data-encoding";
@@ -220,7 +220,7 @@ export function getBytecodeInfo(contractsRoot: string): BytecodeInfo {
     const bytecode = readSolcBytecode(contractsRoot, contract.file, contract.name);
     const hash = hashL2Bytecode(bytecode); // Pads and hashes Solc bytecode
     // Encode as bytes32 for L2GenesisUpgrade
-    const abiCoder = new utils.AbiCoder();
+    const abiCoder = utils.defaultAbiCoder;
     info[contract.key] = abiCoder.encode(["bytes32"], [hash]);
   }
 
@@ -257,15 +257,15 @@ export function buildFixedForceDeploymentsData(
     assetTrackerBytecodeInfo: bytecodeInfo.assetTrackerBytecodeInfo,
     beaconDeployerInfo: bytecodeInfo.beaconDeployerBytecodeInfo,
     baseTokenHolderBytecodeInfo: bytecodeInfo.baseTokenHolderBytecodeInfo,
-    l2SharedBridgeLegacyImpl: "0x0000000000000000000000000000000000000000",
-    l2BridgedStandardERC20Impl: "0x0000000000000000000000000000000000000000",
+    l2SharedBridgeLegacyImpl: ethers.constants.AddressZero,
+    l2BridgedStandardERC20Impl: ethers.constants.AddressZero,
     aliasedChainRegistrationSender: applyL1ToL2Alias(l1ChainRegistrationSender),
-    dangerousTestOnlyForcedBeacon: "0x0000000000000000000000000000000000000000",
+    dangerousTestOnlyForcedBeacon: ethers.constants.AddressZero,
     // Placeholder ZK token asset ID for testing — InteropCenter.initL2 requires non-zero
     zkTokenAssetId: encodeNtvAssetId(l1ChainId, ETH_TOKEN_ADDRESS),
   };
 
-  const abiCoder = new utils.AbiCoder();
+  const abiCoder = utils.defaultAbiCoder;
   return abiCoder.encode(
     [
       "tuple(uint256 l1ChainId, uint256 gatewayChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes bridgehubBytecodeInfo, bytes l2AssetRouterBytecodeInfo, bytes l2NtvBytecodeInfo, bytes messageRootBytecodeInfo, bytes chainAssetHandlerBytecodeInfo, bytes interopCenterBytecodeInfo, bytes interopHandlerBytecodeInfo, bytes assetTrackerBytecodeInfo, bytes beaconDeployerInfo, bytes baseTokenHolderBytecodeInfo, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address aliasedChainRegistrationSender, address dangerousTestOnlyForcedBeacon, bytes32 zkTokenAssetId)",
@@ -303,11 +303,11 @@ export function buildFixedForceDeploymentsData(
  * Build ZKChainSpecificForceDeploymentsData
  */
 export function buildAdditionalForceDeploymentsData(baseTokenL1Address: string): string {
-  const abiCoder = new utils.AbiCoder();
+  const abiCoder = utils.defaultAbiCoder;
   const baseTokenAssetId = encodeNtvAssetId(L1_CHAIN_ID, baseTokenL1Address);
 
   const data: ZKChainSpecificForceDeploymentsData = {
-    l2LegacySharedBridge: "0x0000000000000000000000000000000000000000",
+    l2LegacySharedBridge: ethers.constants.AddressZero,
     predeployedL2WethAddress: ETH_TOKEN_ADDRESS,
     baseTokenL1Address: baseTokenL1Address,
     baseTokenMetadata: {

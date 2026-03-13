@@ -283,7 +283,7 @@ export class BatchSettler {
       return "0x";
     }
 
-    const abiCoder = new utils.AbiCoder();
+    const abiCoder = utils.defaultAbiCoder;
 
     const logs = txs.map((tx) => tx.hash);
 

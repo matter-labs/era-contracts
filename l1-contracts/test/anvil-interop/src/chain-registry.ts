@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as fs from "fs";
-import { providers, Wallet } from "ethers";
+import { ethers, providers, Wallet } from "ethers";
 import type { ChainConfig, ChainAddresses, CoreDeployedAddresses, CTMDeployedAddresses, AnvilConfig } from "./types";
 import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig } from "./utils";
 import { SystemContractsDeployer } from "./system-contracts-deployer";
@@ -187,7 +187,7 @@ export class ChainRegistry {
         validium_mode: config.validiumMode,
         base_token_gas_price_multiplier_nominator: 1,
         base_token_gas_price_multiplier_denominator: 1,
-        governance_security_council_address: "0x0000000000000000000000000000000000000000",
+        governance_security_council_address: ethers.constants.AddressZero,
         governance_min_delay: 0,
         validator_sender_operator_eth: ownerAddress,
         validator_sender_operator_blobs_eth: ownerAddress,
