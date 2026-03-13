@@ -11,6 +11,7 @@ import {
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
 import { encodeNtvAssetId, encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
+import { buildMockInteropProof } from "../core/utils";
 import { createBalanceTrackerFromState } from "./balance-tracker";
 
 type Logger = (line: string) => void;
@@ -200,17 +201,7 @@ export async function executeTokenTransfer(
     log(`⏱️  [${elapsed()}] Executing bundle directly on destination chain via L2InteropHandler...`);
     const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi(), targetWallet);
 
-    const mockProof = {
-      chainId: sourceChainId,
-      l1BatchNumber: 0,
-      l2MessageIndex: 0,
-      message: {
-        txNumberInBatch: 0,
-        sender: INTEROP_CENTER_ADDR,
-        data: "0x",
-      },
-      proof: [],
-    };
+    const mockProof = buildMockInteropProof(sourceChainId);
 
     const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
     try {

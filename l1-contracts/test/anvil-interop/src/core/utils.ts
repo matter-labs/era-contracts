@@ -4,6 +4,7 @@ import * as fs from "fs";
 import * as path from "path";
 import {
   ANVIL_FUND_BALANCE,
+  INTEROP_CENTER_ADDR,
   L1_CHAIN_ID,
   L1_MESSAGE_SENT_EVENT_SIG,
   L1_TO_L2_ALIAS_OFFSET,
@@ -387,6 +388,24 @@ export async function extractAndRelayNewPriorityRequests(
   );
 
   return perChainResults.flat();
+}
+
+/**
+ * Build a mock InteropProof struct for test bundle execution.
+ * In the test environment, proof verification is bypassed, so we only need the correct shape.
+ */
+export function buildMockInteropProof(sourceChainId: number) {
+  return {
+    chainId: sourceChainId,
+    l1BatchNumber: 0,
+    l2MessageIndex: 0,
+    message: {
+      txNumberInBatch: 0,
+      sender: INTEROP_CENTER_ADDR,
+      data: "0x",
+    },
+    proof: [],
+  };
 }
 
 /**
