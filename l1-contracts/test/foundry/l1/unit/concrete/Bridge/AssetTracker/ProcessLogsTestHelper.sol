@@ -55,54 +55,29 @@ library ProcessLogsTestHelper {
         uint16 _txNumberInBatch,
         bytes memory _message
     ) internal pure returns (L2Log memory) {
-        return
-            L2Log({
-                l2ShardId: 0,
-                isService: true,
-                txNumberInBatch: _txNumberInBatch,
-                sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-                key: bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR))),
-                value: keccak256(_message)
-            });
+        return _createMessengerLog(_txNumberInBatch, L2_INTEROP_CENTER_ADDR, _message);
     }
 
-    /// @notice Creates a minimal InteropBundle with the given number of simple calls.
+    /// @notice Creates a minimal InteropBundle with the given number of simple zero-value calls.
     /// @dev Calls have `from` set to address(1) (not L2_ASSET_ROUTER_ADDR), so they are
     ///      skipped by _handleInteropCenterMessage (no balance processing), but still
     ///      counted for settlement fees.
-    /// @param _sourceChainId Source chain ID.
-    /// @param _destinationChainId Destination chain ID.
-    /// @param _destinationBaseTokenAssetId Base token asset ID of the destination chain.
-    /// @param _numCalls Number of calls in the bundle.
-    /// @param _salt Salt for bundle uniqueness.
     function createSimpleInteropBundle(
         uint256 _sourceChainId,
         uint256 _destinationChainId,
         bytes32 _destinationBaseTokenAssetId,
         uint256 _numCalls,
         bytes32 _salt
-    ) internal pure returns (InteropBundle memory bundle) {
-        InteropCall[] memory calls = new InteropCall[](_numCalls);
-        for (uint256 i = 0; i < _numCalls; i++) {
-            calls[i] = InteropCall({
-                version: INTEROP_CALL_VERSION,
-                shadowAccount: false,
-                to: address(0xdead),
-                from: address(1), // Not L2_ASSET_ROUTER_ADDR => skipped by _processInteropCall
-                value: 0,
-                data: ""
-            });
-        }
-
-        bundle = InteropBundle({
-            version: INTEROP_BUNDLE_VERSION,
-            sourceChainId: _sourceChainId,
-            destinationChainId: _destinationChainId,
-            destinationBaseTokenAssetId: _destinationBaseTokenAssetId,
-            interopBundleSalt: _salt,
-            calls: calls,
-            bundleAttributes: BundleAttributes({executionAddress: "", unbundlerAddress: "", useFixedFee: false})
-        });
+    ) internal pure returns (InteropBundle memory) {
+        return
+            createInteropBundleWithBaseTokenValue(
+                _sourceChainId,
+                _destinationChainId,
+                _destinationBaseTokenAssetId,
+                _numCalls,
+                0,
+                _salt
+            );
     }
 
     /// @notice Encodes an InteropBundle into the message format expected by processLogsAndMessages.
@@ -149,15 +124,7 @@ library ProcessLogsTestHelper {
         uint16 _txNumberInBatch,
         bytes memory _message
     ) internal pure returns (L2Log memory) {
-        return
-            L2Log({
-                l2ShardId: 0,
-                isService: true,
-                txNumberInBatch: _txNumberInBatch,
-                sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-                key: bytes32(uint256(uint160(address(L2_INTEROP_HANDLER_ADDR)))),
-                value: keccak256(_message)
-            });
+        return _createMessengerLog(_txNumberInBatch, L2_INTEROP_HANDLER_ADDR, _message);
     }
 
     /// @notice Encodes an InteropCallExecutedMessage into the L2→L1 message format expected by
@@ -169,39 +136,36 @@ library ProcessLogsTestHelper {
     }
 
     /// @notice Creates an L2Log for an asset router withdrawal (L2→L1).
-    /// @param _txNumberInBatch The transaction number in the batch.
-    /// @param _message The encoded withdrawal message.
     function createAssetRouterWithdrawalLog(
         uint16 _txNumberInBatch,
         bytes memory _message
     ) internal pure returns (L2Log memory) {
-        return
-            L2Log({
-                l2ShardId: 0,
-                isService: true,
-                txNumberInBatch: _txNumberInBatch,
-                sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-                key: bytes32(uint256(uint160(L2_ASSET_ROUTER_ADDR))),
-                value: keccak256(_message)
-            });
+        return _createMessengerLog(_txNumberInBatch, L2_ASSET_ROUTER_ADDR, _message);
     }
 
     /// @notice Creates an L2Log for a legacy bridge withdrawal.
-    /// @param _txNumberInBatch The transaction number in the batch.
     /// @param _legacyBridge The legacy bridge address (used as log key).
-    /// @param _message The encoded legacy withdrawal message.
     function createLegacyBridgeLog(
         uint16 _txNumberInBatch,
         address _legacyBridge,
         bytes memory _message
     ) internal pure returns (L2Log memory) {
+        return _createMessengerLog(_txNumberInBatch, _legacyBridge, _message);
+    }
+
+    /// @dev Creates a service L2Log from L2_TO_L1_MESSENGER with the given key address and message hash.
+    function _createMessengerLog(
+        uint16 _txNumberInBatch,
+        address _keyAddr,
+        bytes memory _message
+    ) private pure returns (L2Log memory) {
         return
             L2Log({
                 l2ShardId: 0,
                 isService: true,
                 txNumberInBatch: _txNumberInBatch,
                 sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-                key: bytes32(uint256(uint160(_legacyBridge))),
+                key: bytes32(uint256(uint160(_keyAddr))),
                 value: keccak256(_message)
             });
     }
@@ -277,19 +241,12 @@ library ProcessLogsTestHelper {
         uint256 _amount
     ) internal returns (ProcessLogsInput memory) {
         bytes memory arCallData = buildArCallData(_assetId, _srcChainId, _originChainId, _originToken, _amount);
-        InteropBundle memory bundle = createInteropBundleWithArCall(
-            _srcChainId,
-            _dstChainId,
-            _destBaseTokenAssetId,
-            arCallData,
-            keccak256("salt")
-        );
-        bytes memory message = encodeInteropCenterMessage(bundle);
-        L2Log[] memory logs = new L2Log[](1);
-        logs[0] = createInteropCenterLog(0, message);
-        bytes[] memory messages = new bytes[](1);
-        messages[0] = message;
-        return buildProcessLogsInput(_gwAssetTracker, _srcChainId, 1, logs, messages, address(0));
+        return
+            _buildBundleInputFromBundle(
+                _gwAssetTracker,
+                _srcChainId,
+                createInteropBundleWithArCall(_srcChainId, _dstChainId, _destBaseTokenAssetId, arCallData, keccak256("salt"))
+            );
     }
 
     /// @notice Builds a ProcessLogsInput for the source chain settling an interop bundle
@@ -302,20 +259,12 @@ library ProcessLogsTestHelper {
         uint256 _numCalls,
         uint256 _valuePerCall
     ) internal returns (ProcessLogsInput memory) {
-        InteropBundle memory bundle = createInteropBundleWithBaseTokenValue(
-            _srcChainId,
-            _dstChainId,
-            _destBaseTokenAssetId,
-            _numCalls,
-            _valuePerCall,
-            keccak256("salt")
-        );
-        bytes memory message = encodeInteropCenterMessage(bundle);
-        L2Log[] memory logs = new L2Log[](1);
-        logs[0] = createInteropCenterLog(0, message);
-        bytes[] memory messages = new bytes[](1);
-        messages[0] = message;
-        return buildProcessLogsInput(_gwAssetTracker, _srcChainId, 1, logs, messages, address(0));
+        return
+            _buildBundleInputFromBundle(
+                _gwAssetTracker,
+                _srcChainId,
+                createInteropBundleWithBaseTokenValue(_srcChainId, _dstChainId, _destBaseTokenAssetId, _numCalls, _valuePerCall, keccak256("salt"))
+            );
     }
 
     /// @notice Builds a ProcessLogsInput for the destination chain confirming an AR-call execution.
@@ -329,24 +278,20 @@ library ProcessLogsTestHelper {
         address _originToken,
         uint256 _amount
     ) internal returns (ProcessLogsInput memory) {
-        InteropCall memory interopCall = InteropCall({
-            version: INTEROP_CALL_VERSION,
-            shadowAccount: false,
-            to: L2_ASSET_ROUTER_ADDR,
-            from: L2_ASSET_ROUTER_ADDR,
-            value: 0,
-            data: buildArCallData(_assetId, _fromChainId, _originChainId, _originToken, _amount)
-        });
-        InteropCallExecutedMessage memory executionMsg = InteropCallExecutedMessage({
-            destinationBaseTokenAssetId: _destBaseTokenAssetId,
-            interopCall: interopCall
-        });
-        bytes memory handlerMsg = encodeInteropCallExecutedMessage(executionMsg);
-        L2Log[] memory logs = new L2Log[](1);
-        logs[0] = createInteropHandlerLog(0, handlerMsg);
-        bytes[] memory messages = new bytes[](1);
-        messages[0] = handlerMsg;
-        return buildProcessLogsInput(_gwAssetTracker, _dstChainId, 1, logs, messages, address(0));
+        return
+            _buildHandlerInputFromCall(
+                _gwAssetTracker,
+                _dstChainId,
+                _destBaseTokenAssetId,
+                InteropCall({
+                    version: INTEROP_CALL_VERSION,
+                    shadowAccount: false,
+                    to: L2_ASSET_ROUTER_ADDR,
+                    from: L2_ASSET_ROUTER_ADDR,
+                    value: 0,
+                    data: buildArCallData(_assetId, _fromChainId, _originChainId, _originToken, _amount)
+                })
+            );
     }
 
     /// @notice Builds a ProcessLogsInput for the destination chain confirming a base-token-only execution.
@@ -356,19 +301,46 @@ library ProcessLogsTestHelper {
         bytes32 _destBaseTokenAssetId,
         uint256 _baseTokenValue
     ) internal returns (ProcessLogsInput memory) {
-        InteropCall memory interopCall = InteropCall({
-            version: INTEROP_CALL_VERSION,
-            shadowAccount: false,
-            to: address(0xdead),
-            from: address(1),
-            value: _baseTokenValue,
-            data: ""
-        });
-        InteropCallExecutedMessage memory executionMsg = InteropCallExecutedMessage({
-            destinationBaseTokenAssetId: _destBaseTokenAssetId,
-            interopCall: interopCall
-        });
-        bytes memory handlerMsg = encodeInteropCallExecutedMessage(executionMsg);
+        return
+            _buildHandlerInputFromCall(
+                _gwAssetTracker,
+                _dstChainId,
+                _destBaseTokenAssetId,
+                InteropCall({
+                    version: INTEROP_CALL_VERSION,
+                    shadowAccount: false,
+                    to: address(0xdead),
+                    from: address(1),
+                    value: _baseTokenValue,
+                    data: ""
+                })
+            );
+    }
+
+    /// @dev Encodes a bundle as a message, wraps it in a single log, and builds the ProcessLogsInput.
+    function _buildBundleInputFromBundle(
+        GWAssetTrackerTestHelper _gwAssetTracker,
+        uint256 _srcChainId,
+        InteropBundle memory _bundle
+    ) private returns (ProcessLogsInput memory) {
+        bytes memory message = encodeInteropCenterMessage(_bundle);
+        L2Log[] memory logs = new L2Log[](1);
+        logs[0] = createInteropCenterLog(0, message);
+        bytes[] memory messages = new bytes[](1);
+        messages[0] = message;
+        return buildProcessLogsInput(_gwAssetTracker, _srcChainId, 1, logs, messages, address(0));
+    }
+
+    /// @dev Wraps an InteropCall in an executed message, creates the handler log, and builds the ProcessLogsInput.
+    function _buildHandlerInputFromCall(
+        GWAssetTrackerTestHelper _gwAssetTracker,
+        uint256 _dstChainId,
+        bytes32 _destBaseTokenAssetId,
+        InteropCall memory _call
+    ) private returns (ProcessLogsInput memory) {
+        bytes memory handlerMsg = encodeInteropCallExecutedMessage(
+            InteropCallExecutedMessage({destinationBaseTokenAssetId: _destBaseTokenAssetId, interopCall: _call})
+        );
         L2Log[] memory logs = new L2Log[](1);
         logs[0] = createInteropHandlerLog(0, handlerMsg);
         bytes[] memory messages = new bytes[](1);
