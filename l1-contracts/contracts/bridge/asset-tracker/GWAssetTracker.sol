@@ -562,8 +562,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         // Move asset balance from pending to confirmed chainBalance (for asset router calls).
         if (executionMsg.interopCall.from == L2_ASSET_ROUTER_ADDR) {
-            (, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(executionMsg.interopCall.data);
             // slither-disable-next-line unused-return
+            (, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(executionMsg.interopCall.data);
             (, , , uint256 assetAmount, ) = DataEncoding.decodeBridgeMintData(transferData);
             if (assetAmount > 0) {
                 _confirmPendingInteropBalance(_chainId, assetId, assetAmount);
