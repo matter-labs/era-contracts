@@ -405,7 +405,8 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
                 rotateCommitterRole: false,
                 rotateReverterRole: true,
                 rotateProverRole: true,
-                rotateExecutorRole: true
+                rotateExecutorRole: true,
+                rotateUpgraderRole: true
             })
         );
 
@@ -417,7 +418,8 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
                 rotateCommitterRole: true,
                 rotateReverterRole: false,
                 rotateProverRole: false,
-                rotateExecutorRole: false
+                rotateExecutorRole: false,
+                rotateUpgraderRole: false
             })
         );
 
@@ -431,7 +433,8 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
                     rotateCommitterRole: false,
                     rotateReverterRole: false,
                     rotateProverRole: true,
-                    rotateExecutorRole: false
+                    rotateExecutorRole: false,
+                    rotateUpgraderRole: false
                 })
             );
         }
@@ -446,7 +449,8 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
                     rotateCommitterRole: false,
                     rotateReverterRole: false,
                     rotateProverRole: false,
-                    rotateExecutorRole: true
+                    rotateExecutorRole: true,
+                    rotateUpgraderRole: false
                 })
             );
         }

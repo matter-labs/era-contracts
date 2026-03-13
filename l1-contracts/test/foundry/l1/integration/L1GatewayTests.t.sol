@@ -463,13 +463,18 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             abi.encode(keccak256(abi.encode(diamondCut)))
         );
         vm.mockCall(
+            ctm,
+            abi.encodeCall(IChainTypeManager.protocolVersionVerifier, (newProtocolVersion)),
+            abi.encode(address(0x1))
+        );
+        vm.mockCall(
             address(gatewayChain),
             abi.encodeCall(IGetters.getProtocolVersion, ()),
             abi.encode(newProtocolVersion)
         );
 
         vm.startBroadcast(migratingChain.getAdmin());
-        migratingChain.upgradeChainFromVersion(currentProtocolVersion, diamondCut);
+        migratingChain.upgradeChainFromVersion(address(migratingChain), currentProtocolVersion, diamondCut);
         vm.stopBroadcast();
     }
 

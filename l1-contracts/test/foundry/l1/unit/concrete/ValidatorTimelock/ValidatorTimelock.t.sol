@@ -5,6 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
@@ -51,11 +53,13 @@ contract ValidatorTimelockTest is Test {
     bytes32 reverterRole;
     bytes32 proverRole;
     bytes32 executorRole;
+    bytes32 upgraderRole;
     bytes32 precommitterAdminRole;
     bytes32 committerAdminRole;
     bytes32 reverterAdminRole;
     bytes32 proverAdminRole;
     bytes32 executorAdminRole;
+    bytes32 upgraderAdminRole;
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -87,11 +91,13 @@ contract ValidatorTimelockTest is Test {
         reverterRole = validator.REVERTER_ROLE();
         proverRole = validator.PROVER_ROLE();
         executorRole = validator.EXECUTOR_ROLE();
+        upgraderRole = validator.UPGRADER_ROLE();
         precommitterAdminRole = validator.OPTIONAL_PRECOMMITTER_ADMIN_ROLE();
         committerAdminRole = validator.OPTIONAL_COMMITTER_ADMIN_ROLE();
         reverterAdminRole = validator.OPTIONAL_REVERTER_ADMIN_ROLE();
         proverAdminRole = validator.OPTIONAL_PROVER_ADMIN_ROLE();
         executorAdminRole = validator.OPTIONAL_EXECUTOR_ADMIN_ROLE();
+        upgraderAdminRole = validator.OPTIONAL_UPGRADER_ADMIN_ROLE();
     }
 
     function _deployValidatorTimelock(address _initialOwner, uint32 _initialExecutionDelay) internal returns (address) {
@@ -113,12 +119,13 @@ contract ValidatorTimelockTest is Test {
         assertEq(validator.executionDelay(), executionDelay);
     }
 
-    function _assertAllRoles(uint256 _chainId, address _addr, bool _expected) internal {
+    function _assertAllRoles(uint256 _chainId, address _addr, bool _expected) internal view {
         require(validator.hasRoleForChainId(_chainId, validator.PRECOMMITTER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.COMMITTER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.REVERTER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.PROVER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.EXECUTOR_ROLE(), _addr) == _expected);
+        require(validator.hasRoleForChainId(_chainId, validator.UPGRADER_ROLE(), _addr) == _expected);
     }
 
     function test_addValidatorForChainId() public {
@@ -135,6 +142,8 @@ contract ValidatorTimelockTest is Test {
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, proverRole, bob);
         vm.expectEmit(true, true, true, true, address(validator));
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, executorRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, upgraderRole, bob);
         validator.addValidatorForChainId(chainId, bob);
 
         _assertAllRoles(chainId, bob, true);
@@ -156,6 +165,8 @@ contract ValidatorTimelockTest is Test {
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, proverRole, bob);
         vm.expectEmit(true, true, true, true, address(validator));
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, executorRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, upgraderRole, bob);
         validator.removeValidatorForChainId(chainId, bob);
 
         _assertAllRoles(chainId, bob, false);
@@ -264,6 +275,37 @@ contract ValidatorTimelockTest is Test {
             proof
         );
         validator.proveBatchesSharedBridge(zkSync, proveBatchFrom, proveBatchTo, proveData);
+    }
+
+    function test_upgradeChainFromVersion_PropagatesToDiamondProxy() public {
+        uint256 oldProtocolVersion = 1;
+        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: address(0),
+            initCalldata: bytes("")
+        });
+
+        vm.mockCall(
+            zkSync,
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion, diamondCut)),
+            ""
+        );
+
+        vm.prank(alice);
+        validator.upgradeChainFromVersion(zkSync, oldProtocolVersion, diamondCut);
+    }
+
+    function test_RevertWhen_upgradeChainFromVersionNotUpgrader() public {
+        uint256 oldProtocolVersion = 1;
+        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: address(0),
+            initCalldata: bytes("")
+        });
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, upgraderRole, bob));
+        validator.upgradeChainFromVersion(zkSync, oldProtocolVersion, diamondCut);
     }
 
     function test_executeBatchesSharedBridge() public {
@@ -437,7 +479,8 @@ contract ValidatorTimelockTest is Test {
             rotateCommitterRole: true,
             rotateReverterRole: false,
             rotateProverRole: false,
-            rotateExecutorRole: false
+            rotateExecutorRole: false,
+            rotateUpgraderRole: false
         });
 
         // Bob should not have any roles initially
@@ -470,7 +513,8 @@ contract ValidatorTimelockTest is Test {
             rotateCommitterRole: false,
             rotateReverterRole: true,
             rotateProverRole: true,
-            rotateExecutorRole: false
+            rotateExecutorRole: false,
+            rotateUpgraderRole: false
         });
 
         vm.prank(owner);
@@ -490,7 +534,8 @@ contract ValidatorTimelockTest is Test {
             rotateCommitterRole: false,
             rotateReverterRole: false,
             rotateProverRole: false,
-            rotateExecutorRole: true
+            rotateExecutorRole: true,
+            rotateUpgraderRole: false
         });
 
         vm.prank(owner);
@@ -532,7 +577,8 @@ contract ValidatorTimelockTest is Test {
             rotateCommitterRole: false,
             rotateReverterRole: false,
             rotateProverRole: false,
-            rotateExecutorRole: false
+            rotateExecutorRole: false,
+            rotateUpgraderRole: false
         });
 
         vm.expectRevert(abi.encodeWithSelector(NotAZKChain.selector, fakeChain));

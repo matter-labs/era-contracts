@@ -448,6 +448,8 @@ error UnsupportedProofBatchEncoding(uint8 version);
 error UnsupportedUpgradeType();
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
+// 0x04d91f9d
+error UpgradeTimestampNotReached(uint256 upgradeTimestamp, uint256 currentTimestamp);
 // 0x47b3b145
 error ValidateTxnNotEnoughGas();
 // 0x626ade30

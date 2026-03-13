@@ -72,7 +72,10 @@ contract DefaultChainUpgrade is Script {
             IZKChain(config.chainDiamondProxyAddress).getAdmin(),
             address(0),
             config.chainDiamondProxyAddress,
-            abi.encodeCall(IAdmin.upgradeChainFromVersion, (config.oldProtocolVersion, diamondCutData)),
+            abi.encodeCall(
+                IAdmin.upgradeChainFromVersion,
+                (config.chainDiamondProxyAddress, config.oldProtocolVersion, diamondCutData)
+            ),
             0
         );
     }
