@@ -147,7 +147,6 @@ contract L1AssetRouterTest is Test {
         l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehubAddress),
             _messageRoot: IMessageRootBase(messageRootAddress),
-            _interopCenter: IInteropCenter(interopCenterAddress),
             _eraChainId: eraChainId,
             _eraDiamondProxy: eraDiamondProxy
         });
