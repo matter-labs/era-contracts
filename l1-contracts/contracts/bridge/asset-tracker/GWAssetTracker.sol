@@ -564,6 +564,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         if (executionMsg.interopCall.from == L2_ASSET_ROUTER_ADDR) {
             // slither-disable-next-line unused-return
             (, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(executionMsg.interopCall.data);
+            // slither-disable-next-line unused-return
             (, , , uint256 assetAmount, ) = DataEncoding.decodeBridgeMintData(transferData);
             if (assetAmount > 0) {
                 _confirmPendingInteropBalance(_chainId, assetId, assetAmount);
