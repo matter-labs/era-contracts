@@ -245,7 +245,13 @@ library ProcessLogsTestHelper {
             _buildBundleInputFromBundle(
                 _gwAssetTracker,
                 _srcChainId,
-                createInteropBundleWithArCall(_srcChainId, _dstChainId, _destBaseTokenAssetId, arCallData, keccak256("salt"))
+                createInteropBundleWithArCall(
+                    _srcChainId,
+                    _dstChainId,
+                    _destBaseTokenAssetId,
+                    arCallData,
+                    keccak256("salt")
+                )
             );
     }
 
@@ -263,7 +269,14 @@ library ProcessLogsTestHelper {
             _buildBundleInputFromBundle(
                 _gwAssetTracker,
                 _srcChainId,
-                createInteropBundleWithBaseTokenValue(_srcChainId, _dstChainId, _destBaseTokenAssetId, _numCalls, _valuePerCall, keccak256("salt"))
+                createInteropBundleWithBaseTokenValue(
+                    _srcChainId,
+                    _dstChainId,
+                    _destBaseTokenAssetId,
+                    _numCalls,
+                    _valuePerCall,
+                    keccak256("salt")
+                )
             );
     }
 

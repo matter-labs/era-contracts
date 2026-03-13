@@ -748,5 +748,4 @@ contract GWAssetTrackerExtendedTest is Test {
         assertEq(gwAssetTracker.getOriginToken(ASSET_ID), ORIGIN_TOKEN);
         assertEq(gwAssetTracker.getTokenOriginChainId(ASSET_ID), ORIGIN_CHAIN_ID);
     }
-
 }

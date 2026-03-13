@@ -66,7 +66,6 @@ contract GWAssetTrackerTestHelper is GWAssetTracker {
     function setPendingInteropBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount) external {
         pendingInteropBalance[_chainId][_assetId] = _amount;
     }
-
 }
 
 contract GWAssetTrackerTest is Test {
@@ -757,9 +756,7 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), 300);
 
         assertEq(gwAssetTracker.pendingInteropBalance(CHAIN_ID, assetId1), 0);
-        assertEq(gwAssetTracker.pendingInteropBalance(CHAIN_ID, assetId2),
-            0
-        );
+        assertEq(gwAssetTracker.pendingInteropBalance(CHAIN_ID, assetId2), 0);
         assertEq(gwAssetTracker.pendingInteropBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), 0);
     }
 
@@ -828,7 +825,11 @@ contract GWAssetTrackerTest is Test {
             transferAmount,
             "Destination pending balance should increase"
         );
-        assertEq(gwAssetTracker.chainBalance(DEST_CHAIN_ID, assetId), 0, "Destination chainBalance stays 0 until confirmed");
+        assertEq(
+            gwAssetTracker.chainBalance(DEST_CHAIN_ID, assetId),
+            0,
+            "Destination chainBalance stays 0 until confirmed"
+        );
 
         // Destination chain confirms via InteropHandler: pending moves to chainBalance.
         _confirmInteropAsset(DEST_CHAIN_ID, assetId, transferAmount);
@@ -891,14 +892,30 @@ contract GWAssetTrackerTest is Test {
 
         _submitInteropBundleWithArCall(_sourceChainId, srcSender, _destinationChainId, assetId, _amount);
 
-        assertEq(gwAssetTracker.chainBalance(_sourceChainId, assetId), sourceBalanceBefore - _amount, "Source balance should decrease");
-        assertEq(gwAssetTracker.pendingInteropBalance(_destinationChainId, assetId), _amount, "Destination pending balance should increase");
-        assertEq(gwAssetTracker.chainBalance(_destinationChainId, assetId), 0, "Destination chainBalance stays 0 until confirmed");
+        assertEq(
+            gwAssetTracker.chainBalance(_sourceChainId, assetId),
+            sourceBalanceBefore - _amount,
+            "Source balance should decrease"
+        );
+        assertEq(
+            gwAssetTracker.pendingInteropBalance(_destinationChainId, assetId),
+            _amount,
+            "Destination pending balance should increase"
+        );
+        assertEq(
+            gwAssetTracker.chainBalance(_destinationChainId, assetId),
+            0,
+            "Destination chainBalance stays 0 until confirmed"
+        );
 
         _confirmInteropAsset(_destinationChainId, dstSender, assetId, _amount);
 
         assertEq(gwAssetTracker.pendingInteropBalance(_destinationChainId, assetId), 0);
-        assertEq(gwAssetTracker.chainBalance(_destinationChainId, assetId), _amount, "Destination chainBalance after confirmation");
+        assertEq(
+            gwAssetTracker.chainBalance(_destinationChainId, assetId),
+            _amount,
+            "Destination chainBalance after confirmation"
+        );
     }
 
     /// @notice Regression: legacy bridge message decoding does not revert (parseTokenData on empty bytes was fixed).
@@ -1051,7 +1068,11 @@ contract GWAssetTrackerTest is Test {
 
         _submitLegacyBridgeWithdrawal(legacyChainId, legacyBridge, legacyMessage);
 
-        assertEq(gwAssetTracker.chainBalance(legacyChainId, assetId), balanceBefore - _amount, "Balance should decrease");
+        assertEq(
+            gwAssetTracker.chainBalance(legacyChainId, assetId),
+            balanceBefore - _amount,
+            "Balance should decrease"
+        );
         assertEq(gwAssetTracker.pendingInteropBalance(legacyChainId, assetId), 0);
     }
 
@@ -1375,8 +1396,11 @@ contract GWAssetTrackerTest is Test {
             vm.prank(mockDestZKChain);
             gwAssetTracker.processLogsAndMessages(confirmInput);
 
-            assertEq(gwAssetTracker.pendingInteropBalance(DEST_CHAIN_ID, DEST_BASE_TOKEN_ASSET_ID), totalValue - (i+1) * valuePerCall);
-            assertEq(gwAssetTracker.chainBalance(DEST_CHAIN_ID, DEST_BASE_TOKEN_ASSET_ID), (i+1) * valuePerCall);
+            assertEq(
+                gwAssetTracker.pendingInteropBalance(DEST_CHAIN_ID, DEST_BASE_TOKEN_ASSET_ID),
+                totalValue - (i + 1) * valuePerCall
+            );
+            assertEq(gwAssetTracker.chainBalance(DEST_CHAIN_ID, DEST_BASE_TOKEN_ASSET_ID), (i + 1) * valuePerCall);
         }
     }
 
@@ -1489,12 +1513,7 @@ contract GWAssetTrackerTest is Test {
     }
 
     /// @dev Confirms pending interop asset on _dstChainId; _dstSender is the pranked ZKChain address.
-    function _confirmInteropAsset(
-        uint256 _dstChainId,
-        address _dstSender,
-        bytes32 _assetId,
-        uint256 _amount
-    ) internal {
+    function _confirmInteropAsset(uint256 _dstChainId, address _dstSender, bytes32 _assetId, uint256 _amount) internal {
         ProcessLogsInput memory input = _buildInteropHandlerInput(_dstChainId, _assetId, _amount);
         vm.prank(_dstSender);
         gwAssetTracker.processLogsAndMessages(input);
@@ -1529,11 +1548,7 @@ contract GWAssetTrackerTest is Test {
     }
 
     /// @dev Submits a legacy bridge withdrawal for the given chain via processLogsAndMessages.
-    function _submitLegacyBridgeWithdrawal(
-        uint256 _chainId,
-        address _legacyBridge,
-        bytes memory _legacyMsg
-    ) internal {
+    function _submitLegacyBridgeWithdrawal(uint256 _chainId, address _legacyBridge, bytes memory _legacyMsg) internal {
         L2Log[] memory logs = new L2Log[](1);
         logs[0] = ProcessLogsTestHelper.createLegacyBridgeLog(0, _legacyBridge, _legacyMsg);
         bytes[] memory messages = new bytes[](1);
