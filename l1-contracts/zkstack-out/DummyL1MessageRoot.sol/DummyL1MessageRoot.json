@@ -1,16 +1,24 @@
 [
   {
-    "type": "function",
-    "name": "BRIDGEHUB_STORAGE_SLOT",
-    "inputs": [],
-    "outputs": [
+    "type": "constructor",
+    "inputs": [
       {
-        "name": "",
+        "name": "_bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_eraGatewayChainId",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "_chainAssetHandler",
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -40,33 +48,7 @@
   },
   {
     "type": "function",
-    "name": "CHAIN_ASSET_HANDLER_STORAGE_SLOT",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "ERA_GATEWAY_CHAIN_ID",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "ERA_GATEWAY_CHAIN_ID_STORAGE_SLOT",
     "inputs": [],
     "outputs": [
       {
@@ -227,25 +209,6 @@
   },
   {
     "type": "function",
-    "name": "chainTree",
-    "inputs": [
-      {
-        "name": "chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "_nextLeafIndex",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "currentChainBatchNumber",
     "inputs": [
       {
@@ -291,6 +254,42 @@
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getChainTree",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct DynamicIncrementalMerkle.Bytes32PushTree",
+        "components": [
+          {
+            "name": "_nextLeafIndex",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "_sides",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
+          },
+          {
+            "name": "_zeros",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -413,6 +412,20 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "initialize",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "initializeL1V31Upgrade",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -781,29 +794,6 @@
   },
   {
     "type": "function",
-    "name": "setStoredAddresses",
-    "inputs": [
-      {
-        "name": "_bridgehubAddr",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_chainAssetHandlerAddr",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_eraGwChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "sharedTree",
     "inputs": [],
     "outputs": [
@@ -993,12 +983,22 @@
   },
   {
     "type": "error",
+    "name": "CurrentBatchNumberAlreadySet",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "HashedLogIsDefault",
     "inputs": []
   },
   {
     "type": "error",
     "name": "InvalidProofLengthForFinalNode",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "LocallyNoChainsAtGenesis",
     "inputs": []
   },
   {
@@ -1060,6 +1060,11 @@
   },
   {
     "type": "error",
+    "name": "NotAllChainsOnL1",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "OnlyAssetTracker",
     "inputs": [
       {
@@ -1113,6 +1118,21 @@
   },
   {
     "type": "error",
+    "name": "OnlyOnSettlementLayer",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TotalBatchesExecutedZero",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "UnsupportedProofMetadataVersion",
     "inputs": [
       {
@@ -1121,5 +1141,15 @@
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "V31UpgradeChainBatchNumberAlreadySet",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroAddress",
+    "inputs": []
   }
 ]

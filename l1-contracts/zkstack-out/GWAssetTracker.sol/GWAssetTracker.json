@@ -414,7 +414,7 @@
             "internalType": "bytes32"
           },
           {
-            "name": "messageRoot",
+            "name": "multichainBatchRoot",
             "type": "bytes32",
             "internalType": "bytes32"
           },
@@ -931,15 +931,15 @@
   },
   {
     "type": "error",
-    "name": "InvalidEmptyMessageRoot",
+    "name": "InvalidEmptyMultichainBatchRoot",
     "inputs": [
       {
-        "name": "expectedMessageRoot",
+        "name": "expectedMultichainBatchRoot",
         "type": "bytes32",
         "internalType": "bytes32"
       },
       {
-        "name": "providedMessageRoot",
+        "name": "providedMultichainBatchRoot",
         "type": "bytes32",
         "internalType": "bytes32"
       }

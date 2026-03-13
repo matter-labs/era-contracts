@@ -20,19 +20,6 @@
   },
   {
     "type": "function",
-    "name": "burnMsgValue",
-    "inputs": [
-      {
-        "name": "_toChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "payable"
-  },
-  {
-    "type": "function",
     "name": "decimals",
     "inputs": [],
     "outputs": [

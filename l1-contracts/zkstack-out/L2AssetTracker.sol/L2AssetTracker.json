@@ -148,6 +148,11 @@
     "name": "handleFinalizeBaseTokenBridgingOnL2",
     "inputs": [
       {
+        "name": "_fromChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
         "name": "_amount",
         "type": "uint256",
         "internalType": "uint256"
@@ -273,6 +278,30 @@
   },
   {
     "type": "function",
+    "name": "interopInfo",
+    "inputs": [
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "totalWithdrawalsToL1",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "totalSuccessfulDepositsFromL1",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "isAssetRegistered",
     "inputs": [
       {
@@ -328,6 +357,13 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "registerBaseTokenDuringUpgrade",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -412,6 +448,30 @@
   },
   {
     "type": "function",
+    "name": "totalPreV31TotalSupply",
+    "inputs": [
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "isSaved",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "transferOwnership",
     "inputs": [
       {
@@ -422,6 +482,19 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "BaseTokenRegisteredDuringUpgrade",
+    "inputs": [
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -495,6 +568,17 @@
   },
   {
     "type": "error",
+    "name": "AssetAlreadyRegistered",
+    "inputs": [
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "AssetIdNotRegistered",
     "inputs": [
       {
@@ -503,11 +587,6 @@
         "internalType": "bytes32"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "BaseTokenTotalSupplyBackfillFailed",
-    "inputs": []
   },
   {
     "type": "error",

@@ -1,5 +1,9 @@
 [
   {
+    "type": "receive",
+    "stateMutability": "payable"
+  },
+  {
     "type": "function",
     "name": "L1_CHAIN_ID",
     "inputs": [],
@@ -163,11 +167,6 @@
     "type": "function",
     "name": "unbundleBundle",
     "inputs": [
-      {
-        "name": "_sourceChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
       {
         "name": "_bundle",
         "type": "bytes",
