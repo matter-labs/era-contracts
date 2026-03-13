@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { Contract, providers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { l1BridgehubAbi } from "../../src/contracts";
+import { l1BridgehubAbi } from "../../src/core/contracts";
 import {
   L2_BRIDGEHUB_ADDR,
   L2_ASSET_ROUTER_ADDR,
@@ -13,7 +13,7 @@ import {
   L2_ASSET_TRACKER_ADDR,
   L2_MESSAGE_VERIFICATION_ADDR,
   GW_ASSET_TRACKER_ADDR,
-} from "../../src/const";
+} from "../../src/core/const";
 
 describe("01 - Deployment Verification", function () {
   this.timeout(0);

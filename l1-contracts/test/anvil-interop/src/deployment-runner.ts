@@ -2,13 +2,13 @@ import * as fs from "fs";
 import * as path from "path";
 import * as zlib from "zlib";
 import { Contract, Wallet, providers } from "ethers";
-import type { AnvilManager } from "./anvil-manager";
-import { ForgeDeployer } from "./deployer";
-import { ChainRegistry } from "./chain-registry";
-import { GatewaySetup } from "./gateway-setup";
-import { BatchSettler } from "./batch-settler";
-import { L1ToL2Relayer } from "./l1-to-l2-relayer";
-import { L2ToL2Relayer } from "./l2-to-l2-relayer";
+import type { AnvilManager } from "./daemons/anvil-manager";
+import { ForgeDeployer } from "./deployers/deployer";
+import { ChainRegistry } from "./deployers/chain-registry";
+import { GatewaySetup } from "./deployers/gateway-setup";
+import { BatchSettler } from "./daemons/batch-settler";
+import { L1ToL2Relayer } from "./daemons/l1-to-l2-relayer";
+import { L2ToL2Relayer } from "./daemons/l2-to-l2-relayer";
 import type {
   AnvilConfig,
   ChainAddresses,
@@ -16,10 +16,10 @@ import type {
   CoreDeployedAddresses,
   CTMDeployedAddresses,
   DeploymentState,
-} from "./types";
-import { getChainIdsByRole } from "./utils";
-import { migratorFacetAbi } from "./contracts";
-import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./const";
+} from "./core/types";
+import { getChainIdsByRole } from "./core/utils";
+import { migratorFacetAbi } from "./core/contracts";
+import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./core/const";
 
 export interface StartChainOptions {
   blockTime?: number;

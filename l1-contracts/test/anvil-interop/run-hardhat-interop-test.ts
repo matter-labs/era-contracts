@@ -2,11 +2,11 @@
 
 import { spawnSync } from "child_process";
 import * as path from "path";
-import { AnvilManager } from "./src/anvil-manager";
+import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
-import { deployTestTokens } from "./deploy-test-token";
-import { getChainIdsByRole } from "./src/utils";
-import { registerAndMigrateTestTokens } from "./src/token-balance-migration-helper";
+import { deployTestTokens } from "./src/helpers/deploy-test-token";
+import { getChainIdsByRole } from "./src/core/utils";
+import { registerAndMigrateTestTokens } from "./src/helpers/token-balance-migration-helper";
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");

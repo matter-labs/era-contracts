@@ -1,11 +1,11 @@
 import * as path from "path";
 import * as fs from "fs";
 import { ethers, providers, Wallet } from "ethers";
-import type { ChainConfig, ChainAddresses, CoreDeployedAddresses, CTMDeployedAddresses, AnvilConfig } from "./types";
-import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig } from "./utils";
+import type { ChainConfig, ChainAddresses, CoreDeployedAddresses, CTMDeployedAddresses, AnvilConfig } from "../core/types";
+import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig } from "../core/utils";
 import { SystemContractsDeployer } from "./system-contracts-deployer";
 import { L2GenesisUpgradeDeployer } from "./l2-genesis-upgrade-deployer";
-import { runForgeScript } from "./forge";
+import { runForgeScript } from "../core/forge";
 
 export class ChainRegistry {
   private l1RpcUrl: string;

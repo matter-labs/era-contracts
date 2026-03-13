@@ -2,7 +2,7 @@ import { execSync } from "child_process";
 import * as path from "path";
 import { expect } from "chai";
 import { BigNumber } from "ethers";
-import { executeTokenTransfer } from "../../src/token-transfer";
+import { executeTokenTransfer } from "../../src/helpers/token-transfer";
 
 const ANVIL_INTEROP_DIR = path.resolve(__dirname, "../..");
 

@@ -1,8 +1,8 @@
 import * as fs from "fs";
 import * as path from "path";
 import { ethers, providers, Contract, Wallet, utils } from "ethers";
-import { impersonateAndRun } from "./utils";
-import { encodeNtvAssetId } from "./data-encoding";
+import { impersonateAndRun } from "../core/utils";
+import { encodeNtvAssetId } from "../core/data-encoding";
 import {
   l2BridgehubAbi,
   interopCenterAbi,
@@ -11,7 +11,7 @@ import {
   l2AssetTrackerAbi,
   l2NativeTokenVaultAbi,
   l2NativeTokenVaultDevAbi,
-} from "./contracts";
+} from "../core/contracts";
 import {
   ETH_TOKEN_ADDRESS,
   INTEROP_CENTER_ADDR,
@@ -28,7 +28,7 @@ import {
   SERVICE_TX_SENDER_ADDR,
   SYSTEM_CONTEXT_ADDR,
   LEGACY_SHARED_BRIDGE_PLACEHOLDER,
-} from "./const";
+} from "../core/const";
 
 /**
  * SystemContractsDeployer

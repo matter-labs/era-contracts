@@ -12,17 +12,17 @@ import * as fs from "fs";
 import * as path from "path";
 import { parse as parseToml } from "toml";
 import { ethers } from "ethers";
-import { AnvilManager } from "./src/anvil-manager";
+import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
-import { runForgeScript } from "./src/forge";
-import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_DEFAULT_PRIVATE_KEY } from "./src/const";
+import { runForgeScript } from "./src/core/forge";
+import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_DEFAULT_PRIVATE_KEY } from "./src/core/const";
 import {
   adminFacetAbi,
   chainAdminOwnableAbi,
   chainAdminOwnableBytecode,
   ownable2StepAbi,
   gettersFacetAbi,
-} from "./src/contracts";
+} from "./src/core/contracts";
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");

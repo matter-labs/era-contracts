@@ -1,13 +1,13 @@
 import type { providers } from "ethers";
 import { Contract, Wallet, utils } from "ethers";
-import { sleep } from "./utils";
-import { interopHandlerAbi } from "./contracts";
+import { sleep } from "../core/utils";
+import { interopHandlerAbi } from "../core/contracts";
 import {
   INTEROP_BUNDLE_SENT_TOPIC,
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
-} from "./const";
+} from "../core/const";
 
 /**
  * L2→L2 Cross-Chain Relayer

@@ -1,10 +1,10 @@
 import type { BigNumber } from "ethers";
 import { Contract, providers, Wallet, ethers } from "ethers";
-import type { CoreDeployedAddresses } from "./types";
-import { impersonateAndRun, extractAndRelayNewPriorityRequests } from "./utils";
-import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "./data-encoding";
-import { l1BridgehubAbi, l2AssetRouterAbi, testnetERC20TokenAbi, l1NativeTokenVaultAbi } from "./contracts";
-import { ANVIL_DEFAULT_PRIVATE_KEY, L1_CHAIN_ID, L2_ASSET_ROUTER_ADDR } from "./const";
+import type { CoreDeployedAddresses } from "../core/types";
+import { impersonateAndRun, extractAndRelayNewPriorityRequests } from "../core/utils";
+import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
+import { l1BridgehubAbi, l2AssetRouterAbi, testnetERC20TokenAbi, l1NativeTokenVaultAbi } from "../core/contracts";
+import { ANVIL_DEFAULT_PRIVATE_KEY, L1_CHAIN_ID, L2_ASSET_ROUTER_ADDR } from "../core/const";
 
 export interface DepositETHParams {
   l1RpcUrl: string;

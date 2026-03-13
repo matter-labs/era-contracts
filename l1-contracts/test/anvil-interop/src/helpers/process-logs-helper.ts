@@ -1,8 +1,8 @@
 import type { BigNumber, providers } from "ethers";
 import { Contract, ethers } from "ethers";
-import { gwAssetTrackerAbi, l2BridgehubAbi, l2MessageRootAbi } from "./contracts";
-import { impersonateAndRun } from "./utils";
-import { encodeTokenData, encodeBridgeMintData } from "./data-encoding";
+import { gwAssetTrackerAbi, l2BridgehubAbi, l2MessageRootAbi } from "../core/contracts";
+import { impersonateAndRun } from "../core/utils";
+import { encodeTokenData, encodeBridgeMintData } from "../core/data-encoding";
 import {
   CHAIN_ID_LEAF_PADDING,
   FINALIZE_DEPOSIT_SIG,
@@ -15,7 +15,7 @@ import {
   L2_MESSAGE_ROOT_ADDR,
   L2_TO_L1_LOGS_MERKLE_TREE_DEPTH,
   L2_TO_L1_MESSENGER_ADDR,
-} from "./const";
+} from "../core/const";
 
 // ───────────────────────────────────────────────────────────────
 // Types

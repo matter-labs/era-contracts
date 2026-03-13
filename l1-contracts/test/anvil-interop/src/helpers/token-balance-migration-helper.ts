@@ -1,13 +1,13 @@
 import { Contract, ethers, providers, Wallet } from "ethers";
-import { l1AssetTrackerAbi, l2AssetTrackerAbi, l2NativeTokenVaultAbi } from "./contracts";
+import { l1AssetTrackerAbi, l2AssetTrackerAbi, l2NativeTokenVaultAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   L1_MESSAGE_SENT_EVENT_SIG,
   L2_ASSET_TRACKER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
-} from "./const";
-import { buildFinalizeWithdrawalParams, extractAndRelayNewPriorityRequests } from "./utils";
-import { encodeNtvAssetId } from "./data-encoding";
+} from "../core/const";
+import { buildFinalizeWithdrawalParams, extractAndRelayNewPriorityRequests } from "../core/utils";
+import { encodeNtvAssetId } from "../core/data-encoding";
 
 /**
  * Orchestrates the full Token Balance Migration (TBM) flow:

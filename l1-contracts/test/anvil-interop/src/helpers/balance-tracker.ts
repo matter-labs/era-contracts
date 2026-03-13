@@ -1,7 +1,7 @@
 import { BigNumber, Contract, providers } from "ethers";
-import type { BalanceSnapshot, CoreDeployedAddresses, DeploymentState } from "./types";
-import { l1AssetTrackerAbi, gwAssetTrackerAbi, testnetERC20TokenAbi, l1NativeTokenVaultAbi } from "./contracts";
-import { ETH_TOKEN_ADDRESS, GW_ASSET_TRACKER_ADDR } from "./const";
+import type { BalanceSnapshot, CoreDeployedAddresses, DeploymentState } from "../core/types";
+import { l1AssetTrackerAbi, gwAssetTrackerAbi, testnetERC20TokenAbi, l1NativeTokenVaultAbi } from "../core/contracts";
+import { ETH_TOKEN_ADDRESS, GW_ASSET_TRACKER_ADDR } from "../core/const";
 
 /**
  * Balance tracking across L1AssetTracker, GWAssetTracker, and actual token balances.

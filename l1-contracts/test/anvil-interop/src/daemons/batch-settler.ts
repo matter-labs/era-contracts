@@ -1,8 +1,8 @@
 import type { providers } from "ethers";
 import { Contract, Wallet, utils } from "ethers";
-import type { BatchState, L2Transaction, CommitBatchInfo, StoredBatchInfo, ProofInput, ChainAddresses } from "./types";
-import { sleep } from "./utils";
-import { executorFacetAbi } from "./contracts";
+import type { BatchState, L2Transaction, CommitBatchInfo, StoredBatchInfo, ProofInput, ChainAddresses } from "../core/types";
+import { sleep } from "../core/utils";
+import { executorFacetAbi } from "../core/contracts";
 
 export class BatchSettler {
   private l1Provider: providers.JsonRpcProvider;

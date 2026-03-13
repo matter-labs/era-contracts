@@ -1,9 +1,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import { ethers, utils } from "ethers";
-import { ETH_TOKEN_ADDRESS, L1_CHAIN_ID, ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE } from "./const";
-import { applyL1ToL2Alias } from "./utils";
-import { encodeNtvAssetId } from "./data-encoding";
+import { ETH_TOKEN_ADDRESS, L1_CHAIN_ID, ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE } from "../core/const";
+import { applyL1ToL2Alias } from "../core/utils";
+import { encodeNtvAssetId } from "../core/data-encoding";
 
 /**
  * Helper for building L2GenesisUpgrade data structures

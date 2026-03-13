@@ -1,7 +1,7 @@
 import { BigNumber, Contract, ethers, providers, Wallet } from "ethers";
-import { DeploymentRunner } from "./deployment-runner";
-import type { MultiChainTokenTransferParams, MultiChainTokenTransferResult } from "./types";
-import { testnetERC20TokenAbi, interopCenterAbi, l2NativeTokenVaultAbi, interopHandlerAbi } from "./contracts";
+import { DeploymentRunner } from "../deployment-runner";
+import type { MultiChainTokenTransferParams, MultiChainTokenTransferResult } from "../core/types";
+import { testnetERC20TokenAbi, interopCenterAbi, l2NativeTokenVaultAbi, interopHandlerAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   INTEROP_BUNDLE_TUPLE_TYPE,
@@ -9,8 +9,8 @@ import {
   L2_ASSET_ROUTER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
-} from "./const";
-import { encodeNtvAssetId, encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "./data-encoding";
+} from "../core/const";
+import { encodeNtvAssetId, encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
 import { createBalanceTrackerFromState } from "./balance-tracker";
 
 type Logger = (line: string) => void;

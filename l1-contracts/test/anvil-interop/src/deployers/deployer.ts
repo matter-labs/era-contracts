@@ -1,10 +1,10 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
-import type { CoreDeployedAddresses, CTMDeployedAddresses } from "./types";
-import { parseForgeScriptOutput, ensureDirectoryExists } from "./utils";
-import { ANVIL_DEFAULT_ACCOUNT_ADDR } from "./const";
-import { runForgeScript } from "./forge";
+import type { CoreDeployedAddresses, CTMDeployedAddresses } from "../core/types";
+import { parseForgeScriptOutput, ensureDirectoryExists } from "../core/utils";
+import { ANVIL_DEFAULT_ACCOUNT_ADDR } from "../core/const";
+import { runForgeScript } from "../core/forge";
 
 const execAsync = promisify(exec);
 

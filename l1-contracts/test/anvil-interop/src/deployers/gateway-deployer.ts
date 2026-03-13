@@ -10,7 +10,7 @@ import {
   L2_ASSET_TRACKER_ADDR,
   GW_ASSET_TRACKER_ADDR,
   L2_MESSAGE_VERIFICATION_ADDR,
-} from "./const";
+} from "../core/const";
 
 /**
  * Pre-deploy Gateway CTM contracts on the GW chain via anvil_setCode.

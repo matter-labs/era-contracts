@@ -1,8 +1,8 @@
 import type { providers } from "ethers";
 import { Contract, Wallet } from "ethers";
-import type { ChainAddresses, CoreDeployedAddresses } from "./types";
-import { sleep } from "./utils";
-import { il1BridgehubAbi } from "./contracts";
+import type { ChainAddresses, CoreDeployedAddresses } from "../core/types";
+import { sleep } from "../core/utils";
+import { il1BridgehubAbi } from "../core/contracts";
 
 /**
  * L1→L2 Transaction Relayer

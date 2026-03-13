@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { ethers, providers, Wallet, ContractFactory } from "ethers";
-import { DeploymentRunner } from "./src/deployment-runner";
-import { ANVIL_DEFAULT_PRIVATE_KEY } from "./src/const";
+import { DeploymentRunner } from "../deployment-runner";
+import { ANVIL_DEFAULT_PRIVATE_KEY } from "../core/const";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -23,7 +23,7 @@ export async function deployTestTokens(): Promise<void> {
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
   // Load TestnetERC20Token artifact
-  const artifactPath = path.join(__dirname, "../../out/TestnetERC20Token.sol/TestnetERC20Token.json");
+  const artifactPath = path.join(__dirname, "../../../../out/TestnetERC20Token.sol/TestnetERC20Token.json");
 
   if (!fs.existsSync(artifactPath)) {
     throw new Error(`TestnetERC20Token artifact not found at ${artifactPath}. Run 'forge build' first.`);

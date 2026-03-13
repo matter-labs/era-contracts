@@ -3,9 +3,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import { execSync } from "child_process";
-import { AnvilManager } from "./src/anvil-manager";
+import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
-import { deployTestTokens } from "./deploy-test-token";
+import { deployTestTokens } from "./src/helpers/deploy-test-token";
 
 async function main(): Promise<void> {
   // Use the anvil-interop Foundry profile which disables CBOR metadata,

@@ -1,8 +1,8 @@
 import { expect } from "chai";
 import { BigNumber } from "ethers";
-import { executeTokenTransfer } from "../../src/token-transfer";
+import { executeTokenTransfer } from "../../src/helpers/token-transfer";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getChainIdByRole, getChainIdsByRole } from "../../src/utils";
+import { getChainIdByRole, getChainIdsByRole } from "../../src/core/utils";
 
 describe("03 - Interop Transfer (Direct Settlement)", function () {
   this.timeout(0);

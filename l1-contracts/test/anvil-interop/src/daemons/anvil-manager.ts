@@ -2,8 +2,8 @@ import { spawn } from "child_process";
 import { providers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
-import type { AnvilChain } from "./types";
-import { waitForChainReady, formatChainInfo } from "./utils";
+import type { AnvilChain } from "../core/types";
+import { waitForChainReady, formatChainInfo } from "../core/utils";
 
 export class AnvilManager {
   private chains: Map<number, AnvilChain> = new Map();

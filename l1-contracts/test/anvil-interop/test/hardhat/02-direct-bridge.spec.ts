@@ -1,11 +1,11 @@
 import { expect } from "chai";
 import { BigNumber, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { createBalanceTrackerFromState, queryEthAssetId, computeBalanceDeltas } from "../../src/balance-tracker";
-import { depositETHToL2 } from "../../src/l1-deposit-helper";
-import { withdrawETHFromL2 } from "../../src/l2-withdrawal-helper";
-import { ANVIL_DEFAULT_ACCOUNT_ADDR } from "../../src/const";
-import { getL2Chain, getChainDiamondProxy, getChainIdByRole } from "../../src/utils";
+import { createBalanceTrackerFromState, queryEthAssetId, computeBalanceDeltas } from "../../src/helpers/balance-tracker";
+import { depositETHToL2 } from "../../src/helpers/l1-deposit-helper";
+import { withdrawETHFromL2 } from "../../src/helpers/l2-withdrawal-helper";
+import { ANVIL_DEFAULT_ACCOUNT_ADDR } from "../../src/core/const";
+import { getL2Chain, getChainDiamondProxy, getChainIdByRole } from "../../src/core/utils";
 
 describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
   this.timeout(0);

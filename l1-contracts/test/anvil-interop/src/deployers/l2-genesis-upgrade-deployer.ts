@@ -5,9 +5,9 @@ import {
   buildFixedForceDeploymentsData,
   getBytecodeInfo,
 } from "./l2-genesis-helper";
-import { impersonateAndRun, loadBytecodeFromOut } from "./utils";
-import { encodeNtvAssetId } from "./data-encoding";
-import { l2ComplexUpgraderAbi, l2GenesisUpgradeAbi, l2BridgehubAbi } from "./contracts";
+import { impersonateAndRun, loadBytecodeFromOut } from "../core/utils";
+import { encodeNtvAssetId } from "../core/data-encoding";
+import { l2ComplexUpgraderAbi, l2GenesisUpgradeAbi, l2BridgehubAbi } from "../core/contracts";
 import {
   ETH_TOKEN_ADDRESS,
   GW_ASSET_TRACKER_ADDR,
@@ -32,7 +32,7 @@ import {
   L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
   SERVICE_TX_SENDER_ADDR,
   SYSTEM_CONTEXT_ADDR,
-} from "./const";
+} from "../core/const";
 
 interface PredeployedContractSpec {
   address: string;

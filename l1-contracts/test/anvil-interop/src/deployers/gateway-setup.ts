@@ -1,8 +1,8 @@
 import { Contract, ethers, providers } from "ethers";
 import * as path from "path";
-import type { CoreDeployedAddresses, CTMDeployedAddresses } from "./types";
+import type { CoreDeployedAddresses, CTMDeployedAddresses } from "../core/types";
 import { GatewayDeployer } from "./gateway-deployer";
-import { l1BridgehubAbi, l2BridgehubAbi, l2MessageRootAbi, systemContextAbi, ownable2StepAbi } from "./contracts";
+import { l1BridgehubAbi, l2BridgehubAbi, l2MessageRootAbi, systemContextAbi, ownable2StepAbi } from "../core/contracts";
 import {
   ETH_TOKEN_ADDRESS,
   L1_CHAIN_ID,
@@ -11,12 +11,12 @@ import {
   ANVIL_DEFAULT_ACCOUNT_ADDR,
   SYSTEM_CONTEXT_ADDR,
   L2_BOOTLOADER_ADDR,
-} from "./const";
-import { impersonateAndRun, scanAndRelayPriorityRequests } from "./utils";
-import { encodeNtvAssetId } from "./data-encoding";
-import { migrateTokenBalanceToGW } from "./token-balance-migration-helper";
-import { prepareMergedToml, prepareGatewayChainConfig } from "./toml-handling";
-import { runForgeScript } from "./forge";
+} from "../core/const";
+import { impersonateAndRun, scanAndRelayPriorityRequests } from "../core/utils";
+import { encodeNtvAssetId } from "../core/data-encoding";
+import { migrateTokenBalanceToGW } from "../helpers/token-balance-migration-helper";
+import { prepareMergedToml, prepareGatewayChainConfig } from "../core/toml-handling";
+import { runForgeScript } from "../core/forge";
 
 function timeIt(label: string): () => void {
   const start = Date.now();

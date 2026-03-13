@@ -1,18 +1,18 @@
 import { expect } from "chai";
 import { BigNumber, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { createBalanceTrackerFromState, queryEthAssetIdFromState } from "../../src/balance-tracker";
-import { depositETHToL2 } from "../../src/l1-deposit-helper";
-import { withdrawETHFromL2 } from "../../src/l2-withdrawal-helper";
+import { createBalanceTrackerFromState, queryEthAssetIdFromState } from "../../src/helpers/balance-tracker";
+import { depositETHToL2 } from "../../src/helpers/l1-deposit-helper";
+import { withdrawETHFromL2 } from "../../src/helpers/l2-withdrawal-helper";
 import {
   buildAssetRouterWithdrawalLog,
   callProcessLogsAndMessages,
   getGWChainBalance,
-} from "../../src/process-logs-helper";
-import { migrateTokenBalanceToGW } from "../../src/token-balance-migration-helper";
-import { ETH_TOKEN_ADDRESS, L1_CHAIN_ID } from "../../src/const";
-import { encodeNtvAssetId } from "../../src/data-encoding";
-import { getL2Chain, getChainDiamondProxy, getChainIdByRole, getChainIdsByRole } from "../../src/utils";
+} from "../../src/helpers/process-logs-helper";
+import { migrateTokenBalanceToGW } from "../../src/helpers/token-balance-migration-helper";
+import { ETH_TOKEN_ADDRESS, L1_CHAIN_ID } from "../../src/core/const";
+import { encodeNtvAssetId } from "../../src/core/data-encoding";
+import { getL2Chain, getChainDiamondProxy, getChainIdByRole, getChainIdsByRole } from "../../src/core/utils";
 
 describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
   this.timeout(0);

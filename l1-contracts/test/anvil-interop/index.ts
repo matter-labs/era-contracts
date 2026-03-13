@@ -3,11 +3,11 @@
 import * as fs from "fs";
 import * as path from "path";
 import type { providers } from "ethers";
-import { AnvilManager } from "./src/anvil-manager";
+import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
-import type { BatchSettler } from "./src/batch-settler";
-import type { ChainAddresses } from "./src/types";
-import { sleep } from "./src/utils";
+import type { BatchSettler } from "./src/daemons/batch-settler";
+import type { ChainAddresses } from "./src/core/types";
+import { sleep } from "./src/core/utils";
 
 async function main() {
   console.log("🚀 Starting Multi-Chain Anvil Testing Environment\n");

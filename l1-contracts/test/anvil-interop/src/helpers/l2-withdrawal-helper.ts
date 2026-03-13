@@ -1,14 +1,14 @@
 import type { BigNumber } from "ethers";
 import { Contract, providers, Wallet, ethers } from "ethers";
-import { buildWithdrawalMerkleProof, getSettlementLayerChainId } from "./utils";
-import { encodeBridgeBurnData } from "./data-encoding";
+import { buildWithdrawalMerkleProof, getSettlementLayerChainId } from "../core/utils";
+import { encodeBridgeBurnData } from "../core/data-encoding";
 import {
   iBaseTokenAbi,
   l1NativeTokenVaultAbi,
   testnetERC20TokenAbi,
   il2AssetRouterAbi,
   l1NullifierAbi,
-} from "./contracts";
+} from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   ETH_TOKEN_ADDRESS,
@@ -16,8 +16,8 @@ import {
   L2_NATIVE_TOKEN_VAULT_ADDR,
   L2_BASE_TOKEN_ADDR,
   FINALIZE_DEPOSIT_SIG,
-} from "./const";
-import type { CoreDeployedAddresses } from "./types";
+} from "../core/const";
+import type { CoreDeployedAddresses } from "../core/types";
 
 export interface WithdrawETHParams {
   l1RpcUrl: string;

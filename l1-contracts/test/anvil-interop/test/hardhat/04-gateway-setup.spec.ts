@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { Contract, ethers, providers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { l1BridgehubAbi, l2BridgehubAbi } from "../../src/contracts";
+import { l1BridgehubAbi, l2BridgehubAbi } from "../../src/core/contracts";
 import {
   L2_BRIDGEHUB_ADDR,
   L2_ASSET_ROUTER_ADDR,
@@ -9,8 +9,8 @@ import {
   GW_ASSET_TRACKER_ADDR,
   INTEROP_CENTER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
-} from "../../src/const";
-import { getChainIdByRole, getL2Chain } from "../../src/utils";
+} from "../../src/core/const";
+import { getChainIdByRole, getL2Chain } from "../../src/core/utils";
 
 describe("04 - Gateway State Verification", function () {
   this.timeout(0);
