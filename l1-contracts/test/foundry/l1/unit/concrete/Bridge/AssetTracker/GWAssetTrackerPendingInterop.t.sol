@@ -174,23 +174,14 @@ contract GWAssetTrackerPendingInteropTest is Test {
 
     /// @dev Encodes a valid asset-router interop call targeting the given asset.
     ///      Uses ORIGIN_CHAIN_ID / ORIGIN_TOKEN / ASSET_AMOUNT by default.
-    function _buildAssetRouterCallData(
-        bytes32 _assetId,
-        uint256 _fromChainId
-    ) internal pure returns (bytes memory) {
+    function _buildAssetRouterCallData(bytes32 _assetId, uint256 _fromChainId) internal pure returns (bytes memory) {
         bytes memory erc20Metadata = DataEncoding.encodeTokenData(
             ORIGIN_CHAIN_ID,
             abi.encode("TestToken"),
             abi.encode("TT"),
             abi.encode(uint8(18))
         );
-        bytes memory transferData = abi.encode(
-            address(0),
-            address(0xdead),
-            ORIGIN_TOKEN,
-            ASSET_AMOUNT,
-            erc20Metadata
-        );
+        bytes memory transferData = abi.encode(address(0), address(0xdead), ORIGIN_TOKEN, ASSET_AMOUNT, erc20Metadata);
         return
             abi.encodePacked(
                 AssetRouterBase.finalizeDeposit.selector,

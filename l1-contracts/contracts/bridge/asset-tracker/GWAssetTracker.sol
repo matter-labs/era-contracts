@@ -551,7 +551,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         // Move base token balance from pending to confirmed chainBalance.
         if (executionMsg.interopCall.value > 0) {
-            _confirmPendingInteropBalance(_chainId, executionMsg.destinationBaseTokenAssetId, executionMsg.interopCall.value);
+            _confirmPendingInteropBalance(
+                _chainId,
+                executionMsg.destinationBaseTokenAssetId,
+                executionMsg.interopCall.value
+            );
         }
 
         // Move asset balance from pending to confirmed chainBalance (for asset router calls).
@@ -570,8 +574,13 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         InteropCall memory _interopCall,
         uint256 _destinationChainId
     ) internal {
-        (uint256 fromChainId, bytes32 assetId, address originalToken, uint256 assetAmount, bytes memory erc20Metadata) =
-            this.parseAssetRouterInteropCall(_interopCall.data);
+        (
+            uint256 fromChainId,
+            bytes32 assetId,
+            address originalToken,
+            uint256 assetAmount,
+            bytes memory erc20Metadata
+        ) = this.parseAssetRouterInteropCall(_interopCall.data);
 
         require(_chainId == fromChainId, InvalidInteropChainId(fromChainId, _destinationChainId));
 

@@ -151,5 +151,4 @@ interface IGWAssetTracker {
     function parseTokenData(
         bytes calldata _tokenData
     ) external pure returns (uint256 originChainId, bytes memory name, bytes memory symbol, bytes memory decimals);
-
 }
