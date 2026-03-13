@@ -553,7 +553,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         // Move base token balance from pending to confirmed chainBalance.
         if (executionMsg.interopCall.value > 0) {
-            _confirmPendingInteropBalance(_chainId, executionMsg.destinationBaseTokenAssetId, executionMsg.interopCall.value);
+            _confirmPendingInteropBalance(
+                _chainId,
+                executionMsg.destinationBaseTokenAssetId,
+                executionMsg.interopCall.value
+            );
         }
 
         // Move asset balance from pending to confirmed chainBalance (for asset router calls).

@@ -354,10 +354,7 @@ contract GWAssetTrackerExtendedTest is Test {
 
         vm.prank(mockZKChain);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                InvalidFunctionSignature.selector,
-                IInteropHandler.verifyBundle.selector
-            )
+            abi.encodeWithSelector(InvalidFunctionSignature.selector, IInteropHandler.verifyBundle.selector)
         );
         gwAssetTracker.processLogsAndMessages(input);
     }
