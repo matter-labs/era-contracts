@@ -50,6 +50,15 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         bridgehub.acceptAdmin();
     }
 
+    function runForAnvil() public {
+        // For Anvil testing: deploy contracts but skip acceptAdmin() which requires
+        // broadcasting from a contract address (ChainAdminOwnable)
+        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
+
+        // Note: acceptAdmin() is skipped for local Anvil testing
+        // The admin can be accepted manually if needed for testing
+    }
+
     function getAddresses() public view returns (CoreDeployedAddresses memory) {
         return coreAddresses;
     }
@@ -93,10 +102,15 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridgehub.implementations.chainAssetHandler,
             coreAddresses.bridgehub.proxies.chainAssetHandler
         ) = deployTuppWithContract("L1ChainAssetHandler", false);
-        (
-            coreAddresses.bridgehub.implementations.messageRoot,
-            coreAddresses.bridgehub.proxies.messageRoot
-        ) = deployTuppWithContract("L1MessageRoot", false);
+        {
+            string memory messageRootContract = vm.envOr("USE_DUMMY_MESSAGE_ROOT", false)
+                ? "DummyL1MessageRoot"
+                : "L1MessageRoot";
+            (
+                coreAddresses.bridgehub.implementations.messageRoot,
+                coreAddresses.bridgehub.proxies.messageRoot
+            ) = deployTuppWithContract(messageRootContract, false);
+        }
 
         (
             coreAddresses.bridges.implementations.l1Nullifier,

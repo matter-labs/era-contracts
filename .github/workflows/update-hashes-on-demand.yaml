@@ -6,6 +6,12 @@ on:
       pr_number:
         description: "Pull Request number to update"
         required: true
+  workflow_call:
+    inputs:
+      pr_number:
+        description: "Pull Request number to update"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -30,7 +36,7 @@ jobs:
             const pr = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: parseInt(context.payload.inputs.pr_number, 10),
+              pull_number: parseInt(context.payload.inputs?.pr_number || '${{ inputs.pr_number }}', 10),
             });
             core.setOutput("head_ref", pr.data.head.ref);
             core.setOutput("head_repo", pr.data.head.repo.full_name);
@@ -60,7 +66,7 @@ jobs:
       - name: Run command
         run: |
           set -euo pipefail
-          echo "Updating PR #${{ github.event.inputs.pr_number }} on branch ${{ steps.pr.outputs.head_ref }}"
+          echo "Updating PR #${{ github.event.inputs.pr_number || inputs.pr_number }} on branch ${{ steps.pr.outputs.head_ref }}"
           git submodule update --init --recursive
 
           yarn

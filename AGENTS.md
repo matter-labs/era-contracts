@@ -1,5 +1,13 @@
 # General guidelines
 
+## NEVER kill Anvil processes globally
+
+**THIS IS AN ABSOLUTE RULE - NO EXCEPTIONS**
+
+Never run `pkill -f anvil`, `killall anvil`, or any blanket kill command for Anvil processes. Multiple Anvil sessions may be running in parallel (e.g., interop tests, local development chains). Killing all Anvil processes can destroy other users' or sessions' work.
+
+Instead, use the `cleanup.sh` script in the anvil-interop directory, which targets only processes on known ports.
+
 ## ⚠️ CRITICAL SOLIDITY CODE RULES ⚠️
 
 ### NEVER USE try-catch OR staticcall
@@ -39,6 +47,51 @@ address result = _tryAddress(target, "someFunction()");
 - These patterns make debugging extremely difficult
 - They mask initialization issues and timing problems
 - The codebase should fail fast and clearly, not silently return defaults
+
+### NEVER Override Storage Slots in Tests
+
+**THIS IS AN ABSOLUTE RULE - NO EXCEPTIONS**
+
+❌ **FORBIDDEN PATTERNS:**
+
+- `anvil_setStorageAt` to set contract state
+- Any direct manipulation of storage slots to bypass contract logic
+
+✅ **CORRECT APPROACH:**
+
+- Use real contract calls and flows to achieve the desired state
+- If a flow requires multiple steps (e.g., Token Balance Migration), implement all steps properly
+- If a relay transaction fails, fix the root cause instead of setting storage directly
+
+**WHY THIS RULE EXISTS:**
+
+- Storage slot overrides hide real bugs in the test setup
+- They make tests fragile and tightly coupled to storage layout
+- Real flows validate that the contracts work correctly end-to-end
+- Storage layouts change between versions, silently breaking tests
+
+### NEVER Declare ABIs Inline in TypeScript
+
+**THIS IS AN ABSOLUTE RULE - NO EXCEPTIONS**
+
+❌ **FORBIDDEN PATTERNS:**
+
+```typescript
+// NEVER DO THIS:
+const someAbi = ["function someMethod(uint256 param) view returns (address)"];
+const contract = new Contract(addr, someAbi, provider);
+```
+
+✅ **CORRECT APPROACH:**
+
+- Always import ABIs from the centralized `contracts.ts` file (or equivalent ABI module)
+- If an ABI doesn't exist yet, add it to `contracts.ts` and import it
+
+**WHY THIS RULE EXISTS:**
+
+- Inline ABIs are duplicated across files and easily go out of sync with actual contracts
+- Centralized ABIs are easier to maintain and update when contracts change
+- Import-based ABIs provide a single source of truth
 
 ### Constructors and Immutables
 
@@ -175,6 +228,33 @@ yarn test:foundry
 # Run system-contracts foundry tests
 cd system-contracts
 yarn test:foundry
+```
+
+### Running Anvil Interop Tests
+
+```bash
+cd l1-contracts
+
+# Run with pre-generated chain states (fastest, ~180s)
+yarn test:hardhat:interop
+
+# Use port offset to avoid conflicts with other Anvil instances
+ANVIL_INTEROP_PORT_OFFSET=100 yarn test:hardhat:interop
+
+# Force fresh deployment (skips pre-generated states, ~330s)
+ANVIL_INTEROP_FRESH_DEPLOY=1 yarn test:hardhat:interop
+
+# Keep chains running after tests (for debugging with cast)
+ANVIL_INTEROP_KEEP_CHAINS=1 yarn test:hardhat:interop
+```
+
+After modifying mock system contracts (e.g., `MockL2BaseToken`, `MockL2ToL1Messenger`), regenerate chain states:
+
+```bash
+cd l1-contracts
+forge build
+cd test/anvil-interop
+npx ts-node setup-and-dump-state.ts
 ```
 
 ### Common Issues

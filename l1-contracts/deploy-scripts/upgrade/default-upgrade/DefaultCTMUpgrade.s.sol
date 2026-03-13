@@ -883,6 +883,14 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         calls[0] = prepareCreateNewChainCall(555)[0];
     }
 
+    function getL2BytecodeHash(string memory contractName) public view virtual override returns (bytes32) {
+        if (config.isZKsyncOS) {
+            // ZKsyncOS chains do not use L2 bytecodes from zkout, so we return a placeholder.
+            return bytes32(uint256(1));
+        }
+        return super.getL2BytecodeHash(contractName);
+    }
+
     function getCreationCode(
         string memory contractName,
         bool isZKBytecode

@@ -1,0 +1,360 @@
+[
+  {
+    "type": "function",
+    "name": "forceDeployAndUpgrade",
+    "inputs": [
+      {
+        "name": "_forceDeployments",
+        "type": "tuple[]",
+        "internalType": "struct IL2ContractDeployer.ForceDeployment[]",
+        "components": [
+          {
+            "name": "bytecodeHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "newAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "callConstructor",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "input",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      },
+      {
+        "name": "_delegateTo",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_calldata",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "forceDeployAndUpgradeUniversal",
+    "inputs": [
+      {
+        "name": "_forceDeployments",
+        "type": "tuple[]",
+        "internalType": "struct IComplexUpgrader.UniversalContractUpgradeInfo[]",
+        "components": [
+          {
+            "name": "upgradeType",
+            "type": "uint8",
+            "internalType": "enum IComplexUpgrader.ContractUpgradeType"
+          },
+          {
+            "name": "deployedBytecodeInfo",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "newAddress",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      },
+      {
+        "name": "_delegateTo",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_calldata",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "upgrade",
+    "inputs": [
+      {
+        "name": "_delegateTo",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_calldata",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "event",
+    "name": "ContractUpgradeCompleted",
+    "inputs": [
+      {
+        "name": "upgradeType",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum IComplexUpgrader.ContractUpgradeType"
+      },
+      {
+        "name": "targetAddress",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ContractUpgradeStarted",
+    "inputs": [
+      {
+        "name": "upgradeType",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "enum IComplexUpgrader.ContractUpgradeType"
+      },
+      {
+        "name": "targetAddress",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ForceDeployEraCompleted",
+    "inputs": [
+      {
+        "name": "targetAddress",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ForceDeployEraStarted",
+    "inputs": [
+      {
+        "name": "targetAddress",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "bytecodeHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ImplementationAddressGenerated",
+    "inputs": [
+      {
+        "name": "implAddress",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ProxyUpgradeInitiated",
+    "inputs": [
+      {
+        "name": "proxyAddress",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "newImplementation",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "UpdateZKsyncOSContractCompleted",
+    "inputs": [
+      {
+        "name": "targetAddress",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "UpdateZKsyncOSContractStarted",
+    "inputs": [
+      {
+        "name": "targetAddress",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ZKsyncOSBytecodeDetailsSet",
+    "inputs": [
+      {
+        "name": "targetAddress",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "bytecodeHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "bytecodeLength",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      },
+      {
+        "name": "observableBytecodeHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "observableBytecodeLength",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ZKsyncOSForceDeployCompleted",
+    "inputs": [
+      {
+        "name": "targetAddress",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ZKsyncOSForceDeployStarted",
+    "inputs": [
+      {
+        "name": "targetAddress",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "AddressHasNoCode",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "DeployFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NonCanonicalRepresentation",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Unauthorized",
+    "inputs": [
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "UnsupportedUpgradeType",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZKsyncOSNotForceDeployForExistingContract",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ZKsyncOSNotForceDeployToPrecompileAddress",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  }
+]
