@@ -519,17 +519,14 @@ contract AdminFunctions is Script, IAdminFunctions {
     function unpauseDeposits(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
-        if (IZKChain(chainInfo.diamondProxy).depositsPaused()) {
-            Call[] memory calls = new Call[](1);
-            calls[0] = Call({
-                target: chainInfo.diamondProxy,
-                value: 0,
-                data: abi.encodeCall(IMigrator.unpauseDeposits, ())
-            });
-            saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
-        } else {
-            console.log("Deposits are already unpaused");
-        }
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IMigrator.unpauseDeposits, ())
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
     function setDAValidatorPair(
