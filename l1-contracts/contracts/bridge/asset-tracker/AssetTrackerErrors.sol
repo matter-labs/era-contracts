@@ -74,3 +74,4 @@ error TotalPreV31SupplyNotSaved(bytes32 _assetId);
 error TotalPreV31SupplyShouldBeZero(bytes32 _assetId, uint256 _totalSupply);
 // 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);
+error MustBeWithdrawalToL1(uint256 destinationChainId);

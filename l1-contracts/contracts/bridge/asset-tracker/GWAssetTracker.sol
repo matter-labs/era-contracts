@@ -76,7 +76,8 @@ import {
     RegisterNewTokenNotAllowed,
     InvalidFeeRecipient,
     SettlementFeePayerNotAgreed,
-    CanNotSendInteropToL1
+    CanNotSendInteropToL1,
+    MustBeWithdrawalToL1
 } from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
@@ -623,24 +624,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _decreaseChainBalance(_sourceChainId, _assetId, amount);
             _increasePendingInteropBalance(_destinationChainId, _assetId, amount);
         } else {
-            _handleChainBalanceChangeOnGateway(_sourceChainId, _destinationChainId, _assetId, amount);
-        }
-    }
+            // When it is not an interop call, we expect it to be a withdrawal to L1
+            // This error should never be triggered, it is just an invariant check.
+            require(_destinationChainId == L1_CHAIN_ID, MustBeWithdrawalToL1(_destinationChainId));
 
-    function _handleChainBalanceChangeOnGateway(
-        uint256 _sourceChainId,
-        uint256 _destinationChainId,
-        bytes32 _assetId,
-        uint256 _amount
-    ) internal {
-        if (_amount > 0) {
-            /// Note, we don't track L1 chainBalance on Gateway.
-            if (_sourceChainId != L1_CHAIN_ID) {
-                _decreaseChainBalance(_sourceChainId, _assetId, _amount);
-            }
-            if (_destinationChainId != L1_CHAIN_ID) {
-                _increaseChainBalance(_destinationChainId, _assetId, _amount);
-            }
+            _decreaseChainBalance(_sourceChainId, _assetId, amount);
         }
     }
 
