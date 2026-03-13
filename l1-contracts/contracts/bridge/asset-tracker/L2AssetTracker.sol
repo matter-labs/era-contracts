@@ -67,10 +67,15 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     modifier onlyL2NativeTokenVault() {
-        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
+        if (msg.sender != _nativeTokenVaultAddress()) {
             revert Unauthorized(msg.sender);
         }
         _;
+    }
+
+    /// @notice Returns the NTV address for access control. Virtual for private interop override.
+    function _nativeTokenVaultAddress() internal view virtual returns (address) {
+        return L2_NATIVE_TOKEN_VAULT_ADDR;
     }
 
     modifier onlyBaseTokenHolder() {
@@ -144,7 +149,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         return L1_CHAIN_ID;
     }
 
-    function _nativeTokenVault() internal view override returns (INativeTokenVaultBase) {
+    function _nativeTokenVault() internal view virtual override returns (INativeTokenVaultBase) {
         return L2_NATIVE_TOKEN_VAULT;
     }
 
@@ -247,7 +252,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @notice This function is used to check the asset migration number.
     /// @dev This is used to pause outgoing withdrawals and interop transactions after the chain migrates to Gateway.
-    function _checkAssetMigrationNumber(bytes32 _assetId) internal view {
+    function _checkAssetMigrationNumber(bytes32 _assetId) internal view virtual {
         uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
         /// Note we always allow bridging when settling on L1.

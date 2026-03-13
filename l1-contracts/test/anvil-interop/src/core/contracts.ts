@@ -41,6 +41,11 @@ const ARTIFACTS = {
   MailboxFacet: "Mailbox.sol/MailboxFacet.json",
   MigratorFacet: "Migrator.sol/MigratorFacet.json",
   Ownable2Step: "Ownable2Step.sol/Ownable2Step.json",
+  PrivateInteropCenter: "PrivateInteropCenter.sol/PrivateInteropCenter.json",
+  PrivateInteropHandler: "PrivateInteropHandler.sol/PrivateInteropHandler.json",
+  PrivateL2AssetRouter: "PrivateL2AssetRouter.sol/PrivateL2AssetRouter.json",
+  PrivateL2AssetTracker: "PrivateL2AssetTracker.sol/PrivateL2AssetTracker.json",
+  PrivateL2NativeTokenVault: "PrivateL2NativeTokenVault.sol/PrivateL2NativeTokenVault.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
   TestnetERC20Token: "TestnetERC20Token.sol/TestnetERC20Token.json",
 } as const;
@@ -91,5 +96,17 @@ export const ownable2StepAbi = (): any[] => getAbi("Ownable2Step");
 export const systemContextAbi = (): any[] => getAbi("SystemContext");
 export const testnetERC20TokenAbi = (): any[] => getAbi("TestnetERC20Token");
 
+export const privateInteropCenterAbi = (): any[] => getAbi("PrivateInteropCenter");
+export const privateInteropHandlerAbi = (): any[] => getAbi("PrivateInteropHandler");
+export const privateL2AssetRouterAbi = (): any[] => getAbi("PrivateL2AssetRouter");
+export const privateL2AssetTrackerAbi = (): any[] => getAbi("PrivateL2AssetTracker");
+export const privateL2NativeTokenVaultAbi = (): any[] => getAbi("PrivateL2NativeTokenVault");
+
 export const chainAdminOwnableBytecode = (): string => getCreationBytecode("ChainAdminOwnable");
 export const l2NativeTokenVaultDevBytecode = (): string => getBytecode("L2NativeTokenVaultDev");
+
+export const privateInteropCenterBytecode = (): string => getCreationBytecode("PrivateInteropCenter");
+export const privateInteropHandlerBytecode = (): string => getCreationBytecode("PrivateInteropHandler");
+export const privateL2AssetRouterBytecode = (): string => getCreationBytecode("PrivateL2AssetRouter");
+export const privateL2AssetTrackerBytecode = (): string => getCreationBytecode("PrivateL2AssetTracker");
+export const privateL2NativeTokenVaultBytecode = (): string => getCreationBytecode("PrivateL2NativeTokenVault");

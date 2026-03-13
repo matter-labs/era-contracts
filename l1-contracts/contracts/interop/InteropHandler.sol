@@ -11,6 +11,7 @@ import {
     L2_MESSAGE_VERIFICATION,
     L2_COMPLEX_UPGRADER_ADDR
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
+import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {
     BUNDLE_IDENTIFIER,
@@ -64,6 +65,16 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             revert Unauthorized(msg.sender);
         }
         _;
+    }
+
+    /// @notice Returns the interop center address. Virtual to allow override in private interop.
+    function _interopCenterAddr() internal view virtual returns (address) {
+        return L2_INTEROP_CENTER_ADDR;
+    }
+
+    /// @notice Returns the native token vault. Virtual to allow override in private interop.
+    function _nativeTokenVault() internal view virtual returns (IL2NativeTokenVault) {
+        return L2_NATIVE_TOKEN_VAULT;
     }
 
     /// @inheritdoc IInteropHandler
@@ -277,18 +288,23 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @param _proof Proof for the message that corresponds to the bundle that is to be verified.
     /// @param _bundleHash Hash corresponding to the bundle that is to be verified.
     /// That message gets sent to L1 by origin chain in InteropCenter contract, and is picked up and included in receiving chain by sequencer.
-    function _verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bytes32 _bundleHash) internal {
+    function _verifyBundle(
+        bytes memory _bundle,
+        MessageInclusionProof memory _proof,
+        bytes32 _bundleHash
+    ) internal {
         // Verify that the message came from the legitimate InteropCenter.
         // It is expected that all allowed messages have gone through the GWAssetTracker which
         // ensured that if the `L2_INTEROP_CENTER_ADDR` is the sender of the message, then the message
         // corresponds to a bundle with the valid balance changes.
+        address interopCenter = _interopCenterAddr();
         require(
-            _proof.message.sender == L2_INTEROP_CENTER_ADDR,
-            UnauthorizedMessageSender(L2_INTEROP_CENTER_ADDR, _proof.message.sender)
+            _proof.message.sender == interopCenter,
+            UnauthorizedMessageSender(interopCenter, _proof.message.sender)
         );
 
-        // Substitute provided message data with data corresponding to the bundle currently being verified.
-        _proof.message.data = bytes.concat(BUNDLE_IDENTIFIER, _bundle);
+        // Substitute provided message data with format-specific data.
+        _proof.message.data = _getBundleMessageData(_bundle);
 
         bool isIncluded = L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared({
             _chainId: _proof.chainId,
@@ -304,6 +320,11 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
         // Emit event stating that the bundle was verified.
         emit BundleVerified(_bundleHash);
+    }
+
+    /// @notice Returns the message data for bundle verification. Override for private interop format.
+    function _getBundleMessageData(bytes memory _bundle) internal view virtual returns (bytes memory) {
+        return bytes.concat(BUNDLE_IDENTIFIER, _bundle);
     }
 
     /// @notice The sole purpose of this function is to serve as a rescue mechanism in case the sender is a contract,
@@ -432,7 +453,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         );
 
         // Verify that the destination base token asset ID of the bundle is equal to the base token asset ID of the chain
-        bytes32 baseTokenAssetId = L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
+        bytes32 baseTokenAssetId = _nativeTokenVault().BASE_TOKEN_ASSET_ID();
         require(
             interopBundle.destinationBaseTokenAssetId == baseTokenAssetId,
             WrongDestinationBaseTokenAssetId(bundleHash, baseTokenAssetId, interopBundle.destinationBaseTokenAssetId)

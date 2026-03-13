@@ -3,6 +3,15 @@
 pragma solidity ^0.8.21;
 
 bytes1 constant BUNDLE_IDENTIFIER = 0x01;
+bytes1 constant PRIVATE_BUNDLE_IDENTIFIER = 0x02;
+
+/// @dev Tracks whether an asset uses public or private interop routing.
+/// Once set, the route cannot be changed, preventing mixing of public and private interop for the same asset.
+enum InteropRoute {
+    Unset,
+    Public,
+    Private
+}
 bytes1 constant INTEROP_BUNDLE_VERSION = 0x01;
 bytes1 constant INTEROP_CALL_VERSION = 0x01;
 

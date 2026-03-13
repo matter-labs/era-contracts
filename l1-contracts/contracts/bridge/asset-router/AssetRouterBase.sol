@@ -294,11 +294,16 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
         request = L2TransactionRequestTwoBridgesInner({
             magicValue: TWO_BRIDGES_MAGIC_VALUE,
-            l2Contract: L2_ASSET_ROUTER_ADDR,
+            l2Contract: _l2AssetRouterAddress(),
             l2Calldata: l2TxCalldata,
             factoryDeps: new bytes[](0),
             txDataHash: _txDataHash
         });
+    }
+
+    /// @dev Returns the address of the L2 asset router. Overridden by private interop to return address(this).
+    function _l2AssetRouterAddress() internal view virtual returns (address) {
+        return L2_ASSET_ROUTER_ADDR;
     }
 
     function getDepositCalldata(

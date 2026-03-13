@@ -15,6 +15,7 @@ import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IL2AssetRouter} from "../asset-router/IL2AssetRouter.sol";
 import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 
+import {IL2AssetTracker} from "../asset-tracker/IL2AssetTracker.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER,
@@ -191,7 +192,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         L2_TOKEN_PROXY_BYTECODE_HASH = _l2TokenProxyBytecodeHash;
     }
 
-    function _assetTracker() internal view override returns (IAssetTrackerBase) {
+    function _assetTracker() internal view virtual override returns (IAssetTrackerBase) {
         return IAssetTrackerBase(L2_ASSET_TRACKER_ADDR);
     }
 
@@ -288,10 +289,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         assetId[_expectedToken] = _assetId;
         originChainId[_assetId] = L1_CHAIN_ID;
         _addTokenToTokensList(_assetId);
-        // Note, that here we assume that `L2_ASSET_TRACKER.registerLegacyToken` can only succeed
+        // Note, that here we assume that `registerLegacyToken` can only succeed
         // if the token has been registered on L2NTV before, so it is not possible that someone
         // front-runs and registers the token before we call the function here.
-        L2_ASSET_TRACKER.registerLegacyToken(_assetId);
+        IL2AssetTracker(address(_assetTracker())).registerLegacyToken(_assetId);
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
@@ -337,7 +338,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     //////////////////////////////////////////////////////////////*/
 
     /// @dev Returns the L2 asset router for internal use.
-    function _assetRouter() internal view override returns (IAssetRouterBase) {
+    function _assetRouter() internal view virtual override returns (IAssetRouterBase) {
         return IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
     }
 
@@ -389,19 +390,24 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
             : keccak256(abi.encode(_tokenOriginChainId, _l1Token));
     }
 
-    function _handleBridgeToChain(uint256 _chainid, bytes32 _assetId, uint256 _amount) internal override {
+    function _handleBridgeToChain(uint256 _chainid, bytes32 _assetId, uint256 _amount) internal virtual override {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
         // We need to check the migration number.
-        L2_ASSET_TRACKER.handleInitiateBridgingOnL2(_chainid, _assetId, _amount, originChainId[_assetId]);
+        IL2AssetTracker(address(_assetTracker())).handleInitiateBridgingOnL2(
+            _chainid,
+            _assetId,
+            _amount,
+            originChainId[_assetId]
+        );
     }
 
-    function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
+    function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual override {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
-        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2({
+        IL2AssetTracker(address(_assetTracker())).handleFinalizeBridgingOnL2({
             _fromChainId: _chainId,
             _assetId: _assetId,
             _amount: _amount,
