@@ -11,6 +11,7 @@ error AssetIdNotRegistered(bytes32 _assetId);
 error AssetNotMigratedFromNTV(bytes32 _assetId);
 // 0xca9bc458
 error BaseTokenTotalSupplyBackfillNotNeeded();
+error CanNotSendInteropToL1(uint256 destinationChainId);
 // 0xaab1af2a
 error BaseTokenTotalSupplyBackfillRequired();
 // 0xd054a77e

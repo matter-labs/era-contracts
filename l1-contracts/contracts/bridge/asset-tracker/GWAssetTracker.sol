@@ -75,7 +75,8 @@ import {
     InvalidEmptyMultichainBatchRoot,
     RegisterNewTokenNotAllowed,
     InvalidFeeRecipient,
-    SettlementFeePayerNotAgreed
+    SettlementFeePayerNotAgreed,
+    CanNotSendInteropToL1
 } from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
@@ -556,9 +557,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         // Move asset balance from pending to confirmed chainBalance (for asset router calls).
         if (executionMsg.interopCall.from == L2_ASSET_ROUTER_ADDR) {
-            (, bytes32 assetId, , uint256 assetAmount, ) = this.parseAssetRouterInteropCall(
-                executionMsg.interopCall.data
-            );
+            (, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(executionMsg.interopCall.data);
+            // slither-disable-next-line unused-return
+            (, , , uint256 assetAmount, ) = DataEncoding.decodeBridgeMintData(transferData);
             if (assetAmount > 0) {
                 _confirmPendingInteropBalance(_chainId, assetId, assetAmount);
             }
@@ -597,7 +598,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @param _assetId The asset id of the asset.
     /// @param _transferData The transfer data of the asset.
     /// @param _isInteropCall If true, decreases source chainBalance and increases destination pendingInteropBalance.
-    ///        If false, routes through _handleChainBalanceChangeOnGateway (standard withdrawal).
+    ///        If false, decreases source chainBalance (standard L2->L1 withdrawal; L1 balance is not tracked).
     function _handleAssetRouterMessageInner(
         uint256 _sourceChainId,
         uint256 _destinationChainId,
@@ -615,17 +616,14 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _registerToken(_assetId, originalToken, tokenOriginalChainId);
 
         if (_isInteropCall) {
-            if (amount > 0 && _sourceChainId != L1_CHAIN_ID) {
-                _decreaseChainBalance(_sourceChainId, _assetId, amount);
-            }
+            // Interop calls can not be used to L1.
+            // This error should never be triggered, it is just an invariant check.
+            require(_destinationChainId != L1_CHAIN_ID, CanNotSendInteropToL1(_destinationChainId));
+
+            _decreaseChainBalance(_sourceChainId, _assetId, amount);
             _increasePendingInteropBalance(_destinationChainId, _assetId, amount);
         } else {
-            _handleChainBalanceChangeOnGateway({
-                _sourceChainId: _sourceChainId,
-                _destinationChainId: _destinationChainId,
-                _assetId: _assetId,
-                _amount: amount
-            });
+            _handleChainBalanceChangeOnGateway(_sourceChainId, _destinationChainId, _assetId, amount);
         }
     }
 
@@ -815,29 +813,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes calldata _callData
     ) external pure returns (uint256 fromChainId, bytes32 assetId, bytes memory transferData) {
         (fromChainId, assetId, transferData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
-    }
-
-    /// @notice Parses an asset router interop call, combining chain/asset extraction with bridge mint data decoding.
-    /// @dev Combines the logic of `parseInteropCall` and `decodeBridgeMintData` into a single step.
-    /// Must be called via `this.` when the argument is `bytes memory`, so Solidity ABI-encodes it
-    /// into calldata and the internal `[4:]` slice works correctly.
-    function parseAssetRouterInteropCall(
-        bytes calldata _callData
-    )
-        external
-        pure
-        returns (
-            uint256 fromChainId,
-            bytes32 assetId,
-            address originalToken,
-            uint256 assetAmount,
-            bytes memory erc20Metadata
-        )
-    {
-        bytes memory transferData;
-        (fromChainId, assetId, transferData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
-        // slither-disable-next-line unused-return
-        (, , originalToken, assetAmount, erc20Metadata) = DataEncoding.decodeBridgeMintData(transferData);
     }
 
     /// @inheritdoc IGWAssetTracker
