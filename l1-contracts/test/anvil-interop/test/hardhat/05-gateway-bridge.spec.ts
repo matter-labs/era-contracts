@@ -160,4 +160,32 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
       ).to.equal(true);
     });
   });
+
+  describe("Token balance migration consistency", () => {
+    it("sum of GW per-chain balances <= L1 GW balance", async () => {
+      const tracker = createBalanceTrackerFromState(state);
+      const assetId = await queryEthAssetIdFromState(state);
+      const gwChain = getL2Chain(state.chains!, gwChainId);
+      const gwProvider = new ethers.providers.JsonRpcProvider(gwChain.rpcUrl);
+
+      const l1Snapshot = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
+      const l1GWBalance = BigNumber.from(l1Snapshot.l1ChainBalance);
+
+      const gwSettledChainIds = getChainIdsByRole(state.chains!.config, "gwSettled");
+      let gwTotalBalance = BigNumber.from(0);
+      for (const chainId of gwSettledChainIds) {
+        const bal = await getGWChainBalance(gwProvider, chainId, assetId);
+        gwTotalBalance = gwTotalBalance.add(bal);
+        console.log(`   GWAssetTracker.chainBalance[${chainId}]: ${bal.toString()}`);
+      }
+
+      console.log(`   L1AssetTracker.chainBalance[${gwChainId}] (total): ${l1GWBalance.toString()}`);
+      console.log(`   Sum of GW per-chain balances: ${gwTotalBalance.toString()}`);
+
+      expect(
+        gwTotalBalance.lte(l1GWBalance),
+        `Sum of GW chain balances (${gwTotalBalance.toString()}) should be <= L1 GW balance (${l1GWBalance.toString()})`
+      ).to.equal(true);
+    });
+  });
 });
