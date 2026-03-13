@@ -2,10 +2,7 @@
   "name": "anvil-interop",
   "version": "1.0.0",
   "description": "Multi-chain Anvil testing environment for ZKsync interoperability",
-  "main": "index.ts",
   "scripts": {
-    "start": "ts-node index.ts",
-    "dev": "ts-node index.ts",
     "build": "tsc",
     "clean": "rm -rf dist outputs chain-states",
     "cleanup": "bash cleanup.sh",

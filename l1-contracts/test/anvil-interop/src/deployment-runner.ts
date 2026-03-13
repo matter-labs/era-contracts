@@ -6,9 +6,6 @@ import type { AnvilManager } from "./daemons/anvil-manager";
 import { ForgeDeployer } from "./deployers/deployer";
 import { ChainRegistry } from "./deployers/chain-registry";
 import { GatewaySetup } from "./deployers/gateway-setup";
-import { BatchSettler } from "./daemons/batch-settler";
-import { L1ToL2Relayer } from "./daemons/l1-to-l2-relayer";
-import { L2ToL2Relayer } from "./daemons/l2-to-l2-relayer";
 import type {
   AnvilConfig,
   ChainAddresses,
@@ -459,52 +456,4 @@ export class DeploymentRunner {
     return { gatewayCTMAddr };
   }
 
-  async startDaemons(
-    l1Provider: providers.JsonRpcProvider,
-    l2Providers: Map<number, providers.JsonRpcProvider>,
-    chainAddresses: Map<number, ChainAddresses>,
-    config: AnvilConfig
-  ): Promise<{ settler: BatchSettler; l1ToL2Relayer: L1ToL2Relayer; l2ToL2Relayer: L2ToL2Relayer }> {
-    console.log("\n=== Starting Daemons ===\n");
-
-    const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
-
-    // Start L1→L2 Relayer
-    console.log("Starting L1→L2 Transaction Relayer...");
-    const l1ToL2Relayer = new L1ToL2Relayer(
-      l1Provider,
-      l2Providers,
-      privateKey,
-      this.loadState().l1Addresses!,
-      chainAddresses,
-      2000 // Poll every 2 seconds
-    );
-    await l1ToL2Relayer.start();
-
-    // Start L2→L2 Cross-Chain Relayer
-    console.log("\nStarting L2→L2 Cross-Chain Relayer...");
-    const l2ToL2Relayer = new L2ToL2Relayer(
-      l1Provider,
-      l2Providers,
-      privateKey,
-      2000 // Poll every 2 seconds
-    );
-    await l2ToL2Relayer.start();
-
-    // Start Batch Settler
-    console.log("\nStarting Batch Settler...");
-    const settler = new BatchSettler(
-      l1Provider,
-      l2Providers,
-      privateKey,
-      chainAddresses,
-      config.batchSettler.pollingIntervalMs,
-      config.batchSettler.batchSizeLimit
-    );
-    await settler.start();
-
-    console.log("\n✅ All daemons started");
-
-    return { settler, l1ToL2Relayer, l2ToL2Relayer };
-  }
 }
