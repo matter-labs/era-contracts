@@ -56,15 +56,9 @@ abstract contract MessageVerification is IMessageVerification {
         bytes32[] calldata _proof,
         uint256 _depth
     ) public view virtual returns (bool) {
-        return
-            _proveL2LeafInclusionRecursive({
-                _chainId: _chainId,
-                _blockOrBatchNumber: _blockOrBatchNumber,
-                _leafProofMask: _leafProofMask,
-                _leaf: _leaf,
-                _proof: _proof,
-                _depth: _depth
-            });
+        // this is to fix slither's IR generation of DummyL1MessageRoot
+        // slither-disable-next-line named-args
+        return _proveL2LeafInclusionRecursive(_chainId, _blockOrBatchNumber, _leafProofMask, _leaf, _proof, _depth);
     }
 
     function _proveL2LeafInclusion(

@@ -50,16 +50,4 @@ contract DummyL1MessageRoot is L1MessageRoot {
     ) internal pure override returns (bool) {
         return true;
     }
-
-    /// @dev Override to avoid named-argument syntax that crashes slither's IR generation.
-    function proveL2LeafInclusionSharedRecursive(
-        uint256,
-        uint256,
-        uint256,
-        bytes32,
-        bytes32[] calldata,
-        uint256
-    ) public pure override returns (bool) {
-        return true;
-    }
 }

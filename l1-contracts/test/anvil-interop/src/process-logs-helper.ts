@@ -356,7 +356,7 @@ export async function callProcessLogsAndMessages(params: {
       chainId,
       batchNumber,
       chainBatchRoot,
-      messageRoot,
+      multichainBatchRoot: messageRoot,
       settlementFeePayer: ethers.constants.AddressZero,
     };
 
