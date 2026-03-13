@@ -170,7 +170,7 @@ export class L2GenesisUpgradeDeployer {
     l1ChainId: number = L1_CHAIN_ID
   ) {
     this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
-    this.contractsRoot = path.resolve(__dirname, "../../../..");
+    this.contractsRoot = path.resolve(__dirname, "../../../../..");
     this.l1AssetRouterAddress = l1AssetRouterAddress;
     this.ctmDeployerAddress = ctmDeployerAddress;
     this.governanceAddress = governanceAddress;

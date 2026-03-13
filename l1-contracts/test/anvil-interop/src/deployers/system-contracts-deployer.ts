@@ -45,7 +45,7 @@ export class SystemContractsDeployer {
   constructor(l2RpcUrl: string, privateKey: string) {
     this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
     this.l2Wallet = new Wallet(privateKey, this.l2Provider);
-    this.contractsRoot = path.resolve(__dirname, "../../../..");
+    this.contractsRoot = path.resolve(__dirname, "../../../../..");
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

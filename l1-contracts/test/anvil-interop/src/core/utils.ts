@@ -154,7 +154,7 @@ export async function impersonateAndRun<T>(
 export function loadAbiFromOut(artifactRelativePath: string): any[] {
   // Prefer zkstack-out/ (committed, ABI-only files) over out/ (forge build output).
   // zkstack-out files are raw ABI arrays; out/ files wrap them as { abi: [...] }.
-  const zkstackOutRoot = path.resolve(__dirname, "../../../zkstack-out");
+  const zkstackOutRoot = path.resolve(__dirname, "../../../../zkstack-out");
   const zkstackPath = path.join(zkstackOutRoot, artifactRelativePath);
   if (fs.existsSync(zkstackPath)) {
     return JSON.parse(fs.readFileSync(zkstackPath, "utf-8"));
@@ -175,7 +175,7 @@ export function loadCreationBytecodeFromOut(artifactRelativePath: string): strin
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function loadArtifactFromOut(artifactRelativePath: string): any {
-  const outRoot = path.resolve(__dirname, "../../../out");
+  const outRoot = path.resolve(__dirname, "../../../../out");
   const artifactPath = path.join(outRoot, artifactRelativePath);
   return JSON.parse(fs.readFileSync(artifactPath, "utf-8"));
 }

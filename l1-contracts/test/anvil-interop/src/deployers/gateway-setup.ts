@@ -42,8 +42,8 @@ export class GatewaySetup {
     this.l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
     this.l1Addresses = l1Addresses;
     this.ctmAddresses = ctmAddresses;
-    this.projectRoot = path.resolve(__dirname, "../../..");
-    this.outputDir = path.join(__dirname, "../outputs");
+    this.projectRoot = path.resolve(__dirname, "../../../..");
+    this.outputDir = path.join(__dirname, "../../outputs");
   }
 
   async designateAsGateway(

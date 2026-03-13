@@ -19,8 +19,8 @@ export class ForgeDeployer {
     this.rpcUrl = rpcUrl;
     this.privateKey = privateKey;
     this.senderAddress = ANVIL_DEFAULT_ACCOUNT_ADDR;
-    this.projectRoot = path.resolve(__dirname, "../../..");
-    this.outputDir = path.join(__dirname, "../outputs");
+    this.projectRoot = path.resolve(__dirname, "../../../..");
+    this.outputDir = path.join(__dirname, "../../outputs");
     ensureDirectoryExists(this.outputDir);
   }
 

@@ -27,8 +27,8 @@ export class ChainRegistry {
     this.privateKey = privateKey;
     this.l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
     this.wallet = new Wallet(privateKey, this.l1Provider);
-    this.projectRoot = path.resolve(__dirname, "../../..");
-    this.outputDir = path.join(__dirname, "../outputs");
+    this.projectRoot = path.resolve(__dirname, "../../../..");
+    this.outputDir = path.join(__dirname, "../../outputs");
     this.l1Addresses = l1Addresses;
     this.ctmAddresses = ctmAddresses;
     ensureDirectoryExists(this.outputDir);
@@ -141,7 +141,7 @@ export class ChainRegistry {
   async initializeL2SystemContracts(chainId: number, _chainProxy: string, l2RpcUrl: string): Promise<void> {
     console.log(`🔧 Initializing L2 system contracts for chain ${chainId}...`);
 
-    const configPath = path.join(__dirname, "../config/anvil-config.json");
+    const configPath = path.join(__dirname, "../../config/anvil-config.json");
     let gatewayChainId = 1;
     let interopChainIds: number[] | undefined;
     if (fs.existsSync(configPath)) {
@@ -174,7 +174,7 @@ export class ChainRegistry {
   }
 
   private async generateChainConfig(config: ChainConfig): Promise<string> {
-    const configPath = path.join(__dirname, `../config/chain-${config.chainId}.toml`);
+    const configPath = path.join(__dirname, `../../config/chain-${config.chainId}.toml`);
 
     const ownerAddress = await this.wallet.getAddress();
 
