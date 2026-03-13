@@ -11,14 +11,15 @@ error AssetIdNotRegistered(bytes32 _assetId);
 error AssetNotMigratedFromNTV(bytes32 _assetId);
 // 0xca9bc458
 error BaseTokenTotalSupplyBackfillNotNeeded();
-error CanNotSendInteropToL1(uint256 destinationChainId);
 // 0xaab1af2a
 error BaseTokenTotalSupplyBackfillRequired();
+// 0x14aecab6
+error CanNotSendInteropToL1(uint256 destinationChainId);
 // 0xd054a77e
 error ChainBalanceMustBeZeroBeforeMigration(uint256 _chainId, bytes32 _assetId, uint256 _chainBalance);
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
-// solhint-disable-next-line
+// 0xb13a28eb
 error InsufficientPendingInteropBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
 // 0x95bddd6c
 error InvalidAssetMigrationNumber();
@@ -56,6 +57,8 @@ error InvalidVersion();
 error InvalidWithdrawalChainId();
 // 0x7e472272
 error MissingBaseTokenAssetId();
+// 0x10c549b7
+error MustBeWithdrawalToL1(uint256 destinationChainId);
 // 0x8dfed13a
 error NotMigratedChain();
 // 0x4a22c4b8
@@ -74,4 +77,3 @@ error TotalPreV31SupplyNotSaved(bytes32 _assetId);
 error TotalPreV31SupplyShouldBeZero(bytes32 _assetId, uint256 _totalSupply);
 // 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);
-error MustBeWithdrawalToL1(uint256 destinationChainId);

@@ -1113,10 +1113,8 @@ contract GWAssetTrackerTest is Test {
 
         // Execute first deposit
         vm.prank(L2_INTEROP_CENTER_ADDR);
-        // fixme: use process logs directly
         gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, freshTxHash, balanceChange);
 
-        // fixme: check chain balance is 0 , pending balance is increased.
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, freshAssetId), AMOUNT, "Chain balance should be set");
         assertEq(
             gwAssetTracker.chainBalance(CHAIN_ID, freshBaseTokenAssetId),
