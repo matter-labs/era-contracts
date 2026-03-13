@@ -219,19 +219,14 @@ async function finalizeERC20DepositOnL2(
 ): Promise<string | null> {
   const transferData = encodeBridgeBurnData(amount, recipient, l1TokenAddress);
 
-  try {
-    return await impersonateAndRun(l2Provider, L2_ASSET_ROUTER_ADDR, async (signer) => {
-      const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbi(), signer);
+  return await impersonateAndRun(l2Provider, L2_ASSET_ROUTER_ADDR, async (signer) => {
+    const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbi(), signer);
 
-      const tx = await l2AssetRouter.finalizeDeposit(L1_CHAIN_ID, assetId, transferData, {
-        gasLimit: 5_000_000,
-      });
-      await tx.wait();
-      console.log(`   L2 finalizeDeposit tx: cast run ${tx.hash} -r ${l2Provider.connection.url}`);
-      return tx.hash;
+    const tx = await l2AssetRouter.finalizeDeposit(L1_CHAIN_ID, assetId, transferData, {
+      gasLimit: 5_000_000,
     });
-  } catch (error: unknown) {
-    console.error(`   Failed to finalize ERC20 deposit on L2: ${(error as Error).message}`);
-    return null;
-  }
+    await tx.wait();
+    console.log(`   L2 finalizeDeposit tx: cast run ${tx.hash} -r ${l2Provider.connection.url}`);
+    return tx.hash;
+  });
 }

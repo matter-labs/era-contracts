@@ -76,28 +76,11 @@ export async function migrateTokenBalanceToGW(params: {
   const l1AssetTracker = new Contract(l1AssetTrackerAddr, l1AssetTrackerAbi(), l1Provider);
   const l1Wallet = new ethers.Wallet(privateKey, l1Provider);
 
-  let l1Receipt: ethers.providers.TransactionReceipt;
-  try {
-    // First, simulate via callStatic to get a clearer revert reason
-    try {
-      await l1AssetTracker.connect(l1Wallet).callStatic.receiveL1ToGatewayMigrationOnL1(finalizeParams, {
-        gasLimit: 10_000_000,
-      });
-    } catch (staticErr) {
-      const staticMsg = staticErr instanceof Error ? staticErr.message : String(staticErr);
-      log(`   [TBM] callStatic revert: ${staticMsg.slice(0, 1500)}`);
-      throw staticErr;
-    }
-    const l1Tx = await l1AssetTracker.connect(l1Wallet).receiveL1ToGatewayMigrationOnL1(finalizeParams, {
-      gasLimit: 10_000_000,
-    });
-    l1Receipt = await l1Tx.wait();
-    log(`   [TBM] L1 tx: cast run ${l1Receipt.transactionHash} -r ${l1Provider.connection.url}`);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log(`   [TBM] ERROR in receiveL1ToGatewayMigrationOnL1: ${msg.slice(0, 1500)}`);
-    throw err;
-  }
+  const l1Tx = await l1AssetTracker.connect(l1Wallet).receiveL1ToGatewayMigrationOnL1(finalizeParams, {
+    gasLimit: 10_000_000,
+  });
+  const l1Receipt = await l1Tx.wait();
+  log(`   [TBM] L1 tx: cast run ${l1Receipt.transactionHash} -r ${l1Provider.connection.url}`);
 
   // ── Step 3: Extract and relay all NewPriorityRequest events to target chains ──
 

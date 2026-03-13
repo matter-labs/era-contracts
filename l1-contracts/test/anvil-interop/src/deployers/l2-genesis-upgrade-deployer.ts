@@ -5,7 +5,8 @@ import {
   buildFixedForceDeploymentsData,
   getBytecodeInfo,
 } from "./l2-genesis-helper";
-import { impersonateAndRun, loadBytecodeFromOut } from "../core/utils";
+import { impersonateAndRun } from "../core/utils";
+import { loadBytecodeFromOut } from "../core/artifacts";
 import { encodeNtvAssetId } from "../core/data-encoding";
 import { l2ComplexUpgraderAbi, l2GenesisUpgradeAbi, l2BridgehubAbi } from "../core/contracts";
 import {

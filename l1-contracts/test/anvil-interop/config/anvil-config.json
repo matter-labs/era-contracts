@@ -35,9 +35,5 @@
       "role": "gwSettled",
       "settlement": "gateway"
     }
-  ],
-  "batchSettler": {
-    "pollingIntervalMs": 5000,
-    "batchSizeLimit": 10
-  }
+  ]
 }

@@ -10,7 +10,17 @@ import {
   L2_ASSET_TRACKER_ADDR,
   NEW_PRIORITY_REQUEST_EVENT_SIG,
 } from "./const";
+import { il1BridgehubAbi, mailboxFacetAbi } from "./contracts";
 import type { FinalizeWithdrawalParams, PriorityRequestData } from "./types";
+
+/**
+ * Simple timing helper: call to start, invoke the returned function to log elapsed time.
+ */
+export function timeIt(label: string, prefix = "⏱️  [TIMING]"): () => void {
+  const start = Date.now();
+  console.log(`${prefix} Starting: ${label}`);
+  return () => console.log(`${prefix} Finished: ${label} in ${((Date.now() - start) / 1000).toFixed(1)}s`);
+}
 
 export async function waitForChainReady(rpcUrl: string, maxAttempts = 30): Promise<boolean> {
   const provider = new providers.JsonRpcProvider(rpcUrl);
@@ -150,36 +160,6 @@ export async function impersonateAndRun<T>(
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function loadAbiFromOut(artifactRelativePath: string): any[] {
-  // Prefer zkstack-out/ (committed, ABI-only files) over out/ (forge build output).
-  // zkstack-out files are raw ABI arrays; out/ files wrap them as { abi: [...] }.
-  const zkstackOutRoot = path.resolve(__dirname, "../../../../zkstack-out");
-  const zkstackPath = path.join(zkstackOutRoot, artifactRelativePath);
-  if (fs.existsSync(zkstackPath)) {
-    return JSON.parse(fs.readFileSync(zkstackPath, "utf-8"));
-  }
-  return loadArtifactFromOut(artifactRelativePath).abi;
-}
-
-export function loadBytecodeFromOut(artifactRelativePath: string): string {
-  const artifact = loadArtifactFromOut(artifactRelativePath);
-  return artifact.deployedBytecode?.object || artifact.bytecode?.object || "0x";
-}
-
-/** Load creation (init) bytecode — needed for ContractFactory.deploy(). */
-export function loadCreationBytecodeFromOut(artifactRelativePath: string): string {
-  const artifact = loadArtifactFromOut(artifactRelativePath);
-  return artifact.bytecode?.object || "0x";
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function loadArtifactFromOut(artifactRelativePath: string): any {
-  const outRoot = path.resolve(__dirname, "../../../../out");
-  const artifactPath = path.join(outRoot, artifactRelativePath);
-  return JSON.parse(fs.readFileSync(artifactPath, "utf-8"));
-}
-
 /**
  * Apply L1-to-L2 address alias (AddressAliasHelper.applyL1ToL2Alias).
  */
@@ -226,9 +206,6 @@ export async function getSettlementLayerChainId(
   bridgehubAddr: string,
   chainId: number
 ): Promise<number> {
-  // Lazy import to avoid circular deps
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { il1BridgehubAbi } = require("./contracts");
   const bridgehub = new ethers.Contract(bridgehubAddr, il1BridgehubAbi(), l1Provider);
   const slChainId = await bridgehub.settlementLayer(chainId);
   const slChainIdNum = slChainId.toNumber();
@@ -296,9 +273,6 @@ export function extractNewPriorityRequests(
     }
   );
 
-  // Lazy import to avoid circular dependency at module init time
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { mailboxFacetAbi } = require("./contracts");
   const mailboxIface = new ethers.utils.Interface(mailboxFacetAbi());
 
   return priorityRequestLogs.map((logEntry) => {
@@ -445,8 +419,6 @@ export async function scanAndRelayPriorityRequests(
 
   log(`   Found ${logs.length} NewPriorityRequest event(s) in blocks [${fromBlock}, ${toBlock}]`);
 
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { mailboxFacetAbi } = require("./contracts");
   const mailboxIface = new ethers.utils.Interface(mailboxFacetAbi());
 
   const txHashes: string[] = [];

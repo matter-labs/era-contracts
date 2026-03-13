@@ -14,7 +14,7 @@ import type {
   CTMDeployedAddresses,
   DeploymentState,
 } from "./core/types";
-import { getChainIdsByRole } from "./core/utils";
+import { getChainIdsByRole, timeIt } from "./core/utils";
 import { migratorFacetAbi } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./core/const";
 
@@ -30,12 +30,6 @@ export interface FullDeploymentResult {
   l1Addresses: CoreDeployedAddresses;
   ctmAddresses: CTMDeployedAddresses;
   chainAddresses: ChainAddresses[];
-}
-
-function timeIt(label: string): () => void {
-  const start = Date.now();
-  console.log(`⏱️  [TIMING] Starting: ${label}`);
-  return () => console.log(`⏱️  [TIMING] Finished: ${label} in ${((Date.now() - start) / 1000).toFixed(1)}s`);
 }
 
 export class DeploymentRunner {
@@ -441,8 +435,7 @@ export class DeploymentRunner {
   ): Promise<{ gatewayCTMAddr: string }> {
     console.log("\n=== Step 5: Setting Up Gateway ===\n");
 
-    const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
-    const gatewaySetup = new GatewaySetup(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
+    const gatewaySetup = new GatewaySetup(l1RpcUrl, l1Addresses, ctmAddresses);
 
     const gatewayCTMAddr = await gatewaySetup.designateAsGateway(
       gatewayChainId,

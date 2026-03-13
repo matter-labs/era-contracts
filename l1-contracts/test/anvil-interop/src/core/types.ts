@@ -65,56 +65,6 @@ export interface ChainAddresses {
   diamondProxy: string;
 }
 
-export interface L2Transaction {
-  from: string;
-  to: string;
-  value: string;
-  data: string;
-  gasLimit: string;
-  maxFeePerGas: string;
-  maxPriorityFeePerGas: string;
-  nonce: number;
-  hash: string;
-  blockNumber: number;
-}
-
-export interface BatchState {
-  chainId: number;
-  lastCommitted: number;
-  lastProved: number;
-  lastExecuted: number;
-  pendingTxs: L2Transaction[];
-}
-
-export interface CommitBatchInfo {
-  batchNumber: bigint;
-  timestamp: bigint;
-  indexRepeatedStorageChanges: bigint;
-  newStateRoot: string;
-  numberOfLayer1Txs: bigint;
-  priorityOperationsHash: string;
-  bootloaderHeapInitialContentsHash: string;
-  eventsQueueStateHash: string;
-  systemLogs: string;
-  operatorDAInput: string;
-}
-
-export interface StoredBatchInfo {
-  batchNumber: bigint;
-  batchHash: string;
-  indexRepeatedStorageChanges: bigint;
-  numberOfLayer1Txs: bigint;
-  priorityOperationsHash: string;
-  l2LogsTreeRoot: string;
-  timestamp: bigint;
-  commitment: string;
-}
-
-export interface ProofInput {
-  recursiveAggregationInput: number[];
-  serializedProof: Uint8Array;
-}
-
 /** Role of a chain in the test environment. */
 export type ChainRole = "l1" | "directSettled" | "gateway" | "gwSettled";
 
@@ -132,10 +82,6 @@ export interface AnvilChainConfig {
 
 export interface AnvilConfig {
   chains: AnvilChainConfig[];
-  batchSettler: {
-    pollingIntervalMs: number;
-    batchSizeLimit: number;
-  };
 }
 
 interface L1ChainInfo {

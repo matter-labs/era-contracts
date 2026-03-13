@@ -12,17 +12,13 @@ import {
   SYSTEM_CONTEXT_ADDR,
   L2_BOOTLOADER_ADDR,
 } from "../core/const";
-import { impersonateAndRun, scanAndRelayPriorityRequests } from "../core/utils";
+import { impersonateAndRun, scanAndRelayPriorityRequests, timeIt } from "../core/utils";
 import { encodeNtvAssetId } from "../core/data-encoding";
 import { migrateTokenBalanceToGW } from "../helpers/token-balance-migration-helper";
 import { prepareMergedToml, prepareGatewayChainConfig } from "../core/toml-handling";
 import { runForgeScript } from "../core/forge";
 
-function timeIt(label: string): () => void {
-  const start = Date.now();
-  console.log(`   ⏱️  [GW] Starting: ${label}`);
-  return () => console.log(`   ⏱️  [GW] Finished: ${label} in ${((Date.now() - start) / 1000).toFixed(1)}s`);
-}
+const gwTimeIt = (label: string) => timeIt(label, "   ⏱️  [GW]");
 
 export class GatewaySetup {
   private l1Addresses: CoreDeployedAddresses;
@@ -32,12 +28,7 @@ export class GatewaySetup {
   private projectRoot: string;
   private outputDir: string;
 
-  constructor(
-    l1RpcUrl: string,
-    _privateKey: string,
-    l1Addresses: CoreDeployedAddresses,
-    ctmAddresses: CTMDeployedAddresses
-  ) {
+  constructor(l1RpcUrl: string, l1Addresses: CoreDeployedAddresses, ctmAddresses: CTMDeployedAddresses) {
     this.l1RpcUrl = l1RpcUrl;
     this.l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
     this.l1Addresses = l1Addresses;
@@ -58,14 +49,14 @@ export class GatewaySetup {
 
     // Step 1: Verify GW chain has all required system contracts
     if (gwRpcUrl) {
-      const done = timeIt("verifyGatewayContracts");
+      const done = gwTimeIt("verifyGatewayContracts");
       const deployer = new GatewayDeployer(gwRpcUrl, chainId);
       await deployer.verifyGatewayContracts();
       done();
     }
 
     // Step 2: Transfer bridgehub ownership to Governance contract.
-    let done = timeIt("transferBridgehubOwnershipToGovernance");
+    let done = gwTimeIt("transferBridgehubOwnershipToGovernance");
     await this.transferBridgehubOwnershipToGovernance();
     done();
 
@@ -74,7 +65,7 @@ export class GatewaySetup {
     prepareGatewayChainConfig(this.outputDir, chainId);
 
     // Step 4: Register GW as settlement layer on L1 (pure L1 call via Governance)
-    done = timeIt("forge: runGovernanceRegisterGateway");
+    done = gwTimeIt("forge: runGovernanceRegisterGateway");
     await this.runForgeGatewayScript("runGovernanceRegisterGateway()");
     done();
     console.log(`   Settlement layer status set for chain ${chainId}`);
@@ -88,28 +79,25 @@ export class GatewaySetup {
       console.log(`   GW diamond proxy on L1: ${gwDiamondProxy}`);
 
       const startBlock = await l1Provider.getBlockNumber();
-      done = timeIt("forge: runFullRegistration");
+      done = gwTimeIt("forge: runFullRegistration");
       await this.runForgeGatewayScript("runFullRegistration()");
       done();
 
-      // Relay L1→L2 priority requests to GW chain.
-      // TODO: Consider using the batch settler daemon for this instead of inline scanning,
-      // once the settler supports relaying priority requests during setup.
-      done = timeIt("relay: fullRegistration → GW");
+      done = gwTimeIt("relay: fullRegistration → GW");
       const latestBlock = await l1Provider.getBlockNumber();
       await scanAndRelayPriorityRequests(l1Provider, gwDiamondProxy, gwProvider, startBlock + 1, latestBlock, (line) =>
         console.log(line)
       );
       done();
     } else {
-      done = timeIt("forge: runFullRegistration");
+      done = gwTimeIt("forge: runFullRegistration");
       await this.runForgeGatewayScript("runFullRegistration()");
       done();
     }
 
     // Step 6: Pre-register chains on GW Bridgehub (before migration relay)
     if (gwRpcUrl && gwSettledChainIds && gwSettledChainIds.length > 0) {
-      done = timeIt("registerChainsOnGateway");
+      done = gwTimeIt("registerChainsOnGateway");
       await this.registerChainsOnGateway(gwRpcUrl, gwSettledChainIds);
       done();
     }
@@ -177,21 +165,21 @@ export class GatewaySetup {
       console.log(`   Migrating chain ${chainId} to gateway...`);
 
       // Run forge script: pause deposits + initiate migration.
-      let done = timeIt(`forge: runPauseAndMigrateChain(${chainId})`);
+      let done = gwTimeIt(`forge: runPauseAndMigrateChain(${chainId})`);
       await this.runForgeGatewayScript("runPauseAndMigrateChain(uint256)", String(chainId));
       done();
 
       // Confirm migration on L1
       const startBlock = overallStartBlock + 1;
       const latestBlockAfterMigrate = await l1Provider.getBlockNumber();
-      done = timeIt(`forge: runConfirmMigration(${chainId})`);
+      done = gwTimeIt(`forge: runConfirmMigration(${chainId})`);
       await this.confirmMigrationOnL1(l1Provider, chainId, gatewayChainId, startBlock, latestBlockAfterMigrate);
       done();
     }
 
     // Phase 2: Relay L1→L2 priority requests to GW chain (sequential — same GW impersonated addresses)
     if (gwRpcUrl) {
-      const done = timeIt("relay: migration → GW (all chains)");
+      const done = gwTimeIt("relay: migration → GW (all chains)");
       const gwProvider = new providers.JsonRpcProvider(gwRpcUrl);
       const latestBlock = await l1Provider.getBlockNumber();
       await scanAndRelayPriorityRequests(
@@ -207,7 +195,7 @@ export class GatewaySetup {
 
     // Phase 3: Notify L2 chains about settlement layer change (parallel — different L2 chains)
     {
-      const done = timeIt(`notifyL2SettlementLayerChange (${gwSettledChainIds.length} chains, parallel)`);
+      const done = gwTimeIt(`notifyL2SettlementLayerChange (${gwSettledChainIds.length} chains, parallel)`);
       await Promise.all(
         gwSettledChainIds
           .filter((chainId) => l2ChainRpcUrls?.has(chainId))
@@ -222,7 +210,7 @@ export class GatewaySetup {
     // Phase 4: ETH TBM for each chain (sequential — L1 nonce + GW relay conflicts)
     for (const chainId of gwSettledChainIds) {
       if (l2ChainRpcUrls?.has(chainId) && gwRpcUrl) {
-        const done = timeIt(`ETH TBM chain ${chainId}`);
+        const done = gwTimeIt(`ETH TBM chain ${chainId}`);
         const l2Provider = new providers.JsonRpcProvider(l2ChainRpcUrls.get(chainId)!);
         const gwProvider = new providers.JsonRpcProvider(gwRpcUrl);
         const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
