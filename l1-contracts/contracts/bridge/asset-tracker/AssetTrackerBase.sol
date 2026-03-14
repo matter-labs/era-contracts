@@ -35,6 +35,9 @@ abstract contract AssetTrackerBase is
     /// @dev On GWAssetTracker:
     /// - For each assetId, the sum of chainBalance[chainId][assetId] across all chains is less than or equal to
     ///  chainBalance[settlementLayerId][assetId] on L1AssetTracker, i.e., all tokens are backed by the settlement layer's balance on L1.
+    /// - chainBalance[chainId][assetId] should equal the totalSupply of the token inside that chain.
+    ///   Funds in-flight via interop (sent but not yet executed on the destination) are tracked separately
+    ///   in pendingInteropBalance and are NOT part of chainBalance until execution is confirmed.
     /// - Chains spend their balances when submitting withdrawals, processing failed deposits or sending tokens via interop.
     /// - The balances are increased when deposits are made to the chains and when they receive interop from other chains.
     /// - Also, the balances are increased or decreased when migrating the balance to/from the settlement layer.
