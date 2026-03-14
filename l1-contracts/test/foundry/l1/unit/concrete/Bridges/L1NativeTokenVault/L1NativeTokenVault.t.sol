@@ -102,7 +102,6 @@ contract L1NativeTokenVaultTest is Test {
         L1NullifierDev l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehubAddress),
             _messageRoot: IMessageRootBase(messageRootAddress),
-            _interopCenter: IInteropCenter(interopCenterAddress),
             _eraChainId: eraChainId,
             _eraDiamondProxy: eraDiamondProxy
         });
