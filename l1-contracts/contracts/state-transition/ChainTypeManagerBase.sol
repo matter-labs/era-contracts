@@ -438,7 +438,8 @@ abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ow
 
         // construct init data
         bytes memory initData;
-        /// all together 4+9*32=292 bytes for the selector + mandatory data
+        // It consists from chain specific part and general part(which is same for all the chains and it's fixed as part of `initialCutHash`)
+        // all together 4+8*32=260 bytes for the selector and chain specific part + general part
         // solhint-disable-next-line func-named-parameters
         initData = bytes.concat(
             IDiamondInit.initialize.selector,

@@ -243,6 +243,11 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
         return (s.l1DAValidator, s.l2DACommitmentScheme);
     }
 
+    /// @inheritdoc IGetters
+    function getCodeSizeLimit() external view returns (uint32) {
+        return s.codeSizeLimit;
+    }
+
     /*//////////////////////////////////////////////////////////////
                             DIAMOND LOUPE
      //////////////////////////////////////////////////////////////*/

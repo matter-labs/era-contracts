@@ -174,4 +174,7 @@ interface IGetters is IZKChainBase {
 
     /// @return DA configuration.
     function getDAValidatorPair() external view returns (address, L2DACommitmentScheme);
+
+    /// @return codeSizeLimit chain contract size limit.
+    function getCodeSizeLimit() external view returns (uint32);
 }

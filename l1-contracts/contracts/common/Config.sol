@@ -227,3 +227,9 @@ enum L2DACommitmentScheme {
 
 /// @dev The L2 data availability commitment scheme that permanent rollups are expected to use.
 L2DACommitmentScheme constant ROLLUP_L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256;
+
+/// @dev Minimal allowed code size limit, equals to EVM EIP-170 value.
+uint32 constant MIN_CODE_SIZE_LIMIT = 0x6000;
+
+/// @dev Maximal allowed code size limit, 1 MB.
+uint32 constant MAX_CODE_SIZE_LIMIT = 0x100000;
