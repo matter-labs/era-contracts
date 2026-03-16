@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import {L2AssetTracker} from "./L2AssetTracker.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
+import {AssetIdNotRegistered} from "./AssetTrackerErrors.sol";
 
 /// @title PrivateL2AssetTracker
 /// @author Matter Labs
@@ -32,5 +33,13 @@ contract PrivateL2AssetTracker is L2AssetTracker {
     /// so skip the migration number check entirely.
     function _checkAssetMigrationNumber(bytes32 /* _assetId */) internal view override {
         // No-op: private interop has its own asset tracking lifecycle.
+    }
+
+    /// @notice Override to use the private NTV instead of the hardcoded system NTV.
+    /// The base L2AssetTracker uses L2_NATIVE_TOKEN_VAULT directly, which doesn't
+    /// know about tokens bridged through the private interop stack.
+    function _tryGetTokenAddress(bytes32 _assetId) internal view override returns (address tokenAddress) {
+        tokenAddress = _nativeTokenVault().tokenAddress(_assetId);
+        require(tokenAddress != address(0), AssetIdNotRegistered(_assetId));
     }
 }

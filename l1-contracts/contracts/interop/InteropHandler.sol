@@ -13,6 +13,7 @@ import {
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
+import {ShadowAccount} from "./ShadowAccount.sol";
 import {
     BUNDLE_IDENTIFIER,
     INTEROP_BUNDLE_VERSION,
@@ -40,7 +41,8 @@ import {
     WrongDestinationBaseTokenAssetId,
     WrongSourceChainId,
     InvalidInteropBundleVersion,
-    InvalidInteropCallVersion
+    InvalidInteropCallVersion,
+    ShadowAccountDeploymentFailed
 } from "./InteropErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
 
@@ -273,13 +275,26 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
                 // Transfer base tokens from the BaseTokenHolder instead of minting.
                 L2_BASE_TOKEN_HOLDER.give(address(this), interopCall.value, _sourceChainId);
             }
-            // slither-disable-next-line arbitrary-send-eth
-            bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({
-                receiveId: keccak256(abi.encodePacked(_bundleHash, i)),
-                sender: InteroperableAddress.formatEvmV1(_sourceChainId, interopCall.from),
-                payload: interopCall.data
-            }); // attributes are not supported yet
-            require(selector == IERC7786Recipient.receiveMessage.selector, InvalidSelector(selector));
+
+            if (interopCall.shadowAccount) {
+                // Execute via shadow account - deploy if needed and call the target
+                _executeViaShadowAccount(
+                    _sourceChainId,
+                    interopCall.from,
+                    interopCall.to,
+                    interopCall.value,
+                    interopCall.data
+                );
+            } else {
+                // Normal execution via receiveMessage
+                // slither-disable-next-line arbitrary-send-eth
+                bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({
+                    receiveId: keccak256(abi.encodePacked(_bundleHash, i)),
+                    sender: InteroperableAddress.formatEvmV1(_sourceChainId, interopCall.from),
+                    payload: interopCall.data
+                }); // attributes are not supported yet
+                require(selector == IERC7786Recipient.receiveMessage.selector, InvalidSelector(selector));
+            }
         }
     }
 
@@ -467,5 +482,75 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         if (msg.sender != address(L2_BASE_TOKEN_HOLDER)) {
             revert Unauthorized(msg.sender);
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        Shadow Account Functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Executes a call via the sender's shadow account on this chain.
+    /// @dev Deploys the shadow account if it doesn't exist yet. The shadow account implements
+    /// ERC-7786 receiveMessage, and the payload is delivered as-is from the InteropCall.data field.
+    /// The sender constructs the data as ABI-encoded ShadowAccountCall[] on the source chain.
+    function _executeViaShadowAccount(
+        uint256 _ownerChainId,
+        address _ownerAddress,
+        address /* _to */,
+        uint256 _value,
+        bytes memory _data
+    ) internal {
+        address shadowAccountAddr = _getOrDeployShadowAccount(_ownerChainId, _ownerAddress);
+        bytes memory senderAddress = InteroperableAddress.formatEvmV1(_ownerChainId, _ownerAddress);
+        // slither-disable-next-line arbitrary-send-eth
+        bytes4 selector = IERC7786Recipient(shadowAccountAddr).receiveMessage{value: _value}({
+            receiveId: bytes32(0),
+            sender: senderAddress,
+            payload: _data
+        });
+        require(selector == IERC7786Recipient.receiveMessage.selector, InvalidSelector(selector));
+    }
+
+    /// @notice Gets or deploys a shadow account for the given owner.
+    function _getOrDeployShadowAccount(
+        uint256 _ownerChainId,
+        address _ownerAddress
+    ) internal returns (address shadowAccountAddr) {
+        shadowAccountAddr = _computeShadowAccountAddress(_ownerChainId, _ownerAddress);
+
+        if (shadowAccountAddr.code.length > 0) {
+            return shadowAccountAddr;
+        }
+
+        bytes memory fullOwnerAddress = InteroperableAddress.formatEvmV1(_ownerChainId, _ownerAddress);
+        ShadowAccount account = new ShadowAccount{salt: bytes32(0)}(fullOwnerAddress);
+
+        require(address(account) != address(0), ShadowAccountDeploymentFailed());
+
+        emit ShadowAccountDeployed(address(account), _ownerChainId, _ownerAddress);
+    }
+
+    /// @notice Computes the deterministic address of a shadow account for a given owner.
+    /// @param _ownerChainId The chain ID of the owner.
+    /// @param _ownerAddress The EVM address of the owner on the source chain.
+    /// @return The address where the shadow account is/will be deployed.
+    function getShadowAccountAddress(uint256 _ownerChainId, address _ownerAddress) external view returns (address) {
+        return _computeShadowAccountAddress(_ownerChainId, _ownerAddress);
+    }
+
+    /// @notice Internal function to compute the expected shadow account address.
+    function _computeShadowAccountAddress(
+        uint256 _ownerChainId,
+        address _ownerAddress
+    ) internal view returns (address) {
+        bytes memory fullOwnerAddress = InteroperableAddress.formatEvmV1(_ownerChainId, _ownerAddress);
+        bytes memory bytecode = abi.encodePacked(type(ShadowAccount).creationCode, abi.encode(fullOwnerAddress));
+        bytes32 bytecodeHash = keccak256(bytecode);
+
+        return
+            address(
+                uint160(
+                    uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), bytes32(0x0), bytecodeHash)))
+                )
+            );
     }
 }

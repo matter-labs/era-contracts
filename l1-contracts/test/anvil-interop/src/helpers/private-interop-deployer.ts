@@ -8,20 +8,15 @@ import {
   INTEROP_CENTER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
+import type { PrivateInteropAddresses } from "../core/types";
 
 // Dedicated deployer key for private interop contracts.
 // Using a separate wallet (Anvil account #9) ensures the same nonce (0) on all chains,
 // which gives deterministic addresses — required because initiateIndirectCall returns
 // address(this) as the target l2Contract.
-const PRIVATE_DEPLOYER_KEY = "0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6";
+export const PRIVATE_DEPLOYER_KEY = "0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6";
 
-export interface PrivateInteropAddresses {
-  assetTracker: string;
-  ntv: string;
-  assetRouter: string;
-  interopCenter: string;
-  interopHandler: string;
-}
+export type { PrivateInteropAddresses };
 
 type Logger = (line: string) => void;
 

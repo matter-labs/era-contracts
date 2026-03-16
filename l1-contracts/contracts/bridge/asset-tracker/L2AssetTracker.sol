@@ -491,7 +491,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @notice Retrieves the token contract address for a given asset ID.
     /// @param _assetId The asset ID to look up.
     /// @return tokenAddress The contract address of the token.
-    function _tryGetTokenAddress(bytes32 _assetId) internal view returns (address tokenAddress) {
+    function _tryGetTokenAddress(bytes32 _assetId) internal view virtual returns (address tokenAddress) {
         tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
         require(tokenAddress != address(0), AssetIdNotRegistered(_assetId));
     }

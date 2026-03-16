@@ -51,3 +51,4 @@ error WrongSourceChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
 error ZKTokenNotAvailable();
 error PrivateInteropValueNotZero();
 error InteropRouteMismatch(bytes32 assetId, uint8 current, uint8 expected);
+error ShadowAccountDeploymentFailed();

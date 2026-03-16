@@ -135,6 +135,7 @@ async function main(): Promise<void> {
           );
         }
       }
+
     }
 
     timedRun(
@@ -150,6 +151,7 @@ async function main(): Promise<void> {
         "test/anvil-interop/test/hardhat/05-gateway-bridge.spec.ts",
         "test/anvil-interop/test/hardhat/06-gateway-interop.spec.ts",
         "test/anvil-interop/test/hardhat/07-private-interop.spec.ts",
+        "test/anvil-interop/test/hardhat/08-shadow-account-interop.spec.ts",
         "--network",
         "hardhat",
         "--no-compile",

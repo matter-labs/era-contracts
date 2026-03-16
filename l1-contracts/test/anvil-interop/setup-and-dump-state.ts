@@ -6,6 +6,10 @@ import { execSync } from "child_process";
 import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { deployTestTokens } from "./src/helpers/deploy-test-token";
+import { deployPrivateInteropStack } from "./src/helpers/private-interop-deployer";
+import { getChainIdsByRole } from "./src/core/utils";
+import { L1_CHAIN_ID } from "./src/core/const";
+import type { PrivateInteropAddresses } from "./src/core/types";
 
 async function main(): Promise<void> {
   // Use the anvil-interop Foundry profile which disables CBOR metadata,
@@ -39,11 +43,33 @@ async function main(): Promise<void> {
     const stateAfterTokens = runner.loadState();
     const testTokens = stateAfterTokens.testTokens;
 
+    // Deploy private interop stack on all GW-settled chains.
+    const config = runner.getConfig();
+    const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
+    let privateInteropAddresses: Record<number, PrivateInteropAddresses> | undefined;
+    if (gwSettledChainIds.length > 0) {
+      privateInteropAddresses = {};
+      for (const chainId of gwSettledChainIds) {
+        const chain = stateAfterTokens.chains!.l2.find((c) => c.chainId === chainId);
+        if (!chain) continue;
+        console.log(`Deploying private interop on chain ${chainId}...`);
+        privateInteropAddresses[chainId] = await deployPrivateInteropStack(
+          chain.rpcUrl,
+          chainId,
+          L1_CHAIN_ID,
+          (line) => console.log(`  [chain ${chainId}] ${line}`)
+        );
+      }
+      const s = runner.loadState();
+      s.privateInteropAddresses = privateInteropAddresses;
+      runner.saveState(s);
+    }
+
     // Stop all chains — this triggers Anvil's --dump-state file writes.
     await runner.dumpAllStates(anvilManager, stateDir);
 
     // Save addresses alongside the chain states
-    const addresses = { l1Addresses, ctmAddresses, chainAddresses, testTokens };
+    const addresses = { l1Addresses, ctmAddresses, chainAddresses, testTokens, privateInteropAddresses };
     fs.writeFileSync(path.join(stateDir, "addresses.json"), JSON.stringify(addresses, null, 2));
     console.log(`Addresses saved to ${path.join(stateDir, "addresses.json")}`);
 

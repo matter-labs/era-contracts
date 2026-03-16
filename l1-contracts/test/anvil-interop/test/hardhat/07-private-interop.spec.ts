@@ -2,10 +2,7 @@ import { expect } from "chai";
 import { BigNumber, Contract, ethers, providers, Wallet } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { getChainIdsByRole } from "../../src/core/utils";
-import {
-  deployPrivateInteropStack,
-  PrivateInteropAddresses,
-} from "../../src/helpers/private-interop-deployer";
+import type { PrivateInteropAddresses } from "../../src/core/types";
 import { executePrivateTokenTransfer } from "../../src/helpers/private-token-transfer";
 import { getAbi } from "../../src/core/contracts";
 import { encodeEvmChain, encodeEvmAddress } from "../../src/core/data-encoding";
@@ -21,42 +18,38 @@ describe("07 - Private Interop", function () {
   let state: ReturnType<typeof runner.loadState>;
   let gwSettledChainIds: number[];
 
-  // Private interop addresses per chain
-  const privateAddresses: Record<number, PrivateInteropAddresses> = {};
+  // Private interop addresses per chain (loaded from deployment state)
+  let privateAddresses: Record<number, PrivateInteropAddresses>;
 
   before(async () => {
     state = runner.loadState();
     if (!state.chains || !state.testTokens) {
       throw new Error("Deployment state incomplete. Run setup first.");
     }
+    if (!state.privateInteropAddresses || Object.keys(state.privateInteropAddresses).length === 0) {
+      throw new Error("Private interop addresses not found in state. Run setup first.");
+    }
+    privateAddresses = state.privateInteropAddresses;
     gwSettledChainIds = getChainIdsByRole(state.chains.config, "gwSettled");
     if (gwSettledChainIds.length < 2) {
       throw new Error("Need at least 2 GW-settled chains for private interop tests");
     }
   });
 
-  it("deploys private interop stack on two GW-settled chains", async () => {
-    const chainsToSetup = [gwSettledChainIds[0], gwSettledChainIds[1]];
-
-    for (const chainId of chainsToSetup) {
+  it("verifies private interop stack is deployed on GW-settled chains", async () => {
+    for (const chainId of [gwSettledChainIds[0], gwSettledChainIds[1]]) {
       const chain = state.chains!.l2.find((c) => c.chainId === chainId);
       if (!chain) throw new Error(`Chain ${chainId} not found`);
 
-      console.log(`\n  Deploying private interop stack on chain ${chainId}...`);
-      const addresses = await deployPrivateInteropStack(chain.rpcUrl, chainId, L1_CHAIN_ID, (line) =>
-        console.log(`  [chain ${chainId}] ${line}`)
-      );
+      const addrs = privateAddresses[chainId];
+      expect(addrs).to.not.be.undefined;
 
-      privateAddresses[chainId] = addresses;
-
-      // Verify all contracts are deployed
       const provider = new providers.JsonRpcProvider(chain.rpcUrl);
-      for (const [name, addr] of Object.entries(addresses)) {
+      for (const [name, addr] of Object.entries(addrs)) {
         const code = await provider.getCode(addr);
-        expect(code.length).to.be.greaterThan(2, `${name} has no code at ${addr}`);
+        expect(code.length).to.be.greaterThan(2, `${name} has no code at ${addr} on chain ${chainId}`);
       }
-
-      console.log(`  Private interop stack deployed on chain ${chainId}`);
+      console.log(`  Private interop stack verified on chain ${chainId}`);
     }
   });
 
@@ -177,10 +170,6 @@ describe("07 - Private Interop", function () {
   });
 
   it("enforces route consistency: public token cannot go through private interop", async () => {
-    // Each L2AssetRouter tracks routes independently.
-    // PrivateL2AssetRouter enforces Private route for all assets.
-    // System L2AssetRouter enforces Public route for all assets.
-    // This is validated implicitly through the architecture.
     console.log("  Route enforcement is validated implicitly through the architecture:");
     console.log("  - Each L2AssetRouter tracks routes independently");
     console.log("  - PrivateL2AssetRouter enforces Private route for all assets");

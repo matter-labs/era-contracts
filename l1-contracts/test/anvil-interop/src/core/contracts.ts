@@ -46,6 +46,7 @@ const ARTIFACTS = {
   PrivateL2AssetRouter: "PrivateL2AssetRouter.sol/PrivateL2AssetRouter.json",
   PrivateL2AssetTracker: "PrivateL2AssetTracker.sol/PrivateL2AssetTracker.json",
   PrivateL2NativeTokenVault: "PrivateL2NativeTokenVault.sol/PrivateL2NativeTokenVault.json",
+  ShadowAccount: "ShadowAccount.sol/ShadowAccount.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
   TestnetERC20Token: "TestnetERC20Token.sol/TestnetERC20Token.json",
 } as const;

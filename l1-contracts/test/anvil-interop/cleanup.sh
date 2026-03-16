@@ -10,7 +10,7 @@ echo "🧹 Cleaning up Anvil interop environment..."
 
 # Known ports used by our Anvil instances (offset by ANVIL_INTEROP_PORT_OFFSET if set)
 PORT_OFFSET="${ANVIL_INTEROP_PORT_OFFSET:-0}"
-BASE_PORTS="9545 4050 4051 4052 4053"
+BASE_PORTS="9545 4050 4051 4052 4053 4054"
 ANVIL_PORTS=""
 for BASE in $BASE_PORTS; do
   ANVIL_PORTS="$ANVIL_PORTS $((BASE + PORT_OFFSET))"

@@ -112,7 +112,6 @@ export async function executeInteropTokenTransfer(opts: {
   }
 
   const abiCoder = ethers.utils.defaultAbiCoder;
-  const assetId = encodeNtvAssetId(sourceChainId, sourceTokenAddr);
 
   // Register token if needed
   const registeredAssetId = await sourceVault.assetId(sourceTokenAddr);
@@ -121,6 +120,14 @@ export async function executeInteropTokenTransfer(opts: {
     const registerTx = await sourceVaultWithWallet.registerToken(sourceTokenAddr);
     await registerTx.wait();
     log(`  Token registered in NTV`);
+  }
+
+  // Use the NTV's registered asset ID (correct for bridged tokens where origin != source).
+  // For native tokens this equals encodeNtvAssetId(sourceChainId, sourceTokenAddr).
+  // For bridged tokens (minted via finalizeDeposit), the NTV stores the origin-based asset ID.
+  const assetId = (await sourceVault.assetId(sourceTokenAddr)) as string;
+  if (assetId === ethers.constants.HashZero) {
+    throw new Error(`Asset ID not found for token ${sourceTokenAddr} on chain ${sourceChainId}`);
   }
 
   // Destination balance before
