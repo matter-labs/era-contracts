@@ -394,14 +394,14 @@ export async function extractAndRelayNewPriorityRequests(
  * Build a mock InteropProof struct for test bundle execution.
  * In the test environment, proof verification is bypassed, so we only need the correct shape.
  */
-export function buildMockInteropProof(sourceChainId: number) {
+export function buildMockInteropProof(sourceChainId: number, senderAddress?: string) {
   return {
     chainId: sourceChainId,
     l1BatchNumber: 0,
     l2MessageIndex: 0,
     message: {
       txNumberInBatch: 0,
-      sender: INTEROP_CENTER_ADDR,
+      sender: senderAddress ?? INTEROP_CENTER_ADDR,
       data: "0x",
     },
     proof: [],
