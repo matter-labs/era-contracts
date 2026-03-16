@@ -11,12 +11,12 @@ import {
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
 import {
-  encodeNtvAssetId,
   encodeBridgeBurnData,
   encodeAssetRouterBridgehubDepositData,
   encodeEvmChain,
   encodeEvmAddress,
 } from "../core/data-encoding";
+import { buildMockInteropProof } from "../core/utils";
 import { createBalanceTrackerFromState } from "./balance-tracker";
 
 type Logger = (line: string) => void;
@@ -189,39 +189,32 @@ export async function executeInteropTokenTransfer(opts: {
   }
 
   // Execute on destination chain
-  log(`  Executing bundle on destination chain via InteropHandler...`);
-  const interopHandler = new Contract(
-    targetAddresses.interopHandler,
-    getAbi("InteropHandler"),
-    targetWallet
-  );
-
-  const mockProof = {
-    chainId: sourceChainId,
-    l1BatchNumber: 0,
-    l2MessageIndex: 0,
-    message: {
-      txNumberInBatch: 0,
-      sender: sourceAddresses.interopCenter,
-      data: "0x",
-    },
-    proof: [],
-  };
-
-  const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
   let targetTxHash: string | null = null;
 
-  try {
-    const executeTx = await interopHandler.executeBundle(bundleData, mockProof, { gasLimit: 5_000_000 });
-    await executeTx.wait();
-    targetTxHash = executeTx.hash;
-    log(`  Execute tx confirmed: ${executeTx.hash}`);
-  } catch (error: unknown) {
-    const message = (error as Error)?.message || String(error);
-    log(`  executeBundle failed: ${message}`);
-    const failedTxHash = (error as { transactionHash?: string })?.transactionHash;
-    if (failedTxHash) {
-      targetTxHash = failedTxHash;
+  {
+    log(`  [${elapsed()}] Executing bundle on destination chain via InteropHandler...`);
+    const interopHandler = new Contract(
+      targetAddresses.interopHandler,
+      getAbi("InteropHandler"),
+      targetWallet
+    );
+
+    const mockProof = buildMockInteropProof(sourceChainId, sourceAddresses.interopCenter);
+
+    const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
+    try {
+      const executeTx = await interopHandler.executeBundle(bundleData, mockProof, { gasLimit: 5_000_000 });
+      await executeTx.wait();
+      targetTxHash = executeTx.hash;
+      log(`   executeBundle tx: cast run ${executeTx.hash} -r ${targetChain.rpcUrl}`);
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || String(error);
+      log(`   executeBundle failed: ${message}`);
+      const failedTxHash = (error as { transactionHash?: string })?.transactionHash;
+      if (!targetTxHash && failedTxHash) {
+        targetTxHash = failedTxHash;
+        log(`   using reverted executeBundle tx: cast run ${failedTxHash} -r ${targetChain.rpcUrl}`);
+      }
     }
   }
 
@@ -242,7 +235,7 @@ export async function executeInteropTokenTransfer(opts: {
     log(`  cast run ${targetTxHash} -r ${targetChain.rpcUrl}`);
   }
 
-  log(`\n⏱️  [${elapsed()}] Token transfer complete`);
+  log(`\n  [${elapsed()}] Token transfer complete`);
 
   return {
     sourceChainId,
