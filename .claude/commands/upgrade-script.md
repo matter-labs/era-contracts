@@ -1,6 +1,7 @@
 Create a new version upgrade script following the ZK Stack upgrade architecture.
 
 ## Usage
+
 Invoke with: `/upgrade-script <version_number>` (e.g., `/upgrade-script v32`)
 
 ## What this skill does
@@ -48,6 +49,7 @@ GatewayUpgrade_v{N} (optional)
 6. Ask the user what new contracts or changes this upgrade introduces before filling in deployment logic.
 
 ## Key rules
+
 - NEVER use try-catch or staticcall in upgrade scripts
 - Use composition (not diamond inheritance) for ecosystem upgrades
 - Three-stage governance: stage0 (pause), stage1 (upgrade), stage2 (unpause)

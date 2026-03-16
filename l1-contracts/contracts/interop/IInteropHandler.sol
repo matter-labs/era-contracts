@@ -13,7 +13,11 @@ interface IInteropHandler {
 
     event CallProcessed(bytes32 indexed bundleHash, uint256 indexed callIndex, CallStatus status);
 
-    event ShadowAccountDeployed(address indexed shadowAccount, uint256 indexed ownerChainId, address indexed ownerAddress);
+    event ShadowAccountDeployed(
+        address indexed shadowAccount,
+        uint256 indexed ownerChainId,
+        address indexed ownerAddress
+    );
 
     /// @notice Executes a full bundle atomically.
     /// @dev Reverts if any call fails, or if bundle has been processed already.

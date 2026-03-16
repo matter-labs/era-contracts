@@ -432,9 +432,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             // slither-disable-next-line unused-return
             txHash = L2ContractHelper.sendMessageToL1(message);
         } else {
-            address l1Token = IBridgedStandardToken(
-                IL2NativeTokenVault(_nativeTokenVaultAddr()).tokenAddress(_assetId)
-            ).originToken();
+            address l1Token = IBridgedStandardToken(IL2NativeTokenVault(_nativeTokenVaultAddr()).tokenAddress(_assetId))
+                .originToken();
             require(l1Token != address(0), AssetIdNotSupported(_assetId));
             // slither-disable-next-line unused-return
             (uint256 amount, address l1Receiver, ) = DataEncoding.decodeBridgeBurnData(_assetData);

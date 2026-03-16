@@ -53,11 +53,8 @@ async function main(): Promise<void> {
         const chain = stateAfterTokens.chains!.l2.find((c) => c.chainId === chainId);
         if (!chain) continue;
         console.log(`Deploying private interop on chain ${chainId}...`);
-        privateInteropAddresses[chainId] = await deployPrivateInteropStack(
-          chain.rpcUrl,
-          chainId,
-          L1_CHAIN_ID,
-          (line) => console.log(`  [chain ${chainId}] ${line}`)
+        privateInteropAddresses[chainId] = await deployPrivateInteropStack(chain.rpcUrl, chainId, L1_CHAIN_ID, (line) =>
+          console.log(`  [chain ${chainId}] ${line}`)
         );
       }
       const s = runner.loadState();

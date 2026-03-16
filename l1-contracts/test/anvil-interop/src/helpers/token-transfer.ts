@@ -1,7 +1,6 @@
 import { BigNumber, Contract, ethers, providers, Wallet } from "ethers";
 import { DeploymentRunner } from "../deployment-runner";
 import type { MultiChainTokenTransferParams, MultiChainTokenTransferResult } from "../core/types";
-import { testnetERC20TokenAbi, interopCenterAbi, l2NativeTokenVaultAbi, interopHandlerAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   INTEROP_BUNDLE_TUPLE_TYPE,
@@ -119,7 +118,7 @@ export async function executeInteropTokenTransfer(opts: {
     const sourceVaultWithWallet = sourceVault.connect(sourceWallet);
     const registerTx = await sourceVaultWithWallet.registerToken(sourceTokenAddr);
     await registerTx.wait();
-    log(`  Token registered in NTV`);
+    log("  Token registered in NTV");
   }
 
   // Use the NTV's registered asset ID (correct for bridged tokens where origin != source).
@@ -193,11 +192,7 @@ export async function executeInteropTokenTransfer(opts: {
 
   {
     log(`  [${elapsed()}] Executing bundle on destination chain via InteropHandler...`);
-    const interopHandler = new Contract(
-      targetAddresses.interopHandler,
-      getAbi("InteropHandler"),
-      targetWallet
-    );
+    const interopHandler = new Contract(targetAddresses.interopHandler, getAbi("InteropHandler"), targetWallet);
 
     const mockProof = buildMockInteropProof(sourceChainId, sourceAddresses.interopCenter);
 

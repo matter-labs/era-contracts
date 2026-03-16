@@ -18,7 +18,6 @@ import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 import {IL2AssetTracker} from "../asset-tracker/IL2AssetTracker.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
-    L2_ASSET_TRACKER,
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,

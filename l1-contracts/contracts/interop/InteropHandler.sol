@@ -13,7 +13,7 @@ import {
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
-import {ShadowAccount} from "./ShadowAccount.sol";
+import {ShadowAccount, ShadowAccountCall, ShadowAccountCallType} from "./ShadowAccount.sol";
 import {
     BUNDLE_IDENTIFIER,
     INTEROP_BUNDLE_VERSION,
@@ -278,13 +278,13 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
             if (interopCall.shadowAccount) {
                 // Execute via shadow account - deploy if needed and call the target
-                _executeViaShadowAccount(
-                    _sourceChainId,
-                    interopCall.from,
-                    interopCall.to,
-                    interopCall.value,
-                    interopCall.data
-                );
+                _executeViaShadowAccount({
+                    _ownerChainId: _sourceChainId,
+                    _ownerAddress: interopCall.from,
+                    _to: interopCall.to,
+                    _value: interopCall.value,
+                    _data: interopCall.data
+                });
             } else {
                 // Normal execution via receiveMessage
                 // slither-disable-next-line arbitrary-send-eth
@@ -303,11 +303,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @param _proof Proof for the message that corresponds to the bundle that is to be verified.
     /// @param _bundleHash Hash corresponding to the bundle that is to be verified.
     /// That message gets sent to L1 by origin chain in InteropCenter contract, and is picked up and included in receiving chain by sequencer.
-    function _verifyBundle(
-        bytes memory _bundle,
-        MessageInclusionProof memory _proof,
-        bytes32 _bundleHash
-    ) internal {
+    function _verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bytes32 _bundleHash) internal {
         // Verify that the message came from the legitimate InteropCenter.
         // It is expected that all allowed messages have gone through the GWAssetTracker which
         // ensured that if the `L2_INTEROP_CENTER_ADDR` is the sender of the message, then the message
@@ -489,23 +485,34 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Executes a call via the sender's shadow account on this chain.
-    /// @dev Deploys the shadow account if it doesn't exist yet. The shadow account implements
-    /// ERC-7786 receiveMessage, and the payload is delivered as-is from the InteropCall.data field.
-    /// The sender constructs the data as ABI-encoded ShadowAccountCall[] on the source chain.
+    /// @dev Deploys the shadow account if it doesn't exist yet. Wraps the original InteropCall's
+    /// `to`, `value`, and `data` into a ShadowAccountCall[] payload and delivers it via
+    /// receiveMessage — so the sender just sets `shadowAccount: true` and specifies the target
+    /// in the normal `to` field, without having to encode anything special in `data`.
     function _executeViaShadowAccount(
         uint256 _ownerChainId,
         address _ownerAddress,
-        address /* _to */,
+        address _to,
         uint256 _value,
         bytes memory _data
     ) internal {
         address shadowAccountAddr = _getOrDeployShadowAccount(_ownerChainId, _ownerAddress);
         bytes memory senderAddress = InteroperableAddress.formatEvmV1(_ownerChainId, _ownerAddress);
+
+        // Wrap the original call into a single-element ShadowAccountCall[]
+        ShadowAccountCall[] memory calls = new ShadowAccountCall[](1);
+        calls[0] = ShadowAccountCall({
+            callType: ShadowAccountCallType.Call,
+            target: _to,
+            value: _value,
+            data: _data
+        });
+
         // slither-disable-next-line arbitrary-send-eth
         bytes4 selector = IERC7786Recipient(shadowAccountAddr).receiveMessage{value: _value}({
             receiveId: bytes32(0),
             sender: senderAddress,
-            payload: _data
+            payload: abi.encode(calls)
         });
         require(selector == IERC7786Recipient.receiveMessage.selector, InvalidSelector(selector));
     }
@@ -548,9 +555,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
         return
             address(
-                uint160(
-                    uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), bytes32(0x0), bytecodeHash)))
-                )
+                uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), bytes32(0x0), bytecodeHash))))
             );
     }
 }

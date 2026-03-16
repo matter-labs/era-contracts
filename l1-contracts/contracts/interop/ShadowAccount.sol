@@ -86,7 +86,8 @@ contract ShadowAccount is IERC7786Recipient {
         }
 
         ShadowAccountCall[] memory calls = abi.decode(_payload, (ShadowAccountCall[]));
-        for (uint256 i = 0; i < calls.length; ++i) {
+        uint256 callsLength = calls.length;
+        for (uint256 i = 0; i < callsLength; ++i) {
             bool success;
             bytes memory returndata;
             if (calls[i].callType == ShadowAccountCallType.DelegateCall) {

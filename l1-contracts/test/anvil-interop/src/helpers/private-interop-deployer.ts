@@ -1,13 +1,6 @@
 import { ContractFactory, Contract, providers, Wallet, ethers } from "ethers";
-import {
-  getAbi,
-  getCreationBytecode,
-} from "../core/contracts";
-import {
-  ANVIL_DEFAULT_PRIVATE_KEY,
-  INTEROP_CENTER_ADDR,
-  L2_NATIVE_TOKEN_VAULT_ADDR,
-} from "../core/const";
+import { getAbi, getCreationBytecode } from "../core/contracts";
+import { ANVIL_DEFAULT_PRIVATE_KEY, INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
 import type { PrivateInteropAddresses } from "../core/types";
 
 // Dedicated deployer key for private interop contracts.
@@ -75,7 +68,7 @@ export async function deployPrivateInteropStack(
   // Get origin chain ID for base token bridging data
   const baseTokenOriginChainId = await systemNtv.originChainId(baseTokenAssetId);
 
-  log(`  Deploying PrivateL2AssetTracker...`);
+  log("  Deploying PrivateL2AssetTracker...");
   const assetTrackerFactory = new ContractFactory(
     getAbi("PrivateL2AssetTracker"),
     getCreationBytecode("PrivateL2AssetTracker"),
@@ -86,7 +79,7 @@ export async function deployPrivateInteropStack(
   await assetTracker.deployed();
   log(`    AssetTracker: ${assetTracker.address}`);
 
-  log(`  Deploying PrivateL2NativeTokenVault...`);
+  log("  Deploying PrivateL2NativeTokenVault...");
   const ntvFactory = new ContractFactory(
     getAbi("PrivateL2NativeTokenVault"),
     getCreationBytecode("PrivateL2NativeTokenVault"),
@@ -96,7 +89,7 @@ export async function deployPrivateInteropStack(
   await ntv.deployed();
   log(`    NTV: ${ntv.address}`);
 
-  log(`  Deploying PrivateL2AssetRouter...`);
+  log("  Deploying PrivateL2AssetRouter...");
   const assetRouterFactory = new ContractFactory(
     getAbi("PrivateL2AssetRouter"),
     getCreationBytecode("PrivateL2AssetRouter"),
@@ -106,7 +99,7 @@ export async function deployPrivateInteropStack(
   await assetRouter.deployed();
   log(`    AssetRouter: ${assetRouter.address}`);
 
-  log(`  Deploying PrivateInteropCenter...`);
+  log("  Deploying PrivateInteropCenter...");
   const interopCenterFactory = new ContractFactory(
     getAbi("PrivateInteropCenter"),
     getCreationBytecode("PrivateInteropCenter"),
@@ -116,7 +109,7 @@ export async function deployPrivateInteropStack(
   await interopCenter.deployed();
   log(`    InteropCenter: ${interopCenter.address}`);
 
-  log(`  Deploying PrivateInteropHandler...`);
+  log("  Deploying PrivateInteropHandler...");
   const interopHandlerFactory = new ContractFactory(
     getAbi("PrivateInteropHandler"),
     getCreationBytecode("PrivateInteropHandler"),
@@ -127,15 +120,11 @@ export async function deployPrivateInteropStack(
   log(`    InteropHandler: ${interopHandler.address}`);
 
   // Initialize contracts in order
-  log(`  Initializing AssetTracker...`);
-  const initAssetTrackerTx = await assetTracker.initialize(
-    l1ChainId,
-    baseTokenAssetId,
-    ntv.address
-  );
+  log("  Initializing AssetTracker...");
+  const initAssetTrackerTx = await assetTracker.initialize(l1ChainId, baseTokenAssetId, ntv.address);
   await initAssetTrackerTx.wait();
 
-  log(`  Initializing NTV...`);
+  log("  Initializing NTV...");
   const baseTokenBridgingData = {
     assetId: baseTokenAssetId,
     originChainId: baseTokenOriginChainId,
@@ -158,7 +147,7 @@ export async function deployPrivateInteropStack(
   );
   await initNtvTx.wait();
 
-  log(`  Initializing AssetRouter...`);
+  log("  Initializing AssetRouter...");
   const initAssetRouterTx = await assetRouter.initialize(
     l1ChainId,
     eraChainId,
@@ -170,7 +159,7 @@ export async function deployPrivateInteropStack(
   );
   await initAssetRouterTx.wait();
 
-  log(`  Initializing InteropCenter...`);
+  log("  Initializing InteropCenter...");
   const initInteropCenterTx = await interopCenter.initialize(
     l1ChainId,
     wallet.address,
@@ -180,12 +169,8 @@ export async function deployPrivateInteropStack(
   );
   await initInteropCenterTx.wait();
 
-  log(`  Initializing InteropHandler...`);
-  const initInteropHandlerTx = await interopHandler.initialize(
-    l1ChainId,
-    interopCenter.address,
-    ntv.address
-  );
+  log("  Initializing InteropHandler...");
+  const initInteropHandlerTx = await interopHandler.initialize(l1ChainId, interopCenter.address, ntv.address);
   await initInteropHandlerTx.wait();
 
   log(`  Private interop stack deployed and initialized on chain ${chainId}`);

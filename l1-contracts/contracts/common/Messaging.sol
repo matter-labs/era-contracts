@@ -206,8 +206,8 @@ struct InteropCallStarterInternal {
 ///                      The call's data field should contain ABI-encoded ShadowAccountCall[] for the account to execute.
 struct CallAttributes {
     uint256 interopCallValue;
-    bool indirectCall;
     uint256 indirectCallMessageValue;
+    bool indirectCall;
     bool shadowAccount;
 }
 

@@ -468,14 +468,14 @@ contract InteropCenter is
         }
 
         // Ensure that tokens required for bundle execution were received.
-        _handleValueCollection(
-            bundle.destinationChainId,
-            bundle.destinationBaseTokenAssetId,
-            totalBurnedCallsValue,
-            totalIndirectCallsValue,
-            _bundleAttributes.useFixedFee,
-            callStartersLength
-        );
+        _handleValueCollection({
+            _destinationChainId: bundle.destinationChainId,
+            _destinationBaseTokenAssetId: bundle.destinationBaseTokenAssetId,
+            _totalBurnedCallsValue: totalBurnedCallsValue,
+            _totalIndirectCallsValue: totalIndirectCallsValue,
+            _useFixedFee: _bundleAttributes.useFixedFee,
+            _callStartersLength: callStartersLength
+        });
 
         bytes memory interopBundleBytes = abi.encode(bundle);
         bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);

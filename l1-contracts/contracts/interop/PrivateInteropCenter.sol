@@ -32,10 +32,10 @@ contract PrivateInteropCenter is InteropCenter {
         _privateAssetRouter = _assetRouter;
         _privateNtv = _ntv;
 
-        require(_zkTokenAssetId != bytes32(0));
+        require(_zkTokenAssetId != bytes32(0), ZKTokenNotAvailable());
         ZK_TOKEN_ASSET_ID = _zkTokenAssetId;
 
-        require(_owner != address(0));
+        require(_owner != address(0), ZeroAddress());
         L1_CHAIN_ID = _l1ChainId;
         ZK_INTEROP_FEE = 10e18;
         _transferOwnership(_owner);
@@ -55,22 +55,12 @@ contract PrivateInteropCenter is InteropCenter {
     }
 
     /// @notice Private interop does not collect base-token value (no interopCallValue allowed).
-    function _handleValueCollection(
-        uint256,
-        bytes32,
-        uint256,
-        uint256,
-        bool,
-        uint256
-    ) internal override {
+    function _handleValueCollection(uint256, bytes32, uint256, uint256, bool, uint256) internal override {
         // No base-token value collection for private interop.
     }
 
     /// @notice Sends only hash + callCount to L1 instead of full bundle data.
-    function _sendBundleToL1(
-        bytes memory _interopBundleBytes,
-        uint256 _callCount
-    ) internal override returns (bytes32) {
+    function _sendBundleToL1(bytes memory _interopBundleBytes, uint256 _callCount) internal override returns (bytes32) {
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
             abi.encodePacked(PRIVATE_BUNDLE_IDENTIFIER, keccak256(_interopBundleBytes), _callCount)
         );

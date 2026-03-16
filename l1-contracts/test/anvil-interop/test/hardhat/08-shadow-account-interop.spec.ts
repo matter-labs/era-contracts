@@ -117,7 +117,11 @@ describe("08 - Shadow Account Interop (B -> A -> C)", function () {
   it("verifies token exists on all three chains", async () => {
     const assetId = encodeNtvAssetId(chainA, originTokenAddress);
 
-    for (const [label, chainId] of [["A", chainA], ["B", chainB], ["C", chainC]] as const) {
+    for (const [label, chainId] of [
+      ["A", chainA],
+      ["B", chainB],
+      ["C", chainC],
+    ] as const) {
       const chain = state.chains!.l2.find((c) => c.chainId === chainId)!;
       const provider = new providers.JsonRpcProvider(chain.rpcUrl);
       const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
@@ -129,6 +133,6 @@ describe("08 - Shadow Account Interop (B -> A -> C)", function () {
       console.log(`  Chain ${label} (${chainId}) balance: ${ethers.utils.formatUnits(balance, 18)}`);
       expect(balance.gt(0), `Chain ${label} should have non-zero balance`).to.eq(true);
     }
-    console.log(`\n  B -> A -> C transfer verified: tokens exist on all three chains`);
+    console.log("\n  B -> A -> C transfer verified: tokens exist on all three chains");
   });
 });

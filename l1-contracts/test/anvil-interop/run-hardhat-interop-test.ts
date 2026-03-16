@@ -135,7 +135,6 @@ async function main(): Promise<void> {
           );
         }
       }
-
     }
 
     timedRun(

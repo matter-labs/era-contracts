@@ -3,6 +3,7 @@ Regenerate zkstack-out artifacts and selectors after interface changes.
 ## When to use
 
 Run this skill when:
+
 - You modified a Solidity interface file (added/removed functions, events, errors)
 - CI fails with "l1-contracts/zkstack-out is out of date"
 - CI fails with "Selectors file does not match computed selectors"
@@ -19,21 +20,25 @@ Run this skill when:
 ## Steps
 
 1. **Build all contracts:**
+
    ```bash
    cd l1-contracts && forge build
    ```
 
 2. **Regenerate zkstack-out artifacts:**
+
    ```bash
    cd l1-contracts && npx ts-node scripts/copy-to-zkstack-out.ts
    ```
 
 3. **Format the generated JSON files** (required - CI checks for trailing newlines):
+
    ```bash
    cd .. && yarn prettier:fix
    ```
 
 4. **Regenerate selectors:**
+
    ```bash
    cd l1-contracts && yarn selectors --fix
    ```
@@ -54,6 +59,7 @@ If a new contract needs to be available in zkstack-out:
 4. Re-run the regeneration steps above
 
 ## Notes
+
 - The `yarn build:foundry` command combines forge build + copy-to-zkstack-out in one step
 - zkstack-out contains ONLY the ABI arrays, not full Forge artifacts
 - Selectors file must match byte-for-byte in CI (strict comparison)

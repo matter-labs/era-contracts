@@ -6,10 +6,7 @@ import type { PrivateInteropAddresses } from "../../src/core/types";
 import { executePrivateTokenTransfer } from "../../src/helpers/private-token-transfer";
 import { getAbi } from "../../src/core/contracts";
 import { encodeEvmChain, encodeEvmAddress } from "../../src/core/data-encoding";
-import {
-  ANVIL_DEFAULT_PRIVATE_KEY,
-  L1_CHAIN_ID,
-} from "../../src/core/const";
+import { ANVIL_DEFAULT_PRIVATE_KEY } from "../../src/core/const";
 
 describe("07 - Private Interop", function () {
   this.timeout(0);
@@ -121,7 +118,10 @@ describe("07 - Private Interop", function () {
     expect(messageData.slice(0, 4)).to.eq("0x02", "Message should start with PRIVATE_BUNDLE_IDENTIFIER (0x02)");
 
     // Total length: 1 (identifier) + 32 (hash) + 32 (callCount) = 65 bytes = 130 hex chars + 2 prefix
-    expect(messageData.length).to.eq(2 + 130, "Private message should be exactly 65 bytes (identifier + hash + callCount)");
+    expect(messageData.length).to.eq(
+      2 + 130,
+      "Private message should be exactly 65 bytes (identifier + hash + callCount)"
+    );
 
     // Extract callCount from the message (last 32 bytes, after 1-byte identifier + 32-byte hash)
     const callCountHex = "0x" + messageData.slice(2 + 2 + 64, 2 + 2 + 64 + 64);

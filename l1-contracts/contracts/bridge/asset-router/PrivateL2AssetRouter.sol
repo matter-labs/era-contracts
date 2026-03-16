@@ -4,8 +4,6 @@ pragma solidity 0.8.28;
 
 import {L2AssetRouter} from "./L2AssetRouter.sol";
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
-import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
-import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
 import {InteropRoute} from "../../common/Messaging.sol";
 import {EmptyAddress} from "../../common/L1ContractErrors.sol";
 
