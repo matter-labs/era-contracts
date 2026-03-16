@@ -474,7 +474,7 @@ contract InteropCenter is
             _totalBurnedCallsValue: totalBurnedCallsValue,
             _totalIndirectCallsValue: totalIndirectCallsValue,
             _useFixedFee: _bundleAttributes.useFixedFee,
-            _callStartersLength: callStartersLength
+            _callCount: callStartersLength
         });
 
         bytes memory interopBundleBytes = abi.encode(bundle);

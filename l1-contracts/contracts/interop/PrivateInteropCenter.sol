@@ -3,7 +3,8 @@
 pragma solidity ^0.8.24;
 
 import {InteropCenter} from "./InteropCenter.sol";
-import {PrivateInteropValueNotZero} from "./InteropErrors.sol";
+import {PrivateInteropValueNotZero, ZKTokenNotAvailable} from "./InteropErrors.sol";
+import {ZeroAddress} from "../common/L1ContractErrors.sol";
 
 import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
 
@@ -55,7 +56,14 @@ contract PrivateInteropCenter is InteropCenter {
     }
 
     /// @notice Private interop does not collect base-token value (no interopCallValue allowed).
-    function _handleValueCollection(uint256, bytes32, uint256, uint256, bool, uint256) internal override {
+    function _handleValueCollection(
+        uint256 /* _destinationChainId */,
+        bytes32 /* _destinationBaseTokenAssetId */,
+        uint256 /* _totalBurnedCallsValue */,
+        uint256 /* _totalIndirectCallsValue */,
+        bool /* _useFixedFee */,
+        uint256 /* _callCount */
+    ) internal override {
         // No base-token value collection for private interop.
     }
 
