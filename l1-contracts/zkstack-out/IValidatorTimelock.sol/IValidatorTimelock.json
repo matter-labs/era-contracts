@@ -595,12 +595,12 @@
         "internalType": "address"
       },
       {
-        "name": "_oldProtocolVersion",
+        "name": "_protocolVersion",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "_diamondCut",
+        "name": "_cutData",
         "type": "tuple",
         "internalType": "struct Diamond.DiamondCutData",
         "components": [
