@@ -52,20 +52,8 @@ pub fn error(msg: impl Display) {
     log::error(style(msg).red()).unwrap();
 }
 
-pub fn success(msg: impl Display) {
-    log::success(msg).unwrap();
-}
-
 pub fn step(msg: impl Display) {
     log::step(msg).unwrap();
-}
-
-pub fn raw(msg: impl Display) {
-    term_write(msg);
-}
-
-pub fn note(msg: impl Display, content: impl Display) {
-    cliclack::note(msg, content).unwrap();
 }
 
 pub fn error_note(msg: &str, content: &str) {

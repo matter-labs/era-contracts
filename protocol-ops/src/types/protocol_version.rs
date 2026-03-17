@@ -1,9 +1,5 @@
-use std::{convert::TryInto, fmt, str::FromStr};
-use ethers::types::U256;
+use std::{fmt, str::FromStr};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
-
-pub const PACKED_SEMVER_MINOR_OFFSET: u32 = 32;
-pub const PACKED_SEMVER_MINOR_MASK: u32 = 0xFFFF;
 
 /// Semantic protocol version.
 #[derive(
@@ -16,23 +12,6 @@ pub struct ProtocolSemanticVersion {
 
 impl ProtocolSemanticVersion {
     const MAJOR_VERSION: u8 = 0;
-
-    pub fn new(minor: u32, patch: u32) -> Self {
-        Self { minor, patch }
-    }
-
-    pub fn try_from_packed(packed: U256) -> Result<Self, String> {
-        let minor = ((packed >> U256::from(PACKED_SEMVER_MINOR_OFFSET))
-            & U256::from(PACKED_SEMVER_MINOR_MASK))
-        .try_into()?;
-        let patch = packed.0[0] as u32;
-        Ok(Self { minor, patch })
-    }
-
-    pub fn pack(&self) -> U256 {
-        (U256::from(self.minor as u16) << U256::from(PACKED_SEMVER_MINOR_OFFSET))
-            | U256::from(self.patch)
-    }
 }
 
 impl fmt::Display for ProtocolSemanticVersion {
