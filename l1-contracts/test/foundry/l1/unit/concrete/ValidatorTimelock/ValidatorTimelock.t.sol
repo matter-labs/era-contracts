@@ -290,10 +290,7 @@ contract ValidatorTimelockTest is Test {
             abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion, diamondCut)),
             ""
         );
-        vm.expectCall(
-            zkSync,
-            abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion, diamondCut))
-        );
+        vm.expectCall(zkSync, abi.encodeCall(IAdmin.upgradeChainFromVersion, (zkSync, oldProtocolVersion, diamondCut)));
 
         vm.prank(alice);
         validator.upgradeChainFromVersion(zkSync, oldProtocolVersion, diamondCut);
