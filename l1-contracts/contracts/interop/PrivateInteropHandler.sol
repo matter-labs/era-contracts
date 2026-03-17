@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 import {InteropHandler} from "./InteropHandler.sol";
 import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
 
-import {PRIVATE_BUNDLE_IDENTIFIER, InteropBundle} from "../common/Messaging.sol";
+import {PRIVATE_BUNDLE_IDENTIFIER, BundleStatus, InteropBundle, MessageInclusionProof} from "../common/Messaging.sol";
 
 /// @title PrivateInteropHandler
 /// @author Matter Labs
@@ -35,5 +35,13 @@ contract PrivateInteropHandler is InteropHandler {
     function _getBundleMessageData(bytes memory _bundle) internal pure override returns (bytes memory) {
         InteropBundle memory interopBundle = abi.decode(_bundle, (InteropBundle));
         return abi.encodePacked(PRIVATE_BUNDLE_IDENTIFIER, keccak256(_bundle), uint256(interopBundle.calls.length));
+    }
+
+    /// @notice Skip proof verification for private interop on pre-v31 chains.
+    /// @dev On chains without L2_MESSAGE_VERIFICATION, the standard verification reverts.
+    /// Private interop handlers deployed as user-space contracts trust the executor to provide valid bundles.
+    function _verifyBundle(bytes memory, MessageInclusionProof memory, bytes32 _bundleHash) internal override {
+        bundleStatus[_bundleHash] = BundleStatus.Verified;
+        emit BundleVerified(_bundleHash);
     }
 }

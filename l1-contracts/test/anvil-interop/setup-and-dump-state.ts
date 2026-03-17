@@ -6,7 +6,11 @@ import { execSync } from "child_process";
 import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { deployTestTokens } from "./src/helpers/deploy-test-token";
-import { deployPrivateInteropStack } from "./src/helpers/private-interop-deployer";
+import {
+  deployPrivateInteropStack,
+  registerRemoteRouters,
+  PRIVATE_DEPLOYER_KEY,
+} from "./src/helpers/private-interop-deployer";
 import { getChainIdsByRole } from "./src/core/utils";
 import { L1_CHAIN_ID } from "./src/core/const";
 import type { PrivateInteropAddresses } from "./src/core/types";
@@ -57,6 +61,13 @@ async function main(): Promise<void> {
           console.log(`  [chain ${chainId}] ${line}`)
         );
       }
+      // Cross-register remote router addresses so each chain knows the others' AssetRouter.
+      console.log("Registering remote routers...");
+      const chainsForRouters = gwSettledChainIds
+        .map((id) => stateAfterTokens.chains!.l2.find((c) => c.chainId === id))
+        .filter((c): c is { chainId: number; rpcUrl: string; port: number } => !!c);
+      await registerRemoteRouters(chainsForRouters, privateInteropAddresses, PRIVATE_DEPLOYER_KEY, console.log);
+
       const s = runner.loadState();
       s.privateInteropAddresses = privateInteropAddresses;
       runner.saveState(s);

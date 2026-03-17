@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {L2AssetRouter} from "./L2AssetRouter.sol";
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {InteropRoute} from "../../common/Messaging.sol";
-import {EmptyAddress} from "../../common/L1ContractErrors.sol";
+import {EmptyAddress, Unauthorized} from "../../common/L1ContractErrors.sol";
 
 /// @title PrivateL2AssetRouter
 /// @author Matter Labs
@@ -16,6 +16,10 @@ contract PrivateL2AssetRouter is L2AssetRouter {
     address private _privateNtv;
     address private _privateInteropCenter;
     address private _privateInteropHandler;
+
+    /// @notice Maps destination chain ID to the PrivateL2AssetRouter address on that chain.
+    /// Required when private interop contracts have different addresses across chains.
+    mapping(uint256 chainId => address router) public remoteRouterAddress;
 
     /// @notice Initializes the private asset router.
     function initialize(
@@ -43,6 +47,13 @@ contract PrivateL2AssetRouter is L2AssetRouter {
         _transferOwnership(msg.sender);
     }
 
+    /// @notice Registers the PrivateL2AssetRouter address on a remote chain.
+    /// @param _chainId The destination chain ID.
+    /// @param _router The PrivateL2AssetRouter address on that chain.
+    function setRemoteRouter(uint256 _chainId, address _router) external onlyOwner {
+        remoteRouterAddress[_chainId] = _router;
+    }
+
     function _nativeTokenVaultAddr() internal view override returns (address) {
         return _privateNtv;
     }
@@ -59,7 +70,19 @@ contract PrivateL2AssetRouter is L2AssetRouter {
         return InteropRoute.Private;
     }
 
-    function _l2AssetRouterAddress() internal view override returns (address) {
-        return address(this);
+    /// @notice Returns the AssetRouter address on the destination chain.
+    /// If a remote router is registered for that chain, returns it.
+    /// Otherwise falls back to address(this) (works when all chains share the same address).
+    function _l2AssetRouterAddress(uint256 _destinationChainId) internal view override returns (address) {
+        address remote = remoteRouterAddress[_destinationChainId];
+        require(remote != address(0), EmptyAddress());
+        return remote;
+    }
+
+    /// @notice Accepts messages from registered remote AssetRouters in addition to self.
+    function _validateAssetRouterCounterpart(uint256 _senderChainId, address _senderAddress) internal view override {
+        if (_senderAddress == address(this)) return;
+        address registered = remoteRouterAddress[_senderChainId];
+        require(registered != address(0) && registered == _senderAddress, Unauthorized(_senderAddress));
     }
 }

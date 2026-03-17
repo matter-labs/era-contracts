@@ -422,11 +422,10 @@ contract InteropCenter is
         BundleAttributes memory _bundleAttributes,
         bytes[][] memory _originalCallAttributes
     ) internal returns (bytes32 bundleHash) {
-        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
+        _validateGatewayMode();
 
         // Form an InteropBundle.
-        bytes32 destinationBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
-        require(destinationBaseTokenAssetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
+        bytes32 destinationBaseTokenAssetId = _getDestinationBaseTokenAssetId(_destinationChainId);
         InteropBundle memory bundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: block.chainid,
@@ -493,6 +492,18 @@ contract InteropCenter is
 
         // Emit event stating that the bundle was sent out successfully.
         emit InteropBundleSent(msgHash, bundleHash, bundle);
+    }
+
+    /// @notice Validates that we're in gateway mode. Override in private interop for pre-v31 chains.
+    function _validateGatewayMode() internal view virtual {
+        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
+    }
+
+    /// @notice Returns the base token asset ID for the destination chain. Override for pre-v31 chains.
+    function _getDestinationBaseTokenAssetId(uint256 _destinationChainId) internal view virtual returns (bytes32) {
+        bytes32 assetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
+        require(assetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
+        return assetId;
     }
 
     /// @notice Validates a single call starter's interopCallValue. Override in private interop to reject value > 0.

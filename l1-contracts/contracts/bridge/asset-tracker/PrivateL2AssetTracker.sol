@@ -35,6 +35,12 @@ contract PrivateL2AssetTracker is L2AssetTracker {
         // No-op: private interop has its own asset tracking lifecycle.
     }
 
+    /// @notice Private interop does not use L2ChainAssetHandler for migration numbers.
+    /// Returns 0 to avoid calling a system contract that may not exist on pre-v31 chains.
+    function _getChainMigrationNumber(uint256 /* _chainId */) internal pure override returns (uint256) {
+        return 0;
+    }
+
     /// @notice Override to use the private NTV instead of the hardcoded system NTV.
     /// The base L2AssetTracker uses L2_NATIVE_TOKEN_VAULT directly, which doesn't
     /// know about tokens bridged through the private interop stack.

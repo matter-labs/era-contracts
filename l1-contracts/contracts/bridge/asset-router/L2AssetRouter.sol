@@ -106,6 +106,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         return InteropRoute.Public;
     }
 
+    /// @notice Validates that an interop message sender is an authorized AssetRouter counterpart.
+    /// @dev By default, only accepts messages from the same address (all system AssetRouters share one address).
+    /// Override in PrivateL2AssetRouter to accept registered remote routers.
+    function _validateAssetRouterCounterpart(uint256 _senderChainId, address _senderAddress) internal view virtual {
+        require((_senderChainId != L1_CHAIN_ID && _senderAddress == address(this)), Unauthorized(_senderAddress));
+    }
+
     /// @notice Enforces that an asset uses a consistent interop route.
     function _enforceRoute(bytes32 _assetId) internal {
         InteropRoute expected = _expectedInteropRoute();
@@ -294,7 +301,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
 
         (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
 
-        require((senderChainId != L1_CHAIN_ID && senderAddress == address(this)), Unauthorized(senderAddress));
+        _validateAssetRouterCounterpart(senderChainId, senderAddress);
 
         // The payload must contain a valid finalizeDeposit selector to ensure only legitimate
         // bridge operations are executed. This prevents arbitrary function calls through the interop system.

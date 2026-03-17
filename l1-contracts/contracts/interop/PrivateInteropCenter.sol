@@ -20,6 +20,10 @@ contract PrivateInteropCenter is InteropCenter {
     address private _privateAssetRouter;
     address private _privateNtv;
 
+    /// @notice Configurable base token asset IDs for destination chains.
+    /// Used on pre-v31 chains where L2Bridgehub doesn't know about other chains.
+    mapping(uint256 chainId => bytes32 assetId) public destinationBaseTokenAssetIds;
+
     /// @notice Initializes the private interop center.
     function initialize(
         uint256 _l1ChainId,
@@ -40,6 +44,12 @@ contract PrivateInteropCenter is InteropCenter {
         L1_CHAIN_ID = _l1ChainId;
         ZK_INTEROP_FEE = 10e18;
         _transferOwnership(_owner);
+    }
+
+    /// @notice Registers a destination chain's base token asset ID.
+    /// @dev Only needed on pre-v31 chains where L2Bridgehub.baseTokenAssetId() returns 0.
+    function setDestinationBaseTokenAssetId(uint256 _chainId, bytes32 _assetId) external onlyOwner {
+        destinationBaseTokenAssetIds[_chainId] = _assetId;
     }
 
     function _assetRouterAddr() internal view override returns (address) {
@@ -65,6 +75,21 @@ contract PrivateInteropCenter is InteropCenter {
         uint256 /* _callCount */
     ) internal override {
         // No base-token value collection for private interop.
+    }
+
+    /// @notice Skip gateway mode check — private interop works on any chain.
+    function _validateGatewayMode() internal view override {
+        // No-op: private interop doesn't require gateway mode.
+    }
+
+    /// @notice Returns destination base token asset ID from local mapping or falls back to L2Bridgehub.
+    function _getDestinationBaseTokenAssetId(uint256 _destinationChainId) internal view override returns (bytes32) {
+        bytes32 assetId = destinationBaseTokenAssetIds[_destinationChainId];
+        if (assetId != bytes32(0)) {
+            return assetId;
+        }
+        // Fall back to the default behavior
+        return super._getDestinationBaseTokenAssetId(_destinationChainId);
     }
 
     /// @notice Sends only hash + callCount to L1 instead of full bundle data.
