@@ -43,16 +43,6 @@ pub enum L1Network {
 }
 
 impl L1Network {
-    #[must_use]
-    pub fn chain_id(&self) -> u64 {
-        match self {
-            L1Network::Localhost => 9,
-            L1Network::Sepolia => 11_155_111,
-            L1Network::Holesky => 17000,
-            L1Network::Mainnet => 1,
-        }
-    }
-
     /// Look up the Avail L1 DA validator address for this network from configs/da.yaml.
     pub fn avail_l1_da_validator_addr(&self) -> Option<Address> {
         let key = match self {

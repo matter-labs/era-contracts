@@ -12,17 +12,12 @@ use crate::common::logger;
 pub struct AnvilInstance {
     child: Child,
     rpc_url: String,
-    port: u16,
 }
 
 impl AnvilInstance {
     /// The local RPC URL for this anvil instance.
     pub fn rpc_url(&self) -> &str {
         &self.rpc_url
-    }
-
-    pub fn port(&self) -> u16 {
-        self.port
     }
 }
 
@@ -72,7 +67,6 @@ pub fn start_anvil_fork(fork_url: &str) -> anyhow::Result<AnvilInstance> {
     Ok(AnvilInstance {
         child,
         rpc_url,
-        port,
     })
 }
 

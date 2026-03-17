@@ -251,8 +251,6 @@ pub async fn ctm_init<'a>(
     Ok(CtmInitOutput {
         deploy_output,
         ctm_proxy,
-        governance,
-        chain_admin,
     })
 }
 
@@ -276,6 +274,4 @@ pub struct CtmInitInput {
 pub struct CtmInitOutput {
     pub deploy_output: DeployCTMOutput,
     pub ctm_proxy: Address,
-    pub governance: Address,
-    pub chain_admin: Address,
 }

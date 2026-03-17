@@ -1,12 +1,10 @@
 
 use ethers::{
-    abi::{decode, Abi, ParamType, Token},
+    abi::{decode, ParamType},
     types::{Address, U256},
     utils::hex,
 };
 use serde::Serialize;
-
-use crate::abi::CHAINADMINOWNABLEABI_ABI as CHAIN_ADMIN_OWNABLE_ABI;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct AdminCall {
@@ -53,77 +51,10 @@ pub(crate) fn decode_admin_calls(encoded_calls: &[u8]) -> anyhow::Result<Vec<Adm
     Ok(calls)
 }
 
-impl AdminCall {
-    fn into_token(self) -> Token {
-        let Self {
-            target,
-            data,
-            value,
-            ..
-        } = self;
-        Token::Tuple(vec![
-            Token::Address(target),
-            Token::Uint(value),
-            Token::Bytes(data),
-        ])
-    }
-}
-
 fn serialize_hex<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: serde::Serializer,
 {
     let hex_string = format!("0x{}", hex::encode(bytes));
     serializer.serialize_str(&hex_string)
-}
-
-#[derive(Debug, Clone)]
-pub struct AdminCallBuilder {
-    calls: Vec<AdminCall>,
-    chain_admin_abi: Abi,
-}
-
-impl AdminCallBuilder {
-    pub fn new(calls: Vec<AdminCall>) -> Self {
-        Self {
-            calls,
-            chain_admin_abi: CHAIN_ADMIN_OWNABLE_ABI.clone(),
-        }
-    }
-
-    pub fn extend_with_calls(&mut self, calls: Vec<AdminCall>) {
-        self.calls.extend(calls);
-    }
-
-    pub fn to_json_string(&self) -> String {
-        // Serialize with pretty printing
-        serde_json::to_string_pretty(&self.calls).unwrap()
-    }
-
-    pub fn display(&self) {
-        // Serialize with pretty printing
-        let serialized = serde_json::to_string_pretty(&self.calls).unwrap();
-
-        // Output the serialized JSON
-        println!("{}", serialized);
-    }
-
-    pub fn compile_full_calldata(self) -> (Vec<u8>, U256) {
-        let mut sum = U256::zero();
-        let mut tokens = vec![];
-
-        for call in self.calls {
-            sum += call.value;
-            tokens.push(call.into_token());
-        }
-
-        let data = self
-            .chain_admin_abi
-            .function("multicall")
-            .unwrap()
-            .encode_input(&[Token::Array(tokens), Token::Bool(true)])
-            .unwrap();
-
-        (data.to_vec(), sum)
-    }
 }

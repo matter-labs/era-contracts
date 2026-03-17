@@ -8,7 +8,6 @@ pub mod ethereum;
 pub mod files;
 pub mod forge;
 pub mod paths;
-pub mod system_contracts;
 pub mod traits;
 pub mod versions;
 pub mod wallets;

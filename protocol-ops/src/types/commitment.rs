@@ -96,18 +96,3 @@ impl TryFrom<(Option<Address>, Option<L2DACommitmentScheme>)> for L2PubdataValid
     }
 }
 
-impl L2PubdataValidator {
-    pub fn l2_da_validator(&self) -> Option<Address> {
-        match self {
-            L2PubdataValidator::Address(addr) => Some(*addr),
-            L2PubdataValidator::CommitmentScheme(_) => None,
-        }
-    }
-
-    pub fn l2_da_commitment_scheme(&self) -> Option<L2DACommitmentScheme> {
-        match self {
-            L2PubdataValidator::Address(_) => None,
-            L2PubdataValidator::CommitmentScheme(scheme) => Some(*scheme),
-        }
-    }
-}

@@ -17,8 +17,8 @@ pub struct NewChainParams {
     pub owner: Address,
     pub commit_operator: Address,
     pub prove_operator: Address,
-    pub execute_operator: Option<Address>,
-    pub token_multiplier_setter: Option<Address>,
+    pub _execute_operator: Option<Address>,
+    pub _token_multiplier_setter: Option<Address>,
     pub da_mode: DAValidatorType,
 }
 

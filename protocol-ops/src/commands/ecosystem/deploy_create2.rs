@@ -43,7 +43,7 @@ pub struct DeployCreate2Args {
 pub async fn run(args: DeployCreate2Args, shell: &Shell) -> anyhow::Result<()> {
     let foundry_scripts_path = paths::path_from_root("l1-contracts");
 
-    let (auth, sender, execution_mode) =
+    let (auth, _sender, execution_mode) =
         resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
 
     let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));

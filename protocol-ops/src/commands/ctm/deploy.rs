@@ -68,8 +68,8 @@ pub struct CtmDeployArgs {
 
     // Advanced input
     /// VM type: zksyncos (default) or eravm
-    #[clap(long, default_value = "zksyncos", help_heading = "Advanced input")]
-    pub vm_type: String,
+    #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM, help_heading = "Advanced input")]
+    pub vm_type: VMOption,
     /// Reuse governance and admin contracts from hub (default: true)
     #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub reuse_gov_and_admin: bool,
@@ -97,12 +97,6 @@ pub struct CtmDeployArgs {
 pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
     let foundry_scripts_path = paths::path_from_root("l1-contracts");
 
-    let vm_type = match args.vm_type.to_lowercase().as_str() {
-        "eravm" | "era" => VMOption::EraVM,
-        "zksyncos" | "zksync" | "zksync-os" => VMOption::ZKSyncOsVM,
-        _ => anyhow::bail!("Invalid VM type '{}'. Use 'zksyncos' or 'eravm'", args.vm_type),
-    };
-
     let (auth, sender, execution_mode) =
         resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
     let owner = args.owner.unwrap_or(sender);
@@ -126,7 +120,7 @@ pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
     let input = CtmDeployInput {
         bridgehub: args.bridgehub,
         owner,
-        vm_type,
+        vm_type: args.vm_type,
         reuse_gov_and_admin: args.reuse_gov_and_admin,
         with_testnet_verifier: args.with_testnet_verifier,
         with_legacy_bridge: args.with_legacy_bridge,

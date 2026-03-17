@@ -210,14 +210,13 @@ pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
         owner,
         commit_operator: args.commit_operator,
         prove_operator: args.prove_operator,
-        execute_operator: args.execute_operator,
-        token_multiplier_setter: args.token_multiplier_setter,
+        _execute_operator: args.execute_operator,
+        _token_multiplier_setter: args.token_multiplier_setter,
         da_mode: args.da_mode,
     };
 
     let init_input = ChainInitInput {
         ctm_proxy: args.ctm_proxy,
-        bridgehub,
         l1_da_validator: args.l1_da_validator,
         chain_params: chain_params.clone(),
         with_legacy_bridge: args.with_legacy_bridge,
@@ -654,7 +653,6 @@ fn setup_legacy_bridge_step(
 #[derive(Debug, Clone)]
 pub struct ChainInitInput {
     pub ctm_proxy: Address,
-    pub bridgehub: Address,
     pub l1_da_validator: Address,
     pub chain_params: NewChainParams,
     pub with_legacy_bridge: bool,

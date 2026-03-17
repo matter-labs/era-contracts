@@ -76,12 +76,6 @@ impl<'a> Cmd<'a> {
         }
     }
 
-    /// Run the command printing the output to the console.
-    pub fn with_force_run(mut self) -> Self {
-        self.force_run = true;
-        self
-    }
-
     pub fn with_piped_std_err(mut self) -> Self {
         self.piped_std_err = true;
         self
@@ -122,24 +116,6 @@ impl<'a> Cmd<'a> {
         Ok(())
     }
 
-    /// Run the command and return its output.
-    pub fn run_with_output(&mut self) -> CmdResult<std::process::Output> {
-        if global_config().verbose || self.force_run {
-            logger::debug(format!("Running: {}", self.inner));
-            logger::new_empty_line();
-        }
-
-        self.inner.set_ignore_status(true);
-        let output = self.inner.output()?;
-
-        if global_config().verbose || self.force_run {
-            logger::raw(log_output(&output));
-            logger::new_empty_line();
-            logger::new_line();
-        }
-
-        Ok(output)
-    }
 }
 
 fn check_output_status(command_text: &str, output: &std::process::Output) -> CmdResult<()> {

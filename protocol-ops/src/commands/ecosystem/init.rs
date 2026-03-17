@@ -207,25 +207,6 @@ pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
     Ok(())
 }
 
-// ── Internal structs ────────────────────────────────────────────────────────
-
-/// Input parameters for ecosystem init.
-#[derive(Debug, Clone)]
-pub struct EcosystemInitInput {
-    pub owner: Address,
-    pub era_chain_id: u64,
-    pub vm_type: VMOption,
-    pub with_testnet_verifier: bool,
-    pub with_legacy_bridge: bool,
-}
-
-/// Output from ecosystem init.
-#[derive(Debug, Clone)]
-pub struct EcosystemInitOutput {
-    pub hub_output: DeployL1CoreContractsOutput,
-    pub ctm_output: CtmInitOutput,
-}
-
 // ── Output structs ──────────────────────────────────────────────────────────
 
 #[derive(Serialize)]
