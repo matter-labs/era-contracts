@@ -50,6 +50,13 @@ struct Opt {
     #[structopt(long = "variant", default_value = "custom")]
     variant: Variant,
 
+    /// Contract name prefix to use with custom variant.
+    #[structopt(
+        long = "contract_name_prefix",
+        default_value = ""
+    )]
+    contract_name_prefix: String,
+
     /// Input path to scheduler verification key file.
     #[structopt(
         long = "plonk_input_path",
@@ -97,11 +104,11 @@ fn resolve_paths(opt: &Opt) -> (String, String, String, String) {
     }
 }
 
-fn resolve_contract_name(variant: &Variant) -> String {
-    match variant {
+fn resolve_contract_name(opt: &Opt) -> String {
+    match opt.variant {
         Variant::Era => "Era".to_string(),
         Variant::ZKsyncOS => "ZKsyncOS".to_string(),
-        Variant::Custom => "".to_string(),
+        Variant::Custom => opt.contract_name_prefix.clone(),
     }
 }
 
@@ -109,7 +116,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
 
     let (plonk_input_path, fflonk_input_path, plonk_output_path, fflonk_output_path) = resolve_paths(&opt);
-    let contract_name = resolve_contract_name(&opt.variant);
+    let contract_name = resolve_contract_name(&opt);
 
     let plonk_reader = BufReader::new(File::open(&plonk_input_path)?);
     let fflonk_reader = BufReader::new(File::open(&fflonk_input_path)?);
