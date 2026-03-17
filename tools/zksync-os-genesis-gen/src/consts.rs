@@ -91,6 +91,10 @@ pub const L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR: Address = Address(FixedBytes::<20>
     hex_literal::hex!("000000000000000000000000000000000000800a"),
 ));
 
+pub const L2_SYSTEM_CONTEXT_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "000000000000000000000000000000000000800b"
+)));
+
 // keccak256("L2_COMPLEX_UPGRADER_IMPL_ADDR") - 1.
 // We need it predeployed to make the genesis upgrade work at all.
 pub const L2_COMPLEX_UPGRADER_IMPL_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
@@ -112,7 +116,7 @@ const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::h
     "0000000000000000000000000000000000010009"
 )));
 
-pub const INITIAL_CONTRACTS: [(Address, ContractSource); 22] = [
+pub const INITIAL_CONTRACTS: [(Address, ContractSource); 23] = [
     (
         L2_COMPLEX_UPGRADER_ADDR,
         ContractSource::L1ContractName("SystemContractProxy"),
@@ -189,6 +193,10 @@ pub const INITIAL_CONTRACTS: [(Address, ContractSource); 22] = [
     (
         L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
         ContractSource::L1ContractName("L2BaseTokenZKOS"),
+    ),
+    (
+        L2_SYSTEM_CONTEXT_ADDR,
+        ContractSource::L1ContractName("SystemContext"),
     ),
     // Deterministic Create2 factory
     (
