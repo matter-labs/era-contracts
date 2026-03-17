@@ -121,6 +121,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         setPendingAdmin();
 
         if (config.initializeLegacyBridge) {
+            unpauseDeposits();
             deployLegacySharedBridge();
         }
 
@@ -169,16 +170,12 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
             config.validatorSenderOperatorExecute = address(0);
         }
 
-        if (vm.keyExistsToml(toml, "$.chain.initialize_legacy_bridge")) {
-            config.initializeLegacyBridge = toml.readBool("$.chain.initialize_legacy_bridge");
+        if (vm.keyExistsToml(toml, "$.initialize_legacy_bridge")) {
+            config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
         }
 
-        if (vm.keyExistsToml(toml, "$.chain.l1_erc20_bridge")) {
-            config.l1Erc20Bridge = toml.readAddress("$.chain.l1_erc20_bridge");
-        }
-        if (vm.keyExistsToml(toml, "$.chain.l1_shared_bridge_proxy")) {
-            config.l1SharedBridgeProxy = toml.readAddress("$.chain.l1_shared_bridge_proxy");
-        }
+        config.l1Erc20Bridge = coreAddresses.bridges.proxies.erc20Bridge;
+        config.l1SharedBridgeProxy = coreAddresses.bridges.proxies.l1AssetRouter;
 
         // Read create2 factory values from permanent values file
         (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(vm);
@@ -487,6 +484,15 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         zkChain.setPendingAdmin(output.chainAdmin);
         vm.stopBroadcast();
         console.log("Owner for ", output.diamondProxy, "set to", output.chainAdmin);
+    }
+
+    function unpauseDeposits() internal {
+        IZKChain zkChain = IZKChain(output.diamondProxy);
+        if (zkChain.depositsPaused()) {
+            vm.broadcast(msg.sender);
+            zkChain.unpauseDeposits();
+            console.log("Deposits unpaused");
+        }
     }
 
     function deployChainProxyAddress() internal {

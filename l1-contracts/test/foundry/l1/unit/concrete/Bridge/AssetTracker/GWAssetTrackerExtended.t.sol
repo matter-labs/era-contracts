@@ -6,14 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 
-import {
-    BalanceChange,
-    MigrationConfirmationData,
-    L2Log,
-    TxStatus,
-    InteropBundle,
-    InteropCall
-} from "contracts/common/Messaging.sol";
+import {BalanceChange, MigrationConfirmationData, L2Log, TxStatus} from "contracts/common/Messaging.sol";
 import {
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
@@ -34,12 +27,7 @@ import {
     L2_INTEROP_CENTER_ADDR as INTEROP_CENTER_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
-import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
-
-import {
-    BALANCE_CHANGE_VERSION,
-    INTEROP_BALANCE_CHANGE_VERSION
-} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
 import {
@@ -65,7 +53,6 @@ import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailb
 import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
@@ -367,12 +354,7 @@ contract GWAssetTrackerExtendedTest is Test {
 
         vm.prank(mockZKChain);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                InvalidBuiltInContractMessage.selector,
-                uint256(0),
-                uint256(0),
-                bytes32(uint256(uint160(address(L2_INTEROP_HANDLER_ADDR))))
-            )
+            abi.encodeWithSelector(InvalidFunctionSignature.selector, IInteropHandler.verifyBundle.selector)
         );
         gwAssetTracker.processLogsAndMessages(input);
     }

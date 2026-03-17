@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use alloy::primitives::{Address, FixedBytes, B256};
+use alloy::primitives::{Address, B256, FixedBytes};
 
 use blake2::{Blake2s256, Digest};
 
@@ -78,8 +78,6 @@ pub struct Genesis {
     pub initial_genesis: InitialGenesisInput,
     pub genesis_root: B256,
     pub protocol_semantic_version: ProtocolVersion,
-    /// Execution version used for genesis.
-    pub execution_version: u32,
     #[serde(flatten)]
     pub other: serde_json::Value,
 }

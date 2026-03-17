@@ -11,6 +11,8 @@ error BundleAlreadyProcessed(bytes32 bundleHash);
 error CallAlreadyExecuted(bytes32 bundleHash, uint256 callIndex);
 // 0xc087b727
 error CallNotExecutable(bytes32 bundleHash, uint256 callIndex);
+// 0xf36a88e5
+error CannotClaimInteropOnL1Settlement();
 // 0xf729f26d
 error CanNotUnbundle(bytes32 bundleHash);
 // 0x2d159f39
@@ -25,12 +27,12 @@ error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 // 0x884f49ba
 error InteroperableAddressNotEmpty(bytes interoperableAddress);
+// 0x2d48e8cf
+error InteropRootAlreadyExists();
 // 0xeae192ef
 error InvalidInteropBundleVersion();
 // 0xd5f13973
 error InvalidInteropCallVersion();
-// 0x2d48e8cf
-error InteropRootAlreadyExists();
 // 0x32c2e156
 error MessageNotIncluded();
 // 0x2f59bd0d
@@ -41,10 +43,10 @@ error UnauthorizedMessageSender(address expected, address actual);
 error UnbundlingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes unbundlerAddress);
 // 0x801534e9
 error WrongCallStatusLength(uint256 bundleCallsLength, uint256 providedCallStatusLength);
-// 0x4534e972
-error WrongDestinationChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
 // 0xb99d46dc
 error WrongDestinationBaseTokenAssetId(bytes32 bundleHash, bytes32 expected, bytes32 actual);
+// 0x4534e972
+error WrongDestinationChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
 // 0x534ab1b2
 error WrongSourceChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
 // 0x92196069

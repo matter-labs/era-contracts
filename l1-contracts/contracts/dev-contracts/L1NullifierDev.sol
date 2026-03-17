@@ -4,13 +4,11 @@ pragma solidity 0.8.28;
 
 import {IL1Bridgehub, L1Nullifier} from "../bridge/L1Nullifier.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
-import {IInteropCenter} from "../interop/IInteropCenter.sol";
 
 contract L1NullifierDev is L1Nullifier {
     constructor(
         IL1Bridgehub _bridgehub,
         IMessageRootBase _messageRoot,
-        IInteropCenter _interopCenter,
         uint256 _eraChainId,
         address _eraDiamondProxy
     ) L1Nullifier(_bridgehub, _messageRoot, _eraChainId, _eraDiamondProxy) {}
