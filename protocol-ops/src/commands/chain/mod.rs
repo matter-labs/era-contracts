@@ -1,5 +1,4 @@
 use clap::Subcommand;
-use xshell::Shell;
 
 use crate::commands::chain::{
     init::ChainInitArgs,
@@ -19,9 +18,9 @@ pub enum ChainCommands {
     Upgrade(ChainUpgradeArgs),
 }
 
-pub(crate) async fn run(shell: &Shell, args: ChainCommands) -> anyhow::Result<()> {
+pub(crate) async fn run(args: ChainCommands) -> anyhow::Result<()> {
     match args {
-        ChainCommands::Init(args) => init::run(args, shell).await,
-        ChainCommands::Upgrade(args) => upgrade::run(args, shell).await,
+        ChainCommands::Init(args) => init::run(args).await,
+        ChainCommands::Upgrade(args) => upgrade::run(args).await,
     }
 }

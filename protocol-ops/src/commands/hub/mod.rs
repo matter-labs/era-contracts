@@ -1,5 +1,4 @@
 use clap::Subcommand;
-use xshell::Shell;
 
 use crate::commands::hub::{
     init::HubInitArgs,
@@ -21,9 +20,9 @@ pub enum HubCommands {
     Upgrade(HubUpgradeArgs),
 }
 
-pub(crate) async fn run(shell: &Shell, args: HubCommands) -> anyhow::Result<()> {
+pub(crate) async fn run(args: HubCommands) -> anyhow::Result<()> {
     match args {
-        HubCommands::Init(args) => init::run(args, shell).await,
-        HubCommands::Upgrade(args) => upgrade::run(args, shell).await,
+        HubCommands::Init(args) => init::run(args).await,
+        HubCommands::Upgrade(args) => upgrade::run(args).await,
     }
 }

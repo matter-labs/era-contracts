@@ -60,12 +60,6 @@ pub const REGISTER_CHAIN_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
     script_path: "deploy-scripts/ctm/RegisterZKChain.s.sol",
 };
 
-pub const DEPLOY_ERC20_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
-    input: "script-config/config-deploy-erc20.toml",
-    output: "script-out/output-deploy-erc20.toml",
-    script_path: "deploy-scripts/tokens/DeployErc20.s.sol",
-};
-
 pub const DEPLOY_PAYMASTER_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
     input: "script-config/config-deploy-paymaster.toml",
     output: "script-out/output-deploy-paymaster.toml",

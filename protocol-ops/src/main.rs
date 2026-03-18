@@ -77,10 +77,10 @@ async fn run_subcommand(cli_args: ProtocolOps) -> anyhow::Result<()> {
     versions::check_versions(&shell);
 
     match cli_args.command {
-        ProtocolOpsSubcommands::Ecosystem(args) => commands::ecosystem::run(&shell, *args).await?,
-        ProtocolOpsSubcommands::Chain(args) => commands::chain::run(&shell, *args).await?,
-        ProtocolOpsSubcommands::Hub(args) => commands::hub::run(&shell, *args).await?,
-        ProtocolOpsSubcommands::Ctm(args) => commands::ctm::run(&shell, *args).await?,
+        ProtocolOpsSubcommands::Ecosystem(args) => commands::ecosystem::run(*args).await?,
+        ProtocolOpsSubcommands::Chain(args) => commands::chain::run(*args).await?,
+        ProtocolOpsSubcommands::Hub(args) => commands::hub::run(*args).await?,
+        ProtocolOpsSubcommands::Ctm(args) => commands::ctm::run(*args).await?,
     }
     Ok(())
 }

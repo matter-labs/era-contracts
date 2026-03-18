@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::Parser;
 use ethers::{
@@ -10,7 +10,6 @@ use ethers::{
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use tokio::task::block_in_place;
-use xshell::Shell;
 
 use crate::abi::{
     IDEPLOYL2CONTRACTSABI_ABI, IDEPLOYPAYMASTERABI_ABI, IENABLEEVMEMULATORABI_ABI,
@@ -22,12 +21,10 @@ use crate::admin_functions::{
 use crate::commands::output::CommandEnvelope;
 use crate::common::{
     ethereum::get_ethers_provider,
-    forge::{
-        resolve_execution, resolve_owner_auth, resolve_secondary_auth, ExecutionMode, Forge,
-        ForgeArgs, ForgeContext, ForgeRunner, ForgeScriptArgs, SenderAuth,
-    },
+    forge::{Forge, ForgeRunner, ForgeScriptArgs},
     logger,
     traits::{FileConfigTrait, ReadConfig, SaveConfig},
+    wallets::Wallet,
 };
 use crate::config::{
     forge_interface::{
@@ -48,7 +45,6 @@ use crate::config::{
     }
 };
 use crate::types::{DAValidatorType, L2ChainId, L2DACommitmentScheme, VMOption};
-use crate::common::paths;
 
 lazy_static! {
     static ref REGISTER_CHAIN_FUNCTIONS: BaseContract = BaseContract::from(IREGISTERZKCHAINABI_ABI.clone());
@@ -163,51 +159,35 @@ pub struct ChainInitArgs {
     // Forge options
     #[clap(flatten)]
     #[serde(flatten)]
-    pub forge_args: ForgeArgs,
+    pub forge_args: ForgeScriptArgs,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
 
-pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
-    let foundry_scripts_path = paths::path_from_root("l1-contracts");
-
+pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
     let (price_ratio_num, price_ratio_den) = parse_ratio(&args.base_token_price_ratio)?;
 
-    let (sender_auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
-    let owner = args.owner.unwrap_or(sender);
-    let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
+    let deployer = Wallet::parse(args.private_key, args.sender)?;
+    let mut runner = ForgeRunner::new(args.simulate, &args.l1_rpc_url, args.forge_args.clone())?;
 
-    let owner_auth = resolve_owner_auth(
-        owner, args.owner_private_key, sender, &sender_auth, is_simulation,
-    )?;
+    let owner = Wallet::resolve(args.owner, args.owner_private_key, &deployer)?;
 
-    let bridgehub_admin_auth = resolve_secondary_auth(
-        args.bridgehub_admin_private_key,
-        "Bridgehub admin (for chain registration)",
-        &sender_auth,
-    )?;
+    let bridgehub_admin = if let Some(pk) = args.bridgehub_admin_private_key {
+        Wallet::parse(Some(pk), None)?
+    } else {
+        deployer.clone()
+    };
 
-    if is_simulation {
-        logger::info(format!("Simulation mode: forking {} via anvil", args.l1_rpc_url));
-    }
-
-    let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
-
-    // Derive bridgehub address from CTM proxy
     logger::info(format!("Querying bridgehub from CTM proxy {:#x}...", args.ctm_proxy));
-    let bridgehub = query_bridgehub(effective_rpc, args.ctm_proxy)?;
+    let bridgehub = query_bridgehub(&runner.rpc_url, args.ctm_proxy)?;
     logger::info(format!("Bridgehub: {:#x}", bridgehub));
 
-    let mut runner = ForgeRunner::new();
-
-    // Build chain params
     let chain_params = NewChainParams {
         chain_id: L2ChainId::from(args.chain_id as u32),
         base_token_addr: args.base_token_addr,
         base_token_gas_price_multiplier_numerator: price_ratio_num,
         base_token_gas_price_multiplier_denominator: price_ratio_den,
-        owner,
+        owner: owner.address,
         commit_operator: args.commit_operator,
         prove_operator: args.prove_operator,
         _execute_operator: args.execute_operator,
@@ -215,166 +195,40 @@ pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
         da_mode: args.da_mode,
     };
 
-    let init_input = ChainInitInput {
+    let input = ChainInitInput {
         ctm_proxy: args.ctm_proxy,
+        bridgehub,
         l1_da_validator: args.l1_da_validator,
-        chain_params: chain_params.clone(),
+        chain_params,
+        vm_type: args.vm_type,
         with_legacy_bridge: args.with_legacy_bridge,
         create2_factory_addr: args.create2_factory_addr,
         create2_factory_salt: args.create2_factory_salt,
+        pause_deposits: args.pause_deposits,
+        evm_emulator: args.evm_emulator,
+        deploy_paymaster: args.deploy_paymaster,
+        make_permanent_rollup: args.make_permanent_rollup,
+        skip_priority_txs: args.skip_priority_txs,
+        governance_addr: args.governance_addr,
     };
 
-    // Step 1: Register chain (as bridgehub admin)
-    logger::info(format!("Initializing chain {} ...", args.chain_id));
-    logger::info(format!("Owner: {:#x}", owner));
+    logger::step(format!("Initializing chain {} on CTM...", args.chain_id));
     logger::info(format!("CTM proxy: {:#x}", args.ctm_proxy));
 
-    let register_output = {
-        let mut ctx = ForgeContext {
-            shell,
-            foundry_scripts_path: foundry_scripts_path.as_path(),
-            runner: &mut runner,
-            forge_args: &args.forge_args.script,
-            l1_rpc_url: effective_rpc,
-            auth: &bridgehub_admin_auth,
-        };
-        register_chain(&mut ctx, &init_input)?
-    };
+    let full_output = chain_init(&mut runner, &deployer, &owner, &bridgehub_admin, &input).await?;
 
-    let diamond_proxy = register_output.diamond_proxy_addr;
-    let chain_admin = register_output.chain_admin_addr;
-    let mut full_output = FullChainInitOutput::from_register(&register_output);
-    logger::info("Chain registered.");
-    logger::info(format!("  Diamond proxy: {:#x}", diamond_proxy));
-    logger::info(format!("  ChainAdmin:    {:#x}", chain_admin));
-
-    // Step 2: Accept admin of chain (as owner)
-    logger::info("Accepting admin of chain...");
-    let owner_wallet = owner_auth.to_wallet()?;
-    accept_admin(
-        shell,
-        &mut runner,
-        foundry_scripts_path.as_path(),
-        chain_admin,
-        &owner_wallet,
-        diamond_proxy,
-        &args.forge_args.script,
-        effective_rpc.to_string(),
-    )
-    .await?;
-
-    // Step 3: Unpause deposits (unless pause_deposits is set, as owner)
-    if !args.pause_deposits {
-        logger::info("Unpausing deposits...");
-        unpause_deposits(
-            shell,
-            &mut runner,
-            &args.forge_args.script,
-            foundry_scripts_path.as_path(),
-            AdminScriptMode::Broadcast(owner_wallet.clone()),
-            args.chain_id,
-            bridgehub,
-            effective_rpc.to_string(),
-        )
-        .await?;
-    }
-
-    // Step 4: Set DA validator pair (as owner)
-    logger::info("Setting DA validator pair...");
-    let commitment_scheme = match args.da_mode {
-        DAValidatorType::Rollup => match args.vm_type {
-            VMOption::EraVM => L2DACommitmentScheme::BlobsAndPubdataKeccak256,
-            VMOption::ZKSyncOsVM => L2DACommitmentScheme::BlobsZKSyncOS,
-        },
-        DAValidatorType::Avail | DAValidatorType::Eigen => L2DACommitmentScheme::PubdataKeccak256,
-        DAValidatorType::NoDA => L2DACommitmentScheme::EmptyNoDA,
-    };
-
-    set_da_validator_pair(
-        shell,
-        &mut runner,
-        &args.forge_args.script,
-        foundry_scripts_path.as_path(),
-        AdminScriptMode::Broadcast(owner_wallet.clone()),
-        args.chain_id,
-        bridgehub,
-        args.l1_da_validator,
-        commitment_scheme,
-        effective_rpc.to_string(),
-    )
-    .await?;
-
-    // Step 5: Enable EVM emulator (if requested, as owner)
-    if args.evm_emulator {
-        logger::info("Enabling EVM emulator...");
-        enable_evm_emulator_step(
-            shell, &mut runner, &args.forge_args.script, foundry_scripts_path.as_path(),
-            &owner_auth, chain_admin, diamond_proxy, effective_rpc,
-        )?;
-    }
-
-    // Step 6: Deploy L2 contracts (if not skipping priority txs)
-    if !args.skip_priority_txs {
-        let governance = args.governance_addr.unwrap_or(owner);
-
-        logger::info("Deploying L2 contracts...");
-        let l2_output = deploy_l2_contracts_step(
-            shell, &mut runner, &args.forge_args.script, foundry_scripts_path.as_path(),
-            &sender_auth, bridgehub, args.chain_id, governance, owner, args.da_mode,
-            args.with_legacy_bridge, effective_rpc,
-        )?;
-        full_output.l2_default_upgrader = Some(l2_output.l2_default_upgrader);
-        full_output.consensus_registry_proxy = Some(l2_output.consensus_registry_proxy);
-        full_output.multicall3 = Some(l2_output.multicall3);
-        full_output.timestamp_asserter = Some(l2_output.timestamp_asserter);
-
-        // Step 7: Deploy paymaster (if requested)
-        if args.deploy_paymaster {
-            logger::info("Deploying paymaster...");
-            let paymaster_addr = deploy_paymaster_step(
-                shell, &mut runner, &args.forge_args.script, foundry_scripts_path.as_path(),
-                &sender_auth, bridgehub, args.chain_id, effective_rpc,
-            )?;
-            full_output.paymaster_addr = Some(paymaster_addr);
-            logger::info(format!("Paymaster deployed at: {:#x}", paymaster_addr));
-        }
-
-        // Step 8: Register on all chains
-        logger::info("Registering chain on all other chains...");
-        register_on_all_chains_step(
-            shell, &mut runner, &args.forge_args.script, foundry_scripts_path.as_path(),
-            &sender_auth, bridgehub, args.chain_id, effective_rpc,
-        )?;
-    }
-
-    // Step 9: Make permanent rollup (if requested, as owner)
-    if args.make_permanent_rollup {
-        logger::info("Making chain a permanent rollup...");
-        make_permanent_rollup(
-            shell, &mut runner, foundry_scripts_path.as_path(), chain_admin,
-            &owner_wallet, diamond_proxy, &args.forge_args.script, effective_rpc.to_string(),
-        )
-        .await?;
-    }
-
-    // Step 10: Setup legacy bridge (if requested)
-    if args.with_legacy_bridge && !args.skip_priority_txs {
-        logger::info("Setting up legacy bridge...");
-        setup_legacy_bridge_step(
-            shell, &mut runner, &args.forge_args.script, foundry_scripts_path.as_path(),
-            &sender_auth, bridgehub, args.chain_id, effective_rpc,
-        )?;
-    }
+    let diamond_proxy = full_output.diamond_proxy_addr;
+    let chain_admin = full_output.chain_admin_addr;
 
     if let Some(out_path) = &args.out {
         let input_echo = ChainInitInputEcho {
-            chain_id: init_input.chain_params.chain_id.as_u64(),
-            ctm_proxy: init_input.ctm_proxy,
-            bridgehub,
-            l1_da_validator: init_input.l1_da_validator,
-            owner: init_input.chain_params.owner,
-            base_token_addr: init_input.chain_params.base_token_addr,
-            da_mode: init_input.chain_params.da_mode,
+            chain_id: input.chain_params.chain_id.as_u64(),
+            ctm_proxy: input.ctm_proxy,
+            bridgehub: input.bridgehub,
+            l1_da_validator: input.l1_da_validator,
+            owner: owner.address,
+            base_token_addr: input.chain_params.base_token_addr,
+            da_mode: input.chain_params.da_mode,
             vm_type: args.vm_type,
             simulate: args.simulate,
         };
@@ -384,32 +238,131 @@ pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
         logger::info(format!("Full output written to: {}", out_path.display()));
     }
 
-    if is_simulation {
-        logger::outro(format!(
-            "Chain init simulation complete — DiamondProxy: {:#x}, ChainAdmin: {:#x}",
-            diamond_proxy, chain_admin
-        ));
-    } else {
-        logger::outro(format!(
-            "DiamondProxy deployed at: {:#x}, ChainAdmin deployed at: {:#x}",
-            diamond_proxy, chain_admin
-        ));
-    }
+    logger::outro(format!(
+        "DiamondProxy: {:#x}  ChainAdmin: {:#x}",
+        diamond_proxy, chain_admin
+    ));
 
-    drop(execution_mode);
     Ok(())
 }
 
-// ── Library functions ───────────────────────────────────────────────────────
+/// Initialize a chain: register, accept admin, configure DA/validators, deploy L2 contracts.
+pub async fn chain_init(
+    runner: &mut ForgeRunner,
+    deployer: &Wallet,
+    owner: &Wallet,
+    bridgehub_admin: &Wallet,
+    input: &ChainInitInput,
+) -> anyhow::Result<FullChainInitOutput> {
+    // Register chain on CTM
+    logger::step("Registering chain on CTM...");
+    let register_output = register_chain(runner, bridgehub_admin, input)?;
+    let diamond_proxy = register_output.diamond_proxy_addr;
+    let chain_admin = register_output.chain_admin_addr;
+    let mut full_output = FullChainInitOutput::from_register(&register_output);
+    logger::info(format!("  Diamond proxy: {:#x}", diamond_proxy));
+    logger::info(format!("  ChainAdmin:    {:#x}", chain_admin));
+
+    // Accept admin (as owner)
+    logger::step("Accepting admin of chain...");
+    accept_admin(runner, chain_admin, owner, diamond_proxy).await?;
+
+    // Unpause deposits (unless pause_deposits is set)
+    if !input.pause_deposits {
+        logger::step("Unpausing deposits...");
+        unpause_deposits(
+            runner,
+            AdminScriptMode::Broadcast(owner.clone()),
+            input.chain_params.chain_id.as_u64(),
+            input.bridgehub,
+        )
+        .await?;
+    }
+
+    // Set DA validator pair (as owner)
+    logger::step("Setting DA validator pair...");
+    let commitment_scheme = match input.chain_params.da_mode {
+        DAValidatorType::Rollup => match input.vm_type {
+            VMOption::EraVM => L2DACommitmentScheme::BlobsAndPubdataKeccak256,
+            VMOption::ZKSyncOsVM => L2DACommitmentScheme::BlobsZKSyncOS,
+        },
+        DAValidatorType::Avail | DAValidatorType::Eigen => L2DACommitmentScheme::PubdataKeccak256,
+        DAValidatorType::NoDA => L2DACommitmentScheme::EmptyNoDA,
+    };
+    set_da_validator_pair(
+        runner,
+        AdminScriptMode::Broadcast(owner.clone()),
+        input.chain_params.chain_id.as_u64(),
+        input.bridgehub,
+        input.l1_da_validator,
+        commitment_scheme,
+    )
+    .await?;
+
+    // Enable EVM emulator (if requested, as owner)
+    if input.evm_emulator {
+        logger::step("Enabling EVM emulator...");
+        enable_evm_emulator_step(runner, owner, chain_admin, diamond_proxy)?;
+    }
+
+    // Deploy L2 contracts (if not skipping priority txs)
+    if !input.skip_priority_txs {
+        let governance = input.governance_addr.unwrap_or(input.chain_params.owner);
+
+        logger::step("Deploying L2 contracts...");
+        let l2_output = deploy_l2_contracts_step(
+            runner, deployer, input.bridgehub, input.chain_params.chain_id.as_u64(),
+            governance, input.chain_params.owner, input.chain_params.da_mode,
+            input.with_legacy_bridge,
+        )?;
+        full_output.l2_default_upgrader = Some(l2_output.l2_default_upgrader);
+        full_output.consensus_registry_proxy = Some(l2_output.consensus_registry_proxy);
+        full_output.multicall3 = Some(l2_output.multicall3);
+        full_output.timestamp_asserter = Some(l2_output.timestamp_asserter);
+
+        // Deploy paymaster (if requested)
+        if input.deploy_paymaster {
+            logger::step("Deploying paymaster...");
+            let paymaster_addr = deploy_paymaster_step(
+                runner, deployer, input.bridgehub, input.chain_params.chain_id.as_u64(),
+            )?;
+            full_output.paymaster_addr = Some(paymaster_addr);
+            logger::info(format!("Paymaster deployed at: {:#x}", paymaster_addr));
+        }
+
+        // Register on all chains
+        logger::step("Registering chain on all other chains...");
+        register_on_all_chains_step(
+            runner, deployer, input.bridgehub, input.chain_params.chain_id.as_u64(),
+        )?;
+    }
+
+    // Make permanent rollup (if requested, as owner)
+    if input.make_permanent_rollup {
+        logger::step("Making chain a permanent rollup...");
+        make_permanent_rollup(runner, chain_admin, owner, diamond_proxy).await?;
+    }
+
+    // Setup legacy bridge (if requested)
+    if input.with_legacy_bridge && !input.skip_priority_txs {
+        logger::step("Setting up legacy bridge...");
+        setup_legacy_bridge_step(
+            runner, deployer, input.bridgehub, input.chain_params.chain_id.as_u64(),
+        )?;
+    }
+
+    Ok(full_output)
+}
 
 /// Register a chain on the CTM.
 pub fn register_chain(
-    ctx: &mut ForgeContext,
+    runner: &mut ForgeRunner,
+    auth: &Wallet,
     input: &ChainInitInput,
 ) -> anyhow::Result<RegisterChainOutput> {
     let salt = input.create2_factory_salt.unwrap_or(H256::zero());
     let permanent_values = PermanentValuesConfig::new(input.create2_factory_addr, salt);
-    permanent_values.save(ctx.shell, PermanentValuesConfig::path(ctx.foundry_scripts_path))?;
+    permanent_values.save(&runner.shell, PermanentValuesConfig::path(&runner.foundry_scripts_path))?;
 
     let deploy_config = RegisterChainL1Config::new(
         &input.chain_params,
@@ -418,33 +371,27 @@ pub fn register_chain(
         input.with_legacy_bridge,
     )?;
 
-    let input_path = REGISTER_CHAIN_SCRIPT_PARAMS.input(ctx.foundry_scripts_path);
-    deploy_config.save(ctx.shell, input_path)?;
+    let input_path = REGISTER_CHAIN_SCRIPT_PARAMS.input(&runner.foundry_scripts_path);
+    deploy_config.save(&runner.shell, input_path)?;
 
     let calldata = REGISTER_CHAIN_FUNCTIONS
         .encode("run", (input.ctm_proxy, input.chain_params.chain_id.as_u64()))
         .map_err(|e| anyhow::anyhow!("Failed to encode calldata: {}", e))?;
 
-    let mut forge = Forge::new(ctx.foundry_scripts_path)
-        .script(&REGISTER_CHAIN_SCRIPT_PARAMS.script(), ctx.forge_args.clone())
+    let forge = Forge::new(&runner.foundry_scripts_path)
+        .script(&REGISTER_CHAIN_SCRIPT_PARAMS.script(), runner.forge_args.clone())
         .with_ffi()
         .with_calldata(&calldata)
-        .with_rpc_url(ctx.l1_rpc_url.to_string())
+        .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow();
-
-    match ctx.auth {
-        SenderAuth::PrivateKey(pk) => forge = forge.with_private_key(*pk),
-        SenderAuth::Unlocked(addr) => {
-            forge = forge.with_sender(format!("{:#x}", addr)).with_unlocked()
-        }
-    }
+        .with_slow()
+        .with_wallet(auth, runner.simulate);
 
     logger::info("Registering chain on CTM...");
-    ctx.runner.run(ctx.shell, forge)?;
+    runner.run(forge)?;
 
-    let output_path = REGISTER_CHAIN_SCRIPT_PARAMS.output(ctx.foundry_scripts_path);
-    RegisterChainOutput::read(ctx.shell, output_path)
+    let output_path = REGISTER_CHAIN_SCRIPT_PARAMS.output(&runner.foundry_scripts_path);
+    RegisterChainOutput::read(&runner.shell, output_path)
 }
 
 /// Parse a ratio string like "4000/1" into (numerator, denominator).
@@ -486,41 +433,38 @@ fn query_bridgehub(rpc_url: &str, ctm_proxy: Address) -> anyhow::Result<Address>
     Ok(Address::from_slice(&result[12..32]))
 }
 
-// ── Step helpers ────────────────────────────────────────────────────────────
-
 fn enable_evm_emulator_step(
-    shell: &Shell, runner: &mut ForgeRunner, forge_args: &ForgeScriptArgs,
-    foundry_scripts_path: &Path, auth: &SenderAuth, chain_admin: Address,
-    diamond_proxy: Address, l1_rpc_url: &str,
+    runner: &mut ForgeRunner,
+    auth: &Wallet,
+    chain_admin: Address,
+    diamond_proxy: Address,
 ) -> anyhow::Result<()> {
     let calldata = ENABLE_EVM_EMULATOR_FUNCTIONS
         .encode("chainAllowEvmEmulation", (chain_admin, diamond_proxy))
         .map_err(|e| anyhow::anyhow!("Failed to encode calldata: {}", e))?;
 
-    let mut forge = Forge::new(foundry_scripts_path)
-        .script(&ENABLE_EVM_EMULATOR_PARAMS.script(), forge_args.clone())
+    let forge = Forge::new(&runner.foundry_scripts_path)
+        .script(&ENABLE_EVM_EMULATOR_PARAMS.script(), runner.forge_args.clone())
         .with_ffi()
         .with_calldata(&calldata)
-        .with_rpc_url(l1_rpc_url.to_string())
-        .with_broadcast();
+        .with_rpc_url(runner.rpc_url.clone())
+        .with_broadcast()
+        .with_wallet(auth, runner.simulate);
 
-    match auth {
-        SenderAuth::PrivateKey(pk) => forge = forge.with_private_key(*pk),
-        SenderAuth::Unlocked(addr) => {
-            forge = forge.with_sender(format!("{:#x}", addr)).with_unlocked()
-        }
-    }
-
-    runner.run(shell, forge)?;
+    runner.run(forge)?;
     Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
 fn deploy_l2_contracts_step(
-    shell: &Shell, runner: &mut ForgeRunner, forge_args: &ForgeScriptArgs,
-    foundry_scripts_path: &Path, auth: &SenderAuth, bridgehub: Address, chain_id: u64,
-    governance: Address, consensus_registry_owner: Address, da_mode: DAValidatorType,
-    with_legacy_bridge: bool, l1_rpc_url: &str,
+    runner: &mut ForgeRunner,
+    auth: &Wallet,
+    bridgehub: Address,
+    chain_id: u64,
+    governance: Address,
+    consensus_registry_owner: Address,
+    da_mode: DAValidatorType,
+    with_legacy_bridge: bool,
 ) -> anyhow::Result<FullL2DeployOutput> {
     let function_name = if with_legacy_bridge { "runWithLegacyBridge" } else { "run" };
     let calldata = DEPLOY_L2_FUNCTIONS
@@ -530,28 +474,22 @@ fn deploy_l2_contracts_step(
         ))
         .map_err(|e| anyhow::anyhow!("Failed to encode deploy_l2 calldata: {}", e))?;
 
-    let mut forge = Forge::new(foundry_scripts_path)
-        .script(&DEPLOY_L2_CONTRACTS_SCRIPT_PARAMS.script(), forge_args.clone())
+    let forge = Forge::new(&runner.foundry_scripts_path)
+        .script(&DEPLOY_L2_CONTRACTS_SCRIPT_PARAMS.script(), runner.forge_args.clone())
         .with_ffi()
         .with_calldata(&calldata)
-        .with_rpc_url(l1_rpc_url.to_string())
+        .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow();
+        .with_slow()
+        .with_wallet(auth, runner.simulate);
 
-    match auth {
-        SenderAuth::PrivateKey(pk) => forge = forge.with_private_key(*pk),
-        SenderAuth::Unlocked(addr) => {
-            forge = forge.with_sender(format!("{:#x}", addr)).with_unlocked()
-        }
-    }
+    runner.run(forge)?;
 
-    runner.run(shell, forge)?;
-
-    let output_path = DEPLOY_L2_CONTRACTS_SCRIPT_PARAMS.output(foundry_scripts_path);
-    let upgrader_output = DefaultL2UpgradeOutput::read(shell, &output_path)?;
-    let consensus_output = ConsensusRegistryOutput::read(shell, &output_path)?;
-    let multicall3_output = Multicall3Output::read(shell, &output_path)?;
-    let timestamp_output = TimestampAsserterOutput::read(shell, &output_path)?;
+    let output_path = DEPLOY_L2_CONTRACTS_SCRIPT_PARAMS.output(&runner.foundry_scripts_path);
+    let upgrader_output = DefaultL2UpgradeOutput::read(&runner.shell, &output_path)?;
+    let consensus_output = ConsensusRegistryOutput::read(&runner.shell, &output_path)?;
+    let multicall3_output = Multicall3Output::read(&runner.shell, &output_path)?;
+    let timestamp_output = TimestampAsserterOutput::read(&runner.shell, &output_path)?;
 
     Ok(FullL2DeployOutput {
         l2_default_upgrader: upgrader_output.l2_default_upgrader,
@@ -562,89 +500,74 @@ fn deploy_l2_contracts_step(
 }
 
 fn deploy_paymaster_step(
-    shell: &Shell, runner: &mut ForgeRunner, forge_args: &ForgeScriptArgs,
-    foundry_scripts_path: &Path, auth: &SenderAuth, bridgehub: Address, chain_id: u64,
-    l1_rpc_url: &str,
+    runner: &mut ForgeRunner,
+    auth: &Wallet,
+    bridgehub: Address,
+    chain_id: u64,
 ) -> anyhow::Result<Address> {
     let calldata = DEPLOY_PAYMASTER_FUNCTIONS
         .encode("run", (bridgehub, U256::from(chain_id)))
         .map_err(|e| anyhow::anyhow!("Failed to encode deploy_paymaster calldata: {}", e))?;
 
-    let mut forge = Forge::new(foundry_scripts_path)
-        .script(&DEPLOY_PAYMASTER_SCRIPT_PARAMS.script(), forge_args.clone())
+    let forge = Forge::new(&runner.foundry_scripts_path)
+        .script(&DEPLOY_PAYMASTER_SCRIPT_PARAMS.script(), runner.forge_args.clone())
         .with_ffi()
         .with_calldata(&calldata)
-        .with_rpc_url(l1_rpc_url.to_string())
+        .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow();
+        .with_slow()
+        .with_wallet(auth, runner.simulate);
 
-    match auth {
-        SenderAuth::PrivateKey(pk) => forge = forge.with_private_key(*pk),
-        SenderAuth::Unlocked(addr) => {
-            forge = forge.with_sender(format!("{:#x}", addr)).with_unlocked()
-        }
-    }
+    runner.run(forge)?;
 
-    runner.run(shell, forge)?;
-
-    let output_path = DEPLOY_PAYMASTER_SCRIPT_PARAMS.output(foundry_scripts_path);
-    let output = DeployPaymasterOutput::read(shell, output_path)?;
+    let output_path = DEPLOY_PAYMASTER_SCRIPT_PARAMS.output(&runner.foundry_scripts_path);
+    let output = DeployPaymasterOutput::read(&runner.shell, output_path)?;
     Ok(output.paymaster)
 }
 
 fn register_on_all_chains_step(
-    shell: &Shell, runner: &mut ForgeRunner, forge_args: &ForgeScriptArgs,
-    foundry_scripts_path: &Path, auth: &SenderAuth, bridgehub: Address, chain_id: u64,
-    l1_rpc_url: &str,
+    runner: &mut ForgeRunner,
+    auth: &Wallet,
+    bridgehub: Address,
+    chain_id: u64,
 ) -> anyhow::Result<()> {
     let calldata = REGISTER_ON_ALL_CHAINS_FUNCTIONS
         .encode("registerOnOtherChains", (bridgehub, U256::from(chain_id)))
         .map_err(|e| anyhow::anyhow!("Failed to encode register_on_all_chains calldata: {}", e))?;
 
-    let mut forge = Forge::new(foundry_scripts_path)
-        .script(&REGISTER_ON_ALL_CHAINS_SCRIPT_PARAMS.script(), forge_args.clone())
+    let forge = Forge::new(&runner.foundry_scripts_path)
+        .script(&REGISTER_ON_ALL_CHAINS_SCRIPT_PARAMS.script(), runner.forge_args.clone())
         .with_ffi()
         .with_calldata(&calldata)
-        .with_rpc_url(l1_rpc_url.to_string())
+        .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow();
+        .with_slow()
+        .with_wallet(auth, runner.simulate);
 
-    match auth {
-        SenderAuth::PrivateKey(pk) => forge = forge.with_private_key(*pk),
-        SenderAuth::Unlocked(addr) => {
-            forge = forge.with_sender(format!("{:#x}", addr)).with_unlocked()
-        }
-    }
-
-    runner.run(shell, forge)?;
+    runner.run(forge)?;
     Ok(())
 }
 
 fn setup_legacy_bridge_step(
-    shell: &Shell, runner: &mut ForgeRunner, forge_args: &ForgeScriptArgs,
-    foundry_scripts_path: &Path, auth: &SenderAuth, bridgehub: Address, chain_id: u64,
-    l1_rpc_url: &str,
+    runner: &mut ForgeRunner,
+    auth: &Wallet,
+    bridgehub: Address,
+    chain_id: u64,
 ) -> anyhow::Result<()> {
     let calldata = SETUP_LEGACY_BRIDGE_FUNCTIONS
         .encode("run", (bridgehub, U256::from(chain_id)))
         .map_err(|e| anyhow::anyhow!("Failed to encode setup_legacy_bridge calldata: {}", e))?;
 
-    let mut forge = Forge::new(foundry_scripts_path)
-        .script(&SETUP_LEGACY_BRIDGE.script(), forge_args.clone())
+    let forge = Forge::new(&runner.foundry_scripts_path)
+        .script(&SETUP_LEGACY_BRIDGE.script(), runner.forge_args.clone())
         .with_ffi()
         .with_calldata(&calldata)
-        .with_rpc_url(l1_rpc_url.to_string())
+        .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow();
+        .with_slow()
+        .with_wallet(auth, runner.simulate);
 
-    match auth {
-        SenderAuth::PrivateKey(pk) => forge = forge.with_private_key(*pk),
-        SenderAuth::Unlocked(addr) => {
-            forge = forge.with_sender(format!("{:#x}", addr)).with_unlocked()
-        }
-    }
-
-    runner.run(shell, forge)?;
+    runner.run(forge)?;
     Ok(())
 }
 
@@ -653,11 +576,19 @@ fn setup_legacy_bridge_step(
 #[derive(Debug, Clone)]
 pub struct ChainInitInput {
     pub ctm_proxy: Address,
+    pub bridgehub: Address,
     pub l1_da_validator: Address,
     pub chain_params: NewChainParams,
+    pub vm_type: VMOption,
     pub with_legacy_bridge: bool,
     pub create2_factory_addr: Option<Address>,
     pub create2_factory_salt: Option<H256>,
+    pub pause_deposits: bool,
+    pub evm_emulator: bool,
+    pub deploy_paymaster: bool,
+    pub make_permanent_rollup: bool,
+    pub skip_priority_txs: bool,
+    pub governance_addr: Option<Address>,
 }
 
 #[derive(Debug, Clone, Default)]

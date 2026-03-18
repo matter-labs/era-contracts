@@ -3,21 +3,19 @@ use std::{path::PathBuf, str::FromStr};
 use clap::Parser;
 use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
-use xshell::Shell;
 
 use crate::commands::ctm::init::{ctm_init, CtmInitInput, CtmInitOutput};
-use crate::commands::ecosystem::deploy_create2::{deploy_create2_factory, DETERMINISTIC_CREATE2_ADDRESS};
+use crate::commands::ecosystem::deploy_create2::deploy_create2_factory;
 use crate::commands::hub::init::{hub_init, HubInitInput};
 use crate::commands::output::CommandEnvelope;
 use crate::common::{
-    forge::{
-        resolve_execution, resolve_owner_auth, ExecutionMode, ForgeArgs, ForgeContext, ForgeRunner,
-    },
+    constants::DETERMINISTIC_CREATE2_ADDRESS,
+    forge::{ForgeRunner, ForgeScriptArgs},
     logger,
+    wallets::Wallet,
 };
 use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
 use crate::types::VMOption;
-use crate::common::paths;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -75,109 +73,61 @@ pub struct EcosystemInitArgs {
     // Forge options
     #[clap(flatten)]
     #[serde(flatten)]
-    pub forge_args: ForgeArgs,
+    pub forge_args: ForgeScriptArgs,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
 
-pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
-    let foundry_scripts_path = paths::path_from_root("l1-contracts");
+pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
+    let deployer = Wallet::parse(args.private_key, args.sender)?;
+    let mut runner = ForgeRunner::new(args.simulate, &args.l1_rpc_url, args.forge_args.clone())?;
 
-    let (sender_auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
-    let owner = args.owner.unwrap_or(sender);
-    let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
+    let owner = Wallet::resolve(args.owner, args.owner_private_key, &deployer)?;
 
-    let owner_auth = resolve_owner_auth(
-        owner, args.owner_private_key, sender, &sender_auth, is_simulation,
-    )?;
 
-    if is_simulation {
-        logger::info(format!("Simulation mode: forking {} via anvil", args.l1_rpc_url));
-    }
-
-    let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
-    let mut runner = ForgeRunner::new();
-
-    logger::info("Initializing ecosystem...");
-    logger::info(format!("Sender: {:#x}", sender));
-    logger::info(format!("Owner: {:#x}", owner));
-
-    let create2_factory_addr = if args.create2_factory_addr.is_some() {
-        args.create2_factory_addr.unwrap()
-    } else {
+    // Determine CREATE2 factory address
+    let create2_factory_addr = if args.create2_factory_addr.is_none() {
         logger::step("Deploying CREATE2 factory...");
-        let mut create2_ctx = ForgeContext {
-            shell,
-            foundry_scripts_path: foundry_scripts_path.as_path(),
-            runner: &mut runner,
-            forge_args: &args.forge_args.script,
-            l1_rpc_url: effective_rpc,
-            auth: &sender_auth,
-        };
-        deploy_create2_factory(&mut create2_ctx)?;
+        deploy_create2_factory(&mut runner, &deployer)?;
         logger::info(format!("CREATE2 factory at: {}", DETERMINISTIC_CREATE2_ADDRESS));
         Address::from_str(DETERMINISTIC_CREATE2_ADDRESS).unwrap()
-    };
-   
-    let mut ctx = ForgeContext {
-        shell,
-        foundry_scripts_path: foundry_scripts_path.as_path(),
-        runner: &mut runner,
-        forge_args: &args.forge_args.script,
-        l1_rpc_url: effective_rpc,
-        auth: &owner_auth,
+    } else {
+        args.create2_factory_addr.unwrap()
     };
 
-    // Initialize Bridgehub contracts (shared within ecosystem)
-    logger::step("Initializing hub...");
+    // Initialize Bridgehub contracts
+    logger::step("Initializing Bridgehub contracts...");
     let hub_input = HubInitInput {
-        owner,
+        owner: owner.address,
         era_chain_id: args.era_chain_id,
         with_legacy_bridge: args.with_legacy_bridge,
         create2_factory_addr: Some(create2_factory_addr),
         create2_factory_salt: args.create2_factory_salt,
     };
-    let hub_output = hub_init(&mut ctx, &hub_input).await?;
-
-    let bridgehub = hub_output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
-    logger::info(format!("Hub initialized. Bridgehub: {:#x}", bridgehub));
+    let hub_output = hub_init(&mut runner, &deployer, &owner, &hub_input).await?;
+    let bridgehub_addr = hub_output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
+    logger::info(format!("Bridgehub contracts initialized. Bridgehub proxy: {:#x}", bridgehub_addr));
 
     // Initialize CTM contracts
-    logger::step("Initializing CTM...");
-    let ctm_create2_addr = Some(create2_factory_addr);
-
+    logger::step("Initializing CTM contracts...");
     let ctm_input = CtmInitInput {
-        bridgehub,
-        owner,
+        bridgehub: bridgehub_addr,
+        owner: owner.address,
         vm_type: args.vm_type,
-        reuse_gov_and_admin: true, // Always reuse in ecosystem init
+        reuse_gov_and_admin: true,
         with_testnet_verifier: args.with_testnet_verifier,
         with_legacy_bridge: args.with_legacy_bridge,
-        create2_factory_addr: ctm_create2_addr,
+        create2_factory_addr: Some(create2_factory_addr),
         create2_factory_salt: args.create2_factory_salt,
     };
+    let ctm_output = ctm_init(&mut runner, &deployer, &owner, &owner, &ctm_input).await?;
+    logger::info(format!("CTM contracts initialized. CTM proxy: {:#x}", ctm_output.ctm_proxy));
 
-    let ctm_output = ctm_init(
-        &mut ctx,
-        &ctm_input,
-        &owner_auth, // Accept ownership as owner (uses hub's governance)
-        &owner_auth, // Register as owner (uses hub's chain_admin)
-    )
-    .await?;
-
-    logger::info(format!(
-        "CTM initialized. CTM proxy: {:#x}",
-        ctm_output.ctm_proxy
-    ));
-
-    let bridgehub_addr = hub_output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
-    let ctm_proxy_addr = ctm_output.ctm_proxy;
-
+    // Write output to file
     if let Some(out_path) = &args.out {
         let input_echo = EcosystemInitInputEcho {
-            sender,
-            owner,
+            sender: deployer.address,
+            owner: owner.address,
             l1_rpc_url: args.l1_rpc_url.clone(),
             era_chain_id: args.era_chain_id,
             vm_type: args.vm_type,
@@ -191,19 +141,7 @@ pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
         logger::info(format!("Full output written to: {}", out_path.display()));
     }
 
-    if is_simulation {
-        logger::outro(format!(
-            "Ecosystem init simulation complete\n  Bridgehub Proxy: {:#x}\n  CTM Proxy: {:#x}",
-            bridgehub_addr, ctm_proxy_addr
-        ));
-    } else {
-        logger::outro(format!(
-            "Bridgehub Proxy deployed at: {:#x}\nCTM Proxy deployed at: {:#x}",
-            bridgehub_addr, ctm_proxy_addr
-        ));
-    }
-
-    drop(execution_mode);
+    logger::outro("Ecosystem initialized.");
     Ok(())
 }
 

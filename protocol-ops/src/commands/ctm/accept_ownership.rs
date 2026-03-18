@@ -1,14 +1,13 @@
 use clap::Parser;
 use ethers::types::{Address, H256};
 use crate::common::{
-    forge::{resolve_execution, ExecutionMode, ForgeArgs, ForgeContext, ForgeRunner},
+    forge::{ForgeRunner, ForgeScriptArgs},
     logger,
+    wallets::Wallet,
 };
 use serde::{Deserialize, Serialize};
-use xshell::Shell;
 
 use crate::admin_functions::{accept_admin, accept_owner};
-use crate::common::paths;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct CtmAcceptOwnershipArgs {
@@ -36,7 +35,7 @@ pub struct CtmAcceptOwnershipArgs {
 
     #[clap(flatten)]
     #[serde(flatten)]
-    pub forge_args: ForgeArgs,
+    pub forge_args: ForgeScriptArgs,
 }
 
 /// Input parameters for accepting ownership of CTM contracts.
@@ -49,67 +48,27 @@ pub struct CtmAcceptOwnershipInput {
 
 /// Accept ownership of CTM contracts.
 pub async fn accept_ownership(
-    ctx: &mut ForgeContext<'_>,
+    runner: &mut ForgeRunner,
+    auth: &Wallet,
     input: &CtmAcceptOwnershipInput,
 ) -> anyhow::Result<()> {
-    let governor_wallet = ctx.auth.to_wallet()?;
-
-    // Accept ownership for CTM (State Transition Manager)
     logger::step("Accepting ownership of CTM...");
-    accept_owner(
-        ctx.shell,
-        ctx.runner,
-        ctx.foundry_scripts_path,
-        input.governance,
-        &governor_wallet,
-        input.ctm_proxy,
-        ctx.forge_args,
-        ctx.l1_rpc_url.to_string(),
-    )
-    .await?;
+    accept_owner(runner, input.governance, auth, input.ctm_proxy).await?;
 
     logger::step("Accepting admin of CTM...");
-    accept_admin(
-        ctx.shell,
-        ctx.runner,
-        ctx.foundry_scripts_path,
-        input.chain_admin,
-        &governor_wallet,
-        input.ctm_proxy,
-        ctx.forge_args,
-        ctx.l1_rpc_url.to_string(),
-    )
-    .await?;
+    accept_admin(runner, input.chain_admin, auth, input.ctm_proxy).await?;
 
     Ok(())
 }
 
-pub async fn run(args: CtmAcceptOwnershipArgs, shell: &Shell) -> anyhow::Result<()> {
-    let foundry_scripts_path = paths::path_from_root("l1-contracts");
+pub async fn run(args: CtmAcceptOwnershipArgs) -> anyhow::Result<()> {
+    let governor = Wallet::parse(args.private_key, args.sender)?;
+    let mut runner = ForgeRunner::new(args.simulate, &args.l1_rpc_url, args.forge_args.clone())?;
 
-    let (auth, sender, execution_mode) = resolve_execution(
-        args.private_key,
-        args.sender,
-        args.simulate,
-        &args.l1_rpc_url,
-    )?;
-
-    let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
-    let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
-
-    if is_simulation {
-        logger::info(format!(
-            "Simulation mode: forking {} via anvil",
-            args.l1_rpc_url
-        ));
-    }
-
-    logger::info(format!("Accepting ownership for governor: {:#x}", sender));
+    logger::info(format!("Accepting ownership for governor: {:#x}", governor.address));
     logger::info(format!("CTM proxy: {:#x}", args.ctm_proxy));
     logger::info(format!("Governance contract: {:#x}", args.governance));
     logger::info(format!("Chain admin contract: {:#x}", args.chain_admin));
-
-    let mut runner = ForgeRunner::new();
 
     let input = CtmAcceptOwnershipInput {
         ctm_proxy: args.ctm_proxy,
@@ -117,25 +76,9 @@ pub async fn run(args: CtmAcceptOwnershipArgs, shell: &Shell) -> anyhow::Result<
         chain_admin: args.chain_admin,
     };
 
-    {
-        let mut ctx = ForgeContext {
-            shell,
-            foundry_scripts_path: foundry_scripts_path.as_path(),
-            runner: &mut runner,
-            forge_args: &args.forge_args.script,
-            l1_rpc_url: effective_rpc,
-            auth: &auth,
-        };
-        accept_ownership(&mut ctx, &input).await?;
-    }
+    accept_ownership(&mut runner, &governor, &input).await?;
 
-    if is_simulation {
-        logger::outro("CTM accept ownership simulation complete (no on-chain changes)");
-    } else {
-        logger::outro("CTM accept ownership complete");
-    }
-
-    drop(execution_mode);
+    logger::outro("CTM accept ownership complete");
 
     Ok(())
 }

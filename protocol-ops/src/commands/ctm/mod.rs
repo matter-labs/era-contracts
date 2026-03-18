@@ -1,5 +1,4 @@
 use clap::Subcommand;
-use xshell::Shell;
 
 use crate::commands::ctm::{
     accept_ownership::CtmAcceptOwnershipArgs,
@@ -26,11 +25,11 @@ pub enum CtmCommands {
     Upgrade(CtmUpgradeArgs),
 }
 
-pub(crate) async fn run(shell: &Shell, args: CtmCommands) -> anyhow::Result<()> {
+pub(crate) async fn run(args: CtmCommands) -> anyhow::Result<()> {
     match args {
-        CtmCommands::Deploy(args) => deploy::run(args, shell).await,
-        CtmCommands::AcceptOwnership(args) => accept_ownership::run(args, shell).await,
-        CtmCommands::Init(args) => init::run(args, shell).await,
-        CtmCommands::Upgrade(args) => upgrade::run(args, shell).await,
+        CtmCommands::Deploy(args) => deploy::run(args).await,
+        CtmCommands::AcceptOwnership(args) => accept_ownership::run(args).await,
+        CtmCommands::Init(args) => init::run(args).await,
+        CtmCommands::Upgrade(args) => upgrade::run(args).await,
     }
 }

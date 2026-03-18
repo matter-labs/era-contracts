@@ -7,14 +7,14 @@ use ethers::{
 };
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use xshell::Shell;
 
 use crate::abi::IDEPLOYCTMABI_ABI;
 use crate::commands::output::CommandEnvelope;
 use crate::common::{
-    forge::{resolve_execution, ExecutionMode, Forge, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth},
+    forge::{Forge, ForgeRunner, ForgeScriptArgs},
     logger,
     traits::{ReadConfig, SaveConfig},
+    wallets::Wallet,
 };
 use crate::config::{
     forge_interface::{
@@ -25,7 +25,6 @@ use crate::config::{
     },
 };
 use crate::types::{L1Network, VMOption};
-use crate::common::paths;
 
 lazy_static! {
     static ref DEPLOY_CTM_FUNCTIONS: BaseContract = BaseContract::from(IDEPLOYCTMABI_ABI.clone());
@@ -89,33 +88,16 @@ pub struct CtmDeployArgs {
     // Forge options
     #[clap(flatten)]
     #[serde(flatten)]
-    pub forge_args: ForgeArgs,
+    pub forge_args: ForgeScriptArgs,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
 
-pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
-    let foundry_scripts_path = paths::path_from_root("l1-contracts");
+pub async fn run(args: CtmDeployArgs) -> anyhow::Result<()> {
+    let deployer = Wallet::parse(args.private_key, args.sender)?;
+    let mut runner = ForgeRunner::new(args.simulate, &args.l1_rpc_url, args.forge_args.clone())?;
 
-    let (auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
-    let owner = args.owner.unwrap_or(sender);
-
-    let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
-    if is_simulation {
-        logger::info(format!("Simulation mode: forking {} via anvil", args.l1_rpc_url));
-    }
-
-    let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
-    let mut runner = ForgeRunner::new();
-    let mut ctx = ForgeContext {
-        shell,
-        foundry_scripts_path: foundry_scripts_path.as_path(),
-        runner: &mut runner,
-        forge_args: &args.forge_args.script,
-        l1_rpc_url: effective_rpc,
-        auth: &auth,
-    };
+    let owner = args.owner.unwrap_or(deployer.address);
 
     let input = CtmDeployInput {
         bridgehub: args.bridgehub,
@@ -128,25 +110,20 @@ pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
         create2_factory_salt: args.create2_factory_salt,
     };
 
-    let output = deploy(&mut ctx, &input)?;
+    let output = deploy(&mut runner, &deployer, &input)?;
 
     let ctm_proxy_addr = output.deployed_addresses.state_transition.state_transition_proxy_addr;
 
     if let Some(out_path) = &args.out {
         let input_echo = CtmDeployInputEcho::from_input(&input);
         let output_data = CtmDeployOutputData::from_deploy_output(&output);
-        let envelope = CommandEnvelope::new("ctm.deploy", input_echo, output_data, ctx.runner);
+        let envelope = CommandEnvelope::new("ctm.deploy", input_echo, output_data, &runner);
         envelope.write_to_file(out_path)?;
         logger::info(format!("Full output written to: {}", out_path.display()));
     }
 
-    if is_simulation {
-        logger::outro(format!("CTM deploy simulation complete — CTM Proxy: {:#x}", ctm_proxy_addr));
-    } else {
-        logger::outro(format!("CTM Proxy deployed at: {:#x}", ctm_proxy_addr));
-    }
+    logger::outro(format!("CTM Proxy: {:#x}", ctm_proxy_addr));
 
-    drop(execution_mode);
     Ok(())
 }
 
@@ -166,7 +143,7 @@ pub struct CtmDeployInput {
 }
 
 /// Deploy CTM contracts and return the output.
-pub fn deploy(ctx: &mut ForgeContext, input: &CtmDeployInput) -> anyhow::Result<DeployCTMOutput> {
+pub fn deploy(runner: &mut ForgeRunner, auth: &Wallet, input: &CtmDeployInput) -> anyhow::Result<DeployCTMOutput> {
     let l1_network = L1Network::Localhost;
     let mut initial_deployment_config = InitialDeploymentConfig::default();
 
@@ -181,7 +158,7 @@ pub fn deploy(ctx: &mut ForgeContext, input: &CtmDeployInput) -> anyhow::Result<
         initial_deployment_config.create2_factory_addr,
         initial_deployment_config.create2_factory_salt,
     );
-    permanent_values.save(ctx.shell, PermanentValuesConfig::path(ctx.foundry_scripts_path))?;
+    permanent_values.save(&runner.shell, PermanentValuesConfig::path(&runner.foundry_scripts_path))?;
 
     let deploy_config = DeployCTMConfig::new(
         input.owner,
@@ -192,35 +169,27 @@ pub fn deploy(ctx: &mut ForgeContext, input: &CtmDeployInput) -> anyhow::Result<
         input.vm_type,
     );
 
-    let input_path = DEPLOY_CTM_SCRIPT_PARAMS.input(ctx.foundry_scripts_path);
-    deploy_config.save(ctx.shell, input_path)?;
+    let input_path = DEPLOY_CTM_SCRIPT_PARAMS.input(&runner.foundry_scripts_path);
+    deploy_config.save(&runner.shell, input_path)?;
 
     let calldata = DEPLOY_CTM_FUNCTIONS
         .encode("runWithBridgehub", (input.bridgehub, input.reuse_gov_and_admin))
         .map_err(|e| anyhow::anyhow!("Failed to encode calldata: {}", e))?;
 
-    let mut forge = Forge::new(ctx.foundry_scripts_path)
-        .script(&DEPLOY_CTM_SCRIPT_PARAMS.script(), ctx.forge_args.clone())
+    let forge = Forge::new(&runner.foundry_scripts_path)
+        .script(&DEPLOY_CTM_SCRIPT_PARAMS.script(), runner.forge_args.clone())
         .with_ffi()
         .with_calldata(&calldata)
-        .with_rpc_url(ctx.l1_rpc_url.to_string())
+        .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow();
-
-    match ctx.auth {
-        SenderAuth::PrivateKey(pk) => {
-            forge = forge.with_private_key(*pk);
-        }
-        SenderAuth::Unlocked(addr) => {
-            forge = forge.with_sender(format!("{:#x}", addr)).with_unlocked();
-        }
-    }
+        .with_slow()
+        .with_wallet(auth, runner.simulate);
 
     logger::info("Deploying CTM contracts...");
-    ctx.runner.run(ctx.shell, forge)?;
+    runner.run(forge)?;
 
-    let output_path = DEPLOY_CTM_SCRIPT_PARAMS.output(ctx.foundry_scripts_path);
-    DeployCTMOutput::read(ctx.shell, output_path)
+    let output_path = DEPLOY_CTM_SCRIPT_PARAMS.output(&runner.foundry_scripts_path);
+    DeployCTMOutput::read(&runner.shell, output_path)
 }
 
 // ── Output structs ──────────────────────────────────────────────────────────

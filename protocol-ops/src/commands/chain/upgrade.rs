@@ -1,16 +1,15 @@
 use clap::Parser;
-use crate::common::forge::ForgeArgs;
+use crate::common::forge::ForgeScriptArgs;
 use serde::{Deserialize, Serialize};
-use xshell::Shell;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct ChainUpgradeArgs {
     #[clap(flatten)]
     #[serde(flatten)]
-    pub forge_args: ForgeArgs,
+    pub forge_args: ForgeScriptArgs,
 }
 
-pub async fn run(_args: ChainUpgradeArgs, _shell: &Shell) -> anyhow::Result<()> {
+pub async fn run(_args: ChainUpgradeArgs) -> anyhow::Result<()> {
     // Placeholder
     Ok(())
 }

@@ -3,19 +3,16 @@ use std::path::PathBuf;
 use clap::Parser;
 use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
-use xshell::Shell;
 
 use crate::commands::hub::accept_ownership::{accept_ownership, AcceptOwnershipInput};
 use crate::commands::hub::deploy::{deploy, DeployInput};
 use crate::commands::output::CommandEnvelope;
 use crate::common::{
-    forge::{
-        resolve_execution, resolve_owner_auth, ExecutionMode, ForgeArgs, ForgeContext, ForgeRunner,
-    },
+    forge::{ForgeRunner, ForgeScriptArgs},
     logger,
+    wallets::Wallet,
 };
 use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
-use crate::common::paths;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
 
@@ -55,8 +52,7 @@ pub struct HubInitArgs {
     #[clap(long, default_value_t = 270, help_heading = "Advanced input")]
     pub era_chain_id: u64,
     /// Enable legacy bridge testing
-    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true",
-           help_heading = "Advanced input")]
+    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_legacy_bridge: bool,
     /// CREATE2 factory address
     #[clap(long, help_heading = "Advanced input")]
@@ -68,71 +64,33 @@ pub struct HubInitArgs {
     // Forge options
     #[clap(flatten)]
     #[serde(flatten)]
-    pub forge_args: ForgeArgs,
+    pub forge_args: ForgeScriptArgs,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
 
-pub async fn run(args: HubInitArgs, shell: &Shell) -> anyhow::Result<()> {
-    let foundry_scripts_path = paths::path_from_root("l1-contracts");
+pub async fn run(args: HubInitArgs) -> anyhow::Result<()> {
+    let deployer = Wallet::parse(args.private_key, args.sender)?;
+    let mut runner = ForgeRunner::new(args.simulate, &args.l1_rpc_url, args.forge_args.clone())?;
 
-    let (sender_auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
-    let owner = args.owner.unwrap_or(sender);
-    let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
-    let owner_auth = resolve_owner_auth(
-        owner,
-        args.owner_private_key,
-        sender,
-        &sender_auth,
-        is_simulation,
-    )?;
+    let owner = Wallet::resolve(args.owner, args.owner_private_key, &deployer)?;
 
-    if is_simulation {
-        logger::info(format!("Simulation mode: forking {} via anvil", args.l1_rpc_url));
-    }
-    let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
-    let mut runner = ForgeRunner::new();
 
-    // Step 1: Deploy hub contracts (as sender)
-    logger::info(format!("Deploying hub contracts as sender: {:#x}", sender));
-    logger::info(format!("Owner will be: {:#x}", owner));
-
-    let deploy_input = DeployInput {
-        owner,
+    let input = HubInitInput {
+        owner: owner.address,
         era_chain_id: args.era_chain_id,
         with_legacy_bridge: args.with_legacy_bridge,
         create2_factory_addr: args.create2_factory_addr,
         create2_factory_salt: args.create2_factory_salt,
     };
-
-    let mut ctx = ForgeContext {
-        shell,
-        foundry_scripts_path: foundry_scripts_path.as_path(),
-        runner: &mut runner,
-        forge_args: &args.forge_args.script,
-        l1_rpc_url: effective_rpc,
-        auth: &sender_auth,
-    };
-    let output = deploy(&mut ctx, &deploy_input)?;
-
-    // Step 2: Accept ownership (as owner)
-    logger::info(format!("Accepting ownership as owner: {:#x}", owner));
-    let deployed = &output.deployed_addresses;
-    let accept_input = AcceptOwnershipInput {
-        bridgehub: deployed.bridgehub.bridgehub_proxy_addr,
-        governance: deployed.governance_addr,
-        chain_admin: deployed.chain_admin,
-    };
-    ctx.auth = &owner_auth;
-    accept_ownership(&mut ctx, &accept_input).await?;
+    let output = hub_init(&mut runner, &deployer, &owner, &input).await?;
 
     let bridgehub_addr = output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
 
     if let Some(out_path) = &args.out {
         let input_echo = HubInitInputEcho {
-            sender,
-            owner,
+            sender: deployer.address,
+            owner: owner.address,
             l1_rpc_url: args.l1_rpc_url.clone(),
             era_chain_id: args.era_chain_id,
             with_legacy_bridge: args.with_legacy_bridge,
@@ -144,20 +102,9 @@ pub async fn run(args: HubInitArgs, shell: &Shell) -> anyhow::Result<()> {
         logger::info(format!("Full output written to: {}", out_path.display()));
     }
 
-    if is_simulation {
-        logger::outro(format!(
-            "Hub init simulation complete — Bridgehub Proxy: {:#x}",
-            bridgehub_addr
-        ));
-    } else {
-        logger::outro(format!("Bridgehub Proxy deployed at: {:#x}", bridgehub_addr));
-    }
-
-    drop(execution_mode);
+    logger::outro(format!("Bridgehub Proxy: {:#x}", bridgehub_addr));
     Ok(())
 }
-
-// ── Library function (for programmatic use) ─────────────────────────────────
 
 /// Input parameters for hub init.
 #[derive(Debug, Clone)]
@@ -171,10 +118,12 @@ pub struct HubInitInput {
 
 /// Initialize hub: deploy contracts and accept ownership.
 pub async fn hub_init(
-    ctx: &mut ForgeContext<'_>,
+    runner: &mut ForgeRunner,
+    deployer: &Wallet,
+    owner: &Wallet,
     input: &HubInitInput,
 ) -> anyhow::Result<DeployL1CoreContractsOutput> {
-    logger::info("Deploying hub contracts...");
+    logger::step("Deploying Bridgehub contracts...");
     let deploy_input = DeployInput {
         owner: input.owner,
         era_chain_id: input.era_chain_id,
@@ -182,16 +131,16 @@ pub async fn hub_init(
         create2_factory_addr: input.create2_factory_addr,
         create2_factory_salt: input.create2_factory_salt,
     };
-    let output = deploy(ctx, &deploy_input)?;
+    let output = deploy(runner, deployer, &deploy_input)?;
 
-    logger::info("Accepting ownership of hub contracts...");
+    logger::step("Accepting ownership of Bridgehub contracts...");
     let deployed = &output.deployed_addresses;
     let accept_input = AcceptOwnershipInput {
         bridgehub: deployed.bridgehub.bridgehub_proxy_addr,
         governance: deployed.governance_addr,
         chain_admin: deployed.chain_admin,
     };
-    accept_ownership(ctx, &accept_input).await?;
+    accept_ownership(runner, owner, &accept_input).await?;
 
     Ok(output)
 }

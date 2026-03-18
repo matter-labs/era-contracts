@@ -1,8 +1,8 @@
 use ethers::types::{Address, H256};
 use crate::common::{
-    forge::ForgeContext,
-    logger,
+    forge::ForgeRunner,
     traits::SaveConfig,
+    wallets::Wallet,
 };
 use crate::config::{
     forge_interface::{
@@ -26,10 +26,9 @@ pub struct DeployInput {
 }
 
 /// Deploy hub contracts and return the output.
-pub fn deploy(ctx: &mut ForgeContext, input: &DeployInput) -> anyhow::Result<DeployL1CoreContractsOutput> {
+pub fn deploy(runner: &mut ForgeRunner, auth: &Wallet, input: &DeployInput) -> anyhow::Result<DeployL1CoreContractsOutput> {
     let mut initial_config = InitialDeploymentConfig::default();
 
-    // Override create2 factory settings if provided
     if let Some(addr) = input.create2_factory_addr {
         initial_config.create2_factory_addr = Some(addr);
     }
@@ -37,12 +36,11 @@ pub fn deploy(ctx: &mut ForgeContext, input: &DeployInput) -> anyhow::Result<Dep
         initial_config.create2_factory_salt = salt;
     }
 
-    // Update permanent-values.toml so Forge scripts use the correct factory
     let permanent_values = PermanentValuesConfig::new(
         initial_config.create2_factory_addr,
         initial_config.create2_factory_salt,
     );
-    permanent_values.save(ctx.shell, PermanentValuesConfig::path(ctx.foundry_scripts_path))?;
+    permanent_values.save(&runner.shell, PermanentValuesConfig::path(&runner.foundry_scripts_path))?;
 
     let deploy_config = DeployL1Config::new(
         input.owner,
@@ -51,6 +49,5 @@ pub fn deploy(ctx: &mut ForgeContext, input: &DeployInput) -> anyhow::Result<Dep
         input.with_legacy_bridge,
     );
 
-    logger::info("Deploying hub contracts...");
-    ctx.run(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS, &deploy_config)
+    runner.run_script(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS, &deploy_config, auth)
 }

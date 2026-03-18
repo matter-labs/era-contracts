@@ -2,16 +2,14 @@ use std::path::PathBuf;
 use clap::Parser;
 use ethers::types::{Address, H256};
 use crate::common::{
-    forge::{resolve_execution, ExecutionMode, Forge, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth},
-    logger, paths
+    constants::DETERMINISTIC_CREATE2_ADDRESS,
+    forge::{Forge, ForgeRunner, ForgeScriptArgs},
+    logger,
+    wallets::Wallet,
 };
 use crate::commands::output::CommandEnvelope;
 use serde_json::json;
 use serde::{Deserialize, Serialize};
-use xshell::Shell;
-
-/// The deterministic CREATE2 factory address (Arachnid's deterministic-deployment-proxy)
-pub const DETERMINISTIC_CREATE2_ADDRESS: &str = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct DeployCreate2Args {
@@ -37,63 +35,36 @@ pub struct DeployCreate2Args {
     // Forge options
     #[clap(flatten)]
     #[serde(flatten)]
-    pub forge_args: ForgeArgs,
+    pub forge_args: ForgeScriptArgs,
 }
 
-pub async fn run(args: DeployCreate2Args, shell: &Shell) -> anyhow::Result<()> {
-    let foundry_scripts_path = paths::path_from_root("l1-contracts");
+pub async fn run(args: DeployCreate2Args) -> anyhow::Result<()> {
+    let deployer = Wallet::parse(args.private_key, args.sender)?;
+    let mut runner = ForgeRunner::new(args.simulate, &args.l1_rpc_url, args.forge_args.clone())?;
 
-    let (auth, _sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
-
-    let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
-    if is_simulation {
-        logger::info(format!(
-            "Simulation mode: forking {} via anvil",
-            args.l1_rpc_url
-        ));
-    }
-
-    let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
-    let mut runner = ForgeRunner::new();
-
-    let mut ctx = ForgeContext {
-        shell,
-        foundry_scripts_path: foundry_scripts_path.as_path(),
-        runner: &mut runner,
-        forge_args: &args.forge_args.script,
-        l1_rpc_url: effective_rpc,
-        auth: &auth,
-    };
-
-    deploy_create2_factory(&mut ctx)?;
+    deploy_create2_factory(&mut runner, &deployer)?;
 
     if let Some(out_path) = &args.out {
-        let envelope = CommandEnvelope::new("ecosystem.deploy-create2", json!({}), json!({}), &ctx.runner);
+        let envelope = CommandEnvelope::new("ecosystem.deploy-create2", json!({}), json!({}), &runner);
         envelope.write_to_file(out_path)?;
         logger::info(format!("Full output written to: {}", out_path.display()));
     }
-    
-    drop(execution_mode);
+
+    logger::outro(format!("CREATE2 factory at: {}", DETERMINISTIC_CREATE2_ADDRESS));
+
     Ok(())
 }
 
-pub fn deploy_create2_factory(ctx: &mut ForgeContext) -> anyhow::Result<()> {
-    let mut forge = Forge::new(ctx.foundry_scripts_path)
+pub fn deploy_create2_factory(runner: &mut ForgeRunner, auth: &Wallet) -> anyhow::Result<()> {
+    let forge = Forge::new(&runner.foundry_scripts_path)
         .script(
             &std::path::PathBuf::from("deploy-scripts/ecosystem/DeployCreate2Factory.s.sol"),
-            ctx.forge_args.clone(),
+            runner.forge_args.clone(),
         )
         .with_ffi()
-        .with_rpc_url(ctx.l1_rpc_url.to_string())
-        .with_broadcast();
+        .with_rpc_url(runner.rpc_url.clone())
+        .with_broadcast()
+        .with_wallet(auth, runner.simulate);
 
-    match ctx.auth {
-        SenderAuth::PrivateKey(pk) => forge = forge.with_private_key(*pk),
-        SenderAuth::Unlocked(addr) => {
-            forge = forge.with_sender(format!("{:#x}", addr)).with_unlocked()
-        }
-    }
-
-    ctx.runner.run(ctx.shell, forge)
+    runner.run(forge)
 }

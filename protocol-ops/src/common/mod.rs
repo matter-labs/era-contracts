@@ -2,8 +2,8 @@ mod term;
 
 pub mod anvil;
 pub mod cmd;
+pub mod constants;
 pub mod config;
-pub mod contracts;
 pub mod ethereum;
 pub mod files;
 pub mod forge;

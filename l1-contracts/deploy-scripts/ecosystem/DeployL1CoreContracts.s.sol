@@ -197,6 +197,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
 
     function setL1NativeTokenVaultParams() internal {
         IL1AssetRouter sharedBridge = IL1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
+        L1AssetRouter l1AssetRouter = L1AssetRouter(coreAddresses.bridges.proxies.l1AssetRouter);
         IL1Nullifier l1Nullifier = IL1Nullifier(coreAddresses.bridges.proxies.l1Nullifier);
         // Ownable ownable = Ownable(coreAddresses.bridges.proxies.l1AssetRouter);
         vm.broadcast(getDeployerAddress());

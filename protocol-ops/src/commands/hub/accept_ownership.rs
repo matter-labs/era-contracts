@@ -1,7 +1,8 @@
 use ethers::types::Address;
 use crate::common::{
-    forge::ForgeContext,
+    forge::ForgeRunner,
     logger,
+    wallets::Wallet,
 };
 
 use crate::admin_functions::{accept_admin, accept_owner_aggregated};
@@ -17,36 +18,15 @@ pub struct AcceptOwnershipInput {
 
 /// Accept ownership of hub contracts.
 pub async fn accept_ownership(
-    ctx: &mut ForgeContext<'_>,
+    runner: &mut ForgeRunner,
+    auth: &Wallet,
     input: &AcceptOwnershipInput,
 ) -> anyhow::Result<()> {
-    let governor_wallet = ctx.auth.to_wallet()?;
-
     logger::step("Accepting ownership of Bridgehub admin...");
-    accept_admin(
-        ctx.shell,
-        ctx.runner,
-        ctx.foundry_scripts_path,
-        input.chain_admin,
-        &governor_wallet,
-        input.bridgehub,
-        ctx.forge_args,
-        ctx.l1_rpc_url.to_string(),
-    )
-    .await?;
+    accept_admin(runner, input.chain_admin, auth, input.bridgehub).await?;
 
     logger::step("Accepting ownership of ecosystem governance contracts...");
-    accept_owner_aggregated(
-        ctx.shell,
-        ctx.runner,
-        ctx.foundry_scripts_path,
-        input.governance,
-        &governor_wallet,
-        input.bridgehub,
-        &ctx.forge_args,
-        ctx.l1_rpc_url.to_string(),
-    )
-    .await?;
+    accept_owner_aggregated(runner, input.governance, auth, input.bridgehub).await?;
 
     Ok(())
 }

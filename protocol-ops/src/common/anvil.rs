@@ -6,8 +6,6 @@ use std::{
 
 use anyhow::{bail, Context};
 
-use crate::common::logger;
-
 /// A running anvil instance. Killed on drop.
 pub struct AnvilInstance {
     child: Child,
@@ -37,10 +35,6 @@ impl Drop for AnvilInstance {
 pub fn start_anvil_fork(fork_url: &str) -> anyhow::Result<AnvilInstance> {
     let port = pick_unused_port()?;
 
-    logger::info(format!(
-        "Starting anvil fork of {fork_url} on port {port}..."
-    ));
-
     let mut child = Command::new("anvil")
         .args([
             "--fork-url",
@@ -61,8 +55,6 @@ pub fn start_anvil_fork(fork_url: &str) -> anyhow::Result<AnvilInstance> {
         .context("failed to capture anvil stdout")?;
 
     let rpc_url = wait_for_ready(stdout, port, Duration::from_secs(30))?;
-
-    logger::info(format!("Anvil ready at {rpc_url}"));
 
     Ok(AnvilInstance {
         child,

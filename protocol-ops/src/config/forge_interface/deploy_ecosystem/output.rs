@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use ethers::types::{Address, U256};
+use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
 use crate::common::traits::FileConfigTrait;
@@ -51,19 +49,3 @@ pub struct L1BridgesOutput {
     pub l1_nullifier_proxy_addr: Address,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Erc20Token {
-    pub address: Address,
-    pub name: String,
-    pub symbol: String,
-    pub decimals: u64,
-    pub implementation: String,
-    pub mint: U256,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct ERC20Tokens {
-    pub tokens: HashMap<String, Erc20Token>,
-}
-
-impl FileConfigTrait for ERC20Tokens {}
