@@ -95,14 +95,21 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @notice The total number of published interop roots.
     /// @dev Used inside the `NewInteropRoot` event, used for indexing purposes by the node.
     /// @dev Note that it counts roots starting from V31 ONLY.
+    /// @dev Each distinct block that emits at least one NewInteropRoot contributes exactly one
+    /// increment to this counter. Multiple emissions within the same block share the same logId.
     uint256 public totalPublishedInteropRoots;
+
+    /// @notice The block number at which the last interop root was emitted.
+    /// @dev Used to ensure logId increments per block: within the same block all NewInteropRoot
+    /// events share the same logId value, and the counter only advances when the block changes.
+    uint256 public lastEmitBlock;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[36] private __gap;
+    uint256[35] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
@@ -193,6 +200,8 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     }
 
     /// @notice Emits a new interop root event when the shared tree root changes.
+    /// @dev The logId (totalPublishedInteropRoots) increments at most once per block. All emissions
+    /// within the same block share the same logId so that the server node can group them by block.
     function _emitRoot(bytes32 _root) internal {
         // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
         // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
@@ -200,7 +209,11 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         _sides[0] = _root;
 
         uint256 currentCount = totalPublishedInteropRoots;
-        totalPublishedInteropRoots = currentCount + 1;
+        if (block.number != lastEmitBlock) {
+            ++currentCount;
+            totalPublishedInteropRoots = currentCount;
+            lastEmitBlock = block.number;
+        }
 
         emit NewInteropRoot(block.chainid, block.number, currentCount, _sides);
     }
