@@ -2071,13 +2071,13 @@
   },
   {
     "contractName": "l1-contracts/SystemContext",
-    "zkBytecodeHash": "0x0100001d3f36441617170a6b4abc85b780e52ca934f859b8872b143179217aae",
+    "zkBytecodeHash": "0x0100003d4499ce7d24a1ae6f9a18c7ff3f34b5ee7f50333521df9d37cac19e62",
     "zkBytecodePath": "/l1-contracts/zkout/SystemContext.sol/SystemContext.json",
-    "evmBytecodeHash": "0x2a1e7403a5ec9ec4ba56384142c990e419b3eb2177a2e8b2ed97554402a23633",
+    "evmBytecodeHash": "0x6875e44245ec67e59b67c886b286c4760ed736d535bd4fafe5f02f2603614231",
     "evmBytecodePath": "/l1-contracts/out/SystemContext.sol/SystemContext.json",
-    "evmDeployedBytecodeHash": "0xd9a19c78d9ffc43ed66222a6a7ce58cb503c35b73bec60b0cb772619cf3f3aad",
-    "evmDeployedBytecodeBlakeHash": "0x8c4a60b28dae49a3c8e5914edb28b0dd9d3e0f2e583acfbab4b17f272607a314",
-    "evmDeployedBytecodeLength": 442
+    "evmDeployedBytecodeHash": "0x47bbe6fbac3530008f5e50cd8956611d6fdb9a2d2b0a30e58d369a30c1b74d86",
+    "evmDeployedBytecodeBlakeHash": "0x158c686e0d2c9a4f800e70e8a3c8957b0ee8cd0e2b0b9abedc547e1dbcc09ffc",
+    "evmDeployedBytecodeLength": 570
   },
   {
     "contractName": "l1-contracts/SystemContractProxy",
