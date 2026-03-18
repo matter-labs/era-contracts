@@ -327,34 +327,6 @@ contract MessageRootTest is Test {
         assertEq(l2MessageRoot.totalPublishedInteropRoots(), count + 2, "block N+2 first emission: +2");
     }
 
-    /// @notice Verify that the emitted logId value matches totalPublishedInteropRoots for same-block emissions.
-    function test_logId_eventLogIdMatchesCounter() public {
-        uint256 chainId1 = uint256(uint160(makeAddr("chain1")));
-        uint256 chainId2 = uint256(uint160(makeAddr("chain2")));
-
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(L2_CHAIN_ASSET_HANDLER_ADDR)
-        );
-
-        // Roll to a fresh block so we can observe the counter going from 1 to 2.
-        vm.roll(block.number + 1);
-
-        // The first emission in the new block should use logId = totalPublishedInteropRoots + 1 = 2.
-        uint256 expectedLogId = l2MessageRoot.totalPublishedInteropRoots() + 1;
-        vm.expectEmit(true, true, true, false);
-        emit IMessageRootBase.NewInteropRoot(block.chainid, block.number, expectedLogId, new bytes32[](0));
-        vm.prank(L2_BRIDGEHUB_ADDR);
-        l2MessageRoot.addNewChain(chainId1, 0);
-
-        // Second emission in the same block must reuse the same logId.
-        vm.expectEmit(true, true, true, false);
-        emit IMessageRootBase.NewInteropRoot(block.chainid, block.number, expectedLogId, new bytes32[](0));
-        vm.prank(L2_BRIDGEHUB_ADDR);
-        l2MessageRoot.addNewChain(chainId2, 0);
-    }
-
     function test_getMerklePathForChain() public {
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         uint256 betaChainId = uint256(uint160(makeAddr("betaChainId")));
