@@ -55,7 +55,7 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
 
 // TODO: pass this value from zkstack_cli
-uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 6;
+uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 7;
 
 contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
