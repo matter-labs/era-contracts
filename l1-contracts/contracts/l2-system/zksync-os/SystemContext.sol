@@ -33,7 +33,11 @@ contract SystemContext {
 
     function setSettlementLayerChainId(uint256 _newSettlementLayerChainId) external onlyCallFromBootloader {
         if (currentSettlementLayerChainId != _newSettlementLayerChainId) {
-            IL2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).setSettlementLayerChainId(currentSettlementLayerChainId, _newSettlementLayerChainId);
+            // slither-disable-next-line reentrancy-no-eth
+            IL2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).setSettlementLayerChainId(
+                currentSettlementLayerChainId,
+                _newSettlementLayerChainId
+            );
             currentSettlementLayerChainId = _newSettlementLayerChainId;
             emit SettlementLayerChainIdUpdated(_newSettlementLayerChainId);
         }
