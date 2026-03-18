@@ -82,7 +82,7 @@ describe("07 - Private Interop", function () {
     const sourceWallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, sourceProvider);
     const addrs = privateAddresses[sourceChainId];
 
-    const interopCenter = new Contract(addrs.interopCenter, getAbi("PrivateInteropCenter"), sourceWallet);
+    const interopCenter = new Contract(addrs.interopCenter, getAbi("InteropCenter"), sourceWallet);
     const abiCoder = ethers.utils.defaultAbiCoder;
 
     // Build a simple direct call (not indirect) to test message format
@@ -136,7 +136,7 @@ describe("07 - Private Interop", function () {
     const sourceWallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, sourceProvider);
     const addrs = privateAddresses[sourceChainId];
 
-    const interopCenter = new Contract(addrs.interopCenter, getAbi("PrivateInteropCenter"), sourceWallet);
+    const interopCenter = new Contract(addrs.interopCenter, getAbi("InteropCenter"), sourceWallet);
     const abiCoder = ethers.utils.defaultAbiCoder;
 
     const targetChainId = gwSettledChainIds[1];
