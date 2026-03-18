@@ -381,6 +381,32 @@
   },
   {
     "type": "function",
+    "name": "interopRootLogId",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "lastEmitBlock",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "proveL1DepositParamsInclusion",
     "inputs": [
       {
@@ -724,19 +750,6 @@
       },
       {
         "name": "_leafNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "interopRootLogId",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }
