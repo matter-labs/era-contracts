@@ -1,16 +1,32 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import "forge-std/Test.sol";
-import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import "contracts/l2-system/zksync-os/SystemContext.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {
+    L2_BOOTLOADER_ADDRESS,
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {SystemContext} from "contracts/l2-system/zksync-os/SystemContext.sol";
 import {Unauthorized} from "contracts/l2-system/zksync-os/errors/ZKOSContractErrors.sol";
+import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
+import {IL2ChainAssetHandler} from "contracts/core/chain-asset-handler/IL2ChainAssetHandler.sol";
 
 contract SystemContextTest is Test {
-    SystemContext systemContext;
+    SystemContext internal systemContext;
 
-    function setUp() public {
-        systemContext = new SystemContext();
+    function setUp() public virtual {
+        // Etch the real L2ChainAssetHandler bytecode at its canonical address so that
+        // SystemContext's external call does not revert with "call to non-contract address".
+        L2ChainAssetHandler cahImpl = new L2ChainAssetHandler();
+        vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, address(cahImpl).code);
+
+        // Etch the real SystemContext bytecode at its canonical system address so that
+        // the onlySystemContext modifier in L2ChainAssetHandler (msg.sender check) passes.
+        SystemContext scImpl = new SystemContext();
+        vm.etch(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, address(scImpl).code);
+        systemContext = SystemContext(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR);
     }
 
     function test_setSettlementLayerChainId_works_andEmitsEvent() public {
