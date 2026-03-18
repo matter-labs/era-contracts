@@ -360,9 +360,9 @@ contract MessageRoot_Extended_Test is Test {
         l2MessageRoot.addNewChain(chainId, 0);
 
         // With per-block logId: initL2 + addNewChain(chainId) both happen in the same block, so
-        // totalPublishedInteropRoots is incremented only once (for that block).
-        uint256 countBefore = l2MessageRoot.totalPublishedInteropRoots();
-        assertEq(countBefore, 1, "totalPublishedInteropRoots should be 1 (single block so far)");
+        // interopRootLogId is incremented only once (for that block).
+        uint256 countBefore = l2MessageRoot.interopRootLogId();
+        assertEq(countBefore, 1, "interopRootLogId should be 1 (single block so far)");
 
         // Roll to a new block so the next emission increments the counter.
         vm.roll(block.number + 1);
@@ -371,11 +371,11 @@ contract MessageRoot_Extended_Test is Test {
         vm.prank(GW_ASSET_TRACKER_ADDR);
         l2MessageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
 
-        // Verify totalPublishedInteropRoots incremented once for the new block
+        // Verify interopRootLogId incremented once for the new block
         assertEq(
-            l2MessageRoot.totalPublishedInteropRoots(),
+            l2MessageRoot.interopRootLogId(),
             countBefore + 1,
-            "totalPublishedInteropRoots should increment by 1 when block advances"
+            "interopRootLogId should increment by 1 when block advances"
         );
 
         // Check that historical root is set

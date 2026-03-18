@@ -92,12 +92,11 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @dev An expected invariant is that for all batches starting from currentChainBatchNumber + 1, the `chainBatchRoots` is 0.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
-    /// @notice The total number of published interop roots.
-    /// @dev Used inside the `NewInteropRoot` event, used for indexing purposes by the node.
-    /// @dev Note that it counts roots starting from V31 ONLY.
-    /// @dev Each distinct block that emits at least one NewInteropRoot contributes exactly one
-    /// increment to this counter. Multiple emissions within the same block share the same logId.
-    uint256 public totalPublishedInteropRoots;
+    /// @notice The current logId value emitted in `NewInteropRoot` events.
+    /// @dev Increments at most once per block: all emissions within the same block share the same
+    /// logId, and the counter only advances when `block.number` changes.
+    /// @dev Note that it counts starting from V31 ONLY.
+    uint256 public interopRootLogId;
 
     /// @notice The block number at which the last interop root was emitted.
     /// @dev Used to ensure logId increments per block: within the same block all NewInteropRoot
@@ -200,7 +199,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     }
 
     /// @notice Emits a new interop root event when the shared tree root changes.
-    /// @dev The logId (totalPublishedInteropRoots) increments at most once per block. All emissions
+    /// @dev The logId (interopRootLogId) increments at most once per block. All emissions
     /// within the same block share the same logId so that the server node can group them by block.
     function _emitRoot(bytes32 _root) internal {
         // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
@@ -208,10 +207,10 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         bytes32[] memory _sides = new bytes32[](1);
         _sides[0] = _root;
 
-        uint256 currentCount = totalPublishedInteropRoots;
+        uint256 currentCount = interopRootLogId;
         if (block.number != lastEmitBlock) {
             ++currentCount;
-            totalPublishedInteropRoots = currentCount;
+            interopRootLogId = currentCount;
             lastEmitBlock = block.number;
         }
 

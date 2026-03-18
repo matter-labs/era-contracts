@@ -732,7 +732,7 @@
   },
   {
     "type": "function",
-    "name": "totalPublishedInteropRoots",
+    "name": "interopRootLogId",
     "inputs": [],
     "outputs": [
       {
