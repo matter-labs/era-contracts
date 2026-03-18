@@ -66,8 +66,14 @@ function parseArgs() {
   if (opts.from && opts.to) {
     const src = KNOWN_CHAINS[opts.from];
     const tgt = KNOWN_CHAINS[opts.to];
-    if (!src) { console.error(`Unknown chain: ${opts.from}. Known: ${Object.keys(KNOWN_CHAINS).join(", ")}`); process.exit(1); }
-    if (!tgt) { console.error(`Unknown chain: ${opts.to}. Known: ${Object.keys(KNOWN_CHAINS).join(", ")}`); process.exit(1); }
+    if (!src) {
+      console.error(`Unknown chain: ${opts.from}. Known: ${Object.keys(KNOWN_CHAINS).join(", ")}`);
+      process.exit(1);
+    }
+    if (!tgt) {
+      console.error(`Unknown chain: ${opts.to}. Known: ${Object.keys(KNOWN_CHAINS).join(", ")}`);
+      process.exit(1);
+    }
     sourceRpc = src.rpcUrl;
     targetRpc = tgt.rpcUrl;
     sourceIc = src.addresses.interopCenter;
@@ -91,7 +97,10 @@ function parseArgs() {
 
 async function main() {
   const pk = process.env.DEPLOYER_PK;
-  if (!pk) { console.error("Set DEPLOYER_PK"); process.exit(1); }
+  if (!pk) {
+    console.error("Set DEPLOYER_PK");
+    process.exit(1);
+  }
 
   const { txHash, sourceRpc, targetRpc, sourceIc, targetIh, sourceChainId } = parseArgs();
 
@@ -102,8 +111,14 @@ async function main() {
   // Step 1: Get source tx receipt and extract bundle
   console.log(`Fetching tx ${txHash}...`);
   const receipt = await sourceProvider.getTransactionReceipt(txHash);
-  if (!receipt) { console.error("Transaction not found"); process.exit(1); }
-  if (receipt.status !== 1) { console.error("Source tx failed"); process.exit(1); }
+  if (!receipt) {
+    console.error("Transaction not found");
+    process.exit(1);
+  }
+  if (receipt.status !== 1) {
+    console.error("Source tx failed");
+    process.exit(1);
+  }
 
   const ic = new Contract(sourceIc, getAbi("InteropCenter"), sourceProvider);
   let interopBundle: unknown = null;
@@ -115,9 +130,14 @@ async function main() {
         interopBundle = (parsed.args as any).interopBundle;
         break;
       }
-    } catch { /* skip */ }
+    } catch {
+      /* skip */
+    }
   }
-  if (!interopBundle) { console.error("InteropBundleSent event not found in tx"); process.exit(1); }
+  if (!interopBundle) {
+    console.error("InteropBundleSent event not found in tx");
+    process.exit(1);
+  }
   console.log("Bundle extracted.");
 
   // Step 2: Execute on target
@@ -136,7 +156,7 @@ async function main() {
   const gasPrice = await targetProvider.getGasPrice();
   const overrides = { gasPrice: gasPrice.mul(2), gasLimit: 30_000_000, type: 0 };
 
-  console.log(`Executing bundle on target chain...`);
+  console.log("Executing bundle on target chain...");
   try {
     const execTx = await ih.executeBundle(bundleData, mockProof, overrides);
     const execReceipt = await execTx.wait();
@@ -163,4 +183,7 @@ async function main() {
   }
 }
 
-main().catch((err) => { console.error(err.message || err); process.exit(1); });
+main().catch((err) => {
+  console.error(err.message || err);
+  process.exit(1);
+});

@@ -266,19 +266,25 @@ export class DeploymentRunner {
     fs.mkdirSync(tmpDir, { recursive: true });
 
     const loadStatePaths: Record<number, string> = {};
+    const skippedChains: number[] = [];
     for (const chainConfig of config.chains) {
       const stateFile = path.join(stateDir, `${chainConfig.chainId}.json`);
       if (!fs.existsSync(stateFile)) {
-        throw new Error(`State file not found: ${stateFile}`);
+        skippedChains.push(chainConfig.chainId);
+        continue;
       }
       const nativeFile = path.join(tmpDir, `${chainConfig.chainId}.json`);
       this.decompressStateFile(stateFile, nativeFile);
       loadStatePaths[chainConfig.chainId] = nativeFile;
     }
+    if (skippedChains.length > 0) {
+      console.log(`  Skipping chains without state files: ${skippedChains.join(", ")}`);
+    }
 
-    // Start all chains with --load-state pointing to the decompressed native JSON
+    // Start only chains that have state files
+    const chainsToStart = config.chains.filter((c) => loadStatePaths[c.chainId]);
     await Promise.all(
-      config.chains.map((chainConfig) =>
+      chainsToStart.map((chainConfig) =>
         anvilManager.startChain({
           chainId: chainConfig.chainId,
           port: chainConfig.port,

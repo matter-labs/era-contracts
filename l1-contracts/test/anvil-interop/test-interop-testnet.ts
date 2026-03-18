@@ -119,8 +119,10 @@ async function main() {
   await tx.wait();
 
   console.log(`\nSource tx: ${tx.hash}`);
-  console.log(`\nRelay with:`);
-  console.log(`  DEPLOYER_PK=$DEPLOYER_PK npx ts-node test/anvil-interop/relay-bundle.ts ${tx.hash} --from creator --to zksync_os`);
+  console.log("\nRelay with:");
+  console.log(
+    `  DEPLOYER_PK=$DEPLOYER_PK npx ts-node test/anvil-interop/relay-bundle.ts ${tx.hash} --from creator --to zksync_os`
+  );
 }
 
 main().catch((err) => {
