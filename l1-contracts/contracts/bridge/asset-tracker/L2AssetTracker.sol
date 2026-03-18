@@ -496,7 +496,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         require(tokenAddress != address(0), AssetIdNotRegistered(_assetId));
     }
 
-    function _getChainMigrationNumber(uint256 _chainId) internal view override virtual returns (uint256) {
+    function _getChainMigrationNumber(uint256 _chainId) internal view virtual override returns (uint256) {
         return L2_CHAIN_ASSET_HANDLER.migrationNumber(_chainId);
     }
 }

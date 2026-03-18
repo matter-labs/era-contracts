@@ -34,7 +34,6 @@ const SOURCE = {
 };
 
 const TARGET_CHAIN_ID = 8022833; // zksync_os_testnet
-const TARGET_IH = "0x364aB5bc8c300892Ec6A819bbB1732043CF4377A";
 
 // Final recipient of the tokens on the target chain
 const FINAL_RECIPIENT = "0xE6140D4B389a9D9A7FFcd44dBc4a22cc57b0797e";

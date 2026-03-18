@@ -303,7 +303,11 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @param _proof Proof for the message that corresponds to the bundle that is to be verified.
     /// @param _bundleHash Hash corresponding to the bundle that is to be verified.
     /// That message gets sent to L1 by origin chain in InteropCenter contract, and is picked up and included in receiving chain by sequencer.
-    function _verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bytes32 _bundleHash) internal virtual {
+    function _verifyBundle(
+        bytes memory _bundle,
+        MessageInclusionProof memory _proof,
+        bytes32 _bundleHash
+    ) internal virtual {
         // Verify that the message came from the legitimate InteropCenter.
         // It is expected that all allowed messages have gone through the GWAssetTracker which
         // ensured that if the `L2_INTEROP_CENTER_ADDR` is the sender of the message, then the message
@@ -501,12 +505,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
         // Wrap the original call into a single-element ShadowAccountCall[]
         ShadowAccountCall[] memory calls = new ShadowAccountCall[](1);
-        calls[0] = ShadowAccountCall({
-            callType: ShadowAccountCallType.Call,
-            target: _to,
-            value: _value,
-            data: _data
-        });
+        calls[0] = ShadowAccountCall({callType: ShadowAccountCallType.Call, target: _to, value: _value, data: _data});
 
         // slither-disable-next-line arbitrary-send-eth
         bytes4 selector = IERC7786Recipient(shadowAccountAddr).receiveMessage{value: _value}({
