@@ -6,6 +6,7 @@ import { l2BridgehubAbi } from "../core/contracts";
 import {
   ETH_TOKEN_ADDRESS,
   GW_ASSET_TRACKER_ADDR,
+  INITIAL_BASE_TOKEN_HOLDER_BALANCE,
   INTEROP_CENTER_ADDR,
   L1_CHAIN_ID,
   L2_ASSET_ROUTER_ADDR,
@@ -24,6 +25,7 @@ import {
   L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
   L2_TO_L1_MESSENGER_ADDR,
   L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
+  MINT_BASE_TOKEN_HOOK_ADDR,
   SERVICE_TX_SENDER_ADDR,
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
@@ -60,13 +62,19 @@ const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
   },
   {
     address: L2_BASE_TOKEN_ADDR,
-    name: "MockL2BaseToken",
-    artifactPath: "MockL2BaseToken.sol/MockL2BaseToken.json",
+    name: "L2BaseTokenZKOS",
+    artifactPath: "L2BaseTokenZKOS.sol/L2BaseTokenZKOS.json",
   },
   {
     address: L2_MESSAGE_VERIFICATION_ADDR,
     name: "MockL2MessageVerification",
     artifactPath: "MockL2MessageVerification.sol/MockL2MessageVerification.json",
+  },
+  // Mock ZK-VM hook: MINT_BASE_TOKEN_HOOK (0x7100) — returns success so initL2() can proceed
+  {
+    address: MINT_BASE_TOKEN_HOOK_ADDR,
+    name: "MockMintBaseTokenHook",
+    artifactPath: "MockMintBaseTokenHook.sol/MockMintBaseTokenHook.json",
   },
   // Infrastructure contracts needed before/during genesis upgrade execution
   {
@@ -277,7 +285,13 @@ export class L2GenesisUpgradeDeployer {
     // Step 1: Pre-deploy all contracts (isZKsyncOS=true skips force deploys in genesis upgrade)
     await this.ensurePredeployedContracts();
 
-    // Step 2: Relay the real genesis upgrade priority tx from L1
+    // Step 2: Pre-fund L2BaseToken with INITIAL_BASE_TOKEN_HOLDER_BALANCE.
+    // The real initL2() calls MINT_BASE_TOKEN_HOOK to mint ETH, then transfers it to BaseTokenHolder.
+    // Our mock hook returns success but doesn't mint, so we pre-fund via anvil_setBalance.
+    console.log("   Pre-funding L2BaseToken for initL2() → BaseTokenHolder transfer...");
+    await this.l2Provider.send("anvil_setBalance", [L2_BASE_TOKEN_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE]);
+
+    // Step 3: Relay the real genesis upgrade priority tx from L1
     await this.relayGenesisPriorityTx(genesisPriorityTx);
 
     // Step 3: Register interop chains (test-only shortcut, not production flow)

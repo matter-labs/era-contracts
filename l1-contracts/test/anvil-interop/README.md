@@ -196,10 +196,12 @@ L2 system contracts are ZK-VM bytecode and cannot run on Anvil. The following mo
 
 | Mock Contract | Address | What it replaces | Key difference |
 |---|---|---|---|
-| `MockL2BaseToken` | `0x800a` | L2BaseToken | Returns `type(uint256).max` for all balances; `burnMsgValue` is a no-op (Anvil tracks ETH natively) |
 | `MockL2ToL1Messenger` | `0x8008` | L2ToL1Messenger | Only emits `L1MessageSent` event; no merkle tree or proof construction |
 | `MockL2MessageVerification` | `0x10009` | L2MessageVerification | All proof verification functions return `true` unconditionally |
 | `MockSystemContext` | `0x800b` | SystemContext | Minimal implementation without ZK-VM state tracking |
+| `MockMintBaseTokenHook` | `0x7100` | MINT_BASE_TOKEN_HOOK | Returns success without minting; L2BaseToken is pre-funded via `anvil_setBalance` |
+
+Note: The real `L2BaseTokenZKOS` contract is used at `0x800a` — the old `MockL2BaseToken` is no longer needed since the burner pattern was removed.
 
 ### Proof Verification Bypass
 

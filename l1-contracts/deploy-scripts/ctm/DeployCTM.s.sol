@@ -574,7 +574,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             );
             return abi.encode(_cachedZKOSBytecodeInfo(implBytecode), _cachedZKOSBytecodeInfo(proxyBytecode));
         }
-        return _getProxyUpgradeBytecodeInfo(fileName, contractName);
+        return Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
     }
 
     function _buildForceDeploymentsData(
