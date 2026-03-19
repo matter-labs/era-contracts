@@ -172,13 +172,11 @@ async function main(): Promise<void> {
   const anvilManager = new AnvilManager();
   const runner = new DeploymentRunner();
   let cleanupUpgradeHarnessInputs: (() => void) | null = null;
-  let upgradeHarnessInputs:
-    | {
-        envVars: Record<string, string>;
-        ecosystemOutputPath: string;
-        cleanup: () => void;
-      }
-    | null = null;
+  let upgradeHarnessInputs: {
+    envVars: Record<string, string>;
+    ecosystemOutputPath: string;
+    cleanup: () => void;
+  } | null = null;
 
   try {
     // ── Step 1: Load v29 chain states ───────────────────────────────

@@ -3,12 +3,7 @@ import { relayTx } from "../core/utils";
 import { getAbi, getBytecode } from "../core/contracts";
 import { PREDEPLOY_SYSTEM_CONTRACTS } from "../core/predeploys";
 import type { SystemContractPredeploy } from "../core/predeploys";
-import {
-  INITIAL_BASE_TOKEN_HOLDER_BALANCE,
-  L1_CHAIN_ID,
-  L2_BASE_TOKEN_ADDR,
-  SYSTEM_CONTEXT_ADDR,
-} from "../core/const";
+import { INITIAL_BASE_TOKEN_HOLDER_BALANCE, L1_CHAIN_ID, L2_BASE_TOKEN_ADDR, SYSTEM_CONTEXT_ADDR } from "../core/const";
 import type { PriorityRequestData } from "../core/types";
 import { setSettlementLayerViaBootloader } from "../helpers/harness-shims";
 

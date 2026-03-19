@@ -1,4 +1,5 @@
-import { Contract, providers } from "ethers";
+import type { providers } from "ethers";
+import { Contract } from "ethers";
 import type { ContractInterface } from "@ethersproject/contracts";
 import { impersonateAndRun } from "../core/utils";
 import { L2_BOOTLOADER_ADDR, SYSTEM_CONTEXT_ADDR } from "../core/const";
