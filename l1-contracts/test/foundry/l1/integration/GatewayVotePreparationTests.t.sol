@@ -71,10 +71,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
 
         _writeGatewayVotePreparationConfig();
 
-        vm.setEnv(
-            "GATEWAY_VOTE_PREPARATION_INPUT",
-            GATEWAY_VOTE_PREPARATION_CONFIG_PATH
-        );
+        vm.setEnv("GATEWAY_VOTE_PREPARATION_INPUT", GATEWAY_VOTE_PREPARATION_CONFIG_PATH);
         vm.setEnv("GATEWAY_VOTE_PREPARATION_OUTPUT", GATEWAY_VOTE_PREPARATION_OUTPUT_PATH);
     }
 
