@@ -17,13 +17,30 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
   const runner = new DeploymentRunner();
   let state: ReturnType<typeof runner.loadState>;
   let directSettledChainId: number;
+  let initialDirectChainBalance: BigNumber;
+  let initialTotalChainBalance: BigNumber;
+  let depositMintValue: BigNumber | null = null;
+  let withdrawalAmount: BigNumber | null = null;
 
-  before(() => {
+  before(async () => {
     state = runner.loadState();
     if (!state.chains || !state.l1Addresses || !state.chainAddresses) {
       throw new Error("Deployment state incomplete. Run setup first.");
     }
     directSettledChainId = getChainIdByRole(state.chains.config, "directSettled");
+
+    const tracker = createBalanceTrackerFromState(state);
+    const l1Provider = new ethers.providers.JsonRpcProvider(state.chains.l1!.rpcUrl);
+    const assetId = await queryEthAssetId(l1Provider, state.l1Addresses.l1NativeTokenVault);
+
+    initialDirectChainBalance = await tracker.getL1ChainBalance(directSettledChainId, assetId);
+    initialTotalChainBalance = BigNumber.from(0);
+    for (const chainConfig of state.chains.config) {
+      if (!chainConfig.isL1) {
+        const balance = await tracker.getL1ChainBalance(chainConfig.chainId, assetId);
+        initialTotalChainBalance = initialTotalChainBalance.add(balance);
+      }
+    }
   });
 
   describe("ETH deposits L1 -> L2", () => {
@@ -53,6 +70,7 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
       });
 
       expect(result.l1TxHash).to.not.be.null;
+      depositMintValue = result.mintValue;
 
       const after = await tracker.takeSnapshot(directSettledChainId, assetId, undefined, undefined, walletAddr, false);
 
@@ -88,6 +106,7 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
       });
 
       expect(result.l2TxHash).to.not.be.null;
+      withdrawalAmount = amount;
 
       const after = await tracker.takeSnapshot(directSettledChainId, assetId, undefined, undefined, walletAddr, false);
 
@@ -101,19 +120,24 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
   });
 
   describe("Balance conservation", () => {
-    it("L1AssetTracker chain balances equal total deposits minus withdrawals", async () => {
+    it("L1AssetTracker balances reflect the net flow performed", async () => {
+      if (!depositMintValue || !withdrawalAmount) {
+        throw new Error("Expected deposit and withdrawal test data to be populated before balance verification");
+      }
+
       const tracker = createBalanceTrackerFromState(state);
       const l1Provider = new ethers.providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
       const assetId = await queryEthAssetId(l1Provider, state.l1Addresses!.l1NativeTokenVault);
 
-      // Check direct-settled chain: we deposited 1 ETH + gas and withdrew 0.5 ETH
-      // The chain balance should reflect the net (deposit mintValue - withdrawal amount)
-      const chainBalance = await tracker.getL1ChainBalance(directSettledChainId, assetId);
-      expect(chainBalance.gt(0), "Direct-settled chain should have positive chain balance after deposit").to.equal(
-        true
-      );
+      const expectedNetDelta = depositMintValue.sub(withdrawalAmount);
 
-      // Verify total across all chains is positive
+      const directChainBalance = await tracker.getL1ChainBalance(directSettledChainId, assetId);
+      const expectedDirectChainBalance = initialDirectChainBalance.add(expectedNetDelta);
+      expect(
+        directChainBalance.eq(expectedDirectChainBalance),
+        `Direct-settled chain balance should equal initial balance ${initialDirectChainBalance.toString()} + net delta ${expectedNetDelta.toString()}, got ${directChainBalance.toString()}`
+      ).to.equal(true);
+
       let totalChainBalance = BigNumber.from(0);
       for (const chainConfig of state.chains!.config) {
         if (!chainConfig.isL1) {
@@ -121,10 +145,15 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
           totalChainBalance = totalChainBalance.add(balance);
         }
       }
+      const expectedTotalChainBalance = initialTotalChainBalance.add(expectedNetDelta);
       expect(
-        totalChainBalance.gt(0),
-        "Total chain balance should be > 0 (we've deposited more than withdrawn)"
+        totalChainBalance.eq(expectedTotalChainBalance),
+        `Total ETH chain balance should equal initial total ${initialTotalChainBalance.toString()} + net delta ${expectedNetDelta.toString()}, got ${totalChainBalance.toString()}`
       ).to.equal(true);
+
+      console.log(
+        `   Direct chain balance: ${ethers.utils.formatEther(directChainBalance)} ETH (expected ${ethers.utils.formatEther(expectedDirectChainBalance)} ETH)`
+      );
       console.log(`   Total L1AssetTracker chain balance (ETH): ${ethers.utils.formatEther(totalChainBalance)}`);
     });
   });

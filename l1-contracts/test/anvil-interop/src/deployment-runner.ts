@@ -98,12 +98,13 @@ export class DeploymentRunner {
   private computeInteropChainIds(chainId: number, chainConfigs: AnvilChainConfig[]): number[] {
     const l2Chains = chainConfigs.filter((chainConfig) => !chainConfig.isL1);
     const thisChain = l2Chains.find((chainConfig) => chainConfig.chainId === chainId);
-    if (!thisChain || thisChain.settlement === "l1" || !thisChain.settlement) {
+    if (!thisChain || thisChain.settlement === "l1" || !thisChain.settlement || thisChain.role !== "gwSettled") {
       return [];
     }
 
     return l2Chains
       .filter((chainConfig) => chainConfig.chainId !== chainId)
+      .filter((chainConfig) => chainConfig.role === "gwSettled")
       .filter((chainConfig) => chainConfig.settlement === thisChain.settlement)
       .map((chainConfig) => chainConfig.chainId);
   }

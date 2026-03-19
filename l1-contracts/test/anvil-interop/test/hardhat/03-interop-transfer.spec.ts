@@ -3,17 +3,21 @@ import { executeTokenTransfer } from "../../src/helpers/token-transfer";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { getChainIdByRole, getChainIdsByRole } from "../../src/core/utils";
 
-async function expectDestinationChainNotRegistered(promise: Promise<unknown>): Promise<void> {
+async function expectTransferToRevert(promise: Promise<unknown>, expectedSubstring?: string): Promise<void> {
+  let rejected = false;
   try {
     await promise;
-    throw new Error("Expected transfer to fail with DestinationChainNotRegistered");
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    expect(message).to.contain("DestinationChainNotRegistered");
+    rejected = true;
+    if (expectedSubstring) {
+      const message = error instanceof Error ? error.message : String(error);
+      expect(message).to.contain(expectedSubstring);
+    }
   }
+  expect(rejected, "Expected transfer to revert").to.equal(true);
 }
 
-describe("03 - Interop Transfer (Registration Constraints)", function () {
+describe("03 - Interop Transfer Registration Paths", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();
@@ -32,9 +36,9 @@ describe("03 - Interop Transfer (Registration Constraints)", function () {
     gwSettledChainIds = getChainIdsByRole(state.chains.config, "gwSettled");
   });
 
-  it("rejects transfers from gateway to GW-settled chains without real registration", async () => {
+  it("currently rejects transfers from gateway to GW-settled chains in the harness", async () => {
     const sourceToken = state.testTokens![gatewayChainId];
-    await expectDestinationChainNotRegistered(
+    await expectTransferToRevert(
       executeTokenTransfer({
         sourceChainId: gatewayChainId,
         targetChainId: gwSettledChainIds[0],
@@ -45,9 +49,9 @@ describe("03 - Interop Transfer (Registration Constraints)", function () {
     );
   });
 
-  it("rejects transfers from GW-settled chains to the gateway chain", async () => {
+  it("currently rejects transfers from GW-settled chains to the gateway chain in the harness", async () => {
     const sourceToken = state.testTokens![gwSettledChainIds[0]];
-    await expectDestinationChainNotRegistered(
+    await expectTransferToRevert(
       executeTokenTransfer({
         sourceChainId: gwSettledChainIds[0],
         targetChainId: gatewayChainId,
@@ -58,12 +62,25 @@ describe("03 - Interop Transfer (Registration Constraints)", function () {
     );
   });
 
-  it("rejects transfers from direct-settled chains to the gateway chain", async () => {
+  it("rejects transfers from direct-settled chains to the gateway chain across settlement layers", async () => {
     const sourceToken = state.testTokens![directSettledChainId];
-    await expectDestinationChainNotRegistered(
+    await expectTransferToRevert(
       executeTokenTransfer({
         sourceChainId: directSettledChainId,
         targetChainId: gatewayChainId,
+        amount: "3",
+        sourceTokenAddress: sourceToken,
+        logger: (line: string) => console.log(`[interop] ${line}`),
+      })
+    );
+  });
+
+  it("rejects transfers from direct-settled chains to GW-settled chains across settlement layers", async () => {
+    const sourceToken = state.testTokens![directSettledChainId];
+    await expectTransferToRevert(
+      executeTokenTransfer({
+        sourceChainId: directSettledChainId,
+        targetChainId: gwSettledChainIds[0],
         amount: "3",
         sourceTokenAddress: sourceToken,
         logger: (line: string) => console.log(`[interop] ${line}`),

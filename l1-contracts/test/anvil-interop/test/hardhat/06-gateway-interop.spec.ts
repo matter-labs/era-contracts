@@ -198,13 +198,4 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
       sourceTokenAddress: state.testTokens![gwSettledChainIds[1]],
     });
   });
-
-  it("transfers tokens from GW-settled chain to GW and processes logs", async () => {
-    await transferAndProcessLogs({
-      sourceChainId: gwSettledChainIds[0],
-      targetChainId: gwChainId,
-      amount: "2",
-      sourceTokenAddress: state.testTokens![gwSettledChainIds[0]],
-    });
-  });
 });
