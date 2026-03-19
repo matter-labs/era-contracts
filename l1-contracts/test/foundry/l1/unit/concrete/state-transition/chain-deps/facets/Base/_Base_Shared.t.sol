@@ -36,8 +36,7 @@ bytes constant ERROR_ONLY_VALIDATOR = "ZKChain: not validator";
 bytes constant ERROR_ONLY_STATE_TRANSITION_MANAGER = "ZKChain: not state transition manager";
 bytes constant ERROR_ONLY_BRIDGEHUB = "ZKChain: not bridgehub";
 bytes constant ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by admin or state transition manager";
-bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER =
-    "ZKChain: Only by validator or state transition manager";
+bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by validator or state transition manager";
 
 contract ZKChainBaseTest is UtilsTest {
     TestBaseFacet internal testBaseFacet;

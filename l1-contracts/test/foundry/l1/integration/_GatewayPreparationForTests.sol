@@ -195,13 +195,12 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
 
         // Compute required value (baseCost * 2 as in Utils.prepareL1L2TransactionTwoBridges)
         uint256 l1GasPrice = _getL1GasPrice();
-        uint256 requiredValue =
-            bridgehub.l2TransactionBaseCost(
-                _gatewayGovernanceConfig.gatewayChainId,
-                l1GasPrice,
-                Utils.MAX_PRIORITY_TX_GAS,
-                REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-            ) * 2;
+        uint256 requiredValue = bridgehub.l2TransactionBaseCost(
+            _gatewayGovernanceConfig.gatewayChainId,
+            l1GasPrice,
+            Utils.MAX_PRIORITY_TX_GAS,
+            REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        ) * 2;
 
         // Call requestL2TransactionTwoBridges directly from chain admin.
         // This sets isMigrationInProgress[chainId] = true and pausedDepositsTimestamp on the diamond proxy.

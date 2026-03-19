@@ -264,8 +264,10 @@ abstract contract L2InteropIndirectCallValueRegressionTestAbstract is L2InteropT
         uint256 interopCallValue2 = 200;
         uint256 indirectCallMessageValue2 = 75;
 
-        uint256 totalValue =
-            interopCallValue1 + indirectCallMessageValue1 + interopCallValue2 + indirectCallMessageValue2;
+        uint256 totalValue = interopCallValue1 +
+            indirectCallMessageValue1 +
+            interopCallValue2 +
+            indirectCallMessageValue2;
 
         vm.deal(address(this), totalValue);
 

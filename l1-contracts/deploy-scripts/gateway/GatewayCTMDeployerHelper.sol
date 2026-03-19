@@ -270,10 +270,9 @@ library GatewayCTMDeployerHelper {
         });
 
         // Different deployer contracts for each mode
-        bytes memory bytecode =
-            config.isZKsyncOS
-                ? _readBytecode("GatewayCTMDeployerVerifiersZKsyncOS.sol", "GatewayCTMDeployerVerifiersZKsyncOS", true)
-                : _readBytecode("GatewayCTMDeployerVerifiers.sol", "GatewayCTMDeployerVerifiers", false);
+        bytes memory bytecode = config.isZKsyncOS
+            ? _readBytecode("GatewayCTMDeployerVerifiersZKsyncOS.sol", "GatewayCTMDeployerVerifiersZKsyncOS", true)
+            : _readBytecode("GatewayCTMDeployerVerifiers.sol", "GatewayCTMDeployerVerifiers", false);
         bytes memory constructorArgs = abi.encode(verifiersConfig);
 
         L1L2DeployUtils.DeployResult memory deployResult = L1L2DeployUtils.prepareDeployment(
@@ -437,10 +436,9 @@ library GatewayCTMDeployerHelper {
         });
 
         // Different deployer contracts for each mode
-        bytes memory bytecode =
-            config.isZKsyncOS
-                ? _readBytecode("GatewayCTMDeployerCTMZKsyncOS.sol", "GatewayCTMDeployerCTMZKsyncOS", true)
-                : _readBytecode("GatewayCTMDeployerCTM.sol", "GatewayCTMDeployerCTM", false);
+        bytes memory bytecode = config.isZKsyncOS
+            ? _readBytecode("GatewayCTMDeployerCTMZKsyncOS.sol", "GatewayCTMDeployerCTMZKsyncOS", true)
+            : _readBytecode("GatewayCTMDeployerCTM.sol", "GatewayCTMDeployerCTM", false);
         bytes memory constructorArgs = abi.encode(ctmConfig);
 
         L1L2DeployUtils.DeployResult memory deployResult = L1L2DeployUtils.prepareDeployment(

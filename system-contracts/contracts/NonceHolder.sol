@@ -211,9 +211,8 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     function isNonceUsed(address _address, uint256 _nonce) public view returns (bool) {
         uint256 addressAsKey = uint256(uint160(_address));
         (uint192 nonceKey, uint64 nonceValue) = _splitKeyedNonce(_nonce);
-        bool belowMinimum =
-            (nonceKey == 0 && _nonce < getMinNonce(_address)) ||
-                (nonceKey != 0 && nonceValue < keyedNonces[addressAsKey][nonceKey]);
+        bool belowMinimum = (nonceKey == 0 && _nonce < getMinNonce(_address)) ||
+            (nonceKey != 0 && nonceValue < keyedNonces[addressAsKey][nonceKey]);
         // We keep the `nonceValues` check here, until it is confirmed that this mapping has never been used by anyone.
         return belowMinimum || __DEPRECATED_nonceValues[addressAsKey][_nonce] > 0;
     }

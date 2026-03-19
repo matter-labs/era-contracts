@@ -248,10 +248,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function _enforceMinUpdateInterval() internal view {
         uint256 lastFeeParamsUpdateTimestamp = s.lastFeeParamsUpdateTimestamp;
         uint256 lastTokenMultiplierUpdateTimestamp = s.lastTokenMultiplierUpdateTimestamp;
-        uint256 lastUpdateTimestamp =
-            lastFeeParamsUpdateTimestamp > lastTokenMultiplierUpdateTimestamp
-                ? lastFeeParamsUpdateTimestamp
-                : lastTokenMultiplierUpdateTimestamp;
+        uint256 lastUpdateTimestamp = lastFeeParamsUpdateTimestamp > lastTokenMultiplierUpdateTimestamp
+            ? lastFeeParamsUpdateTimestamp
+            : lastTokenMultiplierUpdateTimestamp;
         if (lastUpdateTimestamp != 0 && block.timestamp < lastUpdateTimestamp + PRICE_UPDATE_INTERVAL) {
             revert TokenMultiplierChangeTooFrequent(lastUpdateTimestamp + PRICE_UPDATE_INTERVAL);
         }

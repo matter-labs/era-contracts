@@ -77,8 +77,9 @@ contract GasBoundCaller {
 
         // It is possible that pubdataPublishedAfter < pubdataPublishedBefore if the call, e.g. removes
         // some of the previously created state diffs
-        uint256 pubdataSpent =
-            pubdataPublishedAfter > pubdataPublishedBefore ? pubdataPublishedAfter - pubdataPublishedBefore : 0;
+        uint256 pubdataSpent = pubdataPublishedAfter > pubdataPublishedBefore
+            ? pubdataPublishedAfter - pubdataPublishedBefore
+            : 0;
 
         uint256 pubdataGasRate = SYSTEM_CONTEXT_CONTRACT.gasPerPubdataByte();
 

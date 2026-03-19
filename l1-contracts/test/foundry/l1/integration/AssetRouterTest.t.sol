@@ -43,9 +43,10 @@ import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
 
-    bytes32 constant NEW_PRIORITY_REQUEST_HASH = keccak256(
-        "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])"
-    );
+    bytes32 constant NEW_PRIORITY_REQUEST_HASH =
+        keccak256(
+            "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])"
+        );
 
     struct NewPriorityRequest {
         uint256 txId;

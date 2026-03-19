@@ -78,18 +78,16 @@ library AddressAliasHelper {
             // Or if the `_sender` is EIP7702, then we also do not want to apply aliasing to original caller.
             // solhint-disable avoid-tx-origin
             // slither-disable-next-line tx-origin
-            _recipient =
-                (_originalCaller == tx.origin || _is7702AccountSender)
-                    ? _originalCaller
-                    : AddressAliasHelper.applyL1ToL2Alias(_originalCaller);
+            _recipient = (_originalCaller == tx.origin || _is7702AccountSender)
+                ? _originalCaller
+                : AddressAliasHelper.applyL1ToL2Alias(_originalCaller);
             // solhint-enable avoid-tx-origin
         } else {
             // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
             // Also we check that refund recipient is not EIP7702 account, as this would result in incorrect aliasing
-            _recipient =
-                (_refundRecipient.code.length == 0 || _is7702AccountRefundRecipient)
-                    ? _refundRecipient
-                    : AddressAliasHelper.applyL1ToL2Alias(_refundRecipient);
+            _recipient = (_refundRecipient.code.length == 0 || _is7702AccountRefundRecipient)
+                ? _refundRecipient
+                : AddressAliasHelper.applyL1ToL2Alias(_refundRecipient);
         }
     }
 }

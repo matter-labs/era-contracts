@@ -29,9 +29,10 @@ import {IEraMultisigValidator} from "./interfaces/IEraMultisigValidator.sol";
 /// that this contract itself does NOT enforce the timelock in any way, it just forwards the calls to the underlying `ValidatorTimelock` after checking for multisig approvals.
 contract EraMultisigValidator is IEraMultisigValidator, ValidatorTimelock, EIP712Upgradeable {
     /// @dev EIP-712 typehash for the ExecuteBatches struct.
-    bytes32 internal constant EXECUTE_BATCHES_TYPEHASH = keccak256(
-        "ExecuteBatches(address chainAddress,uint256 processBatchFrom,uint256 processBatchTo,bytes batchData)"
-    );
+    bytes32 internal constant EXECUTE_BATCHES_TYPEHASH =
+        keccak256(
+            "ExecuteBatches(address chainAddress,uint256 processBatchFrom,uint256 processBatchTo,bytes batchData)"
+        );
 
     /// @inheritdoc IEraMultisigValidator
     address public override validatorTimelock;

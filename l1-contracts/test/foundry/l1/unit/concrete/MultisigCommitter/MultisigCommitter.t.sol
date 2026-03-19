@@ -47,9 +47,8 @@ contract MultisigCommitterTest is Test {
 
     bytes32 committerRole;
     bytes32 validatorRole;
-    bytes32 constant EIP712_DOMAIN_TYPEHASH = keccak256(
-        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-    );
+    bytes32 constant EIP712_DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
     bytes32 constant EIP712_NAME_HASH = keccak256("MultisigCommitter");
     bytes32 constant EIP712_VERSION_HASH = keccak256("1");
 

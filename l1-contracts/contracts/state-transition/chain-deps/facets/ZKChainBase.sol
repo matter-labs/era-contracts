@@ -267,11 +267,11 @@ contract ZKChainBase is ReentrancyGuard {
 
         // slither-disable-next-line divide-before-multiply
         uint256 batchOverheadBaseToken = uint256(_feeParams.batchOverheadL1Gas) * l1GasPriceConverted;
-        uint256 fullPubdataPriceBaseToken =
-            pubdataPriceBaseToken + batchOverheadBaseToken / uint256(_feeParams.maxPubdataPerBatch);
+        uint256 fullPubdataPriceBaseToken = pubdataPriceBaseToken +
+            batchOverheadBaseToken / uint256(_feeParams.maxPubdataPerBatch);
 
-        uint256 l2GasPrice =
-            _feeParams.minimalL2GasPrice + batchOverheadBaseToken / uint256(_feeParams.maxL2GasPerBatch);
+        uint256 l2GasPrice = _feeParams.minimalL2GasPrice +
+            batchOverheadBaseToken / uint256(_feeParams.maxL2GasPerBatch);
         uint256 minL2GasPriceBaseToken = (fullPubdataPriceBaseToken + _gasPerPubdata - 1) / _gasPerPubdata;
 
         return Math.max(l2GasPrice, minL2GasPriceBaseToken);

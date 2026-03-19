@@ -82,13 +82,13 @@ library TransactionHelper {
     using SafeERC20 for IERC20;
 
     /// @notice The EIP-712 typehash for the contract's domain
-    bytes32 internal constant EIP712_DOMAIN_TYPEHASH = keccak256(
-        "EIP712Domain(string name,string version,uint256 chainId)"
-    );
+    bytes32 internal constant EIP712_DOMAIN_TYPEHASH =
+        keccak256("EIP712Domain(string name,string version,uint256 chainId)");
 
-    bytes32 internal constant EIP712_TRANSACTION_TYPE_HASH = keccak256(
-        "Transaction(uint256 txType,uint256 from,uint256 to,uint256 gasLimit,uint256 gasPerPubdataByteLimit,uint256 maxFeePerGas,uint256 maxPriorityFeePerGas,uint256 paymaster,uint256 nonce,uint256 value,bytes data,bytes32[] factoryDeps,bytes paymasterInput)"
-    );
+    bytes32 internal constant EIP712_TRANSACTION_TYPE_HASH =
+        keccak256(
+            "Transaction(uint256 txType,uint256 from,uint256 to,uint256 gasLimit,uint256 gasPerPubdataByteLimit,uint256 maxFeePerGas,uint256 maxPriorityFeePerGas,uint256 paymaster,uint256 nonce,uint256 value,bytes data,bytes32[] factoryDeps,bytes paymasterInput)"
+        );
 
     /// @notice Whether the token is Ethereum.
     /// @param _addr The address of the token
@@ -167,10 +167,9 @@ library TransactionHelper {
         }
 
         // "to" field is empty if it is EVM deploy tx
-        bytes memory encodedTo =
-            _transaction.reserved[1] == 1
-                ? bytes(hex"80")
-                : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
+        bytes memory encodedTo = _transaction.reserved[1] == 1
+            ? bytes(hex"80")
+            : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
         bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
         // Encode only the length of the transaction data, and not the data itself,
         // so as not to copy to memory a potentially huge transaction data twice.
@@ -196,14 +195,13 @@ library TransactionHelper {
 
         bytes memory encodedListLength;
         unchecked {
-            uint256 listLength =
-                encodedNonce.length +
-                    encodedGasParam.length +
-                    encodedTo.length +
-                    encodedValue.length +
-                    encodedDataLength.length +
-                    _transaction.data.length +
-                    encodedChainId.length;
+            uint256 listLength = encodedNonce.length +
+                encodedGasParam.length +
+                encodedTo.length +
+                encodedValue.length +
+                encodedDataLength.length +
+                _transaction.data.length +
+                encodedChainId.length;
 
             // Safe cast, because the length of the list can't be so large.
             encodedListLength = RLPEncoder.encodeListLen(uint64(listLength));
@@ -241,10 +239,9 @@ library TransactionHelper {
             bytes memory encodedGasPrice = RLPEncoder.encodeUint256(_transaction.maxFeePerGas);
             bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
             // "to" field is empty if it is EVM deploy tx
-            bytes memory encodedTo =
-                _transaction.reserved[1] == 1
-                    ? bytes(hex"80")
-                    : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
+            bytes memory encodedTo = _transaction.reserved[1] == 1
+                ? bytes(hex"80")
+                : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
             // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(
@@ -278,11 +275,10 @@ library TransactionHelper {
 
         bytes memory encodedListLength;
         unchecked {
-            uint256 listLength =
-                encodedFixedLengthParams.length +
-                    encodedDataLength.length +
-                    _transaction.data.length +
-                    encodedAccessListLength.length;
+            uint256 listLength = encodedFixedLengthParams.length +
+                encodedDataLength.length +
+                _transaction.data.length +
+                encodedAccessListLength.length;
 
             // Safe cast, because the length of the list can't be so large.
             encodedListLength = RLPEncoder.encodeListLen(uint64(listLength));
@@ -319,10 +315,9 @@ library TransactionHelper {
             bytes memory encodedMaxFeePerGas = RLPEncoder.encodeUint256(_transaction.maxFeePerGas);
             bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
             // "to" field is empty if it is EVM deploy tx
-            bytes memory encodedTo =
-                _transaction.reserved[1] == 1
-                    ? bytes(hex"80")
-                    : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
+            bytes memory encodedTo = _transaction.reserved[1] == 1
+                ? bytes(hex"80")
+                : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
             // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(
@@ -357,11 +352,10 @@ library TransactionHelper {
 
         bytes memory encodedListLength;
         unchecked {
-            uint256 listLength =
-                encodedFixedLengthParams.length +
-                    encodedDataLength.length +
-                    _transaction.data.length +
-                    encodedAccessListLength.length;
+            uint256 listLength = encodedFixedLengthParams.length +
+                encodedDataLength.length +
+                _transaction.data.length +
+                encodedAccessListLength.length;
 
             // Safe cast, because the length of the list can't be so large.
             encodedListLength = RLPEncoder.encodeListLen(uint64(listLength));

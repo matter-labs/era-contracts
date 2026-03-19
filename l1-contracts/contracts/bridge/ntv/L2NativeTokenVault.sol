@@ -384,10 +384,9 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         uint256 _tokenOriginChainId,
         address _l1Token
     ) internal view override returns (bytes32 salt) {
-        salt =
-            _tokenOriginChainId == L1_CHAIN_ID
-                ? bytes32(uint256(uint160(_l1Token)))
-                : keccak256(abi.encode(_tokenOriginChainId, _l1Token));
+        salt = _tokenOriginChainId == L1_CHAIN_ID
+            ? bytes32(uint256(uint160(_l1Token)))
+            : keccak256(abi.encode(_tokenOriginChainId, _l1Token));
     }
 
     function _handleBridgeToChain(uint256 _chainid, bytes32 _assetId, uint256 _amount) internal virtual override {

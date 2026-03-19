@@ -67,10 +67,9 @@ contract BootloaderUtilities is IBootloaderUtilities {
         }
 
         // "to" field is empty if it is EVM deploy tx
-        bytes memory encodedTo =
-            _transaction.reserved[1] == 1
-                ? bytes(hex"80")
-                : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
+        bytes memory encodedTo = _transaction.reserved[1] == 1
+            ? bytes(hex"80")
+            : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
 
         bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
         // Encode only the length of the transaction data, and not the data itself,
@@ -117,16 +116,15 @@ contract BootloaderUtilities is IBootloaderUtilities {
 
         bytes memory encodedListLength;
         unchecked {
-            uint256 listLength =
-                encodedNonce.length +
-                    encodedGasParam.length +
-                    encodedTo.length +
-                    encodedValue.length +
-                    encodedDataLength.length +
-                    _transaction.data.length +
-                    rEncoded.length +
-                    sEncoded.length +
-                    vEncoded.length;
+            uint256 listLength = encodedNonce.length +
+                encodedGasParam.length +
+                encodedTo.length +
+                encodedValue.length +
+                encodedDataLength.length +
+                _transaction.data.length +
+                rEncoded.length +
+                sEncoded.length +
+                vEncoded.length;
 
             // Safe cast, because the length of the list can't be so large.
             encodedListLength = RLPEncoder.encodeListLen(uint64(listLength));
@@ -162,10 +160,9 @@ contract BootloaderUtilities is IBootloaderUtilities {
             bytes memory encodedGasPrice = RLPEncoder.encodeUint256(_transaction.maxFeePerGas);
             bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
             // "to" field is empty if it is EVM deploy tx
-            bytes memory encodedTo =
-                _transaction.reserved[1] == 1
-                    ? bytes(hex"80")
-                    : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
+            bytes memory encodedTo = _transaction.reserved[1] == 1
+                ? bytes(hex"80")
+                : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
             // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(
@@ -219,14 +216,13 @@ contract BootloaderUtilities is IBootloaderUtilities {
 
         bytes memory encodedListLength;
         unchecked {
-            uint256 listLength =
-                encodedFixedLengthParams.length +
-                    encodedDataLength.length +
-                    _transaction.data.length +
-                    encodedAccessListLength.length +
-                    rEncoded.length +
-                    sEncoded.length +
-                    vEncoded.length;
+            uint256 listLength = encodedFixedLengthParams.length +
+                encodedDataLength.length +
+                _transaction.data.length +
+                encodedAccessListLength.length +
+                rEncoded.length +
+                sEncoded.length +
+                vEncoded.length;
 
             // Safe cast, because the length of the list can't be so large.
             encodedListLength = RLPEncoder.encodeListLen(uint64(listLength));
@@ -265,10 +261,9 @@ contract BootloaderUtilities is IBootloaderUtilities {
             bytes memory encodedMaxFeePerGas = RLPEncoder.encodeUint256(_transaction.maxFeePerGas);
             bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
             // "to" field is empty if it is EVM deploy tx
-            bytes memory encodedTo =
-                _transaction.reserved[1] == 1
-                    ? bytes(hex"80")
-                    : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
+            bytes memory encodedTo = _transaction.reserved[1] == 1
+                ? bytes(hex"80")
+                : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
             // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(
@@ -323,14 +318,13 @@ contract BootloaderUtilities is IBootloaderUtilities {
 
         bytes memory encodedListLength;
         unchecked {
-            uint256 listLength =
-                encodedFixedLengthParams.length +
-                    encodedDataLength.length +
-                    _transaction.data.length +
-                    encodedAccessListLength.length +
-                    rEncoded.length +
-                    sEncoded.length +
-                    vEncoded.length;
+            uint256 listLength = encodedFixedLengthParams.length +
+                encodedDataLength.length +
+                _transaction.data.length +
+                encodedAccessListLength.length +
+                rEncoded.length +
+                sEncoded.length +
+                vEncoded.length;
 
             // Safe cast, because the length of the list can't be so large.
             encodedListLength = RLPEncoder.encodeListLen(uint64(listLength));

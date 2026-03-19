@@ -38,12 +38,12 @@ library BytecodePublisher {
         uint256 toPublishPtr = 0;
 
         for (uint256 i = 0; i < totalBytecodes; i++) {
-            bytes32 hash =
-                isEVM
-                    ? ZKSyncOSBytecodeInfo.hashEVMBytecode(bytecodes[i])
-                    : L2ContractHelper.hashL2Bytecode(bytecodes[i]);
-            uint256 publishedBlock =
-                isEVM ? bytecodesSupplier.evmPublishingBlock(hash) : bytecodesSupplier.publishingBlock(hash);
+            bytes32 hash = isEVM
+                ? ZKSyncOSBytecodeInfo.hashEVMBytecode(bytecodes[i])
+                : L2ContractHelper.hashL2Bytecode(bytecodes[i]);
+            uint256 publishedBlock = isEVM
+                ? bytecodesSupplier.evmPublishingBlock(hash)
+                : bytecodesSupplier.publishingBlock(hash);
 
             if (publishedBlock != 0) {
                 console.log("The following bytecode has already been published:");

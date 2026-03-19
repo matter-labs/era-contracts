@@ -170,10 +170,9 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         address bridgehubProxy = coreAddresses.bridgehub.proxies.bridgehub;
 
         // Determine which introspection method to use based on protocol version or override
-        bool useV29Introspection =
-            additionalConfig.hasV29IntrospectionOverride
-                ? additionalConfig.useV29IntrospectionOverride
-                : AddressIntrospector.shouldUseV29Introspection(bridgehubProxy);
+        bool useV29Introspection = additionalConfig.hasV29IntrospectionOverride
+            ? additionalConfig.useV29IntrospectionOverride
+            : AddressIntrospector.shouldUseV29Introspection(bridgehubProxy);
 
         if (useV29Introspection) {
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV29(bridgehubProxy);

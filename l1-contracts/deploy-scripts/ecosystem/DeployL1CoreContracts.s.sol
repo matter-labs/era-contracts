@@ -103,8 +103,9 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
             coreAddresses.bridgehub.proxies.chainAssetHandler
         ) = deployTuppWithContract("L1ChainAssetHandler", false);
         {
-            string memory messageRootContract =
-                vm.envOr("USE_DUMMY_MESSAGE_ROOT", false) ? "DummyL1MessageRoot" : "L1MessageRoot";
+            string memory messageRootContract = vm.envOr("USE_DUMMY_MESSAGE_ROOT", false)
+                ? "DummyL1MessageRoot"
+                : "L1MessageRoot";
             (
                 coreAddresses.bridgehub.implementations.messageRoot,
                 coreAddresses.bridgehub.proxies.messageRoot

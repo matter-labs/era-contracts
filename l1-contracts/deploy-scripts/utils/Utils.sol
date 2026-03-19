@@ -1393,10 +1393,9 @@ library Utils {
 
     function adminExecuteCalls(address _admin, address _accessControlRestriction, Call[] memory calls) internal {
         // If `_accessControlRestriction` is not provided, we assume that `_admin` is IOwnable
-        address adminOwner =
-            _accessControlRestriction == address(0)
-                ? IOwnable(_admin).owner()
-                : IAccessControlDefaultAdminRules(_accessControlRestriction).defaultAdmin();
+        address adminOwner = _accessControlRestriction == address(0)
+            ? IOwnable(_admin).owner()
+            : IAccessControlDefaultAdminRules(_accessControlRestriction).defaultAdmin();
 
         // Calculate total ETH required
         uint256 totalValue;
