@@ -9,11 +9,11 @@ import {
   L2_BRIDGEHUB_ADDR,
   ANVIL_DEFAULT_ACCOUNT_ADDR,
   SYSTEM_CONTEXT_ADDR,
-  L2_BOOTLOADER_ADDR,
 } from "../core/const";
 import { applyL1ToL2Alias, impersonateAndRun, scanAndRelayPriorityRequests, timeIt } from "../core/utils";
 import { encodeNtvAssetId } from "../core/data-encoding";
 import { migrateTokenBalanceToGW } from "../helpers/token-balance-migration-helper";
+import { setSettlementLayerViaBootloader, transferOwnable2Step } from "../helpers/harness-shims";
 import {
   mergeGatewayVoteOutput,
   prepareGatewayChainConfig,
@@ -400,17 +400,7 @@ export class GatewaySetup {
       return;
     }
 
-    // Step 1: current owner calls transferOwnership(targetOwner)
-    await impersonateAndRun(gwProvider, currentOwner, async (signer) => {
-      const tx = await l2Bridgehub.connect(signer).transferOwnership(targetOwner, { gasLimit: 500_000 });
-      await tx.wait();
-    });
-
-    // Step 2: target owner calls acceptOwnership()
-    await impersonateAndRun(gwProvider, targetOwner, async (signer) => {
-      const tx = await l2Bridgehub.connect(signer).acceptOwnership({ gasLimit: 500_000 });
-      await tx.wait();
-    });
+    await transferOwnable2Step(gwProvider, L2_BRIDGEHUB_ADDR, this.ownable2StepAbi, currentOwner, targetOwner);
 
     console.log(`   GW L2Bridgehub ownership transferred to aliased ecosystem governance (${targetOwner})`);
   }
@@ -436,13 +426,11 @@ export class GatewaySetup {
       return;
     }
 
-    await impersonateAndRun(l2Provider, L2_BOOTLOADER_ADDR, async (signer) => {
-      const tx = await systemContext.connect(signer).setSettlementLayerChainId(gwChainId, {
-        gasLimit: 1_000_000,
-      });
-      await tx.wait();
-      console.log(`   Notified chain ${chainId}: settlement layer changed to ${gwChainId}`);
+    await setSettlementLayerViaBootloader({
+      provider: l2Provider,
+      settlementLayerChainId: gwChainId,
     });
+    console.log(`   Notified chain ${chainId}: settlement layer changed to ${gwChainId}`);
   }
 
   private async ensureGovernanceOwnership(

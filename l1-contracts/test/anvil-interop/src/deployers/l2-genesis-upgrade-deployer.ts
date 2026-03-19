@@ -1,5 +1,5 @@
 import { Contract, providers } from "ethers";
-import { impersonateAndRun, relayTx } from "../core/utils";
+import { relayTx } from "../core/utils";
 import { getAbi, getBytecode } from "../core/contracts";
 import { PREDEPLOY_SYSTEM_CONTRACTS } from "../core/predeploys";
 import type { SystemContractPredeploy } from "../core/predeploys";
@@ -7,10 +7,12 @@ import {
   INITIAL_BASE_TOKEN_HOLDER_BALANCE,
   L1_CHAIN_ID,
   L2_BASE_TOKEN_ADDR,
-  L2_BOOTLOADER_ADDR,
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
 import type { PriorityRequestData } from "../core/types";
+import { setSettlementLayerViaBootloader } from "../helpers/harness-shims";
+
+const systemContextAbi = getAbi("SystemContext");
 
 /**
  * Deployer that initializes L2 contracts by relaying the real genesis upgrade
@@ -23,7 +25,6 @@ import type { PriorityRequestData } from "../core/types";
  */
 export class L2GenesisUpgradeDeployer {
   private l2Provider: providers.JsonRpcProvider;
-  private readonly systemContextAbi = getAbi("SystemContext");
 
   constructor(l2RpcUrl: string) {
     this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
@@ -79,18 +80,16 @@ export class L2GenesisUpgradeDeployer {
   }
 
   private async initializeSettlementLayerViaBootloader(chainId: number): Promise<void> {
-    const systemContext = new Contract(SYSTEM_CONTEXT_ADDR, this.systemContextAbi, this.l2Provider);
+    const systemContext = new Contract(SYSTEM_CONTEXT_ADDR, systemContextAbi, this.l2Provider);
     const currentSettlementLayerChainId = await systemContext.currentSettlementLayerChainId();
     if (currentSettlementLayerChainId.eq(L1_CHAIN_ID)) {
       console.log(`   Settlement layer already initialized to L1 for chain ${chainId}`);
       return;
     }
 
-    await impersonateAndRun(this.l2Provider, L2_BOOTLOADER_ADDR, async (signer) => {
-      const tx = await systemContext.connect(signer).setSettlementLayerChainId(L1_CHAIN_ID, {
-        gasLimit: 1_000_000,
-      });
-      await tx.wait();
+    await setSettlementLayerViaBootloader({
+      provider: this.l2Provider,
+      settlementLayerChainId: L1_CHAIN_ID,
     });
     console.log(`   Initialized settlement layer to L1 for chain ${chainId}`);
   }

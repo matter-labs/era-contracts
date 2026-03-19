@@ -10,11 +10,12 @@ import { ANVIL_DEFAULT_ACCOUNT_ADDR } from "./const";
 /**
  * Merge L1 core output and CTM output into a single TOML file for the Forge script.
  *
- * _GatewayPreparationForTests.initializeConfig() reads from CTM_OUTPUT and expects:
+ * GatewayPreparationForTests.initializeConfig() reads from CTM_OUTPUT and expects:
  * - $.deployed_addresses.bridgehub.bridgehub_proxy_addr (from L1 core output)
  * - $.deployed_addresses.bridgehub.ctm_deployment_tracker_proxy_addr (from L1 core output)
  * - $.deployed_addresses.bridges.shared_bridge_proxy_addr (in both)
  * - $.deployed_addresses.state_transition.state_transition_proxy_addr (from CTM output)
+ * - $.contracts_config.diamond_cut_data before gateway vote output is merged
  */
 export function prepareMergedToml(outputDir: string): void {
   const l1CorePath = path.join(outputDir, "l1-core-output.toml");
@@ -27,15 +28,9 @@ export function prepareMergedToml(outputDir: string): void {
   // the bridgehub section from L1 core output (CTM output doesn't have it)
   const merged = deepMerge(ctm, l1Core);
   const contractsConfig = asRecord(merged.contracts_config);
-  const gatewayDiamondCutData = contractsConfig?.diamond_cut_data;
-  if (typeof gatewayDiamondCutData !== "string") {
+  if (typeof contractsConfig?.diamond_cut_data !== "string") {
     throw new Error("Missing contracts_config.diamond_cut_data in CTM output; cannot prepare gateway merged TOML");
   }
-
-  // GatewayPreparation.sol expects this top-level key, but DeployCTM writes it
-  // under contracts_config.diamond_cut_data. Synthesize the canonical field so
-  // the test wrapper can follow the production script layout.
-  merged.gateway_diamond_cut_data = gatewayDiamondCutData;
 
   const mergedPath = path.join(outputDir, "gateway-merged-output.toml");
   saveTomlConfig(mergedPath, merged);
@@ -101,12 +96,7 @@ export function mergeGatewayVoteOutput(outputDir: string): void {
     throw new Error("Missing diamond_cut_data in gateway vote output; cannot finalize gateway merged TOML");
   }
 
-  merged.gateway_diamond_cut_data = gatewayDiamondCutData;
-
   for (const [key, value] of Object.entries(gatewayVote)) {
-    if (key === "diamond_cut_data") {
-      continue;
-    }
     merged[key] = value;
   }
 

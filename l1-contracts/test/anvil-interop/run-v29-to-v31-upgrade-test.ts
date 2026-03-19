@@ -17,6 +17,7 @@ import { DeploymentRunner } from "./src/deployment-runner";
 import { runForgeScript } from "./src/core/forge";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_DEFAULT_PRIVATE_KEY } from "./src/core/const";
 import { getAbi, getCreationBytecode } from "./src/core/contracts";
+import { transferOwnable2Step } from "./src/helpers/harness-shims";
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");
@@ -26,36 +27,34 @@ function elapsed(): string {
   return `${((Date.now() - totalStart) / 1000).toFixed(1)}s`;
 }
 
-/**
- * Swap v29 config files into the paths that EcosystemUpgrade_v31.run() expects.
- * Returns a restore function that puts back the originals.
- */
-function swapConfigFiles(): () => void {
-  const permanentValuesPath = path.join(l1ContractsDir, "upgrade-envs/permanent-values/local.toml");
-  const upgradeInputPath = path.join(l1ContractsDir, "upgrade-envs/v0.31.0-interopB/local.toml");
+function prepareUpgradeHarnessInputs(): {
+  envVars: Record<string, string>;
+  ecosystemOutputPath: string;
+  cleanup: () => void;
+} {
+  const tempDir = path.join(anvilInteropDir, "outputs", "upgrade-harness-inputs");
+  fs.mkdirSync(tempDir, { recursive: true });
 
-  const v29PermanentValues = path.join(anvilInteropDir, "config/v29-permanent-values.toml");
-  const v29UpgradeInput = path.join(anvilInteropDir, "config/v29-to-v31-upgrade.toml");
+  const permanentValuesPath = path.join(tempDir, "v29-permanent-values.toml");
+  const upgradeInputPath = path.join(tempDir, "v29-to-v31-upgrade.toml");
+  const ecosystemOutputPath = path.join(tempDir, "v31-upgrade-ecosystem.toml");
 
-  // Back up originals
-  const permanentValuesBackup = permanentValuesPath + ".bak";
-  const upgradeInputBackup = upgradeInputPath + ".bak";
+  fs.copyFileSync(path.join(anvilInteropDir, "config/v29-permanent-values.toml"), permanentValuesPath);
+  fs.copyFileSync(path.join(anvilInteropDir, "config/v29-to-v31-upgrade.toml"), upgradeInputPath);
 
-  fs.copyFileSync(permanentValuesPath, permanentValuesBackup);
-  fs.copyFileSync(upgradeInputPath, upgradeInputBackup);
+  console.log("  Prepared temporary upgrade harness inputs");
 
-  // Copy v29 configs to expected paths
-  fs.copyFileSync(v29PermanentValues, permanentValuesPath);
-  fs.copyFileSync(v29UpgradeInput, upgradeInputPath);
-
-  console.log("  Swapped config files to v29 values");
-
-  return () => {
-    fs.copyFileSync(permanentValuesBackup, permanentValuesPath);
-    fs.copyFileSync(upgradeInputBackup, upgradeInputPath);
-    fs.unlinkSync(permanentValuesBackup);
-    fs.unlinkSync(upgradeInputBackup);
-    console.log("  Restored original config files");
+  return {
+    envVars: {
+      PERMANENT_VALUES_INPUT_OVERRIDE: `/${path.relative(l1ContractsDir, permanentValuesPath)}`,
+      UPGRADE_INPUT_OVERRIDE: `/${path.relative(l1ContractsDir, upgradeInputPath)}`,
+      UPGRADE_ECOSYSTEM_OUTPUT_OVERRIDE: `/${path.relative(l1ContractsDir, ecosystemOutputPath)}`,
+    },
+    ecosystemOutputPath,
+    cleanup: () => {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      console.log("  Removed temporary upgrade harness inputs");
+    },
   };
 }
 
@@ -135,25 +134,51 @@ async function transferOwnership2Step(
 
   console.log(`  ${label}: transferring ownership from ${currentOwner} to ${governanceAddr}`);
 
-  // Step 1: transferOwnership (from current owner, which is the deployer EOA)
-  const tx1 = await ownableContract.connect(defaultSigner).transferOwnership(governanceAddr);
-  await tx1.wait();
+  if (currentOwner.toLowerCase() !== defaultSigner.address.toLowerCase()) {
+    throw new Error(`${label}: expected deployer to remain owner, found ${currentOwner}`);
+  }
 
-  // Step 2: acceptOwnership (from governance, impersonated)
-  await provider.send("anvil_impersonateAccount", [governanceAddr]);
-  await provider.send("anvil_setBalance", [governanceAddr, "0x56BC75E2D63100000"]);
-  const govSigner = provider.getSigner(governanceAddr);
-  const tx2 = await ownableContract.connect(govSigner).acceptOwnership();
-  await tx2.wait();
-  await provider.send("anvil_stopImpersonatingAccount", [governanceAddr]);
+  await transferOwnable2Step(provider, contractAddr, getAbi("Ownable2Step"), currentOwner, governanceAddr);
 
   console.log(`  ${label}: ownership transferred`);
+}
+
+async function applyV29UpgradeHarnessPatches(
+  provider: ethers.providers.JsonRpcProvider,
+  chainAddresses: Array<{ chainId: number; diamondProxy: string }>
+): Promise<void> {
+  const TOTAL_BATCHES_EXECUTED_SLOT = "0x0b";
+  const TOTAL_BATCHES_VERIFIED_SLOT = "0x0c";
+  const TOTAL_BATCHES_COMMITTED_SLOT = "0x0d";
+  const L2_SYSTEM_CONTRACTS_UPGRADE_TX_HASH_SLOT = "0x22";
+  const ZKSYNC_OS_SLOT = "0x3c";
+  const ONE = ethers.utils.hexZeroPad("0x01", 32);
+
+  for (const chain of chainAddresses) {
+    await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_EXECUTED_SLOT, ONE]);
+    await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_VERIFIED_SLOT, ONE]);
+    await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_COMMITTED_SLOT, ONE]);
+    await provider.send("anvil_setStorageAt", [
+      chain.diamondProxy,
+      L2_SYSTEM_CONTRACTS_UPGRADE_TX_HASH_SLOT,
+      ethers.constants.HashZero,
+    ]);
+    await provider.send("anvil_setStorageAt", [chain.diamondProxy, ZKSYNC_OS_SLOT, ONE]);
+    console.log(`  Chain ${chain.chainId}: patched batch counts, cleared upgradeTxHash, set zksyncOS=true`);
+  }
 }
 
 async function main(): Promise<void> {
   const anvilManager = new AnvilManager();
   const runner = new DeploymentRunner();
-  let restoreConfigs: (() => void) | null = null;
+  let cleanupUpgradeHarnessInputs: (() => void) | null = null;
+  let upgradeHarnessInputs:
+    | {
+        envVars: Record<string, string>;
+        ecosystemOutputPath: string;
+        cleanup: () => void;
+      }
+    | null = null;
 
   try {
     // ── Step 1: Load v29 chain states ───────────────────────────────
@@ -179,9 +204,6 @@ async function main(): Promise<void> {
     console.log(`  CTM: ${ctmAddress}`);
 
     // Ensure script-out directory exists
-    const scriptOutDir = path.join(l1ContractsDir, "script-out");
-    fs.mkdirSync(scriptOutDir, { recursive: true });
-
     // ── Step 1.5: Transfer ownership to Governance ──────────────────
     console.log(`\n=== Step 1.5: Transferring contract ownership to Governance (${elapsed()}) ===\n`);
 
@@ -242,25 +264,22 @@ async function main(): Promise<void> {
     // ── Step 2: Swap configs and run EcosystemUpgrade_v31 ─────────
     console.log(`\n=== Step 2: Running v31 ecosystem upgrade (${elapsed()}) ===\n`);
 
-    restoreConfigs = swapConfigFiles();
+    upgradeHarnessInputs = prepareUpgradeHarnessInputs();
+    cleanupUpgradeHarnessInputs = upgradeHarnessInputs.cleanup;
 
     await runForgeScript({
       scriptPath: "deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol:EcosystemUpgrade_v31",
-      envVars: {},
+      envVars: upgradeHarnessInputs.envVars,
       rpcUrl: l1Chain.rpcUrl,
       senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
       projectRoot: l1ContractsDir,
       sig: "run()",
     });
 
-    // Restore configs immediately after forge script completes
-    restoreConfigs();
-    restoreConfigs = null;
-
     // ── Step 3: Execute governance calls ──────────────────────────
     console.log(`\n=== Step 3: Executing governance calls (${elapsed()}) ===\n`);
 
-    const ecosystemOutputPath = path.join(scriptOutDir, "v31-upgrade-ecosystem.toml");
+    const ecosystemOutputPath = upgradeHarnessInputs.ecosystemOutputPath;
     if (!fs.existsSync(ecosystemOutputPath)) {
       throw new Error(`Ecosystem output not found at ${ecosystemOutputPath}`);
     }
@@ -301,27 +320,7 @@ async function main(): Promise<void> {
     // NOTE: Eventually the v29 state generation branch should be rebased on
     // zksync-os-stable, which would eliminate most of these patches.
     console.log(`\n=== Step 3.5: Patching v29 chain storage (${elapsed()}) ===\n`);
-    const TOTAL_BATCHES_EXECUTED_SLOT = "0x0b"; // storage slot 11
-    const TOTAL_BATCHES_VERIFIED_SLOT = "0x0c"; // storage slot 12
-    const TOTAL_BATCHES_COMMITTED_SLOT = "0x0d"; // storage slot 13
-    const L2_SYSTEM_CONTRACTS_UPGRADE_TX_HASH_SLOT = "0x22"; // storage slot 34
-    const ZKSYNC_OS_SLOT = "0x3c"; // storage slot 60
-    const ONE = ethers.utils.hexZeroPad("0x01", 32);
-    for (const chain of chainAddresses) {
-      // Set batch counts to 1 so upgrade checks pass
-      await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_EXECUTED_SLOT, ONE]);
-      await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_VERIFIED_SLOT, ONE]);
-      await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_COMMITTED_SLOT, ONE]);
-      // Clear pending upgrade tx hash
-      await provider.send("anvil_setStorageAt", [
-        chain.diamondProxy,
-        L2_SYSTEM_CONTRACTS_UPGRADE_TX_HASH_SLOT,
-        ethers.constants.HashZero,
-      ]);
-      // Enable zksyncOS flag
-      await provider.send("anvil_setStorageAt", [chain.diamondProxy, ZKSYNC_OS_SLOT, ONE]);
-      console.log(`  Chain ${chain.chainId}: patched batch counts, cleared upgradeTxHash, set zksyncOS=true`);
-    }
+    await applyV29UpgradeHarnessPatches(provider, chainAddresses);
 
     // ── Step 4: Upgrade each chain individually ─────────────────
     console.log(`\n=== Step 4: Upgrading individual chains (${elapsed()}) ===\n`);
@@ -343,19 +342,14 @@ async function main(): Promise<void> {
     console.log(`\n=== Step 5: Running stage3 migration (${elapsed()}) ===\n`);
 
     // Swap configs again for stage3 (it reads permanent values)
-    restoreConfigs = swapConfigFiles();
-
     await runForgeScript({
       scriptPath: "deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol:EcosystemUpgrade_v31",
-      envVars: {},
+      envVars: upgradeHarnessInputs.envVars,
       rpcUrl: l1Chain.rpcUrl,
       senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
       projectRoot: l1ContractsDir,
       sig: "stage3()",
     });
-
-    restoreConfigs();
-    restoreConfigs = null;
 
     // ── Step 6: Verify upgrade ───────────────────────────────────
     console.log(`\n=== Step 6: Verifying upgrade (${elapsed()}) ===\n`);
@@ -378,7 +372,7 @@ async function main(): Promise<void> {
 
     console.log(`\n=== V29 -> V31 upgrade test completed successfully! (${elapsed()}) ===\n`);
   } finally {
-    if (restoreConfigs) restoreConfigs();
+    if (cleanupUpgradeHarnessInputs) cleanupUpgradeHarnessInputs();
     await anvilManager.stopAll();
   }
 }

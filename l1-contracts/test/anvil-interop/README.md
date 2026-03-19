@@ -38,7 +38,7 @@ yarn test:hardhat:interop --keep-chains
 
 Tests load pregenerated Anvil snapshots from `chain-states/v0.31.0/` by default. This skips the full deployment and cuts test time from ~5 min to ~85s.
 
-The runner auto-detects pregenerated state by checking for `chain-states/<protocol-version>/addresses.json`. If found, it restores each chain via `anvil_loadState`. If not found (or `FRESH_DEPLOY=1`), it runs the full 5-step deployment.
+The runner auto-detects pregenerated state by checking for `chain-states/<protocol-version>/addresses.json`. If found, it decompresses the dumped state and starts each Anvil process with `--load-state`. If not found (or `FRESH_DEPLOY=1`), it runs the full 5-step deployment.
 
 To regenerate pregenerated state after contract changes:
 
@@ -78,11 +78,11 @@ You can also add `.only` to a `describe` or `it` block in the spec file to isola
 | Spec                         | What it tests                                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `01-deployment-verification` | L1 contracts deployed, CTM registered, all 4 L2 chains have diamond proxies, L2 system contracts present, test tokens deployed, initial chainBalance is zero |
-| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), L1AssetTracker chainBalance tracking, balance conservation                    |
-| `03-interop-transfer`        | Unsupported cross-settlement interop routes revert with `DestinationChainNotRegistered`                                                                      |
+| `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), L1AssetTracker chainBalance tracking, net flow assertions                    |
+| `03-interop-transfer`        | Unsupported interop routes revert; only GW-settled L2<->GW-settled L2 interop is intentionally registered                                                   |
 | `04-gateway-setup`           | GW chain contracts deployed, interop chains registered on GW L2Bridgehub, GW designated as settlement layer on L1                                            |
 | `05-gateway-bridge`          | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW), L1AssetTracker chainBalance tracking, token balance migration, processLogsAndMessages     |
-| `06-gateway-interop`         | L2A<->L2B interop transfers (both on GW), L2A<->GW interop transfers                                                                                         |
+| `06-gateway-interop`         | L2A<->L2B interop transfers between GW-settled L2 chains                                                                                                      |
 
 ## Environment Variables
 
@@ -205,6 +205,8 @@ Contracts are placed at hardcoded addresses via `anvil_setCode` (production has 
 - **Interop registration scope**: the harness only intentionally registers GW-settled L2 chains for interop. Routes involving the gateway chain or a direct-settled chain revert in the harness.
 - **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
 - **Interop proofs**: Correct struct shape but empty proof arrays
+- **v29 -> v31 upgrade harness**: [run-v29-to-v31-upgrade-test.ts](/Users/kalmanlajko/programming/zksync/zksync-era2/contracts/l1-contracts/test/anvil-interop/run-v29-to-v31-upgrade-test.ts) still applies direct `anvil_setStorageAt` patches to legacy chain state before per-chain upgrade. This is a test-only compatibility bridge, not a production upgrade flow.
+- **Temporary upgrade inputs**: the upgrade harness copies v29 config inputs into `test/anvil-interop/outputs/upgrade-harness-inputs/` and passes them to Forge via env overrides. It no longer mutates checked-in `upgrade-envs/.../local.toml`.
 
 ## Cleanup
 

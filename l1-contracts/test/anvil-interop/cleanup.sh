@@ -6,6 +6,11 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+L1_CONTRACTS_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+cd "$SCRIPT_DIR"
+
 echo "🧹 Cleaning up Anvil interop environment..."
 
 # Known ports used by our Anvil instances (offset by ANVIL_INTEROP_PORT_OFFSET if set)
@@ -86,7 +91,7 @@ EOF
 
 # Clean up any broadcast files from forge
 echo "Cleaning up broadcast files..."
-cd ../..
+cd "$L1_CONTRACTS_DIR"
 rm -rf broadcast/DeployL1CoreContracts.s.sol 2>/dev/null || true
 rm -rf broadcast/DeployCTM.s.sol 2>/dev/null || true
 rm -rf broadcast/RegisterCTM.s.sol 2>/dev/null || true
@@ -96,7 +101,7 @@ rm -rf cache-forge/DeployL1CoreContracts.s.sol 2>/dev/null || true
 rm -rf cache-forge/DeployCTM.s.sol 2>/dev/null || true
 rm -rf cache-forge/RegisterCTM.s.sol 2>/dev/null || true
 
-cd test/anvil-interop
+cd "$SCRIPT_DIR"
 
 echo "✅ Broadcast and cache files cleaned"
 

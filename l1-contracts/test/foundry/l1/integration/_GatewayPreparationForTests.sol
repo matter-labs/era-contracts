@@ -48,11 +48,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         // Grab config from output of l1 deployment
         path = string.concat(root, vm.envString("CTM_OUTPUT"));
         toml = vm.readFile(path);
-        gatewayDiamondCutData = _readGatewayBytes(
-            toml,
-            "$.gateway_diamond_cut_data",
-            "$.contracts_config.diamond_cut_data"
-        );
+        gatewayDiamondCutData = _readGatewayBytes(toml, "$.diamond_cut_data", "$.contracts_config.diamond_cut_data");
         gatewayCTMAddress = _readGatewayAddress(
             toml,
             "$.gateway_state_transition.chain_type_manager_proxy_addr",
