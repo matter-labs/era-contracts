@@ -52,10 +52,10 @@ pub async fn accept_ownership(
     auth: &Wallet,
     input: &CtmAcceptOwnershipInput,
 ) -> anyhow::Result<()> {
-    logger::step("Accepting ownership of CTM...");
+    logger::step("Accepting ownership of CTM contracts...");
     accept_owner(runner, input.governance, auth, input.ctm_proxy).await?;
 
-    logger::step("Accepting admin of CTM...");
+    logger::step("Accepting adminship of CTM contracts...");
     accept_admin(runner, input.chain_admin, auth, input.ctm_proxy).await?;
 
     Ok(())

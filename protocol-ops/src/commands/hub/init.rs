@@ -70,11 +70,10 @@ pub struct HubInitArgs {
 // ── run() ───────────────────────────────────────────────────────────────────
 
 pub async fn run(args: HubInitArgs) -> anyhow::Result<()> {
-    let deployer = Wallet::parse(args.private_key, args.sender)?;
+    let sender = Wallet::parse(args.private_key, args.sender)?;
+    let owner = Wallet::resolve(args.owner, args.owner_private_key, &sender)?;
+
     let mut runner = ForgeRunner::new(args.simulate, &args.l1_rpc_url, args.forge_args.clone())?;
-
-    let owner = Wallet::resolve(args.owner, args.owner_private_key, &deployer)?;
-
 
     let input = HubInitInput {
         owner: owner.address,
@@ -83,13 +82,13 @@ pub async fn run(args: HubInitArgs) -> anyhow::Result<()> {
         create2_factory_addr: args.create2_factory_addr,
         create2_factory_salt: args.create2_factory_salt,
     };
-    let output = hub_init(&mut runner, &deployer, &owner, &input).await?;
+    let output = hub_init(&mut runner, &sender, &owner, &input).await?;
 
     let bridgehub_addr = output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
 
     if let Some(out_path) = &args.out {
         let input_echo = HubInitInputEcho {
-            sender: deployer.address,
+            sender: sender.address,
             owner: owner.address,
             l1_rpc_url: args.l1_rpc_url.clone(),
             era_chain_id: args.era_chain_id,

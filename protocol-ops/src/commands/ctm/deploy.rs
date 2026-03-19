@@ -144,7 +144,7 @@ pub struct CtmDeployInput {
 
 /// Deploy CTM contracts and return the output.
 pub fn deploy(runner: &mut ForgeRunner, auth: &Wallet, input: &CtmDeployInput) -> anyhow::Result<DeployCTMOutput> {
-    let l1_network = L1Network::Localhost;
+    let l1_network = L1Network::from_l1_rpc(&runner.rpc_url)?;
     let mut initial_deployment_config = InitialDeploymentConfig::default();
 
     if let Some(addr) = input.create2_factory_addr {

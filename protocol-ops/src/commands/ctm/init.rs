@@ -165,7 +165,7 @@ pub async fn ctm_init(
     let governance = deployed.governance_addr;
     let chain_admin = deployed.chain_admin;
 
-    logger::step("Accepting ownership of CTM...");
+    logger::step("Accepting ownership of CTM contracts...");
     let accept_input = CtmAcceptOwnershipInput {
         ctm_proxy,
         governance,

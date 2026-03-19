@@ -22,10 +22,10 @@ pub async fn accept_ownership(
     auth: &Wallet,
     input: &AcceptOwnershipInput,
 ) -> anyhow::Result<()> {
-    logger::step("Accepting ownership of Bridgehub admin...");
+    logger::step("Accepting adminship of Bridgehub contracts...");
     accept_admin(runner, input.chain_admin, auth, input.bridgehub).await?;
 
-    logger::step("Accepting ownership of ecosystem governance contracts...");
+    logger::step("Accepting ownership of Bridgehub contracts...");
     accept_owner_aggregated(runner, input.governance, auth, input.bridgehub).await?;
 
     Ok(())

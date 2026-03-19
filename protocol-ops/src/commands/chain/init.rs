@@ -264,7 +264,7 @@ pub async fn chain_init(
     logger::info(format!("  ChainAdmin:    {:#x}", chain_admin));
 
     // Accept admin (as owner)
-    logger::step("Accepting admin of chain...");
+    logger::step("Accepting adminship of chain...");
     accept_admin(runner, chain_admin, owner, diamond_proxy).await?;
 
     // Unpause deposits (unless pause_deposits is set)

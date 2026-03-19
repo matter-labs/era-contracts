@@ -43,19 +43,25 @@ pub enum L1Network {
 }
 
 impl L1Network {
+    pub fn from_l1_rpc(rpc_url: &str) -> anyhow::Result<Self> {
+        let chain_id = crate::common::ethereum::query_chain_id_sync(rpc_url)?;
+        match chain_id {
+            1 => Ok(Self::Mainnet),
+            9 => Ok(Self::Localhost),
+            17000 => Ok(Self::Holesky),
+            11155111 => Ok(Self::Sepolia),
+            other => anyhow::bail!("Unrecognized L1 chain ID: {}", other),
+        }
+    }
+
     /// Look up the Avail L1 DA validator address for this network from configs/da.yaml.
     pub fn avail_l1_da_validator_addr(&self) -> Option<Address> {
-        let key = match self {
-            L1Network::Localhost => return None,
-            L1Network::Sepolia => "sepolia",
-            L1Network::Holesky => "holesky",
-            L1Network::Mainnet => "mainnet",
-        };
-        DA_CONFIG
-            .avail
-            .as_ref()
-            .and_then(|m| m.get(key))
-            .map(|s| Address::from_str(s).expect("invalid address in da.yaml"))
+        match self {
+            L1Network::Localhost => None,
+            L1Network::Sepolia => None,
+            L1Network::Holesky => Some(Address::from_str("0x73d59fe232fce421d1365d6a5beec49acde3d0d9").unwrap()),
+            L1Network::Mainnet => None,
+        }
     }
 
     pub fn zk_token_asset_id(&self) -> H256 {
