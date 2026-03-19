@@ -18,6 +18,7 @@ const ARTIFACTS = {
   AdminFacet: "Admin.sol/AdminFacet.json",
   BaseTokenHolder: "BaseTokenHolder.sol/BaseTokenHolder.json",
   ChainAdminOwnable: "ChainAdminOwnable.sol/ChainAdminOwnable.json",
+  ChainRegistrationSender: "ChainRegistrationSender.sol/ChainRegistrationSender.json",
   GettersFacet: "Getters.sol/GettersFacet.json",
   GWAssetTracker: "GWAssetTracker.sol/GWAssetTracker.json",
   IBaseToken: "IBaseToken.sol/IBaseToken.json",

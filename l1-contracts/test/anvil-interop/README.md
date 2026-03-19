@@ -79,7 +79,7 @@ You can also add `.only` to a `describe` or `it` block in the spec file to isola
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `01-deployment-verification` | L1 contracts deployed, CTM registered, all 4 L2 chains have diamond proxies, L2 system contracts present, test tokens deployed, initial chainBalance is zero |
 | `02-direct-bridge`           | L1->L2 ETH deposit + L2->L1 ETH withdrawal on chain 10 (direct L1 settlement), L1AssetTracker chainBalance tracking, balance conservation                    |
-| `03-interop-transfer`        | L2<->L2 token transfers via InteropCenter between direct-settlement chains (10, 11, 12)                                                                      |
+| `03-interop-transfer`        | Unsupported cross-settlement interop routes revert with `DestinationChainNotRegistered`                                                                       |
 | `04-gateway-setup`           | GW chain contracts deployed, interop chains registered on GW L2Bridgehub, GW designated as settlement layer on L1                                            |
 | `05-gateway-bridge`          | L1->L2A ETH deposit + L2A->L1 ETH withdrawal on chain 12 (via GW), L1AssetTracker chainBalance tracking, token balance migration, processLogsAndMessages     |
 | `06-gateway-interop`         | L2A<->L2B interop transfers (both on GW), L2A<->GW interop transfers                                                                                         |
@@ -193,7 +193,7 @@ Contracts are placed at hardcoded addresses via `anvil_setCode` (production has 
 | What                          | Who                      | Production equivalent               |
 | ----------------------------- | ------------------------ | ----------------------------------- |
 | Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade tx      |
-| Interop chain registration    | `SERVICE_TX_SENDER_ADDR` | Service transactions from sequencer |
+| Interop chain registration    | L1 `ChainRegistrationSender` | Real L1 service-tx flow relayed to L2 |
 | GW chain registration         | `ChainAssetHandler`      | Governance flow                     |
 | Settlement layer notification | `L2_BOOTLOADER_ADDR`     | Bootloader at batch start           |
 | Governance calls              | Governance contract      | Multi-sig / timelock                |
@@ -202,6 +202,7 @@ Contracts are placed at hardcoded addresses via `anvil_setCode` (production has 
 ### Other Shortcuts
 
 - **GW L2Bridgehub ownership transfer**: CTM deploys a per-chain Governance, but `fullRegistration` sends from ecosystem Governance. The test transfers ownership before relay.
+- **Interop registration scope**: only same-settlement, non-L1 pairs are registered through the real `ChainRegistrationSender.registerChain(...)` flow. Cross-settlement routes such as direct-settled↔gateway or gateway↔GW-settled remain unregistered and should revert with `DestinationChainNotRegistered`.
 - **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
 - **Interop proofs**: Correct struct shape but empty proof arrays
 

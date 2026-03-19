@@ -1,10 +1,19 @@
 import { expect } from "chai";
-import { BigNumber } from "ethers";
 import { executeTokenTransfer } from "../../src/helpers/token-transfer";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { getChainIdByRole, getChainIdsByRole } from "../../src/core/utils";
 
-describe("03 - Interop Transfer (Direct Settlement)", function () {
+async function expectDestinationChainNotRegistered(promise: Promise<unknown>): Promise<void> {
+  try {
+    await promise;
+    throw new Error("Expected transfer to fail with DestinationChainNotRegistered");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    expect(message).to.contain("DestinationChainNotRegistered");
+  }
+}
+
+describe("03 - Interop Transfer (Registration Constraints)", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();
@@ -23,63 +32,42 @@ describe("03 - Interop Transfer (Direct Settlement)", function () {
     gwSettledChainIds = getChainIdsByRole(state.chains.config, "gwSettled");
   });
 
-  it("transfers tokens from gateway to first GW-settled chain via InteropCenter", async () => {
+  it("rejects transfers from gateway to GW-settled chains without real registration", async () => {
     const sourceToken = state.testTokens![gatewayChainId];
-    const result = await executeTokenTransfer({
-      sourceChainId: gatewayChainId,
-      targetChainId: gwSettledChainIds[0],
-      amount: "10",
-      sourceTokenAddress: sourceToken,
-      logger: (line: string) => console.log(`[interop] ${line}`),
-    });
-
-    expect(result.sourceTxHash).to.not.be.null;
-    expect(result.targetTxHash).to.not.be.null;
-
-    const sourceBalanceDelta = BigNumber.from(result.sourceBalanceBefore).sub(result.sourceBalanceAfter);
-    const destinationBalanceDelta = BigNumber.from(result.destinationBalanceAfter).sub(result.destinationBalanceBefore);
-
-    expect(sourceBalanceDelta.eq(result.amountWei), "source chain burned amount mismatch").to.eq(true);
-    expect(destinationBalanceDelta.eq(result.amountWei), "destination chain minted amount mismatch").to.eq(true);
+    await expectDestinationChainNotRegistered(
+      executeTokenTransfer({
+        sourceChainId: gatewayChainId,
+        targetChainId: gwSettledChainIds[0],
+        amount: "10",
+        sourceTokenAddress: sourceToken,
+        logger: (line: string) => console.log(`[interop] ${line}`),
+      })
+    );
   });
 
-  it("transfers tokens from first GW-settled chain to gateway via InteropCenter", async () => {
+  it("rejects transfers from GW-settled chains to the gateway chain", async () => {
     const sourceToken = state.testTokens![gwSettledChainIds[0]];
-    const result = await executeTokenTransfer({
-      sourceChainId: gwSettledChainIds[0],
-      targetChainId: gatewayChainId,
-      amount: "5",
-      sourceTokenAddress: sourceToken,
-      logger: (line: string) => console.log(`[interop] ${line}`),
-    });
-
-    expect(result.sourceTxHash).to.not.be.null;
-    expect(result.targetTxHash).to.not.be.null;
-
-    const sourceBalanceDelta = BigNumber.from(result.sourceBalanceBefore).sub(result.sourceBalanceAfter);
-    const destinationBalanceDelta = BigNumber.from(result.destinationBalanceAfter).sub(result.destinationBalanceBefore);
-
-    expect(sourceBalanceDelta.eq(result.amountWei), "source chain burned amount mismatch").to.eq(true);
-    expect(destinationBalanceDelta.eq(result.amountWei), "destination chain minted amount mismatch").to.eq(true);
+    await expectDestinationChainNotRegistered(
+      executeTokenTransfer({
+        sourceChainId: gwSettledChainIds[0],
+        targetChainId: gatewayChainId,
+        amount: "5",
+        sourceTokenAddress: sourceToken,
+        logger: (line: string) => console.log(`[interop] ${line}`),
+      })
+    );
   });
 
-  it("transfers tokens from direct-settled to gateway chain via InteropCenter", async () => {
+  it("rejects transfers from direct-settled chains to the gateway chain", async () => {
     const sourceToken = state.testTokens![directSettledChainId];
-    const result = await executeTokenTransfer({
-      sourceChainId: directSettledChainId,
-      targetChainId: gatewayChainId,
-      amount: "3",
-      sourceTokenAddress: sourceToken,
-      logger: (line: string) => console.log(`[interop] ${line}`),
-    });
-
-    expect(result.sourceTxHash).to.not.be.null;
-    expect(result.targetTxHash).to.not.be.null;
-
-    const sourceBalanceDelta = BigNumber.from(result.sourceBalanceBefore).sub(result.sourceBalanceAfter);
-    const destinationBalanceDelta = BigNumber.from(result.destinationBalanceAfter).sub(result.destinationBalanceBefore);
-
-    expect(sourceBalanceDelta.eq(result.amountWei), "source chain burned amount mismatch").to.eq(true);
-    expect(destinationBalanceDelta.eq(result.amountWei), "destination chain minted amount mismatch").to.eq(true);
+    await expectDestinationChainNotRegistered(
+      executeTokenTransfer({
+        sourceChainId: directSettledChainId,
+        targetChainId: gatewayChainId,
+        amount: "3",
+        sourceTokenAddress: sourceToken,
+        logger: (line: string) => console.log(`[interop] ${line}`),
+      })
+    );
   });
 });

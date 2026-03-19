@@ -75,6 +75,15 @@ function parsePortOffset(argv: string[]): number {
   return portOffsetIdx !== -1 ? parseInt(argv[portOffsetIdx + 1], 10) : 0;
 }
 
+function readLogTail(logPath: string, maxLines = 40): string {
+  if (!fs.existsSync(logPath)) {
+    return "log file not found";
+  }
+
+  const lines = fs.readFileSync(logPath, "utf-8").trimEnd().split("\n");
+  return lines.slice(-maxLines).join("\n");
+}
+
 async function runParallelWorker(label: string, specs: string[], portOffset: number): Promise<void> {
   const runSuffix = `-p${portOffset}`;
   const logsDir = path.join(anvilInteropDir, `outputs/logs${runSuffix}`);
@@ -120,7 +129,13 @@ async function runParallelWorker(label: string, specs: string[], portOffset: num
         );
         resolve();
       } else {
-        reject(new Error(`${label} failed with exit code ${code ?? "unknown"}. Log: ${logPath}`));
+        const tail = readLogTail(logPath);
+        reject(
+          new Error(
+            `${label} failed with exit code ${code ?? "unknown"}. Log: ${logPath}\n` +
+              `--- ${label} log tail ---\n${tail}\n--- end log tail ---`
+          )
+        );
       }
     });
   });

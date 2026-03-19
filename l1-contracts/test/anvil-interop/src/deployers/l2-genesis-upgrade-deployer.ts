@@ -1,17 +1,9 @@
-import { ethers, providers } from "ethers";
-import { impersonateAndRun, relayTx } from "../core/utils";
-import { encodeNtvAssetId } from "../core/data-encoding";
-import { getAbi, getBytecode } from "../core/contracts";
+import { providers } from "ethers";
+import { relayTx } from "../core/utils";
+import { getBytecode } from "../core/contracts";
 import { PREDEPLOY_SYSTEM_CONTRACTS } from "../core/predeploys";
 import type { SystemContractPredeploy } from "../core/predeploys";
-import {
-  ETH_TOKEN_ADDRESS,
-  INITIAL_BASE_TOKEN_HOLDER_BALANCE,
-  L1_CHAIN_ID,
-  L2_BASE_TOKEN_ADDR,
-  L2_BRIDGEHUB_ADDR,
-  SERVICE_TX_SENDER_ADDR,
-} from "../core/const";
+import { INITIAL_BASE_TOKEN_HOLDER_BALANCE, L2_BASE_TOKEN_ADDR } from "../core/const";
 import type { PriorityRequestData } from "../core/types";
 
 /**
@@ -21,7 +13,7 @@ import type { PriorityRequestData } from "../core/types";
  * The flow:
  * 1. Pre-deploy all contracts via anvil_setCode (isZKsyncOS=true skips force deploys)
  * 2. Relay the genesis upgrade transaction from the L1 GenesisUpgrade event
- * 3. Register interop chains on L2Bridgehub and verify the deployed code
+ * 3. Verify the deployed code
  */
 export class L2GenesisUpgradeDeployer {
   private l2Provider: providers.JsonRpcProvider;
@@ -56,34 +48,12 @@ export class L2GenesisUpgradeDeployer {
 
     const result = await relayTx(this.l2Provider, genesisTx.from, genesisTx.to, genesisTx.calldata, genesisTx.value);
     if (!result.success) {
-      throw new Error(`Genesis upgrade tx failed on L2. Debug: cast run ${result.txHash} -r ${this.l2Provider.connection.url}`);
+      throw new Error(
+        `Genesis upgrade tx failed on L2. Debug: cast run ${result.txHash} -r ${this.l2Provider.connection.url}`
+      );
     }
 
     console.log(`   ✅ Genesis upgrade relayed: cast run ${result.txHash} -r ${this.l2Provider.connection.url}`);
-  }
-
-  private async registerInteropChains(interopChainIds: number[]): Promise<void> {
-    const l2BridgehubAbiData = getAbi("L2Bridgehub");
-    const l2Bridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbiData, this.l2Provider);
-    const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
-    const chainIds = Array.from(new Set(interopChainIds));
-
-    await impersonateAndRun(this.l2Provider, SERVICE_TX_SENDER_ADDR, async (serviceTxSenderSigner) => {
-      const l2BridgehubWithSigner = l2Bridgehub.connect(serviceTxSenderSigner);
-
-      for (const chainId of chainIds) {
-        const existingAssetId = await l2Bridgehub.baseTokenAssetId(chainId);
-        if (existingAssetId !== ethers.constants.HashZero) {
-          console.log(`   ✅ Chain ${chainId} already registered on L2Bridgehub`);
-          continue;
-        }
-
-        console.log(`   Registering chain ${chainId} on L2Bridgehub...`);
-        const registerTx = await l2BridgehubWithSigner.registerChainForInterop(chainId, ethAssetId);
-        await registerTx.wait();
-        console.log(`   ✅ Chain ${chainId} registered on L2Bridgehub`);
-      }
-    });
   }
 
   private async assertCodePresent(address: string, name: string): Promise<void> {
@@ -101,11 +71,7 @@ export class L2GenesisUpgradeDeployer {
     );
   }
 
-  async deployAllSystemContracts(
-    chainId: number,
-    genesisPriorityTx: PriorityRequestData,
-    interopChainIds: number[]
-  ): Promise<void> {
+  async deployAllSystemContracts(chainId: number, genesisPriorityTx: PriorityRequestData): Promise<void> {
     console.log(`\n🔧 Deploying system contracts for chain ${chainId} via real genesis upgrade...`);
     await this.ensurePredeployedContracts();
 
@@ -114,8 +80,7 @@ export class L2GenesisUpgradeDeployer {
 
     await this.relayGenesisPriorityTx(genesisPriorityTx);
 
-    console.log("   Registering interop chains and verifying deployment...");
-    await this.registerInteropChains(interopChainIds);
+    console.log("   Verifying deployment...");
     await this.assertPostDeploymentCode();
     console.log(`✅ Genesis upgrade deployment completed for chain ${chainId}`);
   }

@@ -98,12 +98,14 @@ export class DeploymentRunner {
   private computeInteropChainIds(chainId: number, chainConfigs: AnvilChainConfig[]): number[] {
     const l2Chains = chainConfigs.filter((chainConfig) => !chainConfig.isL1);
     const thisChain = l2Chains.find((chainConfig) => chainConfig.chainId === chainId);
-    if (thisChain?.isGateway) {
-      return l2Chains
-        .filter((chainConfig) => chainConfig.settlement === "gateway" || chainConfig.chainId === chainId)
-        .map((chainConfig) => chainConfig.chainId);
+    if (!thisChain || thisChain.settlement === "l1" || !thisChain.settlement) {
+      return [];
     }
-    return l2Chains.map((chainConfig) => chainConfig.chainId);
+
+    return l2Chains
+      .filter((chainConfig) => chainConfig.chainId !== chainId)
+      .filter((chainConfig) => chainConfig.settlement === thisChain.settlement)
+      .map((chainConfig) => chainConfig.chainId);
   }
 
   private buildInteropChainMap(chainConfigs: AnvilConfig["chains"]): Map<number, number[]> {
@@ -147,8 +149,7 @@ export class DeploymentRunner {
     registry: ChainRegistry,
     chain: ChainAddresses,
     l2RpcUrlsByChainId: Map<number, string>,
-    genesisPriorityTxs: Map<number, PriorityRequestData>,
-    interopChainIdsByChainId: Map<number, number[]>
+    genesisPriorityTxs: Map<number, PriorityRequestData>
   ): Promise<void> {
     const rpcUrl = l2RpcUrlsByChainId.get(chain.chainId);
     if (!rpcUrl) {
@@ -158,14 +159,31 @@ export class DeploymentRunner {
     if (!genesisTx) {
       throw new Error(`Genesis tx not found for chain ${chain.chainId}`);
     }
+    const done = timeIt(`initializeL2 chain ${chain.chainId}`);
+    await registry.initializeL2SystemContracts(chain.chainId, chain.diamondProxy, rpcUrl, genesisTx);
+    done();
+    console.log(`  Chain ${chain.chainId} system contracts initialized`);
+  }
+
+  private async registerInteropChainsForL2Chain(
+    registry: ChainRegistry,
+    chain: ChainAddresses,
+    l2RpcUrlsByChainId: Map<number, string>,
+    interopChainIdsByChainId: Map<number, number[]>
+  ): Promise<void> {
+    const rpcUrl = l2RpcUrlsByChainId.get(chain.chainId);
+    if (!rpcUrl) {
+      throw new Error(`L2 chain ${chain.chainId} not found`);
+    }
     const interopChainIds = interopChainIdsByChainId.get(chain.chainId);
     if (!interopChainIds) {
       throw new Error(`Interop chain plan not found for chain ${chain.chainId}`);
     }
-    const done = timeIt(`initializeL2 chain ${chain.chainId}`);
-    await registry.initializeL2SystemContracts(chain.chainId, rpcUrl, genesisTx, interopChainIds);
+
+    const done = timeIt(`registerInterop chain ${chain.chainId}`);
+    await registry.registerInteropChainsOnL2(chain.chainId, chain.diamondProxy, rpcUrl, interopChainIds);
     done();
-    console.log(`  Chain ${chain.chainId} system contracts initialized`);
+    console.log(`  Chain ${chain.chainId} interop registrations completed`);
   }
 
   private async unpauseChainDeposits(
@@ -271,7 +289,6 @@ export class DeploymentRunner {
     const registry = new ChainRegistry(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
     const chainConfigsById = this.toChainConfigMap(chainConfigs);
     const l2RpcUrlsByChainId = this.toRpcUrlMap(l2Chains);
-    const interopChainIdsByChainId = this.buildInteropChainMap(chainConfigs);
 
     // Batch-register all chains in a single forge call (avoids nonce conflicts)
     const configs = this.buildRegistrationConfigs(l2Chains, chainConfigsById);
@@ -287,9 +304,7 @@ export class DeploymentRunner {
     // Initialize all L2 chains in parallel (each goes to a separate Anvil instance)
     console.log("\nInitializing L2 system contracts (in parallel)...\n");
     await Promise.all(
-      chainAddresses.map((chain) =>
-        this.initializeL2Chain(registry, chain, l2RpcUrlsByChainId, genesisPriorityTxs, interopChainIdsByChainId)
-      )
+      chainAddresses.map((chain) => this.initializeL2Chain(registry, chain, l2RpcUrlsByChainId, genesisPriorityTxs))
     );
 
     // Unpause deposits on all chains in parallel using explicit nonces
@@ -307,6 +322,26 @@ export class DeploymentRunner {
     this.saveState(state);
 
     return { chainAddresses };
+  }
+
+  async step6RegisterInteropChains(
+    l1RpcUrl: string,
+    l2Chains: Array<{ chainId: number; rpcUrl: string }>,
+    chainConfigs: AnvilConfig["chains"],
+    l1Addresses: CoreDeployedAddresses,
+    ctmAddresses: CTMDeployedAddresses,
+    chainAddresses: ChainAddresses[]
+  ): Promise<void> {
+    console.log("\n=== Step 6: Register Interop Chains ===\n");
+
+    const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
+    const registry = new ChainRegistry(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
+    const l2RpcUrlsByChainId = this.toRpcUrlMap(l2Chains);
+    const interopChainIdsByChainId = this.buildInteropChainMap(chainConfigs);
+
+    for (const chain of chainAddresses) {
+      await this.registerInteropChainsForL2Chain(registry, chain, l2RpcUrlsByChainId, interopChainIdsByChainId);
+    }
   }
 
   /**
@@ -508,6 +543,15 @@ export class DeploymentRunner {
         l2ChainRpcUrls
       );
     }
+
+    await this.step6RegisterInteropChains(
+      chains.l1.rpcUrl,
+      chains.l2,
+      chains.config,
+      l1Addresses,
+      ctmAddresses,
+      chainAddresses
+    );
 
     return { chains, l1Addresses, ctmAddresses, chainAddresses };
   }

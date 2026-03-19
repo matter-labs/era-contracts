@@ -9,6 +9,7 @@ import type {
 } from "../core/types";
 import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig } from "../core/utils";
 import { L2GenesisUpgradeDeployer } from "./l2-genesis-upgrade-deployer";
+import { InteropChainRegistrar } from "./interop-chain-registrar";
 import { runForgeScript } from "../core/forge";
 import { GENESIS_UPGRADE_EVENT_SIG } from "../core/const";
 import { getAbi } from "../core/contracts";
@@ -173,17 +174,36 @@ export class ChainRegistry {
 
   async initializeL2SystemContracts(
     chainId: number,
+    diamondProxy: string,
     l2RpcUrl: string,
-    genesisPriorityTx: PriorityRequestData,
-    interopChainIds: number[]
+    genesisPriorityTx: PriorityRequestData
   ): Promise<void> {
     console.log(`🔧 Initializing L2 system contracts for chain ${chainId}...`);
 
     console.log("   Using real genesis upgrade (relaying L1 genesis tx)");
     const deployer = new L2GenesisUpgradeDeployer(l2RpcUrl);
-    await deployer.deployAllSystemContracts(chainId, genesisPriorityTx, interopChainIds);
+    await deployer.deployAllSystemContracts(chainId, genesisPriorityTx);
 
     console.log(`✅ L2 system contracts initialized for chain ${chainId}`);
+  }
+
+  async registerInteropChainsOnL2(
+    chainId: number,
+    diamondProxy: string,
+    l2RpcUrl: string,
+    interopChainIds: number[]
+  ): Promise<void> {
+    console.log(`🔗 Registering interop chains for chain ${chainId} via L1 ChainRegistrationSender...`);
+
+    const registrar = new InteropChainRegistrar(
+      l2RpcUrl,
+      this.l1RpcUrl,
+      this.l1Addresses.chainRegistrationSender,
+      diamondProxy
+    );
+    await registrar.registerInteropChains(chainId, interopChainIds);
+
+    console.log(`✅ Interop chains registered for chain ${chainId}`);
   }
 
   private async generateChainConfig(config: ChainConfig): Promise<string> {

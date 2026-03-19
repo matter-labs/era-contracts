@@ -132,7 +132,9 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
 
     console.log(`   GWAssetTracker.chainBalance[${sourceChainId}][assetId] before: ${srcGwBalanceBefore}`);
     console.log(`   GWAssetTracker.chainBalance[${targetChainId}][assetId] before: ${dstGwBalanceBefore}`);
-    console.log(`   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] before: ${dstPendingInteropBefore}`);
+    console.log(
+      `   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] before: ${dstPendingInteropBefore}`
+    );
 
     const processResult = await callProcessLogsAndMessages({
       gwProvider,
