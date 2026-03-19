@@ -359,20 +359,23 @@ contract MessageRoot_Extended_Test is Test {
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(chainId, 0);
 
-        // totalPublishedInteropRoots accounts for _emitRoot calls in _addNewChain:
-        // initL2 adds block.chainid (1), addNewChain(chainId) (2)
-        uint256 countBefore = l2MessageRoot.totalPublishedInteropRoots();
-        assertEq(countBefore, 2, "totalPublishedInteropRoots should be 2 after chain additions");
+        // With per-block logId: initL2 + addNewChain(chainId) both happen in the same block, so
+        // interopRootLogId is incremented only once (for that block).
+        uint256 countBefore = l2MessageRoot.interopRootLogId();
+        assertEq(countBefore, 1, "interopRootLogId should be 1 (single block so far)");
+
+        // Roll to a new block so the next emission increments the counter.
+        vm.roll(block.number + 1);
 
         // Add a batch root
         vm.prank(GW_ASSET_TRACKER_ADDR);
         l2MessageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
 
-        // Verify totalPublishedInteropRoots incremented after addChainBatchRoot (L2MessageRoot calls _emitRoot)
+        // Verify interopRootLogId incremented once for the new block
         assertEq(
-            l2MessageRoot.totalPublishedInteropRoots(),
+            l2MessageRoot.interopRootLogId(),
             countBefore + 1,
-            "totalPublishedInteropRoots should increment by 1 after addChainBatchRoot"
+            "interopRootLogId should increment by 1 when block advances"
         );
 
         // Check that historical root is set
