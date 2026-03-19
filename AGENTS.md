@@ -1,6 +1,6 @@
 # General guidelines
 
-## Code sryle requirements
+## Code style requirements
 
 1. Avoid using magic numbers. Most constant numbers especially for system params / well known chain ids must be represented as a constant.
 2. All constants should be placed in the dedicated file (e.g. `common/Config.sol` in `l1-contracts`, `Constants.sol` in `system-contracts`, etc). if you do not know where to put the constant to, please closely analyze the corresponding project. If this file can not be found, please create one.
