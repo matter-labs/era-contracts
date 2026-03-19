@@ -10,7 +10,8 @@ export class AnvilManager {
   private pidFilePath: string;
 
   constructor() {
-    this.pidFilePath = path.join(__dirname, "../../outputs/anvil-pids.json");
+    const runSuffix = process.env.ANVIL_INTEROP_RUN_SUFFIX || "";
+    this.pidFilePath = path.join(__dirname, `../../outputs/anvil-pids${runSuffix}.json`);
   }
 
   private resolveAnvilBinary(): string {

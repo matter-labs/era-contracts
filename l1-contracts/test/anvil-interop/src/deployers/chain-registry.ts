@@ -126,9 +126,8 @@ export class ChainRegistry {
    * Scan L1 blocks for GenesisUpgrade events emitted during chain registration.
    * Each diamond proxy emits exactly one GenesisUpgrade event containing the L2 upgrade tx.
    *
-   * Note: The genesis upgrade does NOT emit NewPriorityRequest — the upgrade tx is stored
-   * in s.l2SystemContractsUpgradeTxHash and executed by the bootloader in the next batch.
-   * We extract it from the GenesisUpgrade event and relay it manually on Anvil.
+   * The genesis upgrade does not emit NewPriorityRequest. The upgrade tx is emitted in the
+   * GenesisUpgrade event and must be replayed directly on the target L2 Anvil instance.
    */
   private async extractGenesisTxs(
     chainAddresses: ChainAddresses[],
@@ -155,7 +154,6 @@ export class ChainRegistry {
         );
       }
 
-      // Parse the GenesisUpgrade event — extract L2CanonicalTransaction
       const parsed = genesisIface.parseLog({ topics: logs[0].topics, data: logs[0].data });
       const l2Tx = parsed.args._l2Transaction;
       const fromUint256 = ethers.BigNumber.from(l2Tx.from);
@@ -181,7 +179,7 @@ export class ChainRegistry {
   ): Promise<void> {
     console.log(`🔧 Initializing L2 system contracts for chain ${chainId}...`);
 
-    console.log("   Using real genesis upgrade (relaying L1 priority tx)");
+    console.log("   Using real genesis upgrade (relaying L1 genesis tx)");
     const deployer = new L2GenesisUpgradeDeployer(l2RpcUrl);
     await deployer.deployAllSystemContracts(chainId, genesisPriorityTx, interopChainIds);
 

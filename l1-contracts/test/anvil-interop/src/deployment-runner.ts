@@ -40,7 +40,8 @@ export class DeploymentRunner {
   private configPath: string;
 
   constructor(baseDir: string = __dirname + "/..") {
-    this.stateDir = path.join(baseDir, "outputs/state");
+    const runSuffix = process.env.ANVIL_INTEROP_RUN_SUFFIX || "";
+    this.stateDir = path.join(baseDir, `outputs/state${runSuffix}`);
     this.configDir = path.join(baseDir, "config");
     this.configPath = path.join(this.configDir, "anvil-config.json");
     fs.mkdirSync(this.stateDir, { recursive: true });
@@ -155,10 +156,7 @@ export class DeploymentRunner {
     }
     const genesisTx = genesisPriorityTxs.get(chain.chainId);
     if (!genesisTx) {
-      throw new Error(
-        `Genesis priority tx not found for chain ${chain.chainId}. ` +
-          "Ensure registerChainBatch() captured the GenesisUpgrade events."
-      );
+      throw new Error(`Genesis tx not found for chain ${chain.chainId}`);
     }
     const interopChainIds = interopChainIdsByChainId.get(chain.chainId);
     if (!interopChainIds) {
@@ -354,7 +352,8 @@ export class DeploymentRunner {
 
     // Decompress hex-gzip state files to native JSON for --load-state CLI.
     // This is more portable than anvil_loadState RPC across anvil versions.
-    const tmpDir = path.join(stateDir, ".tmp");
+    const runSuffix = process.env.ANVIL_INTEROP_RUN_SUFFIX || "";
+    const tmpDir = path.join(stateDir, `.tmp${runSuffix}`);
     fs.mkdirSync(tmpDir, { recursive: true });
 
     const loadStatePaths: Record<number, string> = {};

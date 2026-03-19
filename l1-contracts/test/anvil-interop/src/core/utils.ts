@@ -11,6 +11,7 @@ import {
   L1_MESSAGE_SENT_EVENT_SIG,
   L1_TO_L2_ALIAS_OFFSET,
   L2_ASSET_TRACKER_ADDR,
+  L2_BRIDGEHUB_ADDR,
   L2_INTEROP_HANDLER_ADDR,
   NEW_PRIORITY_REQUEST_EVENT_SIG,
 } from "./const";
@@ -334,29 +335,24 @@ export async function relayTx(
   }
 }
 
-/**
- * Extract NewPriorityRequest events from a receipt and relay them to the target chains.
- *
- * For each chain entry, filters events from the corresponding diamond proxy, extracts the
- * sender, destination address, calldata, and value from the event data, and relays the
- * transaction by impersonating the original sender on the target chain.
- *
- * If a chain has `relayChains`, after relaying to it, any NewPriorityRequest events from
- * the relay receipt are extracted and relayed to those chains (GW → L2 relay).
- *
- * @returns Array of relay transaction hashes
- */
-export async function extractAndRelayNewPriorityRequests(
-  receipt: ethers.providers.TransactionReceipt,
-  chains: Array<{
-    diamondProxy: string;
-    provider: providers.JsonRpcProvider;
-    relayChains?: Array<{ provider: providers.JsonRpcProvider }>;
-  }>,
-  logger?: (line: string) => void
-): Promise<string[]> {
-  const log = logger || console.log;
+interface PriorityRelayChainTarget {
+  diamondProxy: string;
+  provider: providers.JsonRpcProvider;
+}
 
+interface PriorityRelayResolvedPath {
+  l1RpcUrl: string;
+  bridgehubAddr: string;
+  chainId: number;
+  chainRpcUrl: string;
+  gwRpcUrl?: string;
+}
+
+async function relayPriorityRequestsToTargets(
+  receipt: ethers.providers.TransactionReceipt,
+  chains: PriorityRelayChainTarget[],
+  log: (line: string) => void
+): Promise<string[]> {
   // Relay across different target chains in parallel (different providers = no nonce conflicts).
   // Within each chain, requests are relayed sequentially (same impersonated sender).
   const perChainResults = await Promise.all(
@@ -369,31 +365,6 @@ export async function extractAndRelayNewPriorityRequests(
         if (result.success) {
           hashes.push(result.txHash);
           log(`   Relay tx: cast run ${result.txHash} -r ${chain.provider.connection.url}`);
-
-          // GW relay: if this chain has relayChains, extract NewPriorityRequest events
-          // from the relay receipt and relay them to the next-hop chains.
-          if (chain.relayChains && result.receipt) {
-            const nextRequests = extractNewPriorityRequests(result.receipt);
-            log(`   Found ${nextRequests.length} next-hop priority request(s)`);
-            for (const nextReq of nextRequests) {
-              for (const relayChain of chain.relayChains) {
-                log(`   Relaying next-hop from ${nextReq.from} to ${nextReq.to}`);
-                const nextResult = await relayTx(
-                  relayChain.provider,
-                  nextReq.from,
-                  nextReq.to,
-                  nextReq.calldata,
-                  nextReq.value
-                );
-                if (nextResult.success) {
-                  hashes.push(nextResult.txHash);
-                  log(`   Next-hop relay tx: cast run ${nextResult.txHash} -r ${relayChain.provider.connection.url}`);
-                } else {
-                  throw new Error(`Next-hop relay tx failed: from=${nextReq.from} to=${nextReq.to}`);
-                }
-              }
-            }
-          }
         } else {
           throw new Error(`Relay tx failed: from=${req.from} to=${req.to} via proxy ${chain.diamondProxy}`);
         }
@@ -403,6 +374,105 @@ export async function extractAndRelayNewPriorityRequests(
   );
 
   return perChainResults.flat();
+}
+
+async function resolvePriorityRelayPath(path: PriorityRelayResolvedPath): Promise<{
+  l2Provider: providers.JsonRpcProvider;
+  l1DiamondProxy: string;
+  settlementLayerChainId: number;
+  gwProvider?: providers.JsonRpcProvider;
+  gwDiamondProxy?: string;
+}> {
+  const l1Provider = new providers.JsonRpcProvider(path.l1RpcUrl);
+  const l2Provider = new providers.JsonRpcProvider(path.chainRpcUrl);
+  const bridgehub = new ethers.Contract(path.bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
+  const settlementLayerChainId = await getSettlementLayerChainId(l1Provider, path.bridgehubAddr, path.chainId);
+  const relayChainId = settlementLayerChainId === 0 ? path.chainId : settlementLayerChainId;
+  const l1DiamondProxy: string = await bridgehub.getZKChain(relayChainId);
+
+  if (l1DiamondProxy === ethers.constants.AddressZero) {
+    const targetLabel =
+      settlementLayerChainId === 0
+        ? `target chain ${path.chainId}`
+        : `gateway settlement layer ${settlementLayerChainId} for chain ${path.chainId}`;
+    throw new Error(`No L1 diamond proxy registered for ${targetLabel}`);
+  }
+
+  if (settlementLayerChainId === 0) {
+    return { l2Provider, l1DiamondProxy, settlementLayerChainId };
+  }
+
+  if (!path.gwRpcUrl) {
+    throw new Error(
+      `Chain ${path.chainId} settles through gateway chain ${settlementLayerChainId}; gwRpcUrl is required`
+    );
+  }
+
+  const gwProvider = new providers.JsonRpcProvider(path.gwRpcUrl);
+  const gwBridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), gwProvider);
+  const gwDiamondProxy: string = await gwBridgehub.getZKChain(path.chainId);
+
+  if (gwDiamondProxy === ethers.constants.AddressZero) {
+    throw new Error(`No GW diamond proxy registered for chain ${path.chainId}`);
+  }
+
+  return {
+    l2Provider,
+    l1DiamondProxy,
+    settlementLayerChainId,
+    gwProvider,
+    gwDiamondProxy,
+  };
+}
+
+/**
+ * Extract NewPriorityRequest events from a receipt and relay them to the target chains.
+ *
+ * Supports two modes:
+ * - explicit targets: relay the receipt's requests to the given diamond proxy / provider pairs
+ * - resolved chain path: look up settlement on L1Bridgehub and relay to L2 directly or via GW
+ *
+ * @returns Array of relay transaction hashes
+ */
+export async function extractAndRelayNewPriorityRequests(
+  receipt: ethers.providers.TransactionReceipt,
+  chainsOrPath: PriorityRelayChainTarget[] | PriorityRelayResolvedPath,
+  logger?: (line: string) => void
+): Promise<string[]> {
+  const log = logger || console.log;
+
+  if (Array.isArray(chainsOrPath)) {
+    return relayPriorityRequestsToTargets(receipt, chainsOrPath, log);
+  }
+
+  const { l2Provider, l1DiamondProxy, settlementLayerChainId, gwProvider, gwDiamondProxy } =
+    await resolvePriorityRelayPath(chainsOrPath);
+
+  if (settlementLayerChainId === 0) {
+    return relayPriorityRequestsToTargets(receipt, [{ diamondProxy: l1DiamondProxy, provider: l2Provider }], log);
+  }
+
+  const gwTxHashes = await relayPriorityRequestsToTargets(
+    receipt,
+    [{ diamondProxy: l1DiamondProxy, provider: gwProvider! }],
+    log
+  );
+  const l2TxHashes: string[] = [];
+
+  for (const gwTxHash of gwTxHashes) {
+    const gwReceipt = await gwProvider!.getTransactionReceipt(gwTxHash);
+    if (!gwReceipt) {
+      throw new Error(`Missing gateway relay receipt for tx ${gwTxHash}`);
+    }
+    const nestedTxHashes = await relayPriorityRequestsToTargets(
+      gwReceipt,
+      [{ diamondProxy: gwDiamondProxy!, provider: l2Provider }],
+      log
+    );
+    l2TxHashes.push(...nestedTxHashes);
+  }
+
+  return [...gwTxHashes, ...l2TxHashes];
 }
 
 /**
@@ -427,8 +497,8 @@ export function buildMockInteropProof(sourceChainId: number) {
  * Extract InteropBundleSent events from a receipt and execute each bundle on the
  * destination chain via L2InteropHandler.executeBundle().
  *
- * Used for GW→L2 relay: when a deposit goes through the GW, the InteropCenter on GW
- * creates a bundle for the destination chain. We extract that bundle and execute it.
+ * Used for real interop flows only. L1-originated deposits should stay on the
+ * NewPriorityRequest relay path even when they pass through the gateway chain.
  *
  * @returns Array of relay tx hashes on the destination chain
  */

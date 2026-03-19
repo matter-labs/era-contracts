@@ -168,7 +168,7 @@ test/anvil-interop/
 - **L1→L2 transaction failures / refundRecipient**: Priority requests always succeed on Anvil; failure + refund logic is untested
 - **Batch settlement**: No real sequencer or prover; batches are never committed/proved/executed
 - **Custom pubdata pricing**: Gas and pubdata costs use Anvil defaults, not ZKsync fee models
-- **L1→GW→L2 relay**: GW-settled ETH deposits relay L1→GW via `NewPriorityRequest`, then GW→L2 via nested `NewPriorityRequest` events extracted from the GW relay receipt. The `relayChains` next-hop path in `extractAndRelayNewPriorityRequests` is used for this GW→L2 hop
+- **L1→GW→L2 relay**: GW-settled ETH deposits stay on the priority-request path for both hops: L1→GW via `NewPriorityRequest`, then GW→L2 via nested `NewPriorityRequest` events extracted from the GW relay receipt. `InteropBundleSent` is only used for real L2↔L2 interop flows
 
 ### Mock Contracts
 
@@ -178,12 +178,11 @@ Source of truth for the Anvil predeploy layout lives in
 | Mock                        | Address   | Replaces              | Difference                                           |
 | --------------------------- | --------- | --------------------- | ---------------------------------------------------- |
 | `MockL2MessageVerification` | `0x10009` | L2MessageVerification | All proof checks return `true`                       |
-| `MockSystemContext`         | `0x800b`  | SystemContext         | Minimal; no ZK-VM state                              |
 | `MockL1MessengerHook`       | `0x7001`  | L1_MESSENGER_HOOK     | No-op; real L1MessengerZKOS still emits events       |
 | `MockMintBaseTokenHook`     | `0x7100`  | MINT_BASE_TOKEN_HOOK  | No-op; L2BaseToken pre-funded via `anvil_setBalance` |
 | `DummyL1MessageRoot`        | L1        | L1MessageRoot         | All proof verification returns `true`                |
 
-Real contracts used: `L1MessengerZKOS` at `0x8008`, `L2BaseTokenZKOS` at `0x800a`, all other L2 system contracts at their production addresses.
+Real contracts used: `SystemContext` at `0x800b`, `L1MessengerZKOS` at `0x8008`, `L2BaseTokenZKOS` at `0x800a`, all other L2 system contracts at their production addresses.
 
 ### L2 Deployment: `anvil_setCode` + Real Genesis Upgrade
 

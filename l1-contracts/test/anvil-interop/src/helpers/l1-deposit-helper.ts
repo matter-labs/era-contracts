@@ -1,7 +1,7 @@
 import type { BigNumber } from "ethers";
 import { Contract, providers, Wallet, ethers } from "ethers";
 import type { CoreDeployedAddresses } from "../core/types";
-import { impersonateAndRun, extractAndRelayNewPriorityRequests, getSettlementLayerChainId } from "../core/utils";
+import { impersonateAndRun, extractAndRelayNewPriorityRequests } from "../core/utils";
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
 import { getAbi } from "../core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, L1_CHAIN_ID, L2_ASSET_ROUTER_ADDR } from "../core/const";
@@ -41,11 +41,6 @@ export interface DepositERC20Result {
   assetId: string;
 }
 
-interface DepositRelayTarget {
-  diamondProxy: string;
-  settlementLayerChainId: number;
-}
-
 /**
  * Deposit ETH from L1 to an L2 chain via Bridgehub.requestL2TransactionDirect.
  *
@@ -60,7 +55,6 @@ export async function depositETHToL2(params: DepositETHParams): Promise<DepositE
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
 
   const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
-  const l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
   const l1Wallet = new Wallet(privateKey, l1Provider);
   const recipient = params.recipient || l1Wallet.address;
 
@@ -96,69 +90,24 @@ export async function depositETHToL2(params: DepositETHParams): Promise<DepositE
 
   console.log(`   L1 tx: cast run ${tx.hash} -r ${l1RpcUrl}`);
 
-  let l2TxHash: string | null = null;
-  const relayTarget = await resolveDepositRelayTarget(l1Provider, l1Addresses.bridgehub, chainId);
-
-  if (relayTarget.settlementLayerChainId !== 0) {
-    if (!params.gwRpcUrl) {
-      throw new Error(
-        `Chain ${chainId} settles through gateway chain ${relayTarget.settlementLayerChainId}; gwRpcUrl is required`
-      );
-    }
-
-    const gwProvider = new providers.JsonRpcProvider(params.gwRpcUrl);
-    const txHashes = await extractAndRelayNewPriorityRequests(
-      l1Receipt,
-      [
-        {
-          diamondProxy: relayTarget.diamondProxy,
-          provider: gwProvider,
-          relayChains: [{ provider: l2Provider }],
-        },
-      ],
-      (line) => console.log(line)
-    );
-    l2TxHash = txHashes.length > 0 ? txHashes[txHashes.length - 1] : null;
-  } else {
-    // Direct chain: relay L1 → L2
-    const txHashes = await extractAndRelayNewPriorityRequests(l1Receipt, [
-      {
-        diamondProxy: relayTarget.diamondProxy,
-        provider: l2Provider,
-      },
-    ]);
-    l2TxHash = txHashes.length > 0 ? txHashes[txHashes.length - 1] : null;
-  }
+  const txHashes = await extractAndRelayNewPriorityRequests(
+    l1Receipt,
+    {
+      l1RpcUrl,
+      bridgehubAddr: l1Addresses.bridgehub,
+      chainId,
+      chainRpcUrl: l2RpcUrl,
+      gwRpcUrl: params.gwRpcUrl,
+    },
+    (line) => console.log(line)
+  );
+  const l2TxHash = txHashes.length > 0 ? txHashes[txHashes.length - 1] : null;
 
   return {
     l1TxHash: tx.hash,
     l2TxHash,
     amount,
     mintValue: baseCost.add(amount),
-  };
-}
-
-async function resolveDepositRelayTarget(
-  l1Provider: providers.JsonRpcProvider,
-  bridgehubAddr: string,
-  chainId: number
-): Promise<DepositRelayTarget> {
-  const bridgehub = new Contract(bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
-  const settlementLayerChainId = await getSettlementLayerChainId(l1Provider, bridgehubAddr, chainId);
-  const relayChainId = settlementLayerChainId === 0 ? chainId : settlementLayerChainId;
-  const diamondProxy: string = await bridgehub.getZKChain(relayChainId);
-
-  if (diamondProxy === ethers.constants.AddressZero) {
-    const settlementLayerLabel =
-      settlementLayerChainId === 0
-        ? `target chain ${chainId}`
-        : `gateway settlement layer ${settlementLayerChainId} for chain ${chainId}`;
-    throw new Error(`No L1 diamond proxy registered for ${settlementLayerLabel}`);
-  }
-
-  return {
-    diamondProxy,
-    settlementLayerChainId,
   };
 }
 

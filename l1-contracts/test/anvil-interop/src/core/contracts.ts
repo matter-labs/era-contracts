@@ -49,7 +49,6 @@ const ARTIFACTS = {
   MockL1MessengerHook: "MockL1MessengerHook.sol/MockL1MessengerHook.json",
   MockL2MessageVerification: "MockL2MessageVerification.sol/MockL2MessageVerification.json",
   MockMintBaseTokenHook: "MockMintBaseTokenHook.sol/MockMintBaseTokenHook.json",
-  MockSystemContext: "MockSystemContext.sol/MockSystemContext.json",
   Ownable2Step: "Ownable2Step.sol/Ownable2Step.json",
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",

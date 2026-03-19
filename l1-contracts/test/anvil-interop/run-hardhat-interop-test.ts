@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import * as path from "path";
 import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
@@ -10,6 +10,15 @@ import { registerAndMigrateTestTokens } from "./src/helpers/token-balance-migrat
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");
+const allSpecFiles = [
+  "test/anvil-interop/test/hardhat/01-deployment-verification.spec.ts",
+  "test/anvil-interop/test/hardhat/02-direct-bridge.spec.ts",
+  "test/anvil-interop/test/hardhat/03-interop-transfer.spec.ts",
+  "test/anvil-interop/test/hardhat/04-gateway-setup.spec.ts",
+  "test/anvil-interop/test/hardhat/05-gateway-bridge.spec.ts",
+  "test/anvil-interop/test/hardhat/06-gateway-interop.spec.ts",
+];
+const parallelSpecGroups = allSpecFiles.map((spec) => [spec]);
 
 const totalStart = Date.now();
 
@@ -45,17 +54,90 @@ function timedRun(label: string, command: string, args: string[], cwd: string, e
   console.log(`⏱️  [TIMING] Finished: ${label} in ${elapsedSince(start)} (total elapsed: ${elapsedSince(totalStart)})`);
 }
 
+function parseRequestedSpecs(argv: string[]): string[] {
+  const specArgs: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--spec") {
+      const spec = argv[i + 1];
+      if (!spec) {
+        throw new Error("--spec requires a file path");
+      }
+      specArgs.push(spec);
+      i += 1;
+    }
+  }
+  return specArgs;
+}
+
+function parsePortOffset(argv: string[]): number {
+  const portOffsetIdx = argv.indexOf("--port-offset");
+  return portOffsetIdx !== -1 ? parseInt(argv[portOffsetIdx + 1], 10) : 0;
+}
+
+async function runParallelWorker(label: string, specs: string[], portOffset: number): Promise<void> {
+  console.log(
+    `\n⏱️  [TIMING] Starting: ${label} (${specs.length} specs, offset ${portOffset}, total elapsed: ${elapsedSince(totalStart)})`
+  );
+
+  const workerArgs = [
+    "test/anvil-interop/run-hardhat-interop-test.ts",
+    "--port-offset",
+    portOffset.toString(),
+    ...specs.flatMap((spec) => ["--spec", spec]),
+  ];
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn("ts-node", workerArgs, {
+      cwd: l1ContractsDir,
+      env: {
+        ...process.env,
+        ANVIL_INTEROP_PARALLEL_WORKER: "1",
+        ANVIL_INTEROP_RUN_SUFFIX: `-p${portOffset}`,
+      },
+      stdio: "inherit",
+    });
+
+    child.once("error", (error) => reject(new Error(`Failed to start ${label}: ${error.message}`)));
+    child.once("exit", (code) => {
+      if (code === 0) {
+        console.log(
+          `⏱️  [TIMING] Finished: ${label} (offset ${portOffset}, total elapsed: ${elapsedSince(totalStart)})`
+        );
+        resolve();
+      } else {
+        reject(new Error(`${label} failed with exit code ${code ?? "unknown"}`));
+      }
+    });
+  });
+}
+
 async function main(): Promise<void> {
   const keepChains = process.argv.includes("--keep-chains") || process.env.ANVIL_INTEROP_KEEP_CHAINS === "1";
   const skipSetup = process.env.ANVIL_INTEROP_SKIP_SETUP === "1";
   const skipCleanup = keepChains || process.env.ANVIL_INTEROP_SKIP_CLEANUP === "1";
+  const requestedSpecs = parseRequestedSpecs(process.argv.slice(2));
+  const workerMode = process.env.ANVIL_INTEROP_PARALLEL_WORKER === "1";
+  const freshDeploy = process.env.ANVIL_INTEROP_FRESH_DEPLOY === "1";
 
   // Parse --port-offset <N> flag and propagate via env var
-  const portOffsetIdx = process.argv.indexOf("--port-offset");
-  const portOffset = portOffsetIdx !== -1 ? parseInt(process.argv[portOffsetIdx + 1], 10) : 0;
+  const portOffset = parsePortOffset(process.argv.slice(2));
   if (portOffset) {
     process.env.ANVIL_INTEROP_PORT_OFFSET = portOffset.toString();
   }
+
+  const shouldParallelize = !workerMode && !keepChains && !skipSetup && !freshDeploy && requestedSpecs.length === 0;
+
+  if (shouldParallelize) {
+    await timedAsync("parallel hardhat interop workers", async () => {
+      await Promise.all(
+        parallelSpecGroups.map((specs, index) => runParallelWorker(`worker ${index + 1}`, specs, index * 100))
+      );
+    });
+    console.log(`\n⏱️  [TIMING] Total test run: ${elapsedSince(totalStart)}`);
+    return;
+  }
+
+  const specsToRun = requestedSpecs.length > 0 ? requestedSpecs : allSpecFiles;
 
   try {
     if (!skipSetup) {
@@ -71,7 +153,6 @@ async function main(): Promise<void> {
 
       // Try loading pre-generated chain states (much faster — skips deploy steps 2-5)
       // Set ANVIL_INTEROP_FRESH_DEPLOY=1 to force full deployment instead.
-      const freshDeploy = process.env.ANVIL_INTEROP_FRESH_DEPLOY === "1";
       if (!freshDeploy && runner.hasChainStates()) {
         const stateDir = runner.getChainStatesDir();
         console.log(`\nFound pre-generated chain states at ${stateDir}`);
@@ -135,21 +216,9 @@ async function main(): Promise<void> {
     }
 
     timedRun(
-      "hardhat test - all interop specs",
+      `hardhat test - ${specsToRun.length} interop spec${specsToRun.length === 1 ? "" : "s"}`,
       "yarn",
-      [
-        "hardhat",
-        "test",
-        "test/anvil-interop/test/hardhat/01-deployment-verification.spec.ts",
-        "test/anvil-interop/test/hardhat/02-direct-bridge.spec.ts",
-        "test/anvil-interop/test/hardhat/03-interop-transfer.spec.ts",
-        "test/anvil-interop/test/hardhat/04-gateway-setup.spec.ts",
-        "test/anvil-interop/test/hardhat/05-gateway-bridge.spec.ts",
-        "test/anvil-interop/test/hardhat/06-gateway-interop.spec.ts",
-        "--network",
-        "hardhat",
-        "--no-compile",
-      ],
+      ["hardhat", "test", ...specsToRun, "--network", "hardhat", "--no-compile"],
       l1ContractsDir,
       {
         ...process.env,

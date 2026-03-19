@@ -89,9 +89,9 @@ export class GatewaySetup {
     prepareGatewayChainConfig(this.outputDir, chainId);
     prepareGatewayVoteConfig(this.outputDir, chainId);
 
-    // Step 4: Deploy the gateway-side CTM contracts on the GW chain and merge their
-    // output back into the harness config before any governance registration uses it.
     if (gatewayContext) {
+      // Step 4: Deploy the gateway-side CTM contracts on the GW chain and merge their
+      // output back into the harness config before any governance registration uses it.
       const deploymentStartBlock = await this.l1Provider.getBlockNumber();
       await this.runTimedStep("forge: deployGatewayCTM", async () => {
         await this.runForgeGatewayVoteScript("run(address,uint256)", `${this.l1Addresses.bridgehub} 0`);

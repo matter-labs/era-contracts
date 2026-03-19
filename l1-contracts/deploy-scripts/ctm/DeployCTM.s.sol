@@ -597,6 +597,8 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             gatewayChainId: config.gatewayChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
+            // Not used on ZKsyncOS (beacon is deployed via UpgradeableBeaconDeployer instead).
+            // Kept for Era compatibility; ZKsyncOS uses the L1 bytecode hash as a placeholder.
             l2TokenProxyBytecodeHash: config.isZKsyncOS
                 ? keccak256(Utils.readFoundryDeployedBytecodeL1("BeaconProxy.sol", "BeaconProxy"))
                 : getL2BytecodeHash("BeaconProxy"),

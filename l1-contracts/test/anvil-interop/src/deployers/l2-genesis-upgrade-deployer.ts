@@ -15,15 +15,13 @@ import {
 import type { PriorityRequestData } from "../core/types";
 
 /**
- * Deployer that initializes L2 contracts by relaying the real genesis upgrade priority
- * transaction from L1.
+ * Deployer that initializes L2 contracts by relaying the real genesis upgrade
+ * transaction emitted on L1 during chain registration.
  *
  * The flow:
  * 1. Pre-deploy all contracts via anvil_setCode (isZKsyncOS=true skips force deploys)
- * 2. Relay the genesis priority tx extracted from L1's NewPriorityRequest event
- *    → L2ComplexUpgrader.upgrade() → L2GenesisUpgrade.genesisUpgrade()
- *    → initializes all contracts via their initL2() methods
- * 3. Register interop chains on L2Bridgehub (test-only shortcut)
+ * 2. Relay the genesis upgrade transaction from the L1 GenesisUpgrade event
+ * 3. Register interop chains on L2Bridgehub and verify the deployed code
  */
 export class L2GenesisUpgradeDeployer {
   private l2Provider: providers.JsonRpcProvider;
@@ -53,22 +51,14 @@ export class L2GenesisUpgradeDeployer {
     await Promise.all(PREDEPLOY_SYSTEM_CONTRACTS.map((contractSpec) => this.ensureSystemContract(contractSpec)));
   }
 
-  /**
-   * Relay the real genesis upgrade priority transaction from L1 to L2.
-   *
-   * This executes the same calldata that the L1 ChainTypeManager generated
-   * during createNewChain(): L2ComplexUpgrader.upgrade(L2GenesisUpgrade, genesisUpgradeCalldata)
-   */
   private async relayGenesisPriorityTx(genesisTx: PriorityRequestData): Promise<void> {
-    console.log(`   Relaying genesis priority tx: from=${genesisTx.from} to=${genesisTx.to}`);
+    console.log(`   Relaying genesis tx: from=${genesisTx.from} to=${genesisTx.to}`);
 
     const result = await relayTx(this.l2Provider, genesisTx.from, genesisTx.to, genesisTx.calldata, genesisTx.value);
-
     if (!result.success) {
-      throw new Error(
-        `Genesis upgrade priority tx failed on L2. Debug: cast run ${result.txHash} -r ${this.l2Provider.connection.url}`
-      );
+      throw new Error(`Genesis upgrade tx failed on L2. Debug: cast run ${result.txHash} -r ${this.l2Provider.connection.url}`);
     }
+
     console.log(`   ✅ Genesis upgrade relayed: cast run ${result.txHash} -r ${this.l2Provider.connection.url}`);
   }
 
@@ -117,25 +107,16 @@ export class L2GenesisUpgradeDeployer {
     interopChainIds: number[]
   ): Promise<void> {
     console.log(`\n🔧 Deploying system contracts for chain ${chainId} via real genesis upgrade...`);
-
-    // Step 1: Pre-deploy all contracts (isZKsyncOS=true skips force deploys in genesis upgrade)
     await this.ensurePredeployedContracts();
 
-    // Step 2: Pre-fund L2BaseToken with INITIAL_BASE_TOKEN_HOLDER_BALANCE.
-    // The real initL2() calls MINT_BASE_TOKEN_HOOK to mint ETH, then transfers it to BaseTokenHolder.
-    // Our mock hook returns success but doesn't mint, so we pre-fund via anvil_setBalance.
     console.log("   Pre-funding L2BaseToken for initL2() → BaseTokenHolder transfer...");
     await this.l2Provider.send("anvil_setBalance", [L2_BASE_TOKEN_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE]);
 
-    // Step 3: Relay the real genesis upgrade priority tx from L1
     await this.relayGenesisPriorityTx(genesisPriorityTx);
 
-    // Step 3: Register interop chains (test-only shortcut, not production flow)
+    console.log("   Registering interop chains and verifying deployment...");
     await this.registerInteropChains(interopChainIds);
-
-    // Step 4: Verify deployment
     await this.assertPostDeploymentCode();
-
     console.log(`✅ Genesis upgrade deployment completed for chain ${chainId}`);
   }
 }

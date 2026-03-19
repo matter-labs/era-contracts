@@ -384,6 +384,18 @@ export async function getGWChainBalance(
 }
 
 /**
+ * Helper to read GWAssetTracker.pendingInteropBalance(chainId, assetId) on the GW.
+ */
+export async function getGWPendingInteropBalance(
+  gwProvider: providers.JsonRpcProvider,
+  chainId: number,
+  assetId: string
+): Promise<BigNumber> {
+  const tracker = new Contract(GW_ASSET_TRACKER_ADDR, getAbi("GWAssetTracker"), gwProvider);
+  return tracker.pendingInteropBalance(chainId, assetId);
+}
+
+/**
  * Query the ETH asset ID from the Bridgehub on GW (baseTokenAssetId for a chain).
  */
 export async function getBaseTokenAssetId(gwProvider: providers.JsonRpcProvider, chainId: number): Promise<string> {

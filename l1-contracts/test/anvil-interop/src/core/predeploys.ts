@@ -30,7 +30,7 @@ export interface SystemContractPredeploy {
 
 // Source of truth for the Anvil interop harness predeploy layout.
 export const PREDEPLOY_SYSTEM_CONTRACTS: readonly SystemContractPredeploy[] = [
-  { address: SYSTEM_CONTEXT_ADDR, contractName: "MockSystemContext" },
+  { address: SYSTEM_CONTEXT_ADDR, contractName: "SystemContext" },
   { address: L2_TO_L1_MESSENGER_ADDR, contractName: "L1MessengerZKOS" },
   { address: L2_BASE_TOKEN_ADDR, contractName: "L2BaseTokenZKOS" },
   { address: L2_MESSAGE_VERIFICATION_ADDR, contractName: "MockL2MessageVerification" },
