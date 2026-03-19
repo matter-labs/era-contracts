@@ -34,9 +34,8 @@ library Merkle {
 
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < pathLength; ++i) {
-            currentHash = (_index % 2 == 0)
-                ? efficientHash(currentHash, _path[i])
-                : efficientHash(_path[i], currentHash);
+            currentHash =
+                (_index % 2 == 0) ? efficientHash(currentHash, _path[i]) : efficientHash(_path[i], currentHash);
             _index /= 2;
         }
 
@@ -60,9 +59,8 @@ library Merkle {
 
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < pathLength; ++i) {
-            currentHash = (_index % 2 == 0)
-                ? efficientHash(currentHash, _path[i])
-                : efficientHash(_path[i], currentHash);
+            currentHash =
+                (_index % 2 == 0) ? efficientHash(currentHash, _path[i]) : efficientHash(_path[i], currentHash);
             _index /= 2;
         }
 
@@ -109,9 +107,10 @@ library Merkle {
             uint256 nextLevelLen = levelLen / 2 + (parity | (levelLen % 2));
             for (uint256 i; i < nextLevelLen; ++i) {
                 bytes32 lhs = (i == 0 && parity == 1) ? _startPath[level] : itemHashes[2 * i - parity];
-                bytes32 rhs = (i == nextLevelLen - 1 && (levelLen - parity) % 2 == 1)
-                    ? _endPath[level]
-                    : itemHashes[2 * i + 1 - parity];
+                bytes32 rhs =
+                    (i == nextLevelLen - 1 && (levelLen - parity) % 2 == 1)
+                        ? _endPath[level]
+                        : itemHashes[2 * i + 1 - parity];
                 itemHashes[i] = efficientHash(lhs, rhs);
             }
             levelLen = nextLevelLen;

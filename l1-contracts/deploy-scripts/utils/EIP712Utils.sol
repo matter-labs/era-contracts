@@ -3,8 +3,9 @@
 pragma solidity 0.8.28;
 
 library EIP712Utils {
-    bytes32 private constant TYPE_HASH =
-        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    bytes32 private constant TYPE_HASH = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
 
     function buildDomainHash(
         address _verifyingContract,

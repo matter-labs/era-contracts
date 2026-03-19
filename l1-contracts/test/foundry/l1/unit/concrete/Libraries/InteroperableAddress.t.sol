@@ -284,9 +284,10 @@ contract InteroperableAddressTest is Test {
 
     function test_tryParseEvmV1_chainReferenceTooLong() public pure {
         // Chain reference > 32 bytes (version + chainType + chainRefLen=33 + 33 bytes chainRef + addrLen + 20 bytes addr)
-        bytes memory invalid = hex"0001000021"
-        hex"0102030405060708091011121314151617181920212223242526272829303132330014"
-        hex"1234567890123456789012345678901234567890";
+        bytes memory invalid =
+            hex"0001000021"
+            hex"0102030405060708091011121314151617181920212223242526272829303132330014"
+            hex"1234567890123456789012345678901234567890";
 
         (bool success, , ) = invalid.tryParseEvmV1();
         assertFalse(success);

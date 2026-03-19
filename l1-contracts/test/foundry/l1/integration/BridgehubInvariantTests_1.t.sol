@@ -34,10 +34,9 @@ import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
 
-    bytes32 constant NEW_PRIORITY_REQUEST_HASH =
-        keccak256(
-            "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])"
-        );
+    bytes32 constant NEW_PRIORITY_REQUEST_HASH = keccak256(
+        "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])"
+    );
 
     enum RequestType {
         DIRECT,

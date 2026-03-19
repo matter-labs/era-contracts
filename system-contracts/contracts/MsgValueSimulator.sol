@@ -53,9 +53,8 @@ contract MsgValueSimulator is SystemContractBase {
         uint256 gasInContext = gasleft();
         // Note, that the `gasInContext` might be slightly less than the MSG_VALUE_SIMULATOR_STIPEND_GAS, since
         // by the time we retrieve it, some gas might have already been spent, e.g. on the `gasleft` opcode itself.
-        uint256 userGas = gasInContext > MSG_VALUE_SIMULATOR_STIPEND_GAS
-            ? gasInContext - MSG_VALUE_SIMULATOR_STIPEND_GAS
-            : 0;
+        uint256 userGas =
+            gasInContext > MSG_VALUE_SIMULATOR_STIPEND_GAS ? gasInContext - MSG_VALUE_SIMULATOR_STIPEND_GAS : 0;
 
         (uint256 value, bool isSystemCall, address to) = _getAbiParams();
 

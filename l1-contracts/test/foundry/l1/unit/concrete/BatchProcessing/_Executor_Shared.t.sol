@@ -50,7 +50,8 @@ import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCall
 import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
-bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
+bytes constant POINT_EVALUATION_PRECOMPILE_RESULT =
+    hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
 
 contract ExecutorTest is UtilsCallMockerTest {
     address internal owner;

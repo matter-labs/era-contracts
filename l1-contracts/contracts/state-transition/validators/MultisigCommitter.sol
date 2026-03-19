@@ -33,10 +33,9 @@ contract MultisigCommitter is IMultisigCommitter, ValidatorTimelock, EIP712Upgra
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
     /// @dev EIP-712 TypeHash for commitBatchesMultisig
-    bytes32 internal constant COMMIT_BATCHES_MULTISIG_TYPEHASH =
-        keccak256(
-            "CommitBatchesMultisig(address chainAddress,uint256 processBatchFrom,uint256 processBatchTo,bytes batchData)"
-        );
+    bytes32 internal constant COMMIT_BATCHES_MULTISIG_TYPEHASH = keccak256(
+        "CommitBatchesMultisig(address chainAddress,uint256 processBatchFrom,uint256 processBatchTo,bytes batchData)"
+    );
 
     /// @dev The per chain validator role, only applies if useCustomValidators is set
     bytes32 public constant override COMMIT_VALIDATOR_ROLE = keccak256("COMMIT_VALIDATOR_ROLE");

@@ -7,11 +7,14 @@
     "import/no-named-as-default-member": "off",
     "import/namespace": "off",
     "import/no-unresolved": "off",
+    "import/default": "off",
     "import/order": "off",
     "no-console": "off"
   },
   "ignorePatterns": [
     "**/lib/*",
-    "lib/*"
+    "lib/*",
+    "l1-contracts/scripts/verify-l2-contracts.ts",
+    "system-contracts/scripts/utils.ts"
   ]
 }

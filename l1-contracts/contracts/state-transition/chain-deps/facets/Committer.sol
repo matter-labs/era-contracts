@@ -233,8 +233,8 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         _checkBatchHashMismatch(lastCommittedBatchData, s.totalBatchesCommitted, false);
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
-        bool processSystemUpgradeTx = systemContractsUpgradeTxHash != bytes32(0) &&
-            s.l2SystemContractsUpgradeBatchNumber == 0;
+        bool processSystemUpgradeTx =
+            systemContractsUpgradeTxHash != bytes32(0) && s.l2SystemContractsUpgradeBatchNumber == 0;
         _commitBatchesZKsyncOS(lastCommittedBatchData, newBatchesData, processSystemUpgradeTx);
 
         s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;

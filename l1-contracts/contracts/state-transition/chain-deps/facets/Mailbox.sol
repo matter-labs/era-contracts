@@ -116,9 +116,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
         CHAIN_ASSET_HANDLER = _chainAssetHandler;
         EIP_7702_CHECKER = _eip7702Checker;
 
-        PAUSE_DEPOSITS_TIME_WINDOW_START = _isTestnet
-            ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET
-            : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
+        PAUSE_DEPOSITS_TIME_WINDOW_START =
+            _isTestnet ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
     }
 
     /// @inheritdoc IMailboxImpl

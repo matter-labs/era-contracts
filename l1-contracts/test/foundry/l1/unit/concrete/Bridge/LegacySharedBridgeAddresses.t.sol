@@ -22,12 +22,12 @@ contract LegacySharedBridgeAddressesWrapper {
 contract LegacySharedBridgeAddressesTest is Test {
     LegacySharedBridgeAddressesWrapper internal wrapper;
 
-    address constant STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS =
-        LegacySharedBridgeAddresses.STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS;
-    address constant TESTNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS =
-        LegacySharedBridgeAddresses.TESTNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS;
-    address constant MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS =
-        LegacySharedBridgeAddresses.MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS;
+    address constant STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS = LegacySharedBridgeAddresses
+        .STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS;
+    address constant TESTNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS = LegacySharedBridgeAddresses
+        .TESTNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS;
+    address constant MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS = LegacySharedBridgeAddresses
+        .MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS;
 
     function setUp() public {
         wrapper = new LegacySharedBridgeAddressesWrapper();

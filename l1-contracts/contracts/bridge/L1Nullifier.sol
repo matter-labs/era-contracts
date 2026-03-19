@@ -379,11 +379,12 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bool notCheckedInLegacyBridgeOrWeCanCheckDeposit;
         {
             // Deposits that happened before the upgrade cannot be checked here, they have to be claimed and checked in the legacyBridge
-            bool weCanCheckDepositHere = !_isPreSharedBridgeDepositOnEra(
-                _confirmTransferResultData._chainId,
-                _confirmTransferResultData._l2BatchNumber,
-                _confirmTransferResultData._l2TxNumberInBatch
-            );
+            bool weCanCheckDepositHere =
+                !_isPreSharedBridgeDepositOnEra(
+                    _confirmTransferResultData._chainId,
+                    _confirmTransferResultData._l2BatchNumber,
+                    _confirmTransferResultData._l2TxNumberInBatch
+                );
             // Double claims are not possible, as depositHappened is checked here for all except legacy deposits (which have to happen through the legacy bridge)
             // Funds claimed before the update will still be recorded in the legacy bridge
             // Note we double check NEW deposits if they are called from the legacy bridge
@@ -537,8 +538,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             if (baseTokenWithdrawal) {
                 require(l2Sender == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, WrongL2Sender(l2Sender));
             } else {
-                bool isL2SenderCorrect = l2Sender == L2_ASSET_ROUTER_ADDR ||
-                    l2Sender == __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId];
+                bool isL2SenderCorrect =
+                    l2Sender == L2_ASSET_ROUTER_ADDR ||
+                        l2Sender == __DEPRECATED_l2BridgeAddress[_finalizeWithdrawalParams.chainId];
                 require(isL2SenderCorrect, WrongL2Sender(l2Sender));
             }
 

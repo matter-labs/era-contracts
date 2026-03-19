@@ -157,9 +157,8 @@ library AddressIntrospector {
         require(l1NativeTokenVaultProxy != address(0), "NativeTokenVault address is zero");
         NativeTokenVaultBase ntv = NativeTokenVaultBase(l1NativeTokenVaultProxy);
         address bridgedTokenBeacon = address(ntv.bridgedTokenBeacon());
-        address bridgedStandardERC20Implementation = bridgedTokenBeacon != address(0)
-            ? UpgradeableBeacon(bridgedTokenBeacon).implementation()
-            : address(0);
+        address bridgedStandardERC20Implementation =
+            bridgedTokenBeacon != address(0) ? UpgradeableBeacon(bridgedTokenBeacon).implementation() : address(0);
 
         BridgeContracts memory proxies = BridgeContracts({
             erc20Bridge: erc20BridgeProxy,
