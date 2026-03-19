@@ -456,7 +456,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
     }
 
-    function prepareFixedForceDeploymentsData() public view virtual returns (FixedForceDeploymentsData memory data) {
+    function prepareFixedForceDeploymentsData() public virtual returns (FixedForceDeploymentsData memory data) {
         require(config.ownerAddress != address(0), "owner not set");
 
         data = FixedForceDeploymentsData({
@@ -464,19 +464,23 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             eraChainId: config.eraChainId,
             gatewayChainId: config.gatewayChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
+            l2TokenProxyBytecodeHash: getUpgradeBytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: abi.encode(getL2BytecodeHash("L2Bridgehub")),
-            l2AssetRouterBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetRouter")),
-            l2NtvBytecodeInfo: abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
-            messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
-            chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
-            beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
-            baseTokenHolderBytecodeInfo: abi.encode(getL2BytecodeHash("BaseTokenHolder")),
-            interopCenterBytecodeInfo: abi.encode(getL2BytecodeHash("InteropCenter")),
-            interopHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("InteropHandler")),
-            assetTrackerBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetTracker")),
+            bridgehubBytecodeInfo: getUpgradeBytecodeInfo("L2Bridgehub"),
+            l2AssetRouterBytecodeInfo: getUpgradeBytecodeInfo("L2AssetRouter"),
+            l2NtvBytecodeInfo: getUpgradeBytecodeInfo(
+                "L2NativeTokenVault",
+                "L2NativeTokenVaultZKOS.sol",
+                "L2NativeTokenVaultZKOS"
+            ),
+            messageRootBytecodeInfo: getUpgradeBytecodeInfo("L2MessageRoot"),
+            chainAssetHandlerBytecodeInfo: getUpgradeBytecodeInfo("L2ChainAssetHandler"),
+            beaconDeployerInfo: getUpgradeBytecodeInfo("UpgradeableBeaconDeployer"),
+            baseTokenHolderBytecodeInfo: getUpgradeBytecodeInfo("BaseTokenHolder"),
+            interopCenterBytecodeInfo: getUpgradeBytecodeInfo("InteropCenter"),
+            interopHandlerBytecodeInfo: getUpgradeBytecodeInfo("InteropHandler"),
+            assetTrackerBytecodeInfo: getUpgradeBytecodeInfo("L2AssetTracker"),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
@@ -486,6 +490,36 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             dangerousTestOnlyForcedBeacon: address(0),
             zkTokenAssetId: config.zkTokenAssetId
         });
+    }
+
+    function getUpgradeBytecodeInfo(string memory contractName) internal returns (bytes memory) {
+        return getUpgradeBytecodeInfo(string.concat(contractName, ".sol"), contractName, contractName);
+    }
+
+    function getUpgradeBytecodeInfo(
+        string memory eraContractName,
+        string memory zksyncOSFileName,
+        string memory zksyncOSContractName
+    ) internal returns (bytes memory) {
+        if (config.isZKsyncOS) {
+            return Utils.getZKOSProxyUpgradeBytecodeInfo(zksyncOSFileName, zksyncOSContractName);
+        }
+        return abi.encode(getL2BytecodeHash(eraContractName));
+    }
+
+    function getUpgradeBytecodeHash(string memory contractName) internal view returns (bytes32) {
+        return getUpgradeBytecodeHash(string.concat(contractName, ".sol"), contractName, contractName);
+    }
+
+    function getUpgradeBytecodeHash(
+        string memory zksyncOSFileName,
+        string memory zksyncOSContractName,
+        string memory eraContractName
+    ) internal view returns (bytes32) {
+        if (config.isZKsyncOS) {
+            return keccak256(Utils.readFoundryDeployedBytecodeL1(zksyncOSFileName, zksyncOSContractName));
+        }
+        return getL2BytecodeHash(eraContractName);
     }
 
     function getUpgradeAddedFacetCuts(
