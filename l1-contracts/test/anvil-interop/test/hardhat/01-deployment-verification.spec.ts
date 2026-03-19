@@ -38,7 +38,6 @@ describe("01 - Deployment Verification", function () {
     it("has Bridgehub deployed with code", async () => {
       const code = await l1Provider.getCode(state.l1Addresses!.bridgehub);
       expect(code).to.not.equal("0x");
-      expect(code).to.not.equal("0x0");
     });
 
     it("has L1AssetRouter (SharedBridge) deployed with code", async () => {

@@ -239,9 +239,10 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments;
 
         if (isZKsyncOS) {
-            // ZKsyncOS chains do not use L2 bytecodes from zkout/, so skip
-            // getBaseForceDeployments which reads system contract bytecodes.
-            forceDeployments = getAdditionalForceDeployments();
+            // ZKsyncOS uses FixedForceDeploymentsData (built in DeployCTM) instead of
+            // Era-style ForceDeployment[] arrays. Return empty — the upgrade tx for
+            // ZKsyncOS chains carries data through a different path.
+            forceDeployments = new IL2ContractDeployer.ForceDeployment[](0);
         } else {
             IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
                 .getBaseForceDeployments(l1ChainId, ownerAddress);

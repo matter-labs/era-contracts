@@ -62,6 +62,13 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
 
     /// @dev Cache for batched blake2s hashing (keccak256(bytecode) => blake2s(bytecode)).
+    /// ZKsyncOS bytecode info requires blake2s hashes, computed via FFI (`yarn ts-node blake2s256.ts`).
+    /// Without caching, each call to `Utils.getZKOSProxyUpgradeBytecodeInfo` spawns 2 FFI processes
+    /// (one for the impl, one for SystemContractProxy). With ~10 contracts in `_buildForceDeploymentsData`,
+    /// that's ~20 sequential FFI calls. The cache batches all bytecodes into a single FFI call in
+    /// `_precomputeBlakeHashes()`, reducing deployment time significantly.
+    /// Only used by `runForAnvilTest` — production paths (`runWithBridgehub`/`runForTest`) use the
+    /// uncached `Utils.getZKOSProxyUpgradeBytecodeInfo` fallback in `_getProxyUpgradeBytecodeInfo`.
     mapping(bytes32 => bytes32) private _blakeCache;
     bool private _useBlakeCache;
 

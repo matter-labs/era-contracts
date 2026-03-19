@@ -204,40 +204,31 @@ export class SystemContractsDeployer {
   }
 
   /**
-   * Deploy L2BaseToken system contract
+   * Deploy the real L2BaseTokenZKOS contract at the base token system address.
    */
   private async deployL2BaseToken(): Promise<void> {
-    // Check if already deployed
     const existingCode = await this.l2Provider.getCode(L2_BASE_TOKEN_ADDR);
     if (existingCode !== "0x" && existingCode !== "0x0") {
       console.log(`   ✅ L2BaseToken already deployed at ${L2_BASE_TOKEN_ADDR}`);
       return;
     }
 
-    console.log(`   Deploying L2BaseToken at ${L2_BASE_TOKEN_ADDR}...`);
+    console.log(`   Deploying L2BaseTokenZKOS at ${L2_BASE_TOKEN_ADDR}...`);
 
-    // Anvil is standard EVM, not zkSync EVM, so we MUST use the minimal mock
-    // instead of zkout (which contains zkSync-specific bytecode that won't work in Anvil)
-    console.log("   Using minimal L2BaseToken mock (standard EVM) instead of zkout (zkSync EVM)...");
-    await this.deployMinimalL2BaseToken();
-  }
+    const artifactPath = path.join(
+      this.contractsRoot,
+      "l1-contracts/out/L2BaseTokenZKOS.sol/L2BaseTokenZKOS.json"
+    );
 
-  /**
-   * Deploy minimal mock L2BaseToken if real one not available
-   */
-  private async deployMinimalL2BaseToken(): Promise<void> {
-    // Use the compiled MockL2BaseToken bytecode
-    const mockPath = path.join(this.contractsRoot, "l1-contracts/out/MockL2BaseToken.sol/MockL2BaseToken.json");
-
-    const artifact = JSON.parse(fs.readFileSync(mockPath, "utf-8"));
+    const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf-8"));
     const bytecode = artifact.deployedBytecode?.object;
 
     if (!bytecode || bytecode === "0x") {
-      throw new Error("MockL2BaseToken bytecode not found - run forge build first");
+      throw new Error("L2BaseTokenZKOS bytecode not found - run forge build first");
     }
 
     await this.l2Provider.send("anvil_setCode", [L2_BASE_TOKEN_ADDR, bytecode]);
-    console.log("   ✅ MockL2BaseToken deployed");
+    console.log("   ✅ L2BaseTokenZKOS deployed");
   }
 
   /**

@@ -884,10 +884,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function getL2BytecodeHash(string memory contractName) public view virtual override returns (bytes32) {
-        if (config.isZKsyncOS) {
-            // ZKsyncOS chains do not use L2 bytecodes from zkout, so we return a placeholder.
-            return bytes32(uint256(1));
-        }
+        // ZKsyncOS chains use FixedForceDeploymentsData (built in DeployCTM) instead of
+        // Era-style ForceDeployment[] arrays, so this function should never be called.
+        // Revert loudly to prevent silent use of wrong bytecode hashes.
+        require(!config.isZKsyncOS, "getL2BytecodeHash must not be called for ZKsyncOS chains");
         return super.getL2BytecodeHash(contractName);
     }
 
