@@ -86,13 +86,13 @@ You can also add `.only` to a `describe` or `it` block in the spec file to isola
 
 ## Environment Variables
 
-| Variable                                 | Effect                                                            |
-| ---------------------------------------- | ----------------------------------------------------------------- |
-| `ANVIL_INTEROP_SKIP_SETUP=1`             | Skip deployment, run only tests (requires chains already running) |
-| `ANVIL_INTEROP_SKIP_CLEANUP=1`           | Don't kill Anvil processes after tests                            |
-| `ANVIL_INTEROP_KEEP_CHAINS=1`            | Same as `--keep-chains` flag                                      |
-| `ANVIL_INTEROP_FRESH_DEPLOY=1`           | Force full deployment even if pregenerated state exists           |
-| `ANVIL_INTEROP_PORT_OFFSET=N`            | Offset all chain ports by N (useful for parallel runs)            |
+| Variable                       | Effect                                                            |
+| ------------------------------ | ----------------------------------------------------------------- |
+| `ANVIL_INTEROP_SKIP_SETUP=1`   | Skip deployment, run only tests (requires chains already running) |
+| `ANVIL_INTEROP_SKIP_CLEANUP=1` | Don't kill Anvil processes after tests                            |
+| `ANVIL_INTEROP_KEEP_CHAINS=1`  | Same as `--keep-chains` flag                                      |
+| `ANVIL_INTEROP_FRESH_DEPLOY=1` | Force full deployment even if pregenerated state exists           |
+| `ANVIL_INTEROP_PORT_OFFSET=N`  | Offset all chain ports by N (useful for parallel runs)            |
 
 ## Debugging
 
@@ -172,13 +172,16 @@ test/anvil-interop/
 
 ### Mock Contracts
 
-| Mock | Address | Replaces | Difference |
-|---|---|---|---|
-| `MockL2MessageVerification` | `0x10009` | L2MessageVerification | All proof checks return `true` |
-| `MockSystemContext` | `0x800b` | SystemContext | Minimal; no ZK-VM state |
-| `MockL1MessengerHook` | `0x7001` | L1_MESSENGER_HOOK | No-op; real L1MessengerZKOS still emits events |
-| `MockMintBaseTokenHook` | `0x7100` | MINT_BASE_TOKEN_HOOK | No-op; L2BaseToken pre-funded via `anvil_setBalance` |
-| `DummyL1MessageRoot` | L1 | L1MessageRoot | All proof verification returns `true` |
+Source of truth for the Anvil predeploy layout lives in
+`src/core/contracts.ts` via `PREDEPLOY_SYSTEM_CONTRACTS`.
+
+| Mock                        | Address   | Replaces              | Difference                                           |
+| --------------------------- | --------- | --------------------- | ---------------------------------------------------- |
+| `MockL2MessageVerification` | `0x10009` | L2MessageVerification | All proof checks return `true`                       |
+| `MockSystemContext`         | `0x800b`  | SystemContext         | Minimal; no ZK-VM state                              |
+| `MockL1MessengerHook`       | `0x7001`  | L1_MESSENGER_HOOK     | No-op; real L1MessengerZKOS still emits events       |
+| `MockMintBaseTokenHook`     | `0x7100`  | MINT_BASE_TOKEN_HOOK  | No-op; L2BaseToken pre-funded via `anvil_setBalance` |
+| `DummyL1MessageRoot`        | L1        | L1MessageRoot         | All proof verification returns `true`                |
 
 Real contracts used: `L1MessengerZKOS` at `0x8008`, `L2BaseTokenZKOS` at `0x800a`, all other L2 system contracts at their production addresses.
 
@@ -188,14 +191,14 @@ Contracts are placed at hardcoded addresses via `anvil_setCode` (production has 
 
 ### Impersonation
 
-| What | Who | Production equivalent |
-|---|---|---|
-| Genesis upgrade relay | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade tx |
-| Interop chain registration | `SERVICE_TX_SENDER_ADDR` | Service transactions from sequencer |
-| GW chain registration | `ChainAssetHandler` | Governance flow |
-| Settlement layer notification | `L2_BOOTLOADER_ADDR` | Bootloader at batch start |
-| Governance calls | Governance contract | Multi-sig / timelock |
-| GW L2Bridgehub ownership | Aliased CTM governance | Shared governance from deployment |
+| What                          | Who                      | Production equivalent               |
+| ----------------------------- | ------------------------ | ----------------------------------- |
+| Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade tx      |
+| Interop chain registration    | `SERVICE_TX_SENDER_ADDR` | Service transactions from sequencer |
+| GW chain registration         | `ChainAssetHandler`      | Governance flow                     |
+| Settlement layer notification | `L2_BOOTLOADER_ADDR`     | Bootloader at batch start           |
+| Governance calls              | Governance contract      | Multi-sig / timelock                |
+| GW L2Bridgehub ownership      | Aliased CTM governance   | Shared governance from deployment   |
 
 ### Other Shortcuts
 

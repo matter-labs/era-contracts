@@ -12,7 +12,14 @@ import {
   NEW_PRIORITY_REQUEST_EVENT_SIG,
 } from "./const";
 import { getAbi } from "./contracts";
-import type { AnvilChainConfig, ChainAddresses, ChainInfo, ChainRole, FinalizeWithdrawalParams, PriorityRequestData } from "./types";
+import type {
+  AnvilChainConfig,
+  ChainAddresses,
+  ChainInfo,
+  ChainRole,
+  FinalizeWithdrawalParams,
+  PriorityRequestData,
+} from "./types";
 
 /**
  * Simple timing helper: call to start, invoke the returned function to log elapsed time.
@@ -95,10 +102,7 @@ export function ensureDirectoryExists(dirPath: string): void {
 /**
  * Find an L2 chain by chain ID in the deployment state, or throw.
  */
-export function getL2Chain(
-  chains: ChainInfo,
-  chainId: number
-): { chainId: number; rpcUrl: string } {
+export function getL2Chain(chains: ChainInfo, chainId: number): { chainId: number; rpcUrl: string } {
   const chain = chains.l2.find((c) => c.chainId === chainId);
   if (!chain) {
     throw new Error(`L2 chain ${chainId} not found. Available: ${chains.l2.map((c) => c.chainId).join(", ")}`);
@@ -109,10 +113,7 @@ export function getL2Chain(
 /**
  * Find a chain's diamond proxy address by chain ID, or throw.
  */
-export function getChainDiamondProxy(
-  chainAddresses: ChainAddresses[],
-  chainId: number
-): string {
+export function getChainDiamondProxy(chainAddresses: ChainAddresses[], chainId: number): string {
   const addr = chainAddresses.find((c) => c.chainId === chainId);
   if (!addr) {
     throw new Error(`Chain addresses for ${chainId} not found`);

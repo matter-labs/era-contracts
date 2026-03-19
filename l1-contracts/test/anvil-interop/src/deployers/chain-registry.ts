@@ -138,10 +138,7 @@ export class ChainRegistry {
     // Extract genesis upgrade L2 transactions from L1 GenesisUpgrade events.
     // During createNewChain(), L1GenesisUpgrade.genesisUpgrade() is executed via delegatecall
     // from the diamond proxy, emitting GenesisUpgrade with the full L2CanonicalTransaction.
-    const genesisPriorityTxs = await this.extractGenesisTxs(
-      chainAddresses,
-      blockBeforeRegistration + 1
-    );
+    const genesisPriorityTxs = await this.extractGenesisTxs(chainAddresses, blockBeforeRegistration + 1);
 
     return { chainAddresses, genesisPriorityTxs };
   }

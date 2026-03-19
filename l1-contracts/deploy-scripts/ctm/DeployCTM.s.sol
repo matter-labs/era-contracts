@@ -91,21 +91,27 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function runForTest(address bridgehub, bool skipL1Deployments) public {
-        saveDiamondSelectors();
-        runInner(
-            vm.envString("PERMANENT_VALUES_INPUT"),
-            vm.envString("CTM_CONFIG"),
-            vm.envString("CTM_OUTPUT"),
-            bridgehub,
-            false,
-            skipL1Deployments
-        );
+        _runConfiguredTest(bridgehub, skipL1Deployments, true, false);
     }
 
     /// @notice Like runForTest but skips saveDiamondSelectors() and batches blake2s FFI calls.
     function runForAnvilTest(address bridgehub, bool skipL1Deployments) public {
-        _useBlakeCache = true;
-        _precomputeBlakeHashes();
+        _runConfiguredTest(bridgehub, skipL1Deployments, false, true);
+    }
+
+    function _runConfiguredTest(
+        address bridgehub,
+        bool skipL1Deployments,
+        bool shouldSaveSelectors,
+        bool shouldUseBlakeCache
+    ) internal {
+        if (shouldSaveSelectors) {
+            saveDiamondSelectors();
+        }
+        _useBlakeCache = shouldUseBlakeCache;
+        if (shouldUseBlakeCache) {
+            _precomputeBlakeHashes();
+        }
         runInner(
             vm.envString("PERMANENT_VALUES_INPUT"),
             vm.envString("CTM_CONFIG"),

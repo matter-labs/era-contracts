@@ -134,7 +134,7 @@ function compareJsonFiles(path1: string, path2: string, name: string): string[] 
 function main() {
   const args = process.argv.slice(2);
   if (args.length !== 2) {
-    console.error(`Usage: ts-node compare-chain-states.ts <committed-dir> <generated-dir>`);
+    console.error("Usage: ts-node compare-chain-states.ts <committed-dir> <generated-dir>");
     process.exit(2);
   }
 

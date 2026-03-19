@@ -20,6 +20,11 @@ import { runForgeScript } from "../core/forge";
 
 const gwTimeIt = (label: string) => timeIt(label, "   ⏱️  [GW]");
 
+interface GatewayContext {
+  gwProvider: providers.JsonRpcProvider;
+  gwDiamondProxy: string;
+}
+
 export class GatewaySetup {
   private l1Addresses: CoreDeployedAddresses;
   private ctmAddresses: CTMDeployedAddresses;
@@ -27,6 +32,8 @@ export class GatewaySetup {
   private l1Provider: providers.JsonRpcProvider;
   private projectRoot: string;
   private outputDir: string;
+  private providerCache = new Map<string, providers.JsonRpcProvider>();
+  private l1Bridgehub?: Contract;
 
   constructor(l1RpcUrl: string, l1Addresses: CoreDeployedAddresses, ctmAddresses: CTMDeployedAddresses) {
     this.l1RpcUrl = l1RpcUrl;
@@ -46,11 +53,12 @@ export class GatewaySetup {
     console.log("🌐 Gateway setup for Anvil test environment...");
 
     const gatewayCTMAddr = this.ctmAddresses.chainTypeManager;
+    const gatewayContext = gwRpcUrl ? await this.createGatewayContext(chainId, gwRpcUrl) : undefined;
 
     // Step 1: Verify GW chain has all required system contracts
-    if (gwRpcUrl) {
+    if (gatewayContext) {
       const done = gwTimeIt("verifyGatewayContracts");
-      const deployer = new GatewayDeployer(gwRpcUrl, chainId);
+      const deployer = new GatewayDeployer(gatewayContext.gwProvider.connection.url, chainId);
       await deployer.verifyGatewayContracts();
       done();
     }
@@ -71,31 +79,23 @@ export class GatewaySetup {
     console.log(`   Settlement layer status set for chain ${chainId}`);
 
     // Step 5: Full gateway registration (includes L1→L2 governance calls)
-    if (gwRpcUrl) {
-      const l1Provider = this.l1Provider;
-      const gwProvider = new providers.JsonRpcProvider(gwRpcUrl);
-      const l1Bridgehub = new Contract(this.l1Addresses.bridgehub, getAbi("L1Bridgehub"), l1Provider);
-      const gwDiamondProxy: string = await l1Bridgehub.getZKChain(chainId);
-      console.log(`   GW diamond proxy on L1: ${gwDiamondProxy}`);
-
+    if (gatewayContext) {
       // Transfer GW L2Bridgehub ownership from the aliased CTM governance (set during genesis)
       // to the aliased ecosystem governance (used by fullRegistration priority requests).
       // The CTM deploys its own per-chain Governance, but fullRegistration sends calls from
       // the ecosystem Governance contract. Without this transfer, addChainTypeManager etc. fail.
       done = gwTimeIt("transferGwL2BridgehubOwnership");
-      await this.transferGwL2BridgehubOwnership(gwProvider);
+      await this.transferGwL2BridgehubOwnership(gatewayContext.gwProvider);
       done();
 
-      const startBlock = await l1Provider.getBlockNumber();
+      const startBlock = await this.l1Provider.getBlockNumber();
       done = gwTimeIt("forge: runFullRegistration");
       await this.runForgeGatewayScript("runFullRegistration()");
       done();
 
       done = gwTimeIt("relay: fullRegistration → GW");
-      const latestBlock = await l1Provider.getBlockNumber();
-      await scanAndRelayPriorityRequests(l1Provider, gwDiamondProxy, gwProvider, startBlock + 1, latestBlock, (line) =>
-        console.log(line)
-      );
+      const latestBlock = await this.l1Provider.getBlockNumber();
+      await this.relayPriorityRequestsToGateway(gatewayContext, startBlock + 1, latestBlock);
       done();
     } else {
       done = gwTimeIt("forge: runFullRegistration");
@@ -104,15 +104,15 @@ export class GatewaySetup {
     }
 
     // Step 6: Pre-register chains on GW Bridgehub (before migration relay)
-    if (gwRpcUrl && gwSettledChainIds && gwSettledChainIds.length > 0) {
+    if (gatewayContext && gwSettledChainIds && gwSettledChainIds.length > 0) {
       done = gwTimeIt("registerChainsOnGateway");
-      await this.registerChainsOnGateway(gwRpcUrl, gwSettledChainIds);
+      await this.registerChainsOnGateway(gatewayContext.gwProvider, gwSettledChainIds);
       done();
     }
 
     // Step 7: Migrate chains to gateway via Forge scripts
     if (gwSettledChainIds && gwSettledChainIds.length > 0) {
-      await this.migrateChains(chainId, gwSettledChainIds, gwRpcUrl, l2ChainRpcUrls);
+      await this.migrateChains(chainId, gwSettledChainIds, gatewayContext, l2ChainRpcUrls);
     }
 
     console.log(`   Using existing CTM: ${gatewayCTMAddr}`);
@@ -148,6 +148,48 @@ export class GatewaySetup {
     });
   }
 
+  private getProvider(rpcUrl: string): providers.JsonRpcProvider {
+    let provider = this.providerCache.get(rpcUrl);
+    if (!provider) {
+      provider = new providers.JsonRpcProvider(rpcUrl);
+      this.providerCache.set(rpcUrl, provider);
+    }
+    return provider;
+  }
+
+  private getL1Bridgehub(): Contract {
+    if (!this.l1Bridgehub) {
+      this.l1Bridgehub = new Contract(this.l1Addresses.bridgehub, getAbi("L1Bridgehub"), this.l1Provider);
+    }
+    return this.l1Bridgehub;
+  }
+
+  private async getGwDiamondProxy(chainId: number): Promise<string> {
+    return this.getL1Bridgehub().getZKChain(chainId);
+  }
+
+  private async createGatewayContext(chainId: number, gwRpcUrl: string): Promise<GatewayContext> {
+    const gwProvider = this.getProvider(gwRpcUrl);
+    const gwDiamondProxy = await this.getGwDiamondProxy(chainId);
+    console.log(`   GW diamond proxy on L1: ${gwDiamondProxy}`);
+    return { gwProvider, gwDiamondProxy };
+  }
+
+  private async relayPriorityRequestsToGateway(
+    gatewayContext: GatewayContext,
+    fromBlock: number,
+    toBlock: number
+  ): Promise<void> {
+    await scanAndRelayPriorityRequests(
+      this.l1Provider,
+      gatewayContext.gwDiamondProxy,
+      gatewayContext.gwProvider,
+      fromBlock,
+      toBlock,
+      (line) => console.log(line)
+    );
+  }
+
   /**
    * Migrate chains to gateway using Forge scripts + L1→L2 relay.
    *
@@ -160,44 +202,40 @@ export class GatewaySetup {
   private async migrateChains(
     gatewayChainId: number,
     gwSettledChainIds: number[],
-    gwRpcUrl?: string,
+    gatewayContext?: GatewayContext,
     l2ChainRpcUrls?: Map<number, string>
   ): Promise<void> {
-    const l1Provider = this.l1Provider;
-    const l1Bridgehub = new Contract(this.l1Addresses.bridgehub, getAbi("L1Bridgehub"), l1Provider);
-    const gwDiamondProxy: string = await l1Bridgehub.getZKChain(gatewayChainId);
+    const l1Bridgehub = this.getL1Bridgehub();
+    const migrationPhaseStartBlock = await this.l1Provider.getBlockNumber();
 
     // Phase 1: All L1 forge scripts (sequential — shared L1 nonce)
-    const overallStartBlock = await l1Provider.getBlockNumber();
     for (const chainId of gwSettledChainIds) {
       console.log(`   Migrating chain ${chainId} to gateway...`);
 
       // Run forge script: pause deposits + initiate migration.
+      const migrationStartBlock = await this.l1Provider.getBlockNumber();
       let done = gwTimeIt(`forge: runPauseAndMigrateChain(${chainId})`);
       await this.runForgeGatewayScript("runPauseAndMigrateChain(uint256)", String(chainId));
       done();
 
       // Confirm migration on L1
-      const startBlock = overallStartBlock + 1;
-      const latestBlockAfterMigrate = await l1Provider.getBlockNumber();
+      const latestBlockAfterMigrate = await this.l1Provider.getBlockNumber();
       done = gwTimeIt(`forge: runConfirmMigration(${chainId})`);
-      await this.confirmMigrationOnL1(l1Provider, chainId, gatewayChainId, startBlock, latestBlockAfterMigrate);
+      await this.confirmMigrationOnL1(
+        this.l1Provider,
+        chainId,
+        gatewayChainId,
+        migrationStartBlock + 1,
+        latestBlockAfterMigrate
+      );
       done();
     }
 
     // Phase 2: Relay L1→L2 priority requests to GW chain (sequential — same GW impersonated addresses)
-    if (gwRpcUrl) {
+    if (gatewayContext) {
       const done = gwTimeIt("relay: migration → GW (all chains)");
-      const gwProvider = new providers.JsonRpcProvider(gwRpcUrl);
-      const latestBlock = await l1Provider.getBlockNumber();
-      await scanAndRelayPriorityRequests(
-        l1Provider,
-        gwDiamondProxy,
-        gwProvider,
-        overallStartBlock + 1,
-        latestBlock,
-        (line) => console.log(line)
-      );
+      const latestBlock = await this.l1Provider.getBlockNumber();
+      await this.relayPriorityRequestsToGateway(gatewayContext, migrationPhaseStartBlock + 1, latestBlock);
       done();
     }
 
@@ -208,7 +246,7 @@ export class GatewaySetup {
         gwSettledChainIds
           .filter((chainId) => l2ChainRpcUrls?.has(chainId))
           .map(async (chainId) => {
-            const l2Provider = new providers.JsonRpcProvider(l2ChainRpcUrls!.get(chainId)!);
+            const l2Provider = this.getProvider(l2ChainRpcUrls!.get(chainId)!);
             await this.notifyL2SettlementLayerChange(l2Provider, gatewayChainId, chainId);
           })
       );
@@ -217,21 +255,20 @@ export class GatewaySetup {
 
     // Phase 4: ETH TBM for each chain (sequential — L1 nonce + GW relay conflicts)
     for (const chainId of gwSettledChainIds) {
-      if (l2ChainRpcUrls?.has(chainId) && gwRpcUrl) {
+      if (l2ChainRpcUrls?.has(chainId) && gatewayContext) {
         const done = gwTimeIt(`ETH TBM chain ${chainId}`);
-        const l2Provider = new providers.JsonRpcProvider(l2ChainRpcUrls.get(chainId)!);
-        const gwProvider = new providers.JsonRpcProvider(gwRpcUrl);
+        const l2Provider = this.getProvider(l2ChainRpcUrls.get(chainId)!);
         const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         const l2DiamondProxy: string = await l1Bridgehub.getZKChain(chainId);
         console.log(`   Running real TBM for ETH on chain ${chainId}...`);
         await migrateTokenBalanceToGW({
           l2Provider,
-          l1Provider,
-          gwProvider,
+          l1Provider: this.l1Provider,
+          gwProvider: gatewayContext.gwProvider,
           chainId,
           assetId: ethAssetId,
           l1AssetTrackerAddr: this.l1Addresses.l1AssetTracker,
-          gwDiamondProxyAddr: gwDiamondProxy,
+          gwDiamondProxyAddr: gatewayContext.gwDiamondProxy,
           l2DiamondProxyAddr: l2DiamondProxy,
           logger: (line) => console.log(line),
         });
@@ -367,8 +404,7 @@ export class GatewaySetup {
    * Pre-registering ensures getZKChain(chainId) != address(0) in forwardedBridgeMint,
    * so IChainTypeManager(ctm).forwardedBridgeMint() is never called (the crash path).
    */
-  private async registerChainsOnGateway(gwRpcUrl: string, chainIds: number[]): Promise<void> {
-    const gwProvider = new providers.JsonRpcProvider(gwRpcUrl);
+  private async registerChainsOnGateway(gwProvider: providers.JsonRpcProvider, chainIds: number[]): Promise<void> {
     const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), gwProvider);
     const messageRoot = new Contract(L2_MESSAGE_ROOT_ADDR, getAbi("L2MessageRoot"), gwProvider);
 

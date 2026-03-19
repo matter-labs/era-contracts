@@ -1,165 +1,19 @@
 import { ethers, providers } from "ethers";
 import { impersonateAndRun, relayTx } from "../core/utils";
-import { loadBytecodeFromOut } from "../core/artifacts";
 import { encodeNtvAssetId } from "../core/data-encoding";
-import { getAbi } from "../core/contracts";
+import type { SystemContractPredeploy } from "../core/contracts";
+import { getAbi, getBytecode, PREDEPLOY_SYSTEM_CONTRACTS } from "../core/contracts";
 import {
   ETH_TOKEN_ADDRESS,
-  GW_ASSET_TRACKER_ADDR,
   INITIAL_BASE_TOKEN_HOLDER_BALANCE,
-  INTEROP_CENTER_ADDR,
-  L1_MESSENGER_HOOK_ADDR,
   L1_CHAIN_ID,
-  L2_ASSET_ROUTER_ADDR,
-  L2_ASSET_TRACKER_ADDR,
   L2_BASE_TOKEN_ADDR,
-  L2_BASE_TOKEN_HOLDER_ADDR,
   L2_BRIDGEHUB_ADDR,
-  L2_CHAIN_ASSET_HANDLER_ADDR,
-  L2_COMPLEX_UPGRADER_ADDR,
-  L2_GENESIS_UPGRADE_ADDR,
-  L2_INTEROP_HANDLER_ADDR,
-  L2_MESSAGE_ROOT_ADDR,
-  L2_MESSAGE_VERIFICATION_ADDR,
-  L2_NATIVE_TOKEN_VAULT_ADDR,
-  L2_NTV_BEACON_DEPLOYER_ADDR,
-  L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
-  L2_TO_L1_MESSENGER_ADDR,
-  L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
-  MINT_BASE_TOKEN_HOOK_ADDR,
   SERVICE_TX_SENDER_ADDR,
-  SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
 import type { PriorityRequestData } from "../core/types";
 
-interface PredeployedContractSpec {
-  address: string;
-  name: string;
-  artifactPath: string;
-}
-
 const INTEROP_TEST_CHAIN_IDS = [10, 11, 12, 13];
-
-/**
- * Contracts that must be pre-deployed via anvil_setCode before the genesis upgrade runs.
- *
- * The genesis upgrade (with isZKsyncOS=true) skips force deployments — it only calls
- * initL2() on each contract. So the bytecode must already be at these addresses.
- *
- * Mock contracts replace ZK-VM system contracts that can't run on standard EVM.
- * Real contracts are deployed at their system addresses for the genesis initL2() to work.
- */
-const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
-  // Mock system contracts (replace ZK-VM bytecode that can't run on Anvil)
-  {
-    address: SYSTEM_CONTEXT_ADDR,
-    name: "MockSystemContext",
-    artifactPath: "MockSystemContext.sol/MockSystemContext.json",
-  },
-  {
-    address: L2_TO_L1_MESSENGER_ADDR,
-    name: "L1MessengerZKOS",
-    artifactPath: "L1MessengerZKOS.sol/L1MessengerZKOS.json",
-  },
-  {
-    address: L2_BASE_TOKEN_ADDR,
-    name: "L2BaseTokenZKOS",
-    artifactPath: "L2BaseTokenZKOS.sol/L2BaseTokenZKOS.json",
-  },
-  {
-    address: L2_MESSAGE_VERIFICATION_ADDR,
-    name: "MockL2MessageVerification",
-    artifactPath: "MockL2MessageVerification.sol/MockL2MessageVerification.json",
-  },
-  // Mock ZK-VM hooks — return success so real contracts can call them on Anvil
-  {
-    address: L1_MESSENGER_HOOK_ADDR,
-    name: "MockL1MessengerHook",
-    artifactPath: "MockL1MessengerHook.sol/MockL1MessengerHook.json",
-  },
-  {
-    address: MINT_BASE_TOKEN_HOOK_ADDR,
-    name: "MockMintBaseTokenHook",
-    artifactPath: "MockMintBaseTokenHook.sol/MockMintBaseTokenHook.json",
-  },
-  // Infrastructure contracts needed before/during genesis upgrade execution
-  {
-    address: L2_COMPLEX_UPGRADER_ADDR,
-    name: "L2ComplexUpgrader",
-    artifactPath: "L2ComplexUpgrader.sol/L2ComplexUpgrader.json",
-  },
-  {
-    address: L2_GENESIS_UPGRADE_ADDR,
-    name: "L2GenesisUpgrade",
-    artifactPath: "L2GenesisUpgrade.sol/L2GenesisUpgrade.json",
-  },
-  {
-    address: L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
-    name: "SystemContractProxyAdmin",
-    artifactPath: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
-  },
-  {
-    address: L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
-    name: "L2WrappedBaseToken",
-    artifactPath: "L2WrappedBaseToken.sol/L2WrappedBaseToken.json",
-  },
-  {
-    address: L2_NTV_BEACON_DEPLOYER_ADDR,
-    name: "UpgradeableBeaconDeployer",
-    artifactPath: "UpgradeableBeaconDeployer.sol/UpgradeableBeaconDeployer.json",
-  },
-  // Real L2 system contracts — genesis initL2() runs on these
-  {
-    address: L2_MESSAGE_ROOT_ADDR,
-    name: "L2MessageRoot",
-    artifactPath: "L2MessageRoot.sol/L2MessageRoot.json",
-  },
-  {
-    address: L2_BRIDGEHUB_ADDR,
-    name: "L2Bridgehub",
-    artifactPath: "L2Bridgehub.sol/L2Bridgehub.json",
-  },
-  {
-    address: L2_ASSET_ROUTER_ADDR,
-    name: "L2AssetRouter",
-    artifactPath: "L2AssetRouter.sol/L2AssetRouter.json",
-  },
-  {
-    address: L2_NATIVE_TOKEN_VAULT_ADDR,
-    name: "L2NativeTokenVaultZKOS",
-    artifactPath: "L2NativeTokenVaultZKOS.sol/L2NativeTokenVaultZKOS.json",
-  },
-  {
-    address: L2_CHAIN_ASSET_HANDLER_ADDR,
-    name: "L2ChainAssetHandler",
-    artifactPath: "L2ChainAssetHandler.sol/L2ChainAssetHandler.json",
-  },
-  {
-    address: L2_ASSET_TRACKER_ADDR,
-    name: "L2AssetTracker",
-    artifactPath: "L2AssetTracker.sol/L2AssetTracker.json",
-  },
-  {
-    address: GW_ASSET_TRACKER_ADDR,
-    name: "GWAssetTracker",
-    artifactPath: "GWAssetTracker.sol/GWAssetTracker.json",
-  },
-  {
-    address: L2_BASE_TOKEN_HOLDER_ADDR,
-    name: "BaseTokenHolder",
-    artifactPath: "BaseTokenHolder.sol/BaseTokenHolder.json",
-  },
-  {
-    address: INTEROP_CENTER_ADDR,
-    name: "InteropCenter",
-    artifactPath: "InteropCenter.sol/InteropCenter.json",
-  },
-  {
-    address: L2_INTEROP_HANDLER_ADDR,
-    name: "InteropHandler",
-    artifactPath: "InteropHandler.sol/InteropHandler.json",
-  },
-];
 
 /**
  * Deployer that initializes L2 contracts by relaying the real genesis upgrade priority
@@ -179,29 +33,25 @@ export class L2GenesisUpgradeDeployer {
     this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
   }
 
-  private async ensureSystemContract(address: string, artifactPath: string, name: string): Promise<void> {
-    const existingCode = await this.l2Provider.getCode(address);
+  private async ensureSystemContract(contractSpec: SystemContractPredeploy): Promise<void> {
+    const existingCode = await this.l2Provider.getCode(contractSpec.address);
     if (existingCode !== "0x" && existingCode !== "0x0") {
-      console.log(`   ✅ ${name} already deployed at ${address}`);
+      console.log(`   ✅ ${contractSpec.contractName} already deployed at ${contractSpec.address}`);
       return;
     }
 
-    const bytecode = loadBytecodeFromOut(artifactPath);
+    const bytecode = getBytecode(contractSpec.contractName);
     if (!bytecode || bytecode === "0x") {
-      throw new Error(`No bytecode found for ${name} at ${artifactPath}`);
+      throw new Error(`No bytecode found for ${contractSpec.contractName}`);
     }
 
-    console.log(`   Deploying ${name} at ${address}...`);
-    await this.l2Provider.send("anvil_setCode", [address, bytecode]);
-    console.log(`   ✅ ${name} deployed`);
+    console.log(`   Deploying ${contractSpec.contractName} at ${contractSpec.address}...`);
+    await this.l2Provider.send("anvil_setCode", [contractSpec.address, bytecode]);
+    console.log(`   ✅ ${contractSpec.contractName} deployed`);
   }
 
   private async ensurePredeployedContracts(): Promise<void> {
-    await Promise.all(
-      PREDEPLOY_CONTRACTS.map((contractSpec) =>
-        this.ensureSystemContract(contractSpec.address, contractSpec.artifactPath, contractSpec.name)
-      )
-    );
+    await Promise.all(PREDEPLOY_SYSTEM_CONTRACTS.map((contractSpec) => this.ensureSystemContract(contractSpec)));
   }
 
   /**
@@ -213,18 +63,11 @@ export class L2GenesisUpgradeDeployer {
   private async relayGenesisPriorityTx(genesisTx: PriorityRequestData): Promise<void> {
     console.log(`   Relaying genesis priority tx: from=${genesisTx.from} to=${genesisTx.to}`);
 
-    const result = await relayTx(
-      this.l2Provider,
-      genesisTx.from,
-      genesisTx.to,
-      genesisTx.calldata,
-      genesisTx.value
-    );
+    const result = await relayTx(this.l2Provider, genesisTx.from, genesisTx.to, genesisTx.calldata, genesisTx.value);
 
     if (!result.success) {
       throw new Error(
-        `Genesis upgrade priority tx failed on L2. ` +
-          `Debug: cast run ${result.txHash} -r ${this.l2Provider.connection.url}`
+        `Genesis upgrade priority tx failed on L2. Debug: cast run ${result.txHash} -r ${this.l2Provider.connection.url}`
       );
     }
     console.log(`   ✅ Genesis upgrade relayed: cast run ${result.txHash} -r ${this.l2Provider.connection.url}`);
@@ -264,21 +107,11 @@ export class L2GenesisUpgradeDeployer {
   }
 
   private async assertPostDeploymentCode(): Promise<void> {
-    const expectedContracts: Array<{ addr: string; name: string }> = [
-      { addr: L2_BRIDGEHUB_ADDR, name: "L2Bridgehub" },
-      { addr: L2_ASSET_ROUTER_ADDR, name: "L2AssetRouter" },
-      { addr: L2_NATIVE_TOKEN_VAULT_ADDR, name: "L2NativeTokenVault" },
-      { addr: L2_MESSAGE_ROOT_ADDR, name: "L2MessageRoot" },
-      { addr: L2_CHAIN_ASSET_HANDLER_ADDR, name: "L2ChainAssetHandler" },
-      { addr: INTEROP_CENTER_ADDR, name: "InteropCenter" },
-      { addr: L2_INTEROP_HANDLER_ADDR, name: "InteropHandler" },
-      { addr: L2_ASSET_TRACKER_ADDR, name: "L2AssetTracker" },
-      { addr: L2_MESSAGE_VERIFICATION_ADDR, name: "L2MessageVerification" },
-      { addr: GW_ASSET_TRACKER_ADDR, name: "GWAssetTracker" },
-      { addr: L2_BASE_TOKEN_HOLDER_ADDR, name: "BaseTokenHolder" },
-    ];
-
-    await Promise.all(expectedContracts.map((c) => this.assertCodePresent(c.addr, c.name)));
+    await Promise.all(
+      PREDEPLOY_SYSTEM_CONTRACTS.map((contractSpec) =>
+        this.assertCodePresent(contractSpec.address, contractSpec.contractName)
+      )
+    );
   }
 
   async deployAllSystemContracts(

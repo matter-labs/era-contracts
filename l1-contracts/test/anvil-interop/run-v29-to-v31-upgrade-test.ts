@@ -213,9 +213,10 @@ async function main(): Promise<void> {
       await provider.send("anvil_impersonateAccount", [currentAdmin]);
       await provider.send("anvil_setBalance", [currentAdmin, "0x56BC75E2D63100000"]);
       const adminSigner = provider.getSigner(currentAdmin);
-      const setPendingAdminData = new ethers.utils.Interface(getAbi("AdminFacet")).encodeFunctionData("setPendingAdmin", [
-        chainAdmin.address,
-      ]);
+      const setPendingAdminData = new ethers.utils.Interface(getAbi("AdminFacet")).encodeFunctionData(
+        "setPendingAdmin",
+        [chainAdmin.address]
+      );
       const tx = await adminSigner.sendTransaction({
         to: chain.diamondProxy,
         data: setPendingAdminData,

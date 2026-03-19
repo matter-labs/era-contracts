@@ -73,6 +73,14 @@ export class DeploymentRunner {
     fs.writeFileSync(path.join(this.stateDir, "chains.json"), JSON.stringify(state, null, 2));
   }
 
+  private toChainConfigMap(chainConfigs: AnvilConfig["chains"]): Map<number, AnvilConfig["chains"][number]> {
+    return new Map(chainConfigs.map((chainConfig) => [chainConfig.chainId, chainConfig]));
+  }
+
+  private toRpcUrlMap(l2Chains: Array<{ chainId: number; rpcUrl: string }>): Map<number, string> {
+    return new Map(l2Chains.map((chain) => [chain.chainId, chain.rpcUrl]));
+  }
+
   async step1StartChains(
     anvilManager: AnvilManager,
     startChainOptions?: StartChainOptions
@@ -162,10 +170,12 @@ export class DeploymentRunner {
 
     const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
     const registry = new ChainRegistry(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
+    const chainConfigsById = this.toChainConfigMap(chainConfigs);
+    const l2RpcUrlsByChainId = this.toRpcUrlMap(l2Chains);
 
     // Batch-register all chains in a single forge call (avoids nonce conflicts)
     const configs = l2Chains.map((l2Chain) => {
-      const chainConfig = chainConfigs.find((c) => c.chainId === l2Chain.chainId);
+      const chainConfig = chainConfigsById.get(l2Chain.chainId);
       return {
         chainId: l2Chain.chainId,
         rpcUrl: l2Chain.rpcUrl,
@@ -187,8 +197,8 @@ export class DeploymentRunner {
     console.log("\nInitializing L2 system contracts (in parallel)...\n");
     await Promise.all(
       chainAddresses.map(async (chain) => {
-        const l2Chain = l2Chains.find((c) => c.chainId === chain.chainId);
-        if (!l2Chain) {
+        const rpcUrl = l2RpcUrlsByChainId.get(chain.chainId);
+        if (!rpcUrl) {
           throw new Error(`L2 chain ${chain.chainId} not found`);
         }
         const genesisTx = genesisPriorityTxs.get(chain.chainId);
@@ -199,7 +209,7 @@ export class DeploymentRunner {
           );
         }
         const done = timeIt(`initializeL2 chain ${chain.chainId}`);
-        await registry.initializeL2SystemContracts(chain.chainId, l2Chain.rpcUrl, genesisTx);
+        await registry.initializeL2SystemContracts(chain.chainId, rpcUrl, genesisTx);
         done();
         console.log(`  Chain ${chain.chainId} system contracts initialized`);
       })
@@ -209,10 +219,11 @@ export class DeploymentRunner {
     console.log("\nUnpausing deposits on all chains...");
     const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
     const wallet = new Wallet(privateKey, l1Provider);
+    const migratorAbi = getAbi("MigratorFacet");
     const baseNonce = await wallet.getTransactionCount();
     await Promise.all(
       chainAddresses.map(async (chain, i) => {
-        const migrator = new Contract(chain.diamondProxy, getAbi("MigratorFacet"), wallet);
+        const migrator = new Contract(chain.diamondProxy, migratorAbi, wallet);
         const tx = await migrator.unpauseDeposits({ gasLimit: 500_000, nonce: baseNonce + i });
         await tx.wait();
         console.log(`  Deposits unpaused on chain ${chain.chainId}`);
