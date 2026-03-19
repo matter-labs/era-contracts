@@ -1,9 +1,15 @@
-import { providers } from "ethers";
-import { relayTx } from "../core/utils";
-import { getBytecode } from "../core/contracts";
+import { Contract, providers } from "ethers";
+import { impersonateAndRun, relayTx } from "../core/utils";
+import { getAbi, getBytecode } from "../core/contracts";
 import { PREDEPLOY_SYSTEM_CONTRACTS } from "../core/predeploys";
 import type { SystemContractPredeploy } from "../core/predeploys";
-import { INITIAL_BASE_TOKEN_HOLDER_BALANCE, L2_BASE_TOKEN_ADDR } from "../core/const";
+import {
+  INITIAL_BASE_TOKEN_HOLDER_BALANCE,
+  L1_CHAIN_ID,
+  L2_BASE_TOKEN_ADDR,
+  L2_BOOTLOADER_ADDR,
+  SYSTEM_CONTEXT_ADDR,
+} from "../core/const";
 import type { PriorityRequestData } from "../core/types";
 
 /**
@@ -17,6 +23,7 @@ import type { PriorityRequestData } from "../core/types";
  */
 export class L2GenesisUpgradeDeployer {
   private l2Provider: providers.JsonRpcProvider;
+  private readonly systemContextAbi = getAbi("SystemContext");
 
   constructor(l2RpcUrl: string) {
     this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
@@ -71,6 +78,23 @@ export class L2GenesisUpgradeDeployer {
     );
   }
 
+  private async initializeSettlementLayerViaBootloader(chainId: number): Promise<void> {
+    const systemContext = new Contract(SYSTEM_CONTEXT_ADDR, this.systemContextAbi, this.l2Provider);
+    const currentSettlementLayerChainId = await systemContext.currentSettlementLayerChainId();
+    if (currentSettlementLayerChainId.eq(L1_CHAIN_ID)) {
+      console.log(`   Settlement layer already initialized to L1 for chain ${chainId}`);
+      return;
+    }
+
+    await impersonateAndRun(this.l2Provider, L2_BOOTLOADER_ADDR, async (signer) => {
+      const tx = await systemContext.connect(signer).setSettlementLayerChainId(L1_CHAIN_ID, {
+        gasLimit: 1_000_000,
+      });
+      await tx.wait();
+    });
+    console.log(`   Initialized settlement layer to L1 for chain ${chainId}`);
+  }
+
   async deployAllSystemContracts(chainId: number, genesisPriorityTx: PriorityRequestData): Promise<void> {
     console.log(`\n🔧 Deploying system contracts for chain ${chainId} via real genesis upgrade...`);
     await this.ensurePredeployedContracts();
@@ -79,6 +103,7 @@ export class L2GenesisUpgradeDeployer {
     await this.l2Provider.send("anvil_setBalance", [L2_BASE_TOKEN_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE]);
 
     await this.relayGenesisPriorityTx(genesisPriorityTx);
+    await this.initializeSettlementLayerViaBootloader(chainId);
 
     console.log("   Verifying deployment...");
     await this.assertPostDeploymentCode();

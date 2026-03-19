@@ -202,7 +202,7 @@ Contracts are placed at hardcoded addresses via `anvil_setCode` (production has 
 ### Other Shortcuts
 
 - **GW L2Bridgehub ownership transfer**: CTM deploys a per-chain Governance, but `fullRegistration` sends from ecosystem Governance. The test transfers ownership before relay.
-- **Interop registration scope**: the harness registers interop only between GW-settled L2 chains. The gateway chain itself is excluded from interop registration, even though the underlying `ChainRegistrationSender` contract would allow any same-settlement, non-L1 pair. Gateway↔GW-settled and direct-settled↔gateway / GW-settled routes therefore remain unregistered and are expected to revert in the harness.
+- **Interop registration scope**: the harness only intentionally registers GW-settled L2 chains for interop. Routes involving the gateway chain or a direct-settled chain revert in the harness.
 - **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
 - **Interop proofs**: Correct struct shape but empty proof arrays
 
