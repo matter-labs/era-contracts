@@ -57,9 +57,6 @@ async function main(): Promise<void> {
     process.env.ANVIL_INTEROP_PORT_OFFSET = portOffset.toString();
   }
 
-  // Set env for genesis upgrade deployer
-  process.env.ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE = process.env.ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE || "1";
-
   try {
     if (!skipSetup) {
       // Cleanup previous state (still uses shell script for process killing)

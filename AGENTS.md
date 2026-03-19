@@ -248,7 +248,7 @@ ANVIL_INTEROP_FRESH_DEPLOY=1 yarn test:hardhat:interop
 ANVIL_INTEROP_KEEP_CHAINS=1 yarn test:hardhat:interop
 ```
 
-After modifying mock system contracts (e.g., `MockL2BaseToken`, `MockL2ToL1Messenger`), regenerate chain states:
+After modifying mock system contracts (e.g., `MockL2ToL1Messenger`, `MockMintBaseTokenHook`), regenerate chain states:
 
 ```bash
 cd l1-contracts

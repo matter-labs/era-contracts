@@ -15,7 +15,7 @@ import type {
   DeploymentState,
 } from "./core/types";
 import { getChainIdsByRole, timeIt } from "./core/utils";
-import { migratorFacetAbi } from "./core/contracts";
+import { getAbi } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./core/const";
 
 export interface StartChainOptions {
@@ -191,12 +191,15 @@ export class DeploymentRunner {
         if (!l2Chain) {
           throw new Error(`L2 chain ${chain.chainId} not found`);
         }
+        const genesisTx = genesisPriorityTxs.get(chain.chainId);
+        if (!genesisTx) {
+          throw new Error(
+            `Genesis priority tx not found for chain ${chain.chainId}. ` +
+              "Ensure registerChainBatch() captured the GenesisUpgrade events."
+          );
+        }
         const done = timeIt(`initializeL2 chain ${chain.chainId}`);
-        await registry.initializeL2SystemContracts(
-          chain.chainId,
-          l2Chain.rpcUrl,
-          genesisPriorityTxs.get(chain.chainId)
-        );
+        await registry.initializeL2SystemContracts(chain.chainId, l2Chain.rpcUrl, genesisTx);
         done();
         console.log(`  Chain ${chain.chainId} system contracts initialized`);
       })
@@ -209,7 +212,7 @@ export class DeploymentRunner {
     const baseNonce = await wallet.getTransactionCount();
     await Promise.all(
       chainAddresses.map(async (chain, i) => {
-        const migrator = new Contract(chain.diamondProxy, migratorFacetAbi(), wallet);
+        const migrator = new Contract(chain.diamondProxy, getAbi("MigratorFacet"), wallet);
         const tx = await migrator.unpauseDeposits({ gasLimit: 500_000, nonce: baseNonce + i });
         await tx.wait();
         console.log(`  Deposits unpaused on chain ${chain.chainId}`);

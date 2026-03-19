@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { Contract, providers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { l1BridgehubAbi } from "../../src/core/contracts";
+import { getAbi } from "../../src/core/contracts";
 import {
   L2_BRIDGEHUB_ADDR,
   L2_ASSET_ROUTER_ADDR,
@@ -56,8 +56,7 @@ describe("01 - Deployment Verification", function () {
     });
 
     it("has CTM registered in Bridgehub", async () => {
-      const bridgehubAbi = l1BridgehubAbi();
-      const bridgehub = new Contract(state.l1Addresses!.bridgehub, bridgehubAbi, l1Provider);
+      const bridgehub = new Contract(state.l1Addresses!.bridgehub, getAbi("L1Bridgehub"), l1Provider);
       const isRegistered = await bridgehub.chainTypeManagerIsRegistered(state.ctmAddresses!.chainTypeManager);
       expect(isRegistered).to.equal(true);
     });

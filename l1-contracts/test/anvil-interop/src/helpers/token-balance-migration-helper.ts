@@ -1,5 +1,5 @@
 import { Contract, ethers, providers, Wallet } from "ethers";
-import { l1AssetTrackerAbi, l2AssetTrackerAbi, l2NativeTokenVaultAbi } from "../core/contracts";
+import { getAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   L1_MESSAGE_SENT_EVENT_SIG,
@@ -48,7 +48,7 @@ export async function migrateTokenBalanceToGW(params: {
 
   log(`   [TBM] Step 1: Calling initiateL1ToGatewayMigrationOnL2 on chain ${chainId}...`);
 
-  const l2AssetTracker = new Contract(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAbi(), l2Provider);
+  const l2AssetTracker = new Contract(L2_ASSET_TRACKER_ADDR, getAbi("L2AssetTracker"), l2Provider);
   const l2Wallet = new ethers.Wallet(privateKey, l2Provider);
 
   const l2Tx = await l2AssetTracker.connect(l2Wallet).initiateL1ToGatewayMigrationOnL2(assetId, {
@@ -73,7 +73,7 @@ export async function migrateTokenBalanceToGW(params: {
   const finalizeParams = buildFinalizeWithdrawalParams(l2Receipt, chainId);
   log(`   [TBM] Captured L2→L1 message (${finalizeParams.message.length} chars)`);
 
-  const l1AssetTracker = new Contract(l1AssetTrackerAddr, l1AssetTrackerAbi(), l1Provider);
+  const l1AssetTracker = new Contract(l1AssetTrackerAddr, getAbi("L1AssetTracker"), l1Provider);
   const l1Wallet = new ethers.Wallet(privateKey, l1Provider);
 
   const l1Tx = await l1AssetTracker.connect(l1Wallet).receiveL1ToGatewayMigrationOnL1(finalizeParams, {
@@ -115,10 +115,8 @@ export async function registerTestTokenOnL2NTV(
 ): Promise<void> {
   const log = logger || console.log;
   const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
-  const ntvAbi = l2NativeTokenVaultAbi();
-
   const l2Wallet = new Wallet(privateKey, l2Provider);
-  const ntv = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, ntvAbi, l2Wallet);
+  const ntv = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), l2Wallet);
 
   const existingAssetId = await ntv.assetId(tokenAddr);
   if (existingAssetId === ethers.constants.HashZero) {

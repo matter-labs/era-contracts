@@ -3,7 +3,7 @@ import { Contract, providers, Wallet, ethers } from "ethers";
 import type { CoreDeployedAddresses } from "../core/types";
 import { impersonateAndRun, extractAndRelayNewPriorityRequests } from "../core/utils";
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
-import { l1BridgehubAbi, l2AssetRouterAbi, testnetERC20TokenAbi, l1NativeTokenVaultAbi } from "../core/contracts";
+import { getAbi } from "../core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, L1_CHAIN_ID, L2_ASSET_ROUTER_ADDR } from "../core/const";
 
 export interface DepositETHParams {
@@ -59,7 +59,7 @@ export async function depositETHToL2(params: DepositETHParams): Promise<DepositE
   const l1Wallet = new Wallet(privateKey, l1Provider);
   const recipient = params.recipient || l1Wallet.address;
 
-  const bridgehub = new Contract(l1Addresses.bridgehub, l1BridgehubAbi(), l1Wallet);
+  const bridgehub = new Contract(l1Addresses.bridgehub, getAbi("L1Bridgehub"), l1Wallet);
 
   const l2GasLimit = 1_000_000;
   const l2GasPerPubdataByteLimit = 800;
@@ -136,14 +136,14 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
   const recipient = params.recipient || l1Wallet.address;
 
   // First approve the L1 shared bridge to spend the tokens
-  const token = new Contract(l1TokenAddress, testnetERC20TokenAbi(), l1Wallet);
+  const token = new Contract(l1TokenAddress, getAbi("TestnetERC20Token"), l1Wallet);
 
   console.log(`   Approving L1AssetRouter to spend ${amount.toString()} tokens...`);
   const approveTx = await token.approve(l1Addresses.l1SharedBridge, amount);
   await approveTx.wait();
 
   // Register the token in L1NativeTokenVault if needed
-  const ntv = new Contract(l1Addresses.l1NativeTokenVault, l1NativeTokenVaultAbi(), l1Wallet);
+  const ntv = new Contract(l1Addresses.l1NativeTokenVault, getAbi("L1NativeTokenVault"), l1Wallet);
   const registeredAssetId = await ntv.assetId(l1TokenAddress);
   if (registeredAssetId === ethers.constants.HashZero) {
     console.log(`   Registering token ${l1TokenAddress} in L1NativeTokenVault...`);
@@ -155,8 +155,7 @@ export async function depositERC20ToL2(params: DepositERC20Params): Promise<Depo
   const assetId = await ntv.assetId(l1TokenAddress);
 
   // Build the two-bridges request
-  const bridgehubAbi = l1BridgehubAbi();
-  const bridgehub = new Contract(l1Addresses.bridgehub, bridgehubAbi, l1Wallet);
+  const bridgehub = new Contract(l1Addresses.bridgehub, getAbi("L1Bridgehub"), l1Wallet);
 
   const l2GasLimit = 1_000_000;
   const l2GasPerPubdataByteLimit = 800;
@@ -220,7 +219,7 @@ async function finalizeERC20DepositOnL2(
   const transferData = encodeBridgeBurnData(amount, recipient, l1TokenAddress);
 
   return await impersonateAndRun(l2Provider, L2_ASSET_ROUTER_ADDR, async (signer) => {
-    const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbi(), signer);
+    const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, getAbi("L2AssetRouter"), signer);
 
     const tx = await l2AssetRouter.finalizeDeposit(L1_CHAIN_ID, assetId, transferData, {
       gasLimit: 5_000_000,

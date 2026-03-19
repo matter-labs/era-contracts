@@ -16,13 +16,7 @@ import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { runForgeScript } from "./src/core/forge";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_DEFAULT_PRIVATE_KEY } from "./src/core/const";
-import {
-  adminFacetAbi,
-  chainAdminOwnableAbi,
-  chainAdminOwnableBytecode,
-  ownable2StepAbi,
-  gettersFacetAbi,
-} from "./src/core/contracts";
+import { getAbi, getCreationBytecode } from "./src/core/contracts";
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");
@@ -131,7 +125,7 @@ async function transferOwnership2Step(
   contractAddr: string,
   label: string
 ): Promise<void> {
-  const ownableContract = new ethers.Contract(contractAddr, ownable2StepAbi(), provider);
+  const ownableContract = new ethers.Contract(contractAddr, getAbi("Ownable2Step"), provider);
 
   const currentOwner = await ownableContract.owner();
   if (currentOwner.toLowerCase() === governanceAddr.toLowerCase()) {
@@ -200,13 +194,13 @@ async function main(): Promise<void> {
     console.log(`\n=== Step 1.6: Deploying ChainAdminOwnable per chain (${elapsed()}) ===\n`);
 
     const chainAdminFactory = new ethers.ContractFactory(
-      chainAdminOwnableAbi(),
-      chainAdminOwnableBytecode(),
+      getAbi("ChainAdminOwnable"),
+      getCreationBytecode("ChainAdminOwnable"),
       defaultSigner
     );
 
     for (const chain of chainAddresses) {
-      const diamondProxy = new ethers.Contract(chain.diamondProxy, gettersFacetAbi(), provider);
+      const diamondProxy = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), provider);
       const currentAdmin = await diamondProxy.getAdmin();
       console.log(`  Chain ${chain.chainId}: current admin = ${currentAdmin}`);
 
@@ -219,7 +213,7 @@ async function main(): Promise<void> {
       await provider.send("anvil_impersonateAccount", [currentAdmin]);
       await provider.send("anvil_setBalance", [currentAdmin, "0x56BC75E2D63100000"]);
       const adminSigner = provider.getSigner(currentAdmin);
-      const setPendingAdminData = new ethers.utils.Interface(adminFacetAbi()).encodeFunctionData("setPendingAdmin", [
+      const setPendingAdminData = new ethers.utils.Interface(getAbi("AdminFacet")).encodeFunctionData("setPendingAdmin", [
         chainAdmin.address,
       ]);
       const tx = await adminSigner.sendTransaction({
@@ -231,8 +225,8 @@ async function main(): Promise<void> {
       await provider.send("anvil_stopImpersonatingAccount", [currentAdmin]);
 
       // Accept admin via ChainAdminOwnable.multicall → diamondProxy.acceptAdmin()
-      const acceptAdminData = new ethers.utils.Interface(adminFacetAbi()).encodeFunctionData("acceptAdmin", []);
-      const chainAdminContract = new ethers.Contract(chainAdmin.address, chainAdminOwnableAbi(), defaultSigner);
+      const acceptAdminData = new ethers.utils.Interface(getAbi("AdminFacet")).encodeFunctionData("acceptAdmin", []);
+      const chainAdminContract = new ethers.Contract(chainAdmin.address, getAbi("ChainAdminOwnable"), defaultSigner);
       const multicallTx = await chainAdminContract.multicall(
         [{ target: chain.diamondProxy, value: 0, data: acceptAdminData }],
         true
@@ -368,7 +362,7 @@ async function main(): Promise<void> {
     const expectedVersion = ethers.BigNumber.from("0x1f00000000"); // v31
 
     for (const chain of chainAddresses) {
-      const diamondProxy = new ethers.Contract(chain.diamondProxy, gettersFacetAbi(), provider);
+      const diamondProxy = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), provider);
       const protocolVersion = await diamondProxy.getProtocolVersion();
       const versionHex = "0x" + protocolVersion.toHexString().replace("0x", "").padStart(10, "0");
       console.log(`  Chain ${chain.chainId} (${chain.diamondProxy}): protocol version ${versionHex}`);

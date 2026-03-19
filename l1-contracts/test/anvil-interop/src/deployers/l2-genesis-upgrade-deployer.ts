@@ -2,7 +2,7 @@ import { ethers, providers } from "ethers";
 import { impersonateAndRun, relayTx } from "../core/utils";
 import { loadBytecodeFromOut } from "../core/artifacts";
 import { encodeNtvAssetId } from "../core/data-encoding";
-import { l2BridgehubAbi } from "../core/contracts";
+import { getAbi } from "../core/contracts";
 import {
   ETH_TOKEN_ADDRESS,
   GW_ASSET_TRACKER_ADDR,
@@ -225,7 +225,7 @@ export class L2GenesisUpgradeDeployer {
   }
 
   private async registerInteropChains(currentChainId: number, interopChainIds?: number[]): Promise<void> {
-    const l2BridgehubAbiData = l2BridgehubAbi();
+    const l2BridgehubAbiData = getAbi("L2Bridgehub");
     const l2Bridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbiData, this.l2Provider);
     const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
 

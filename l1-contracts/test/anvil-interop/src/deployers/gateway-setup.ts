@@ -2,7 +2,7 @@ import { Contract, ethers, providers } from "ethers";
 import * as path from "path";
 import type { CoreDeployedAddresses, CTMDeployedAddresses } from "../core/types";
 import { GatewayDeployer } from "./gateway-deployer";
-import { l1BridgehubAbi, l2BridgehubAbi, l2MessageRootAbi, systemContextAbi, ownable2StepAbi } from "../core/contracts";
+import { getAbi } from "../core/contracts";
 import {
   ETH_TOKEN_ADDRESS,
   L1_CHAIN_ID,
@@ -74,7 +74,7 @@ export class GatewaySetup {
     if (gwRpcUrl) {
       const l1Provider = this.l1Provider;
       const gwProvider = new providers.JsonRpcProvider(gwRpcUrl);
-      const l1Bridgehub = new Contract(this.l1Addresses.bridgehub, l1BridgehubAbi(), l1Provider);
+      const l1Bridgehub = new Contract(this.l1Addresses.bridgehub, getAbi("L1Bridgehub"), l1Provider);
       const gwDiamondProxy: string = await l1Bridgehub.getZKChain(chainId);
       console.log(`   GW diamond proxy on L1: ${gwDiamondProxy}`);
 
@@ -164,7 +164,7 @@ export class GatewaySetup {
     l2ChainRpcUrls?: Map<number, string>
   ): Promise<void> {
     const l1Provider = this.l1Provider;
-    const l1Bridgehub = new Contract(this.l1Addresses.bridgehub, l1BridgehubAbi(), l1Provider);
+    const l1Bridgehub = new Contract(this.l1Addresses.bridgehub, getAbi("L1Bridgehub"), l1Provider);
     const gwDiamondProxy: string = await l1Bridgehub.getZKChain(gatewayChainId);
 
     // Phase 1: All L1 forge scripts (sequential — shared L1 nonce)
@@ -313,7 +313,7 @@ export class GatewaySetup {
 
     await impersonateAndRun(l1Provider, governanceAddr, async (govSigner) => {
       for (const c of contracts) {
-        const contract = new Contract(c.addr, ownable2StepAbi(), l1Provider);
+        const contract = new Contract(c.addr, getAbi("Ownable2Step"), l1Provider);
         const currentOwner: string = await contract.owner();
 
         if (currentOwner.toLowerCase() === governanceAddr.toLowerCase()) {
@@ -337,7 +337,7 @@ export class GatewaySetup {
    * requests from the ecosystem Governance, so L2Bridgehub ownership must match.
    */
   private async transferGwL2BridgehubOwnership(gwProvider: providers.JsonRpcProvider): Promise<void> {
-    const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, ownable2StepAbi(), gwProvider);
+    const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, getAbi("Ownable2Step"), gwProvider);
     const currentOwner: string = await l2Bridgehub.owner();
     const targetOwner = applyL1ToL2Alias(this.l1Addresses.governance);
 
@@ -369,8 +369,8 @@ export class GatewaySetup {
    */
   private async registerChainsOnGateway(gwRpcUrl: string, chainIds: number[]): Promise<void> {
     const gwProvider = new providers.JsonRpcProvider(gwRpcUrl);
-    const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbi(), gwProvider);
-    const messageRoot = new Contract(L2_MESSAGE_ROOT_ADDR, l2MessageRootAbi(), gwProvider);
+    const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), gwProvider);
+    const messageRoot = new Contract(L2_MESSAGE_ROOT_ADDR, getAbi("L2MessageRoot"), gwProvider);
 
     // Read the chainAssetHandler address from the L2Bridgehub
     const chainAssetHandlerAddr: string = await bridgehub.chainAssetHandler();
@@ -423,7 +423,7 @@ export class GatewaySetup {
     gwChainId: number,
     chainId: number
   ): Promise<void> {
-    const systemContext = new Contract(SYSTEM_CONTEXT_ADDR, systemContextAbi(), l2Provider);
+    const systemContext = new Contract(SYSTEM_CONTEXT_ADDR, getAbi("SystemContext"), l2Provider);
 
     const current: ethers.BigNumber = await systemContext.currentSettlementLayerChainId();
     if (current.eq(gwChainId)) {

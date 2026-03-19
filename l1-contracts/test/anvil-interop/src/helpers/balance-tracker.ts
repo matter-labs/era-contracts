@@ -1,6 +1,6 @@
 import { BigNumber, Contract, providers } from "ethers";
 import type { BalanceSnapshot, CoreDeployedAddresses, DeploymentState } from "../core/types";
-import { l1AssetTrackerAbi, gwAssetTrackerAbi, testnetERC20TokenAbi, l1NativeTokenVaultAbi } from "../core/contracts";
+import { getAbi } from "../core/contracts";
 import { ETH_TOKEN_ADDRESS, GW_ASSET_TRACKER_ADDR } from "../core/const";
 
 /**
@@ -33,7 +33,7 @@ export class BalanceTracker {
    * Read L1AssetTracker.chainBalance(chainId, assetId) on L1.
    */
   async getL1ChainBalance(chainId: number, assetId: string): Promise<BigNumber> {
-    const tracker = new Contract(this.l1AssetTrackerAddr, l1AssetTrackerAbi(), this.l1Provider);
+    const tracker = new Contract(this.l1AssetTrackerAddr, getAbi("L1AssetTracker"), this.l1Provider);
     return tracker.chainBalance(chainId, assetId);
   }
 
@@ -48,7 +48,7 @@ export class BalanceTracker {
     if (!gwProvider) {
       throw new Error(`GW provider not found for chain ${this.gwChainId}`);
     }
-    const tracker = new Contract(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAbi(), gwProvider);
+    const tracker = new Contract(GW_ASSET_TRACKER_ADDR, getAbi("GWAssetTracker"), gwProvider);
     return tracker.chainBalance(chainId, assetId);
   }
 
@@ -75,7 +75,7 @@ export class BalanceTracker {
    */
   async getL2TokenBalance(chainId: number, tokenAddress: string, walletAddress: string): Promise<BigNumber> {
     const provider = this.getL2Provider(chainId);
-    const token = new Contract(tokenAddress, testnetERC20TokenAbi(), provider);
+    const token = new Contract(tokenAddress, getAbi("TestnetERC20Token"), provider);
     return token.balanceOf(walletAddress);
   }
 
@@ -83,7 +83,7 @@ export class BalanceTracker {
    * Read an ERC20 token balance for an address on L1.
    */
   async getL1TokenBalance(tokenAddress: string, walletAddress: string): Promise<BigNumber> {
-    const token = new Contract(tokenAddress, testnetERC20TokenAbi(), this.l1Provider);
+    const token = new Contract(tokenAddress, getAbi("TestnetERC20Token"), this.l1Provider);
     return token.balanceOf(walletAddress);
   }
 
@@ -212,7 +212,7 @@ export async function queryEthAssetId(
   l1Provider: providers.JsonRpcProvider,
   l1NativeTokenVaultAddr: string
 ): Promise<string> {
-  const ntv = new Contract(l1NativeTokenVaultAddr, l1NativeTokenVaultAbi(), l1Provider);
+  const ntv = new Contract(l1NativeTokenVaultAddr, getAbi("L1NativeTokenVault"), l1Provider);
   return ntv.assetId(ETH_TOKEN_ADDRESS);
 }
 

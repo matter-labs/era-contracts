@@ -10,11 +10,10 @@ import type {
   PriorityRequestData,
 } from "../core/types";
 import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig } from "../core/utils";
-import { SystemContractsDeployer } from "./system-contracts-deployer";
 import { L2GenesisUpgradeDeployer } from "./l2-genesis-upgrade-deployer";
 import { runForgeScript } from "../core/forge";
 import { GENESIS_UPGRADE_EVENT_SIG } from "../core/const";
-import { il1GenesisUpgradeAbi } from "../core/contracts";
+import { getAbi } from "../core/contracts";
 
 export class ChainRegistry {
   private l1RpcUrl: string;
@@ -163,7 +162,7 @@ export class ChainRegistry {
     const latestBlock = await this.l1Provider.getBlockNumber();
 
     const genesisTxs = new Map<number, PriorityRequestData>();
-    const genesisIface = new ethers.utils.Interface(il1GenesisUpgradeAbi());
+    const genesisIface = new ethers.utils.Interface(getAbi("IL1GenesisUpgrade"));
 
     for (const chain of chainAddresses) {
       const logs = await this.l1Provider.getLogs({
@@ -214,7 +213,7 @@ export class ChainRegistry {
   async initializeL2SystemContracts(
     chainId: number,
     l2RpcUrl: string,
-    genesisPriorityTx?: PriorityRequestData
+    genesisPriorityTx: PriorityRequestData
   ): Promise<void> {
     console.log(`🔧 Initializing L2 system contracts for chain ${chainId}...`);
 
@@ -225,22 +224,9 @@ export class ChainRegistry {
       interopChainIds = this.computeInteropChainIds(chainId, config);
     }
 
-    const useGenesisUpgradeDeployer = process.env.ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE !== "0";
-    if (useGenesisUpgradeDeployer) {
-      if (!genesisPriorityTx) {
-        throw new Error(
-          `Genesis priority tx required for chain ${chainId} when using L2GenesisUpgrade deployer. ` +
-            "Ensure registerChainBatch() captured the NewPriorityRequest events."
-        );
-      }
-      console.log("   Using real genesis upgrade (relaying L1 priority tx)");
-      const deployer = new L2GenesisUpgradeDeployer(l2RpcUrl);
-      await deployer.deployAllSystemContracts(chainId, genesisPriorityTx, interopChainIds);
-    } else {
-      console.log("   Using direct SystemContractsDeployer path");
-      const deployer = new SystemContractsDeployer(l2RpcUrl, this.privateKey, this.l1Addresses.l1SharedBridge);
-      await deployer.deployAllSystemContracts(chainId, interopChainIds);
-    }
+    console.log("   Using real genesis upgrade (relaying L1 priority tx)");
+    const deployer = new L2GenesisUpgradeDeployer(l2RpcUrl);
+    await deployer.deployAllSystemContracts(chainId, genesisPriorityTx, interopChainIds);
 
     console.log(`✅ L2 system contracts initialized for chain ${chainId}`);
   }

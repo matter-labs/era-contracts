@@ -1,6 +1,6 @@
 import type { BigNumber, providers } from "ethers";
 import { Contract, ethers } from "ethers";
-import { gwAssetTrackerAbi, l2BridgehubAbi, l2MessageRootAbi } from "../core/contracts";
+import { getAbi } from "../core/contracts";
 import { impersonateAndRun } from "../core/utils";
 import { encodeTokenData, encodeBridgeMintData } from "../core/data-encoding";
 import {
@@ -277,7 +277,7 @@ export function buildInteropBundleLog(params: { txNumberInBatch: number; interop
  * Chains must be registered during setup (step 5) via gateway-setup.ts.
  */
 async function getZKChainAddressOnGW(gwProvider: providers.JsonRpcProvider, chainId: number): Promise<string> {
-  const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbi(), gwProvider);
+  const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), gwProvider);
   const addr: string = await bridgehub.getZKChain(chainId);
   if (addr === ethers.constants.AddressZero) {
     throw new Error(`Chain ${chainId} not registered on GW Bridgehub. Ensure step 5 (gateway setup) ran correctly.`);
@@ -312,7 +312,7 @@ export async function callProcessLogsAndMessages(params: {
   // Auto-detect batch number if not provided: query currentChainBatchNumber + 1
   let batchNumber = params.batchNumber;
   if (batchNumber === undefined) {
-    const messageRoot = new Contract(L2_MESSAGE_ROOT_ADDR, l2MessageRootAbi(), gwProvider);
+    const messageRoot = new Contract(L2_MESSAGE_ROOT_ADDR, getAbi("L2MessageRoot"), gwProvider);
     const currentBatch: BigNumber = await messageRoot.currentChainBatchNumber(chainId);
     batchNumber = currentBatch.toNumber() + 1;
   }
@@ -345,7 +345,7 @@ export async function callProcessLogsAndMessages(params: {
 
   // 6. Impersonate the diamond proxy address (passes onlyChain modifier)
   // TODO: In a future release, impersonate the operator instead of the diamond proxy.
-  const gwAssetTracker = new Contract(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAbi(), gwProvider);
+  const gwAssetTracker = new Contract(GW_ASSET_TRACKER_ADDR, getAbi("GWAssetTracker"), gwProvider);
 
   const txHash = await impersonateAndRun(gwProvider, zkChainAddr, async (signer) => {
     const trackerAsSigner = gwAssetTracker.connect(signer);
@@ -379,8 +379,7 @@ export async function getGWChainBalance(
   chainId: number,
   assetId: string
 ): Promise<BigNumber> {
-  const abi = gwAssetTrackerAbi();
-  const tracker = new Contract(GW_ASSET_TRACKER_ADDR, abi, gwProvider);
+  const tracker = new Contract(GW_ASSET_TRACKER_ADDR, getAbi("GWAssetTracker"), gwProvider);
   return tracker.chainBalance(chainId, assetId);
 }
 
@@ -388,7 +387,6 @@ export async function getGWChainBalance(
  * Query the ETH asset ID from the Bridgehub on GW (baseTokenAssetId for a chain).
  */
 export async function getBaseTokenAssetId(gwProvider: providers.JsonRpcProvider, chainId: number): Promise<string> {
-  const bridgehubAbi = l2BridgehubAbi();
-  const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, bridgehubAbi, gwProvider);
+  const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), gwProvider);
   return bridgehub.baseTokenAssetId(chainId);
 }

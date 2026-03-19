@@ -1,7 +1,7 @@
 import { BigNumber, Contract, ethers, providers, Wallet } from "ethers";
 import { DeploymentRunner } from "../deployment-runner";
 import type { MultiChainTokenTransferParams, MultiChainTokenTransferResult } from "../core/types";
-import { testnetERC20TokenAbi, interopCenterAbi, l2NativeTokenVaultAbi, interopHandlerAbi } from "../core/contracts";
+import { getAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   INTEROP_BUNDLE_TUPLE_TYPE,
@@ -78,10 +78,10 @@ export async function executeTokenTransfer(
   const targetWallet = new Wallet(privateKey, targetProvider);
   const tracker = createBalanceTrackerFromState(state);
 
-  const sourceToken = new Contract(sourceTokenAddr, testnetERC20TokenAbi(), sourceWallet);
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, interopCenterAbi(), sourceWallet);
-  const sourceVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbi(), sourceProvider);
-  const targetVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbi(), targetProvider);
+  const sourceToken = new Contract(sourceTokenAddr, getAbi("TestnetERC20Token"), sourceWallet);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), sourceWallet);
+  const sourceVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), sourceProvider);
+  const targetVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), targetProvider);
 
   const transferStart = Date.now();
   const elapsed = () => `${((Date.now() - transferStart) / 1000).toFixed(1)}s`;
@@ -199,7 +199,7 @@ export async function executeTokenTransfer(
 
   {
     log(`⏱️  [${elapsed()}] Executing bundle directly on destination chain via L2InteropHandler...`);
-    const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbi(), targetWallet);
+    const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), targetWallet);
 
     const mockProof = buildMockInteropProof(sourceChainId);
 

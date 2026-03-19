@@ -62,36 +62,3 @@ export function getCreationBytecode(name: ContractName): string {
   return loadCreationBytecodeFromOut(ARTIFACTS[name]);
 }
 
-// ── Legacy named exports (thin wrappers for existing call sites) ─
-
-export const adminFacetAbi = (): any[] => getAbi("AdminFacet");
-export const chainAdminOwnableAbi = (): any[] => getAbi("ChainAdminOwnable");
-export const gettersFacetAbi = (): any[] => getAbi("GettersFacet");
-export const gwAssetTrackerAbi = (): any[] => getAbi("GWAssetTracker");
-export const iBaseTokenAbi = (): any[] => getAbi("IBaseToken");
-export const il1BridgehubAbi = (): any[] => getAbi("IL1Bridgehub");
-export const il1GenesisUpgradeAbi = (): any[] => getAbi("IL1GenesisUpgrade");
-export const il2AssetRouterAbi = (): any[] => getAbi("IL2AssetRouter");
-export const interopCenterAbi = (): any[] => getAbi("InteropCenter");
-export const interopHandlerAbi = (): any[] => getAbi("InteropHandler");
-export const l1AssetRouterAbi = (): any[] => getAbi("L1AssetRouter");
-export const l1AssetTrackerAbi = (): any[] => getAbi("L1AssetTracker");
-export const l1BridgehubAbi = (): any[] => getAbi("L1Bridgehub");
-export const l1NativeTokenVaultAbi = (): any[] => getAbi("L1NativeTokenVault");
-export const l1NullifierAbi = (): any[] => getAbi("L1Nullifier");
-export const l2AssetRouterAbi = (): any[] => getAbi("L2AssetRouter");
-export const l2AssetTrackerAbi = (): any[] => getAbi("L2AssetTracker");
-export const l2BridgehubAbi = (): any[] => getAbi("L2Bridgehub");
-export const l2ComplexUpgraderAbi = (): any[] => getAbi("L2ComplexUpgrader");
-export const l2GenesisUpgradeAbi = (): any[] => getAbi("L2GenesisUpgrade");
-export const l2MessageRootAbi = (): any[] => getAbi("L2MessageRoot");
-export const l2NativeTokenVaultAbi = (): any[] => getAbi("L2NativeTokenVault");
-export const l2NativeTokenVaultDevAbi = (): any[] => getAbi("L2NativeTokenVaultDev");
-export const mailboxFacetAbi = (): any[] => getAbi("MailboxFacet");
-export const migratorFacetAbi = (): any[] => getAbi("MigratorFacet");
-export const ownable2StepAbi = (): any[] => getAbi("Ownable2Step");
-export const systemContextAbi = (): any[] => getAbi("SystemContext");
-export const testnetERC20TokenAbi = (): any[] => getAbi("TestnetERC20Token");
-
-export const chainAdminOwnableBytecode = (): string => getCreationBytecode("ChainAdminOwnable");
-export const l2NativeTokenVaultDevBytecode = (): string => getBytecode("L2NativeTokenVaultDev");

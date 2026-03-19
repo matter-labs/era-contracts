@@ -11,7 +11,7 @@ import {
   L2_ASSET_TRACKER_ADDR,
   NEW_PRIORITY_REQUEST_EVENT_SIG,
 } from "./const";
-import { il1BridgehubAbi, mailboxFacetAbi } from "./contracts";
+import { getAbi } from "./contracts";
 import type { AnvilChainConfig, ChainAddresses, ChainInfo, ChainRole, FinalizeWithdrawalParams, PriorityRequestData } from "./types";
 
 /**
@@ -207,7 +207,7 @@ export async function getSettlementLayerChainId(
   bridgehubAddr: string,
   chainId: number
 ): Promise<number> {
-  const bridgehub = new ethers.Contract(bridgehubAddr, il1BridgehubAbi(), l1Provider);
+  const bridgehub = new ethers.Contract(bridgehubAddr, getAbi("IL1Bridgehub"), l1Provider);
   const slChainId = await bridgehub.settlementLayer(chainId);
   const slChainIdNum = slChainId.toNumber();
   const isGatewaySettled = slChainIdNum !== 0 && slChainIdNum !== L1_CHAIN_ID;
@@ -274,7 +274,7 @@ export function extractNewPriorityRequests(
     }
   );
 
-  const mailboxIface = new ethers.utils.Interface(mailboxFacetAbi());
+  const mailboxIface = new ethers.utils.Interface(getAbi("MailboxFacet"));
 
   return priorityRequestLogs.map((logEntry) => {
     const parsed = mailboxIface.parseLog({ topics: logEntry.topics, data: logEntry.data });
@@ -438,7 +438,7 @@ export async function scanAndRelayPriorityRequests(
 
   log(`   Found ${logs.length} NewPriorityRequest event(s) in blocks [${fromBlock}, ${toBlock}]`);
 
-  const mailboxIface = new ethers.utils.Interface(mailboxFacetAbi());
+  const mailboxIface = new ethers.utils.Interface(getAbi("MailboxFacet"));
 
   const txHashes: string[] = [];
   for (const logEntry of logs) {
