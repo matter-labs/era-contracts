@@ -8,7 +8,8 @@ import {
     L2_TO_L1_LOG_SERIALIZE_SIZE,
     L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
     L2_TO_L1_LOGS_MERKLE_TREE_DEPTH,
-    SUPPORTED_PROOF_METADATA_VERSION
+    SUPPORTED_PROOF_METADATA_VERSION,
+    HARD_CODED_CHAIN_ID
 } from "system-contracts/contracts/Constants.sol";
 // solhint-enable no-unused-import
 
@@ -44,6 +45,9 @@ uint256 constant PRIORITY_EXPIRATION = 4 days;
 
 // @dev The chainId of Ethereum Mainnet
 uint256 constant MAINNET_CHAIN_ID = 1;
+
+// @dev The chainId of Ethereum Sepolia testnet
+uint256 constant SEPOLIA_CHAIN_ID = 11155111;
 
 /// @dev Timestamp - seconds since unix epoch. This value will be used on the mainnet.
 uint256 constant MAINNET_COMMIT_TIMESTAMP_NOT_OLDER = 3 days;

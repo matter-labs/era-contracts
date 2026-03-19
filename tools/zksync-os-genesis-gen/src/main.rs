@@ -14,21 +14,13 @@ struct Opt {
     /// Output file path
     #[structopt(long = "output-file", default_value = "../../zksync-os-genesis.json")]
     output_file: String,
-    /// Execution version (CLI > env > default)
-    #[structopt(long = "execution-version", env = "EXECUTION_VERSION")]
-    execution_version: Option<u32>,
 }
 
 fn main() -> anyhow::Result<()> {
     let opt = Opt::from_args();
     println!("Output file: {}", opt.output_file);
 
-    let mut genesis = update_local_genesis()?;
-    if let Some(execution_version) = opt.execution_version {
-        println!("Setting execution version to {}", execution_version);
-        genesis.execution_version = execution_version;
-    }
-
+    let genesis = update_local_genesis()?;
     let json = serde_json::to_string_pretty(&genesis)?;
     std::fs::write(PATH_TO_LOCAL_GENESIS, &json)?;
     std::fs::write(opt.output_file, &json)?;

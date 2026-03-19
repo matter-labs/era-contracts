@@ -1468,6 +1468,11 @@
   },
   {
     "type": "error",
+    "name": "ChainIdIsHardcoded",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "ChainIdMismatch",
     "inputs": []
   },

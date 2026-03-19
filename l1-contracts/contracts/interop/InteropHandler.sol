@@ -5,10 +5,12 @@ pragma solidity ^0.8.24;
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
 import {
+    L2_BRIDGEHUB,
     L2_BASE_TOKEN_HOLDER,
     L2_INTEROP_CENTER_ADDR,
     L2_NATIVE_TOKEN_VAULT,
     L2_MESSAGE_VERIFICATION,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     L2_COMPLEX_UPGRADER_ADDR
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
@@ -20,6 +22,7 @@ import {
     CallStatus,
     InteropBundle,
     InteropCall,
+    InteropCallExecutedMessage,
     MessageInclusionProof
 } from "../common/Messaging.sol";
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
@@ -30,6 +33,7 @@ import {
     CallAlreadyExecuted,
     CallNotExecutable,
     CanNotUnbundle,
+    CannotClaimInteropOnL1Settlement,
     ExecutingNotAllowed,
     MessageNotIncluded,
     UnauthorizedMessageSender,
@@ -42,6 +46,7 @@ import {
     InvalidInteropCallVersion
 } from "./InteropErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
+import {IAssetTrackerDataEncoding} from "../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 
 /// @title InteropHandler
 /// @author Matter Labs
@@ -73,6 +78,10 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
     /// @inheritdoc IInteropHandler
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
+        // Interop claiming requires the chain to settle on Gateway so that GWAssetTracker can process
+        // the execution confirmation and move balances from pendingInteropBalance to chainBalance.
+        require(L2_BRIDGEHUB.settlementLayer(block.chainid) != L1_CHAIN_ID, CannotClaimInteropOnL1Settlement());
+
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
@@ -149,6 +158,10 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
     /// @inheritdoc IInteropHandler
     function unbundleBundle(bytes memory _bundle, CallStatus[] calldata _providedCallStatus) public {
+        // Interop claiming requires the chain to settle on Gateway so that GWAssetTracker can process
+        // the execution confirmation and move balances from pendingInteropBalance to chainBalance.
+        require(L2_BRIDGEHUB.settlementLayer(block.chainid) != L1_CHAIN_ID, CannotClaimInteropOnL1Settlement());
+
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
@@ -219,6 +232,26 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
                             Internal functions
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Sends an L2→L1 message for a single successfully executed interop call.
+    /// @dev Called inside _executeCalls for each executed call so GWAssetTracker can move the call's
+    /// balances from pendingInteropBalance to chainBalance during the next settlement.
+    /// @param _destinationBaseTokenAssetId Asset ID of the destination chain's base token.
+    /// @param _interopCall The interop call that was executed.
+    function _sendCallExecutedMessage(bytes32 _destinationBaseTokenAssetId, InteropCall memory _interopCall) internal {
+        // slither-disable-next-line unused-return
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            abi.encodeCall(
+                IAssetTrackerDataEncoding.receiveInteropCallExecuted,
+                (
+                    InteropCallExecutedMessage({
+                        destinationBaseTokenAssetId: _destinationBaseTokenAssetId,
+                        interopCall: _interopCall
+                    })
+                )
+            )
+        );
+    }
+
     /// @notice Decode an ABI-encoded bundle, compute its hash, and fetch its current status.
     /// @param _bundle ABI-encoded InteropBundle.
     /// @return interopBundle The decoded InteropBundle struct.
@@ -269,6 +302,10 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
                 payload: interopCall.data
             }); // attributes are not supported yet
             require(selector == IERC7786Recipient.receiveMessage.selector, InvalidSelector(selector));
+
+            // Notify GWAssetTracker of this successfully executed call so it can move the call's balances
+            // from pendingInteropBalance to chainBalance during the next settlement.
+            _sendCallExecutedMessage(_interopBundle.destinationBaseTokenAssetId, interopCall);
         }
     }
 

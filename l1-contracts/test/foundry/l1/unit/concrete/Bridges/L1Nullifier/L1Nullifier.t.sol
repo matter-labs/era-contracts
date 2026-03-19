@@ -78,7 +78,6 @@ contract L1NullifierTest is Test {
         l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
             _messageRoot: IMessageRootBase(messageRoot),
-            _interopCenter: IInteropCenter(interopCenter),
             _eraChainId: ERA_CHAIN_ID,
             _eraDiamondProxy: eraDiamondProxy
         });
@@ -104,7 +103,6 @@ contract L1NullifierTest is Test {
         L1NullifierDev impl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehub),
             _messageRoot: IMessageRootBase(messageRoot),
-            _interopCenter: IInteropCenter(interopCenter),
             _eraChainId: ERA_CHAIN_ID,
             _eraDiamondProxy: eraDiamondProxy
         });

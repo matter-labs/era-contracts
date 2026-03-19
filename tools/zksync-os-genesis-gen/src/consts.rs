@@ -1,4 +1,4 @@
-use alloy::primitives::{Address, FixedBytes, B256};
+use alloy::primitives::{Address, B256, FixedBytes};
 
 /// Represents the source of a contract's bytecode.
 #[derive(Clone, Copy)]
@@ -6,14 +6,11 @@ pub enum ContractSource {
     /// Load bytecode from a compiled contract artifact by name from l1-contracts.
     L1ContractName(&'static str),
     /// Load bytecode from a compiled contract artifact by name from da-contracts.
+    #[allow(dead_code)]
     DAContractName(&'static str),
     /// Use bytecode directly.
     Bytecode(&'static [u8]),
 }
-
-pub const BASE_TOKEN_HOLDER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
-    "0000000000000000000000000000000000010011"
-)));
 
 pub const L2_COMPLEX_UPGRADER_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "000000000000000000000000000000000000800f"
@@ -86,12 +83,16 @@ pub const L2_DEPLOYER_SYSTEM_CONTRACT_ADDR: Address = Address(FixedBytes::<20>(h
     "0000000000000000000000000000000000008006"
 )));
 
-pub const L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
-    "0000000000000000000000000000000000008008"
-)));
+pub const L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR: Address = Address(FixedBytes::<20>(
+    hex_literal::hex!("0000000000000000000000000000000000008008"),
+));
 
-pub const L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
-    "000000000000000000000000000000000000800a"
+pub const L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR: Address = Address(FixedBytes::<20>(
+    hex_literal::hex!("000000000000000000000000000000000000800a"),
+));
+
+pub const L2_SYSTEM_CONTEXT_ADDR: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "000000000000000000000000000000000000800b"
 )));
 
 // keccak256("L2_COMPLEX_UPGRADER_IMPL_ADDR") - 1.
@@ -108,27 +109,106 @@ pub const EIP1967_ADMIN_SLOT: B256 = FixedBytes::<32>(hex_literal::hex!(
     "b53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103"
 ));
 
-pub const INITIAL_CONTRACTS: [(Address, ContractSource); 20] = [
-    (L2_COMPLEX_UPGRADER_ADDR, ContractSource::L1ContractName("SystemContractProxy")),
-    (L2_GENESIS_UPGRADE, ContractSource::L1ContractName("L2GenesisUpgrade")),
-    (L2_WRAPPED_BASE_TOKEN, ContractSource::L1ContractName("L2WrappedBaseToken")),
-    (SYSTEM_CONTRACT_PROXY_ADMIN, ContractSource::L1ContractName("SystemContractProxyAdmin")),
-    (L2_COMPLEX_UPGRADER_IMPL_ADDR, ContractSource::L1ContractName("L2ComplexUpgrader")),
-    (L2_MESSAGE_ROOT_ADDR, ContractSource::L1ContractName("L2MessageRoot")),
-    (L2_BRIDGEHUB_ADDR, ContractSource::L1ContractName("L2Bridgehub")),
-    (L2_ASSET_ROUTER_ADDR, ContractSource::L1ContractName("L2AssetRouter")),
-    (L2_NATIVE_TOKEN_VAULT_ADDR, ContractSource::L1ContractName("L2NativeTokenVaultZKOS")),
-    (L2_NTV_BEACON_DEPLOYER_ADDR, ContractSource::L1ContractName("UpgradeableBeaconDeployer")),
-    (L2_CHAIN_ASSET_HANDLER_ADDR, ContractSource::L1ContractName("L2ChainAssetHandler")),
-    (L2_ASSET_TRACKER_ADDR, ContractSource::L1ContractName("L2AssetTracker")),
-    (GW_ASSET_TRACKER_ADDR, ContractSource::L1ContractName("GWAssetTracker")),
-    (L2_INTEROP_CENTER_ADDR, ContractSource::L1ContractName("InteropCenter")),
-    (L2_INTEROP_HANDLER_ADDR, ContractSource::L1ContractName("InteropHandler")),
-    (L2_BASE_TOKEN_HOLDER_ADDR, ContractSource::L1ContractName("BaseTokenHolder")),
+const L2_INTEROP_ROOT_STORAGE: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "0000000000000000000000000000000000010008"
+)));
+const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "0000000000000000000000000000000000010009"
+)));
+
+pub const INITIAL_CONTRACTS: [(Address, ContractSource); 23] = [
+    (
+        L2_COMPLEX_UPGRADER_ADDR,
+        ContractSource::L1ContractName("SystemContractProxy"),
+    ),
+    (
+        L2_GENESIS_UPGRADE,
+        ContractSource::L1ContractName("L2GenesisUpgrade"),
+    ),
+    (
+        L2_WRAPPED_BASE_TOKEN,
+        ContractSource::L1ContractName("L2WrappedBaseToken"),
+    ),
+    (
+        SYSTEM_CONTRACT_PROXY_ADMIN,
+        ContractSource::L1ContractName("SystemContractProxyAdmin"),
+    ),
+    (
+        L2_COMPLEX_UPGRADER_IMPL_ADDR,
+        ContractSource::L1ContractName("L2ComplexUpgrader"),
+    ),
+    (
+        L2_MESSAGE_ROOT_ADDR,
+        ContractSource::L1ContractName("L2MessageRoot"),
+    ),
+    (
+        L2_BRIDGEHUB_ADDR,
+        ContractSource::L1ContractName("L2Bridgehub"),
+    ),
+    (
+        L2_ASSET_ROUTER_ADDR,
+        ContractSource::L1ContractName("L2AssetRouter"),
+    ),
+    (
+        L2_NATIVE_TOKEN_VAULT_ADDR,
+        ContractSource::L1ContractName("L2NativeTokenVaultZKOS"),
+    ),
+    (
+        L2_NTV_BEACON_DEPLOYER_ADDR,
+        ContractSource::L1ContractName("UpgradeableBeaconDeployer"),
+    ),
+    (
+        L2_CHAIN_ASSET_HANDLER_ADDR,
+        ContractSource::L1ContractName("L2ChainAssetHandler"),
+    ),
+    (
+        L2_ASSET_TRACKER_ADDR,
+        ContractSource::L1ContractName("L2AssetTracker"),
+    ),
+    (
+        GW_ASSET_TRACKER_ADDR,
+        ContractSource::L1ContractName("GWAssetTracker"),
+    ),
+    (
+        L2_INTEROP_CENTER_ADDR,
+        ContractSource::L1ContractName("InteropCenter"),
+    ),
+    (
+        L2_INTEROP_HANDLER_ADDR,
+        ContractSource::L1ContractName("InteropHandler"),
+    ),
+    (
+        L2_BASE_TOKEN_HOLDER_ADDR,
+        ContractSource::L1ContractName("BaseTokenHolder"),
+    ),
     // System contracts (0x8000 range)
-    (L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, ContractSource::L1ContractName("ZKOSContractDeployer")),
-    (L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, ContractSource::L1ContractName("L1MessengerZKOS")),
-    (L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, ContractSource::L1ContractName("L2BaseTokenZKOS")),
+    (
+        L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+        ContractSource::L1ContractName("ZKOSContractDeployer"),
+    ),
+    (
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+        ContractSource::L1ContractName("L1MessengerZKOS"),
+    ),
+    (
+        L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+        ContractSource::L1ContractName("L2BaseTokenZKOS"),
+    ),
+    (
+        L2_SYSTEM_CONTEXT_ADDR,
+        ContractSource::L1ContractName("SystemContext"),
+    ),
     // Deterministic Create2 factory
-    (DETERMINISTIC_CREATE2_ADDRESS, ContractSource::Bytecode(CREATE2_FACTORY_RUNTIME_BYTECODE)),
+    (
+        DETERMINISTIC_CREATE2_ADDRESS,
+        ContractSource::Bytecode(CREATE2_FACTORY_RUNTIME_BYTECODE),
+    ),
+    (
+        L2_INTEROP_ROOT_STORAGE,
+        ContractSource::L1ContractName("L2InteropRootStorage"),
+    ),
+    (
+        L2_MESSAGE_VERIFICATION,
+        ContractSource::L1ContractName("L2MessageVerification"),
+    ),
 ];
