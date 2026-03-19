@@ -8,6 +8,7 @@ import {
   GW_ASSET_TRACKER_ADDR,
   INITIAL_BASE_TOKEN_HOLDER_BALANCE,
   INTEROP_CENTER_ADDR,
+  L1_MESSENGER_HOOK_ADDR,
   L1_CHAIN_ID,
   L2_ASSET_ROUTER_ADDR,
   L2_ASSET_TRACKER_ADDR,
@@ -57,8 +58,8 @@ const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
   },
   {
     address: L2_TO_L1_MESSENGER_ADDR,
-    name: "MockL2ToL1Messenger",
-    artifactPath: "MockL2ToL1Messenger.sol/MockL2ToL1Messenger.json",
+    name: "L1MessengerZKOS",
+    artifactPath: "L1MessengerZKOS.sol/L1MessengerZKOS.json",
   },
   {
     address: L2_BASE_TOKEN_ADDR,
@@ -70,7 +71,12 @@ const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
     name: "MockL2MessageVerification",
     artifactPath: "MockL2MessageVerification.sol/MockL2MessageVerification.json",
   },
-  // Mock ZK-VM hook: MINT_BASE_TOKEN_HOOK (0x7100) — returns success so initL2() can proceed
+  // Mock ZK-VM hooks — return success so real contracts can call them on Anvil
+  {
+    address: L1_MESSENGER_HOOK_ADDR,
+    name: "MockL1MessengerHook",
+    artifactPath: "MockL1MessengerHook.sol/MockL1MessengerHook.json",
+  },
   {
     address: MINT_BASE_TOKEN_HOOK_ADDR,
     name: "MockMintBaseTokenHook",

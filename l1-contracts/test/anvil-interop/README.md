@@ -174,13 +174,13 @@ test/anvil-interop/
 
 | Mock | Address | Replaces | Difference |
 |---|---|---|---|
-| `MockL2ToL1Messenger` | `0x8008` | L2ToL1Messenger | Only emits `L1MessageSent`; no merkle tree |
 | `MockL2MessageVerification` | `0x10009` | L2MessageVerification | All proof checks return `true` |
 | `MockSystemContext` | `0x800b` | SystemContext | Minimal; no ZK-VM state |
+| `MockL1MessengerHook` | `0x7001` | L1_MESSENGER_HOOK | No-op; real L1MessengerZKOS still emits events |
 | `MockMintBaseTokenHook` | `0x7100` | MINT_BASE_TOKEN_HOOK | No-op; L2BaseToken pre-funded via `anvil_setBalance` |
 | `DummyL1MessageRoot` | L1 | L1MessageRoot | All proof verification returns `true` |
 
-Real contracts used: `L2BaseTokenZKOS` at `0x800a`, all other L2 system contracts at their production addresses.
+Real contracts used: `L1MessengerZKOS` at `0x8008`, `L2BaseTokenZKOS` at `0x800a`, all other L2 system contracts at their production addresses.
 
 ### L2 Deployment: `anvil_setCode` + Real Genesis Upgrade
 

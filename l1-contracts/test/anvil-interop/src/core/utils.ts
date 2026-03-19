@@ -217,7 +217,7 @@ export async function getSettlementLayerChainId(
 /**
  * Extract FinalizeWithdrawalParams from an L2 transaction receipt.
  *
- * Parses the L1MessageSent event from the MockL2ToL1Messenger and builds
+ * Parses the L1MessageSent event from the L1MessengerZKOS and builds
  * the finalization params needed to call receiveL1ToGatewayMigrationOnL1 on L1.
  * Uses an empty merkle proof (relies on DummyL1MessageRoot returning true).
  */
@@ -225,7 +225,7 @@ export function buildFinalizeWithdrawalParams(
   l2Receipt: ethers.providers.TransactionReceipt,
   chainId: number
 ): FinalizeWithdrawalParams {
-  // Parse L1MessageSent event from MockL2ToL1Messenger
+  // Parse L1MessageSent event from L1MessengerZKOS
   const l1MessageSentTopic = ethers.utils.id(L1_MESSAGE_SENT_EVENT_SIG);
   const l1MessageSentLog = l2Receipt.logs.find(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -233,7 +233,7 @@ export function buildFinalizeWithdrawalParams(
   );
 
   if (!l1MessageSentLog) {
-    throw new Error("L1MessageSent event not found in L2 tx receipt. Check MockL2ToL1Messenger emits the event.");
+    throw new Error("L1MessageSent event not found in L2 tx receipt. Check L1MessengerZKOS emits the event.");
   }
 
   // Decode the message bytes from the event data
