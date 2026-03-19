@@ -12,7 +12,7 @@ import {
   SYSTEM_CONTEXT_ADDR,
   L2_BOOTLOADER_ADDR,
 } from "../core/const";
-import { impersonateAndRun, scanAndRelayPriorityRequests, timeIt } from "../core/utils";
+import { applyL1ToL2Alias, impersonateAndRun, scanAndRelayPriorityRequests, timeIt } from "../core/utils";
 import { encodeNtvAssetId } from "../core/data-encoding";
 import { migrateTokenBalanceToGW } from "../helpers/token-balance-migration-helper";
 import { prepareMergedToml, prepareGatewayChainConfig } from "../core/toml-handling";
@@ -77,6 +77,14 @@ export class GatewaySetup {
       const l1Bridgehub = new Contract(this.l1Addresses.bridgehub, l1BridgehubAbi(), l1Provider);
       const gwDiamondProxy: string = await l1Bridgehub.getZKChain(chainId);
       console.log(`   GW diamond proxy on L1: ${gwDiamondProxy}`);
+
+      // Transfer GW L2Bridgehub ownership from the aliased CTM governance (set during genesis)
+      // to the aliased ecosystem governance (used by fullRegistration priority requests).
+      // The CTM deploys its own per-chain Governance, but fullRegistration sends calls from
+      // the ecosystem Governance contract. Without this transfer, addChainTypeManager etc. fail.
+      done = gwTimeIt("transferGwL2BridgehubOwnership");
+      await this.transferGwL2BridgehubOwnership(gwProvider);
+      done();
 
       const startBlock = await l1Provider.getBlockNumber();
       done = gwTimeIt("forge: runFullRegistration");
@@ -318,6 +326,39 @@ export class GatewaySetup {
         console.log(`   ${c.name} ownership transferred to Governance`);
       }
     });
+  }
+
+  /**
+   * Transfer GW L2Bridgehub ownership from the aliased CTM governance to the aliased
+   * ecosystem governance.
+   *
+   * The CTM deployment creates a per-chain Governance contract whose aliased address
+   * becomes the L2Bridgehub owner during genesis. But fullRegistration sends priority
+   * requests from the ecosystem Governance, so L2Bridgehub ownership must match.
+   */
+  private async transferGwL2BridgehubOwnership(gwProvider: providers.JsonRpcProvider): Promise<void> {
+    const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, ownable2StepAbi(), gwProvider);
+    const currentOwner: string = await l2Bridgehub.owner();
+    const targetOwner = applyL1ToL2Alias(this.l1Addresses.governance);
+
+    if (currentOwner.toLowerCase() === targetOwner.toLowerCase()) {
+      console.log("   GW L2Bridgehub already owned by aliased ecosystem governance");
+      return;
+    }
+
+    // Step 1: current owner calls transferOwnership(targetOwner)
+    await impersonateAndRun(gwProvider, currentOwner, async (signer) => {
+      const tx = await l2Bridgehub.connect(signer).transferOwnership(targetOwner, { gasLimit: 500_000 });
+      await tx.wait();
+    });
+
+    // Step 2: target owner calls acceptOwnership()
+    await impersonateAndRun(gwProvider, targetOwner, async (signer) => {
+      const tx = await l2Bridgehub.connect(signer).acceptOwnership({ gasLimit: 500_000 });
+      await tx.wait();
+    });
+
+    console.log(`   GW L2Bridgehub ownership transferred to aliased ecosystem governance (${targetOwner})`);
   }
 
   /**
