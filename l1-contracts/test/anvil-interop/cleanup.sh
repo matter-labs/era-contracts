@@ -10,6 +10,9 @@ echo "🧹 Cleaning up Anvil interop environment..."
 
 # Known ports used by our Anvil instances (offset by ANVIL_INTEROP_PORT_OFFSET if set)
 PORT_OFFSET="${ANVIL_INTEROP_PORT_OFFSET:-0}"
+RUN_SUFFIX="${ANVIL_INTEROP_RUN_SUFFIX:-}"
+PID_FILE="outputs/anvil-pids${RUN_SUFFIX}.json"
+STATE_DIR="outputs/state${RUN_SUFFIX}"
 BASE_PORTS="9545 4050 4051 4052 4053"
 ANVIL_PORTS=""
 for BASE in $BASE_PORTS; do
@@ -20,10 +23,10 @@ done
 echo "Stopping Anvil instances..."
 
 # Try to use PID file for graceful shutdown
-if [ -f "outputs/anvil-pids.json" ]; then
+if [ -f "$PID_FILE" ]; then
     echo "Found PID file, attempting graceful shutdown..."
     # Extract PIDs and kill them
-    pids=$(cat outputs/anvil-pids.json | grep -o '"[0-9]*":' | grep -o '[0-9]*' || true)
+    pids=$(cat "$PID_FILE" | grep -o '"[0-9]*":' | grep -o '[0-9]*' || true)
     for pid in $pids; do
         if kill -0 "$pid" 2>/dev/null; then
             echo "  Stopping Anvil process $pid..."
@@ -32,7 +35,7 @@ if [ -f "outputs/anvil-pids.json" ]; then
     done
     sleep 2
     # Remove PID file
-    rm -f outputs/anvil-pids.json
+    rm -f "$PID_FILE"
 fi
 
 # Fallback: Kill processes LISTENING on known Anvil ports only (not system-wide)
@@ -69,8 +72,9 @@ fi
 
 # Clean up output files
 echo "Cleaning up output files..."
-rm -rf outputs
 mkdir -p outputs
+rm -rf "$STATE_DIR"
+mkdir -p "$STATE_DIR"
 
 # Reset permanent values to initial state
 echo "Resetting permanent values..."

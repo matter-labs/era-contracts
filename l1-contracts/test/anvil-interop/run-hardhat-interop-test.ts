@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { spawn, spawnSync } from "child_process";
+import * as fs from "fs";
 import * as path from "path";
 import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
@@ -75,9 +76,16 @@ function parsePortOffset(argv: string[]): number {
 }
 
 async function runParallelWorker(label: string, specs: string[], portOffset: number): Promise<void> {
+  const runSuffix = `-p${portOffset}`;
+  const logsDir = path.join(anvilInteropDir, `outputs/logs${runSuffix}`);
+  fs.mkdirSync(logsDir, { recursive: true });
+  const logPath = path.join(logsDir, `${label.replace(/\s+/g, "-")}.log`);
+  const logStream = fs.createWriteStream(logPath, { flags: "w" });
+
   console.log(
     `\n⏱️  [TIMING] Starting: ${label} (${specs.length} specs, offset ${portOffset}, total elapsed: ${elapsedSince(totalStart)})`
   );
+  console.log(`   log: ${logPath}`);
 
   const workerArgs = [
     "test/anvil-interop/run-hardhat-interop-test.ts",
@@ -92,20 +100,27 @@ async function runParallelWorker(label: string, specs: string[], portOffset: num
       env: {
         ...process.env,
         ANVIL_INTEROP_PARALLEL_WORKER: "1",
-        ANVIL_INTEROP_RUN_SUFFIX: `-p${portOffset}`,
+        ANVIL_INTEROP_RUN_SUFFIX: runSuffix,
       },
-      stdio: "inherit",
+      stdio: ["ignore", "pipe", "pipe"],
     });
 
-    child.once("error", (error) => reject(new Error(`Failed to start ${label}: ${error.message}`)));
+    child.stdout?.pipe(logStream);
+    child.stderr?.pipe(logStream);
+
+    child.once("error", (error) => {
+      logStream.end();
+      reject(new Error(`Failed to start ${label}: ${error.message}. Log: ${logPath}`));
+    });
     child.once("exit", (code) => {
+      logStream.end();
       if (code === 0) {
         console.log(
           `⏱️  [TIMING] Finished: ${label} (offset ${portOffset}, total elapsed: ${elapsedSince(totalStart)})`
         );
         resolve();
       } else {
-        reject(new Error(`${label} failed with exit code ${code ?? "unknown"}`));
+        reject(new Error(`${label} failed with exit code ${code ?? "unknown"}. Log: ${logPath}`));
       }
     });
   });
@@ -130,7 +145,9 @@ async function main(): Promise<void> {
   if (shouldParallelize) {
     await timedAsync("parallel hardhat interop workers", async () => {
       await Promise.all(
-        parallelSpecGroups.map((specs, index) => runParallelWorker(`worker ${index + 1}`, specs, index * 100))
+        parallelSpecGroups.map((specs, index) =>
+          runParallelWorker(`worker ${index + 1}`, specs, portOffset + index * 100)
+        )
       );
     });
     console.log(`\n⏱️  [TIMING] Total test run: ${elapsedSince(totalStart)}`);
