@@ -41,10 +41,10 @@ error BaseTokenGasPriceDenominatorNotSet();
 error BaseTokenHolderAlreadyInitialized();
 // 0xd3cd4bd2
 error BaseTokenHolderMintFailed();
-// 0x00a6b592
-error BaseTokenPreV31TotalSupplyNotSet();
 // 0x7f9159de
 error BaseTokenPreV31TotalSupplyAlreadySet();
+// 0x00a6b592
+error BaseTokenPreV31TotalSupplyNotSet();
 // 0xe3ec2bc9
 error BaseTokenTransferFailed();
 // 0x55ad3fd3
@@ -73,6 +73,8 @@ error ChainAlreadyLive();
 error ChainIdAlreadyExists();
 // 0x717a1656
 error ChainIdCantBeCurrentChain();
+// 0x6b617b38
+error ChainIdIsHardcoded();
 // 0xa179f8c9
 error ChainIdMismatch();
 // 0x23f3c357
