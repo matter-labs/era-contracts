@@ -493,7 +493,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function getUpgradeBytecodeInfo(string memory contractName) internal returns (bytes memory) {
-        return getUpgradeBytecodeInfo(string.concat(contractName, ".sol"), contractName, contractName);
+        return getUpgradeBytecodeInfo(contractName, string.concat(contractName, ".sol"), contractName);
     }
 
     function getUpgradeBytecodeInfo(
