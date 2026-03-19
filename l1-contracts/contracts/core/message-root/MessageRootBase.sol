@@ -92,17 +92,23 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     /// @dev An expected invariant is that for all batches starting from currentChainBatchNumber + 1, the `chainBatchRoots` is 0.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
-    /// @notice The total number of published interop roots.
-    /// @dev Used inside the `NewInteropRoot` event, used for indexing purposes by the node.
-    /// @dev Note that it counts roots starting from V31 ONLY.
-    uint256 public totalPublishedInteropRoots;
+    /// @notice The current logId value emitted in `NewInteropRoot` events.
+    /// @dev Increments at most once per block: all emissions within the same block share the same
+    /// logId, and the counter only advances when `block.number` changes.
+    /// @dev Note that it counts starting from V31 ONLY.
+    uint256 public interopRootLogId;
+
+    /// @notice The block number at which the last interop root was emitted.
+    /// @dev Used to ensure logId increments per block: within the same block all NewInteropRoot
+    /// events share the same logId value, and the counter only advances when the block changes.
+    uint256 public lastEmitBlock;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[36] private __gap;
+    uint256[35] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
@@ -193,14 +199,20 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     }
 
     /// @notice Emits a new interop root event when the shared tree root changes.
+    /// @dev The logId (interopRootLogId) increments at most once per block. All emissions
+    /// within the same block share the same logId so that the server node can group them by block.
     function _emitRoot(bytes32 _root) internal {
         // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
         // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
         bytes32[] memory _sides = new bytes32[](1);
         _sides[0] = _root;
 
-        uint256 currentCount = totalPublishedInteropRoots;
-        totalPublishedInteropRoots = currentCount + 1;
+        uint256 currentCount = interopRootLogId;
+        if (block.number != lastEmitBlock) {
+            ++currentCount;
+            interopRootLogId = currentCount;
+            lastEmitBlock = block.number;
+        }
 
         emit NewInteropRoot(block.chainid, block.number, currentCount, _sides);
     }
