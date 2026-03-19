@@ -22,6 +22,7 @@ const ARTIFACTS = {
   GWAssetTracker: "GWAssetTracker.sol/GWAssetTracker.json",
   IBaseToken: "IBaseToken.sol/IBaseToken.json",
   IL1Bridgehub: "IL1Bridgehub.sol/IL1Bridgehub.json",
+  IL1GenesisUpgrade: "IL1GenesisUpgrade.sol/IL1GenesisUpgrade.json",
   IL2AssetRouter: "IL2AssetRouter.sol/IL2AssetRouter.json",
   InteropCenter: "InteropCenter.sol/InteropCenter.json",
   InteropHandler: "InteropHandler.sol/InteropHandler.json",
@@ -69,6 +70,7 @@ export const gettersFacetAbi = (): any[] => getAbi("GettersFacet");
 export const gwAssetTrackerAbi = (): any[] => getAbi("GWAssetTracker");
 export const iBaseTokenAbi = (): any[] => getAbi("IBaseToken");
 export const il1BridgehubAbi = (): any[] => getAbi("IL1Bridgehub");
+export const il1GenesisUpgradeAbi = (): any[] => getAbi("IL1GenesisUpgrade");
 export const il2AssetRouterAbi = (): any[] => getAbi("IL2AssetRouter");
 export const interopCenterAbi = (): any[] => getAbi("InteropCenter");
 export const interopHandlerAbi = (): any[] => getAbi("InteropHandler");

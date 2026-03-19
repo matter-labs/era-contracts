@@ -13,8 +13,8 @@ import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig } from ".
 import { SystemContractsDeployer } from "./system-contracts-deployer";
 import { L2GenesisUpgradeDeployer } from "./l2-genesis-upgrade-deployer";
 import { runForgeScript } from "../core/forge";
-import { NEW_PRIORITY_REQUEST_EVENT_SIG } from "../core/const";
-import { mailboxFacetAbi } from "../core/contracts";
+import { GENESIS_UPGRADE_EVENT_SIG } from "../core/const";
+import { il1GenesisUpgradeAbi } from "../core/contracts";
 
 export class ChainRegistry {
   private l1RpcUrl: string;
@@ -136,10 +136,10 @@ export class ChainRegistry {
       });
     }
 
-    // Extract genesis priority transactions from L1 NewPriorityRequest events.
-    // Each chain's diamond proxy emits exactly one NewPriorityRequest during createNewChain()
-    // containing the real genesis upgrade calldata (L2ComplexUpgrader.upgrade → L2GenesisUpgrade).
-    const genesisPriorityTxs = await this.extractGenesisPriorityTxs(
+    // Extract genesis upgrade L2 transactions from L1 GenesisUpgrade events.
+    // During createNewChain(), L1GenesisUpgrade.genesisUpgrade() is executed via delegatecall
+    // from the diamond proxy, emitting GenesisUpgrade with the full L2CanonicalTransaction.
+    const genesisPriorityTxs = await this.extractGenesisTxs(
       chainAddresses,
       blockBeforeRegistration + 1
     );
@@ -148,43 +148,51 @@ export class ChainRegistry {
   }
 
   /**
-   * Scan L1 blocks for NewPriorityRequest events emitted during chain registration.
-   * Each diamond proxy emits exactly one event containing the genesis upgrade priority tx.
+   * Scan L1 blocks for GenesisUpgrade events emitted during chain registration.
+   * Each diamond proxy emits exactly one GenesisUpgrade event containing the L2 upgrade tx.
+   *
+   * Note: The genesis upgrade does NOT emit NewPriorityRequest — the upgrade tx is stored
+   * in s.l2SystemContractsUpgradeTxHash and executed by the bootloader in the next batch.
+   * We extract it from the GenesisUpgrade event and relay it manually on Anvil.
    */
-  private async extractGenesisPriorityTxs(
+  private async extractGenesisTxs(
     chainAddresses: ChainAddresses[],
     fromBlock: number
   ): Promise<Map<number, PriorityRequestData>> {
-    const newPriorityRequestTopic = ethers.utils.id(NEW_PRIORITY_REQUEST_EVENT_SIG);
+    const genesisUpgradeTopic = ethers.utils.id(GENESIS_UPGRADE_EVENT_SIG);
     const latestBlock = await this.l1Provider.getBlockNumber();
 
     const genesisTxs = new Map<number, PriorityRequestData>();
-    const mailboxIface = new ethers.utils.Interface(mailboxFacetAbi());
+    const genesisIface = new ethers.utils.Interface(il1GenesisUpgradeAbi());
 
     for (const chain of chainAddresses) {
       const logs = await this.l1Provider.getLogs({
         address: chain.diamondProxy,
-        topics: [newPriorityRequestTopic],
+        topics: [genesisUpgradeTopic],
         fromBlock,
         toBlock: latestBlock,
       });
 
       if (logs.length === 0) {
-        throw new Error(`No NewPriorityRequest event found for chain ${chain.chainId} at ${chain.diamondProxy}`);
+        throw new Error(
+          `No GenesisUpgrade event found for chain ${chain.chainId} at ${chain.diamondProxy}. ` +
+            `Scanned blocks ${fromBlock}..${latestBlock}.`
+        );
       }
 
-      // Parse the first (and only) NewPriorityRequest event — this is the genesis upgrade
-      const parsed = mailboxIface.parseLog({ topics: logs[0].topics, data: logs[0].data });
-      const fromUint256 = ethers.BigNumber.from(parsed.args.transaction.from);
-      const toUint256 = ethers.BigNumber.from(parsed.args.transaction.to);
+      // Parse the GenesisUpgrade event — extract L2CanonicalTransaction
+      const parsed = genesisIface.parseLog({ topics: logs[0].topics, data: logs[0].data });
+      const l2Tx = parsed.args._l2Transaction;
+      const fromUint256 = ethers.BigNumber.from(l2Tx.from);
+      const toUint256 = ethers.BigNumber.from(l2Tx.to);
 
       genesisTxs.set(chain.chainId, {
         from: ethers.utils.getAddress(ethers.utils.hexZeroPad(fromUint256.toHexString(), 20)),
         to: ethers.utils.getAddress(ethers.utils.hexZeroPad(toUint256.toHexString(), 20)),
-        calldata: parsed.args.transaction.data,
-        value: ethers.BigNumber.from(parsed.args.transaction.value),
+        calldata: l2Tx.data,
+        value: ethers.BigNumber.from(l2Tx.value),
       });
-      console.log(`   Captured genesis priority tx for chain ${chain.chainId}`);
+      console.log(`   Captured genesis upgrade tx for chain ${chain.chainId}`);
     }
 
     return genesisTxs;

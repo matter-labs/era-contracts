@@ -103,6 +103,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     /// @notice Like runForTest but skips saveDiamondSelectors() and batches blake2s FFI calls.
+    /// Uses reuseGovAndAdmin=true so the CTM shares the ecosystem Governance contract
+    /// rather than deploying a separate per-chain one. This ensures L2Bridgehub on the
+    /// gateway is owned by the same aliased governance that fullRegistration uses.
     function runForAnvilTest(address bridgehub, bool skipL1Deployments) public {
         _useBlakeCache = true;
         _precomputeBlakeHashes();
@@ -111,7 +114,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             vm.envString("CTM_CONFIG"),
             vm.envString("CTM_OUTPUT"),
             bridgehub,
-            false,
+            true,
             skipL1Deployments
         );
     }
