@@ -79,7 +79,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     function runWithBridgehub(address bridgehub, bool reuseGovAndAdmin) public {
         console.log("Deploying CTM related contracts");
-
         runInner(
             "/script-config/permanent-values.toml",
             "/script-config/config-deploy-ctm.toml",

@@ -168,12 +168,12 @@ test/anvil-interop/
 - **L1→L2 transaction failures / refundRecipient**: Priority requests always succeed on Anvil; failure + refund logic is untested
 - **Batch settlement**: No real sequencer or prover; batches are never committed/proved/executed
 - **Custom pubdata pricing**: Gas and pubdata costs use Anvil defaults, not ZKsync fee models
-- **L1→GW→L2 relay via NewPriorityRequest on GW**: GW does not emit `NewPriorityRequest` during relay; the `relayChains` next-hop path in `extractAndRelayNewPriorityRequests` is not exercised
+- **L1→GW→L2 relay**: GW-settled ETH deposits relay L1→GW via `NewPriorityRequest`, then GW→L2 via nested `NewPriorityRequest` events extracted from the GW relay receipt. The `relayChains` next-hop path in `extractAndRelayNewPriorityRequests` is used for this GW→L2 hop
 
 ### Mock Contracts
 
 Source of truth for the Anvil predeploy layout lives in
-`src/core/contracts.ts` via `PREDEPLOY_SYSTEM_CONTRACTS`.
+`src/core/predeploys.ts` via `PREDEPLOY_SYSTEM_CONTRACTS`.
 
 | Mock                        | Address   | Replaces              | Difference                                           |
 | --------------------------- | --------- | --------------------- | ---------------------------------------------------- |
@@ -202,7 +202,6 @@ Contracts are placed at hardcoded addresses via `anvil_setCode` (production has 
 
 ### Other Shortcuts
 
-- **Fake GW diamond proxies**: Placeholder addresses via `anvil_setCode` for `getZKChain() != 0`
 - **GW L2Bridgehub ownership transfer**: CTM deploys a per-chain Governance, but `fullRegistration` sends from ecosystem Governance. The test transfers ownership before relay.
 - **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
 - **Interop proofs**: Correct struct shape but empty proof arrays

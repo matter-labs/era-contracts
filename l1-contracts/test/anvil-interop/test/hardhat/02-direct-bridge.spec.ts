@@ -9,7 +9,7 @@ import {
 import { depositETHToL2 } from "../../src/helpers/l1-deposit-helper";
 import { withdrawETHFromL2 } from "../../src/helpers/l2-withdrawal-helper";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR } from "../../src/core/const";
-import { getL2Chain, getChainDiamondProxy, getChainIdByRole } from "../../src/core/utils";
+import { getL2Chain, getChainIdByRole } from "../../src/core/utils";
 
 describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
   this.timeout(0);
@@ -34,7 +34,6 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
       const walletAddr = ANVIL_DEFAULT_ACCOUNT_ADDR;
       const amount = ethers.utils.parseEther("1.0");
       const l2Chain = getL2Chain(state.chains!, directSettledChainId);
-      const chainDiamondProxy = getChainDiamondProxy(state.chainAddresses!, directSettledChainId);
 
       const before = await tracker.takeSnapshot(
         directSettledChainId,
@@ -51,7 +50,6 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
         chainId: directSettledChainId,
         l1Addresses: state.l1Addresses!,
         amount,
-        l1DiamondProxy: chainDiamondProxy,
       });
 
       expect(result.l1TxHash).to.not.be.null;

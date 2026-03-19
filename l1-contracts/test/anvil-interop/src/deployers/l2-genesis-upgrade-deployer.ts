@@ -1,8 +1,9 @@
 import { ethers, providers } from "ethers";
 import { impersonateAndRun, relayTx } from "../core/utils";
 import { encodeNtvAssetId } from "../core/data-encoding";
-import type { SystemContractPredeploy } from "../core/contracts";
-import { getAbi, getBytecode, PREDEPLOY_SYSTEM_CONTRACTS } from "../core/contracts";
+import { getAbi, getBytecode } from "../core/contracts";
+import { PREDEPLOY_SYSTEM_CONTRACTS } from "../core/predeploys";
+import type { SystemContractPredeploy } from "../core/predeploys";
 import {
   ETH_TOKEN_ADDRESS,
   INITIAL_BASE_TOKEN_HOLDER_BALANCE,
@@ -12,8 +13,6 @@ import {
   SERVICE_TX_SENDER_ADDR,
 } from "../core/const";
 import type { PriorityRequestData } from "../core/types";
-
-const INTEROP_TEST_CHAIN_IDS = [10, 11, 12, 13];
 
 /**
  * Deployer that initializes L2 contracts by relaying the real genesis upgrade priority
@@ -73,13 +72,11 @@ export class L2GenesisUpgradeDeployer {
     console.log(`   ✅ Genesis upgrade relayed: cast run ${result.txHash} -r ${this.l2Provider.connection.url}`);
   }
 
-  private async registerInteropChains(currentChainId: number, interopChainIds?: number[]): Promise<void> {
+  private async registerInteropChains(interopChainIds: number[]): Promise<void> {
     const l2BridgehubAbiData = getAbi("L2Bridgehub");
     const l2Bridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbiData, this.l2Provider);
     const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
-
-    const baseChainIds = interopChainIds ?? INTEROP_TEST_CHAIN_IDS;
-    const chainIds = Array.from(new Set([...baseChainIds, currentChainId]));
+    const chainIds = Array.from(new Set(interopChainIds));
 
     await impersonateAndRun(this.l2Provider, SERVICE_TX_SENDER_ADDR, async (serviceTxSenderSigner) => {
       const l2BridgehubWithSigner = l2Bridgehub.connect(serviceTxSenderSigner);
@@ -117,7 +114,7 @@ export class L2GenesisUpgradeDeployer {
   async deployAllSystemContracts(
     chainId: number,
     genesisPriorityTx: PriorityRequestData,
-    interopChainIds?: number[]
+    interopChainIds: number[]
   ): Promise<void> {
     console.log(`\n🔧 Deploying system contracts for chain ${chainId} via real genesis upgrade...`);
 
@@ -134,7 +131,7 @@ export class L2GenesisUpgradeDeployer {
     await this.relayGenesisPriorityTx(genesisPriorityTx);
 
     // Step 3: Register interop chains (test-only shortcut, not production flow)
-    await this.registerInteropChains(chainId, interopChainIds);
+    await this.registerInteropChains(interopChainIds);
 
     // Step 4: Verify deployment
     await this.assertPostDeploymentCode();

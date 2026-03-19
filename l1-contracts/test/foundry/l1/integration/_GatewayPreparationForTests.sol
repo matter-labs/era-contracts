@@ -29,6 +29,12 @@ import {ConfirmTransferResultData, TxStatus} from "contracts/common/Messaging.so
 contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
     using stdToml for string;
 
+    bytes internal gatewayDiamondCutData;
+    address internal gatewayCTMAddress;
+    address internal gatewayRollupDAManager;
+    address internal gatewayValidatorTimelock;
+    address internal gatewayServerNotifier;
+
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
 
@@ -42,26 +48,28 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         // Grab config from output of l1 deployment
         path = string.concat(root, vm.envString("CTM_OUTPUT"));
         toml = vm.readFile(path);
+        gatewayDiamondCutData = toml.readBytes("$.gateway_diamond_cut_data");
+        gatewayCTMAddress = _readGatewayAddress(
+            toml,
+            "$.gateway_state_transition.chain_type_manager_proxy_addr",
+            "$.deployed_addresses.state_transition.state_transition_proxy_addr"
+        );
+        gatewayRollupDAManager = _readGatewayAddress(
+            toml,
+            "$.gateway_state_transition.rollup_da_manager_addr",
+            "$.deployed_addresses.l1_rollup_da_manager"
+        );
+        gatewayValidatorTimelock = _readGatewayAddress(
+            toml,
+            "$.gateway_state_transition.validator_timelock_addr",
+            "$.deployed_addresses.validator_timelock_addr"
+        );
+        gatewayServerNotifier = _readGatewayAddress(
+            toml,
+            "$.gateway_state_transition.server_notifier_proxy_addr",
+            "$.deployed_addresses.server_notifier_proxy_addr"
+        );
 
-        // config.gatewayChainId = 506; //toml.readUint("$.chain.chain_chain_id");
-        // currently there is a single gateway test file.
-        // console.log("Gateway chain id skipped value = %s", toml.readUint("$.chain.chain_chain_id"));
-
-        // path = string.concat(root, vm.envString("GATEWAY_AS_CHAIN_OUTPUT"));
-        // toml = vm.readFile(path);
-
-        // config.gatewayChainAdmin = IZKChain(IBridgehubBase(config.bridgehub).getZKChain(config.gatewayChainId)).getAdmin();
-        // // toml.readAddress("$.chain_admin_addr");
-        // config.gatewayChainProxyAdmin = toml.readAddress("$.chain_proxy_admin_addr");
-        // config.gatewayAccessControlRestriction = toml.readAddress(
-        //     "$.deployed_addresses.access_control_restriction_addr"
-        // );
-        // config.l1NullifierProxy = address(IL1AssetRouter(IBridgehubBase(config.bridgehub).assetRouter()).L1_NULLIFIER());
-
-        // console.log("chain chain id = ", config.gatewayChainId);
-
-        // // This value is never checked in the integration tests
-        // config.gatewayDiamondCutData = hex"";
         _initializeGatewayGovernanceConfig(
             GatewayGovernanceConfig({
                 bridgehubProxy: toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr"),
@@ -141,14 +149,10 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         Call[] memory calls = _prepareGatewayGovernanceCalls(
             PrepareGatewayGovernanceCalls({
                 _l1GasPrice: _getL1GasPrice(),
-                // Some non-zero address
-                _gatewayCTMAddress: address(uint160(1)),
-                // Some non-zero address
-                _gatewayRollupDAManager: address(uint160(1)),
-                // Some non-zero address
-                _gatewayValidatorTimelock: address(uint160(1)),
-                // Some non-zero address
-                _gatewayServerNotifier: address(uint160(1)),
+                _gatewayCTMAddress: gatewayCTMAddress,
+                _gatewayRollupDAManager: gatewayRollupDAManager,
+                _gatewayValidatorTimelock: gatewayValidatorTimelock,
+                _gatewayServerNotifier: gatewayServerNotifier,
                 _refundRecipient: msg.sender,
                 _ctmRepresentativeChainId: 0,
                 _gatewaySettlementFee: 0
@@ -187,7 +191,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         bytes memory bridgehubData = abi.encode(
             BridgehubBurnCTMAssetData({
                 chainId: chainId,
-                ctmData: abi.encode(AddressAliasHelper.applyL1ToL2Alias(chainAdmin), hex""),
+                ctmData: abi.encode(AddressAliasHelper.applyL1ToL2Alias(chainAdmin), gatewayDiamondCutData),
                 chainData: abi.encode(IZKChain(diamondProxy).getProtocolVersion())
             })
         );
@@ -246,7 +250,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         bytes memory transferData = abi.encode(
             BridgehubBurnCTMAssetData({
                 chainId: chainId,
-                ctmData: abi.encode(AddressAliasHelper.applyL1ToL2Alias(chainAdmin), hex""),
+                ctmData: abi.encode(AddressAliasHelper.applyL1ToL2Alias(chainAdmin), gatewayDiamondCutData),
                 chainData: abi.encode(IZKChain(diamondProxy).getProtocolVersion())
             })
         );
@@ -279,5 +283,16 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
 
     function _getL1GasPrice() internal view returns (uint256) {
         return 10;
+    }
+
+    function _readGatewayAddress(
+        string memory toml,
+        string memory gatewayPath,
+        string memory fallbackPath
+    ) internal view returns (address) {
+        if (vm.keyExistsToml(toml, gatewayPath)) {
+            return toml.readAddress(gatewayPath);
+        }
+        return toml.readAddress(fallbackPath);
     }
 }

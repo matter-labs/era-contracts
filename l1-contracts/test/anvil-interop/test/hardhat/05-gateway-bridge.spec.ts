@@ -38,7 +38,6 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
       const amount = ethers.utils.parseEther("0.5");
       const l2Chain = getL2Chain(state.chains!, gwSettledChainId);
       const gwChain = getL2Chain(state.chains!, gwChainId);
-      const gwDiamondProxy = getChainDiamondProxy(state.chainAddresses!, gwChainId);
 
       // For gateway-settled chains, L1AssetTracker tracks balance under the GW chain ID
       const before = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
@@ -49,7 +48,6 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
         chainId: gwSettledChainId,
         l1Addresses: state.l1Addresses!,
         amount,
-        l1DiamondProxy: gwDiamondProxy,
         gwRpcUrl: gwChain.rpcUrl,
       });
 

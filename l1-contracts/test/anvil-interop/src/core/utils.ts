@@ -3,12 +3,15 @@ import { parse as parseToml } from "toml";
 import * as fs from "fs";
 import * as path from "path";
 import {
+  ANVIL_DEFAULT_PRIVATE_KEY,
   ANVIL_FUND_BALANCE,
+  INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
   L1_CHAIN_ID,
   L1_MESSAGE_SENT_EVENT_SIG,
   L1_TO_L2_ALIAS_OFFSET,
   L2_ASSET_TRACKER_ADDR,
+  L2_INTEROP_HANDLER_ADDR,
   NEW_PRIORITY_REQUEST_EVENT_SIG,
 } from "./const";
 import { getAbi } from "./contracts";
@@ -62,13 +65,14 @@ export function saveTomlConfig(filePath: string, data: Record<string, unknown>):
   const lines: string[] = [];
 
   function writeSection(obj: Record<string, unknown>, prefix = ""): void {
-    for (const [key, value] of Object.entries(obj)) {
-      const fullKey = prefix ? `${prefix}.${key}` : key;
+    const entries = Object.entries(obj);
 
+    for (const [key, value] of entries) {
       if (value && typeof value === "object" && !Array.isArray(value)) {
-        lines.push(`\n[${fullKey}]`);
-        writeSection(value as Record<string, unknown>, fullKey);
-      } else if (typeof value === "string") {
+        continue;
+      }
+
+      if (typeof value === "string") {
         lines.push(`${key} = "${value}"`);
       } else if (typeof value === "boolean") {
         lines.push(`${key} = ${value}`);
@@ -77,6 +81,16 @@ export function saveTomlConfig(filePath: string, data: Record<string, unknown>):
       } else if (Array.isArray(value)) {
         lines.push(`${key} = [${value.map((v) => (typeof v === "string" ? `"${v}"` : v)).join(", ")}]`);
       }
+    }
+
+    for (const [key, value] of entries) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        continue;
+      }
+
+      const fullKey = prefix ? `${prefix}.${key}` : key;
+      lines.push(`\n[${fullKey}]`);
+      writeSection(value as Record<string, unknown>, fullKey);
     }
   }
 
@@ -407,6 +421,80 @@ export function buildMockInteropProof(sourceChainId: number) {
     },
     proof: [],
   };
+}
+
+/**
+ * Extract InteropBundleSent events from a receipt and execute each bundle on the
+ * destination chain via L2InteropHandler.executeBundle().
+ *
+ * Used for GW→L2 relay: when a deposit goes through the GW, the InteropCenter on GW
+ * creates a bundle for the destination chain. We extract that bundle and execute it.
+ *
+ * @returns Array of relay tx hashes on the destination chain
+ */
+export async function extractAndRelayInteropBundles(
+  receipt: ethers.providers.TransactionReceipt,
+  sourceChainId: number,
+  destProvider: providers.JsonRpcProvider,
+  logger?: (line: string) => void
+): Promise<string[]> {
+  const log = logger || console.log;
+  const interopCenterIface = new ethers.utils.Interface(getAbi("InteropCenter"));
+  const abiCoder = ethers.utils.defaultAbiCoder;
+
+  // Extract all InteropBundleSent events
+  const bundles: unknown[] = [];
+  for (const logEntry of receipt.logs) {
+    try {
+      const parsed = interopCenterIface.parseLog({
+        topics: logEntry.topics as string[],
+        data: logEntry.data,
+      });
+      if (parsed && parsed.name === "InteropBundleSent") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        bundles.push((parsed.args as any).interopBundle);
+      }
+    } catch {
+      // Ignore non-InteropCenter logs
+    }
+  }
+
+  if (bundles.length === 0) {
+    log("   No InteropBundleSent events found in receipt");
+    return [];
+  }
+
+  log(`   Found ${bundles.length} InteropBundleSent event(s)`);
+
+  const txHashes: string[] = [];
+  const mockProof = buildMockInteropProof(sourceChainId);
+
+  for (const bundle of bundles) {
+    const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [bundle]);
+
+    // executeBundle can be called by any EOA — use the default Anvil account
+    const wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, destProvider);
+    const interopHandler = new ethers.Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+    let result: { txHash: string; success: boolean };
+    try {
+      const tx = await interopHandler.executeBundle(bundleData, mockProof, { gasLimit: 5_000_000 });
+      const r = await tx.wait();
+      result = { txHash: r.transactionHash, success: r.status === 1 };
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      log(`   executeBundle failed: ${msg.slice(0, 200)}`);
+      result = { txHash: "", success: false };
+    }
+
+    if (result.success) {
+      txHashes.push(result.txHash);
+      log(`   Interop bundle relayed: cast run ${result.txHash} -r ${destProvider.connection.url}`);
+    } else {
+      throw new Error("Interop bundle execution failed on destination chain");
+    }
+  }
+
+  return txHashes;
 }
 
 /**

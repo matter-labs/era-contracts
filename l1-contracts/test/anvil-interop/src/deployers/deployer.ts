@@ -5,6 +5,16 @@ import type { CoreDeployedAddresses, CTMDeployedAddresses } from "../core/types"
 import { parseForgeScriptOutput, ensureDirectoryExists } from "../core/utils";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR } from "../core/const";
 import { runForgeScript } from "../core/forge";
+import {
+  ANVIL_INTEROP_CTM_DEPLOYMENT_CONFIG_RELATIVE,
+  ANVIL_INTEROP_DEPLOY_CTM_SCRIPT,
+  ANVIL_INTEROP_DEPLOY_L1_CORE_SCRIPT,
+  ANVIL_INTEROP_CTM_OUTPUT_RELATIVE,
+  ANVIL_INTEROP_L1_CORE_OUTPUT_RELATIVE,
+  ANVIL_INTEROP_L1_DEPLOYMENT_CONFIG_RELATIVE,
+  ANVIL_INTEROP_PERMANENT_VALUES_RELATIVE,
+  ANVIL_INTEROP_REGISTER_CTM_SCRIPT,
+} from "../core/paths";
 
 const execAsync = promisify(exec);
 
@@ -27,21 +37,16 @@ export class ForgeDeployer {
   async deployL1Core(): Promise<CoreDeployedAddresses> {
     console.log("📦 Deploying L1 core contracts...");
 
-    const scriptPath = "deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol:DeployL1CoreContractsScript";
-    // Use path from l1-contracts root (must start with / for string.concat in script)
-    const configPath = "/test/anvil-interop/config/l1-deployment.toml";
-    const outputPath = "/test/anvil-interop/outputs/l1-core-output.toml";
-
     const envVars = {
-      L1_CONFIG: configPath,
-      L1_OUTPUT: outputPath,
-      PERMANENT_VALUES_INPUT: "/test/anvil-interop/config/permanent-values.toml",
+      L1_CONFIG: ANVIL_INTEROP_L1_DEPLOYMENT_CONFIG_RELATIVE,
+      L1_OUTPUT: ANVIL_INTEROP_L1_CORE_OUTPUT_RELATIVE,
+      PERMANENT_VALUES_INPUT: ANVIL_INTEROP_PERMANENT_VALUES_RELATIVE,
       USE_DUMMY_MESSAGE_ROOT: "true",
     };
 
     // Use runForAnvil() which skips the acceptAdmin() step
     await runForgeScript({
-      scriptPath,
+      scriptPath: ANVIL_INTEROP_DEPLOY_L1_CORE_SCRIPT,
       envVars,
       rpcUrl: this.rpcUrl,
       senderAddress: this.senderAddress,
@@ -49,7 +54,7 @@ export class ForgeDeployer {
       sig: "runForAnvil()",
     });
 
-    const fullOutputPath = path.join(this.projectRoot, outputPath);
+    const fullOutputPath = path.join(this.projectRoot, ANVIL_INTEROP_L1_CORE_OUTPUT_RELATIVE);
     const output = parseForgeScriptOutput(fullOutputPath);
 
     console.log("✅ L1 core contracts deployed");
@@ -81,23 +86,17 @@ export class ForgeDeployer {
   async deployCTM(bridgehubAddr: string): Promise<CTMDeployedAddresses> {
     console.log("📦 Deploying ChainTypeManager...");
 
-    const scriptPath = "deploy-scripts/ctm/DeployCTM.s.sol:DeployCTMScript";
-    // Use path from l1-contracts root (must start with / for string.concat in script)
-    const configPath = "/test/anvil-interop/config/ctm-deployment.toml";
-    const outputPath = "/test/anvil-interop/outputs/ctm-output.toml";
-    const permanentValuesPath = "/test/anvil-interop/config/permanent-values.toml";
-
     const envVars = {
-      CTM_CONFIG: configPath,
-      CTM_OUTPUT: outputPath,
-      PERMANENT_VALUES_INPUT: permanentValuesPath,
+      CTM_CONFIG: ANVIL_INTEROP_CTM_DEPLOYMENT_CONFIG_RELATIVE,
+      CTM_OUTPUT: ANVIL_INTEROP_CTM_OUTPUT_RELATIVE,
+      PERMANENT_VALUES_INPUT: ANVIL_INTEROP_PERMANENT_VALUES_RELATIVE,
     };
 
     const sig = "runForAnvilTest(address,bool)";
     const args = `${bridgehubAddr} false`;
 
     await runForgeScript({
-      scriptPath,
+      scriptPath: ANVIL_INTEROP_DEPLOY_CTM_SCRIPT,
       envVars,
       rpcUrl: this.rpcUrl,
       senderAddress: this.senderAddress,
@@ -106,7 +105,7 @@ export class ForgeDeployer {
       args,
     });
 
-    const fullOutputPath = path.join(this.projectRoot, outputPath);
+    const fullOutputPath = path.join(this.projectRoot, ANVIL_INTEROP_CTM_OUTPUT_RELATIVE);
     const output = parseForgeScriptOutput(fullOutputPath);
 
     // Access nested TOML structure: deployed_addresses.state_transition.*
@@ -132,8 +131,6 @@ export class ForgeDeployer {
 
   async registerCTM(bridgehubAddr: string, ctmAddr: string): Promise<void> {
     console.log("📝 Registering ChainTypeManager with Bridgehub...");
-
-    const scriptPath = "deploy-scripts/ecosystem/RegisterCTM.s.sol:RegisterCTM";
     const sig = "runForTest(address,address)";
     const args = `${bridgehubAddr} ${ctmAddr}`;
 
@@ -143,7 +140,7 @@ export class ForgeDeployer {
     };
 
     await runForgeScript({
-      scriptPath,
+      scriptPath: ANVIL_INTEROP_REGISTER_CTM_SCRIPT,
       envVars,
       rpcUrl: this.rpcUrl,
       senderAddress: this.senderAddress,

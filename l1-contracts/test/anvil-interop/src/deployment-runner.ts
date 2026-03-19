@@ -8,11 +8,13 @@ import { ChainRegistry } from "./deployers/chain-registry";
 import { GatewaySetup } from "./deployers/gateway-setup";
 import type {
   AnvilConfig,
+  AnvilChainConfig,
   ChainAddresses,
   ChainInfo,
   CoreDeployedAddresses,
   CTMDeployedAddresses,
   DeploymentState,
+  PriorityRequestData,
 } from "./core/types";
 import { getChainIdsByRole, timeIt } from "./core/utils";
 import { getAbi } from "./core/contracts";
@@ -79,6 +81,105 @@ export class DeploymentRunner {
 
   private toRpcUrlMap(l2Chains: Array<{ chainId: number; rpcUrl: string }>): Map<number, string> {
     return new Map(l2Chains.map((chain) => [chain.chainId, chain.rpcUrl]));
+  }
+
+  private getChainConfigOrThrow(
+    chainConfigsById: Map<number, AnvilConfig["chains"][number]>,
+    chainId: number
+  ): AnvilChainConfig {
+    const chainConfig = chainConfigsById.get(chainId);
+    if (!chainConfig) {
+      throw new Error(`Chain config not found for chain ${chainId}`);
+    }
+    return chainConfig;
+  }
+
+  private computeInteropChainIds(chainId: number, chainConfigs: AnvilChainConfig[]): number[] {
+    const l2Chains = chainConfigs.filter((chainConfig) => !chainConfig.isL1);
+    const thisChain = l2Chains.find((chainConfig) => chainConfig.chainId === chainId);
+    if (thisChain?.isGateway) {
+      return l2Chains
+        .filter((chainConfig) => chainConfig.settlement === "gateway" || chainConfig.chainId === chainId)
+        .map((chainConfig) => chainConfig.chainId);
+    }
+    return l2Chains.map((chainConfig) => chainConfig.chainId);
+  }
+
+  private buildInteropChainMap(chainConfigs: AnvilConfig["chains"]): Map<number, number[]> {
+    const l2ChainConfigs = chainConfigs.filter((chainConfig) => !chainConfig.isL1);
+    return new Map(
+      l2ChainConfigs.map((chainConfig) => [
+        chainConfig.chainId,
+        this.computeInteropChainIds(chainConfig.chainId, chainConfigs),
+      ])
+    );
+  }
+
+  private buildRegistrationConfigs(
+    l2Chains: Array<{ chainId: number; rpcUrl: string }>,
+    chainConfigsById: Map<number, AnvilConfig["chains"][number]>
+  ) {
+    return l2Chains.map((l2Chain) => {
+      const chainConfig = this.getChainConfigOrThrow(chainConfigsById, l2Chain.chainId);
+      return {
+        chainId: l2Chain.chainId,
+        rpcUrl: l2Chain.rpcUrl,
+        baseToken: ETH_TOKEN_ADDRESS,
+        validiumMode: false,
+        isGateway: chainConfig.isGateway ?? false,
+      };
+    });
+  }
+
+  private getGatewayChainOrThrow(
+    gatewayChainId: number,
+    l2Chains: Array<{ chainId: number; rpcUrl: string }>
+  ): { chainId: number; rpcUrl: string } {
+    const gwChain = l2Chains.find((chain) => chain.chainId === gatewayChainId);
+    if (!gwChain) {
+      throw new Error(`Gateway chain ${gatewayChainId} not found in started L2 chains`);
+    }
+    return gwChain;
+  }
+
+  private async initializeL2Chain(
+    registry: ChainRegistry,
+    chain: ChainAddresses,
+    l2RpcUrlsByChainId: Map<number, string>,
+    genesisPriorityTxs: Map<number, PriorityRequestData>,
+    interopChainIdsByChainId: Map<number, number[]>
+  ): Promise<void> {
+    const rpcUrl = l2RpcUrlsByChainId.get(chain.chainId);
+    if (!rpcUrl) {
+      throw new Error(`L2 chain ${chain.chainId} not found`);
+    }
+    const genesisTx = genesisPriorityTxs.get(chain.chainId);
+    if (!genesisTx) {
+      throw new Error(
+        `Genesis priority tx not found for chain ${chain.chainId}. ` +
+          "Ensure registerChainBatch() captured the GenesisUpgrade events."
+      );
+    }
+    const interopChainIds = interopChainIdsByChainId.get(chain.chainId);
+    if (!interopChainIds) {
+      throw new Error(`Interop chain plan not found for chain ${chain.chainId}`);
+    }
+    const done = timeIt(`initializeL2 chain ${chain.chainId}`);
+    await registry.initializeL2SystemContracts(chain.chainId, rpcUrl, genesisTx, interopChainIds);
+    done();
+    console.log(`  Chain ${chain.chainId} system contracts initialized`);
+  }
+
+  private async unpauseChainDeposits(
+    wallet: Wallet,
+    chain: ChainAddresses,
+    nonce: number,
+    migratorAbi: ReturnType<typeof getAbi>
+  ): Promise<void> {
+    const migrator = new Contract(chain.diamondProxy, migratorAbi, wallet);
+    const tx = await migrator.unpauseDeposits({ gasLimit: 500_000, nonce });
+    await tx.wait();
+    console.log(`  Deposits unpaused on chain ${chain.chainId}`);
   }
 
   async step1StartChains(
@@ -172,18 +273,10 @@ export class DeploymentRunner {
     const registry = new ChainRegistry(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
     const chainConfigsById = this.toChainConfigMap(chainConfigs);
     const l2RpcUrlsByChainId = this.toRpcUrlMap(l2Chains);
+    const interopChainIdsByChainId = this.buildInteropChainMap(chainConfigs);
 
     // Batch-register all chains in a single forge call (avoids nonce conflicts)
-    const configs = l2Chains.map((l2Chain) => {
-      const chainConfig = chainConfigsById.get(l2Chain.chainId);
-      return {
-        chainId: l2Chain.chainId,
-        rpcUrl: l2Chain.rpcUrl,
-        baseToken: ETH_TOKEN_ADDRESS,
-        validiumMode: false,
-        isGateway: chainConfig?.isGateway || false,
-      };
-    });
+    const configs = this.buildRegistrationConfigs(l2Chains, chainConfigsById);
 
     const regDone = timeIt(`registerChains batch [${configs.map((c) => c.chainId).join(",")}]`);
     const { chainAddresses, genesisPriorityTxs } = await registry.registerChainBatch(configs);
@@ -196,23 +289,9 @@ export class DeploymentRunner {
     // Initialize all L2 chains in parallel (each goes to a separate Anvil instance)
     console.log("\nInitializing L2 system contracts (in parallel)...\n");
     await Promise.all(
-      chainAddresses.map(async (chain) => {
-        const rpcUrl = l2RpcUrlsByChainId.get(chain.chainId);
-        if (!rpcUrl) {
-          throw new Error(`L2 chain ${chain.chainId} not found`);
-        }
-        const genesisTx = genesisPriorityTxs.get(chain.chainId);
-        if (!genesisTx) {
-          throw new Error(
-            `Genesis priority tx not found for chain ${chain.chainId}. ` +
-              "Ensure registerChainBatch() captured the GenesisUpgrade events."
-          );
-        }
-        const done = timeIt(`initializeL2 chain ${chain.chainId}`);
-        await registry.initializeL2SystemContracts(chain.chainId, rpcUrl, genesisTx);
-        done();
-        console.log(`  Chain ${chain.chainId} system contracts initialized`);
-      })
+      chainAddresses.map((chain) =>
+        this.initializeL2Chain(registry, chain, l2RpcUrlsByChainId, genesisPriorityTxs, interopChainIdsByChainId)
+      )
     );
 
     // Unpause deposits on all chains in parallel using explicit nonces
@@ -222,12 +301,7 @@ export class DeploymentRunner {
     const migratorAbi = getAbi("MigratorFacet");
     const baseNonce = await wallet.getTransactionCount();
     await Promise.all(
-      chainAddresses.map(async (chain, i) => {
-        const migrator = new Contract(chain.diamondProxy, migratorAbi, wallet);
-        const tx = await migrator.unpauseDeposits({ gasLimit: 500_000, nonce: baseNonce + i });
-        await tx.wait();
-        console.log(`  Deposits unpaused on chain ${chain.chainId}`);
-      })
+      chainAddresses.map((chain, i) => this.unpauseChainDeposits(wallet, chain, baseNonce + i, migratorAbi))
     );
 
     const state = this.loadState();
@@ -422,11 +496,8 @@ export class DeploymentRunner {
     // Step 5: Setup gateway if configured
     const gatewayConfig = config.chains.find((c) => c.isGateway);
     if (gatewayConfig) {
-      const gwChain = chains.l2.find((c) => c.chainId === gatewayConfig.chainId);
-      const l2ChainRpcUrls = new Map<number, string>();
-      for (const l2Chain of chains.l2) {
-        l2ChainRpcUrls.set(l2Chain.chainId, l2Chain.rpcUrl);
-      }
+      const gwChain = this.getGatewayChainOrThrow(gatewayConfig.chainId, chains.l2);
+      const l2ChainRpcUrls = this.toRpcUrlMap(chains.l2);
       const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
       await this.step5SetupGateway(
         chains.l1.rpcUrl,

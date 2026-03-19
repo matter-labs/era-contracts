@@ -1,12 +1,10 @@
 import * as path from "path";
-import * as fs from "fs";
 import { ethers, providers, Wallet } from "ethers";
 import type {
   ChainConfig,
   ChainAddresses,
   CoreDeployedAddresses,
   CTMDeployedAddresses,
-  AnvilConfig,
   PriorityRequestData,
 } from "../core/types";
 import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig } from "../core/utils";
@@ -14,6 +12,11 @@ import { L2GenesisUpgradeDeployer } from "./l2-genesis-upgrade-deployer";
 import { runForgeScript } from "../core/forge";
 import { GENESIS_UPGRADE_EVENT_SIG } from "../core/const";
 import { getAbi } from "../core/contracts";
+import {
+  ANVIL_INTEROP_CTM_OUTPUT_RELATIVE,
+  ANVIL_INTEROP_PERMANENT_VALUES_RELATIVE,
+  ANVIL_INTEROP_REGISTER_CHAIN_SCRIPT,
+} from "../core/paths";
 
 export class ChainRegistry {
   private l1RpcUrl: string;
@@ -46,30 +49,14 @@ export class ChainRegistry {
     console.log(`📝 Registering L2 chain ${config.chainId}...`);
 
     const configPath = await this.generateChainConfig(config);
-    const outputPath = path.join(this.outputDir, `chain-${config.chainId}-output.toml`);
-
-    const scriptPath = "deploy-scripts/ctm/RegisterZKChain.s.sol:RegisterZKChainScript";
+    const outputPath = this.getChainOutputPath(config.chainId);
     const sig = "runForTest(address,uint256)";
     const args = `${this.ctmAddresses.chainTypeManager} ${config.chainId}`;
 
-    // Paths relative to project root (must start with /)
-    const ctmOutputRelPath = "/test/anvil-interop/outputs/ctm-output.toml";
-    const chainConfigRelPath = configPath.replace(this.projectRoot, "");
-    const chainOutputRelPath = outputPath.replace(this.projectRoot, "");
-
-    const envVars = {
-      CHAIN_CONFIG: configPath,
-      CHAIN_OUTPUT: outputPath,
-      BRIDGEHUB_ADDR: this.l1Addresses.bridgehub,
-      CTM_ADDR: this.ctmAddresses.chainTypeManager,
-      CTM_OUTPUT: ctmOutputRelPath,
-      ZK_CHAIN_CONFIG: chainConfigRelPath,
-      ZK_CHAIN_OUT: chainOutputRelPath,
-      PERMANENT_VALUES_INPUT: "/test/anvil-interop/config/permanent-values.toml",
-    };
+    const envVars = this.buildRegisterChainEnv(configPath, outputPath);
 
     await runForgeScript({
-      scriptPath,
+      scriptPath: ANVIL_INTEROP_REGISTER_CHAIN_SCRIPT,
       envVars,
       rpcUrl: this.l1RpcUrl,
       privateKey: this.privateKey,
@@ -94,27 +81,21 @@ export class ChainRegistry {
     console.log(`📝 Registering ${configs.length} L2 chains in batch...`);
 
     // Generate all config files first
-    for (const config of configs) {
-      await this.generateChainConfig(config);
-    }
+    await Promise.all(configs.map((config) => this.generateChainConfig(config)));
 
     const chainIds = configs.map((c) => c.chainId);
-    const scriptPath = "deploy-scripts/ctm/RegisterZKChain.s.sol:RegisterZKChainScript";
     const sig = "runForTestBatch(address,uint256[])";
     // Encode chainIds array as ABI: [id1,id2,id3]
     const chainIdsArg = `[${chainIds.join(",")}]`;
     const args = `${this.ctmAddresses.chainTypeManager} ${chainIdsArg}`;
 
-    const envVars = {
-      CTM_OUTPUT: "/test/anvil-interop/outputs/ctm-output.toml",
-      PERMANENT_VALUES_INPUT: "/test/anvil-interop/config/permanent-values.toml",
-    };
+    const envVars = this.buildBatchRegisterChainEnv();
 
     // Record L1 block before forge script so we can scan for NewPriorityRequest events after
     const blockBeforeRegistration = await this.l1Provider.getBlockNumber();
 
     await runForgeScript({
-      scriptPath,
+      scriptPath: ANVIL_INTEROP_REGISTER_CHAIN_SCRIPT,
       envVars,
       rpcUrl: this.l1RpcUrl,
       privateKey: this.privateKey,
@@ -124,16 +105,14 @@ export class ChainRegistry {
     });
 
     // Parse per-chain outputs
-    const chainAddresses: ChainAddresses[] = [];
-    for (const config of configs) {
-      const outputPath = path.join(this.outputDir, `chain-${config.chainId}-output.toml`);
-      const output = parseForgeScriptOutput(outputPath);
+    const chainAddresses = configs.map((config) => {
+      const output = parseForgeScriptOutput(this.getChainOutputPath(config.chainId));
       console.log(`✅ Chain ${config.chainId} registered`);
-      chainAddresses.push({
+      return {
         chainId: config.chainId,
         diamondProxy: (output.diamond_proxy_addr || output.diamond_proxy) as string,
-      });
-    }
+      };
+    });
 
     // Extract genesis upgrade L2 transactions from L1 GenesisUpgrade events.
     // During createNewChain(), L1GenesisUpgrade.genesisUpgrade() is executed via delegatecall
@@ -194,32 +173,13 @@ export class ChainRegistry {
     return genesisTxs;
   }
 
-  private computeInteropChainIds(chainId: number, config: AnvilConfig): number[] {
-    const l2Chains = config.chains.filter((c) => !c.isL1);
-    const thisChain = l2Chains.find((c) => c.chainId === chainId);
-
-    if (thisChain?.isGateway) {
-      // GW chain: only GW-settled chains + itself
-      return l2Chains.filter((c) => c.settlement === "gateway" || c.chainId === chainId).map((c) => c.chainId);
-    }
-
-    // Non-GW L2 chains: all other L2 chain IDs + GW
-    return l2Chains.map((c) => c.chainId);
-  }
-
   async initializeL2SystemContracts(
     chainId: number,
     l2RpcUrl: string,
-    genesisPriorityTx: PriorityRequestData
+    genesisPriorityTx: PriorityRequestData,
+    interopChainIds: number[]
   ): Promise<void> {
     console.log(`🔧 Initializing L2 system contracts for chain ${chainId}...`);
-
-    const configPath = path.join(__dirname, "../../config/anvil-config.json");
-    let interopChainIds: number[] | undefined;
-    if (fs.existsSync(configPath)) {
-      const config: AnvilConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-      interopChainIds = this.computeInteropChainIds(chainId, config);
-    }
 
     console.log("   Using real genesis upgrade (relaying L1 priority tx)");
     const deployer = new L2GenesisUpgradeDeployer(l2RpcUrl);
@@ -229,7 +189,7 @@ export class ChainRegistry {
   }
 
   private async generateChainConfig(config: ChainConfig): Promise<string> {
-    const configPath = path.join(__dirname, `../../config/chain-${config.chainId}.toml`);
+    const configPath = this.getChainConfigPath(config.chainId);
 
     const ownerAddress = await this.wallet.getAddress();
 
@@ -253,5 +213,33 @@ export class ChainRegistry {
     saveTomlConfig(configPath, chainConfig);
 
     return configPath;
+  }
+
+  private getChainConfigPath(chainId: number): string {
+    return path.join(__dirname, `../../config/chain-${chainId}.toml`);
+  }
+
+  private getChainOutputPath(chainId: number): string {
+    return path.join(this.outputDir, `chain-${chainId}-output.toml`);
+  }
+
+  private buildRegisterChainEnv(configPath: string, outputPath: string): Record<string, string> {
+    return {
+      CHAIN_CONFIG: configPath,
+      CHAIN_OUTPUT: outputPath,
+      BRIDGEHUB_ADDR: this.l1Addresses.bridgehub,
+      CTM_ADDR: this.ctmAddresses.chainTypeManager,
+      CTM_OUTPUT: ANVIL_INTEROP_CTM_OUTPUT_RELATIVE,
+      ZK_CHAIN_CONFIG: configPath.replace(this.projectRoot, ""),
+      ZK_CHAIN_OUT: outputPath.replace(this.projectRoot, ""),
+      PERMANENT_VALUES_INPUT: ANVIL_INTEROP_PERMANENT_VALUES_RELATIVE,
+    };
+  }
+
+  private buildBatchRegisterChainEnv(): Record<string, string> {
+    return {
+      CTM_OUTPUT: ANVIL_INTEROP_CTM_OUTPUT_RELATIVE,
+      PERMANENT_VALUES_INPUT: ANVIL_INTEROP_PERMANENT_VALUES_RELATIVE,
+    };
   }
 }
