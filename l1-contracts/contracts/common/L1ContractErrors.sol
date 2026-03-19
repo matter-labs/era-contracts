@@ -73,6 +73,8 @@ error ChainAlreadyLive();
 error ChainIdAlreadyExists();
 // 0x717a1656
 error ChainIdCantBeCurrentChain();
+// 0xbb89a856
+error ChainIdForbidden(uint256 chainId);
 // 0xa179f8c9
 error ChainIdMismatch();
 // 0x23f3c357

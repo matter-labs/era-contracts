@@ -55,6 +55,7 @@ import {
     BridgeHubAlreadyRegistered,
     CTMAlreadyRegistered,
     CTMNotRegistered,
+    ChainIdForbidden,
     ChainIdTooBig,
     MsgValueMismatch,
     SharedBridgeNotSet,
@@ -653,6 +654,7 @@ contract ExperimentalBridgeTest is Test {
     ) public useRandomToken(randomValue) {
         chainId = bound(chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
+        vm.assume(chainId != 270);
 
         admin = makeAddr("NEW_CHAIN_ADMIN");
 
@@ -705,6 +707,7 @@ contract ExperimentalBridgeTest is Test {
     ) public useRandomToken(randomValue) {
         chainId = bound(chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
+        vm.assume(chainId != 270);
 
         admin = makeAddr("NEW_CHAIN_ADMIN");
 
@@ -769,6 +772,29 @@ contract ExperimentalBridgeTest is Test {
         });
     }
 
+    function test_RevertWhen_forbiddenChainId270(uint256 salt, uint256 randomValue) public useRandomToken(randomValue) {
+        admin = makeAddr("NEW_CHAIN_ADMIN");
+
+        vm.prank(bridgeOwner);
+        bridgehub.setPendingAdmin(deployerAddress);
+        vm.prank(deployerAddress);
+        bridgehub.acceptAdmin();
+
+        // Chain ID 270 is the legacy hard-coded genesis chain ID used by the ZKsync server as a
+        // temporary sentinel value. Creating a real chain with this ID would break SystemContext invariants.
+        vm.expectRevert(abi.encodeWithSelector(ChainIdForbidden.selector, uint256(270)));
+        vm.prank(deployerAddress);
+        bridgehub.createNewChain({
+            _chainId: 270,
+            _chainTypeManager: address(mockCTM),
+            _baseTokenAssetId: tokenAssetId,
+            _salt: salt,
+            _admin: admin,
+            _initData: bytes(""),
+            _factoryDeps: new bytes[](0)
+        });
+    }
+
     function test_RevertWhen_assetIdNotRegistered(
         uint256 chainId,
         uint256 salt,
@@ -776,6 +802,7 @@ contract ExperimentalBridgeTest is Test {
     ) public useRandomToken(randomValue) {
         chainId = bound(chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
+        vm.assume(chainId != 270);
 
         admin = makeAddr("NEW_CHAIN_ADMIN");
 
@@ -808,6 +835,7 @@ contract ExperimentalBridgeTest is Test {
     ) public useRandomToken(randomValue) {
         chainId = bound(chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
+        vm.assume(chainId != 270);
         admin = makeAddr("NEW_CHAIN_ADMIN");
 
         vm.prank(bridgeOwner);
@@ -844,6 +872,7 @@ contract ExperimentalBridgeTest is Test {
 
         chainId = bound(chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
+        vm.assume(chainId != 270);
         stdstore.target(address(bridgehub)).sig("chainTypeManager(uint256)").with_key(chainId).checked_write(
             address(mockCTM)
         );
@@ -873,6 +902,7 @@ contract ExperimentalBridgeTest is Test {
         admin = makeAddr("NEW_CHAIN_ADMIN");
         chainId = bound(chainId, 1, type(uint48).max);
         vm.assume(chainId != block.chainid);
+        vm.assume(chainId != 270);
         vm.assume(randomCaller != deployerAddress && randomCaller != bridgeOwner);
         vm.assume(newChainAddress != address(0));
 
