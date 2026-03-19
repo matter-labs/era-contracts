@@ -33,7 +33,7 @@ contract UpgradeIntegrationTestBase is Test {
     string public PERMANENT_VALUES_INPUT;
     string public ECOSYSTEM_OUTPUT = "file_3.toml";
     string public CTM_INPUT = "/upgrade-envs/v0.31.0-interopB/shared.toml";
-    string public CTM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/mainnet-gateway.toml";
+    string public CTM_OUTPUT = "/script-out/foundry-upgrade/mainnet-gateway.toml";
     string public CHAIN_INPUT;
     string public CHAIN_OUTPUT;
 
@@ -145,6 +145,7 @@ contract UpgradeIntegrationTestBase is Test {
     function preparePermanentValues() internal {
         string memory root = vm.projectRoot();
         string memory permanentValuesInputPath = string.concat(root, PERMANENT_VALUES_INPUT);
+        vm.createDir(string.concat(root, "/script-out/foundry-upgrade"), true);
         string memory outputDeployL1Toml = vm.readFile(string.concat(root, ECOSYSTEM_INPUT));
         string memory outputDeployCTMToml = vm.readFile(string.concat(root, CTM_INPUT));
 

@@ -14,8 +14,8 @@ const systemContextAbi = getAbi("SystemContext");
  * transaction emitted on L1 during chain registration.
  *
  * The flow:
- * 1. Pre-deploy all contracts via anvil_setCode (isZKsyncOS=true skips force deploys)
- * 2. Relay the genesis upgrade transaction from the L1 GenesisUpgrade event
+ * 1. Bootstrap synthetic prestate via Anvil RPC (production has this in genesis)
+ * 2. Relay the real genesis upgrade transaction from the L1 GenesisUpgrade event
  * 3. Verify the deployed code
  */
 export class L2GenesisUpgradeDeployer {
@@ -25,7 +25,7 @@ export class L2GenesisUpgradeDeployer {
     this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
   }
 
-  private async ensureSystemContract(contractSpec: SystemContractPredeploy): Promise<void> {
+  private async bootstrapSystemContractPrestate(contractSpec: SystemContractPredeploy): Promise<void> {
     const existingCode = await this.l2Provider.getCode(contractSpec.address);
     if (existingCode !== "0x" && existingCode !== "0x0") {
       console.log(`   ✅ ${contractSpec.contractName} already deployed at ${contractSpec.address}`);
@@ -42,8 +42,10 @@ export class L2GenesisUpgradeDeployer {
     console.log(`   ✅ ${contractSpec.contractName} deployed`);
   }
 
-  private async ensurePredeployedContracts(): Promise<void> {
-    await Promise.all(PREDEPLOY_SYSTEM_CONTRACTS.map((contractSpec) => this.ensureSystemContract(contractSpec)));
+  private async bootstrapPrestateContracts(): Promise<void> {
+    await Promise.all(
+      PREDEPLOY_SYSTEM_CONTRACTS.map((contractSpec) => this.bootstrapSystemContractPrestate(contractSpec))
+    );
   }
 
   private async relayGenesisPriorityTx(genesisTx: PriorityRequestData): Promise<void> {
@@ -91,9 +93,9 @@ export class L2GenesisUpgradeDeployer {
 
   async deployAllSystemContracts(chainId: number, genesisPriorityTx: PriorityRequestData): Promise<void> {
     console.log(`\n🔧 Deploying system contracts for chain ${chainId} via real genesis upgrade...`);
-    await this.ensurePredeployedContracts();
+    await this.bootstrapPrestateContracts();
 
-    console.log("   Pre-funding L2BaseToken for initL2() → BaseTokenHolder transfer...");
+    console.log("   Bootstrapping L2BaseToken balance for initL2() → BaseTokenHolder transfer...");
     await this.l2Provider.send("anvil_setBalance", [L2_BASE_TOKEN_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE]);
 
     await this.relayGenesisPriorityTx(genesisPriorityTx);

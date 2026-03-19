@@ -184,9 +184,9 @@ Source of truth for the Anvil predeploy layout lives in
 
 Real contracts used: `SystemContext` at `0x800b`, `L1MessengerZKOS` at `0x8008`, `L2BaseTokenZKOS` at `0x800a`, all other L2 system contracts at their production addresses.
 
-### L2 Deployment: `anvil_setCode` + Real Genesis Upgrade
+### L2 Deployment: Synthetic Prestate + Real Genesis Upgrade
 
-Contracts are placed at hardcoded addresses via `anvil_setCode` (production has them in genesis state). The real genesis upgrade calldata from L1's `GenesisUpgrade` event is relayed to L2, initializing all contracts via `initL2()` with production-identical data.
+Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and the base token is pre-funded via `anvil_setBalance` (production has this in genesis state). The real genesis upgrade calldata from L1's `GenesisUpgrade` event is then relayed to L2, initializing all contracts via `initL2()` with production-identical data.
 
 ### Impersonation
 
@@ -206,6 +206,7 @@ Contracts are placed at hardcoded addresses via `anvil_setCode` (production has 
 - **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
 - **Interop proofs**: Correct struct shape but empty proof arrays
 - **v29 -> v31 upgrade harness**: [run-v29-to-v31-upgrade-test.ts](/Users/kalmanlajko/programming/zksync/zksync-era2/contracts/l1-contracts/test/anvil-interop/run-v29-to-v31-upgrade-test.ts) still applies direct `anvil_setStorageAt` patches to legacy chain state before per-chain upgrade. This is a test-only compatibility bridge, not a production upgrade flow.
+- **L2 genesis bootstrap**: [l2-genesis-upgrade-deployer.ts](/Users/kalmanlajko/programming/zksync/zksync-era2/contracts/l1-contracts/test/anvil-interop/src/deployers/l2-genesis-upgrade-deployer.ts) still bootstraps contract code and base-token balance via Anvil RPC before relaying the real genesis transaction. Production chains get that state directly from genesis.
 - **Temporary upgrade inputs**: the upgrade harness copies v29 config inputs into `test/anvil-interop/outputs/upgrade-harness-inputs/` and passes them to Forge via env overrides. It no longer mutates checked-in `upgrade-envs/.../local.toml`.
 
 ## Cleanup
