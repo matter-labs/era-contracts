@@ -39,43 +39,6 @@ on:
       - "da-contracts/package.json"
       - "package.json"
       - "yarn.lock"
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/anvil-interop-ci.yaml"
-      - ".github/actions/install-zksync-foundry/**"
-      - "l1-contracts/contracts/**"
-      - "l1-contracts/deploy-scripts/**"
-      - "l1-contracts/lib/**"
-      - "l1-contracts/scripts/**"
-      - "l1-contracts/test/**"
-      - "l1-contracts/foundry.toml"
-      - "l1-contracts/hardhat.config.ts"
-      - "l1-contracts/package.json"
-      - "l2-contracts/contracts/**"
-      - "l2-contracts/lib/**"
-      - "l2-contracts/src/**"
-      - "l2-contracts/test/**"
-      - "l2-contracts/foundry.toml"
-      - "l2-contracts/hardhat.config.ts"
-      - "l2-contracts/package.json"
-      - "system-contracts/bootloader/**"
-      - "system-contracts/contracts/**"
-      - "system-contracts/lib/**"
-      - "system-contracts/scripts/**"
-      - "system-contracts/test/**"
-      - "system-contracts/foundry.toml"
-      - "system-contracts/hardhat.config.ts"
-      - "system-contracts/package.json"
-      - "da-contracts/contracts/**"
-      - "da-contracts/lib/**"
-      - "da-contracts/test/**"
-      - "da-contracts/foundry.toml"
-      - "da-contracts/hardhat.config.ts"
-      - "da-contracts/package.json"
-      - "package.json"
-      - "yarn.lock"
 
 jobs:
   # Fast job: uses pre-generated chain states from the repo, no contract compilation needed.
@@ -109,13 +72,13 @@ jobs:
 
       - name: TypeScript type check
         working-directory: l1-contracts/test/anvil-interop
-        run: npx tsc --noEmit
+        run: yarn tsc --noEmit
 
       - name: Run interop tests (preloaded state)
         working-directory: l1-contracts/test/anvil-interop
         run: |
           echo "Running interop tests with preloaded chain states..."
-          npx ts-node run-hardhat-interop-test.ts
+          yarn ts-node run-hardhat-interop-test.ts
 
       - name: Cleanup
         if: always()
@@ -163,7 +126,7 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: |
           echo "Running V29 -> V31 upgrade test..."
-          npx ts-node run-v29-to-v31-upgrade-test.ts
+          yarn ts-node run-v29-to-v31-upgrade-test.ts
 
       - name: Cleanup
         if: always()
@@ -220,7 +183,7 @@ jobs:
         working-directory: l1-contracts/test/anvil-interop
         run: |
           echo "Generating chain state from scratch..."
-          npx ts-node setup-and-dump-state.ts
+          yarn ts-node setup-and-dump-state.ts
 
       - name: Verify committed state matches generated state
         working-directory: l1-contracts/test/anvil-interop

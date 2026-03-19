@@ -7,9 +7,8 @@ import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2Co
 
 /// @title MockL2BaseToken
 /// @notice A mock for L2BaseToken that supports withdraw() for Anvil-based testing.
-/// Mirrors the real zksync-os L2BaseToken (da-contracts/contracts/l2-system/zksync-os/L2BaseToken.sol)
-/// but avoids its `Burner` selfdestruct pattern (deprecated on newer EVM versions).
-/// Instead of burning ETH, the mock simply accepts it — Anvil tracks ETH balances natively.
+/// Mirrors the real L2BaseToken (l1-contracts/contracts/l2-system/) but simplified for Anvil —
+/// Anvil tracks ETH balances natively so no BaseTokenHolder transfer is needed.
 contract MockL2BaseToken {
     IL2ToL1MessengerEra constant L1_MESSENGER = IL2ToL1MessengerEra(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR);
 

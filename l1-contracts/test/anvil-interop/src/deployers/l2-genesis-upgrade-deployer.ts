@@ -1,14 +1,8 @@
-import * as path from "path";
-import { ethers, Contract, providers, utils } from "ethers";
-import {
-  buildAdditionalForceDeploymentsData,
-  buildFixedForceDeploymentsData,
-  getBytecodeInfo,
-} from "./l2-genesis-helper";
-import { impersonateAndRun } from "../core/utils";
+import { ethers, providers } from "ethers";
+import { impersonateAndRun, relayTx } from "../core/utils";
 import { loadBytecodeFromOut } from "../core/artifacts";
 import { encodeNtvAssetId } from "../core/data-encoding";
-import { l2ComplexUpgraderAbi, l2GenesisUpgradeAbi, l2BridgehubAbi } from "../core/contracts";
+import { l2BridgehubAbi } from "../core/contracts";
 import {
   ETH_TOKEN_ADDRESS,
   GW_ASSET_TRACKER_ADDR,
@@ -21,7 +15,6 @@ import {
   L2_BRIDGEHUB_ADDR,
   L2_CHAIN_ASSET_HANDLER_ADDR,
   L2_COMPLEX_UPGRADER_ADDR,
-  L2_FORCE_DEPLOYER_ADDR,
   L2_GENESIS_UPGRADE_ADDR,
   L2_INTEROP_HANDLER_ADDR,
   L2_MESSAGE_ROOT_ADDR,
@@ -34,6 +27,7 @@ import {
   SERVICE_TX_SENDER_ADDR,
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
+import type { PriorityRequestData } from "../core/types";
 
 interface PredeployedContractSpec {
   address: string;
@@ -43,7 +37,17 @@ interface PredeployedContractSpec {
 
 const INTEROP_TEST_CHAIN_IDS = [10, 11, 12, 13];
 
+/**
+ * Contracts that must be pre-deployed via anvil_setCode before the genesis upgrade runs.
+ *
+ * The genesis upgrade (with isZKsyncOS=true) skips force deployments — it only calls
+ * initL2() on each contract. So the bytecode must already be at these addresses.
+ *
+ * Mock contracts replace ZK-VM system contracts that can't run on standard EVM.
+ * Real contracts are deployed at their system addresses for the genesis initL2() to work.
+ */
 const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
+  // Mock system contracts (replace ZK-VM bytecode that can't run on Anvil)
   {
     address: SYSTEM_CONTEXT_ADDR,
     name: "MockSystemContext",
@@ -59,6 +63,12 @@ const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
     name: "MockL2BaseToken",
     artifactPath: "MockL2BaseToken.sol/MockL2BaseToken.json",
   },
+  {
+    address: L2_MESSAGE_VERIFICATION_ADDR,
+    name: "MockL2MessageVerification",
+    artifactPath: "MockL2MessageVerification.sol/MockL2MessageVerification.json",
+  },
+  // Infrastructure contracts needed before/during genesis upgrade execution
   {
     address: L2_COMPLEX_UPGRADER_ADDR,
     name: "L2ComplexUpgrader",
@@ -84,6 +94,7 @@ const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
     name: "UpgradeableBeaconDeployer",
     artifactPath: "UpgradeableBeaconDeployer.sol/UpgradeableBeaconDeployer.json",
   },
+  // Real L2 system contracts — genesis initL2() runs on these
   {
     address: L2_MESSAGE_ROOT_ADDR,
     name: "L2MessageRoot",
@@ -134,50 +145,24 @@ const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
     name: "InteropHandler",
     artifactPath: "InteropHandler.sol/InteropHandler.json",
   },
-  {
-    address: L2_MESSAGE_VERIFICATION_ADDR,
-    name: "MockL2MessageVerification",
-    artifactPath: "MockL2MessageVerification.sol/MockL2MessageVerification.json",
-  },
 ];
 
 /**
- * Alternative deployer that initializes L2 contracts through L2GenesisUpgrade.
+ * Deployer that initializes L2 contracts by relaying the real genesis upgrade priority
+ * transaction from L1.
  *
- * The flow emulates the real upgrade path:
- * - call L2ComplexUpgrader.upgrade(...)
- * - delegatecall into L2GenesisUpgrade.genesisUpgrade(...)
- *
- * This keeps `msg.sender` as L2ComplexUpgrader for system `onlyUpgrader` guards.
+ * The flow:
+ * 1. Pre-deploy all contracts via anvil_setCode (isZKsyncOS=true skips force deploys)
+ * 2. Relay the genesis priority tx extracted from L1's NewPriorityRequest event
+ *    → L2ComplexUpgrader.upgrade() → L2GenesisUpgrade.genesisUpgrade()
+ *    → initializes all contracts via their initL2() methods
+ * 3. Register interop chains on L2Bridgehub (test-only shortcut)
  */
 export class L2GenesisUpgradeDeployer {
   private l2Provider: providers.JsonRpcProvider;
-  private contractsRoot: string;
-  private ctmDeployerAddress: string;
-  private l1AssetRouterAddress: string;
-  private governanceAddress: string;
-  private chainRegistrationSender: string;
-  private gatewayChainId: number;
-  private l1ChainId: number;
 
-  constructor(
-    l2RpcUrl: string,
-    _privateKey: string,
-    l1AssetRouterAddress: string,
-    ctmDeployerAddress: string,
-    governanceAddress: string,
-    chainRegistrationSender: string,
-    gatewayChainId: number,
-    l1ChainId: number = L1_CHAIN_ID
-  ) {
+  constructor(l2RpcUrl: string) {
     this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
-    this.contractsRoot = path.resolve(__dirname, "../../../../..");
-    this.l1AssetRouterAddress = l1AssetRouterAddress;
-    this.ctmDeployerAddress = ctmDeployerAddress;
-    this.governanceAddress = governanceAddress;
-    this.chainRegistrationSender = chainRegistrationSender;
-    this.gatewayChainId = gatewayChainId;
-    this.l1ChainId = l1ChainId;
   }
 
   private async ensureSystemContract(address: string, artifactPath: string, name: string): Promise<void> {
@@ -205,41 +190,39 @@ export class L2GenesisUpgradeDeployer {
     );
   }
 
-  private async callGenesisUpgradeViaComplexUpgrader(
-    chainId: number,
-    fixedData: string,
-    additionalData: string
-  ): Promise<void> {
-    const l2ComplexUpgraderAbiData = l2ComplexUpgraderAbi();
-    const l2GenesisUpgradeAbiData = l2GenesisUpgradeAbi();
-    const l2GenesisUpgradeInterface = new utils.Interface(l2GenesisUpgradeAbiData);
-    const genesisUpgradeCalldata = l2GenesisUpgradeInterface.encodeFunctionData("genesisUpgrade", [
-      true,
-      chainId,
-      this.ctmDeployerAddress,
-      fixedData,
-      additionalData,
-    ]);
+  /**
+   * Relay the real genesis upgrade priority transaction from L1 to L2.
+   *
+   * This executes the same calldata that the L1 ChainTypeManager generated
+   * during createNewChain(): L2ComplexUpgrader.upgrade(L2GenesisUpgrade, genesisUpgradeCalldata)
+   */
+  private async relayGenesisPriorityTx(genesisTx: PriorityRequestData): Promise<void> {
+    console.log(`   Relaying genesis priority tx: from=${genesisTx.from} to=${genesisTx.to}`);
 
-    await impersonateAndRun(this.l2Provider, L2_FORCE_DEPLOYER_ADDR, async (forceDeployerSigner) => {
-      const l2ComplexUpgrader = new Contract(L2_COMPLEX_UPGRADER_ADDR, l2ComplexUpgraderAbiData, forceDeployerSigner);
+    const result = await relayTx(
+      this.l2Provider,
+      genesisTx.from,
+      genesisTx.to,
+      genesisTx.calldata,
+      genesisTx.value
+    );
 
-      console.log("   Running L2ComplexUpgrader.upgrade(...L2GenesisUpgrade.genesisUpgrade)");
-      const tx = await l2ComplexUpgrader.upgrade(L2_GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata, {
-        gasLimit: 30_000_000,
-      });
-      await tx.wait();
-      console.log("   ✅ L2GenesisUpgrade executed via L2ComplexUpgrader");
-    });
+    if (!result.success) {
+      throw new Error(
+        `Genesis upgrade priority tx failed on L2. ` +
+          `Debug: cast run ${result.txHash} -r ${this.l2Provider.connection.url}`
+      );
+    }
+    console.log(`   ✅ Genesis upgrade relayed: cast run ${result.txHash} -r ${this.l2Provider.connection.url}`);
   }
 
   private async registerInteropChains(currentChainId: number, interopChainIds?: number[]): Promise<void> {
     const l2BridgehubAbiData = l2BridgehubAbi();
-    const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbiData, this.l2Provider);
-    const ethAssetId = encodeNtvAssetId(this.l1ChainId, ETH_TOKEN_ADDRESS);
+    const l2Bridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbiData, this.l2Provider);
+    const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
 
     const baseChainIds = interopChainIds ?? INTEROP_TEST_CHAIN_IDS;
-    const chainIds = Array.from(new Set([...baseChainIds, currentChainId, this.gatewayChainId]));
+    const chainIds = Array.from(new Set([...baseChainIds, currentChainId]));
 
     await impersonateAndRun(this.l2Provider, SERVICE_TX_SENDER_ADDR, async (serviceTxSenderSigner) => {
       const l2BridgehubWithSigner = l2Bridgehub.connect(serviceTxSenderSigner);
@@ -284,26 +267,25 @@ export class L2GenesisUpgradeDeployer {
     await Promise.all(expectedContracts.map((c) => this.assertCodePresent(c.addr, c.name)));
   }
 
-  async deployAllSystemContracts(chainId: number, interopChainIds?: number[]): Promise<void> {
-    console.log(`\n🔧 Deploying system contracts for chain ${chainId} via L2GenesisUpgrade...`);
+  async deployAllSystemContracts(
+    chainId: number,
+    genesisPriorityTx: PriorityRequestData,
+    interopChainIds?: number[]
+  ): Promise<void> {
+    console.log(`\n🔧 Deploying system contracts for chain ${chainId} via real genesis upgrade...`);
 
-    const bytecodeInfo = getBytecodeInfo(this.contractsRoot);
-    const fixedData = buildFixedForceDeploymentsData(
-      chainId,
-      this.l1AssetRouterAddress,
-      bytecodeInfo,
-      this.gatewayChainId,
-      this.governanceAddress,
-      this.chainRegistrationSender,
-      this.l1ChainId
-    );
-    const additionalData = buildAdditionalForceDeploymentsData(ETH_TOKEN_ADDRESS);
-
+    // Step 1: Pre-deploy all contracts (isZKsyncOS=true skips force deploys in genesis upgrade)
     await this.ensurePredeployedContracts();
-    await this.callGenesisUpgradeViaComplexUpgrader(chainId, fixedData, additionalData);
+
+    // Step 2: Relay the real genesis upgrade priority tx from L1
+    await this.relayGenesisPriorityTx(genesisPriorityTx);
+
+    // Step 3: Register interop chains (test-only shortcut, not production flow)
     await this.registerInteropChains(chainId, interopChainIds);
+
+    // Step 4: Verify deployment
     await this.assertPostDeploymentCode();
 
-    console.log(`✅ L2GenesisUpgrade deployment flow completed for chain ${chainId}`);
+    console.log(`✅ Genesis upgrade deployment completed for chain ${chainId}`);
   }
 }

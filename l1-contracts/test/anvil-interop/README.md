@@ -137,10 +137,9 @@ test/anvil-interop/
 │   │   └── toml-handling.ts       # TOML file parsing/merging
 │   ├── deployers/
 │   │   ├── deployer.ts            # L1 contract deployment via forge scripts
-│   │   ├── chain-registry.ts      # Register L2 chains on L1 CTM
-│   │   ├── system-contracts-deployer.ts    # L2 system contracts via anvil_setCode
-│   │   ├── l2-genesis-upgrade-deployer.ts  # L2 contracts via L2GenesisUpgrade
-│   │   ├── l2-genesis-helper.ts   # Bytecode hashing for genesis upgrade
+│   │   ├── chain-registry.ts      # Register L2 chains on L1 CTM + capture genesis priority txs
+│   │   ├── system-contracts-deployer.ts    # L2 system contracts via anvil_setCode (legacy path)
+│   │   ├── l2-genesis-upgrade-deployer.ts  # Pre-deploy mocks + relay real genesis priority tx
 │   │   ├── gateway-setup.ts       # Gateway designation + chain migration
 │   │   └── gateway-deployer.ts    # Verify GW system contracts
 │   ├── daemons/
@@ -181,11 +180,62 @@ On ZKsync VM, all functions can receive ETH value even if not marked `payable`. 
 
 ### Proof Bypass
 
-L1 withdrawal finalization normally requires batch proofs. For Anvil testing, we use `anvil_impersonateAccount` on the L1Nullifier to call `L1AssetRouter.finalizeDeposit` directly.
+L1 withdrawal finalization normally requires batch proofs. For Anvil testing, a `DummyL1MessageRoot` is deployed that bypasses proof verification (always returns true). Withdrawals are finalized by calling `L1Nullifier.finalizeDeposit` directly with a synthetic merkle proof that encodes the settlement layer chain ID.
 
 ### Data Encoding
 
 L1 `bridgeMint` expects `DataEncoding.encodeBridgeMintData` format: `(address originalCaller, address receiver, address originToken, uint256 amount, bytes metadata)`. This is different from the L2 burn data format `(uint256 amount, address receiver, address token)`.
+
+## Known Deviations from Production
+
+Anvil runs standard EVM, not ZKsync VM. The test environment uses mocks and impersonation to bridge the gap. This section documents all places where the test setup diverges from production behavior.
+
+### Mock System Contracts
+
+L2 system contracts are ZK-VM bytecode and cannot run on Anvil. The following mocks replace them:
+
+| Mock Contract | Address | What it replaces | Key difference |
+|---|---|---|---|
+| `MockL2BaseToken` | `0x800a` | L2BaseToken | Returns `type(uint256).max` for all balances; `burnMsgValue` is a no-op (Anvil tracks ETH natively) |
+| `MockL2ToL1Messenger` | `0x8008` | L2ToL1Messenger | Only emits `L1MessageSent` event; no merkle tree or proof construction |
+| `MockL2MessageVerification` | `0x10009` | L2MessageVerification | All proof verification functions return `true` unconditionally |
+| `MockSystemContext` | `0x800b` | SystemContext | Minimal implementation without ZK-VM state tracking |
+
+### Proof Verification Bypass
+
+- **`DummyL1MessageRoot`** replaces `L1MessageRoot` on L1. All proof verification functions return `true`.
+- **Synthetic merkle proofs** are constructed by `buildWithdrawalMerkleProof()` — they encode the settlement layer chain ID in the correct format for `getProofData()` to parse, but contain no real cryptographic data.
+- **Interop proofs** (`buildMockInteropProof()`) have the correct struct shape but empty proof arrays.
+
+### L2 Contract Deployment via `anvil_setCode` + Real Genesis Upgrade
+
+System contracts are placed at their hardcoded addresses using `anvil_setCode` before the genesis upgrade runs. This is necessary because `isZKsyncOS=true` skips force deployments in `L2GenesisForceDeploymentsHelper` — in production, these contracts exist in the genesis state. After pre-deployment, the real genesis upgrade priority transaction from L1 is relayed to L2, executing the same `L2GenesisUpgrade.genesisUpgrade()` calldata that the L1 `ChainTypeManager.createNewChain()` generated. This initializes all contracts via their `initL2()` methods using production-identical data.
+
+### Interop Chain Registration Shortcut
+
+`registerChainForInterop()` registers chains on L2Bridgehub by impersonating `SERVICE_TX_SENDER_ADDR`. In production, chain registration goes through the full governance flow with proper authorization. This means the test does not cover the real registration path.
+
+### L1→L2 Priority Request Relay
+
+Instead of a real sequencer, `extractAndRelayNewPriorityRequests()` parses `NewPriorityRequest` events from L1 receipts and replays them on L2 by impersonating the original sender. For GW-settled chains, this chains L1 → GW → L2.
+
+### Impersonation-Based Flows
+
+Several flows use `anvil_impersonateAccount` instead of real authorization:
+
+| What | Who is impersonated | Production equivalent |
+|---|---|---|
+| L2 genesis upgrade | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade transactions |
+| L2 contract init | `SERVICE_TX_SENDER_ADDR` | Service transactions from sequencer |
+| GW chain registration | `ChainAssetHandler` address | Governance authorization flow |
+| Settlement layer notification | `L2_BOOTLOADER_ADDR` | Bootloader sets this at batch start |
+| ETH withdrawals on L2 | `L2_ASSET_ROUTER_ADDR` | ZKsync VM allows non-payable functions to receive ETH |
+| Governance calls | Governance contract address | Multi-sig / timelock flows |
+
+### Gateway Setup Shortcuts
+
+- **Fake diamond proxies**: Deterministic placeholder addresses are deployed on GW via `anvil_setCode` so that `L2Bridgehub.getZKChain(chainId)` returns non-zero. Production uses real diamond proxy deployments.
+- **Ownership transfers**: Uses `anvil_impersonateAccount` on Governance to accept 2-step ownership transfers instantly.
 
 ## Cleanup
 

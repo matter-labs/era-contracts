@@ -7,11 +7,14 @@ import type {
   CoreDeployedAddresses,
   CTMDeployedAddresses,
   AnvilConfig,
+  PriorityRequestData,
 } from "../core/types";
 import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig } from "../core/utils";
 import { SystemContractsDeployer } from "./system-contracts-deployer";
 import { L2GenesisUpgradeDeployer } from "./l2-genesis-upgrade-deployer";
 import { runForgeScript } from "../core/forge";
+import { NEW_PRIORITY_REQUEST_EVENT_SIG } from "../core/const";
+import { mailboxFacetAbi } from "../core/contracts";
 
 export class ChainRegistry {
   private l1RpcUrl: string;
@@ -86,7 +89,9 @@ export class ChainRegistry {
     };
   }
 
-  async registerChainBatch(configs: ChainConfig[]): Promise<ChainAddresses[]> {
+  async registerChainBatch(
+    configs: ChainConfig[]
+  ): Promise<{ chainAddresses: ChainAddresses[]; genesisPriorityTxs: Map<number, PriorityRequestData> }> {
     console.log(`📝 Registering ${configs.length} L2 chains in batch...`);
 
     // Generate all config files first
@@ -106,6 +111,9 @@ export class ChainRegistry {
       PERMANENT_VALUES_INPUT: "/test/anvil-interop/config/permanent-values.toml",
     };
 
+    // Record L1 block before forge script so we can scan for NewPriorityRequest events after
+    const blockBeforeRegistration = await this.l1Provider.getBlockNumber();
+
     await runForgeScript({
       scriptPath,
       envVars,
@@ -117,17 +125,69 @@ export class ChainRegistry {
     });
 
     // Parse per-chain outputs
-    const results: ChainAddresses[] = [];
+    const chainAddresses: ChainAddresses[] = [];
     for (const config of configs) {
       const outputPath = path.join(this.outputDir, `chain-${config.chainId}-output.toml`);
       const output = parseForgeScriptOutput(outputPath);
       console.log(`✅ Chain ${config.chainId} registered`);
-      results.push({
+      chainAddresses.push({
         chainId: config.chainId,
         diamondProxy: (output.diamond_proxy_addr || output.diamond_proxy) as string,
       });
     }
-    return results;
+
+    // Extract genesis priority transactions from L1 NewPriorityRequest events.
+    // Each chain's diamond proxy emits exactly one NewPriorityRequest during createNewChain()
+    // containing the real genesis upgrade calldata (L2ComplexUpgrader.upgrade → L2GenesisUpgrade).
+    const genesisPriorityTxs = await this.extractGenesisPriorityTxs(
+      chainAddresses,
+      blockBeforeRegistration + 1
+    );
+
+    return { chainAddresses, genesisPriorityTxs };
+  }
+
+  /**
+   * Scan L1 blocks for NewPriorityRequest events emitted during chain registration.
+   * Each diamond proxy emits exactly one event containing the genesis upgrade priority tx.
+   */
+  private async extractGenesisPriorityTxs(
+    chainAddresses: ChainAddresses[],
+    fromBlock: number
+  ): Promise<Map<number, PriorityRequestData>> {
+    const newPriorityRequestTopic = ethers.utils.id(NEW_PRIORITY_REQUEST_EVENT_SIG);
+    const latestBlock = await this.l1Provider.getBlockNumber();
+
+    const genesisTxs = new Map<number, PriorityRequestData>();
+    const mailboxIface = new ethers.utils.Interface(mailboxFacetAbi());
+
+    for (const chain of chainAddresses) {
+      const logs = await this.l1Provider.getLogs({
+        address: chain.diamondProxy,
+        topics: [newPriorityRequestTopic],
+        fromBlock,
+        toBlock: latestBlock,
+      });
+
+      if (logs.length === 0) {
+        throw new Error(`No NewPriorityRequest event found for chain ${chain.chainId} at ${chain.diamondProxy}`);
+      }
+
+      // Parse the first (and only) NewPriorityRequest event — this is the genesis upgrade
+      const parsed = mailboxIface.parseLog({ topics: logs[0].topics, data: logs[0].data });
+      const fromUint256 = ethers.BigNumber.from(parsed.args.transaction.from);
+      const toUint256 = ethers.BigNumber.from(parsed.args.transaction.to);
+
+      genesisTxs.set(chain.chainId, {
+        from: ethers.utils.getAddress(ethers.utils.hexZeroPad(fromUint256.toHexString(), 20)),
+        to: ethers.utils.getAddress(ethers.utils.hexZeroPad(toUint256.toHexString(), 20)),
+        calldata: parsed.args.transaction.data,
+        value: ethers.BigNumber.from(parsed.args.transaction.value),
+      });
+      console.log(`   Captured genesis priority tx for chain ${chain.chainId}`);
+    }
+
+    return genesisTxs;
   }
 
   private computeInteropChainIds(chainId: number, config: AnvilConfig): number[] {
@@ -143,38 +203,36 @@ export class ChainRegistry {
     return l2Chains.map((c) => c.chainId);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async initializeL2SystemContracts(chainId: number, _chainProxy: string, l2RpcUrl: string): Promise<void> {
+  async initializeL2SystemContracts(
+    chainId: number,
+    l2RpcUrl: string,
+    genesisPriorityTx?: PriorityRequestData
+  ): Promise<void> {
     console.log(`🔧 Initializing L2 system contracts for chain ${chainId}...`);
 
     const configPath = path.join(__dirname, "../../config/anvil-config.json");
-    let gatewayChainId = 1;
     let interopChainIds: number[] | undefined;
     if (fs.existsSync(configPath)) {
       const config: AnvilConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-      gatewayChainId = config.chains?.find((chain) => chain.isGateway)?.chainId ?? 1;
       interopChainIds = this.computeInteropChainIds(chainId, config);
     }
 
     const useGenesisUpgradeDeployer = process.env.ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE !== "0";
-    const deployer = useGenesisUpgradeDeployer
-      ? new L2GenesisUpgradeDeployer(
-          l2RpcUrl,
-          this.privateKey,
-          this.l1Addresses.l1SharedBridge,
-          this.l1Addresses.ctmDeploymentTracker,
-          this.l1Addresses.governance,
-          this.l1Addresses.chainRegistrationSender,
-          gatewayChainId
-        )
-      : new SystemContractsDeployer(l2RpcUrl, this.privateKey, this.l1Addresses.l1SharedBridge);
-
     if (useGenesisUpgradeDeployer) {
-      console.log("   Using L2GenesisUpgrade deployer path");
+      if (!genesisPriorityTx) {
+        throw new Error(
+          `Genesis priority tx required for chain ${chainId} when using L2GenesisUpgrade deployer. ` +
+            "Ensure registerChainBatch() captured the NewPriorityRequest events."
+        );
+      }
+      console.log("   Using real genesis upgrade (relaying L1 priority tx)");
+      const deployer = new L2GenesisUpgradeDeployer(l2RpcUrl);
+      await deployer.deployAllSystemContracts(chainId, genesisPriorityTx, interopChainIds);
     } else {
       console.log("   Using direct SystemContractsDeployer path");
+      const deployer = new SystemContractsDeployer(l2RpcUrl, this.privateKey, this.l1Addresses.l1SharedBridge);
+      await deployer.deployAllSystemContracts(chainId, interopChainIds);
     }
-    await deployer.deployAllSystemContracts(chainId, interopChainIds);
 
     console.log(`✅ L2 system contracts initialized for chain ${chainId}`);
   }

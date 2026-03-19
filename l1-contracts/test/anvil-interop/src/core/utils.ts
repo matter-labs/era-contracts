@@ -12,7 +12,7 @@ import {
   NEW_PRIORITY_REQUEST_EVENT_SIG,
 } from "./const";
 import { il1BridgehubAbi, mailboxFacetAbi } from "./contracts";
-import type { FinalizeWithdrawalParams, PriorityRequestData } from "./types";
+import type { AnvilChainConfig, ChainAddresses, ChainInfo, ChainRole, FinalizeWithdrawalParams, PriorityRequestData } from "./types";
 
 /**
  * Simple timing helper: call to start, invoke the returned function to log elapsed time.
@@ -96,7 +96,7 @@ export function ensureDirectoryExists(dirPath: string): void {
  * Find an L2 chain by chain ID in the deployment state, or throw.
  */
 export function getL2Chain(
-  chains: { l2: Array<{ chainId: number; rpcUrl: string }> },
+  chains: ChainInfo,
   chainId: number
 ): { chainId: number; rpcUrl: string } {
   const chain = chains.l2.find((c) => c.chainId === chainId);
@@ -110,7 +110,7 @@ export function getL2Chain(
  * Find a chain's diamond proxy address by chain ID, or throw.
  */
 export function getChainDiamondProxy(
-  chainAddresses: Array<{ chainId: number; diamondProxy: string }>,
+  chainAddresses: ChainAddresses[],
   chainId: number
 ): string {
   const addr = chainAddresses.find((c) => c.chainId === chainId);
@@ -123,7 +123,7 @@ export function getChainDiamondProxy(
 /**
  * Find the chain ID with a given role from the anvil config.
  */
-export function getChainIdByRole(config: Array<{ chainId: number; role?: string }>, role: string): number {
+export function getChainIdByRole(config: AnvilChainConfig[], role: ChainRole): number {
   const chain = config.find((c) => c.role === role);
   if (!chain) {
     throw new Error(`No chain with role '${role}' found in config`);
@@ -134,7 +134,7 @@ export function getChainIdByRole(config: Array<{ chainId: number; role?: string 
 /**
  * Find all chain IDs with a given role from the anvil config.
  */
-export function getChainIdsByRole(config: Array<{ chainId: number; role?: string }>, role: string): number[] {
+export function getChainIdsByRole(config: AnvilChainConfig[], role: ChainRole): number[] {
   return config.filter((c) => c.role === role).map((c) => c.chainId);
 }
 

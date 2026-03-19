@@ -176,7 +176,7 @@ export class DeploymentRunner {
     });
 
     const regDone = timeIt(`registerChains batch [${configs.map((c) => c.chainId).join(",")}]`);
-    const chainAddresses = await registry.registerChainBatch(configs);
+    const { chainAddresses, genesisPriorityTxs } = await registry.registerChainBatch(configs);
     regDone();
 
     for (const addr of chainAddresses) {
@@ -192,7 +192,11 @@ export class DeploymentRunner {
           throw new Error(`L2 chain ${chain.chainId} not found`);
         }
         const done = timeIt(`initializeL2 chain ${chain.chainId}`);
-        await registry.initializeL2SystemContracts(chain.chainId, chain.diamondProxy, l2Chain.rpcUrl);
+        await registry.initializeL2SystemContracts(
+          chain.chainId,
+          l2Chain.rpcUrl,
+          genesisPriorityTxs.get(chain.chainId)
+        );
         done();
         console.log(`  Chain ${chain.chainId} system contracts initialized`);
       })
