@@ -43,8 +43,11 @@ import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {
     BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS,
     ETH_TOKEN_ADDRESS,
+    HARD_CODED_CHAIN_ID,
+    MAINNET_CHAIN_ID,
     MAX_NEW_FACTORY_DEPS,
     REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+    SEPOLIA_CHAIN_ID,
     TWO_BRIDGES_MAGIC_VALUE
 } from "contracts/common/Config.sol";
 
@@ -55,6 +58,7 @@ import {
     BridgeHubAlreadyRegistered,
     CTMAlreadyRegistered,
     CTMNotRegistered,
+    ChainIdIsHardcoded,
     ChainIdTooBig,
     MsgValueMismatch,
     SharedBridgeNotSet,
@@ -760,6 +764,56 @@ contract ExperimentalBridgeTest is Test {
         vm.prank(deployerAddress);
         bridgehub.createNewChain({
             _chainId: chainId,
+            _chainTypeManager: address(mockCTM),
+            _baseTokenAssetId: tokenAssetId,
+            _salt: salt,
+            _admin: admin,
+            _initData: bytes(""),
+            _factoryDeps: new bytes[](0)
+        });
+    }
+
+    function test_RevertWhen_hardcodedChainIdOnMainnet(
+        uint256 salt,
+        uint256 randomValue
+    ) public useRandomToken(randomValue) {
+        admin = makeAddr("NEW_CHAIN_ADMIN");
+
+        vm.prank(bridgeOwner);
+        bridgehub.setPendingAdmin(deployerAddress);
+        vm.prank(deployerAddress);
+        bridgehub.acceptAdmin();
+
+        vm.chainId(MAINNET_CHAIN_ID);
+        vm.expectRevert(ChainIdIsHardcoded.selector);
+        vm.prank(deployerAddress);
+        bridgehub.createNewChain({
+            _chainId: HARD_CODED_CHAIN_ID,
+            _chainTypeManager: address(mockCTM),
+            _baseTokenAssetId: tokenAssetId,
+            _salt: salt,
+            _admin: admin,
+            _initData: bytes(""),
+            _factoryDeps: new bytes[](0)
+        });
+    }
+
+    function test_RevertWhen_hardcodedChainIdOnSepolia(
+        uint256 salt,
+        uint256 randomValue
+    ) public useRandomToken(randomValue) {
+        admin = makeAddr("NEW_CHAIN_ADMIN");
+
+        vm.prank(bridgeOwner);
+        bridgehub.setPendingAdmin(deployerAddress);
+        vm.prank(deployerAddress);
+        bridgehub.acceptAdmin();
+
+        vm.chainId(SEPOLIA_CHAIN_ID);
+        vm.expectRevert(ChainIdIsHardcoded.selector);
+        vm.prank(deployerAddress);
+        bridgehub.createNewChain({
+            _chainId: HARD_CODED_CHAIN_ID,
             _chainTypeManager: address(mockCTM),
             _baseTokenAssetId: tokenAssetId,
             _salt: salt,
