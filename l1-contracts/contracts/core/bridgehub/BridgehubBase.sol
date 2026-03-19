@@ -580,8 +580,9 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         // Chain ID 270 is the legacy hard-coded chain ID that the ZKsync server uses as a sentinel
         // "uninitialized" value during genesis, before the real chain ID is injected via L2GenesisUpgradeTxs.
         // SystemContext relies on this value being temporary and only present at the genesis stage.
-        // Allowing a real chain to be deployed with this ID would break SystemContext invariants.
-        if (_chainId == 270) {
+        // Allowing a real chain to be deployed with this ID on Ethereum mainnet or Sepolia would break
+        // SystemContext invariants.
+        if (_chainId == 270 && (block.chainid == 1 || block.chainid == 11155111)) {
             revert ChainIdForbidden(_chainId);
         }
 
