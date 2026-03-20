@@ -32,6 +32,10 @@ import "contracts/l2-upgrades/ISystemContractProxy.sol";
 contract L2GenesisForceDeploymentsHelperTest is Test {
     using L2GenesisForceDeploymentsHelper for *;
 
+    bytes32 internal constant CONTRACT_UPGRADED_SIG = keccak256("ContractUpgraded(uint8,address)");
+    bytes32 internal constant FORCE_DEPLOYED_CONTRACTS_INITIALIZED_SIG =
+        keccak256("ForceDeployedContractsInitialized(bool,bool)");
+
     // Test constants
     uint256 constant L1_CHAIN_ID = 1;
     uint256 constant ERA_CHAIN_ID = 270;
@@ -97,6 +101,10 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             true // _isGenesisUpgrade
         );
         vm.stopPrank();
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(_countLogs(logs, CONTRACT_UPGRADED_SIG), 0);
+        assertEq(_countLogs(logs, FORCE_DEPLOYED_CONTRACTS_INITIALIZED_SIG), 1);
 
         // Verify deployments occurred - use the etched contract at the system address
         MockZKOSContractDeployer etchedDeployer = MockZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
@@ -201,6 +209,14 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     }
 
     // Helper functions
+
+    function _countLogs(Vm.Log[] memory logs, bytes32 signature) internal pure returns (uint256 count) {
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics.length > 0 && logs[i].topics[0] == signature) {
+                count++;
+            }
+        }
+    }
 
     function _createFixedForceDeploymentsData(bool isGenesis) internal returns (FixedForceDeploymentsData memory) {
         FixedForceDeploymentsData memory data;
