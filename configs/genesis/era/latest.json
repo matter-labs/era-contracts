@@ -6,7 +6,7 @@
   },
   "genesis_root": "0x4268daf89efa2f09d184806a6c0ec0e003acf5c03623ac1a9fb7a967fcf34d6d",
   "genesis_rollup_leaf_index": 106,
-  "genesis_batch_commitment": "0x25803dd117add2d063ec9c8b6be31a26536ef01958656ac6449ffb81926b0875",
+  "genesis_batch_commitment": "0x218cbb1fd9615f1eb2aa2c627899fb8bf5a5eb4d2fcabc207ee3e5841aaec0a3",
   "bootloader_hash": "0x0100099b799188da75411d9c2815a792e60e031bc5f89c2938b6deced048ad83",
   "default_aa_hash": "0x010005f9940f6a710cc4332b8a31ad37fb661083e86104e9eb233e8fd745f39c",
   "evm_emulator_hash": "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63",
