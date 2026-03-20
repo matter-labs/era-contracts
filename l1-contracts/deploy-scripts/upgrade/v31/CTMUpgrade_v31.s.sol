@@ -9,13 +9,7 @@ import {Governance} from "contracts/governance/Governance.sol";
 
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {Call} from "contracts/governance/Common.sol";
 
@@ -26,7 +20,7 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
-import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
+import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 
@@ -104,10 +98,9 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     function getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
     ) internal view virtual override returns (address, bytes memory) {
-        bytes32 ethAssetId = IL1AssetRouter(address(bridgehub.assetRouter())).ETH_TOKEN_ASSET_ID();
         bytes memory l2UpgradeCalldata = abi.encodeCall(
-            IL2V29Upgrade.upgrade,
-            (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), ethAssetId)
+            IL2V31Upgrade.upgrade,
+            (uint256(0), address(0))
         );
         return (
             address(L2_COMPLEX_UPGRADER_ADDR),

@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_TRACKER_ADDR,
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR
+} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2AssetTracker} from "../bridge/asset-tracker/L2AssetTracker.sol";
 import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
+import {L2NativeTokenVault} from "../bridge/ntv/L2NativeTokenVault.sol";
+import {MissingBaseTokenAssetId} from "../bridge/asset-tracker/AssetTrackerErrors.sol";
+import {AddressMismatch, ChainIdMismatch} from "../common/L1ContractErrors.sol";
 import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
 import {V31AcrossRecovery} from "./V31AcrossRecovery.sol";
 import {IL2V31Upgrade} from "../upgrades/IL2V31Upgrade.sol";
@@ -14,17 +22,30 @@ import {IL2V31Upgrade} from "../upgrades/IL2V31Upgrade.sol";
 /// @dev This contract is called during the forceDeployAndUpgrade function of the ComplexUpgrader system contract.
 contract L2V31Upgrade is V31AcrossRecovery, IL2V31Upgrade {
     /// @inheritdoc IL2V31Upgrade
-    function upgrade(uint256, address) external {
+    function upgrade(uint256 _baseTokenOriginChainId, address _baseTokenOriginAddress) external {
         acrossRecovery();
-        // kl todo set baseTokenOriginChainId and baseTokenOriginAddress in some location.
-        // kl todo add all setAddresses, initL2 and updateL2s from genesis upgrade.
+
+        L2NativeTokenVault nativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        bytes32 baseTokenAssetId = nativeTokenVault.BASE_TOKEN_ASSET_ID();
+        if (baseTokenAssetId == bytes32(0)) {
+            revert MissingBaseTokenAssetId();
+        }
+
+        if (nativeTokenVault.originChainId(baseTokenAssetId) != _baseTokenOriginChainId) {
+            revert ChainIdMismatch();
+        }
+
+        address currentBaseTokenOriginAddress = nativeTokenVault.originToken(baseTokenAssetId);
+        if (currentBaseTokenOriginAddress != _baseTokenOriginAddress) {
+            revert AddressMismatch(_baseTokenOriginAddress, currentBaseTokenOriginAddress);
+        }
 
         // Register the base token in the asset tracker.
         IL2AssetTracker(L2_ASSET_TRACKER_ADDR).registerBaseTokenDuringUpgrade();
 
         // Initialize the L2BaseToken (sets L1_CHAIN_ID and BaseTokenHolder balance).
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(
-            IL2AssetTracker(L2_ASSET_TRACKER_ADDR).L1_CHAIN_ID()
+            L2AssetTracker(L2_ASSET_TRACKER_ADDR).L1_CHAIN_ID()
         );
     }
 }

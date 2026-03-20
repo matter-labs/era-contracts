@@ -5,7 +5,9 @@ import {Test} from "forge-std/Test.sol";
 import {
     SettlementLayerV31Upgrade,
     PriorityQueueNotReady,
-    NotAllBatchesExecuted
+    NotAllBatchesExecuted,
+    UnsupportedL2UpgradeSelector,
+    UnexpectedUpgradeTarget
 } from "contracts/upgrades/SettlementLayerV31Upgrade.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -20,6 +22,13 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
+import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
+import {
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_VERSION_SPECIFIC_UPGRADER_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 contract DummySettlementLayerV31Upgrade is SettlementLayerV31Upgrade, BaseUpgradeUtils {
     function setTotalBatchesCommitted(uint256 _totalBatchesCommitted) public {
@@ -50,6 +59,14 @@ contract DummySettlementLayerV31Upgrade is SettlementLayerV31Upgrade, BaseUpgrad
         return s.assetTracker;
     }
 
+    function getL2SystemContractsUpgradeTxHash() public view returns (bytes32) {
+        return s.l2SystemContractsUpgradeTxHash;
+    }
+
+    function getConstructedCalldata(address _bridgehub, uint256 _chainId) public view returns (bytes memory) {
+        return getL2V31UpgradeCalldata(_bridgehub, _chainId);
+    }
+
     function setChainTypeManager(address _chainTypeManager) public override {
         s.chainTypeManager = _chainTypeManager;
     }
@@ -72,6 +89,15 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
     uint256 internal gwChainId = 456;
     bytes32 internal baseTokenAssetId = keccak256("baseTokenAssetId");
 
+    function _prepareV31ProposedUpgrade() internal {
+        _prepareProposedUpgrade();
+        proposedUpgrade.l2ProtocolUpgradeTx.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
+        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgrader.upgrade,
+            (L2_VERSION_SPECIFIC_UPGRADER_ADDR, abi.encodeCall(IL2V31Upgrade.upgrade, (uint256(0), address(0))))
+        );
+    }
+
     function setUp() public {
         mockBridgehub = makeAddr("bridgehub");
         mockAssetRouter = makeAddr("assetRouter");
@@ -91,7 +117,7 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         upgrade.setPriorityTxMaxGasLimit(1 ether);
         upgrade.setPriorityTxMaxPubdata(1000000);
 
-        _prepareEmptyProposedUpgrade();
+        _prepareV31ProposedUpgrade();
 
         // Set up CTM for verifier lookup
         upgrade.setChainTypeManager(mockChainTypeManager);
@@ -269,6 +295,77 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         assertEq(result, Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE);
         // The __DEPRECATED_l2DAValidator should be set to address(0)
         // We can't directly check this in the test, but the upgrade should succeed
+    }
+
+    function test_ConstructsChainSpecificL2V31UpgradeCalldata() public {
+        _setupMocks();
+
+        bytes memory data = upgrade.getConstructedCalldata(mockBridgehub, testChainId);
+
+        assertEq(data, abi.encodeCall(IL2V31Upgrade.upgrade, (block.chainid, address(1))));
+    }
+
+    function test_RewritesForceDeployAndUpgradeWithChainSpecificV31Arguments() public {
+        _setupMocks();
+        _prepareV31ProposedUpgrade();
+
+        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = new IL2ContractDeployer.ForceDeployment[](1);
+        forceDeployments[0] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: keccak256("bytecode"),
+            newAddress: makeAddr("newAddress"),
+            callConstructor: false,
+            value: 0,
+            input: hex""
+        });
+
+        bytes memory originalV31Calldata = abi.encodeCall(IL2V31Upgrade.upgrade, (uint256(0), address(0)));
+        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgrade,
+            (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, originalV31Calldata)
+        );
+
+        bytes memory expectedV31Calldata = abi.encodeCall(IL2V31Upgrade.upgrade, (block.chainid, address(1)));
+        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgrade,
+            (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, expectedV31Calldata)
+        );
+        bytes32 expectedTxHash = keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx));
+
+        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgrade,
+            (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, originalV31Calldata)
+        );
+
+        upgrade.upgrade(proposedUpgrade);
+
+        assertEq(upgrade.getL2SystemContractsUpgradeTxHash(), expectedTxHash);
+    }
+
+    function test_RevertWhen_UpgradeTargetIsUnexpected() public {
+        _setupMocks();
+        _prepareV31ProposedUpgrade();
+
+        address wrongTarget = makeAddr("wrongTarget");
+        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgrader.upgrade,
+            (wrongTarget, abi.encodeCall(IL2V31Upgrade.upgrade, (uint256(0), address(0))))
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedUpgradeTarget.selector, wrongTarget));
+        upgrade.upgrade(proposedUpgrade);
+    }
+
+    function test_RevertWhen_L2UpgradePayloadHasUnexpectedSelector() public {
+        _setupMocks();
+        _prepareProposedUpgrade();
+
+        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgrader.upgrade,
+            (L2_VERSION_SPECIFIC_UPGRADER_ADDR, abi.encodeWithSignature("wrongSelector()"))
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(UnsupportedL2UpgradeSelector.selector, bytes4(keccak256("wrongSelector()"))));
+        upgrade.upgrade(proposedUpgrade);
     }
 
     function testFuzz_RevertWhen_BatchesMismatch(uint256 committed, uint256 executed) public {

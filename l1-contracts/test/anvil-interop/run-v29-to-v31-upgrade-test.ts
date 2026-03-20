@@ -16,12 +16,15 @@ import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
 import { runForgeScript } from "./src/core/forge";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_DEFAULT_PRIVATE_KEY } from "./src/core/const";
+import { L1_CHAIN_ID, L2_ASSET_TRACKER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR } from "./src/core/const";
 import { getAbi, getCreationBytecode } from "./src/core/contracts";
 import { transferOwnable2Step } from "./src/helpers/harness-shims";
+import { impersonateAndRun } from "./src/core/utils";
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");
 const totalStart = Date.now();
+const keepChains = process.env.ANVIL_INTEROP_KEEP_CHAINS === "1";
 
 function elapsed(): string {
   return `${((Date.now() - totalStart) / 1000).toFixed(1)}s`;
@@ -56,6 +59,151 @@ function prepareUpgradeHarnessInputs(): {
       console.log("  Removed temporary upgrade harness inputs");
     },
   };
+}
+
+function readNestedString(
+  value: Record<string, unknown>,
+  pathSegments: string[],
+  label: string
+): string {
+  let current: unknown = value;
+  for (const segment of pathSegments) {
+    if (!current || typeof current !== "object" || !(segment in current)) {
+      throw new Error(`Missing ${label} at ${pathSegments.join(".")}`);
+    }
+    current = (current as Record<string, unknown>)[segment];
+  }
+
+  if (typeof current !== "string" || current.length === 0) {
+    throw new Error(`Invalid ${label} at ${pathSegments.join(".")}`);
+  }
+
+  return current;
+}
+
+function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
+  const broadcast = JSON.parse(fs.readFileSync(broadcastPath, "utf8")) as {
+    transactions?: Array<{ input?: string; transaction?: { input?: string } }>;
+  };
+  const transactions = broadcast.transactions || [];
+  if (transactions.length === 0) {
+    throw new Error(`No transactions found in broadcast file ${broadcastPath}`);
+  }
+
+  const chainAdminIface = new ethers.utils.Interface(getAbi("ChainAdminOwnable"));
+  const adminIface = new ethers.utils.Interface(getAbi("AdminFacet"));
+  const settlementLayerUpgradeIface = new ethers.utils.Interface(getAbi("SettlementLayerV31Upgrade"));
+  for (const transaction of [...transactions].reverse()) {
+    const input = transaction.transaction?.input ?? transaction.input;
+    if (typeof input !== "string" || input.length <= 10) {
+      continue;
+    }
+
+    try {
+      const multicallDecoded = chainAdminIface.decodeFunctionData("multicall", input);
+      const calls = multicallDecoded[0] as Array<{ target: string; value: ethers.BigNumber; data: string }>;
+      if (calls.length !== 1) {
+        continue;
+      }
+
+      const adminCall = adminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data);
+      const diamondCutData = adminCall[1] as { initCalldata: string };
+      const proposedUpgrade = settlementLayerUpgradeIface.decodeFunctionData("upgrade", diamondCutData.initCalldata)[0] as {
+        l2ProtocolUpgradeTx: { from: ethers.BigNumber; to: ethers.BigNumber; value: ethers.BigNumber; data: string };
+      };
+
+      return proposedUpgrade.l2ProtocolUpgradeTx.data;
+    } catch {
+      continue;
+    }
+  }
+
+  throw new Error(`Missing upgradeChainFromVersion multicall input in ${broadcastPath}`);
+}
+
+async function executeL2UpgradeTxs(
+  l1Provider: ethers.providers.JsonRpcProvider,
+  anvilManager: AnvilManager,
+  bridgehubAddr: string,
+  settlementLayerUpgradeAddr: string,
+  chainAddresses: Array<{ chainId: number; diamondProxy: string }>,
+  upgradeTxDataByChainId: Map<number, string>
+): Promise<void> {
+  const settlementLayerUpgrade = new ethers.Contract(
+    settlementLayerUpgradeAddr,
+    getAbi("SettlementLayerV31Upgrade"),
+    l1Provider
+  );
+  const complexUpgraderIface = new ethers.utils.Interface(getAbi("L2ComplexUpgrader"));
+
+  for (const chain of chainAddresses) {
+    const l2Chain = anvilManager.getL2Chains().find((candidate) => candidate.chainId === chain.chainId);
+    if (!l2Chain) {
+      throw new Error(`Missing running L2 chain ${chain.chainId}`);
+    }
+
+    const l2Provider = new ethers.providers.JsonRpcProvider(l2Chain.rpcUrl);
+    const originalUpgradeTxData = upgradeTxDataByChainId.get(chain.chainId);
+    if (!originalUpgradeTxData) {
+      throw new Error(`Missing decoded L2 upgrade tx data for chain ${chain.chainId}`);
+    }
+    const l2V31UpgradeCalldata: string = await settlementLayerUpgrade.getL2V31UpgradeCalldata(
+      bridgehubAddr,
+      chain.chainId
+    );
+
+    const selector = originalUpgradeTxData.slice(0, 10);
+    let outerCalldata: string;
+    if (selector === complexUpgraderIface.getSighash("forceDeployAndUpgrade")) {
+      const decodedOuter = complexUpgraderIface.decodeFunctionData("forceDeployAndUpgrade", originalUpgradeTxData);
+      outerCalldata = complexUpgraderIface.encodeFunctionData("forceDeployAndUpgrade", [
+        decodedOuter[0],
+        decodedOuter[1],
+        l2V31UpgradeCalldata,
+      ]);
+    } else if (selector === complexUpgraderIface.getSighash("forceDeployAndUpgradeUniversal")) {
+      const decodedOuter = complexUpgraderIface.decodeFunctionData(
+        "forceDeployAndUpgradeUniversal",
+        originalUpgradeTxData
+      );
+      outerCalldata = complexUpgraderIface.encodeFunctionData("forceDeployAndUpgradeUniversal", [
+        decodedOuter[0],
+        decodedOuter[1],
+        l2V31UpgradeCalldata,
+      ]);
+    } else {
+      throw new Error(`Unexpected L2 upgrade selector for chain ${chain.chainId}: ${selector}`);
+    }
+
+    console.log(`  Chain ${chain.chainId}: executing relayed L2 upgrade tx`);
+    const relayReceipt = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
+      const tx = await signer.sendTransaction({
+        to: L2_COMPLEX_UPGRADER_ADDR,
+        data: outerCalldata,
+        gasLimit: 100_000_000,
+      });
+      return tx.wait();
+    });
+    if (relayReceipt.status !== 1) {
+      throw new Error(`L2 upgrade relay failed for chain ${chain.chainId}: ${relayReceipt.transactionHash}`);
+    }
+
+    const assetTracker = new ethers.Contract(L2_ASSET_TRACKER_ADDR, getAbi("L2AssetTracker"), l2Provider);
+    const assetTrackerL1ChainId = await assetTracker.L1_CHAIN_ID();
+    if (!assetTrackerL1ChainId.eq(L1_CHAIN_ID)) {
+      throw new Error(
+        `Chain ${chain.chainId} L2AssetTracker.L1_CHAIN_ID mismatch: expected ${L1_CHAIN_ID}, got ${assetTrackerL1ChainId.toString()}`
+      );
+    }
+
+    const baseTokenAssetId = await assetTracker.BASE_TOKEN_ASSET_ID();
+    const isBaseTokenRegistered = await assetTracker.isAssetRegistered(baseTokenAssetId);
+    if (!isBaseTokenRegistered) {
+      throw new Error(`Chain ${chain.chainId} base token was not registered by the relayed L2 upgrade`);
+    }
+
+    console.log(`  Chain ${chain.chainId}: relayed L2 upgrade executed successfully (${relayReceipt.transactionHash})`);
+  }
 }
 
 /**
@@ -283,8 +431,8 @@ async function main(): Promise<void> {
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const outputToml = parseToml(fs.readFileSync(ecosystemOutputPath, "utf-8")) as any;
-    const govCalls = outputToml.governance_calls;
+    const outputToml = parseToml(fs.readFileSync(ecosystemOutputPath, "utf-8")) as Record<string, unknown>;
+    const govCalls = outputToml.governance_calls as Record<string, string> | undefined;
     if (!govCalls) {
       throw new Error("No governance_calls section in ecosystem output");
     }
@@ -323,6 +471,12 @@ async function main(): Promise<void> {
     // ── Step 4: Upgrade each chain individually ─────────────────
     console.log(`\n=== Step 4: Upgrading individual chains (${elapsed()}) ===\n`);
 
+    const chainUpgradeBroadcastPath = path.join(
+      l1ContractsDir,
+      "broadcast/ChainUpgrade_v31.s.sol/31337/run-latest.json"
+    );
+    const upgradeTxDataByChainId = new Map<number, string>();
+
     for (const chain of chainAddresses) {
       console.log(`  Upgrading chain ${chain.chainId}...`);
       await runForgeScript({
@@ -334,7 +488,25 @@ async function main(): Promise<void> {
         sig: "run(address,uint256)",
         args: `${ctmAddress} ${chain.chainId}`,
       });
+      upgradeTxDataByChainId.set(chain.chainId, decodeLatestL2UpgradeTxData(chainUpgradeBroadcastPath));
     }
+
+    // ── Step 4.5: Execute relayed L2 upgrade txs ─────────────────
+    console.log(`\n=== Step 4.5: Executing relayed L2 upgrade txs (${elapsed()}) ===\n`);
+
+    const settlementLayerUpgradeAddr = readNestedString(
+      outputToml,
+      ["state_transition", "default_upgrade_addr"],
+      "SettlementLayerV31Upgrade address"
+    );
+    await executeL2UpgradeTxs(
+      provider,
+      anvilManager,
+      l1Addresses.bridgehub,
+      settlementLayerUpgradeAddr,
+      chainAddresses,
+      upgradeTxDataByChainId
+    );
 
     // ── Step 5: Run stage3 post-governance migration ─────────────
     console.log(`\n=== Step 5: Running stage3 migration (${elapsed()}) ===\n`);

@@ -596,7 +596,9 @@ library L2GenesisForceDeploymentsHelper {
             IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
         }
 
-        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
+        if (_isGenesisUpgrade) {
+            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
+        }
 
         emit PerformForceDeployedContractsInitCompleted();
     }
