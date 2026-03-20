@@ -707,6 +707,27 @@ contract L2BaseTokenZKOSTest is Test {
         );
     }
 
+    function test_totalSupply_worksWhenBaseTokenHolderBalanceGreaterThanInitial() public {
+        // Deploy at system address
+        L2BaseTokenZKOS l2BaseTokenAtSystemAddr = new L2BaseTokenZKOS();
+        vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, address(l2BaseTokenAtSystemAddr).code);
+
+        // Deploy BaseTokenHolder so holder balance is known
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, hex"00");
+        vm.deal(L2_BASE_TOKEN_HOLDER_ADDR, INITIAL_BASE_TOKEN_HOLDER_BALANCE + 100);
+
+        // Set the pre-V31 total supply
+        vm.prank(SERVICE_TRANSACTION_SENDER);
+        L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).setZKsyncOSPreV31TotalSupply(200);
+
+        // totalSupply = preV31Supply + INITIAL - holder.balance = 200 + INITIAL - (INITIAL + 100) = 100
+        assertEq(
+            L2BaseTokenZKOS(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).totalSupply(),
+            100,
+            "totalSupply returns wrong value"
+        );
+    }
+
     /*//////////////////////////////////////////////////////////////
                         INTERFACE COMPLIANCE
     //////////////////////////////////////////////////////////////*/
