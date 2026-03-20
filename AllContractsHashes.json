@@ -1501,13 +1501,13 @@
   },
   {
     "contractName": "l1-contracts/L2BaseTokenZKOS",
-    "zkBytecodeHash": "0x010001615f92c93af23fef348c0b885284f889971f68014b4a5efd3c62a5477e",
+    "zkBytecodeHash": "0x010001615286c6d6d0de1a99a2d72a27885fae9ac2243ff218af217dc88b32a1",
     "zkBytecodePath": "/l1-contracts/zkout/L2BaseTokenZKOS.sol/L2BaseTokenZKOS.json",
-    "evmBytecodeHash": "0x0e28a37b52425c900a9f4faa87a73dcfa8390f816ae324277cc251d16691f970",
+    "evmBytecodeHash": "0xf97b49b255246911a4b53acfb28b4aac412188d6bb60cc1164bf6c0d3b95b991",
     "evmBytecodePath": "/l1-contracts/out/L2BaseTokenZKOS.sol/L2BaseTokenZKOS.json",
-    "evmDeployedBytecodeHash": "0xb8e57e6a97d06825ccc6e44a7799498f9aa33270bb2b5dbe505be9b0802bd7f6",
-    "evmDeployedBytecodeBlakeHash": "0xac0b94438135bab53279f6338c4e8ab67ffdc6ad0f61b295b7749d3219e0501d",
-    "evmDeployedBytecodeLength": 3452
+    "evmDeployedBytecodeHash": "0xd9c628fe07f04c6f8d42ce8ff90e56b88d21557ccdd907ef018155ed26e947b6",
+    "evmDeployedBytecodeBlakeHash": "0x1bfc479190c12f776a699b59e6994c5957191ee24968ca46fe5b157d0b606070",
+    "evmDeployedBytecodeLength": 3453
   },
   {
     "contractName": "l1-contracts/L2Bridgehub",
