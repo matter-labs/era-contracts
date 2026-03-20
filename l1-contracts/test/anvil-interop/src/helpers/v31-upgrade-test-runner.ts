@@ -6,13 +6,21 @@ import { AnvilManager } from "../daemons/anvil-manager";
 import { DeploymentRunner } from "../deployment-runner";
 import { runForgeScript } from "../core/forge";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_DEFAULT_PRIVATE_KEY, L1_CHAIN_ID } from "../core/const";
-import { L2_ASSET_TRACKER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR } from "../core/const";
+import {
+  L2_ASSET_TRACKER_ADDR,
+  L2_COMPLEX_UPGRADER_ADDR,
+  L2_FORCE_DEPLOYER_ADDR,
+  L2_NATIVE_TOKEN_VAULT_ADDR,
+} from "../core/const";
 import { getAbi, getCreationBytecode } from "../core/contracts";
 import { transferOwnable2Step } from "./harness-shims";
 import { impersonateAndRun } from "../core/utils";
+import type { ChainRole } from "../core/types";
 
 const anvilInteropDir = path.resolve(__dirname, "../..");
 const l1ContractsDir = path.resolve(anvilInteropDir, "../..");
+const ECOSYSTEM_UPGRADE_TEST_SCRIPT =
+  "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:EcosystemUpgradeV31ForTests";
 
 export type V31UpgradeScenario = {
   label: string;
@@ -20,7 +28,62 @@ export type V31UpgradeScenario = {
   permanentValuesTemplatePath: string;
   upgradeInputTemplatePath: string;
   isZKsyncOS: boolean;
+  targetRoles: ChainRole[];
+  clearGenesisUpgradeTxHash?: boolean;
+  seedBatchCounters?: boolean;
+  transferL1AssetTrackerOwnership?: boolean;
 };
+
+async function clearGenesisUpgradeTxHash(
+  provider: ethers.providers.JsonRpcProvider,
+  chainAddresses: Array<{ chainId: number; diamondProxy: string }>
+): Promise<void> {
+  const L2_SYSTEM_CONTRACTS_UPGRADE_TX_HASH_SLOT = "0x22";
+
+  for (const chain of chainAddresses) {
+    await provider.send("anvil_setStorageAt", [
+      chain.diamondProxy,
+      L2_SYSTEM_CONTRACTS_UPGRADE_TX_HASH_SLOT,
+      ethers.constants.HashZero,
+    ]);
+  }
+}
+
+async function seedBatchCounters(
+  provider: ethers.providers.JsonRpcProvider,
+  chainAddresses: Array<{ chainId: number; diamondProxy: string }>
+): Promise<void> {
+  const TOTAL_BATCHES_EXECUTED_SLOT = ethers.utils.hexZeroPad(ethers.utils.hexlify(11), 32);
+  const TOTAL_BATCHES_COMMITTED_SLOT = ethers.utils.hexZeroPad(ethers.utils.hexlify(13), 32);
+  const ONE = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 32);
+
+  for (const chain of chainAddresses) {
+    await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_EXECUTED_SLOT, ONE]);
+    await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_COMMITTED_SLOT, ONE]);
+  }
+}
+
+async function seedBaseTokenAssetIds(
+  provider: ethers.providers.JsonRpcProvider,
+  bridgehubAddr: string,
+  chainAddresses: Array<{ chainId: number }>
+): Promise<void> {
+  const bridgehub = new ethers.Contract(bridgehubAddr, getAbi("IL1Bridgehub"), provider);
+  const BASE_TOKEN_ASSET_ID_SLOT = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 32);
+
+  for (const chain of chainAddresses) {
+    const baseTokenAssetId = await bridgehub.baseTokenAssetId(chain.chainId);
+    if (baseTokenAssetId === ethers.constants.HashZero) {
+      throw new Error(`Missing base token asset id for chain ${chain.chainId}`);
+    }
+
+    await provider.send("anvil_setStorageAt", [
+      L2_NATIVE_TOKEN_VAULT_ADDR,
+      BASE_TOKEN_ASSET_ID_SLOT,
+      baseTokenAssetId,
+    ]);
+  }
+}
 
 function replaceTomlStringValue(contents: string, key: string, value: string): string {
   const pattern = new RegExp(`^(${key}\\s*=\\s*\").*(\")$`, "m");
@@ -33,7 +96,7 @@ function replaceTomlStringValue(contents: string, key: string, value: string): s
 function replaceTomlBareValue(contents: string, key: string, value: string): string {
   const pattern = new RegExp(`^(${key}\\s*=\\s*).*$`, "m");
   if (!pattern.test(contents)) {
-    return `${contents.trimEnd()}\n${key} = ${value}\n`;
+    return `${key} = ${value}\n${contents}`;
   }
   return contents.replace(pattern, `$1${value}`);
 }
@@ -108,6 +171,21 @@ function readNestedString(value: Record<string, unknown>, pathSegments: string[]
   }
 
   return current;
+}
+
+function selectUpgradeChains(
+  chainAddresses: Array<{ chainId: number; diamondProxy: string }>,
+  chainConfigs: Array<{ chainId: number; role: ChainRole }>,
+  targetRoles: ChainRole[]
+): Array<{ chainId: number; diamondProxy: string }> {
+  const rolesByChainId = new Map(chainConfigs.map((config) => [config.chainId, config.role]));
+  return chainAddresses.filter((chain) => {
+    const role = rolesByChainId.get(chain.chainId);
+    if (!role) {
+      throw new Error(`Missing chain role for chain ${chain.chainId}`);
+    }
+    return targetRoles.includes(role);
+  });
 }
 
 function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
@@ -283,7 +361,11 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       throw new Error(`${scenario.stateVersion} chain states not found. Generate them first.`);
     }
 
-    const { l1Addresses, ctmAddresses, chainAddresses } = await runner.loadChainStates(anvilManager, stateDir);
+    const { chains, l1Addresses, ctmAddresses, chainAddresses } = await runner.loadChainStates(anvilManager, stateDir);
+    const upgradeChainAddresses = selectUpgradeChains(chainAddresses, chains.config, scenario.targetRoles);
+    if (upgradeChainAddresses.length === 0) {
+      throw new Error(`No chains matched upgrade roles ${scenario.targetRoles.join(", ")} for ${scenario.label}`);
+    }
     const l1Chain = anvilManager.getL1Chain();
     if (!l1Chain) {
       throw new Error("L1 chain not started");
@@ -291,11 +373,15 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
 
     const provider = new ethers.providers.JsonRpcProvider(l1Chain.rpcUrl);
     const defaultSigner = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
+    const shouldTransferL1AssetTrackerOwnership = scenario.transferL1AssetTrackerOwnership ?? true;
 
     await transferOwnership2Step(provider, defaultSigner, l1Addresses.governance, l1Addresses.bridgehub);
     await transferOwnership2Step(provider, defaultSigner, l1Addresses.governance, l1Addresses.l1SharedBridge);
+    await transferOwnership2Step(provider, defaultSigner, l1Addresses.governance, l1Addresses.l1NativeTokenVault);
     await transferOwnership2Step(provider, defaultSigner, l1Addresses.governance, ctmAddresses.chainTypeManager);
-    await transferOwnership2Step(provider, defaultSigner, l1Addresses.governance, l1Addresses.l1AssetTracker);
+    if (shouldTransferL1AssetTrackerOwnership) {
+      await transferOwnership2Step(provider, defaultSigner, l1Addresses.governance, l1Addresses.l1AssetTracker);
+    }
 
     const chainAdminFactory = new ethers.ContractFactory(
       getAbi("ChainAdminOwnable"),
@@ -303,7 +389,7 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       defaultSigner
     );
 
-    for (const chain of chainAddresses) {
+    for (const chain of upgradeChainAddresses) {
       const diamondProxy = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), provider);
       const currentAdmin = await diamondProxy.getAdmin();
       const chainAdmin = await chainAdminFactory.deploy(ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_DEFAULT_ACCOUNT_ADDR);
@@ -332,11 +418,15 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       await multicallTx.wait();
     }
 
-    const upgradeHarnessInputs = prepareUpgradeHarnessInputs(scenario, { l1Addresses, ctmAddresses, chainAddresses });
+    const upgradeHarnessInputs = prepareUpgradeHarnessInputs(scenario, {
+      l1Addresses,
+      ctmAddresses,
+      chainAddresses: upgradeChainAddresses,
+    });
     cleanupUpgradeHarnessInputs = upgradeHarnessInputs.cleanup;
 
     await runForgeScript({
-      scriptPath: "deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol:EcosystemUpgrade_v31",
+      scriptPath: ECOSYSTEM_UPGRADE_TEST_SCRIPT,
       envVars: upgradeHarnessInputs.envVars,
       rpcUrl: l1Chain.rpcUrl,
       senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
@@ -359,13 +449,21 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     await executeGovernanceCalls(provider, l1Addresses.governance, decodeGovernanceCalls(govCalls.stage1_calls), "Stage 1");
     await executeGovernanceCalls(provider, l1Addresses.governance, decodeGovernanceCalls(govCalls.stage2_calls), "Stage 2");
 
+    if (scenario.clearGenesisUpgradeTxHash) {
+      await clearGenesisUpgradeTxHash(provider, upgradeChainAddresses);
+    }
+    if (scenario.seedBatchCounters) {
+      await seedBatchCounters(provider, upgradeChainAddresses);
+    }
+    await seedBaseTokenAssetIds(provider, l1Addresses.bridgehub, upgradeChainAddresses);
+
     const chainUpgradeBroadcastPath = path.join(
       l1ContractsDir,
       "broadcast/ChainUpgrade_v31.s.sol/31337/run-latest.json"
     );
     const upgradeTxDataByChainId = new Map<number, string>();
 
-    for (const chain of chainAddresses) {
+    for (const chain of upgradeChainAddresses) {
       await runForgeScript({
         scriptPath: "deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol:ChainUpgrade_v31",
         envVars: {},
@@ -389,12 +487,12 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       anvilManager,
       l1Addresses.bridgehub,
       settlementLayerUpgradeAddr,
-      chainAddresses,
+      upgradeChainAddresses,
       upgradeTxDataByChainId
     );
 
     await runForgeScript({
-      scriptPath: "deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol:EcosystemUpgrade_v31",
+      scriptPath: ECOSYSTEM_UPGRADE_TEST_SCRIPT,
       envVars: upgradeHarnessInputs.envVars,
       rpcUrl: l1Chain.rpcUrl,
       senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
@@ -403,7 +501,7 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     });
 
     const expectedVersion = ethers.BigNumber.from("0x1f00000000");
-    for (const chain of chainAddresses) {
+    for (const chain of upgradeChainAddresses) {
       const diamondProxy = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), provider);
       const protocolVersion = await diamondProxy.getProtocolVersion();
       if (!protocolVersion.eq(expectedVersion)) {
