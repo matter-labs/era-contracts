@@ -4,7 +4,7 @@
     "minor": 31,
     "patch": 0
   },
-  "genesis_root": "0x2961187ecbc851a9ebdbad4978572bef3895e1fa964c93df54bcdd98ee7776d3",
+  "genesis_root": "0x4268daf89efa2f09d184806a6c0ec0e003acf5c03623ac1a9fb7a967fcf34d6d",
   "genesis_rollup_leaf_index": 106,
   "genesis_batch_commitment": "0x25803dd117add2d063ec9c8b6be31a26536ef01958656ac6449ffb81926b0875",
   "bootloader_hash": "0x0100099b799188da75411d9c2815a792e60e031bc5f89c2938b6deced048ad83",
