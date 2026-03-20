@@ -16,7 +16,7 @@ export function gwAssetTrackerAbi(): any[] {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function l2BridgehubAbi(): any[] {
-  return loadAbiFromOut("Bridgehub.sol/Bridgehub.json");
+  return loadAbiFromOut("L2Bridgehub.sol/L2Bridgehub.json");
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -33,7 +33,7 @@ export function l1AssetTrackerAbi(): any[] {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function l1BridgehubAbi(): any[] {
-  return loadAbiFromOut("Bridgehub.sol/Bridgehub.json");
+  return loadAbiFromOut("L1Bridgehub.sol/L1Bridgehub.json");
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -100,7 +100,7 @@ export function l2GenesisUpgradeAbi(): any[] {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function l2MessageRootAbi(): any[] {
-  return loadAbiFromOut("MessageRoot.sol/MessageRoot.json");
+  return loadAbiFromOut("L2MessageRoot.sol/L2MessageRoot.json");
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -120,7 +120,7 @@ export function ownable2StepAbi(): any[] {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function dummyL1MessageRootAbi(): any[] {
-  return loadAbiFromOut("MessageRoot.sol/MessageRoot.json");
+  return loadAbiFromOut("L1MessageRoot.sol/L1MessageRoot.json");
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

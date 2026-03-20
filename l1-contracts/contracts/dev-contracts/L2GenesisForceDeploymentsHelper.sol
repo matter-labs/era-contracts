@@ -3,13 +3,12 @@
 pragma solidity 0.8.28;
 
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {ICTMDeploymentTracker} from "../bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {L2Bridgehub} from "../bridgehub/L2Bridgehub.sol";
 
 address constant L2_ASSET_ROUTER = address(uint160(0x10000 + 0x03));
-IBridgehub constant L2_BRIDGE_HUB = IBridgehub(address(uint160(0x10000 + 0x02)));
+L2Bridgehub constant L2_BRIDGE_HUB = L2Bridgehub(address(uint160(0x10000 + 0x02)));
 IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(address(uint160(0x10000 + 0x05)));
 address constant L2_CHAIN_ASSET_HANDLER = address(uint160(0x10000 + 0x0a));
 
@@ -30,9 +29,11 @@ library L2GenesisForceDeploymentsHelper {
     /// @param _additionalForceDeploymentsData Encoded data for force deployments that
     /// is specific for each ZK Chain.
     function performForceDeployedContractsInit(
+        bool _isZKsyncOS,
         address _ctmDeployer,
         bytes memory _fixedForceDeploymentsData,
-        bytes memory _additionalForceDeploymentsData
+        bytes memory _additionalForceDeploymentsData,
+        bool _isGenesisUpgrade
     ) internal {
         // Decode the fixed and additional force deployments data.
         FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
@@ -47,6 +48,8 @@ library L2GenesisForceDeploymentsHelper {
         // Silence unused variable warnings — on the real ZKsync VM, these are used
         // to build ForceDeployment[] for IContractDeployer.forceDeployOnAddresses.
         // On Anvil, contracts are pre-deployed via anvil_setCode.
+        _isZKsyncOS;
+        _isGenesisUpgrade;
         fixedForceDeploymentsData;
         additionalForceDeploymentsData;
 

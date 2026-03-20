@@ -83,13 +83,17 @@ export class AnvilManager {
       args.push("--load-state", loadStatePath);
     }
 
+    let stderrOutput = "";
     const childProcess = spawn(anvilBinary, args, {
-      stdio: "ignore", // Must ignore all streams for detached process to truly detach
-      detached: true, // Detach from parent process
+      stdio: ["ignore", "ignore", "pipe"],
       env: {
         ...process.env,
         PATH: enrichedPath,
       },
+    });
+
+    childProcess.stderr?.on("data", (chunk: Buffer | string) => {
+      stderrOutput += chunk.toString();
     });
 
     await new Promise<void>((resolve, reject) => {
@@ -98,9 +102,6 @@ export class AnvilManager {
         reject(new Error(`Failed to spawn anvil (${anvilBinary}): ${error.message}`));
       });
     });
-
-    // Unref the process so the parent can exit while child continues
-    childProcess.unref();
 
     const chain: AnvilChain = {
       chainId,
@@ -117,6 +118,12 @@ export class AnvilManager {
 
     const isReady = await waitForChainReady(rpcUrl);
     if (!isReady) {
+      if (childProcess.exitCode !== null) {
+        console.error(`❌ Anvil exited early for chain ${chainId} with code ${childProcess.exitCode}`);
+      }
+      if (stderrOutput.trim()) {
+        console.error(stderrOutput.trim());
+      }
       throw new Error(`Failed to start ${formatChainInfo(chainId, port, isL1)}`);
     }
 

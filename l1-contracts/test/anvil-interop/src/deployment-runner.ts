@@ -63,7 +63,7 @@ export class DeploymentRunner {
 
   /** Return protocol version string for the current branch. */
   getProtocolVersionString(): string {
-    return "v0.29.0";
+    return "v0.30.0";
   }
 
   loadState(): DeploymentState {

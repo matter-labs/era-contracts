@@ -81,13 +81,13 @@ const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
   },
   {
     address: L2_MESSAGE_ROOT_ADDR,
-    name: "MessageRoot",
-    artifactPath: "MessageRoot.sol/MessageRoot.json",
+    name: "L2MessageRoot",
+    artifactPath: "L2MessageRoot.sol/L2MessageRoot.json",
   },
   {
     address: L2_BRIDGEHUB_ADDR,
-    name: "Bridgehub",
-    artifactPath: "Bridgehub.sol/Bridgehub.json",
+    name: "L2Bridgehub",
+    artifactPath: "L2Bridgehub.sol/L2Bridgehub.json",
   },
   {
     address: L2_ASSET_ROUTER_ADDR,
@@ -101,8 +101,8 @@ const PREDEPLOY_CONTRACTS: PredeployedContractSpec[] = [
   },
   {
     address: L2_CHAIN_ASSET_HANDLER_ADDR,
-    name: "ChainAssetHandler",
-    artifactPath: "ChainAssetHandler.sol/ChainAssetHandler.json",
+    name: "L2ChainAssetHandler",
+    artifactPath: "L2ChainAssetHandler.sol/L2ChainAssetHandler.json",
   },
   {
     address: L2_MESSAGE_VERIFICATION_ADDR,
@@ -178,6 +178,7 @@ export class L2GenesisUpgradeDeployer {
     const l2GenesisUpgradeAbiData = l2GenesisUpgradeAbi();
     const l2GenesisUpgradeInterface = new utils.Interface(l2GenesisUpgradeAbiData);
     const genesisUpgradeCalldata = l2GenesisUpgradeInterface.encodeFunctionData("genesisUpgrade", [
+      true,
       chainId,
       this.ctmDeployerAddress,
       fixedData,

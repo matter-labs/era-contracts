@@ -115,6 +115,10 @@ export class ChainRegistry {
 
     const chainConfig = {
       owner_address: ownerAddress,
+      initialize_legacy_bridge: false,
+      governance: this.l1Addresses.governance,
+      create2_factory_address: "0x4e59b44847b379578588920cA78FbF26c0B4956C",
+      create2_salt: "0x00000000000000000000000000000000000000000000000000000000000000ff",
       chain: {
         chain_chain_id: config.chainId,
         base_token_addr: config.baseToken,
@@ -124,8 +128,10 @@ export class ChainRegistry {
         base_token_gas_price_multiplier_denominator: 1,
         governance_security_council_address: "0x0000000000000000000000000000000000000000",
         governance_min_delay: 0,
-        validator_sender_operator_commit_eth: ownerAddress,
+        validator_sender_operator_eth: ownerAddress,
         validator_sender_operator_blobs_eth: ownerAddress,
+        validator_sender_operator_prove: ownerAddress,
+        validator_sender_operator_execute: ownerAddress,
         allow_evm_emulator: false,
       },
     };
