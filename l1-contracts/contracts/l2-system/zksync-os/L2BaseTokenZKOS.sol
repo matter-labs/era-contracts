@@ -53,7 +53,7 @@ contract L2BaseTokenZKOS is L2BaseTokenBase, IL2BaseTokenZKOS {
         if (L2_ASSET_TRACKER.needBaseTokenTotalSupplyBackfill()) {
             revert BaseTokenPreV31TotalSupplyNotSet();
         }
-        return zkosPreV31TotalSupply + (INITIAL_BASE_TOKEN_HOLDER_BALANCE - L2_BASE_TOKEN_HOLDER_ADDR.balance);
+        return zkosPreV31TotalSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE - L2_BASE_TOKEN_HOLDER_ADDR.balance;
     }
 
     /// @notice Sets the pre-V31 total supply for ZKOS chains and backfills the L2AssetTracker.
