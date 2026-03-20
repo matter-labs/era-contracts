@@ -29,6 +29,7 @@ error UnsupportedL2UpgradeSelector(bytes4 selector);
 error UnexpectedUpgradeTarget(address target);
 
 event L2V31UpgradeCalldataConstructed(address indexed bridgehub, uint256 indexed chainId, bytes data);
+event L2UpgradeTxDataConstructed(address indexed bridgehub, uint256 indexed chainId, bytes data);
 
 /// @author Matter Labs
 /// @title This contract will only be used on L1, since for V31 there will be no active GW, due the deprecation of EraGW, and the ZKSync OS GW launch will only happen after V31.
@@ -56,93 +57,12 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
 
         require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 
-        bytes memory l2V31UpgradeCalldata = getL2V31UpgradeCalldata(address(bridgehub), s.chainId);
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
-        bytes4 selector = bytes4(proposedUpgrade.l2ProtocolUpgradeTx.data);
-
-        if (selector == IComplexUpgrader.forceDeployAndUpgrade.selector) {
-            (
-                IL2ContractDeployer.ForceDeployment[] memory forceDeployments,
-                address delegateTo,
-                bytes memory existingUpgradeCalldata
-            ) = abi.decode(
-                proposedUpgrade.l2ProtocolUpgradeTx.data.slice(4),
-                (IL2ContractDeployer.ForceDeployment[], address, bytes)
-            );
-
-            if (bytes4(existingUpgradeCalldata) != IL2V31Upgrade.upgrade.selector) {
-                revert UnsupportedL2UpgradeSelector(bytes4(existingUpgradeCalldata));
-            }
-            if (delegateTo != L2_VERSION_SPECIFIC_UPGRADER_ADDR) {
-                revert UnexpectedUpgradeTarget(delegateTo);
-            }
-
-            proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
-                IComplexUpgrader.forceDeployAndUpgrade,
-                (forceDeployments, delegateTo, l2V31UpgradeCalldata)
-            );
-        } else if (selector == IComplexUpgrader.forceDeployAndUpgradeUniversal.selector) {
-            (
-                IComplexUpgrader.UniversalContractUpgradeInfo[] memory forceDeployments,
-                address delegateTo,
-                bytes memory existingUpgradeCalldata
-            ) = abi.decode(
-                proposedUpgrade.l2ProtocolUpgradeTx.data.slice(4),
-                (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes)
-            );
-
-            if (bytes4(existingUpgradeCalldata) != IL2V31Upgrade.upgrade.selector) {
-                revert UnsupportedL2UpgradeSelector(bytes4(existingUpgradeCalldata));
-            }
-            if (delegateTo != L2_VERSION_SPECIFIC_UPGRADER_ADDR) {
-                revert UnexpectedUpgradeTarget(delegateTo);
-            }
-
-            proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
-                IComplexUpgrader.forceDeployAndUpgradeUniversal,
-                (forceDeployments, delegateTo, l2V31UpgradeCalldata)
-            );
-        } else if (selector == IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal.selector) {
-            (
-                IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[] memory forceDeployments,
-                address delegateTo,
-                bytes memory existingUpgradeCalldata
-            ) = abi.decode(
-                proposedUpgrade.l2ProtocolUpgradeTx.data.slice(4),
-                (IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[], address, bytes)
-            );
-
-            if (bytes4(existingUpgradeCalldata) != IL2V31Upgrade.upgrade.selector) {
-                revert UnsupportedL2UpgradeSelector(bytes4(existingUpgradeCalldata));
-            }
-            if (delegateTo != L2_VERSION_SPECIFIC_UPGRADER_ADDR) {
-                revert UnexpectedUpgradeTarget(delegateTo);
-            }
-
-            proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
-                IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal,
-                (forceDeployments, delegateTo, l2V31UpgradeCalldata)
-            );
-        } else if (selector == IComplexUpgrader.upgrade.selector) {
-            (address delegateTo, bytes memory existingUpgradeCalldata) = abi.decode(
-                proposedUpgrade.l2ProtocolUpgradeTx.data.slice(4),
-                (address, bytes)
-            );
-
-            if (bytes4(existingUpgradeCalldata) != IL2V31Upgrade.upgrade.selector) {
-                revert UnsupportedL2UpgradeSelector(bytes4(existingUpgradeCalldata));
-            }
-            if (delegateTo != L2_VERSION_SPECIFIC_UPGRADER_ADDR) {
-                revert UnexpectedUpgradeTarget(delegateTo);
-            }
-
-            proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
-                IComplexUpgrader.upgrade,
-                (delegateTo, l2V31UpgradeCalldata)
-            );
-        } else {
-            revert UnsupportedL2UpgradeSelector(selector);
-        }
+        proposedUpgrade.l2ProtocolUpgradeTx.data = getL2UpgradeTxData(
+            address(bridgehub),
+            s.chainId,
+            proposedUpgrade.l2ProtocolUpgradeTx.data
+        );
 
         super.upgrade(proposedUpgrade);
         IMessageRootBase messageRoot = IMessageRootBase(bridgehub.messageRoot());
@@ -201,8 +121,99 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
             );
     }
 
+    function getL2UpgradeTxData(
+        address _bridgehub,
+        uint256 _chainId,
+        bytes memory _existingTxData
+    ) public view returns (bytes memory) {
+        bytes memory l2V31UpgradeCalldata = getL2V31UpgradeCalldata(_bridgehub, _chainId);
+        bytes4 selector = bytes4(_existingTxData);
+
+        if (selector == IComplexUpgrader.forceDeployAndUpgrade.selector) {
+            (
+                IL2ContractDeployer.ForceDeployment[] memory forceDeployments,
+                address delegateTo,
+                bytes memory existingUpgradeCalldata
+            ) = abi.decode(_existingTxData.slice(4), (IL2ContractDeployer.ForceDeployment[], address, bytes));
+
+            _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
+
+            return
+                abi.encodeCall(IComplexUpgrader.forceDeployAndUpgrade, (forceDeployments, delegateTo, l2V31UpgradeCalldata));
+        }
+
+        if (selector == IComplexUpgrader.forceDeployAndUpgradeUniversal.selector) {
+            (
+                IComplexUpgrader.UniversalContractUpgradeInfo[] memory forceDeployments,
+                address delegateTo,
+                bytes memory existingUpgradeCalldata
+            ) = abi.decode(
+                _existingTxData.slice(4),
+                (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes)
+            );
+
+            _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
+
+            return
+                abi.encodeCall(
+                    IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                    (forceDeployments, delegateTo, l2V31UpgradeCalldata)
+                );
+        }
+
+        if (selector == IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal.selector) {
+            (
+                IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[] memory forceDeployments,
+                address delegateTo,
+                bytes memory existingUpgradeCalldata
+            ) = abi.decode(
+                _existingTxData.slice(4),
+                (IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[], address, bytes)
+            );
+
+            _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
+
+            return
+                abi.encodeCall(
+                    IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal,
+                    (forceDeployments, delegateTo, l2V31UpgradeCalldata)
+                );
+        }
+
+        if (selector == IComplexUpgrader.upgrade.selector) {
+            (address delegateTo, bytes memory existingUpgradeCalldata) = abi.decode(
+                _existingTxData.slice(4),
+                (address, bytes)
+            );
+
+            _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
+
+            return abi.encodeCall(IComplexUpgrader.upgrade, (delegateTo, l2V31UpgradeCalldata));
+        }
+
+        revert UnsupportedL2UpgradeSelector(selector);
+    }
+
     function emitL2V31UpgradeCalldata(address _bridgehub, uint256 _chainId) external returns (bytes memory data) {
         data = getL2V31UpgradeCalldata(_bridgehub, _chainId);
         emit L2V31UpgradeCalldataConstructed(_bridgehub, _chainId, data);
+    }
+
+    function emitL2UpgradeTxData(
+        address _bridgehub,
+        uint256 _chainId,
+        bytes calldata _existingTxData
+    ) external returns (bytes memory data) {
+        data = getL2UpgradeTxData(_bridgehub, _chainId, _existingTxData);
+        emit L2UpgradeTxDataConstructed(_bridgehub, _chainId, data);
+    }
+
+    function _validateWrappedUpgrade(address _delegateTo, bytes memory _existingUpgradeCalldata) internal pure {
+        if (bytes4(_existingUpgradeCalldata) != IL2V31Upgrade.upgrade.selector) {
+            revert UnsupportedL2UpgradeSelector(bytes4(_existingUpgradeCalldata));
+        }
+        if (_delegateTo != L2_VERSION_SPECIFIC_UPGRADER_ADDR) {
+            revert UnexpectedUpgradeTarget(_delegateTo);
+        }
     }
 }
