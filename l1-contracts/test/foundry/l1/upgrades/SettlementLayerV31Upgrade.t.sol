@@ -23,6 +23,7 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {IComplexUpgraderZKsyncOSV29} from "contracts/state-transition/l2-deps/IComplexUpgraderZKsyncOSV29.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 import {
@@ -94,7 +95,10 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         proposedUpgrade.l2ProtocolUpgradeTx.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
         proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
             IComplexUpgrader.upgrade,
-            (L2_VERSION_SPECIFIC_UPGRADER_ADDR, abi.encodeCall(IL2V31Upgrade.upgrade, (uint256(0), address(0))))
+            (
+                L2_VERSION_SPECIFIC_UPGRADER_ADDR,
+                abi.encodeCall(IL2V31Upgrade.upgrade, (uint256(0), address(0), "", "", uint256(0)))
+            )
         );
     }
 
@@ -302,7 +306,7 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
 
         bytes memory data = upgrade.getConstructedCalldata(mockBridgehub, testChainId);
 
-        assertEq(data, abi.encodeCall(IL2V31Upgrade.upgrade, (block.chainid, address(1))));
+        assertEq(data, abi.encodeCall(IL2V31Upgrade.upgrade, (block.chainid, address(1), "Ether", "ETH", uint256(18))));
     }
 
     function test_RewritesForceDeployAndUpgradeWithChainSpecificV31Arguments() public {
@@ -318,13 +322,16 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
             input: hex""
         });
 
-        bytes memory originalV31Calldata = abi.encodeCall(IL2V31Upgrade.upgrade, (uint256(0), address(0)));
+        bytes memory originalV31Calldata = abi.encodeCall(IL2V31Upgrade.upgrade, (uint256(0), address(0), "", "", uint256(0)));
         proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
             IComplexUpgrader.forceDeployAndUpgrade,
             (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, originalV31Calldata)
         );
 
-        bytes memory expectedV31Calldata = abi.encodeCall(IL2V31Upgrade.upgrade, (block.chainid, address(1)));
+        bytes memory expectedV31Calldata = abi.encodeCall(
+            IL2V31Upgrade.upgrade,
+            (block.chainid, address(1), "Ether", "ETH", uint256(18))
+        );
         proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
             IComplexUpgrader.forceDeployAndUpgrade,
             (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, expectedV31Calldata)
@@ -341,6 +348,82 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         assertEq(upgrade.getL2SystemContractsUpgradeTxHash(), expectedTxHash);
     }
 
+    function test_RewritesForceDeployAndUpgradeUniversalWithChainSpecificV31Arguments() public {
+        _setupMocks();
+        _prepareV31ProposedUpgrade();
+
+        IComplexUpgrader.UniversalContractUpgradeInfo[]
+            memory forceDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
+        forceDeployments[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+            deployedBytecodeInfo: abi.encode(bytes32(uint256(1)), uint32(1), bytes32(uint256(2))),
+            newAddress: makeAddr("newAddress")
+        });
+
+        bytes memory originalV31Calldata = abi.encodeCall(IL2V31Upgrade.upgrade, (uint256(0), address(0), "", "", uint256(0)));
+        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgradeUniversal,
+            (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, originalV31Calldata)
+        );
+
+        bytes memory expectedV31Calldata = abi.encodeCall(
+            IL2V31Upgrade.upgrade,
+            (block.chainid, address(1), "Ether", "ETH", uint256(18))
+        );
+        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgradeUniversal,
+            (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, expectedV31Calldata)
+        );
+        bytes32 expectedTxHash = keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx));
+
+        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgradeUniversal,
+            (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, originalV31Calldata)
+        );
+
+        upgrade.upgrade(proposedUpgrade);
+
+        assertEq(upgrade.getL2SystemContractsUpgradeTxHash(), expectedTxHash);
+    }
+
+    function test_RewritesLegacyForceDeployAndUpgradeUniversalWithChainSpecificV31Arguments() public {
+        _setupMocks();
+        _prepareV31ProposedUpgrade();
+
+        IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[]
+            memory forceDeployments = new IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[](1);
+        forceDeployments[0] = IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo({
+            isZKsyncOS: true,
+            deployedBytecodeInfo: abi.encode(bytes32(uint256(1)), uint32(1), bytes32(uint256(2))),
+            newAddress: makeAddr("newAddress")
+        });
+
+        bytes memory originalV31Calldata = abi.encodeCall(IL2V31Upgrade.upgrade, (uint256(0), address(0), "", "", uint256(0)));
+        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal,
+            (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, originalV31Calldata)
+        );
+
+        bytes memory expectedV31Calldata = abi.encodeCall(
+            IL2V31Upgrade.upgrade,
+            (block.chainid, address(1), "Ether", "ETH", uint256(18))
+        );
+        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal,
+            (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, expectedV31Calldata)
+        );
+        bytes32 expectedTxHash = keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx));
+
+        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+            IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal,
+            (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, originalV31Calldata)
+        );
+
+        upgrade.upgrade(proposedUpgrade);
+
+        assertEq(upgrade.getL2SystemContractsUpgradeTxHash(), expectedTxHash);
+    }
+
     function test_RevertWhen_UpgradeTargetIsUnexpected() public {
         _setupMocks();
         _prepareV31ProposedUpgrade();
@@ -348,7 +431,7 @@ contract SettlementLayerV31UpgradeTest is BaseUpgrade {
         address wrongTarget = makeAddr("wrongTarget");
         proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
             IComplexUpgrader.upgrade,
-            (wrongTarget, abi.encodeCall(IL2V31Upgrade.upgrade, (uint256(0), address(0))))
+            (wrongTarget, abi.encodeCall(IL2V31Upgrade.upgrade, (uint256(0), address(0), "", "", uint256(0))))
         );
 
         vm.expectRevert(abi.encodeWithSelector(UnexpectedUpgradeTarget.selector, wrongTarget));

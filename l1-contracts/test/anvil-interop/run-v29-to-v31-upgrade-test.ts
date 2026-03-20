@@ -135,6 +135,7 @@ async function executeL2UpgradeTxs(
     l1Provider
   );
   const complexUpgraderIface = new ethers.utils.Interface(getAbi("L2ComplexUpgrader"));
+  const legacyComplexUpgraderIface = new ethers.utils.Interface(getAbi("IComplexUpgraderZKsyncOSV29"));
 
   for (const chain of chainAddresses) {
     const l2Chain = anvilManager.getL2Chains().find((candidate) => candidate.chainId === chain.chainId);
@@ -167,6 +168,16 @@ async function executeL2UpgradeTxs(
         originalUpgradeTxData
       );
       outerCalldata = complexUpgraderIface.encodeFunctionData("forceDeployAndUpgradeUniversal", [
+        decodedOuter[0],
+        decodedOuter[1],
+        l2V31UpgradeCalldata,
+      ]);
+    } else if (selector === legacyComplexUpgraderIface.getSighash("forceDeployAndUpgradeUniversal")) {
+      const decodedOuter = legacyComplexUpgraderIface.decodeFunctionData(
+        "forceDeployAndUpgradeUniversal",
+        originalUpgradeTxData
+      );
+      outerCalldata = legacyComplexUpgraderIface.encodeFunctionData("forceDeployAndUpgradeUniversal", [
         decodedOuter[0],
         decodedOuter[1],
         l2V31UpgradeCalldata,

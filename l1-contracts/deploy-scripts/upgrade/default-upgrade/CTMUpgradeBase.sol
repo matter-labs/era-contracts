@@ -81,7 +81,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     /// @notice Get L2 upgrade target and data
     function getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
-    ) internal view virtual returns (address, bytes memory) {
+    ) internal virtual returns (address, bytes memory) {
         return (
             address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR),
             abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (_forceDeployments))
@@ -94,7 +94,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         uint256[] memory factoryDepsHashes,
         uint256 protocolUpgradeNonce,
         bool isZKsyncOS
-    ) internal view returns (L2CanonicalTransaction memory transaction) {
+    ) internal returns (L2CanonicalTransaction memory transaction) {
         // Sanity check
         for (uint256 i; i < forceDeployments.length; i++) {
             require(isHashInFactoryDepsCheck(forceDeployments[i].bytecodeHash), "Bytecode hash not in factory deps");

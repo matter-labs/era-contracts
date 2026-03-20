@@ -19,8 +19,10 @@ import {
     L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {IComplexUpgraderZKsyncOSV29} from "contracts/state-transition/l2-deps/IComplexUpgraderZKsyncOSV29.sol";
 
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
+import {Utils} from "../../utils/Utils.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 
@@ -97,11 +99,32 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
     function getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
-    ) internal view virtual override returns (address, bytes memory) {
+    ) internal virtual override returns (address, bytes memory) {
         bytes memory l2UpgradeCalldata = abi.encodeCall(
             IL2V31Upgrade.upgrade,
-            (uint256(0), address(0))
+            (uint256(0), address(0), "", "", uint256(0))
         );
+
+        if (config.isZKsyncOS) {
+            // The tx is executed by the pre-v31 L2ComplexUpgrader, so it must use the
+            // latest pre-upgrade ABI exposed on zksync-os-stable.
+            IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[]
+                memory universalForceDeployments = new IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[](1);
+            universalForceDeployments[0] = IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo({
+                isZKsyncOS: true,
+                deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade"),
+                newAddress: L2_VERSION_SPECIFIC_UPGRADER_ADDR
+            });
+
+            return (
+                address(L2_COMPLEX_UPGRADER_ADDR),
+                abi.encodeCall(
+                    IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal,
+                    (universalForceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
+                )
+            );
+        }
+
         return (
             address(L2_COMPLEX_UPGRADER_ADDR),
             abi.encodeCall(

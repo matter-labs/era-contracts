@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.28;
 
+import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
+
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
@@ -12,11 +14,13 @@ import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
+import {IComplexUpgraderZKsyncOSV29} from "../state-transition/l2-deps/IComplexUpgraderZKsyncOSV29.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {Bytes} from "../vendor/Bytes.sol";
+import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 
 error PriorityQueueNotReady();
 error V31UpgradeGatewayBlockNumberNotSet();
@@ -77,6 +81,48 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
                 IComplexUpgrader.forceDeployAndUpgrade,
                 (forceDeployments, delegateTo, l2V31UpgradeCalldata)
             );
+        } else if (selector == IComplexUpgrader.forceDeployAndUpgradeUniversal.selector) {
+            (
+                IComplexUpgrader.UniversalContractUpgradeInfo[] memory forceDeployments,
+                address delegateTo,
+                bytes memory existingUpgradeCalldata
+            ) = abi.decode(
+                proposedUpgrade.l2ProtocolUpgradeTx.data.slice(4),
+                (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes)
+            );
+
+            if (bytes4(existingUpgradeCalldata) != IL2V31Upgrade.upgrade.selector) {
+                revert UnsupportedL2UpgradeSelector(bytes4(existingUpgradeCalldata));
+            }
+            if (delegateTo != L2_VERSION_SPECIFIC_UPGRADER_ADDR) {
+                revert UnexpectedUpgradeTarget(delegateTo);
+            }
+
+            proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (forceDeployments, delegateTo, l2V31UpgradeCalldata)
+            );
+        } else if (selector == IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal.selector) {
+            (
+                IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[] memory forceDeployments,
+                address delegateTo,
+                bytes memory existingUpgradeCalldata
+            ) = abi.decode(
+                proposedUpgrade.l2ProtocolUpgradeTx.data.slice(4),
+                (IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[], address, bytes)
+            );
+
+            if (bytes4(existingUpgradeCalldata) != IL2V31Upgrade.upgrade.selector) {
+                revert UnsupportedL2UpgradeSelector(bytes4(existingUpgradeCalldata));
+            }
+            if (delegateTo != L2_VERSION_SPECIFIC_UPGRADER_ADDR) {
+                revert UnexpectedUpgradeTarget(delegateTo);
+            }
+
+            proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
+                IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal,
+                (forceDeployments, delegateTo, l2V31UpgradeCalldata)
+            );
         } else if (selector == IComplexUpgrader.upgrade.selector) {
             (address delegateTo, bytes memory existingUpgradeCalldata) = abi.decode(
                 proposedUpgrade.l2ProtocolUpgradeTx.data.slice(4),
@@ -127,13 +173,30 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         address nativeTokenVaultAddr = address(IL1AssetRouter(assetRouter).nativeTokenVault());
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(_chainId);
         INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(nativeTokenVaultAddr);
+        address originToken = nativeTokenVault.originToken(baseTokenAssetId);
+        string memory baseTokenName;
+        string memory baseTokenSymbol;
+        uint256 baseTokenDecimals;
+
+        if (originToken == ETH_TOKEN_ADDRESS) {
+            baseTokenName = "Ether";
+            baseTokenSymbol = "ETH";
+            baseTokenDecimals = 18;
+        } else {
+            baseTokenName = IERC20Metadata(originToken).name();
+            baseTokenSymbol = IERC20Metadata(originToken).symbol();
+            baseTokenDecimals = IERC20Metadata(originToken).decimals();
+        }
 
         return
             abi.encodeCall(
                 IL2V31Upgrade.upgrade,
                 (
                     nativeTokenVault.originChainId(baseTokenAssetId),
-                    nativeTokenVault.originToken(baseTokenAssetId)
+                    originToken,
+                    baseTokenName,
+                    baseTokenSymbol,
+                    baseTokenDecimals
                 )
             );
     }
