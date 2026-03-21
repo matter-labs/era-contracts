@@ -354,6 +354,7 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
   const anvilManager = new AnvilManager();
   const runner = new DeploymentRunner();
   let cleanupUpgradeHarnessInputs: (() => void) | null = null;
+  const keepChains = process.env.ANVIL_INTEROP_KEEP_CHAINS === "1";
 
   try {
     const stateDir = path.join(anvilInteropDir, "chain-states", scenario.stateVersion);
@@ -514,6 +515,8 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     if (cleanupUpgradeHarnessInputs) {
       cleanupUpgradeHarnessInputs();
     }
-    await anvilManager.stopAll();
+    if (!keepChains) {
+      await anvilManager.stopAll();
+    }
   }
 }
