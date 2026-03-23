@@ -219,14 +219,6 @@ async function main(): Promise<void> {
         l2ChainRpcUrls.set(l2Chain.chainId, l2Chain.rpcUrl);
       }
 
-      // Deploy test tokens if not already present in the preloaded state.
-      // When state was generated with setup-and-dump-state.ts, tokens are included in the dump.
-      const preloadedState = runner.loadState();
-      const hasTestTokens = preloadedState.testTokens && Object.keys(preloadedState.testTokens).length > 0;
-      if (!hasTestTokens) {
-        await timedAsync("deploy:test-token", () => deployTestTokens());
-      }
-
       // Run Token Balance Migration (TBM) for test tokens on GW-settled chains.
       // Test tokens are native to their respective L2 chains. After gateway migration,
       // outgoing transfers from GW-settled chains require assetMigrationNumber == migrationNumber.

@@ -20,6 +20,7 @@ import type {
 import { getChainIdsByRole, timeIt } from "./core/utils";
 import { getAbi } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./core/const";
+import { deployTestTokens } from "./helpers/deploy-test-token";
 
 export interface StartChainOptions {
   blockTime?: number;
@@ -581,4 +582,44 @@ export class DeploymentRunner {
 
     return { gatewayCTMAddr };
   }
+
+  /**
+   * Run full deployment and deploy test tokens.
+   *
+   * This is the shared setup flow used by both `setup-and-dump-state.ts` and
+   * `run-hardhat-interop-test.ts`.  It encapsulates:
+   *   1. Run full deployment (start chains + deploy contracts)
+   *   2. Deploy test tokens (if not already present in state)
+   *
+   * Callers can customise behaviour via `DeployAndSetupOptions`.
+   */
+  async deployAndSetup(
+    anvilManager: AnvilManager,
+    options?: DeployAndSetupOptions
+  ): Promise<FullDeploymentResult> {
+    const startChainOptions: StartChainOptions | undefined = options?.startChainOptions;
+
+    const result = await this.runFullDeployment(anvilManager, startChainOptions);
+
+    // Deploy test tokens unless the caller opted out.
+    if (options?.deployTestTokens !== false) {
+      const state = this.loadState();
+      const hasTestTokens = state.testTokens && Object.keys(state.testTokens).length > 0;
+      if (!hasTestTokens) {
+        await deployTestTokens();
+      }
+    }
+
+    return result;
+  }
+}
+
+export interface DeployAndSetupOptions {
+  /** Options forwarded to `runFullDeployment` → `step1StartChains`. */
+  startChainOptions?: StartChainOptions;
+  /**
+   * Whether to deploy test ERC-20 tokens after deployment.
+   * Defaults to `true`.  Set to `false` to skip token deployment.
+   */
+  deployTestTokens?: boolean;
 }
