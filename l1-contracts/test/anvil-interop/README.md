@@ -223,11 +223,12 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 
 ## Adding New Tests
 
-Test specs live in `test/hardhat/` and are listed in the `allSpecFiles` array in `run-hardhat-interop-test.ts`. To add a new test:
+Test specs are auto-discovered from `test/hardhat/` — any file matching `NN-*.spec.ts` is included automatically. To add a new test:
 
 1. Create a new spec file in `test/hardhat/` (e.g., `07-my-test.spec.ts`)
-2. Add it to the `allSpecFiles` array in `run-hardhat-interop-test.ts`
-3. The spec can load deployment state via `new DeploymentRunner().loadState()`
+2. The spec can load deployment state via `new DeploymentRunner().loadState()`
+
+No need to register the file anywhere — it's picked up by the naming convention.
 
 ### Adding a New Chain
 
