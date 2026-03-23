@@ -25,12 +25,17 @@ export class L2GenesisUpgradeDeployer {
     this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
   }
 
-  private async bootstrapSystemContractPrestate(contractSpec: SystemContractPredeploy): Promise<void> {
+  private async bootstrapSystemContractPrestate(
+    contractSpec: SystemContractPredeploy,
+    expectExisting: boolean = false
+  ): Promise<void> {
     const existingCode = await this.l2Provider.getCode(contractSpec.address);
     if (existingCode !== "0x" && existingCode !== "0x0") {
-      // Expected when loading pregenerated chain state (contracts already deployed).
-      // Only checks code is non-empty; does not verify it matches the expected bytecode.
-      console.log(`   ✅ ${contractSpec.contractName} already deployed at ${contractSpec.address} (skipped)`);
+      if (!expectExisting) {
+        throw new Error(
+          `${contractSpec.contractName} already has code at ${contractSpec.address} — unexpected during fresh deploy`
+        );
+      }
       return;
     }
 
