@@ -75,12 +75,20 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
       const after = await tracker.takeSnapshot(directSettledChainId, assetId, undefined, undefined, walletAddr, false);
 
       const deltas = computeBalanceDeltas(before, after);
+
+      // L1AssetTracker.chainBalance should increase by mintValue
       expect(
         deltas.l1ChainBalanceDelta.eq(result.mintValue),
         `L1AssetTracker.chainBalance should increase by ${result.mintValue.toString()}, got ${deltas.l1ChainBalanceDelta.toString()}`
       ).to.equal(true);
 
-      // Recipient's L2 ETH balance should increase (exact amount differs due to gas costs)
+      // Sender's L1 ETH balance should decrease (by at least mintValue; gas costs add to the decrease)
+      expect(
+        deltas.l1TokenDelta.lte(result.mintValue.mul(-1)),
+        `Sender L1 ETH balance should decrease by at least ${result.mintValue.toString()}, got delta ${deltas.l1TokenDelta.toString()}`
+      ).to.equal(true);
+
+      // Recipient's L2 ETH balance should increase (exact amount differs due to gas costs on relay)
       expect(
         deltas.l2TokenDelta.gt(0),
         `Recipient L2 ETH balance should increase after deposit, got delta ${deltas.l2TokenDelta.toString()}`
@@ -117,13 +125,21 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
       const after = await tracker.takeSnapshot(directSettledChainId, assetId, undefined, undefined, walletAddr, false);
 
       const deltas = computeBalanceDeltas(before, after);
-      // Chain balance should decrease (delta is negative)
+
+      // L1AssetTracker.chainBalance should decrease by the withdrawal amount
       expect(
         deltas.l1ChainBalanceDelta.eq(amount.mul(-1)),
         `L1AssetTracker.chainBalance should decrease by ${amount.toString()}, got ${deltas.l1ChainBalanceDelta.toString()}`
       ).to.equal(true);
 
-      // L2 balance should decrease (by at least the withdrawal amount; gas costs cause additional decrease)
+      // Recipient's L1 ETH balance should increase (the wallet both pays gas for finalization
+      // and receives the withdrawal, so net increase is less than the withdrawal amount)
+      expect(
+        deltas.l1TokenDelta.gt(0),
+        `Recipient L1 ETH balance should increase after withdrawal, got delta ${deltas.l1TokenDelta.toString()}`
+      ).to.equal(true);
+
+      // Sender's L2 ETH balance should decrease (by at least the withdrawal amount; gas costs cause additional decrease)
       expect(
         deltas.l2TokenDelta.lte(amount.mul(-1)),
         `L2 ETH balance should decrease by at least ${amount.toString()}, got delta ${deltas.l2TokenDelta.toString()}`
