@@ -242,7 +242,7 @@ export function createBalanceTrackerFromState(state: DeploymentState): BalanceTr
     l2Providers.set(l2.chainId, new providers.JsonRpcProvider(l2.rpcUrl));
   }
 
-  const gwChainId = state.chains.config.find((c) => c.isGateway)?.chainId;
+  const gwChainId = state.chains.config.find((c) => c.role === "gateway")?.chainId;
 
   return new BalanceTracker(l1Provider, l2Providers, state.l1Addresses, gwChainId);
 }

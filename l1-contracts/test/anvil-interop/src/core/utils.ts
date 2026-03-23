@@ -22,6 +22,7 @@ import type {
   ChainInfo,
   ChainRole,
   FinalizeWithdrawalParams,
+  L2ChainInfo,
   PriorityRequestData,
 } from "./types";
 
@@ -117,7 +118,7 @@ export function ensureDirectoryExists(dirPath: string): void {
 /**
  * Find an L2 chain by chain ID in the deployment state, or throw.
  */
-export function getL2Chain(chains: ChainInfo, chainId: number): { chainId: number; rpcUrl: string } {
+export function getL2Chain(chains: ChainInfo, chainId: number): L2ChainInfo {
   const chain = chains.l2.find((c) => c.chainId === chainId);
   if (!chain) {
     throw new Error(`L2 chain ${chainId} not found. Available: ${chains.l2.map((c) => c.chainId).join(", ")}`);

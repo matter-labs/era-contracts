@@ -128,9 +128,9 @@ export class DeploymentRunner {
       return {
         chainId: l2Chain.chainId,
         rpcUrl: l2Chain.rpcUrl,
-        baseToken: ETH_TOKEN_ADDRESS,
-        validiumMode: false,
-        isGateway: chainConfig.isGateway ?? false,
+        baseToken: ETH_TOKEN_ADDRESS, // TODO: support non-ETH base tokens EVM-1297
+        validiumMode: false, // TODO: support validium mode (requires batch settlement) EVM-1297
+        isGateway: chainConfig.role === "gateway",
       };
     });
   }
@@ -529,7 +529,7 @@ export class DeploymentRunner {
     );
 
     // Step 5: Setup gateway if configured
-    const gatewayConfig = config.chains.find((c) => c.isGateway);
+    const gatewayConfig = config.chains.find((c) => c.role === "gateway");
     if (gatewayConfig) {
       const gwChain = this.getGatewayChainOrThrow(gatewayConfig.chainId, chains.l2);
       const l2ChainRpcUrls = this.toRpcUrlMap(chains.l2);

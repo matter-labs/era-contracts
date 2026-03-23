@@ -202,7 +202,7 @@ async function main(): Promise<void> {
         throw new Error("L1 chain not found");
       }
 
-      const gatewayConfig = config.chains.find((c) => c.isGateway);
+      const gatewayConfig = config.chains.find((c) => c.role === "gateway");
       const gatewayChainId = gatewayConfig?.chainId;
       const gwChain = chains.l2.find((c) => c.chainId === gatewayChainId);
       const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");

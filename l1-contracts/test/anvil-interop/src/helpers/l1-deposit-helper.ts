@@ -1,8 +1,7 @@
 import type { BigNumber } from "ethers";
 import { Contract, providers, Wallet, ethers } from "ethers";
 import type { CoreDeployedAddresses } from "../core/types";
-import { impersonateAndRun, extractAndRelayNewPriorityRequests } from "../core/utils";
-import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
+import { extractAndRelayNewPriorityRequests } from "../core/utils";
 import { getAbi } from "../core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, L1_CHAIN_ID, L2_ASSET_ROUTER_ADDR } from "../core/const";
 
@@ -22,23 +21,6 @@ export interface DepositETHResult {
   l2TxHash: string | null;
   amount: BigNumber;
   mintValue: BigNumber;
-}
-
-export interface DepositERC20Params {
-  l1RpcUrl: string;
-  l2RpcUrl: string;
-  chainId: number;
-  l1Addresses: CoreDeployedAddresses;
-  l1TokenAddress: string;
-  amount: BigNumber;
-  recipient?: string;
-}
-
-export interface DepositERC20Result {
-  l1TxHash: string;
-  l2TxHash: string | null;
-  amount: BigNumber;
-  assetId: string;
 }
 
 /**

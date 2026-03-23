@@ -93,6 +93,7 @@ You can also add `.only` to a `describe` or `it` block in the spec file to isola
 | `ANVIL_INTEROP_KEEP_CHAINS=1`  | Same as `--keep-chains` flag                                      |
 | `ANVIL_INTEROP_FRESH_DEPLOY=1` | Force full deployment even if pregenerated state exists           |
 | `ANVIL_INTEROP_PORT_OFFSET=N`  | Offset all chain ports by N (useful for parallel runs)            |
+| `ANVIL_INTEROP_RUN_SUFFIX=X`   | Suffix for output dirs (set automatically by parallel workers)    |
 
 ## Debugging
 
@@ -156,8 +157,7 @@ test/anvil-interop/
 │   ├── 03-interop-transfer.spec.ts
 │   ├── 04-gateway-setup.spec.ts
 │   ├── 05-gateway-bridge.spec.ts
-│   ├── 06-gateway-interop.spec.ts
-│   └── token-transfer.spec.ts
+│   └── 06-gateway-interop.spec.ts
 └── outputs/                       # Deployment outputs (gitignored)
 ```
 
