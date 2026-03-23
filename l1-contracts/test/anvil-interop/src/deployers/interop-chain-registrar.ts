@@ -1,26 +1,20 @@
 import { ethers, providers } from "ethers";
 import { encodeNtvAssetId } from "../core/data-encoding";
 import { getAbi } from "../core/contracts";
-import { ETH_TOKEN_ADDRESS, L1_CHAIN_ID, L2_BRIDGEHUB_ADDR } from "../core/const";
-import { relayPriorityRequestsToChain, impersonateAndRun } from "../core/utils";
+import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS, L1_CHAIN_ID, L2_BRIDGEHUB_ADDR } from "../core/const";
+import { relayPriorityRequestsToChain } from "../core/utils";
 
 export class InteropChainRegistrar {
   private l1Provider: providers.JsonRpcProvider;
   private l2Provider: providers.JsonRpcProvider;
-  private chainRegistrationSender: string;
+  private chainRegistrationSenderAddr: string;
   private currentChainDiamondProxy: string;
 
   constructor(l2RpcUrl: string, l1RpcUrl: string, chainRegistrationSender: string, currentChainDiamondProxy: string) {
     this.l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
     this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
-    this.chainRegistrationSender = chainRegistrationSender;
+    this.chainRegistrationSenderAddr = chainRegistrationSender;
     this.currentChainDiamondProxy = currentChainDiamondProxy;
-  }
-
-  private getInteropRegistrationSender(chainId: number): string {
-    return ethers.utils.getAddress(
-      ethers.utils.hexDataSlice(ethers.utils.keccak256(ethers.utils.toUtf8Bytes(`interop-registration:${chainId}`)), 12)
-    );
   }
 
   async registerInteropChains(currentChainId: number, interopChainIds: number[]): Promise<void> {
@@ -32,10 +26,11 @@ export class InteropChainRegistrar {
     }
 
     const l2Bridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), this.l2Provider);
+    const l1Wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, this.l1Provider);
     const chainRegistrationSender = new ethers.Contract(
-      this.chainRegistrationSender,
+      this.chainRegistrationSenderAddr,
       getAbi("ChainRegistrationSender"),
-      this.l1Provider
+      l1Wallet
     );
 
     for (const chainId of chainIds) {
@@ -46,14 +41,13 @@ export class InteropChainRegistrar {
       }
 
       console.log(`   Registering chain ${chainId} on chain ${currentChainId} via L1 ChainRegistrationSender...`);
-      const sender = this.getInteropRegistrationSender(currentChainId);
 
-      const l1Receipt = await impersonateAndRun(this.l1Provider, sender, async (signer) => {
-        const tx = await chainRegistrationSender.connect(signer).registerChain(chainId, currentChainId, {
-          gasLimit: 5_000_000,
-        });
-        return tx.wait();
+      // ChainRegistrationSender.registerChain has no access control,
+      // so any EOA can call it directly -- no impersonation needed.
+      const tx = await chainRegistrationSender.registerChain(chainId, currentChainId, {
+        gasLimit: 5_000_000,
       });
+      const l1Receipt = await tx.wait();
 
       await relayPriorityRequestsToChain(l1Receipt, this.currentChainDiamondProxy, this.l2Provider);
 
