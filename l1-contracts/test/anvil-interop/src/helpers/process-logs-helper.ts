@@ -404,7 +404,7 @@ export async function callProcessLogsAndMessages(params: {
   const solidityLogs = logs.map((l) => [l.l2ShardId, l.isService, l.txNumberInBatch, l.sender, l.key, l.value]);
 
   // 6. Impersonate the diamond proxy address (passes onlyChain modifier).
-  // TODO: Impersonate the operator instead of the diamond proxy (requires operator role setup).
+  // TODO(EVM-1300): Impersonate the operator instead of the diamond proxy (requires operator role setup).
   const gwAssetTracker = new Contract(GW_ASSET_TRACKER_ADDR, getAbi("GWAssetTracker"), gwProvider);
 
   const txHash = await impersonateAndRun(gwProvider, zkChainAddr, async (signer) => {
@@ -417,7 +417,7 @@ export async function callProcessLogsAndMessages(params: {
       batchNumber,
       chainBatchRoot,
       multichainBatchRoot: messageRoot,
-      // TODO: Interop fees are currently zero. Add non-zero fee testing when fee logic is implemented.
+      // TODO(EVM-1300): Interop fees are currently zero. Add non-zero fee testing when fee logic is implemented.
       settlementFeePayer: ethers.constants.AddressZero,
     };
 

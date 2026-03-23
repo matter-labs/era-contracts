@@ -5,8 +5,6 @@ import * as fs from "fs";
 import * as path from "path";
 import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
-import { getChainIdsByRole } from "./src/core/utils";
-import { registerAndMigrateTestTokens } from "./src/helpers/token-balance-migration-helper";
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");
@@ -183,65 +181,18 @@ async function main(): Promise<void> {
       const anvilManager = new AnvilManager();
       const config = runner.getConfig();
 
-      let chains: Awaited<ReturnType<typeof runner.runFullDeployment>>["chains"];
-      let l1Addresses: Awaited<ReturnType<typeof runner.runFullDeployment>>["l1Addresses"];
-
-      // Try loading pre-generated chain states (much faster — skips deploy steps 2-5)
+      // Try loading pre-generated chain states (much faster — skips deploy + TBM)
       // Set ANVIL_INTEROP_FRESH_DEPLOY=1 to force full deployment instead.
+      // Pre-generated states already include test tokens and TBM.
       if (!freshDeploy && runner.hasChainStates()) {
         const stateDir = runner.getChainStatesDir();
         console.log(`\nFound pre-generated chain states at ${stateDir}`);
-        const result = await timedAsync("load chain states", () => runner.loadChainStates(anvilManager, stateDir));
-        chains = result.chains;
-        l1Addresses = result.l1Addresses;
+        await timedAsync("load chain states", () => runner.loadChainStates(anvilManager, stateDir));
       } else {
         console.log("\nNo pre-generated chain states found, running full deployment...");
-        // deployAndSetup runs full deployment + deploys test tokens in one call.
-        const result = await timedAsync("full deployment + test tokens (steps 1-5)", () =>
-          runner.deployAndSetup(anvilManager)
+        await timedAsync("full deployment + test tokens + TBM", () =>
+          runner.deployAndSetupWithTBM(anvilManager)
         );
-        chains = result.chains;
-        l1Addresses = result.l1Addresses;
-      }
-
-      if (!chains.l1) {
-        throw new Error("L1 chain not found");
-      }
-
-      const gatewayConfig = config.chains.find((c) => c.role === "gateway");
-      const gatewayChainId = gatewayConfig?.chainId;
-      const gwChain = chains.l2.find((c) => c.chainId === gatewayChainId);
-      const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
-
-      // Build L2 chain RPC URL map for migration preconditions
-      const l2ChainRpcUrls = new Map<number, string>();
-      for (const l2Chain of chains.l2) {
-        l2ChainRpcUrls.set(l2Chain.chainId, l2Chain.rpcUrl);
-      }
-
-      // Run Token Balance Migration (TBM) for test tokens on GW-settled chains.
-      // Test tokens are native to their respective L2 chains. After gateway migration,
-      // outgoing transfers from GW-settled chains require assetMigrationNumber == migrationNumber.
-      // The real TBM flow (L2→L1→GW+L2 confirmations) properly sets assetMigrationNumber.
-      if (gwSettledChainIds.length > 0 && gwChain?.rpcUrl) {
-        const freshState = runner.loadState();
-        if (freshState.testTokens && Object.keys(freshState.testTokens).length > 0) {
-          const gwDiamondProxy = freshState.chainAddresses!.find((c) => c.chainId === gatewayChainId)!.diamondProxy;
-
-          await timedAsync("TBM for test tokens on GW-settled chains", () =>
-            registerAndMigrateTestTokens({
-              gwSettledChainIds,
-              l2ChainRpcUrls,
-              testTokens: freshState.testTokens!,
-              l1RpcUrl: chains.l1!.rpcUrl,
-              gwRpcUrl: gwChain!.rpcUrl,
-              l1AssetTrackerAddr: l1Addresses.l1AssetTracker,
-              gwDiamondProxyAddr: gwDiamondProxy,
-              chainAddresses: freshState.chainAddresses!,
-              logger: (line) => console.log(line),
-            })
-          );
-        }
       }
     }
 

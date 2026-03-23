@@ -21,17 +21,18 @@ async function main(): Promise<void> {
     const stateDir = path.join(__dirname, "chain-states", version);
     const dumpStatePaths = runner.buildDumpStatePaths(stateDir);
 
-    // Run full deployment + deploy test tokens in deterministic mode:
+    // Run full deployment + test tokens + TBM in deterministic mode:
     // - blockTime 0 = instant mining (blocks mined only on transactions)
     // - timestamp 1 = fixed genesis timestamp
     // - dumpStatePaths = Anvil will dump state to these files on exit
     // This ensures state is fully deterministic regardless of wall clock.
-    const { l1Addresses, ctmAddresses, chainAddresses } = await runner.deployAndSetup(anvilManager, {
+    // TBM is included so pregenerated state is ready for tests without re-running TBM.
+    const { l1Addresses, ctmAddresses, chainAddresses } = await runner.deployAndSetupWithTBM(anvilManager, {
       startChainOptions: { blockTime: 0, timestamp: 1, dumpStatePaths },
     });
 
-    const stateAfterTokens = runner.loadState();
-    const testTokens = stateAfterTokens.testTokens;
+    const stateAfterSetup = runner.loadState();
+    const testTokens = stateAfterSetup.testTokens;
 
     // Stop all chains — this triggers Anvil's --dump-state file writes.
     await runner.dumpAllStates(anvilManager, stateDir);

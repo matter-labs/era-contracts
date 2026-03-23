@@ -21,6 +21,7 @@ import { getChainIdsByRole, timeIt } from "./core/utils";
 import { getAbi } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./core/const";
 import { deployTestTokens } from "./helpers/deploy-test-token";
+import { registerAndMigrateTestTokens } from "./helpers/token-balance-migration-helper";
 
 export interface StartChainOptions {
   blockTime?: number;
@@ -607,6 +608,47 @@ export class DeploymentRunner {
       const hasTestTokens = state.testTokens && Object.keys(state.testTokens).length > 0;
       if (!hasTestTokens) {
         await deployTestTokens();
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Full setup: deploy + test tokens + Token Balance Migration (TBM).
+   *
+   * Used by both `setup-and-dump-state.ts` and `run-hardhat-interop-test.ts` (fresh deploy path).
+   * TBM registers and migrates test tokens on GW-settled chains so that
+   * assetMigrationNumber matches migrationNumber (required for interop transfers).
+   */
+  async deployAndSetupWithTBM(
+    anvilManager: AnvilManager,
+    options?: DeployAndSetupOptions
+  ): Promise<FullDeploymentResult> {
+    const result = await this.deployAndSetup(anvilManager, options);
+
+    const config = this.getConfig();
+    const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
+    const gatewayConfig = config.chains.find((c) => c.role === "gateway");
+
+    if (gwSettledChainIds.length > 0 && gatewayConfig) {
+      const state = this.loadState();
+      if (state.testTokens && Object.keys(state.testTokens).length > 0) {
+        const gwChain = state.chains!.l2.find((c) => c.chainId === gatewayConfig.chainId)!;
+        const gwDiamondProxy = state.chainAddresses!.find((c) => c.chainId === gatewayConfig.chainId)!.diamondProxy;
+        const l2ChainRpcUrls = new Map(state.chains!.l2.map((c) => [c.chainId, c.rpcUrl]));
+
+        await registerAndMigrateTestTokens({
+          gwSettledChainIds,
+          l2ChainRpcUrls,
+          testTokens: state.testTokens,
+          l1RpcUrl: state.chains!.l1!.rpcUrl,
+          gwRpcUrl: gwChain.rpcUrl,
+          l1AssetTrackerAddr: result.l1Addresses.l1AssetTracker,
+          gwDiamondProxyAddr: gwDiamondProxy,
+          chainAddresses: state.chainAddresses!,
+          logger: (line) => console.log(line),
+        });
       }
     }
 
