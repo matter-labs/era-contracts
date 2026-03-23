@@ -42,6 +42,13 @@ export interface BalanceSnapshot {
   gwChainBalance?: string;
 }
 
+/** Subset of BalanceSnapshot with only chain-level balances (no wallet balances). */
+export interface ChainBalanceSnapshot {
+  l1ChainBalance: string;
+  l1GwChainBalance?: string;
+  gwChainBalance?: string;
+}
+
 export interface CTMDeployedAddresses {
   chainTypeManager: string;
   chainAdmin: string;

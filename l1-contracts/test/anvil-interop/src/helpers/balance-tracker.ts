@@ -1,5 +1,5 @@
 import { BigNumber, Contract, providers } from "ethers";
-import type { BalanceSnapshot, CoreDeployedAddresses, DeploymentState } from "../core/types";
+import type { BalanceSnapshot, ChainBalanceSnapshot, CoreDeployedAddresses, DeploymentState } from "../core/types";
 import { getAbi } from "../core/contracts";
 import { ETH_TOKEN_ADDRESS, GW_ASSET_TRACKER_ADDR } from "../core/const";
 
@@ -159,11 +159,11 @@ export class BalanceTracker {
     chainId: number,
     assetId: string,
     isGWSettled: boolean = false
-  ): Promise<{ l1ChainBalance: string; l1GwChainBalance?: string; gwChainBalance?: string }> {
+  ): Promise<ChainBalanceSnapshot> {
     // Always track L1AssetTracker.chainBalance under the chain's own ID
     const l1ChainBalance = await this.getL1ChainBalance(chainId, assetId);
 
-    const result: { l1ChainBalance: string; l1GwChainBalance?: string; gwChainBalance?: string } = {
+    const result: ChainBalanceSnapshot = {
       l1ChainBalance: l1ChainBalance.toString(),
     };
 
