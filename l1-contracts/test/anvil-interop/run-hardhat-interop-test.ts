@@ -11,14 +11,14 @@ import { registerAndMigrateTestTokens } from "./src/helpers/token-balance-migrat
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");
-const allSpecFiles = [
-  "test/anvil-interop/test/hardhat/01-deployment-verification.spec.ts",
-  "test/anvil-interop/test/hardhat/02-direct-bridge.spec.ts",
-  "test/anvil-interop/test/hardhat/03-interop-transfer.spec.ts",
-  "test/anvil-interop/test/hardhat/04-gateway-setup.spec.ts",
-  "test/anvil-interop/test/hardhat/05-gateway-bridge.spec.ts",
-  "test/anvil-interop/test/hardhat/06-gateway-interop.spec.ts",
-];
+// Auto-discover spec files from the test/hardhat directory.
+// Files matching NN-*.spec.ts are included in order.
+const specDir = path.join(anvilInteropDir, "test/hardhat");
+const allSpecFiles = fs
+  .readdirSync(specDir)
+  .filter((f) => /^\d+-.*\.spec\.ts$/.test(f))
+  .sort()
+  .map((f) => `test/anvil-interop/test/hardhat/${f}`);
 const parallelSpecGroups = allSpecFiles.map((spec) => [spec]);
 
 const totalStart = Date.now();
@@ -91,8 +91,9 @@ async function runParallelWorker(label: string, specs: string[], portOffset: num
   const logPath = path.join(logsDir, `${label.replace(/\s+/g, "-")}.log`);
   const logStream = fs.createWriteStream(logPath, { flags: "w" });
 
+  const specNames = specs.map((s) => path.basename(s, ".spec.ts"));
   console.log(
-    `\n⏱️  [TIMING] Starting: ${label} (${specs.length} specs, offset ${portOffset}, total elapsed: ${elapsedSince(totalStart)})`
+    `\n⏱️  [TIMING] Starting: ${label} [${specNames.join(", ")}] (offset ${portOffset}, total elapsed: ${elapsedSince(totalStart)})`
   );
   console.log(`   log: ${logPath}`);
 
@@ -125,7 +126,7 @@ async function runParallelWorker(label: string, specs: string[], portOffset: num
       logStream.end();
       if (code === 0) {
         console.log(
-          `⏱️  [TIMING] Finished: ${label} (offset ${portOffset}, total elapsed: ${elapsedSince(totalStart)})`
+          `✅ ${label} [${specNames.join(", ")}] passed (offset ${portOffset}, total elapsed: ${elapsedSince(totalStart)})`
         );
         resolve();
       } else {

@@ -56,9 +56,6 @@ for PORT in $ANVIL_PORTS; do
 done
 sleep 1
 
-# Clean up step6 log file
-rm -f /tmp/step6-output.log 2>/dev/null || true
-
 # Verify ports are free
 ALL_CLEAR=true
 for PORT in $ANVIL_PORTS; do
