@@ -4,6 +4,7 @@ import type { MultiChainTokenTransferParams, MultiChainTokenTransferResult } fro
 import { getAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
+  DEFAULT_TX_GAS_LIMIT,
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
   INTEROP_SEND_BUNDLE_GAS_LIMIT,
