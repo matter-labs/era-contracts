@@ -4,7 +4,7 @@ import type { BigNumber } from "ethers";
 export interface AnvilChain {
   chainId: number;
   port: number;
-  isL1: boolean;
+  role: ChainRole;
   process?: ChildProcess;
   rpcUrl: string;
 }
@@ -57,7 +57,6 @@ export interface ChainConfig {
   rpcUrl: string;
   baseToken: string;
   validiumMode: boolean;
-  isGateway: boolean;
 }
 
 export interface ChainAddresses {
@@ -74,8 +73,6 @@ export type SettlementType = "l1" | "gateway";
 export interface AnvilChainConfig {
   chainId: number;
   port: number;
-  isL1: boolean;
-  isGateway?: boolean;
   role: ChainRole;
   settlement?: SettlementType;
 }
@@ -90,7 +87,7 @@ interface L1ChainInfo {
   port: number;
 }
 
-interface L2ChainInfo {
+export interface L2ChainInfo {
   chainId: number;
   rpcUrl: string;
   port: number;
