@@ -2,7 +2,7 @@ import { ethers, providers } from "ethers";
 import { encodeNtvAssetId } from "../core/data-encoding";
 import { getAbi } from "../core/contracts";
 import { ETH_TOKEN_ADDRESS, L1_CHAIN_ID, L2_BRIDGEHUB_ADDR } from "../core/const";
-import { extractAndRelayNewPriorityRequests, impersonateAndRun } from "../core/utils";
+import { relayPriorityRequestsToChain, impersonateAndRun } from "../core/utils";
 
 export class InteropChainRegistrar {
   private l1Provider: providers.JsonRpcProvider;
@@ -55,11 +55,7 @@ export class InteropChainRegistrar {
         return tx.wait();
       });
 
-      await extractAndRelayNewPriorityRequests(
-        l1Receipt,
-        [{ diamondProxy: this.currentChainDiamondProxy, provider: this.l2Provider }],
-        (line) => console.log(line)
-      );
+      await relayPriorityRequestsToChain(l1Receipt, this.currentChainDiamondProxy, this.l2Provider);
 
       const registeredAssetId = await l2Bridgehub.baseTokenAssetId(chainId);
       const expectedAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);

@@ -108,10 +108,8 @@ export function mergeGatewayVoteOutput(outputDir: string): void {
  * Deep merge two objects. `a` values override `b` values at leaf level.
  * Sub-objects are recursively merged.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function deepMerge(a: Record<string, any>, b: Record<string, any>): Record<string, any> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const result: Record<string, any> = { ...b };
+export function deepMerge(a: Record<string, unknown>, b: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...b };
   for (const key of Object.keys(a)) {
     if (
       a[key] &&
@@ -121,7 +119,7 @@ export function deepMerge(a: Record<string, any>, b: Record<string, any>): Recor
       typeof b[key] === "object" &&
       !Array.isArray(b[key])
     ) {
-      result[key] = deepMerge(a[key], b[key]);
+      result[key] = deepMerge(a[key] as Record<string, unknown>, b[key] as Record<string, unknown>);
     } else {
       result[key] = a[key];
     }

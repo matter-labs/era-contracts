@@ -5,7 +5,7 @@
  * defined in one place and typos are caught at compile time.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any -- ABIs are untyped JSON arrays */
+import type { JsonFragment } from "@ethersproject/abi";
 import { loadAbiFromOut, loadBytecodeFromOut, loadCreationBytecodeFromOut } from "./artifacts";
 
 // ── Artifact path registry ──────────────────────────────────────
@@ -61,7 +61,7 @@ export type ContractName = keyof typeof ARTIFACTS;
 
 // ── Generic loaders ─────────────────────────────────────────────
 
-export function getAbi(name: ContractName): any[] {
+export function getAbi(name: ContractName): JsonFragment[] {
   return loadAbiFromOut(ARTIFACTS[name]);
 }
 

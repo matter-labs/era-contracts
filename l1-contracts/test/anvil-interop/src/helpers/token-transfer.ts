@@ -182,8 +182,7 @@ export async function executeTokenTransfer(
           data: logEntry.data,
         });
         if (parsed && parsed.name === "InteropBundleSent") {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          interopBundle = (parsed.args as any).interopBundle;
+          interopBundle = parsed.args["interopBundle"];
           break;
         }
       } catch {

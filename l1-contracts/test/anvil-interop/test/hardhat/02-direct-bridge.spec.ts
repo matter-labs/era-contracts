@@ -36,7 +36,7 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
     initialDirectChainBalance = await tracker.getL1ChainBalance(directSettledChainId, assetId);
     initialTotalChainBalance = BigNumber.from(0);
     for (const chainConfig of state.chains.config) {
-      if (!chainConfig.isL1) {
+      if (chainConfig.role !== "l1") {
         const balance = await tracker.getL1ChainBalance(chainConfig.chainId, assetId);
         initialTotalChainBalance = initialTotalChainBalance.add(balance);
       }
@@ -80,6 +80,12 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
         `L1AssetTracker.chainBalance should increase by ${result.mintValue.toString()}, got ${deltas.l1ChainBalanceDelta.toString()}`
       ).to.equal(true);
 
+      // Recipient's L2 ETH balance should increase (exact amount differs due to gas costs)
+      expect(
+        deltas.l2TokenDelta.gt(0),
+        `Recipient L2 ETH balance should increase after deposit, got delta ${deltas.l2TokenDelta.toString()}`
+      ).to.equal(true);
+
       console.log(
         `   L1AssetTracker.chainBalance[${directSettledChainId}]: ${BigNumber.from(after.l1ChainBalance).toString()}`
       );
@@ -116,10 +122,16 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
         deltas.l1ChainBalanceDelta.eq(amount.mul(-1)),
         `L1AssetTracker.chainBalance should decrease by ${amount.toString()}, got ${deltas.l1ChainBalanceDelta.toString()}`
       ).to.equal(true);
+
+      // L2 balance should decrease (by at least the withdrawal amount; gas costs cause additional decrease)
+      expect(
+        deltas.l2TokenDelta.lte(amount.mul(-1)),
+        `L2 ETH balance should decrease by at least ${amount.toString()}, got delta ${deltas.l2TokenDelta.toString()}`
+      ).to.equal(true);
     });
   });
 
-  describe("Balance conservation", () => {
+  describe("L1AssetTracker accounting", () => {
     it("L1AssetTracker balances reflect the net flow performed", async () => {
       if (!depositMintValue || !withdrawalAmount) {
         throw new Error("Expected deposit and withdrawal test data to be populated before balance verification");
@@ -140,7 +152,7 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
 
       let totalChainBalance = BigNumber.from(0);
       for (const chainConfig of state.chains!.config) {
-        if (!chainConfig.isL1) {
+        if (chainConfig.role !== "l1") {
           const balance = await tracker.getL1ChainBalance(chainConfig.chainId, assetId);
           totalChainBalance = totalChainBalance.add(balance);
         }

@@ -14,6 +14,7 @@ import type {
   CoreDeployedAddresses,
   CTMDeployedAddresses,
   DeploymentState,
+  L2ChainInfo,
   PriorityRequestData,
 } from "./core/types";
 import { getChainIdsByRole, timeIt } from "./core/utils";
@@ -80,7 +81,7 @@ export class DeploymentRunner {
     return new Map(chainConfigs.map((chainConfig) => [chainConfig.chainId, chainConfig]));
   }
 
-  private toRpcUrlMap(l2Chains: Array<{ chainId: number; rpcUrl: string }>): Map<number, string> {
+  private toRpcUrlMap(l2Chains: L2ChainInfo[]): Map<number, string> {
     return new Map(l2Chains.map((chain) => [chain.chainId, chain.rpcUrl]));
   }
 
@@ -120,7 +121,7 @@ export class DeploymentRunner {
   }
 
   private buildRegistrationConfigs(
-    l2Chains: Array<{ chainId: number; rpcUrl: string }>,
+    l2Chains: L2ChainInfo[],
     chainConfigsById: Map<number, AnvilConfig["chains"][number]>
   ) {
     return l2Chains.map((l2Chain) => {
@@ -136,8 +137,8 @@ export class DeploymentRunner {
 
   private getGatewayChainOrThrow(
     gatewayChainId: number,
-    l2Chains: Array<{ chainId: number; rpcUrl: string }>
-  ): { chainId: number; rpcUrl: string } {
+    l2Chains: L2ChainInfo[]
+  ): L2ChainInfo {
     const gwChain = l2Chains.find((chain) => chain.chainId === gatewayChainId);
     if (!gwChain) {
       throw new Error(`Gateway chain ${gatewayChainId} not found in started L2 chains`);
@@ -276,7 +277,7 @@ export class DeploymentRunner {
 
   async step3And4RegisterAndInitChains(
     l1RpcUrl: string,
-    l2Chains: Array<{ chainId: number; rpcUrl: string }>,
+    l2Chains: L2ChainInfo[],
     chainConfigs: AnvilConfig["chains"],
     l1Addresses: CoreDeployedAddresses,
     ctmAddresses: CTMDeployedAddresses
@@ -326,7 +327,7 @@ export class DeploymentRunner {
 
   async step6RegisterInteropChains(
     l1RpcUrl: string,
-    l2Chains: Array<{ chainId: number; rpcUrl: string }>,
+    l2Chains: L2ChainInfo[],
     chainConfigs: AnvilConfig["chains"],
     l1Addresses: CoreDeployedAddresses,
     ctmAddresses: CTMDeployedAddresses,

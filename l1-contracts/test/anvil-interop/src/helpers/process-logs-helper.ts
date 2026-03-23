@@ -1,4 +1,5 @@
 import type { BigNumber, providers } from "ethers";
+import type { InteropBundle, InteropCall } from "../core/types";
 import { Contract, ethers } from "ethers";
 import { getAbi } from "../core/contracts";
 import { impersonateAndRun } from "../core/utils";

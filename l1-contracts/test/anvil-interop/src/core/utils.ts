@@ -22,6 +22,7 @@ import type {
   ChainInfo,
   ChainRole,
   FinalizeWithdrawalParams,
+  InteropBundle,
   L2ChainInfo,
   PriorityRequestData,
 } from "./types";
@@ -244,10 +245,7 @@ export function buildFinalizeWithdrawalParams(
 ): FinalizeWithdrawalParams {
   // Parse L1MessageSent event from L1MessengerZKOS
   const l1MessageSentTopic = ethers.utils.id(L1_MESSAGE_SENT_EVENT_SIG);
-  const l1MessageSentLog = l2Receipt.logs.find(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (logEntry: any) => logEntry.topics[0] === l1MessageSentTopic
-  );
+  const l1MessageSentLog = l2Receipt.logs.find((logEntry) => logEntry.topics[0] === l1MessageSentTopic);
 
   if (!l1MessageSentLog) {
     throw new Error("L1MessageSent event not found in L2 tx receipt. Check L1MessengerZKOS emits the event.");
@@ -280,16 +278,13 @@ export function extractNewPriorityRequests(
 ): PriorityRequestData[] {
   const newPriorityRequestTopic = ethers.utils.id(NEW_PRIORITY_REQUEST_EVENT_SIG);
 
-  const priorityRequestLogs = receipt.logs.filter(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (logEntry: any) => {
-      if (logEntry.topics[0] !== newPriorityRequestTopic) return false;
-      if (diamondProxyAddr) {
-        return logEntry.address.toLowerCase() === diamondProxyAddr.toLowerCase();
-      }
-      return true;
+  const priorityRequestLogs = receipt.logs.filter((logEntry) => {
+    if (logEntry.topics[0] !== newPriorityRequestTopic) return false;
+    if (diamondProxyAddr) {
+      return logEntry.address.toLowerCase() === diamondProxyAddr.toLowerCase();
     }
-  );
+    return true;
+  });
 
   const mailboxIface = new ethers.utils.Interface(getAbi("MailboxFacet"));
 
@@ -491,6 +486,19 @@ export async function extractAndRelayNewPriorityRequests(
 }
 
 /**
+ * Convenience wrapper: relay priority requests from a receipt to a single L2 chain.
+ * Shorthand for `extractAndRelayNewPriorityRequests(receipt, [{ diamondProxy, provider }])`.
+ */
+export async function relayPriorityRequestsToChain(
+  receipt: ethers.providers.TransactionReceipt,
+  diamondProxy: string,
+  l2Provider: providers.JsonRpcProvider,
+  logger?: (line: string) => void
+): Promise<string[]> {
+  return extractAndRelayNewPriorityRequests(receipt, [{ diamondProxy, provider: l2Provider }], logger);
+}
+
+/**
  * Build a mock InteropProof struct for test bundle execution.
  * In the test environment, proof verification is bypassed, so we only need the correct shape.
  */
@@ -642,8 +650,7 @@ export async function scanAndRelayPriorityRequests(
  *
  * @returns The interopBundle argument from the first InteropBundleSent event found.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function extractInteropBundle(rpcUrl: string, txHash: string): Promise<any> {
+export async function extractInteropBundle(rpcUrl: string, txHash: string): Promise<InteropBundle> {
   const provider = new providers.JsonRpcProvider(rpcUrl);
   const receipt = await provider.getTransactionReceipt(txHash);
   const iface = new ethers.utils.Interface(getAbi("InteropCenter"));
@@ -652,8 +659,7 @@ export async function extractInteropBundle(rpcUrl: string, txHash: string): Prom
     try {
       const parsed = iface.parseLog({ topics: logEntry.topics, data: logEntry.data });
       if (parsed.name === "InteropBundleSent") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return (parsed.args as any).interopBundle;
+        return parsed.args["interopBundle"] as InteropBundle;
       }
     } catch {
       // Not an InteropCenter log

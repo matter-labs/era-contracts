@@ -5,7 +5,6 @@ import * as fs from "fs";
 import * as path from "path";
 import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
-import { deployTestTokens } from "./src/helpers/deploy-test-token";
 import { getChainIdsByRole } from "./src/core/utils";
 import { registerAndMigrateTestTokens } from "./src/helpers/token-balance-migration-helper";
 
@@ -130,6 +129,9 @@ async function runParallelWorker(label: string, specs: string[], portOffset: num
         );
         resolve();
       } else {
+        console.log(
+          `❌ ${label} [${specNames.join(", ")}] failed (offset ${portOffset}, total elapsed: ${elapsedSince(totalStart)})`
+        );
         const tail = readLogTail(logPath);
         reject(
           new Error(
@@ -194,7 +196,10 @@ async function main(): Promise<void> {
         l1Addresses = result.l1Addresses;
       } else {
         console.log("\nNo pre-generated chain states found, running full deployment...");
-        const result = await timedAsync("full deployment (steps 1-5)", () => runner.runFullDeployment(anvilManager));
+        // deployAndSetup runs full deployment + deploys test tokens in one call.
+        const result = await timedAsync("full deployment + test tokens (steps 1-5)", () =>
+          runner.deployAndSetup(anvilManager)
+        );
         chains = result.chains;
         l1Addresses = result.l1Addresses;
       }

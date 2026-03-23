@@ -8,6 +8,7 @@ import {
 } from "../core/const";
 import { buildFinalizeWithdrawalParams, extractAndRelayNewPriorityRequests } from "../core/utils";
 import { encodeNtvAssetId } from "../core/data-encoding";
+import type { ChainAddresses } from "../core/types";
 
 /**
  * Orchestrates the full Token Balance Migration (TBM) flow:
@@ -144,7 +145,7 @@ export async function registerAndMigrateTestTokens(params: {
   gwRpcUrl: string;
   l1AssetTrackerAddr: string;
   gwDiamondProxyAddr: string;
-  chainAddresses: Array<{ chainId: number; diamondProxy: string }>;
+  chainAddresses: ChainAddresses[];
   logger?: (line: string) => void;
 }): Promise<void> {
   const log = params.logger || console.log;

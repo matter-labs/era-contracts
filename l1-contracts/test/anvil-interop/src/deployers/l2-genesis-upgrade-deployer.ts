@@ -16,7 +16,7 @@ const systemContextAbi = getAbi("SystemContext");
  * The flow:
  * 1. Bootstrap synthetic prestate via Anvil RPC (production has this in genesis)
  * 2. Relay the real genesis upgrade transaction from the L1 GenesisUpgrade event
- * 3. Verify the deployed code
+ * 3. Verify the deployed code is non-empty
  */
 export class L2GenesisUpgradeDeployer {
   private l2Provider: providers.JsonRpcProvider;

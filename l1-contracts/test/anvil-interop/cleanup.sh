@@ -18,7 +18,7 @@ PORT_OFFSET="${ANVIL_INTEROP_PORT_OFFSET:-0}"
 RUN_SUFFIX="${ANVIL_INTEROP_RUN_SUFFIX:-}"
 PID_FILE="outputs/anvil-pids${RUN_SUFFIX}.json"
 STATE_DIR="outputs/state${RUN_SUFFIX}"
-BASE_PORTS="9545 4050 4051 4052 4053"
+BASE_PORTS=$(node -e "const c=require('./config/anvil-config.json');console.log(c.chains.map(ch=>ch.port).join(' '))" 2>/dev/null || echo "9545 4050 4051 4052 4053")
 ANVIL_PORTS=""
 for BASE in $BASE_PORTS; do
   ANVIL_PORTS="$ANVIL_PORTS $((BASE + PORT_OFFSET))"

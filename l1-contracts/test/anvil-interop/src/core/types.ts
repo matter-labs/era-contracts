@@ -152,3 +152,28 @@ export interface PriorityRequestData {
   calldata: string;
   value?: BigNumber;
 }
+
+export interface InteropCall {
+  version: string;
+  shadowAccount: boolean;
+  to: string;
+  from: string;
+  value: BigNumber;
+  data: string;
+}
+
+export interface InteropExecutionInfo {
+  executionData: string;
+  paymaster: string;
+  requirePaymaster: boolean;
+}
+
+export interface InteropBundle {
+  version: string;
+  sourceChainId: BigNumber;
+  destinationChainId: BigNumber;
+  bundleHash: string;
+  destinationBaseTokenAssetId: string;
+  calls: InteropCall[];
+  executionInfo: InteropExecutionInfo;
+}
