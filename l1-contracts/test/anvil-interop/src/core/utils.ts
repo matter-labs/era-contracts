@@ -383,6 +383,7 @@ async function resolvePriorityRelayPath(path: PriorityRelayResolvedPath): Promis
   settlementLayerChainId: number;
   gwProvider?: providers.JsonRpcProvider;
   gwDiamondProxy?: string;
+  nestedL1DiamondProxy?: string;
 }> {
   const l1Provider = new providers.JsonRpcProvider(path.l1RpcUrl);
   const l2Provider = new providers.JsonRpcProvider(path.chainRpcUrl);
@@ -409,6 +410,15 @@ async function resolvePriorityRelayPath(path: PriorityRelayResolvedPath): Promis
     );
   }
 
+  // For GW-settled chains, the nested chain also has an L1 diamond proxy.
+  // The L1 receipt contains NewPriorityRequest from BOTH:
+  //   - The GW's L1 diamond proxy (wrapped tx for the GW chain)
+  //   - The nested chain's L1 diamond proxy (original tx for the L2 chain)
+  const nestedL1DiamondProxy: string = await bridgehub.getZKChain(path.chainId);
+  if (nestedL1DiamondProxy === ethers.constants.AddressZero) {
+    throw new Error(`No L1 diamond proxy registered for nested chain ${path.chainId}`);
+  }
+
   const gwProvider = new providers.JsonRpcProvider(path.gwRpcUrl);
   const gwBridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), gwProvider);
   const gwDiamondProxy: string = await gwBridgehub.getZKChain(path.chainId);
@@ -423,6 +433,7 @@ async function resolvePriorityRelayPath(path: PriorityRelayResolvedPath): Promis
     settlementLayerChainId,
     gwProvider,
     gwDiamondProxy,
+    nestedL1DiamondProxy,
   };
 }
 
@@ -446,32 +457,35 @@ export async function extractAndRelayNewPriorityRequests(
     return relayPriorityRequestsToTargets(receipt, chainsOrPath, log);
   }
 
-  const { l2Provider, l1DiamondProxy, settlementLayerChainId, gwProvider, gwDiamondProxy } =
+  const { l2Provider, l1DiamondProxy, settlementLayerChainId, gwProvider, gwDiamondProxy, nestedL1DiamondProxy } =
     await resolvePriorityRelayPath(chainsOrPath);
 
   if (settlementLayerChainId === 0) {
     return relayPriorityRequestsToTargets(receipt, [{ diamondProxy: l1DiamondProxy, provider: l2Provider }], log);
   }
 
+  // Hop 1: relay L1→GW (the wrapped forwarding transaction from the GW's L1 diamond proxy)
   const gwTxHashes = await relayPriorityRequestsToTargets(
     receipt,
     [{ diamondProxy: l1DiamondProxy, provider: gwProvider! }],
     log
   );
-  const l2TxHashes: string[] = [];
 
-  for (const gwTxHash of gwTxHashes) {
-    const gwReceipt = await gwProvider!.getTransactionReceipt(gwTxHash);
-    if (!gwReceipt) {
-      throw new Error(`Missing gateway relay receipt for tx ${gwTxHash}`);
-    }
-    const nestedTxHashes = await relayPriorityRequestsToTargets(
-      gwReceipt,
-      [{ diamondProxy: gwDiamondProxy!, provider: l2Provider }],
-      log
-    );
-    l2TxHashes.push(...nestedTxHashes);
-  }
+  // Hop 2: relay to the final L2 chain.
+  //
+  // On L1, the nested chain's diamond proxy emits NewPriorityRequest with the
+  // *actual* L2 transaction data, and then forwards a wrapped copy to the GW's
+  // L1 diamond proxy. The GW receipt only contains NewRelayedPriorityTransaction
+  // (no full tx data), so we cannot extract the hop-2 payload from it.
+  //
+  // Instead we extract the NewPriorityRequest events emitted by the nested
+  // chain's L1 diamond proxy directly from the original L1 receipt, and relay
+  // those to the L2 chain after hop 1 has been confirmed.
+  const l2TxHashes = await relayPriorityRequestsToTargets(
+    receipt,
+    [{ diamondProxy: nestedL1DiamondProxy!, provider: l2Provider }],
+    log
+  );
 
   return [...gwTxHashes, ...l2TxHashes];
 }
@@ -620,4 +634,30 @@ export async function scanAndRelayPriorityRequests(
   }
 
   return txHashes;
+}
+
+/**
+ * Extract the InteropBundle struct from a transaction receipt.
+ * Parses the InteropBundleSent event emitted by InteropCenter.
+ *
+ * @returns The interopBundle argument from the first InteropBundleSent event found.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function extractInteropBundle(rpcUrl: string, txHash: string): Promise<any> {
+  const provider = new providers.JsonRpcProvider(rpcUrl);
+  const receipt = await provider.getTransactionReceipt(txHash);
+  const iface = new ethers.utils.Interface(getAbi("InteropCenter"));
+
+  for (const logEntry of receipt.logs) {
+    try {
+      const parsed = iface.parseLog({ topics: logEntry.topics, data: logEntry.data });
+      if (parsed.name === "InteropBundleSent") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (parsed.args as any).interopBundle;
+      }
+    } catch {
+      // Not an InteropCenter log
+    }
+  }
+  throw new Error(`InteropBundleSent event not found in tx ${txHash}`);
 }

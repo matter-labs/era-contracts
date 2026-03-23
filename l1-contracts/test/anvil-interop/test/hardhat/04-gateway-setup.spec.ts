@@ -12,7 +12,7 @@ import {
 } from "../../src/core/const";
 import { getChainIdByRole, getL2Chain } from "../../src/core/utils";
 
-describe("04 - Gateway State Verification", function () {
+describe("04 - Gateway Deployment Verification (read-only)", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();

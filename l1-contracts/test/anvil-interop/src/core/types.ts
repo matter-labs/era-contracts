@@ -32,8 +32,11 @@ export interface BalanceSnapshot {
   l1TokenBalance: string;
   l2TokenBalance: string;
 
-  // L1AssetTracker state
+  // L1AssetTracker.chainBalance under the chain's own ID
   l1ChainBalance: string;
+
+  // L1AssetTracker.chainBalance under the GW chain ID (for GW-settled chains)
+  l1GwChainBalance?: string;
 
   // GWAssetTracker state (for GW-settled chains)
   gwChainBalance?: string;

@@ -11,6 +11,7 @@ import {
   INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_BRIDGEHUB_ADDR,
+  L2_INTEROP_HANDLER_ADDR,
   L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
   L2_MESSAGE_ROOT_ADDR,
   L2_TO_L1_LOGS_MERKLE_TREE_DEPTH,
@@ -343,8 +344,8 @@ export async function callProcessLogsAndMessages(params: {
   // Convert logs to the Solidity tuple format
   const solidityLogs = logs.map((l) => [l.l2ShardId, l.isService, l.txNumberInBatch, l.sender, l.key, l.value]);
 
-  // 6. Impersonate the diamond proxy address (passes onlyChain modifier)
-  // TODO: In a future release, impersonate the operator instead of the diamond proxy.
+  // 6. Impersonate the diamond proxy address (passes onlyChain modifier).
+  // TODO: Impersonate the operator instead of the diamond proxy (requires operator role setup).
   const gwAssetTracker = new Contract(GW_ASSET_TRACKER_ADDR, getAbi("GWAssetTracker"), gwProvider);
 
   const txHash = await impersonateAndRun(gwProvider, zkChainAddr, async (signer) => {
@@ -357,6 +358,7 @@ export async function callProcessLogsAndMessages(params: {
       batchNumber,
       chainBatchRoot,
       multichainBatchRoot: messageRoot,
+      // TODO: Interop fees are currently zero. Add non-zero fee testing when fee logic is implemented.
       settlementFeePayer: ethers.constants.AddressZero,
     };
 

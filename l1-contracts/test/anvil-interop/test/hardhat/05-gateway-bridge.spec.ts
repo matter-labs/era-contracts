@@ -10,7 +10,7 @@ import {
   getGWChainBalance,
 } from "../../src/helpers/process-logs-helper";
 import { migrateTokenBalanceToGW } from "../../src/helpers/token-balance-migration-helper";
-import { ETH_TOKEN_ADDRESS, L1_CHAIN_ID } from "../../src/core/const";
+import { ANVIL_DEFAULT_ACCOUNT_ADDR, ETH_TOKEN_ADDRESS, L1_CHAIN_ID } from "../../src/core/const";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
 import { getL2Chain, getChainDiamondProxy, getChainIdByRole, getChainIdsByRole } from "../../src/core/utils";
 
@@ -103,7 +103,7 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
 
       const assetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
       const withdrawalAmount = ethers.utils.parseEther("0.1");
-      const wallet = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+      const wallet = ANVIL_DEFAULT_ACCOUNT_ADDR;
 
       // Establish GWAssetTracker.chainBalance via the full Token Balance Migration flow
       const l1Provider = new ethers.providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);

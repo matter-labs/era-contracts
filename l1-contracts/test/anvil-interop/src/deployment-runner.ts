@@ -96,7 +96,7 @@ export class DeploymentRunner {
   }
 
   private computeInteropChainIds(chainId: number, chainConfigs: AnvilChainConfig[]): number[] {
-    const l2Chains = chainConfigs.filter((chainConfig) => !chainConfig.isL1);
+    const l2Chains = chainConfigs.filter((chainConfig) => chainConfig.role !== "l1");
     const thisChain = l2Chains.find((chainConfig) => chainConfig.chainId === chainId);
     if (!thisChain || thisChain.settlement === "l1" || !thisChain.settlement || thisChain.role !== "gwSettled") {
       return [];
@@ -110,7 +110,7 @@ export class DeploymentRunner {
   }
 
   private buildInteropChainMap(chainConfigs: AnvilConfig["chains"]): Map<number, number[]> {
-    const l2ChainConfigs = chainConfigs.filter((chainConfig) => !chainConfig.isL1);
+    const l2ChainConfigs = chainConfigs.filter((chainConfig) => chainConfig.role !== "l1");
     return new Map(
       l2ChainConfigs.map((chainConfig) => [
         chainConfig.chainId,
@@ -124,13 +124,12 @@ export class DeploymentRunner {
     chainConfigsById: Map<number, AnvilConfig["chains"][number]>
   ) {
     return l2Chains.map((l2Chain) => {
-      const chainConfig = this.getChainConfigOrThrow(chainConfigsById, l2Chain.chainId);
+      this.getChainConfigOrThrow(chainConfigsById, l2Chain.chainId);
       return {
         chainId: l2Chain.chainId,
         rpcUrl: l2Chain.rpcUrl,
         baseToken: ETH_TOKEN_ADDRESS, // TODO: support non-ETH base tokens EVM-1297
         validiumMode: false, // TODO: support validium mode (requires batch settlement) EVM-1297
-        isGateway: chainConfig.role === "gateway",
       };
     });
   }
@@ -213,7 +212,7 @@ export class DeploymentRunner {
         anvilManager.startChain({
           chainId: chainConfig.chainId,
           port: chainConfig.port,
-          isL1: chainConfig.isL1,
+          role: chainConfig.role,
           ...baseOptions,
           dumpStatePath: dumpStatePaths?.[chainConfig.chainId],
         })
@@ -409,7 +408,7 @@ export class DeploymentRunner {
         anvilManager.startChain({
           chainId: chainConfig.chainId,
           port: chainConfig.port,
-          isL1: chainConfig.isL1,
+          role: chainConfig.role,
           loadStatePath: loadStatePaths[chainConfig.chainId],
         })
       )

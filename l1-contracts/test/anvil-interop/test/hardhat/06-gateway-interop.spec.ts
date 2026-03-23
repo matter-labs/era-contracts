@@ -10,36 +10,8 @@ import {
   getGWChainBalance,
   getGWPendingInteropBalance,
 } from "../../src/helpers/process-logs-helper";
-import { getAbi } from "../../src/core/contracts";
-import { getChainIdByRole, getChainIdsByRole, getL2Chain } from "../../src/core/utils";
+import { extractInteropBundle, getChainIdByRole, getChainIdsByRole, getL2Chain } from "../../src/core/utils";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
-
-/**
- * Extract the InteropBundle struct from the source transaction receipt.
- * Parses the InteropBundleSent event emitted by InteropCenter.
- */
-async function extractInteropBundle(
-  rpcUrl: string,
-  txHash: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-): Promise<any> {
-  const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
-  const receipt = await provider.getTransactionReceipt(txHash);
-  const iface = new ethers.utils.Interface(getAbi("InteropCenter"));
-
-  for (const logEntry of receipt.logs) {
-    try {
-      const parsed = iface.parseLog({ topics: logEntry.topics, data: logEntry.data });
-      if (parsed.name === "InteropBundleSent") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return (parsed.args as any).interopBundle;
-      }
-    } catch {
-      // Not an InteropCenter log
-    }
-  }
-  throw new Error(`InteropBundleSent event not found in tx ${txHash}`);
-}
 
 describe("06 - Gateway Interop (GW-settled chains)", function () {
   this.timeout(0);
