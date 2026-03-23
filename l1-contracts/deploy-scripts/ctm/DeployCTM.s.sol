@@ -54,9 +54,6 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 
 import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
 
-// TODO: pass this value from zkstack_cli
-uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 6;
-
 contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
 
@@ -225,7 +222,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
             vm.startBroadcast(getDeployerAddress());
             ZKsyncOSDualVerifier(ctmAddresses.stateTransition.verifiers.verifier).addVerifier(
-                DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
+                config.initialVerifierVersion,
                 IVerifierV2(ctmAddresses.stateTransition.verifiers.verifierFflonk),
                 IVerifier(ctmAddresses.stateTransition.verifiers.verifierPlonk)
             );

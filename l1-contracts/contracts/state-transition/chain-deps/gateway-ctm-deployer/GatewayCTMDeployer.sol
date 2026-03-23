@@ -41,6 +41,9 @@ struct GatewayCTMDeployerConfig {
     bool testnetVerifier;
     /// @notice Flag indicating whether to use ZKsync OS mode.
     bool isZKsyncOS;
+    /// @notice Initial verifier version to register in the ZKsync OS dual verifier.
+    /// @dev Only used when isZKsyncOS is true. Set to 0 to skip registration.
+    uint32 initialVerifierVersion;
     /// @notice Array of function selectors for the Admin facet.
     bytes4[] adminSelectors;
     /// @notice Array of function selectors for the Executor facet.
@@ -183,6 +186,9 @@ struct GatewayVerifiersDeployerConfig {
     bool testnetVerifier;
     /// @notice Flag indicating whether to use ZKsync OS mode.
     bool isZKsyncOS;
+    /// @notice Initial verifier version to register in the ZKsync OS dual verifier.
+    /// @dev Only used when isZKsyncOS is true. Set to 0 to skip registration.
+    uint32 initialVerifierVersion;
 }
 
 /// @notice Result from Verifiers deployer.

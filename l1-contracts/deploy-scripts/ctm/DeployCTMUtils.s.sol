@@ -83,6 +83,9 @@ struct Config {
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
     bool isZKsyncOS;
+    /// @notice Initial verifier version to register in the ZKsync OS dual verifier.
+    /// @dev Only used when isZKsyncOS is true. Passed from the zkstack CLI.
+    uint32 initialVerifierVersion;
     ContractsConfig contracts;
 }
 
@@ -155,6 +158,9 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
         if (toml.keyExists("$.is_zk_sync_os")) {
             config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
+        }
+        if (toml.keyExists("$.initial_verifier_version")) {
+            config.initialVerifierVersion = uint32(toml.readUint("$.initial_verifier_version"));
         }
         if (toml.keyExists("$.zk_token_asset_id")) {
             config.zkTokenAssetId = toml.readBytes32("$.zk_token_asset_id");

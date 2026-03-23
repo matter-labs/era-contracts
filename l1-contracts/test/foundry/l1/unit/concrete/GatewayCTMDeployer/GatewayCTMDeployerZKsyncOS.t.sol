@@ -121,6 +121,7 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
             l1ChainId: 1,
             testnetVerifier: true,
             isZKsyncOS: true, // ZKsyncOS mode enabled
+            initialVerifierVersion: 6,
             adminSelectors: new bytes4[](2),
             executorSelectors: new bytes4[](2),
             mailboxSelectors: new bytes4[](2),

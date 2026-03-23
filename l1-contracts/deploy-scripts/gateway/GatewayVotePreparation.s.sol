@@ -111,6 +111,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
             isZKsyncOS: config.isZKsyncOS,
+            initialVerifierVersion: config.initialVerifierVersion,
             adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),

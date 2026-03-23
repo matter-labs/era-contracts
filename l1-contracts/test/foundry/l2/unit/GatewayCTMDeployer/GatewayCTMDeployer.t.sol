@@ -172,6 +172,7 @@ contract GatewayCTMDeployerTest is Test {
             l1ChainId: 1,
             testnetVerifier: true,
             isZKsyncOS: false,
+            initialVerifierVersion: 6,
             adminSelectors: new bytes4[](2),
             executorSelectors: new bytes4[](2),
             mailboxSelectors: new bytes4[](2),
@@ -268,7 +269,8 @@ contract GatewayCTMDeployerTest is Test {
             salt: deployerConfig.salt,
             aliasedGovernanceAddress: deployerConfig.aliasedGovernanceAddress,
             testnetVerifier: deployerConfig.testnetVerifier,
-            isZKsyncOS: deployerConfig.isZKsyncOS
+            isZKsyncOS: deployerConfig.isZKsyncOS,
+            initialVerifierVersion: deployerConfig.initialVerifierVersion
         });
         new GatewayCTMDeployerVerifiers(verifiersConfig);
     }
