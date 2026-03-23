@@ -6,6 +6,7 @@ import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
+  INTEROP_SEND_BUNDLE_GAS_LIMIT,
   L2_ASSET_ROUTER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
@@ -166,7 +167,7 @@ export async function executeTokenTransfer(
   log(`   Target: L2AssetRouter at ${L2_ASSET_ROUTER_ADDR}`);
 
   const sourceTx = await interopCenter.sendBundle(destinationChainIdBytes, [callStarter], [], {
-    gasLimit: 500000,
+    gasLimit: INTEROP_SEND_BUNDLE_GAS_LIMIT,
     value: 0,
   });
   log(`\n   Transaction sent: cast run ${sourceTx.hash} -r ${sourceChain.rpcUrl}`);
@@ -204,7 +205,7 @@ export async function executeTokenTransfer(
 
     const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
     try {
-      const executeTx = await interopHandler.executeBundle(bundleData, mockProof, { gasLimit: 5_000_000 });
+      const executeTx = await interopHandler.executeBundle(bundleData, mockProof, { gasLimit: DEFAULT_TX_GAS_LIMIT });
       await executeTx.wait();
       targetTxHash = executeTx.hash;
       log(`   ✅ executeBundle tx: cast run ${executeTx.hash} -r ${targetChain.rpcUrl}`);

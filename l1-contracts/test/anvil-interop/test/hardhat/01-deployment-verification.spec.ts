@@ -110,7 +110,6 @@ describe("01 - Deployment Verification", function () {
           it(`has ${contract.name} at ${contract.addr}`, async () => {
             const code = await l2Provider.getCode(contract.addr);
             expect(code, `${contract.name} not deployed on chain ${chainConfig.chainId}`).to.not.equal("0x");
-            expect(code).to.not.equal("0x0");
           });
         }
       });

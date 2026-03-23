@@ -38,6 +38,10 @@ export const ANVIL_DEFAULT_PRIVATE_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bac
 // 100 ETH in hex — used to fund impersonated accounts
 export const ANVIL_FUND_BALANCE = "0x56BC75E2D63100000";
 
+// Default gas limits for test transactions
+export const INTEROP_SEND_BUNDLE_GAS_LIMIT = 500_000;
+export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
+
 
 export const INTEROP_BUNDLE_TUPLE_TYPE =
   "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool))";

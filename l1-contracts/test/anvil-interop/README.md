@@ -95,6 +95,14 @@ You can also add `.only` to a `describe` or `it` block in the spec file to isola
 | `ANVIL_INTEROP_PORT_OFFSET=N`  | Offset all chain ports by N (useful for parallel runs)            |
 | `ANVIL_INTEROP_RUN_SUFFIX=X`   | Suffix for output dirs (set automatically by parallel workers)    |
 
+### CLI Parameters
+
+| Parameter              | Effect                                                                                                  |
+| ---------------------- | ------------------------------------------------------------------------------------------------------- |
+| `--spec <file>`        | Run only the specified spec file(s). Can be repeated (e.g., `--spec 02-direct-bridge.spec.ts --spec 05-gateway-bridge.spec.ts`). Disables parallel workers. |
+| `--port-offset <N>`    | Offset all chain ports by N (equivalent to `ANVIL_INTEROP_PORT_OFFSET`). Useful for avoiding conflicts with other Anvil instances. |
+| `--keep-chains`        | Keep Anvil processes running after tests finish (equivalent to `ANVIL_INTEROP_KEEP_CHAINS=1`). Disables parallel workers. |
+
 ## Debugging
 
 Every transaction hash in the test output is printed as a `cast run` command:
@@ -205,8 +213,9 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 - **Interop registration scope**: the harness only intentionally registers GW-settled L2 chains for interop. Routes involving the gateway chain or a direct-settled chain revert in the harness.
 - **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
 - **Interop proofs**: Correct struct shape but empty proof arrays
-- **v29 -> v31 upgrade harness**: [run-v29-to-v31-upgrade-test.ts](/Users/kalmanlajko/programming/zksync/zksync-era2/contracts/l1-contracts/test/anvil-interop/run-v29-to-v31-upgrade-test.ts) still applies direct `anvil_setStorageAt` patches to legacy chain state before per-chain upgrade. This is a test-only compatibility bridge, not a production upgrade flow.
-- **L2 genesis bootstrap**: [l2-genesis-upgrade-deployer.ts](/Users/kalmanlajko/programming/zksync/zksync-era2/contracts/l1-contracts/test/anvil-interop/src/deployers/l2-genesis-upgrade-deployer.ts) still bootstraps contract code and base-token balance via Anvil RPC before relaying the real genesis transaction. Production chains get that state directly from genesis.
+- **processLogsAndMessages impersonation**: The diamond proxy is impersonated instead of the operator (production uses the operator role)
+- **Settlement layer notification via impersonation**: `SystemContext.setSettlementLayerChainId` is called by impersonating the bootloader. On ZKsync OS, this is only emitted during actual migration between settlement layers (and during genesis/v31 upgrades), not at every batch
+- **v29 -> v31 upgrade harness**: `run-v29-to-v31-upgrade-test.ts` still applies direct `anvil_setStorageAt` patches to legacy chain state before per-chain upgrade. This is a test-only compatibility bridge, not a production upgrade flow.
 - **Temporary upgrade inputs**: the upgrade harness copies v29 config inputs into `test/anvil-interop/outputs/upgrade-harness-inputs/` and passes them to Forge via env overrides. It no longer mutates checked-in `upgrade-envs/.../local.toml`.
 
 ## Cleanup

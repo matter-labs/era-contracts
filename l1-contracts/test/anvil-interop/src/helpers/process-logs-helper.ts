@@ -270,6 +270,64 @@ export function buildInteropBundleLog(params: { txNumberInBatch: number; interop
   return { log, message };
 }
 
+/**
+ * Build L2Log + message entries for each InteropCall in a bundle, representing
+ * the execution confirmation messages that InteropHandler sends via L2→L1 messenger
+ * when executeBundle succeeds.
+ *
+ * Each call produces one log/message pair. The message format matches:
+ *   abi.encodeCall(IAssetTrackerDataEncoding.receiveInteropCallExecuted, (InteropCallExecutedMessage))
+ * The log key is bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))
+ */
+export function buildInteropCallExecutedLogs(params: {
+  startTxNumberInBatch: number;
+  interopBundle: InteropBundle;
+}): { logs: L2Log[]; messages: string[] } {
+  const { interopBundle, startTxNumberInBatch } = params;
+  const abiCoder = ethers.utils.defaultAbiCoder;
+
+  // Compute the selector for receiveInteropCallExecuted(InteropCallExecutedMessage)
+  // InteropCallExecutedMessage is (bytes32, (bytes1, bool, address, address, uint256, bytes))
+  const RECEIVE_INTEROP_CALL_EXECUTED_SELECTOR = ethers.utils
+    .id("receiveInteropCallExecuted((bytes32,(bytes1,bool,address,address,uint256,bytes)))")
+    .slice(0, 10);
+
+  const INTEROP_CALL_EXECUTED_MSG_TYPE = "tuple(bytes32,tuple(bytes1,bool,address,address,uint256,bytes))";
+
+  const logs: L2Log[] = [];
+  const messages: string[] = [];
+
+  const calls: InteropCall[] = interopBundle.calls;
+  const destinationBaseTokenAssetId: string = interopBundle.destinationBaseTokenAssetId;
+
+  for (let i = 0; i < calls.length; i++) {
+    const call = calls[i];
+
+    const interopCallTuple = [call.version, call.shadowAccount, call.to, call.from, call.value, call.data];
+
+    const executedMsgTuple = [destinationBaseTokenAssetId, interopCallTuple];
+
+    const encodedArgs = abiCoder.encode([INTEROP_CALL_EXECUTED_MSG_TYPE], [executedMsgTuple]);
+    const message = ethers.utils.hexlify(
+      ethers.utils.concat([RECEIVE_INTEROP_CALL_EXECUTED_SELECTOR, encodedArgs])
+    );
+
+    const log: L2Log = {
+      l2ShardId: 0,
+      isService: true,
+      txNumberInBatch: startTxNumberInBatch + i,
+      sender: L2_TO_L1_MESSENGER_ADDR,
+      key: ethers.utils.hexZeroPad(L2_INTEROP_HANDLER_ADDR, 32),
+      value: ethers.utils.keccak256(message),
+    };
+
+    logs.push(log);
+    messages.push(message);
+  }
+
+  return { logs, messages };
+}
+
 // ───────────────────────────────────────────────────────────────
 // callProcessLogsAndMessages
 // ───────────────────────────────────────────────────────────────

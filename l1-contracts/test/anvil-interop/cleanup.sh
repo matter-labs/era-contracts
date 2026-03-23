@@ -13,7 +13,7 @@ cd "$SCRIPT_DIR"
 
 echo "🧹 Cleaning up Anvil interop environment..."
 
-# Known ports used by our Anvil instances (offset by ANVIL_INTEROP_PORT_OFFSET if set)
+# Read chain ports from anvil-config.json (single source of truth)
 PORT_OFFSET="${ANVIL_INTEROP_PORT_OFFSET:-0}"
 RUN_SUFFIX="${ANVIL_INTEROP_RUN_SUFFIX:-}"
 PID_FILE="outputs/anvil-pids${RUN_SUFFIX}.json"

@@ -408,7 +408,8 @@ export class GatewaySetup {
   /**
    * Simulate the bootloader calling SystemContext.setSettlementLayerChainId() on an L2 chain.
    *
-   * On a real ZK chain, the bootloader does this at the start of each batch after migration.
+   * On ZKsync OS, this is only emitted during actual migration between settlement layers
+   * (and during genesis/v31 upgrades), NOT at every batch start.
    * This call propagates to L2ChainAssetHandler.setSettlementLayerChainId(), which increments
    * migrationNumber[block.chainid] — required for TBM's initiateL1ToGatewayMigrationOnL2 to
    * emit an L2→L1 message instead of early-returning.

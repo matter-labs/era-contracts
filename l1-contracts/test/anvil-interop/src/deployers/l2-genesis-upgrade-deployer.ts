@@ -28,8 +28,9 @@ export class L2GenesisUpgradeDeployer {
   private async bootstrapSystemContractPrestate(contractSpec: SystemContractPredeploy): Promise<void> {
     const existingCode = await this.l2Provider.getCode(contractSpec.address);
     if (existingCode !== "0x" && existingCode !== "0x0") {
-      // Note: only checks code is non-empty; does not verify it matches the expected bytecode.
-      console.log(`   ✅ ${contractSpec.contractName} already deployed at ${contractSpec.address}`);
+      // Expected when loading pregenerated chain state (contracts already deployed).
+      // Only checks code is non-empty; does not verify it matches the expected bytecode.
+      console.log(`   ✅ ${contractSpec.contractName} already deployed at ${contractSpec.address} (skipped)`);
       return;
     }
 

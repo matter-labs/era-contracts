@@ -21,6 +21,7 @@ import type {
   ChainAddresses,
   ChainInfo,
   ChainRole,
+  DeploymentState,
   FinalizeWithdrawalParams,
   InteropBundle,
   L2ChainInfo,
@@ -159,6 +160,23 @@ export function getChainIdsByRole(config: AnvilChainConfig[], role: ChainRole): 
 export function formatChainInfo(chainId: number, port: number, isL1: boolean): string {
   const type = isL1 ? "L1" : "L2";
   return `${type} Chain ${chainId} on port ${port}`;
+}
+
+/**
+ * Convenience accessor: get the L1 RPC URL from deployment state.
+ */
+export function getL1RpcUrl(state: DeploymentState): string {
+  if (!state.chains?.l1) {
+    throw new Error("Deployment state missing L1 chain");
+  }
+  return state.chains.l1.rpcUrl;
+}
+
+/**
+ * Convenience accessor: get the RPC URL for an L2 chain from deployment state.
+ */
+export function getL2RpcUrl(state: DeploymentState, chainId: number): string {
+  return getL2Chain(state.chains!, chainId).rpcUrl;
 }
 
 /**
@@ -544,8 +562,7 @@ export async function extractAndRelayInteropBundles(
         data: logEntry.data,
       });
       if (parsed && parsed.name === "InteropBundleSent") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        bundles.push((parsed.args as any).interopBundle);
+        bundles.push(parsed.args["interopBundle"]);
       }
     } catch {
       // Ignore non-InteropCenter logs
