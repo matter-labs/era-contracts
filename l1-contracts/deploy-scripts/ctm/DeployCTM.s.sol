@@ -67,10 +67,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     /// (one for the impl, one for SystemContractProxy). With ~10 contracts in `_buildForceDeploymentsData`,
     /// that's ~20 sequential FFI calls. The cache batches all bytecodes into a single FFI call in
     /// `_precomputeBlakeHashes()`, reducing deployment time significantly.
-    /// Only used by `runForAnvilTest` — production paths (`runWithBridgehub`/`runForTest`) use the
-    /// uncached `Utils.getZKOSProxyUpgradeBytecodeInfo` fallback in `_getProxyUpgradeBytecodeInfo`.
+    /// Automatically used by all ZKsyncOS deployments (all entry points). Non-ZKsyncOS (Era) deployments
+    /// skip the cache and use `Utils.getZKOSProxyUpgradeBytecodeInfo` directly.
     mapping(bytes32 => bytes32) private _blakeCache;
-    bool private _useBlakeCache;
 
     function run() public virtual {
         // Had to leave the function due to scripts that inherit this one, as well as for tests
@@ -90,26 +89,21 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function runForTest(address bridgehub, bool skipL1Deployments) public {
-        _runConfiguredTest(bridgehub, skipL1Deployments, true, false);
+        _runConfiguredTest(bridgehub, skipL1Deployments, true);
     }
 
-    /// @notice Like runForTest but skips saveDiamondSelectors() and batches blake2s FFI calls.
+    /// @notice Like runForTest but skips saveDiamondSelectors().
     function runForAnvilTest(address bridgehub, bool skipL1Deployments) public {
-        _runConfiguredTest(bridgehub, skipL1Deployments, false, true);
+        _runConfiguredTest(bridgehub, skipL1Deployments, false);
     }
 
     function _runConfiguredTest(
         address bridgehub,
         bool skipL1Deployments,
-        bool shouldSaveSelectors,
-        bool shouldUseBlakeCache
+        bool shouldSaveSelectors
     ) internal {
         if (shouldSaveSelectors) {
             saveDiamondSelectors();
-        }
-        _useBlakeCache = shouldUseBlakeCache;
-        if (shouldUseBlakeCache) {
-            _precomputeBlakeHashes();
         }
         runInner(
             vm.envString("PERMANENT_VALUES_INPUT"),
@@ -520,7 +514,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
     /// @dev Precompute blake2s hashes for all 10 unique bytecodes in a single FFI call.
     function _precomputeBlakeHashes() private {
-        string memory tmpFile = string.concat(vm.projectRoot(), "/test/anvil-interop/outputs/tmp-blake-batch.txt");
+        string memory tmpFile = string.concat(vm.projectRoot(), "/script-out/tmp-blake-batch.txt");
 
         bytes[10] memory bytecodes;
         bytecodes[0] = Utils.readFoundryDeployedBytecodeL1("L2Bridgehub.sol", "L2Bridgehub");
@@ -578,7 +572,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         string memory fileName,
         string memory contractName
     ) private returns (bytes memory) {
-        if (_useBlakeCache) {
+        if (config.isZKsyncOS) {
             bytes memory implBytecode = Utils.readFoundryDeployedBytecodeL1(fileName, contractName);
             bytes memory proxyBytecode = Utils.readFoundryDeployedBytecodeL1(
                 "SystemContractProxy.sol",
@@ -592,6 +586,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function _buildForceDeploymentsData(
         address dangerousTestOnlyForcedBeacon
     ) private returns (FixedForceDeploymentsData memory data) {
+        if (config.isZKsyncOS) {
+            _precomputeBlakeHashes();
+        }
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             gatewayChainId: config.gatewayChainId,

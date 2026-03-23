@@ -116,14 +116,14 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         // Read on-chain addresses once (same for all chains)
         initializeConfigFromOnChain(_chainTypeManagerProxy);
 
+        // Set shared config (loop-invariant)
+        config.forceDeploymentsData = _forceDeploymentsData;
+        config.diamondCutData = _diamondCutData;
+        config.create2FactoryAddress = _create2FactoryAddress;
+        config.create2Salt = _create2Salt;
+
         for (uint256 i = 0; i < _chainIds.length; i++) {
             console.log("Deploying ZKChain", _chainIds[i]);
-
-            // Set shared config
-            config.forceDeploymentsData = _forceDeploymentsData;
-            config.diamondCutData = _diamondCutData;
-            config.create2FactoryAddress = _create2FactoryAddress;
-            config.create2Salt = _create2Salt;
 
             // Read per-chain config
             string memory chainConfigPath = string.concat(
