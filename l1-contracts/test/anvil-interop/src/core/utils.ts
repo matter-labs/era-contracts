@@ -60,6 +60,21 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Assert that a contract is deployed (has code) at the given address.
+ * Throws with a descriptive message if the address has no code.
+ */
+export async function assertContractDeployed(
+  provider: providers.JsonRpcProvider,
+  address: string,
+  label: string
+): Promise<void> {
+  const code = await provider.getCode(address);
+  if (code === "0x" || code === "0x0") {
+    throw new Error(`${label} at ${address} has no code — contract not deployed`);
+  }
+}
+
 export function saveTomlConfig(filePath: string, data: Record<string, unknown>): void {
   const dir = path.dirname(filePath);
   if (!fs.existsSync(dir)) {

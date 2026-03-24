@@ -12,6 +12,9 @@ async function main(): Promise<void> {
   process.env.FOUNDRY_PROFILE = "anvil-interop";
 
   const runner = new DeploymentRunner();
+  // Clear stale state from previous runs. Without this, cached testTokens in
+  // chains.json causes deployAndSetup to skip token deployment on fresh chains.
+  runner.clearState();
   const anvilManager = new AnvilManager();
 
   try {

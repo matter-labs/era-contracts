@@ -6,7 +6,7 @@ import {
   L2_ASSET_TRACKER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
-import { buildFinalizeWithdrawalParams, extractAndRelayNewPriorityRequests } from "../core/utils";
+import { assertContractDeployed, buildFinalizeWithdrawalParams, extractAndRelayNewPriorityRequests } from "../core/utils";
 import { encodeNtvAssetId } from "../core/data-encoding";
 import type { ChainAddresses } from "../core/types";
 
@@ -121,7 +121,8 @@ export async function registerTestTokenOnL2NTV(
 
   const existingAssetId = await ntv.assetId(tokenAddr);
   if (existingAssetId === ethers.constants.HashZero) {
-    const regTx = await ntv.registerToken(tokenAddr);
+    await assertContractDeployed(l2Provider, tokenAddr, `Test token on chain ${chainId}`);
+    const regTx = await ntv.registerToken(tokenAddr, { gasLimit: 500_000 });
     await regTx.wait();
     log(`   Registered test token ${tokenAddr} on L2NTV (chain ${chainId})`);
   }

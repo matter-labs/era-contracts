@@ -79,6 +79,11 @@ export class DeploymentRunner {
     fs.writeFileSync(path.join(this.stateDir, "chains.json"), JSON.stringify(state, null, 2));
   }
 
+  /** Clear cached deployment state so a fresh run doesn't see stale data. */
+  clearState(): void {
+    this.saveState({});
+  }
+
   private toChainConfigMap(chainConfigs: AnvilConfig["chains"]): Map<number, AnvilConfig["chains"][number]> {
     return new Map(chainConfigs.map((chainConfig) => [chainConfig.chainId, chainConfig]));
   }

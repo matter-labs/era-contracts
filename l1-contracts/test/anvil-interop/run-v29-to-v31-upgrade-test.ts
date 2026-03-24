@@ -362,7 +362,9 @@ async function main(): Promise<void> {
     for (const chain of chainAddresses) {
       const diamondProxy = new ethers.Contract(chain.diamondProxy, getAbi("GettersFacet"), provider);
       const semver = await diamondProxy.getSemverProtocolVersion();
-      const [major, minor, patch] = [semver[0].toNumber(), semver[1].toNumber(), semver[2].toNumber()];
+      const major = Number(semver[0]);
+      const minor = Number(semver[1]);
+      const patch = Number(semver[2]);
       console.log(`  Chain ${chain.chainId} (${chain.diamondProxy}): protocol version ${major}.${minor}.${patch}`);
 
       if (major !== 0 || minor !== 31) {

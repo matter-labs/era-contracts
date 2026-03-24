@@ -11,6 +11,7 @@ import {
   GW_ASSET_TRACKER_ADDR,
   L2_MESSAGE_VERIFICATION_ADDR,
 } from "../core/const";
+import { assertContractDeployed } from "../core/utils";
 
 /**
  * Pre-deploy Gateway CTM contracts on the GW chain via anvil_setCode.
@@ -55,10 +56,7 @@ export class GatewayDeployer {
     ];
 
     for (const c of contracts) {
-      const code = await this.gwProvider.getCode(c.addr);
-      if (code === "0x" || code === "0x0") {
-        throw new Error(`Missing ${c.name} at ${c.addr} on GW chain ${this.gwChainId}`);
-      }
+      await assertContractDeployed(this.gwProvider, c.addr, `${c.name} on GW chain ${this.gwChainId}`);
     }
 
     console.log(`   All gateway contracts verified on chain ${this.gwChainId}`);
