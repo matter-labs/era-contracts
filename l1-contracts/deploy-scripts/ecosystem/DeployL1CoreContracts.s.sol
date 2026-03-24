@@ -80,8 +80,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
 
-        PermanentValuesHelper.createPermanentValuesIfNeeded();
-
         initializeConfig(inputPath);
 
         (coreAddresses.shared.governance) = deploySimpleContract("Governance", false);
@@ -360,7 +358,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         vm.writeToml(toml, outputPath);
 
         (address create2FactoryAddr, bytes32 create2FactorySalt) = getCreate2FactoryParams();
-        PermanentValuesHelper.savePermanentValues(create2FactoryAddr, create2FactorySalt);
     }
 
     // add this to be excluded from coverage report

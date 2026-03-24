@@ -164,9 +164,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         }
         require(config.zkTokenAssetId != bytes32(0), "zk_token_asset_id must be non-zero in config");
 
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(
-            permanentValuesPath
-        );
+        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues();
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
