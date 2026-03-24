@@ -14,8 +14,9 @@
  *     involve the legacy ZK Gateway (settlementLayerChainId matches
  *     legacy_gateway.chain_id).
  *
- *     For each chain, historical state calls derive the four batch-number
- *     fields required by `MigrationInterval`:
+ *     For each chain, historical state calls via the chain's diamond proxy
+ *     Getters facet derive the four batch-number fields required by
+ *     `MigrationInterval`:
  *       - migrateToGWBatchNumber   (L1 batch of the chain at migration-to time)
  *       - slBatchLowerBound        (GW batch at migration-to time)
  *       - migrateFromGWBatchNumber (GW batch of the chain at migration-from time)
@@ -45,28 +46,66 @@ import {
   getLegacyGatewayChainId,
 } from "./upgrade-script-utils";
 
-// ─── Inline ABIs ─────────────────────────────────────────────────────────────
-//
-// These minimal ABIs are defined inline so that the `write` command works on a
-// clean checkout without requiring `forge build`.  The `collect` command also
-// uses these (augmented by the on-chain data).
+// ─── Block iteration step ─────────────────────────────────────────────────────
 
-const BRIDGEHUB_ABI = [
-  "function chainAssetHandler() external view returns (address)",
-  "function messageRoot() external view returns (address)",
-];
+const BLOCK_STEP = 10_000;
 
-const CHAIN_ASSET_HANDLER_ABI = [
-  // Events
-  "event MigrationStarted(uint256 indexed chainId, uint256 migrationNumber, bytes32 indexed assetId, uint256 indexed settlementLayerChainId)",
-  "event MigrationFinalized(uint256 indexed chainId, uint256 migrationNumber, bytes32 indexed assetId, address indexed zkChain)",
-];
+// ─── ABI loading from zkstack-out (committed artifacts) ──────────────────────
 
-const MESSAGE_ROOT_ABI = [
-  "function currentChainBatchNumber(uint256 chainId) external view returns (uint256)",
-];
+/**
+ * Loads an ABI from a committed zkstack-out JSON file.
+ * These files are flat arrays (not wrapped in {abi: [...]}).
+ */
+function loadZkstackAbi(relativeToZkstackOut: string): ethers.ContractInterface {
+  const fullPath = path.join(__dirname, "..", "zkstack-out", relativeToZkstackOut);
+  if (!fs.existsSync(fullPath)) {
+    throw new Error(
+      `zkstack-out ABI file not found: ${fullPath}\n` +
+        "Ensure the zkstack-out directory is up to date."
+    );
+  }
+  const data = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
+  return Array.isArray(data) ? data : (data as { abi: ethers.ContractInterface }).abi;
+}
+
+// Lazy-load ABIs at first use so the `write` command works without requiring
+// zkstack-out to be present (it only reads committed TOML files).
+let _bridgehubAbi: ethers.ContractInterface | null = null;
+let _chainAssetHandlerAbi: ethers.ContractInterface | null = null;
+let _zkChainAbi: ethers.ContractInterface | null = null;
+
+function getBridgehubAbi(): ethers.ContractInterface {
+  if (!_bridgehubAbi) {
+    _bridgehubAbi = loadZkstackAbi("L1Bridgehub.sol/L1Bridgehub.json");
+  }
+  return _bridgehubAbi;
+}
+
+function getChainAssetHandlerAbi(): ethers.ContractInterface {
+  if (!_chainAssetHandlerAbi) {
+    _chainAssetHandlerAbi = loadZkstackAbi(
+      "IChainAssetHandler.sol/IChainAssetHandlerBase.json"
+    );
+  }
+  return _chainAssetHandlerAbi;
+}
+
+function getZKChainAbi(): ethers.ContractInterface {
+  if (!_zkChainAbi) {
+    _zkChainAbi = loadZkstackAbi("IZKChain.sol/IZKChain.json");
+  }
+  return _zkChainAbi;
+}
 
 // ─── Data types ───────────────────────────────────────────────────────────────
+
+/** Snapshot of on-chain batch counters for a specific chain at a specific block. */
+interface BatchSnapshot {
+  blockNumber: number;
+  totalBatchesExecuted: number;
+  totalBatchesVerified: number;
+  totalBatchesCommitted: number;
+}
 
 /** A single chain's completed legacy-GW migration interval. */
 interface ChainMigrationInterval {
@@ -79,6 +118,13 @@ interface ChainMigrationInterval {
   slBatchLowerBound: number;
   /** Legacy-GW's own batch number at the time the chain migrated FROM it (upper bound). */
   slBatchUpperBound: number;
+  /** Full batch snapshots used to derive the interval (for auditing). */
+  snapshots: {
+    chainAtMigrationStarted: BatchSnapshot;
+    gwAtMigrationStarted: BatchSnapshot;
+    chainAtMigrationFinalized: BatchSnapshot;
+    gwAtMigrationFinalized: BatchSnapshot;
+  };
 }
 
 /** A single raw migration-related event captured during collection. */
@@ -92,7 +138,7 @@ interface RawEvent {
 
 /** The JSON cache format stored in script-out/. */
 interface CollectedData {
-  /** First block number scanned. */
+  /** First block number scanned (block where GW diamond proxy was first deployed). */
   firstBlock: number;
   /** Last block number scanned (inclusive). */
   lastBlock: number;
@@ -100,6 +146,45 @@ interface CollectedData {
   events: RawEvent[];
   /** Derived complete intervals (one per chain). */
   intervals: ChainMigrationInterval[];
+}
+
+// ─── Binary search: find first block with deployed contract code ──────────────
+
+async function binarySearchDeployBlock(
+  provider: ethers.providers.JsonRpcProvider,
+  address: string,
+  lo: number,
+  hi: number
+): Promise<number> {
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const code = await provider.getCode(address, mid);
+    if (code !== "0x") {
+      hi = mid;
+    } else {
+      lo = mid + 1;
+    }
+  }
+  return lo;
+}
+
+// ─── Utility: read batch counters from a ZK chain diamond proxy at a block ───
+
+async function getBatchSnapshot(
+  diamondProxy: ethers.Contract,
+  blockNumber: number
+): Promise<BatchSnapshot> {
+  const [executed, verified, committed] = await Promise.all([
+    diamondProxy.callStatic.getTotalBatchesExecuted({ blockTag: blockNumber }) as Promise<ethers.BigNumber>,
+    diamondProxy.callStatic.getTotalBatchesVerified({ blockTag: blockNumber }) as Promise<ethers.BigNumber>,
+    diamondProxy.callStatic.getTotalBatchesCommitted({ blockTag: blockNumber }) as Promise<ethers.BigNumber>,
+  ]);
+  return {
+    blockNumber,
+    totalBatchesExecuted: executed.toNumber(),
+    totalBatchesVerified: verified.toNumber(),
+    totalBatchesCommitted: committed.toNumber(),
+  };
 }
 
 // ─── collect command ──────────────────────────────────────────────────────────
@@ -118,30 +203,34 @@ async function collect(rpc: string, envName: string): Promise<void> {
   console.log(`Legacy GW chain:   ${legacyGwChainId}`);
 
   const provider = new ethers.providers.JsonRpcProvider(rpc);
-  const bridgehub = new ethers.Contract(bridgehubAddress, BRIDGEHUB_ABI, provider);
+  const bridgehub = new ethers.Contract(bridgehubAddress, getBridgehubAbi(), provider);
 
   const chainAssetHandlerAddress: string = await bridgehub.chainAssetHandler();
-  const messageRootAddress: string = await bridgehub.messageRoot();
-
   console.log(`ChainAssetHandler: ${chainAssetHandlerAddress}`);
-  console.log(`MessageRoot:       ${messageRootAddress}`);
 
   const chainAssetHandler = new ethers.Contract(
     chainAssetHandlerAddress,
-    CHAIN_ASSET_HANDLER_ABI,
+    getChainAssetHandlerAbi(),
     provider
   );
-  const messageRoot = new ethers.Contract(messageRootAddress, MESSAGE_ROOT_ABI, provider);
+
+  // ── Determine scan range via binary search ─────────────────────────────────
+  // Start scanning from the block at which the legacy GW's diamond proxy was
+  // first deployed.  This avoids iterating the entire L1 history.
+
+  const legacyGwDiamondProxy: string = await bridgehub.getZKChain(legacyGwChainId);
+  console.log(`Legacy GW diamond: ${legacyGwDiamondProxy}`);
 
   const latestBlock = await provider.getBlockNumber();
-  const firstBlock = 0;
 
-  console.log(`\nScanning blocks ${firstBlock} – ${latestBlock} …`);
+  console.log(`\nBinary-searching for legacy GW deployment block…`);
+  const firstBlock = await binarySearchDeployBlock(provider, legacyGwDiamondProxy, 0, latestBlock);
+  console.log(`Legacy GW first deployed at block: ${firstBlock}`);
+  console.log(`Scanning blocks ${firstBlock} – ${latestBlock} (step ${BLOCK_STEP})…\n`);
 
-  // ── Collect MigrationStarted events (TO legacy GW) ────────────────────────
+  // ── Build event filters ────────────────────────────────────────────────────
 
-  // The third indexed topic on MigrationStarted is settlementLayerChainId.
-  // Filter directly so we only fetch events destined for the legacy GW.
+  // MigrationStarted: filter to events whose settlementLayerChainId == legacyGwChainId
   const startedFilter = chainAssetHandler.filters.MigrationStarted(
     null, // chainId – any
     null, // migrationNumber – not indexed, cannot filter
@@ -149,37 +238,51 @@ async function collect(rpc: string, envName: string): Promise<void> {
     ethers.BigNumber.from(legacyGwChainId) // settlementLayerChainId
   );
 
-  const startedEvents = await chainAssetHandler.queryFilter(startedFilter, firstBlock, latestBlock);
-  console.log(`  MigrationStarted (to legacy GW): ${startedEvents.length} event(s)`);
+  // MigrationFinalized: collect all (we will pair by chainId + migrationNumber)
+  const finalizedFilter = chainAssetHandler.filters.MigrationFinalized();
 
-  // Build a map: chainId → list of (migrationNumber, blockNumber, txHash)
-  type StartedInfo = { migrationNumber: number; blockNumber: number; txHash: string };
-  const startedByChain = new Map<number, StartedInfo[]>();
+  // ── Single scan loop over all blocks ──────────────────────────────────────
 
-  for (const ev of startedEvents) {
-    const chainId = (ev.args!.chainId as ethers.BigNumber).toNumber();
-    const migNum = (ev.args!.migrationNumber as ethers.BigNumber).toNumber();
-    const entry: StartedInfo = {
-      migrationNumber: migNum,
-      blockNumber: ev.blockNumber,
-      txHash: ev.transactionHash,
-    };
-    if (!startedByChain.has(chainId)) {
-      startedByChain.set(chainId, []);
+  const allStarted: ethers.Event[] = [];
+  const allFinalized: ethers.Event[] = [];
+
+  for (let from = firstBlock; from <= latestBlock; from += BLOCK_STEP) {
+    const to = Math.min(from + BLOCK_STEP - 1, latestBlock);
+
+    const [startedChunk, finalizedChunk] = await Promise.all([
+      chainAssetHandler.queryFilter(startedFilter, from, to),
+      chainAssetHandler.queryFilter(finalizedFilter, from, to),
+    ]);
+
+    allStarted.push(...startedChunk);
+    allFinalized.push(...finalizedChunk);
+
+    if (startedChunk.length > 0 || finalizedChunk.length > 0) {
+      console.log(
+        `  blocks ${from}–${to}: +${startedChunk.length} MigrationStarted, +${finalizedChunk.length} MigrationFinalized`
+      );
     }
-    startedByChain.get(chainId)!.push(entry);
   }
 
-  // ── Collect MigrationFinalized events (back to L1 from legacy GW) ─────────
+  console.log(
+    `\nTotal: ${allStarted.length} MigrationStarted (to legacy GW), ${allFinalized.length} MigrationFinalized`
+  );
 
-  // MigrationFinalized is emitted on L1 when a chain returns from a settlement layer.
-  // We only care about chains that previously started a migration to the legacy GW.
-  const chainIdsToWatch = Array.from(startedByChain.keys());
+  // ── Build lookup map for MigrationFinalized events ────────────────────────
+
+  // Key: `${chainId}:${migrationNumber}`
+  const finalizedByKey = new Map<string, ethers.Event>();
+  for (const ev of allFinalized) {
+    const chainId = (ev.args!.chainId as ethers.BigNumber).toNumber();
+    const migNum = (ev.args!.migrationNumber as ethers.BigNumber).toNumber();
+    finalizedByKey.set(`${chainId}:${migNum}`, ev);
+  }
+
+  // ── Build raw event list ───────────────────────────────────────────────────
 
   const rawEvents: RawEvent[] = [];
 
-  // Record MigrationStarted events
-  for (const ev of startedEvents) {
+  for (const ev of allStarted) {
     rawEvents.push({
       type: "MigrationStarted",
       chainId: (ev.args!.chainId as ethers.BigNumber).toNumber(),
@@ -188,120 +291,87 @@ async function collect(rpc: string, envName: string): Promise<void> {
       txHash: ev.transactionHash,
     });
   }
+  for (const ev of allFinalized) {
+    rawEvents.push({
+      type: "MigrationFinalized",
+      chainId: (ev.args!.chainId as ethers.BigNumber).toNumber(),
+      migrationNumber: (ev.args!.migrationNumber as ethers.BigNumber).toNumber(),
+      blockNumber: ev.blockNumber,
+      txHash: ev.transactionHash,
+    });
+  }
+
+  // ── Pre-fetch diamond proxy addresses for all chains ──────────────────────
+
+  const chainIds = Array.from(new Set(allStarted.map((ev) => (ev.args!.chainId as ethers.BigNumber).toNumber())));
+  const diamondProxies = new Map<number, ethers.Contract>();
+
+  // Always include the legacy GW itself
+  const allChainIds = Array.from(new Set([...chainIds, legacyGwChainId]));
+
+  for (const chainId of allChainIds) {
+    const proxyAddr: string = await bridgehub.getZKChain(chainId);
+    diamondProxies.set(chainId, new ethers.Contract(proxyAddr, getZKChainAbi(), provider));
+    console.log(`  chain ${chainId} diamond proxy: ${proxyAddr}`);
+  }
+
+  const gwProxy = diamondProxies.get(legacyGwChainId)!;
+
+  // ── Derive migration intervals ─────────────────────────────────────────────
 
   const intervals: ChainMigrationInterval[] = [];
 
-  // For each chain that had a MigrationStarted event to legacy GW, look for a
-  // corresponding MigrationFinalized event on L1 (chain returned from legacy GW).
-  for (const chainId of chainIdsToWatch) {
-    const startedList = startedByChain.get(chainId)!;
+  for (const ev of allStarted) {
+    const chainId = (ev.args!.chainId as ethers.BigNumber).toNumber();
+    const migrationNumber = (ev.args!.migrationNumber as ethers.BigNumber).toNumber();
+    const startedBlock = ev.blockNumber;
 
-    for (const started of startedList) {
-      // The MigrationFinalized event for the return trip has the same chainId and
-      // migrationNumber + 1 (outgoing = N, incoming = N+1 per the MIGRATION_NUMBER_* constants).
-      const expectedReturnMigNum = started.migrationNumber + 1;
+    const chainProxy = diamondProxies.get(chainId)!;
 
-      const finalizedFilter = chainAssetHandler.filters.MigrationFinalized(
-        ethers.BigNumber.from(chainId), // chainId (indexed)
-        null, // migrationNumber (not indexed)
-        null, // assetId (indexed)
-        null  // zkChain (indexed)
-      );
+    // The return migration has migrationNumber + 1
+    const returnMigNum = migrationNumber + 1;
+    const finalizedEv = finalizedByKey.get(`${chainId}:${returnMigNum}`);
 
-      const finalizedEvents = await chainAssetHandler.queryFilter(
-        finalizedFilter,
-        started.blockNumber, // only look after the MigrationStarted block
-        latestBlock
-      );
-
-      // Find the one with the matching migration number
-      const matchingFinalized = finalizedEvents.find(
-        (ev) => (ev.args!.migrationNumber as ethers.BigNumber).toNumber() === expectedReturnMigNum
-      );
-
-      // Record all MigrationFinalized events for this chain
-      for (const ev of finalizedEvents) {
-        rawEvents.push({
-          type: "MigrationFinalized",
-          chainId: (ev.args!.chainId as ethers.BigNumber).toNumber(),
-          migrationNumber: (ev.args!.migrationNumber as ethers.BigNumber).toNumber(),
-          blockNumber: ev.blockNumber,
-          txHash: ev.transactionHash,
-        });
-      }
-
-      // ── Derive batch numbers via historical state calls ───────────────────
-
-      // migrateToGWBatchNumber:
-      //   The L1 MessageRoot records the current batch number for each chain.
-      //   At the MigrationStarted block, currentChainBatchNumber(chainId) is the
-      //   last L1 batch of the chain before it moved to the legacy GW.
-      const migrateToGWBatchNumber = await callAtBlock<ethers.BigNumber>(
-        messageRoot,
-        "currentChainBatchNumber",
-        [chainId],
-        started.blockNumber
-      );
-
-      // slBatchLowerBound:
-      //   The legacy GW's own batch number at the time the chain migrated TO it.
-      const slBatchLowerBound = await callAtBlock<ethers.BigNumber>(
-        messageRoot,
-        "currentChainBatchNumber",
-        [legacyGwChainId],
-        started.blockNumber
-      );
-
+    if (!finalizedEv) {
       console.log(
-        `  chain ${chainId} MigrationStarted block=${started.blockNumber}` +
-          ` migrateToGWBatch=${migrateToGWBatchNumber.toString()}` +
-          ` slLowerBound=${slBatchLowerBound.toString()}`
+        `❌  chain ${chainId} (migrationNumber=${migrationNumber}) has NO MigrationFinalized return event — ` +
+          `chain has not returned from the legacy GW yet`
       );
-
-      if (!matchingFinalized) {
-        // Chain is still on the legacy GW (active migration) – skip; the
-        // setHistoricalMigrationInterval function only accepts completed intervals.
-        console.log(
-          `  chain ${chainId} has no MigrationFinalized return event – still active on legacy GW, skipping`
-        );
-        continue;
-      }
-
-      // migrateFromGWBatchNumber:
-      //   After bridgeMint is called on L1 for the returning chain, the MessageRoot's
-      //   currentChainBatchNumber(chainId) is set to the GW batch that was packed into
-      //   the mint data (via setMigratingChainBatchNumber).  Reading it at the
-      //   MigrationFinalized block gives us the exact GW batch.
-      const migrateFromGWBatchNumber = await callAtBlock<ethers.BigNumber>(
-        messageRoot,
-        "currentChainBatchNumber",
-        [chainId],
-        matchingFinalized.blockNumber
-      );
-
-      // slBatchUpperBound:
-      //   The legacy GW's own batch number at the time the chain migrated FROM it.
-      const slBatchUpperBound = await callAtBlock<ethers.BigNumber>(
-        messageRoot,
-        "currentChainBatchNumber",
-        [legacyGwChainId],
-        matchingFinalized.blockNumber
-      );
-
-      console.log(
-        `  chain ${chainId} MigrationFinalized block=${matchingFinalized.blockNumber}` +
-          ` migrateFromGWBatch=${migrateFromGWBatchNumber.toString()}` +
-          ` slUpperBound=${slBatchUpperBound.toString()}`
-      );
-
-      intervals.push({
-        chainId,
-        migrateToGWBatchNumber: migrateToGWBatchNumber.toNumber(),
-        migrateFromGWBatchNumber: migrateFromGWBatchNumber.toNumber(),
-        slBatchLowerBound: slBatchLowerBound.toNumber(),
-        slBatchUpperBound: slBatchUpperBound.toNumber(),
-      });
+      continue;
     }
+
+    const finalizedBlock = finalizedEv.blockNumber;
+
+    console.log(`\n  chain ${chainId}: MigrationStarted block=${startedBlock}, MigrationFinalized block=${finalizedBlock}`);
+
+    // Fetch all batch snapshots concurrently
+    const [chainAtStart, gwAtStart, chainAtFinalized, gwAtFinalized] = await Promise.all([
+      getBatchSnapshot(chainProxy, startedBlock),
+      getBatchSnapshot(gwProxy, startedBlock),
+      getBatchSnapshot(chainProxy, finalizedBlock),
+      getBatchSnapshot(gwProxy, finalizedBlock),
+    ]);
+
+    console.log(
+      `    migrateToGWBatch=${chainAtStart.totalBatchesExecuted}` +
+        ` slLowerBound=${gwAtStart.totalBatchesExecuted}` +
+        ` migrateFromGWBatch=${chainAtFinalized.totalBatchesExecuted}` +
+        ` slUpperBound=${gwAtFinalized.totalBatchesExecuted}`
+    );
+
+    intervals.push({
+      chainId,
+      migrateToGWBatchNumber: chainAtStart.totalBatchesExecuted,
+      migrateFromGWBatchNumber: chainAtFinalized.totalBatchesExecuted,
+      slBatchLowerBound: gwAtStart.totalBatchesExecuted,
+      slBatchUpperBound: gwAtFinalized.totalBatchesExecuted,
+      snapshots: {
+        chainAtMigrationStarted: chainAtStart,
+        gwAtMigrationStarted: gwAtStart,
+        chainAtMigrationFinalized: chainAtFinalized,
+        gwAtMigrationFinalized: gwAtFinalized,
+      },
+    });
   }
 
   // ── Persist to JSON cache ─────────────────────────────────────────────────
@@ -322,17 +392,6 @@ async function collect(rpc: string, envName: string): Promise<void> {
 
   console.log(`\nFound ${intervals.length} completed legacy-GW migration interval(s).`);
   console.log(`Saved to: ${outFile}`);
-}
-
-// ─── Utility: call a view function at a specific historical block ─────────────
-
-async function callAtBlock<T>(
-  contract: ethers.Contract,
-  method: string,
-  args: unknown[],
-  blockNumber: number
-): Promise<T> {
-  return contract.callStatic[method](...args, { blockTag: blockNumber }) as Promise<T>;
 }
 
 // ─── write command ────────────────────────────────────────────────────────────
@@ -376,9 +435,7 @@ function write(envName: string): void {
   content = content.replace(/\n# TODO\(EVM-1221\)[\s\S]*$/, "");
 
   // Append the derived chain intervals.
-  const entries = data.intervals
-    .map((interval) => serializeChainInterval(interval))
-    .join("\n");
+  const entries = data.intervals.map((interval) => serializeChainInterval(interval)).join("\n");
 
   content = content.trimEnd() + "\n\n" + entries + "\n";
 
@@ -413,9 +470,7 @@ function serializeChainInterval(interval: ChainMigrationInterval): string {
 
 async function main(): Promise<void> {
   const program = new Command();
-  program
-    .version("0.1.0")
-    .name("collect-gateway-migration-intervals");
+  program.version("0.1.0").name("collect-gateway-migration-intervals");
 
   program
     .command("collect")
