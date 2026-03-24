@@ -14,7 +14,7 @@ import {
   getGWChainBalance,
 } from "../../src/helpers/process-logs-helper";
 import { migrateTokenBalanceToGW } from "../../src/helpers/token-balance-migration-helper";
-import { ANVIL_DEFAULT_ACCOUNT_ADDR, ETH_TOKEN_ADDRESS, L1_CHAIN_ID } from "../../src/core/const";
+import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_RECIPIENT_ADDR, ETH_TOKEN_ADDRESS, L1_CHAIN_ID } from "../../src/core/const";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
 import {
   getL1RpcUrl,
@@ -46,11 +46,10 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
       const tracker = createBalanceTrackerFromState(state);
       const assetId = await queryEthAssetIdFromState(state);
       const amount = ethers.utils.parseEther("0.5");
-      const walletAddr = ANVIL_DEFAULT_ACCOUNT_ADDR;
+      const senderAddr = ANVIL_DEFAULT_ACCOUNT_ADDR;
 
       // For gateway-settled chains, L1AssetTracker tracks balance under the GW chain ID.
-      // Use gwChainId as the snapshot chain so l1ChainBalance reads L1AssetTracker[gwChainId].
-      const before = await tracker.takeSnapshot(gwChainId, assetId, undefined, undefined, walletAddr, true);
+      const senderBefore = await tracker.takeSnapshot(gwChainId, assetId, undefined, undefined, senderAddr, true);
 
       const result = await depositETHToL2({
         l1RpcUrl: getL1RpcUrl(state),
@@ -63,8 +62,8 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
 
       expect(result.l1TxHash).to.not.be.null;
 
-      const after = await tracker.takeSnapshot(gwChainId, assetId, undefined, undefined, walletAddr, true);
-      const deltas = computeBalanceDeltas(before, after);
+      const senderAfter = await tracker.takeSnapshot(gwChainId, assetId, undefined, undefined, senderAddr, true);
+      const deltas = computeBalanceDeltas(senderBefore, senderAfter);
 
       // L1AssetTracker.chainBalance[gwChainId] should increase by mintValue
       expect(
@@ -78,7 +77,7 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
         `Sender L1 ETH should decrease by at least ${result.mintValue.toString()}, got delta ${deltas.l1TokenDelta.toString()}`
       ).to.equal(true);
 
-      console.log(`   L1AssetTracker.chainBalance[${gwChainId}]: ${BigNumber.from(after.l1ChainBalance).toString()}`);
+      console.log(`   L1AssetTracker.chainBalance[${gwChainId}]: ${BigNumber.from(senderAfter.l1ChainBalance).toString()}`);
     });
   });
 
@@ -87,9 +86,11 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
       const tracker = createBalanceTrackerFromState(state);
       const assetId = await queryEthAssetIdFromState(state);
       const amount = ethers.utils.parseEther("0.2");
-      const walletAddr = ANVIL_DEFAULT_ACCOUNT_ADDR;
+      const recipientAddr = ANVIL_RECIPIENT_ADDR;
 
-      const before = await tracker.takeSnapshot(gwChainId, assetId, undefined, undefined, walletAddr, true);
+      // Snapshot chain balances and recipient's L1 balance
+      const chainBefore = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
+      const recipientL1Before = await tracker.getL1EthBalance(recipientAddr);
 
       const result = await withdrawETHFromL2({
         l1RpcUrl: getL1RpcUrl(state),
@@ -97,26 +98,30 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
         chainId: gwSettledChainId,
         l1Addresses: state.l1Addresses!,
         amount,
+        l1Recipient: recipientAddr,
       });
 
       expect(result.l2TxHash).to.not.be.null;
 
-      const after = await tracker.takeSnapshot(gwChainId, assetId, undefined, undefined, walletAddr, true);
-      const deltas = computeBalanceDeltas(before, after);
+      const chainAfter = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
+      const recipientL1After = await tracker.getL1EthBalance(recipientAddr);
 
       // L1AssetTracker.chainBalance[gwChainId] should decrease by the withdrawal amount
+      const l1ChainBalanceDelta = BigNumber.from(chainBefore.l1ChainBalance).sub(chainAfter.l1ChainBalance);
       expect(
-        deltas.l1ChainBalanceDelta.eq(amount.mul(-1)),
-        `L1AssetTracker.chainBalance[GW] should decrease by ${amount.toString()}, got ${deltas.l1ChainBalanceDelta.toString()}`
+        l1ChainBalanceDelta.eq(amount),
+        `L1AssetTracker.chainBalance[GW] should decrease by ${amount.toString()}, got ${l1ChainBalanceDelta.toString()}`
       ).to.equal(true);
 
-      // Recipient's L1 ETH balance should increase (net of gas costs for finalization)
+      // Recipient's L1 ETH balance should increase by exactly the withdrawal amount
+      const recipientL1Delta = recipientL1After.sub(recipientL1Before);
       expect(
-        deltas.l1TokenDelta.gt(0),
-        `Recipient L1 ETH balance should increase after withdrawal, got delta ${deltas.l1TokenDelta.toString()}`
+        recipientL1Delta.eq(amount),
+        `Recipient L1 ETH balance should increase by ${amount.toString()}, got delta ${recipientL1Delta.toString()}`
       ).to.equal(true);
 
-      console.log(`   L1AssetTracker.chainBalance[${gwChainId}]: ${BigNumber.from(after.l1ChainBalance).toString()}`);
+      console.log(`   L1AssetTracker.chainBalance[${gwChainId}]: ${BigNumber.from(chainAfter.l1ChainBalance).toString()}`);
+      console.log(`   Recipient L1 ETH balance delta: ${ethers.utils.formatEther(recipientL1Delta)} ETH`);
     });
   });
 

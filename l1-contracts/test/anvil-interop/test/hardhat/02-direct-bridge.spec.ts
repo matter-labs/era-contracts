@@ -8,7 +8,7 @@ import {
 } from "../../src/helpers/balance-tracker";
 import { depositETHToL2 } from "../../src/helpers/l1-deposit-helper";
 import { withdrawETHFromL2 } from "../../src/helpers/l2-withdrawal-helper";
-import { ANVIL_DEFAULT_ACCOUNT_ADDR } from "../../src/core/const";
+import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_RECIPIENT_ADDR } from "../../src/core/const";
 import { getL2Chain, getChainIdByRole } from "../../src/core/utils";
 
 describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
@@ -48,18 +48,16 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
       const tracker = createBalanceTrackerFromState(state);
       const l1Provider = new ethers.providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
       const assetId = await queryEthAssetId(l1Provider, state.l1Addresses!.l1NativeTokenVault);
-      const walletAddr = ANVIL_DEFAULT_ACCOUNT_ADDR;
+      const senderAddr = ANVIL_DEFAULT_ACCOUNT_ADDR;
+      const recipientAddr = ANVIL_RECIPIENT_ADDR;
       const amount = ethers.utils.parseEther("1.0");
       const l2Chain = getL2Chain(state.chains!, directSettledChainId);
 
-      const before = await tracker.takeSnapshot(
-        directSettledChainId,
-        assetId,
-        undefined, // ETH, not ERC20
-        undefined,
-        walletAddr,
-        false
+      // Snapshot sender's L1 balance and recipient's L2 balance separately
+      const senderBefore = await tracker.takeSnapshot(
+        directSettledChainId, assetId, undefined, undefined, senderAddr, false
       );
+      const recipientL2Before = await tracker.getL2EthBalance(directSettledChainId, recipientAddr);
 
       const result = await depositETHToL2({
         l1RpcUrl: state.chains!.l1!.rpcUrl,
@@ -67,14 +65,18 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
         chainId: directSettledChainId,
         l1Addresses: state.l1Addresses!,
         amount,
+        recipient: recipientAddr,
       });
 
       expect(result.l1TxHash).to.not.be.null;
       depositMintValue = result.mintValue;
 
-      const after = await tracker.takeSnapshot(directSettledChainId, assetId, undefined, undefined, walletAddr, false);
+      const senderAfter = await tracker.takeSnapshot(
+        directSettledChainId, assetId, undefined, undefined, senderAddr, false
+      );
+      const recipientL2After = await tracker.getL2EthBalance(directSettledChainId, recipientAddr);
 
-      const deltas = computeBalanceDeltas(before, after);
+      const deltas = computeBalanceDeltas(senderBefore, senderAfter);
 
       // L1AssetTracker.chainBalance should increase by mintValue
       expect(
@@ -88,15 +90,17 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
         `Sender L1 ETH balance should decrease by at least ${result.mintValue.toString()}, got delta ${deltas.l1TokenDelta.toString()}`
       ).to.equal(true);
 
-      // Recipient's L2 ETH balance should increase (exact amount differs due to gas costs on relay)
+      // Recipient's L2 ETH balance should increase
+      const recipientL2Delta = recipientL2After.sub(recipientL2Before);
       expect(
-        deltas.l2TokenDelta.gt(0),
-        `Recipient L2 ETH balance should increase after deposit, got delta ${deltas.l2TokenDelta.toString()}`
+        recipientL2Delta.gt(0),
+        `Recipient L2 ETH balance should increase after deposit, got delta ${recipientL2Delta.toString()}`
       ).to.equal(true);
 
       console.log(
-        `   L1AssetTracker.chainBalance[${directSettledChainId}]: ${BigNumber.from(after.l1ChainBalance).toString()}`
+        `   L1AssetTracker.chainBalance[${directSettledChainId}]: ${BigNumber.from(senderAfter.l1ChainBalance).toString()}`
       );
+      console.log(`   Recipient L2 ETH balance delta: ${ethers.utils.formatEther(recipientL2Delta)} ETH`);
     });
   });
 
@@ -105,11 +109,16 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
       const tracker = createBalanceTrackerFromState(state);
       const l1Provider = new ethers.providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
       const assetId = await queryEthAssetId(l1Provider, state.l1Addresses!.l1NativeTokenVault);
-      const walletAddr = ANVIL_DEFAULT_ACCOUNT_ADDR;
+      const senderAddr = ANVIL_DEFAULT_ACCOUNT_ADDR;
+      const recipientAddr = ANVIL_RECIPIENT_ADDR;
       const amount = ethers.utils.parseEther("0.5");
       const l2Chain = getL2Chain(state.chains!, directSettledChainId);
 
-      const before = await tracker.takeSnapshot(directSettledChainId, assetId, undefined, undefined, walletAddr, false);
+      // Snapshot sender's L2 balance and recipient's L1 balance separately
+      const senderBefore = await tracker.takeSnapshot(
+        directSettledChainId, assetId, undefined, undefined, senderAddr, false
+      );
+      const recipientL1Before = await tracker.getL1EthBalance(recipientAddr);
 
       const result = await withdrawETHFromL2({
         l1RpcUrl: state.chains!.l1!.rpcUrl,
@@ -117,14 +126,18 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
         chainId: directSettledChainId,
         l1Addresses: state.l1Addresses!,
         amount,
+        l1Recipient: recipientAddr,
       });
 
       expect(result.l2TxHash).to.not.be.null;
       withdrawalAmount = amount;
 
-      const after = await tracker.takeSnapshot(directSettledChainId, assetId, undefined, undefined, walletAddr, false);
+      const senderAfter = await tracker.takeSnapshot(
+        directSettledChainId, assetId, undefined, undefined, senderAddr, false
+      );
+      const recipientL1After = await tracker.getL1EthBalance(recipientAddr);
 
-      const deltas = computeBalanceDeltas(before, after);
+      const deltas = computeBalanceDeltas(senderBefore, senderAfter);
 
       // L1AssetTracker.chainBalance should decrease by the withdrawal amount
       expect(
@@ -132,18 +145,14 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
         `L1AssetTracker.chainBalance should decrease by ${amount.toString()}, got ${deltas.l1ChainBalanceDelta.toString()}`
       ).to.equal(true);
 
-      // Recipient's L1 ETH balance should increase (the wallet both pays gas for finalization
-      // and receives the withdrawal, so net increase is less than the withdrawal amount)
+      // Recipient's L1 ETH balance should increase by exactly the withdrawal amount
+      const recipientL1Delta = recipientL1After.sub(recipientL1Before);
       expect(
-        deltas.l1TokenDelta.gt(0),
-        `Recipient L1 ETH balance should increase after withdrawal, got delta ${deltas.l1TokenDelta.toString()}`
+        recipientL1Delta.eq(amount),
+        `Recipient L1 ETH balance should increase by ${amount.toString()}, got delta ${recipientL1Delta.toString()}`
       ).to.equal(true);
 
-      // Sender's L2 ETH balance should decrease (by at least the withdrawal amount; gas costs cause additional decrease)
-      expect(
-        deltas.l2TokenDelta.lte(amount.mul(-1)),
-        `L2 ETH balance should decrease by at least ${amount.toString()}, got delta ${deltas.l2TokenDelta.toString()}`
-      ).to.equal(true);
+      console.log(`   Recipient L1 ETH balance delta: ${ethers.utils.formatEther(recipientL1Delta)} ETH`);
     });
   });
 
