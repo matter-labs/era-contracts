@@ -93,6 +93,15 @@ You can also add `.only` to a `describe` or `it` block in the spec file to isola
 | `ANVIL_INTEROP_KEEP_CHAINS=1`  | Same as `--keep-chains` flag                                      |
 | `ANVIL_INTEROP_FRESH_DEPLOY=1` | Force full deployment even if pregenerated state exists           |
 | `ANVIL_INTEROP_PORT_OFFSET=N`  | Offset all chain ports by N (useful for parallel runs)            |
+| `ANVIL_INTEROP_RUN_SUFFIX=X`   | Suffix for output dirs (set automatically by parallel workers)    |
+
+### CLI Parameters
+
+| Parameter           | Effect                                                                                                                                                      |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--spec <file>`     | Run only the specified spec file(s). Can be repeated (e.g., `--spec 02-direct-bridge.spec.ts --spec 05-gateway-bridge.spec.ts`). Disables parallel workers. |
+| `--port-offset <N>` | Offset all chain ports by N (equivalent to `ANVIL_INTEROP_PORT_OFFSET`). Useful for avoiding conflicts with other Anvil instances.                          |
+| `--keep-chains`     | Keep Anvil processes running after tests finish (equivalent to `ANVIL_INTEROP_KEEP_CHAINS=1`). Disables parallel workers.                                   |
 
 ## Debugging
 
@@ -156,8 +165,7 @@ test/anvil-interop/
 │   ├── 03-interop-transfer.spec.ts
 │   ├── 04-gateway-setup.spec.ts
 │   ├── 05-gateway-bridge.spec.ts
-│   ├── 06-gateway-interop.spec.ts
-│   └── token-transfer.spec.ts
+│   └── 06-gateway-interop.spec.ts
 └── outputs/                       # Deployment outputs (gitignored)
 ```
 
@@ -168,7 +176,9 @@ test/anvil-interop/
 - **L1→L2 transaction failures / refundRecipient**: Priority requests always succeed on Anvil; failure + refund logic is untested
 - **Batch settlement**: No real sequencer or prover; batches are never committed/proved/executed
 - **Custom pubdata pricing**: Gas and pubdata costs use Anvil defaults, not ZKsync fee models
-- **L1→GW→L2 relay**: GW-settled ETH deposits stay on the priority-request path for both hops: L1→GW via `NewPriorityRequest`, then GW→L2 via nested `NewPriorityRequest` events extracted from the GW relay receipt. `InteropBundleSent` is only used for real L2↔L2 interop flows
+- **Non-ETH base tokens**: All chains use ETH as the base token
+- **Validium mode**: All chains run as rollup (validium carries no meaning without batch settlement)
+- **Interop fees**: Settlement fees are always zero; non-zero fee testing not implemented
 
 ### Mock Contracts
 
@@ -190,24 +200,44 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 
 ### Impersonation
 
-| What                          | Who                          | Production equivalent                 |
-| ----------------------------- | ---------------------------- | ------------------------------------- |
-| Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR`     | Bootloader executes upgrade tx        |
-| Interop chain registration    | L1 `ChainRegistrationSender` | Real L1 service-tx flow relayed to L2 |
-| GW chain registration         | `ChainAssetHandler`          | Governance flow                       |
-| Settlement layer notification | `L2_BOOTLOADER_ADDR`         | Bootloader at batch start             |
-| Governance calls              | Governance contract          | Multi-sig / timelock                  |
-| GW L2Bridgehub ownership      | Aliased CTM governance       | Shared governance from deployment     |
+| What                          | Who                      | Production equivalent                 |
+| ----------------------------- | ------------------------ | ------------------------------------- |
+| Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade tx        |
+| Interop chain registration    | Default Anvil EOA        | Real L1 service-tx flow relayed to L2 |
+| GW chain registration         | `ChainAssetHandler`      | Governance flow                       |
+| Settlement layer notification | `L2_BOOTLOADER_ADDR`     | Bootloader at batch start             |
+| Governance calls              | Governance contract      | Multi-sig / timelock                  |
+| GW L2Bridgehub ownership      | Aliased CTM governance   | Shared governance from deployment     |
 
 ### Other Shortcuts
 
 - **GW L2Bridgehub ownership transfer**: CTM deploys a per-chain Governance, but `fullRegistration` sends from ecosystem Governance. The test transfers ownership before relay.
 - **Interop registration scope**: the harness only intentionally registers GW-settled L2 chains for interop. Routes involving the gateway chain or a direct-settled chain revert in the harness.
+- **L2 genesis deployment via anvil_setCode**: System contracts are bootstrapped at hardcoded addresses, not via real genesis state. Production chains get that state directly from genesis.
 - **Synthetic merkle proofs**: Encode settlement layer chain ID but contain no real cryptographic data
 - **Interop proofs**: Correct struct shape but empty proof arrays
-- **v29 -> v31 / v30 -> v31 upgrade harnesses**: [run-v29-to-v31-upgrade-test.ts](/Users/kalmanlajko/programming/zksync/zksync-era2/contracts/l1-contracts/test/anvil-interop/run-v29-to-v31-upgrade-test.ts) and [run-v30-to-v31-upgrade-test.ts](/Users/kalmanlajko/programming/zksync/zksync-era2/contracts/l1-contracts/test/anvil-interop/run-v30-to-v31-upgrade-test.ts) still apply direct `anvil_setStorageAt` patches before per-chain upgrade. Today this clears the lingering pre-v31 genesis-upgrade hash and seeds minimal batch counters (`totalBatchesExecuted = totalBatchesCommitted = 1`) so `saveV31UpgradeChainBatchNumber()` can run. This is a test-only compatibility bridge, not a production upgrade flow.
-- **L2 genesis bootstrap**: [l2-genesis-upgrade-deployer.ts](/Users/kalmanlajko/programming/zksync/zksync-era2/contracts/l1-contracts/test/anvil-interop/src/deployers/l2-genesis-upgrade-deployer.ts) still bootstraps contract code and base-token balance via Anvil RPC before relaying the real genesis transaction. Production chains get that state directly from genesis.
+- **processLogsAndMessages impersonation**: The diamond proxy is impersonated instead of the operator (production uses the operator role)
+- **Settlement layer notification via impersonation**: `SystemContext.setSettlementLayerChainId` is called by impersonating the bootloader. On ZKsync OS, this is only emitted during actual migration between settlement layers (and during genesis/v31 upgrades), not at every batch
+- **v29 -> v31 / v30 -> v31 upgrade harnesses**: `run-v29-to-v31-upgrade-test.ts` and `run-v30-to-v31-upgrade-test.ts` still apply direct `anvil_setStorageAt` patches before per-chain upgrade. Today this clears the lingering pre-v31 genesis-upgrade hash and seeds minimal batch counters (`totalBatchesExecuted = totalBatchesCommitted = 1`) so `saveV31UpgradeChainBatchNumber()` can run. This is a test-only compatibility bridge, not a production upgrade flow.
+- **L2 genesis bootstrap**: `l2-genesis-upgrade-deployer.ts` still bootstraps contract code and base-token balance via Anvil RPC before relaying the real genesis transaction. Production chains get that state directly from genesis.
 - **Temporary upgrade inputs**: the upgrade harness copies v29 config inputs into `test/anvil-interop/outputs/upgrade-harness-inputs/` and passes them to Forge via env overrides. It no longer mutates checked-in `upgrade-envs/.../local.toml`.
+
+## Adding New Tests
+
+Test specs are auto-discovered from `test/hardhat/` — any file matching `NN-*.spec.ts` is included automatically. To add a new test:
+
+1. Create a new spec file in `test/hardhat/` (e.g., `07-my-test.spec.ts`)
+2. The spec can load deployment state via `new DeploymentRunner().loadState()`
+
+No need to register the file anywhere — it's picked up by the naming convention.
+
+### Adding a New Chain
+
+1. Add the chain entry to `config/anvil-config.json` (chain ID, port, role, settlement)
+2. Add a chain config TOML in `config/` if needed (e.g., `chain-<id>.toml`)
+3. Regenerate chain states with `yarn setup-and-dump`
+
+Note: `cleanup.sh` reads ports from `anvil-config.json` automatically — no manual port list update needed.
 
 ## Cleanup
 

@@ -2,17 +2,10 @@ import { expect } from "chai";
 import { Contract, ethers, providers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { getAbi } from "../../src/core/contracts";
-import {
-  L2_BRIDGEHUB_ADDR,
-  L2_ASSET_ROUTER_ADDR,
-  L2_NATIVE_TOKEN_VAULT_ADDR,
-  GW_ASSET_TRACKER_ADDR,
-  INTEROP_CENTER_ADDR,
-  L2_INTEROP_HANDLER_ADDR,
-} from "../../src/core/const";
+import { L2_BRIDGEHUB_ADDR } from "../../src/core/const";
 import { getChainIdByRole, getL2Chain } from "../../src/core/utils";
 
-describe("04 - Gateway State Verification", function () {
+describe("04 - Gateway Deployment Verification (read-only)", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();
@@ -27,42 +20,16 @@ describe("04 - Gateway State Verification", function () {
     gwChainId = getChainIdByRole(state.chains.config, "gateway");
   });
 
-  describe("Gateway chain contracts", () => {
+  // Note: individual contract deployment checks (L2Bridgehub, L2AssetRouter, etc.)
+  // are already covered by spec 01 for ALL chains including the gateway.
+  // This spec only tests GW-specific state: chain registration and L1 designation.
+
+  describe("GW chain registration", () => {
     let gwProvider: providers.JsonRpcProvider;
 
     before(() => {
       const gwChain = getL2Chain(state.chains!, gwChainId);
       gwProvider = new providers.JsonRpcProvider(gwChain.rpcUrl);
-    });
-
-    it("has L2Bridgehub deployed on GW", async () => {
-      const code = await gwProvider.getCode(L2_BRIDGEHUB_ADDR);
-      expect(code).to.not.equal("0x");
-    });
-
-    it("has L2AssetRouter deployed on GW", async () => {
-      const code = await gwProvider.getCode(L2_ASSET_ROUTER_ADDR);
-      expect(code).to.not.equal("0x");
-    });
-
-    it("has L2NativeTokenVault deployed on GW", async () => {
-      const code = await gwProvider.getCode(L2_NATIVE_TOKEN_VAULT_ADDR);
-      expect(code).to.not.equal("0x");
-    });
-
-    it("has GWAssetTracker deployed on GW", async () => {
-      const code = await gwProvider.getCode(GW_ASSET_TRACKER_ADDR);
-      expect(code).to.not.equal("0x");
-    });
-
-    it("has InteropCenter deployed on GW", async () => {
-      const code = await gwProvider.getCode(INTEROP_CENTER_ADDR);
-      expect(code).to.not.equal("0x");
-    });
-
-    it("has InteropHandler deployed on GW", async () => {
-      const code = await gwProvider.getCode(L2_INTEROP_HANDLER_ADDR);
-      expect(code).to.not.equal("0x");
     });
 
     it("has GW-settled chains registered on GW L2Bridgehub", async () => {

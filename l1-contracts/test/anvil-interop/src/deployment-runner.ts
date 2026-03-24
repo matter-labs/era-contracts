@@ -14,11 +14,14 @@ import type {
   CoreDeployedAddresses,
   CTMDeployedAddresses,
   DeploymentState,
+  L2ChainInfo,
   PriorityRequestData,
 } from "./core/types";
 import { getChainIdsByRole, timeIt } from "./core/utils";
 import { getAbi } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./core/const";
+import { deployTestTokens } from "./helpers/deploy-test-token";
+import { registerAndMigrateTestTokens } from "./helpers/token-balance-migration-helper";
 
 export interface StartChainOptions {
   blockTime?: number;
@@ -76,11 +79,16 @@ export class DeploymentRunner {
     fs.writeFileSync(path.join(this.stateDir, "chains.json"), JSON.stringify(state, null, 2));
   }
 
+  /** Clear cached deployment state so a fresh run doesn't see stale data. */
+  clearState(): void {
+    this.saveState({});
+  }
+
   private toChainConfigMap(chainConfigs: AnvilConfig["chains"]): Map<number, AnvilConfig["chains"][number]> {
     return new Map(chainConfigs.map((chainConfig) => [chainConfig.chainId, chainConfig]));
   }
 
-  private toRpcUrlMap(l2Chains: Array<{ chainId: number; rpcUrl: string }>): Map<number, string> {
+  private toRpcUrlMap(l2Chains: L2ChainInfo[]): Map<number, string> {
     return new Map(l2Chains.map((chain) => [chain.chainId, chain.rpcUrl]));
   }
 
@@ -96,7 +104,7 @@ export class DeploymentRunner {
   }
 
   private computeInteropChainIds(chainId: number, chainConfigs: AnvilChainConfig[]): number[] {
-    const l2Chains = chainConfigs.filter((chainConfig) => !chainConfig.isL1);
+    const l2Chains = chainConfigs.filter((chainConfig) => chainConfig.role !== "l1");
     const thisChain = l2Chains.find((chainConfig) => chainConfig.chainId === chainId);
     if (!thisChain || thisChain.settlement === "l1" || !thisChain.settlement || thisChain.role !== "gwSettled") {
       return [];
@@ -110,7 +118,7 @@ export class DeploymentRunner {
   }
 
   private buildInteropChainMap(chainConfigs: AnvilConfig["chains"]): Map<number, number[]> {
-    const l2ChainConfigs = chainConfigs.filter((chainConfig) => !chainConfig.isL1);
+    const l2ChainConfigs = chainConfigs.filter((chainConfig) => chainConfig.role !== "l1");
     return new Map(
       l2ChainConfigs.map((chainConfig) => [
         chainConfig.chainId,
@@ -120,25 +128,21 @@ export class DeploymentRunner {
   }
 
   private buildRegistrationConfigs(
-    l2Chains: Array<{ chainId: number; rpcUrl: string }>,
+    l2Chains: L2ChainInfo[],
     chainConfigsById: Map<number, AnvilConfig["chains"][number]>
   ) {
     return l2Chains.map((l2Chain) => {
-      const chainConfig = this.getChainConfigOrThrow(chainConfigsById, l2Chain.chainId);
+      this.getChainConfigOrThrow(chainConfigsById, l2Chain.chainId);
       return {
         chainId: l2Chain.chainId,
         rpcUrl: l2Chain.rpcUrl,
-        baseToken: ETH_TOKEN_ADDRESS,
-        validiumMode: false,
-        isGateway: chainConfig.isGateway ?? false,
+        baseToken: ETH_TOKEN_ADDRESS, // TODO: support non-ETH base tokens EVM-1297
+        validiumMode: false, // TODO: support validium mode (requires batch settlement) EVM-1297
       };
     });
   }
 
-  private getGatewayChainOrThrow(
-    gatewayChainId: number,
-    l2Chains: Array<{ chainId: number; rpcUrl: string }>
-  ): { chainId: number; rpcUrl: string } {
+  private getGatewayChainOrThrow(gatewayChainId: number, l2Chains: L2ChainInfo[]): L2ChainInfo {
     const gwChain = l2Chains.find((chain) => chain.chainId === gatewayChainId);
     if (!gwChain) {
       throw new Error(`Gateway chain ${gatewayChainId} not found in started L2 chains`);
@@ -213,7 +217,7 @@ export class DeploymentRunner {
         anvilManager.startChain({
           chainId: chainConfig.chainId,
           port: chainConfig.port,
-          isL1: chainConfig.isL1,
+          role: chainConfig.role,
           ...baseOptions,
           dumpStatePath: dumpStatePaths?.[chainConfig.chainId],
         })
@@ -277,7 +281,7 @@ export class DeploymentRunner {
 
   async step3And4RegisterAndInitChains(
     l1RpcUrl: string,
-    l2Chains: Array<{ chainId: number; rpcUrl: string }>,
+    l2Chains: L2ChainInfo[],
     chainConfigs: AnvilConfig["chains"],
     l1Addresses: CoreDeployedAddresses,
     ctmAddresses: CTMDeployedAddresses
@@ -327,7 +331,7 @@ export class DeploymentRunner {
 
   async step6RegisterInteropChains(
     l1RpcUrl: string,
-    l2Chains: Array<{ chainId: number; rpcUrl: string }>,
+    l2Chains: L2ChainInfo[],
     chainConfigs: AnvilConfig["chains"],
     l1Addresses: CoreDeployedAddresses,
     ctmAddresses: CTMDeployedAddresses,
@@ -409,7 +413,7 @@ export class DeploymentRunner {
         anvilManager.startChain({
           chainId: chainConfig.chainId,
           port: chainConfig.port,
-          isL1: chainConfig.isL1,
+          role: chainConfig.role,
           loadStatePath: loadStatePaths[chainConfig.chainId],
         })
       )
@@ -529,7 +533,7 @@ export class DeploymentRunner {
     );
 
     // Step 5: Setup gateway if configured
-    const gatewayConfig = config.chains.find((c) => c.isGateway);
+    const gatewayConfig = config.chains.find((c) => c.role === "gateway");
     if (gatewayConfig) {
       const gwChain = this.getGatewayChainOrThrow(gatewayConfig.chainId, chains.l2);
       const l2ChainRpcUrls = this.toRpcUrlMap(chains.l2);
@@ -581,4 +585,82 @@ export class DeploymentRunner {
 
     return { gatewayCTMAddr };
   }
+
+  /**
+   * Run full deployment and deploy test tokens.
+   *
+   * This is the shared setup flow used by both `setup-and-dump-state.ts` and
+   * `run-hardhat-interop-test.ts`.  It encapsulates:
+   *   1. Run full deployment (start chains + deploy contracts)
+   *   2. Deploy test tokens (if not already present in state)
+   *
+   * Callers can customise behaviour via `DeployAndSetupOptions`.
+   */
+  async deployAndSetup(anvilManager: AnvilManager, options?: DeployAndSetupOptions): Promise<FullDeploymentResult> {
+    const startChainOptions: StartChainOptions | undefined = options?.startChainOptions;
+
+    const result = await this.runFullDeployment(anvilManager, startChainOptions);
+
+    // Deploy test tokens unless the caller opted out.
+    if (options?.deployTestTokens !== false) {
+      const state = this.loadState();
+      const hasTestTokens = state.testTokens && Object.keys(state.testTokens).length > 0;
+      if (!hasTestTokens) {
+        await deployTestTokens();
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Full setup: deploy + test tokens + Token Balance Migration (TBM).
+   *
+   * Used by both `setup-and-dump-state.ts` and `run-hardhat-interop-test.ts` (fresh deploy path).
+   * TBM registers and migrates test tokens on GW-settled chains so that
+   * assetMigrationNumber matches migrationNumber (required for interop transfers).
+   */
+  async deployAndSetupWithTBM(
+    anvilManager: AnvilManager,
+    options?: DeployAndSetupOptions
+  ): Promise<FullDeploymentResult> {
+    const result = await this.deployAndSetup(anvilManager, options);
+
+    const config = this.getConfig();
+    const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
+    const gatewayConfig = config.chains.find((c) => c.role === "gateway");
+
+    if (gwSettledChainIds.length > 0 && gatewayConfig) {
+      const state = this.loadState();
+      if (state.testTokens && Object.keys(state.testTokens).length > 0) {
+        const gwChain = state.chains!.l2.find((c) => c.chainId === gatewayConfig.chainId)!;
+        const gwDiamondProxy = state.chainAddresses!.find((c) => c.chainId === gatewayConfig.chainId)!.diamondProxy;
+        const l2ChainRpcUrls = new Map(state.chains!.l2.map((c) => [c.chainId, c.rpcUrl]));
+
+        await registerAndMigrateTestTokens({
+          gwSettledChainIds,
+          l2ChainRpcUrls,
+          testTokens: state.testTokens,
+          l1RpcUrl: state.chains!.l1!.rpcUrl,
+          gwRpcUrl: gwChain.rpcUrl,
+          l1AssetTrackerAddr: result.l1Addresses.l1AssetTracker,
+          gwDiamondProxyAddr: gwDiamondProxy,
+          chainAddresses: state.chainAddresses!,
+          logger: (line) => console.log(line),
+        });
+      }
+    }
+
+    return result;
+  }
+}
+
+export interface DeployAndSetupOptions {
+  /** Options forwarded to `runFullDeployment` → `step1StartChains`. */
+  startChainOptions?: StartChainOptions;
+  /**
+   * Whether to deploy test ERC-20 tokens after deployment.
+   * Defaults to `true`.  Set to `false` to skip token deployment.
+   */
+  deployTestTokens?: boolean;
 }

@@ -21,7 +21,10 @@ import type {
   ChainAddresses,
   ChainInfo,
   ChainRole,
+  DeploymentState,
   FinalizeWithdrawalParams,
+  InteropBundle,
+  L2ChainInfo,
   PriorityRequestData,
 } from "./types";
 
@@ -55,6 +58,21 @@ export async function waitForChainReady(rpcUrl: string, maxAttempts = 30): Promi
 
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Assert that a contract is deployed (has code) at the given address.
+ * Throws with a descriptive message if the address has no code.
+ */
+export async function assertContractDeployed(
+  provider: providers.JsonRpcProvider,
+  address: string,
+  label: string
+): Promise<void> {
+  const code = await provider.getCode(address);
+  if (code === "0x" || code === "0x0") {
+    throw new Error(`${label} at ${address} has no code — contract not deployed`);
+  }
 }
 
 export function saveTomlConfig(filePath: string, data: Record<string, unknown>): void {
@@ -117,7 +135,7 @@ export function ensureDirectoryExists(dirPath: string): void {
 /**
  * Find an L2 chain by chain ID in the deployment state, or throw.
  */
-export function getL2Chain(chains: ChainInfo, chainId: number): { chainId: number; rpcUrl: string } {
+export function getL2Chain(chains: ChainInfo, chainId: number): L2ChainInfo {
   const chain = chains.l2.find((c) => c.chainId === chainId);
   if (!chain) {
     throw new Error(`L2 chain ${chainId} not found. Available: ${chains.l2.map((c) => c.chainId).join(", ")}`);
@@ -157,6 +175,23 @@ export function getChainIdsByRole(config: AnvilChainConfig[], role: ChainRole): 
 export function formatChainInfo(chainId: number, port: number, isL1: boolean): string {
   const type = isL1 ? "L1" : "L2";
   return `${type} Chain ${chainId} on port ${port}`;
+}
+
+/**
+ * Convenience accessor: get the L1 RPC URL from deployment state.
+ */
+export function getL1RpcUrl(state: DeploymentState): string {
+  if (!state.chains?.l1) {
+    throw new Error("Deployment state missing L1 chain");
+  }
+  return state.chains.l1.rpcUrl;
+}
+
+/**
+ * Convenience accessor: get the RPC URL for an L2 chain from deployment state.
+ */
+export function getL2RpcUrl(state: DeploymentState, chainId: number): string {
+  return getL2Chain(state.chains!, chainId).rpcUrl;
 }
 
 /**
@@ -243,10 +278,7 @@ export function buildFinalizeWithdrawalParams(
 ): FinalizeWithdrawalParams {
   // Parse L1MessageSent event from L1MessengerZKOS
   const l1MessageSentTopic = ethers.utils.id(L1_MESSAGE_SENT_EVENT_SIG);
-  const l1MessageSentLog = l2Receipt.logs.find(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (logEntry: any) => logEntry.topics[0] === l1MessageSentTopic
-  );
+  const l1MessageSentLog = l2Receipt.logs.find((logEntry) => logEntry.topics[0] === l1MessageSentTopic);
 
   if (!l1MessageSentLog) {
     throw new Error("L1MessageSent event not found in L2 tx receipt. Check L1MessengerZKOS emits the event.");
@@ -279,16 +311,13 @@ export function extractNewPriorityRequests(
 ): PriorityRequestData[] {
   const newPriorityRequestTopic = ethers.utils.id(NEW_PRIORITY_REQUEST_EVENT_SIG);
 
-  const priorityRequestLogs = receipt.logs.filter(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (logEntry: any) => {
-      if (logEntry.topics[0] !== newPriorityRequestTopic) return false;
-      if (diamondProxyAddr) {
-        return logEntry.address.toLowerCase() === diamondProxyAddr.toLowerCase();
-      }
-      return true;
+  const priorityRequestLogs = receipt.logs.filter((logEntry) => {
+    if (logEntry.topics[0] !== newPriorityRequestTopic) return false;
+    if (diamondProxyAddr) {
+      return logEntry.address.toLowerCase() === diamondProxyAddr.toLowerCase();
     }
-  );
+    return true;
+  });
 
   const mailboxIface = new ethers.utils.Interface(getAbi("MailboxFacet"));
 
@@ -382,6 +411,7 @@ async function resolvePriorityRelayPath(path: PriorityRelayResolvedPath): Promis
   settlementLayerChainId: number;
   gwProvider?: providers.JsonRpcProvider;
   gwDiamondProxy?: string;
+  nestedL1DiamondProxy?: string;
 }> {
   const l1Provider = new providers.JsonRpcProvider(path.l1RpcUrl);
   const l2Provider = new providers.JsonRpcProvider(path.chainRpcUrl);
@@ -408,6 +438,15 @@ async function resolvePriorityRelayPath(path: PriorityRelayResolvedPath): Promis
     );
   }
 
+  // For GW-settled chains, the nested chain also has an L1 diamond proxy.
+  // The L1 receipt contains NewPriorityRequest from BOTH:
+  //   - The GW's L1 diamond proxy (wrapped tx for the GW chain)
+  //   - The nested chain's L1 diamond proxy (original tx for the L2 chain)
+  const nestedL1DiamondProxy: string = await bridgehub.getZKChain(path.chainId);
+  if (nestedL1DiamondProxy === ethers.constants.AddressZero) {
+    throw new Error(`No L1 diamond proxy registered for nested chain ${path.chainId}`);
+  }
+
   const gwProvider = new providers.JsonRpcProvider(path.gwRpcUrl);
   const gwBridgehub = new ethers.Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), gwProvider);
   const gwDiamondProxy: string = await gwBridgehub.getZKChain(path.chainId);
@@ -422,6 +461,7 @@ async function resolvePriorityRelayPath(path: PriorityRelayResolvedPath): Promis
     settlementLayerChainId,
     gwProvider,
     gwDiamondProxy,
+    nestedL1DiamondProxy,
   };
 }
 
@@ -445,34 +485,50 @@ export async function extractAndRelayNewPriorityRequests(
     return relayPriorityRequestsToTargets(receipt, chainsOrPath, log);
   }
 
-  const { l2Provider, l1DiamondProxy, settlementLayerChainId, gwProvider, gwDiamondProxy } =
+  const { l2Provider, l1DiamondProxy, settlementLayerChainId, gwProvider, nestedL1DiamondProxy } =
     await resolvePriorityRelayPath(chainsOrPath);
 
   if (settlementLayerChainId === 0) {
     return relayPriorityRequestsToTargets(receipt, [{ diamondProxy: l1DiamondProxy, provider: l2Provider }], log);
   }
 
+  // Hop 1: relay L1→GW (the wrapped forwarding transaction from the GW's L1 diamond proxy)
   const gwTxHashes = await relayPriorityRequestsToTargets(
     receipt,
     [{ diamondProxy: l1DiamondProxy, provider: gwProvider! }],
     log
   );
-  const l2TxHashes: string[] = [];
 
-  for (const gwTxHash of gwTxHashes) {
-    const gwReceipt = await gwProvider!.getTransactionReceipt(gwTxHash);
-    if (!gwReceipt) {
-      throw new Error(`Missing gateway relay receipt for tx ${gwTxHash}`);
-    }
-    const nestedTxHashes = await relayPriorityRequestsToTargets(
-      gwReceipt,
-      [{ diamondProxy: gwDiamondProxy!, provider: l2Provider }],
-      log
-    );
-    l2TxHashes.push(...nestedTxHashes);
-  }
+  // Hop 2: relay to the final L2 chain.
+  //
+  // On L1, the nested chain's diamond proxy emits NewPriorityRequest with the
+  // *actual* L2 transaction data, and then forwards a wrapped copy to the GW's
+  // L1 diamond proxy. The GW receipt only contains NewRelayedPriorityTransaction
+  // (no full tx data), so we cannot extract the hop-2 payload from it.
+  //
+  // Instead we extract the NewPriorityRequest events emitted by the nested
+  // chain's L1 diamond proxy directly from the original L1 receipt, and relay
+  // those to the L2 chain after hop 1 has been confirmed.
+  const l2TxHashes = await relayPriorityRequestsToTargets(
+    receipt,
+    [{ diamondProxy: nestedL1DiamondProxy!, provider: l2Provider }],
+    log
+  );
 
   return [...gwTxHashes, ...l2TxHashes];
+}
+
+/**
+ * Convenience wrapper: relay priority requests from a receipt to a single L2 chain.
+ * Shorthand for `extractAndRelayNewPriorityRequests(receipt, [{ diamondProxy, provider }])`.
+ */
+export async function relayPriorityRequestsToChain(
+  receipt: ethers.providers.TransactionReceipt,
+  diamondProxy: string,
+  l2Provider: providers.JsonRpcProvider,
+  logger?: (line: string) => void
+): Promise<string[]> {
+  return extractAndRelayNewPriorityRequests(receipt, [{ diamondProxy, provider: l2Provider }], logger);
 }
 
 /**
@@ -521,8 +577,7 @@ export async function extractAndRelayInteropBundles(
         data: logEntry.data,
       });
       if (parsed && parsed.name === "InteropBundleSent") {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        bundles.push((parsed.args as any).interopBundle);
+        bundles.push(parsed.args["interopBundle"]);
       }
     } catch {
       // Ignore non-InteropCenter logs
@@ -619,4 +674,28 @@ export async function scanAndRelayPriorityRequests(
   }
 
   return txHashes;
+}
+
+/**
+ * Extract the InteropBundle struct from a transaction receipt.
+ * Parses the InteropBundleSent event emitted by InteropCenter.
+ *
+ * @returns The interopBundle argument from the first InteropBundleSent event found.
+ */
+export async function extractInteropBundle(rpcUrl: string, txHash: string): Promise<InteropBundle> {
+  const provider = new providers.JsonRpcProvider(rpcUrl);
+  const receipt = await provider.getTransactionReceipt(txHash);
+  const iface = new ethers.utils.Interface(getAbi("InteropCenter"));
+
+  for (const logEntry of receipt.logs) {
+    try {
+      const parsed = iface.parseLog({ topics: logEntry.topics, data: logEntry.data });
+      if (parsed.name === "InteropBundleSent") {
+        return parsed.args["interopBundle"] as InteropBundle;
+      }
+    } catch {
+      // Not an InteropCenter log
+    }
+  }
+  throw new Error(`InteropBundleSent event not found in tx ${txHash}`);
 }

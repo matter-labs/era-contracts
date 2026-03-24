@@ -23,8 +23,19 @@ const IGNORED_BLOCK_FIELDS = new Set(["timestamp", "basefee", "difficulty", "pre
 // Maximum allowed balance difference in wei (0.01 ETH) — covers gas cost variations
 const BALANCE_TOLERANCE_WEI = BigInt("10000000000000000"); // 10^16
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function compareChainState(data1: any, data2: any, name: string): string[] {
+interface ChainStateAccount {
+  nonce?: number;
+  code?: string;
+  storage?: Record<string, string>;
+  balance?: string;
+}
+
+interface ChainStateData {
+  block?: Record<string, unknown>;
+  accounts?: Record<string, ChainStateAccount>;
+}
+
+function compareChainState(data1: ChainStateData, data2: ChainStateData, name: string): string[] {
   const diffs: string[] = [];
 
   // Block: compare only deterministic fields
@@ -111,16 +122,18 @@ function compareJsonFiles(path1: string, path2: string, name: string): string[] 
   if (!fs.existsSync(path1)) return [`  Missing in committed: ${name}`];
   if (!fs.existsSync(path2)) return [`  Missing in generated: ${name}`];
 
-  const data1 = JSON.parse(fs.readFileSync(path1, "utf-8"));
-  const data2 = JSON.parse(fs.readFileSync(path2, "utf-8"));
+  const data1: unknown = JSON.parse(fs.readFileSync(path1, "utf-8"));
+  const data2: unknown = JSON.parse(fs.readFileSync(path2, "utf-8"));
 
   if (name.endsWith("addresses.json")) {
     if (JSON.stringify(data1) !== JSON.stringify(data2)) {
       const diffs = [`  ${name}: addresses differ`];
-      const allKeys = new Set([...Object.keys(data1), ...Object.keys(data2)]);
+      const obj1 = data1 as Record<string, unknown>;
+      const obj2 = data2 as Record<string, unknown>;
+      const allKeys = new Set([...Object.keys(obj1), ...Object.keys(obj2)]);
       for (const key of allKeys) {
-        if (JSON.stringify(data1[key]) !== JSON.stringify(data2[key])) {
-          diffs.push(`    ${key}: ${JSON.stringify(data1[key])} != ${JSON.stringify(data2[key])}`);
+        if (JSON.stringify(obj1[key]) !== JSON.stringify(obj2[key])) {
+          diffs.push(`    ${key}: ${JSON.stringify(obj1[key])} != ${JSON.stringify(obj2[key])}`);
         }
       }
       return diffs;
@@ -128,7 +141,7 @@ function compareJsonFiles(path1: string, path2: string, name: string): string[] 
     return [];
   }
 
-  return compareChainState(data1, data2, name);
+  return compareChainState(data1 as ChainStateData, data2 as ChainStateData, name);
 }
 
 function main() {

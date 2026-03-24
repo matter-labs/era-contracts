@@ -4,7 +4,7 @@ import type { BigNumber } from "ethers";
 export interface AnvilChain {
   chainId: number;
   port: number;
-  isL1: boolean;
+  role: ChainRole;
   process?: ChildProcess;
   rpcUrl: string;
 }
@@ -32,10 +32,20 @@ export interface BalanceSnapshot {
   l1TokenBalance: string;
   l2TokenBalance: string;
 
-  // L1AssetTracker state
+  // L1AssetTracker.chainBalance under the chain's own ID
   l1ChainBalance: string;
 
+  // L1AssetTracker.chainBalance under the GW chain ID (for GW-settled chains)
+  l1GwChainBalance?: string;
+
   // GWAssetTracker state (for GW-settled chains)
+  gwChainBalance?: string;
+}
+
+/** Subset of BalanceSnapshot with only chain-level balances (no wallet balances). */
+export interface ChainBalanceSnapshot {
+  l1ChainBalance: string;
+  l1GwChainBalance?: string;
   gwChainBalance?: string;
 }
 
@@ -57,7 +67,6 @@ export interface ChainConfig {
   rpcUrl: string;
   baseToken: string;
   validiumMode: boolean;
-  isGateway: boolean;
 }
 
 export interface ChainAddresses {
@@ -74,8 +83,6 @@ export type SettlementType = "l1" | "gateway";
 export interface AnvilChainConfig {
   chainId: number;
   port: number;
-  isL1: boolean;
-  isGateway?: boolean;
   role: ChainRole;
   settlement?: SettlementType;
 }
@@ -90,7 +97,7 @@ interface L1ChainInfo {
   port: number;
 }
 
-interface L2ChainInfo {
+export interface L2ChainInfo {
   chainId: number;
   rpcUrl: string;
   port: number;
@@ -151,4 +158,29 @@ export interface PriorityRequestData {
   to: string;
   calldata: string;
   value?: BigNumber;
+}
+
+export interface InteropCall {
+  version: string;
+  shadowAccount: boolean;
+  to: string;
+  from: string;
+  value: BigNumber;
+  data: string;
+}
+
+export interface InteropExecutionInfo {
+  executionData: string;
+  paymaster: string;
+  requirePaymaster: boolean;
+}
+
+export interface InteropBundle {
+  version: string;
+  sourceChainId: BigNumber;
+  destinationChainId: BigNumber;
+  bundleHash: string;
+  destinationBaseTokenAssetId: string;
+  calls: InteropCall[];
+  executionInfo: InteropExecutionInfo;
 }

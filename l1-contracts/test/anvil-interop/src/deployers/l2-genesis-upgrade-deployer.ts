@@ -16,7 +16,7 @@ const systemContextAbi = getAbi("SystemContext");
  * The flow:
  * 1. Bootstrap synthetic prestate via Anvil RPC (production has this in genesis)
  * 2. Relay the real genesis upgrade transaction from the L1 GenesisUpgrade event
- * 3. Verify the deployed code
+ * 3. Verify the deployed code is non-empty
  */
 export class L2GenesisUpgradeDeployer {
   private l2Provider: providers.JsonRpcProvider;
@@ -25,10 +25,17 @@ export class L2GenesisUpgradeDeployer {
     this.l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
   }
 
-  private async bootstrapSystemContractPrestate(contractSpec: SystemContractPredeploy): Promise<void> {
+  private async bootstrapSystemContractPrestate(
+    contractSpec: SystemContractPredeploy,
+    expectExisting: boolean = false
+  ): Promise<void> {
     const existingCode = await this.l2Provider.getCode(contractSpec.address);
     if (existingCode !== "0x" && existingCode !== "0x0") {
-      console.log(`   ✅ ${contractSpec.contractName} already deployed at ${contractSpec.address}`);
+      if (!expectExisting) {
+        throw new Error(
+          `${contractSpec.contractName} already has code at ${contractSpec.address} — unexpected during fresh deploy`
+        );
+      }
       return;
     }
 

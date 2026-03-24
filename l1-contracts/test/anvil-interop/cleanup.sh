@@ -13,12 +13,12 @@ cd "$SCRIPT_DIR"
 
 echo "🧹 Cleaning up Anvil interop environment..."
 
-# Known ports used by our Anvil instances (offset by ANVIL_INTEROP_PORT_OFFSET if set)
+# Read chain ports from anvil-config.json (single source of truth)
 PORT_OFFSET="${ANVIL_INTEROP_PORT_OFFSET:-0}"
 RUN_SUFFIX="${ANVIL_INTEROP_RUN_SUFFIX:-}"
 PID_FILE="outputs/anvil-pids${RUN_SUFFIX}.json"
 STATE_DIR="outputs/state${RUN_SUFFIX}"
-BASE_PORTS="9545 4050 4051 4052 4053"
+BASE_PORTS=$(node -e "const c=require('./config/anvil-config.json');console.log(c.chains.map(ch=>ch.port).join(' '))" 2>/dev/null || echo "9545 4050 4051 4052 4053")
 ANVIL_PORTS=""
 for BASE in $BASE_PORTS; do
   ANVIL_PORTS="$ANVIL_PORTS $((BASE + PORT_OFFSET))"
@@ -55,9 +55,6 @@ for PORT in $ANVIL_PORTS; do
     fi
 done
 sleep 1
-
-# Clean up step6 log file
-rm -f /tmp/step6-output.log 2>/dev/null || true
 
 # Verify ports are free
 ALL_CLEAR=true

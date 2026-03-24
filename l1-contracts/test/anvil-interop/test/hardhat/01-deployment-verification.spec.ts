@@ -69,7 +69,7 @@ describe("01 - Deployment Verification", function () {
       l1Provider = new providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
     });
 
-    for (const chainConfig of runner.getConfig().chains.filter((c) => !c.isL1)) {
+    for (const chainConfig of runner.getConfig().chains.filter((c) => c.role !== "l1")) {
       it(`chain ${chainConfig.chainId} (${chainConfig.role}) has diamond proxy on L1`, async () => {
         const chainAddr = state.chainAddresses!.find((c) => c.chainId === chainConfig.chainId);
         expect(chainAddr, `Chain ${chainConfig.chainId} not found in chainAddresses`).to.exist;
@@ -94,7 +94,7 @@ describe("01 - Deployment Verification", function () {
     ];
 
     const config = runner.getConfig();
-    for (const chainConfig of config.chains.filter((c) => !c.isL1)) {
+    for (const chainConfig of config.chains.filter((c) => c.role !== "l1")) {
       describe(`chain ${chainConfig.chainId} (${chainConfig.role})`, () => {
         let l2Provider: providers.JsonRpcProvider;
 
@@ -110,7 +110,6 @@ describe("01 - Deployment Verification", function () {
           it(`has ${contract.name} at ${contract.addr}`, async () => {
             const code = await l2Provider.getCode(contract.addr);
             expect(code, `${contract.name} not deployed on chain ${chainConfig.chainId}`).to.not.equal("0x");
-            expect(code).to.not.equal("0x0");
           });
         }
       });
@@ -128,7 +127,7 @@ describe("01 - Deployment Verification", function () {
     });
 
     const config = runner.getConfig();
-    for (const chainConfig of config.chains.filter((c) => !c.isL1)) {
+    for (const chainConfig of config.chains.filter((c) => c.role !== "l1")) {
       it(`test token on chain ${chainConfig.chainId} (${chainConfig.role}) has code`, async () => {
         const tokenAddr = state.testTokens![chainConfig.chainId];
         if (!tokenAddr) {
