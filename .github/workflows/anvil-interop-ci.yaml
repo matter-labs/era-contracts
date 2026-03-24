@@ -1,0 +1,204 @@
+name: Anvil Interop CI
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/anvil-interop-ci.yaml"
+      - ".github/actions/install-zksync-foundry/**"
+      - "l1-contracts/contracts/**"
+      - "l1-contracts/deploy-scripts/**"
+      - "l1-contracts/lib/**"
+      - "l1-contracts/scripts/**"
+      - "l1-contracts/test/**"
+      - "l1-contracts/foundry.toml"
+      - "l1-contracts/hardhat.config.ts"
+      - "l1-contracts/package.json"
+      - "l2-contracts/contracts/**"
+      - "l2-contracts/lib/**"
+      - "l2-contracts/src/**"
+      - "l2-contracts/test/**"
+      - "l2-contracts/foundry.toml"
+      - "l2-contracts/hardhat.config.ts"
+      - "l2-contracts/package.json"
+      - "system-contracts/bootloader/**"
+      - "system-contracts/contracts/**"
+      - "system-contracts/lib/**"
+      - "system-contracts/scripts/**"
+      - "system-contracts/test/**"
+      - "system-contracts/foundry.toml"
+      - "system-contracts/hardhat.config.ts"
+      - "system-contracts/package.json"
+      - "da-contracts/contracts/**"
+      - "da-contracts/lib/**"
+      - "da-contracts/test/**"
+      - "da-contracts/foundry.toml"
+      - "da-contracts/hardhat.config.ts"
+      - "da-contracts/package.json"
+      - "package.json"
+      - "yarn.lock"
+
+jobs:
+  # Fast job: uses pre-generated chain states from the repo, no contract compilation needed.
+  integration-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Foundry (for Anvil only, no compilation needed)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      - name: TypeScript type check
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn tsc --noEmit
+
+      - name: Run interop tests (preloaded state)
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          echo "Running interop tests with preloaded chain states..."
+          yarn ts-node run-hardhat-interop-test.ts
+
+      - name: Cleanup
+        if: always()
+        run: |
+          pkill -9 anvil 2>/dev/null || true
+
+  # V29 → V31 upgrade test: loads v29 chain states, runs the v31 ecosystem upgrade,
+  # executes governance calls, and verifies protocol version is updated.
+  v29-to-v31-upgrade-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Foundry (includes Anvil + forge for compilation)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
+
+      - name: Build l1-contracts artifacts
+        working-directory: l1-contracts
+        run: forge build --optimizer-runs 200
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      - name: Run V29 to V31 upgrade test
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          echo "Running V29 -> V31 upgrade test..."
+          yarn ts-node run-v29-to-v31-upgrade-test.ts
+
+      - name: Cleanup
+        if: always()
+        run: |
+          pkill -9 anvil 2>/dev/null || true
+
+  # TODO: Re-enable after merging to main. The 'Regenerate Anvil Interop Chain States'
+  # workflow_dispatch workflow needs to be on main before it can be triggered from the UI/CLI.
+  # Once on main, re-enable this check and use the regenerate workflow to update states.
+  #
+  # Parallel job: rebuilds chain state from scratch and verifies determinism.
+  # This ensures the committed chain-states stay reproducible.
+  state-generation-check:
+    if: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Foundry (no foundry-zksync — deterministic bytecode)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build da-contracts artifacts (no CBOR metadata for determinism)
+        run: FOUNDRY_PROFILE=anvil-interop yarn da build:foundry
+
+      - name: Build l1-contracts artifacts (no CBOR metadata for determinism)
+        working-directory: l1-contracts
+        run: FOUNDRY_PROFILE=anvil-interop forge build
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      - name: Save committed chain states
+        working-directory: l1-contracts/test/anvil-interop
+        run: cp -r chain-states chain-states-committed
+
+      - name: Generate chain state
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          echo "Generating chain state from scratch..."
+          yarn ts-node setup-and-dump-state.ts
+
+      - name: Verify committed state matches generated state
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          echo "Comparing generated state against committed chain-states..."
+          if yarn ts-node compare-chain-states.ts chain-states-committed chain-states; then
+            echo "Committed chain states are up to date"
+          else
+            echo ""
+            echo "Committed chain-states differ from freshly generated state."
+            echo "Run the 'Regenerate Anvil Interop Chain States' workflow from the Actions tab to update them."
+            exit 1
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: |
+          pkill -9 anvil 2>/dev/null || true

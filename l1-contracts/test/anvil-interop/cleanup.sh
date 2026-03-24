@@ -1,0 +1,113 @@
+#!/bin/bash
+
+# Cleanup script for Anvil interop testing environment
+# This script stops all Anvil instances and cleans up deployment artifacts
+# while preserving the original configuration files
+
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+L1_CONTRACTS_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+cd "$SCRIPT_DIR"
+
+echo "🧹 Cleaning up Anvil interop environment..."
+
+# Read chain ports from anvil-config.json (single source of truth)
+PORT_OFFSET="${ANVIL_INTEROP_PORT_OFFSET:-0}"
+RUN_SUFFIX="${ANVIL_INTEROP_RUN_SUFFIX:-}"
+PID_FILE="outputs/anvil-pids${RUN_SUFFIX}.json"
+STATE_DIR="outputs/state${RUN_SUFFIX}"
+BASE_PORTS=$(node -e "const c=require('./config/anvil-config.json');console.log(c.chains.map(ch=>ch.port).join(' '))" 2>/dev/null || echo "9545 4050 4051 4052 4053")
+ANVIL_PORTS=""
+for BASE in $BASE_PORTS; do
+  ANVIL_PORTS="$ANVIL_PORTS $((BASE + PORT_OFFSET))"
+done
+
+# Stop all Anvil instances - try graceful shutdown first using PIDs
+echo "Stopping Anvil instances..."
+
+# Try to use PID file for graceful shutdown
+if [ -f "$PID_FILE" ]; then
+    echo "Found PID file, attempting graceful shutdown..."
+    # Extract PIDs and kill them
+    pids=$(cat "$PID_FILE" | grep -o '"[0-9]*":' | grep -o '[0-9]*' || true)
+    for pid in $pids; do
+        if kill -0 "$pid" 2>/dev/null; then
+            echo "  Stopping Anvil process $pid..."
+            kill -TERM "$pid" 2>/dev/null || true
+        fi
+    done
+    sleep 2
+    # Remove PID file
+    rm -f "$PID_FILE"
+fi
+
+# Fallback: Kill processes LISTENING on known Anvil ports only (not system-wide)
+# -sTCP:LISTEN ensures we only kill Anvil server processes, not Node.js clients
+# that happen to have connections to those ports.
+echo "Checking known Anvil ports..."
+for PORT in $ANVIL_PORTS; do
+    PID=$(lsof -ti :$PORT -sTCP:LISTEN 2>/dev/null || true)
+    if [ -n "$PID" ]; then
+        echo "  Killing process on port $PORT (PID: $PID)..."
+        kill -9 $PID 2>/dev/null || true
+    fi
+done
+sleep 1
+
+# Verify ports are free
+ALL_CLEAR=true
+for PORT in $ANVIL_PORTS; do
+    if lsof -ti :$PORT -sTCP:LISTEN > /dev/null 2>&1; then
+        echo "⚠️  Warning: Port $PORT is still in use"
+        ALL_CLEAR=false
+    fi
+done
+
+if [ "$ALL_CLEAR" = true ]; then
+    echo "✅ All Anvil instances stopped"
+else
+    echo "⚠️  Some ports still in use, waiting..."
+    sleep 2
+fi
+
+# Clean up output files
+echo "Cleaning up output files..."
+mkdir -p outputs
+rm -rf "$STATE_DIR"
+mkdir -p "$STATE_DIR"
+
+# Reset permanent values to initial state
+echo "Resetting permanent values..."
+cat > config/permanent-values.toml << EOF
+[permanent_contracts]
+create2_factory_addr = "0x0000000000000000000000000000000000000000"
+create2_factory_salt = "0x88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5"
+EOF
+
+# Clean up any broadcast files from forge
+echo "Cleaning up broadcast files..."
+cd "$L1_CONTRACTS_DIR"
+rm -rf broadcast/DeployL1CoreContracts.s.sol 2>/dev/null || true
+rm -rf broadcast/DeployCTM.s.sol 2>/dev/null || true
+rm -rf broadcast/RegisterCTM.s.sol 2>/dev/null || true
+
+# Also clean up cache-forge if it exists (can cause issues)
+rm -rf cache-forge/DeployL1CoreContracts.s.sol 2>/dev/null || true
+rm -rf cache-forge/DeployCTM.s.sol 2>/dev/null || true
+rm -rf cache-forge/RegisterCTM.s.sol 2>/dev/null || true
+
+cd "$SCRIPT_DIR"
+
+echo "✅ Broadcast and cache files cleaned"
+
+# Verify testnet_verifier flag exists in config files
+for config_file in config/l1-deployment.toml config/ctm-deployment.toml; do
+    if [ -f "$config_file" ] && ! grep -q "testnet_verifier" "$config_file"; then
+        echo "⚠️  Warning: testnet_verifier missing in $config_file"
+    fi
+done
+
+echo "✅ Cleanup complete!"
+echo "You can now run 'yarn start' fresh."

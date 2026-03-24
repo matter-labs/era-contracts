@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// solhint-disable func-named-parameters
 
 pragma solidity ^0.8.24;
 
@@ -56,15 +57,8 @@ abstract contract MessageVerification is IMessageVerification {
         bytes32[] calldata _proof,
         uint256 _depth
     ) public view virtual returns (bool) {
-        return
-            _proveL2LeafInclusionRecursive({
-                _chainId: _chainId,
-                _blockOrBatchNumber: _blockOrBatchNumber,
-                _leafProofMask: _leafProofMask,
-                _leaf: _leaf,
-                _proof: _proof,
-                _depth: _depth
-            });
+        // Positional args to work around slither IR generation bug with named args
+        return _proveL2LeafInclusionRecursive(_chainId, _blockOrBatchNumber, _leafProofMask, _leaf, _proof, _depth);
     }
 
     function _proveL2LeafInclusion(
@@ -74,15 +68,8 @@ abstract contract MessageVerification is IMessageVerification {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view virtual returns (bool) {
-        return
-            _proveL2LeafInclusionRecursive({
-                _chainId: _chainId,
-                _blockOrBatchNumber: _blockOrBatchNumber,
-                _leafProofMask: _leafProofMask,
-                _leaf: _leaf,
-                _proof: _proof,
-                _depth: 0
-            });
+        // Positional args to work around slither IR generation bug with named args
+        return _proveL2LeafInclusionRecursive(_chainId, _blockOrBatchNumber, _leafProofMask, _leaf, _proof, 0);
     }
 
     function _proveL2LeafInclusionRecursive(

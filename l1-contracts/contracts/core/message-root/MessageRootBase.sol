@@ -277,7 +277,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         bytes32 _leaf,
         bytes32[] calldata _proof,
         uint256 _depth
-    ) internal view override returns (bool) {
+    ) internal view virtual override returns (bool) {
         ProofData memory proofData = MessageHashing._getProofData({
             _chainId: _chainId,
             _batchNumber: _batchNumber,
