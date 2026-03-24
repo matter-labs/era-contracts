@@ -182,10 +182,13 @@ contract MessageRootTest is Test {
         vm.prank(L2_BRIDGEHUB_ADDR);
         l2MessageRoot.addNewChain(alphaChainId, 0);
 
-        // totalPublishedInteropRoots accounts for _emitRoot calls in _addNewChain:
-        // initL2 adds block.chainid (1), addNewChain(L1_CHAIN_ID) (2), addNewChain(alphaChainId) (3)
-        uint256 countBefore = l2MessageRoot.totalPublishedInteropRoots();
-        assertEq(countBefore, 3, "totalPublishedInteropRoots should be 3 after chain additions");
+        // With per-block logId: initL2 + addNewChain(L1_CHAIN_ID) + addNewChain(alphaChainId) all happen
+        // in the same block, so only the first _emitRoot call increments interopRootLogId.
+        uint256 countBefore = l2MessageRoot.interopRootLogId();
+        assertEq(countBefore, 1, "interopRootLogId should be 1 (one block, one increment)");
+
+        // Roll to a new block so the next _emitRoot call increments the counter.
+        vm.roll(block.number + 1);
 
         vm.prank(alphaChainSender);
         vm.expectEmit(true, false, false, false);
@@ -194,11 +197,11 @@ contract MessageRootTest is Test {
         emit IMessageRootBase.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
         l2MessageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
 
-        // Verify totalPublishedInteropRoots incremented after addChainBatchRoot
+        // Verify interopRootLogId incremented once for the new block
         assertEq(
-            l2MessageRoot.totalPublishedInteropRoots(),
+            l2MessageRoot.interopRootLogId(),
             countBefore + 1,
-            "totalPublishedInteropRoots should increment by 1"
+            "interopRootLogId should increment by 1 when block advances"
         );
     }
 
@@ -265,6 +268,63 @@ contract MessageRootTest is Test {
         bytes32 finalChainRoot = messageRoot.getChainRoot(alphaChainId);
         // Chain root is computed - the test verifies the function can be called without reverting
         // The actual root value depends on the merkle tree implementation
+    }
+
+    /// @notice Verify that multiple _emitRoot calls within the same block share the same logId.
+    function test_logId_noIncrementWithinSameBlock() public {
+        uint256 chainId1 = uint256(uint160(makeAddr("chain1")));
+        uint256 chainId2 = uint256(uint160(makeAddr("chain2")));
+
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(L2_CHAIN_ASSET_HANDLER_ADDR)
+        );
+
+        // initL2 (in setUp) already emitted once in block N, setting lastEmitBlock = block.number and
+        // interopRootLogId = 1.
+        uint256 countAfterInit = l2MessageRoot.interopRootLogId();
+        assertEq(countAfterInit, 1, "first block sets counter to 1");
+
+        // Adding two more chains in the same block must NOT increment the counter further.
+        vm.prank(L2_BRIDGEHUB_ADDR);
+        l2MessageRoot.addNewChain(chainId1, 0);
+        assertEq(l2MessageRoot.interopRootLogId(), 1, "same block: counter unchanged after 2nd chain");
+
+        vm.prank(L2_BRIDGEHUB_ADDR);
+        l2MessageRoot.addNewChain(chainId2, 0);
+        assertEq(l2MessageRoot.interopRootLogId(), 1, "same block: counter unchanged after 3rd chain");
+    }
+
+    /// @notice Verify that the logId increments exactly once per new block.
+    function test_logId_incrementsOncePerBlock() public {
+        uint256 chainId1 = uint256(uint160(makeAddr("chain1")));
+        uint256 chainId2 = uint256(uint160(makeAddr("chain2")));
+        uint256 chainId3 = uint256(uint160(makeAddr("chain3")));
+
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(L2_CHAIN_ASSET_HANDLER_ADDR)
+        );
+
+        uint256 count = l2MessageRoot.interopRootLogId();
+
+        // Block N+1: two emissions — counter increments exactly once.
+        vm.roll(block.number + 1);
+        vm.prank(L2_BRIDGEHUB_ADDR);
+        l2MessageRoot.addNewChain(chainId1, 0);
+        assertEq(l2MessageRoot.interopRootLogId(), count + 1, "block N+1 first emission: +1");
+
+        vm.prank(L2_BRIDGEHUB_ADDR);
+        l2MessageRoot.addNewChain(chainId2, 0);
+        assertEq(l2MessageRoot.interopRootLogId(), count + 1, "block N+1 second emission: still +1");
+
+        // Block N+2: one emission — counter increments again.
+        vm.roll(block.number + 1);
+        vm.prank(L2_BRIDGEHUB_ADDR);
+        l2MessageRoot.addNewChain(chainId3, 0);
+        assertEq(l2MessageRoot.interopRootLogId(), count + 2, "block N+2 first emission: +2");
     }
 
     function test_getMerklePathForChain() public {

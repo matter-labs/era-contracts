@@ -1,0 +1,33 @@
+{
+  "chains": [
+    {
+      "chainId": 31337,
+      "port": 9545,
+      "role": "l1"
+    },
+    {
+      "chainId": 10,
+      "port": 4050,
+      "role": "directSettled",
+      "settlement": "l1"
+    },
+    {
+      "chainId": 11,
+      "port": 4051,
+      "role": "gateway",
+      "settlement": "l1"
+    },
+    {
+      "chainId": 12,
+      "port": 4052,
+      "role": "gwSettled",
+      "settlement": "gateway"
+    },
+    {
+      "chainId": 13,
+      "port": 4053,
+      "role": "gwSettled",
+      "settlement": "gateway"
+    }
+  ]
+}

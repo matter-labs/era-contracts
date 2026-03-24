@@ -236,16 +236,22 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         uint256 protocolUpgradeNonce,
         bool isZKsyncOS
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
-        IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
-            .getBaseForceDeployments(l1ChainId, ownerAddress);
+        IL2ContractDeployer.ForceDeployment[] memory forceDeployments;
 
-        // Additional force deployments after Gateway
-        IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalForceDeployments();
-
-        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = SystemContractsProcessing.mergeForceDeployments(
-            baseForceDeployments,
-            additionalForceDeployments
-        );
+        if (isZKsyncOS) {
+            // ZKsyncOS uses FixedForceDeploymentsData (built in DeployCTM) instead of
+            // Era-style ForceDeployment[] arrays. Return empty — the upgrade tx for
+            // ZKsyncOS chains carries data through a different path.
+            forceDeployments = new IL2ContractDeployer.ForceDeployment[](0);
+        } else {
+            IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
+                .getBaseForceDeployments(l1ChainId, ownerAddress);
+            IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalForceDeployments();
+            forceDeployments = SystemContractsProcessing.mergeForceDeployments(
+                baseForceDeployments,
+                additionalForceDeployments
+            );
+        }
 
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: composeUpgradeTx(

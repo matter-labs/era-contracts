@@ -99,6 +99,51 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         runInner(vm.envString("ZK_CHAIN_OUT"));
     }
 
+    /// @notice Register multiple chains in a single forge call (avoids nonce conflicts).
+    /// Config files must already exist at /test/anvil-interop/config/chain-{chainId}.toml
+    function runForTestBatch(address _chainTypeManagerProxy, uint256[] memory _chainIds) public {
+        vm.warp(1);
+
+        // Read shared CTM output once
+        string memory root = vm.projectRoot();
+        string memory ctmPath = string.concat(root, vm.envString("CTM_OUTPUT"));
+        string memory ctmToml = vm.readFile(ctmPath);
+        bytes memory _forceDeploymentsData = ctmToml.readBytes("$.contracts_config.force_deployments_data");
+        bytes memory _diamondCutData = ctmToml.readBytes("$.contracts_config.diamond_cut_data");
+        address _create2FactoryAddress = ctmToml.readAddress("$.contracts.create2_factory_addr");
+        bytes32 _create2Salt = ctmToml.readBytes32("$.contracts.create2_factory_salt");
+
+        // Read on-chain addresses once (same for all chains)
+        initializeConfigFromOnChain(_chainTypeManagerProxy);
+
+        // Set shared config (loop-invariant)
+        config.forceDeploymentsData = _forceDeploymentsData;
+        config.diamondCutData = _diamondCutData;
+        config.create2FactoryAddress = _create2FactoryAddress;
+        config.create2Salt = _create2Salt;
+
+        for (uint256 i = 0; i < _chainIds.length; i++) {
+            console.log("Deploying ZKChain", _chainIds[i]);
+
+            // Read per-chain config
+            string memory chainConfigPath = string.concat(
+                root,
+                "/test/anvil-interop/config/chain-",
+                vm.toString(_chainIds[i]),
+                ".toml"
+            );
+            initializeConfig(chainConfigPath, _chainTypeManagerProxy, _chainIds[i]);
+
+            // Register and save output
+            string memory chainOutputPath = string.concat(
+                "/test/anvil-interop/outputs/chain-",
+                vm.toString(_chainIds[i]),
+                "-output.toml"
+            );
+            runInner(chainOutputPath);
+        }
+    }
+
     function runInner(string memory outputPath) internal {
         string memory root = vm.projectRoot();
 
@@ -121,6 +166,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         setPendingAdmin();
 
         if (config.initializeLegacyBridge) {
+            unpauseDeposits();
             deployLegacySharedBridge();
         }
 
@@ -169,16 +215,12 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
             config.validatorSenderOperatorExecute = address(0);
         }
 
-        if (vm.keyExistsToml(toml, "$.chain.initialize_legacy_bridge")) {
-            config.initializeLegacyBridge = toml.readBool("$.chain.initialize_legacy_bridge");
+        if (vm.keyExistsToml(toml, "$.initialize_legacy_bridge")) {
+            config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
         }
 
-        if (vm.keyExistsToml(toml, "$.chain.l1_erc20_bridge")) {
-            config.l1Erc20Bridge = toml.readAddress("$.chain.l1_erc20_bridge");
-        }
-        if (vm.keyExistsToml(toml, "$.chain.l1_shared_bridge_proxy")) {
-            config.l1SharedBridgeProxy = toml.readAddress("$.chain.l1_shared_bridge_proxy");
-        }
+        config.l1Erc20Bridge = coreAddresses.bridges.proxies.erc20Bridge;
+        config.l1SharedBridgeProxy = coreAddresses.bridges.proxies.l1AssetRouter;
 
         // Read create2 factory values from permanent values file
         (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(vm);
@@ -483,6 +525,15 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         zkChain.setPendingAdmin(output.chainAdmin);
         vm.stopBroadcast();
         console.log("Owner for ", output.diamondProxy, "set to", output.chainAdmin);
+    }
+
+    function unpauseDeposits() internal {
+        IZKChain zkChain = IZKChain(output.diamondProxy);
+        if (zkChain.depositsPaused()) {
+            vm.broadcast(msg.sender);
+            zkChain.unpauseDeposits();
+            console.log("Deposits unpaused");
+        }
     }
 
     function deployChainProxyAddress() internal {

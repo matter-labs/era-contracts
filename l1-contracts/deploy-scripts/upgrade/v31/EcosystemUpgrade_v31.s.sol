@@ -31,6 +31,22 @@ import {CTMUpgrade_v31} from "./CTMUpgrade_v31.s.sol";
 contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
     using stdToml for string;
 
+    string internal constant DEFAULT_PERMANENT_VALUES_INPUT = "/upgrade-envs/permanent-values/local.toml";
+    string internal constant DEFAULT_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/local.toml";
+    string internal constant DEFAULT_ECOSYSTEM_OUTPUT = "/script-out/v31-upgrade-ecosystem.toml";
+
+    function getPermanentValuesInputPath() internal view returns (string memory) {
+        return vm.envOr("PERMANENT_VALUES_INPUT_OVERRIDE", DEFAULT_PERMANENT_VALUES_INPUT);
+    }
+
+    function getUpgradeInputPath() internal view returns (string memory) {
+        return vm.envOr("UPGRADE_INPUT_OVERRIDE", DEFAULT_UPGRADE_INPUT);
+    }
+
+    function getEcosystemOutputPath() internal view returns (string memory) {
+        return vm.envOr("UPGRADE_ECOSYSTEM_OUTPUT_OVERRIDE", DEFAULT_ECOSYSTEM_OUTPUT);
+    }
+
     /// @notice Create v31-specific core upgrade instance
     function createCoreUpgrade() internal virtual override returns (DefaultCoreUpgrade) {
         return new CoreUpgrade_v31();
@@ -86,11 +102,7 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
 
     /// @notice E2e upgrade generation
     function run() public override {
-        initialize(
-            "/upgrade-envs/permanent-values/local.toml",
-            "/upgrade-envs/v0.31.0-interopB/local.toml",
-            "/script-out/v31-upgrade-ecosystem.toml"
-        );
+        initialize(getPermanentValuesInputPath(), getUpgradeInputPath(), getEcosystemOutputPath());
 
         prepareEcosystemUpgrade();
         prepareDefaultGovernanceCalls();
@@ -104,7 +116,7 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
 
         // Read the permanent values to get contract addresses
         string memory root = vm.projectRoot();
-        string memory permanentValuesPath = string.concat(root, "/upgrade-envs/permanent-values/local.toml");
+        string memory permanentValuesPath = string.concat(root, getPermanentValuesInputPath());
         string memory permanentValues = vm.readFile(permanentValuesPath);
 
         address bridgehubProxy = permanentValues.readAddress("$.core_contracts.bridgehub_proxy_addr");

@@ -400,6 +400,16 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             "validator_timelock_addr",
             output.gatewayStateTransition.proxies.validatorTimelock
         );
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "server_notifier_proxy_addr",
+            output.gatewayStateTransition.proxies.serverNotifier
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "server_notifier_implementation_addr",
+            output.gatewayStateTransition.implementations.serverNotifier
+        );
         vm.serializeAddress("gateway_state_transition", "rollup_da_manager_addr", output.rollupDAManager);
         string memory gatewayStateTransition = vm.serializeAddress(
             "gateway_state_transition",

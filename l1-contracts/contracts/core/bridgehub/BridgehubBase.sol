@@ -28,6 +28,7 @@ import {
     CTMAlreadyRegistered,
     CTMNotRegistered,
     ChainIdCantBeCurrentChain,
+    ChainIdIsHardcoded,
     ChainIdNotRegistered,
     ChainIdTooBig,
     EmptyAssetId,
@@ -40,6 +41,7 @@ import {
     ZeroAddress,
     ZeroChainId
 } from "../../common/L1ContractErrors.sol";
+import {HARD_CODED_CHAIN_ID, MAINNET_CHAIN_ID, SEPOLIA_CHAIN_ID} from "../../common/Config.sol";
 import {GW_ASSET_TRACKER, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 
 /// @author Matter Labs
@@ -578,6 +580,17 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
 
         if (_chainId == block.chainid) {
             revert ChainIdCantBeCurrentChain();
+        }
+
+        // Chain ID 270 is reserved as a temporary placeholder used by the server at genesis stage.
+        // SystemContext relies on the fact that 270 is only set temporarily and gets replaced
+        // with the real chain ID during L2GenesisUpgrade. Allowing a real chain to register
+        // with this ID on mainnet or Sepolia would break that assumption.
+        // We allow this chain id on local envs to support the legacy testing pipeline.
+        if (
+            _chainId == HARD_CODED_CHAIN_ID && (block.chainid == MAINNET_CHAIN_ID || block.chainid == SEPOLIA_CHAIN_ID)
+        ) {
+            revert ChainIdIsHardcoded();
         }
 
         if (_chainTypeManager == address(0)) {

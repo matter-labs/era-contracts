@@ -242,7 +242,10 @@ library AddressIntrospector {
 
         Facets memory facets = _getFacetsFromUptoDateZkChain(ctm);
         address verifier = _getVerifierFromUptoDateZkChain(ctm);
-        (address verifierFflonk, address verifierPlonk) = _getSubVerifiers(verifier, isZKsyncOS);
+        // V29 verifier is a dual verifier, but the sub-verifier getters were added in V31
+        (address verifierFflonk, address verifierPlonk) = isV29
+            ? (address(0), address(0))
+            : _getSubVerifiers(verifier, isZKsyncOS);
 
         // bytecodesSupplier only available in newer versions
         address bytecodesSupplier = isV29 ? address(0) : ctm.L1_BYTECODES_SUPPLIER();
@@ -254,7 +257,8 @@ library AddressIntrospector {
                 serverNotifier: ctm.serverNotifierAddress(),
                 validatorTimelock: validatorTimelock,
                 bytecodesSupplier: bytecodesSupplier,
-                permissionlessValidator: ctm.PERMISSIONLESS_VALIDATOR()
+                // PERMISSIONLESS_VALIDATOR only available in newer versions
+                permissionlessValidator: isV29 ? address(0) : ctm.PERMISSIONLESS_VALIDATOR()
             }),
             implementations: StateTransitionContracts({
                 chainTypeManager: Utils.getImplementation(_ctmAddr),
