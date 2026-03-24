@@ -30,7 +30,6 @@ contract UpgradeIntegrationTestBase is Test {
     // For now, this test is testing "stage" - as mainnet wasn't updated yet.
     string public ECOSYSTEM_INPUT = "file_1.toml";
     string public ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/shared.toml";
-    string public PERMANENT_VALUES_INPUT;
     string public ECOSYSTEM_OUTPUT = "file_3.toml";
     string public CTM_INPUT = "/upgrade-envs/v0.31.0-interopB/shared.toml";
     string public CTM_OUTPUT = "/script-out/foundry-upgrade/mainnet-gateway.toml";
@@ -43,6 +42,7 @@ contract UpgradeIntegrationTestBase is Test {
 
         console.log("setupUpgrade: Reading deployment outputs for initializeWithArgs");
         string memory root = vm.projectRoot();
+        vm.createDir(string.concat(root, "/script-out/foundry-upgrade"), true);
         string memory outputDeployL1Toml = vm.readFile(string.concat(root, ECOSYSTEM_INPUT));
         string memory outputDeployCTMToml = vm.readFile(string.concat(root, CTM_INPUT));
 
@@ -176,77 +176,4 @@ contract UpgradeIntegrationTestBase is Test {
         vm.stopBroadcast();
     }
 
-    function preparePermanentValues() internal {
-        string memory root = vm.projectRoot();
-        string memory permanentValuesInputPath = string.concat(root, PERMANENT_VALUES_INPUT);
-        vm.createDir(string.concat(root, "/script-out/foundry-upgrade"), true);
-        string memory outputDeployL1Toml = vm.readFile(string.concat(root, ECOSYSTEM_INPUT));
-        string memory outputDeployCTMToml = vm.readFile(string.concat(root, CTM_INPUT));
-
-        bytes32 create2FactorySalt = outputDeployL1Toml.readBytes32("$.contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(outputDeployL1Toml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = outputDeployL1Toml.readAddress("$.contracts.create2_factory_addr");
-        }
-        address ctm = outputDeployCTMToml.readAddress(
-            "$.deployed_addresses.state_transition.state_transition_proxy_addr"
-        );
-        address bytecodesSupplier = outputDeployCTMToml.readAddress(
-            "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
-        );
-        address l1Bridgehub = outputDeployL1Toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-        bool isZKsyncOs = outputDeployCTMToml.readBool("$.is_zk_sync_os");
-
-        address rollupDAManager;
-        if (isZKsyncOs) {
-            rollupDAManager = outputDeployCTMToml.readAddress(
-                "$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr"
-            );
-        } else {
-            rollupDAManager = outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
-        }
-        uint256 eraChainId = outputDeployL1Toml.readUint("$.era_chain_id");
-
-        // Serialize permanent_contracts section
-        {
-            vm.serializeString("permanent_contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
-            string memory permanent_contracts = vm.serializeAddress(
-                "permanent_contracts",
-                "create2_factory_addr",
-                create2FactoryAddr
-            );
-            vm.serializeString("root2", "permanent_contracts", permanent_contracts);
-        }
-
-        // Serialize ctm_contracts section
-        {
-            vm.serializeAddress("ctm_contracts", "ctm_proxy_addr", ctm);
-            vm.serializeAddress("ctm_contracts", "rollup_da_manager", rollupDAManager);
-            string memory ctm_contracts = vm.serializeAddress(
-                "ctm_contracts",
-                "l1_bytecodes_supplier_addr",
-                bytecodesSupplier
-            );
-            vm.serializeString("root2", "ctm_contracts", ctm_contracts);
-        }
-
-        // Serialize core_contracts section
-        {
-            string memory core_contracts = vm.serializeAddress("core_contracts", "bridgehub_proxy_addr", l1Bridgehub);
-            vm.serializeString("root2", "core_contracts", core_contracts);
-        }
-
-        // Serialize chain2 section
-        {
-            string memory chain2 = vm.serializeUint("chain2", "chain_id", eraChainId);
-            vm.serializeString("root2", "chain2", chain2);
-        }
-
-        // Serialize is_zk_sync_os at root level
-        vm.serializeBool("root2", "is_zk_sync_os", isZKsyncOs);
-
-        // Write the final TOML
-        string memory permanentValuesToml2 = vm.serializeUint("root2", "era_chain_id", eraChainId);
-        vm.writeToml(permanentValuesToml2, permanentValuesInputPath);
-    }
 }
