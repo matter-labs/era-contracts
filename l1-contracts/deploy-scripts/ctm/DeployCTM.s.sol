@@ -97,11 +97,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         _runConfiguredTest(bridgehub, skipL1Deployments, false);
     }
 
-    function _runConfiguredTest(
-        address bridgehub,
-        bool skipL1Deployments,
-        bool shouldSaveSelectors
-    ) internal {
+    function _runConfiguredTest(address bridgehub, bool skipL1Deployments, bool shouldSaveSelectors) internal {
         if (shouldSaveSelectors) {
             saveDiamondSelectors();
         }

@@ -142,10 +142,7 @@ export class DeploymentRunner {
     });
   }
 
-  private getGatewayChainOrThrow(
-    gatewayChainId: number,
-    l2Chains: L2ChainInfo[]
-  ): L2ChainInfo {
+  private getGatewayChainOrThrow(gatewayChainId: number, l2Chains: L2ChainInfo[]): L2ChainInfo {
     const gwChain = l2Chains.find((chain) => chain.chainId === gatewayChainId);
     if (!gwChain) {
       throw new Error(`Gateway chain ${gatewayChainId} not found in started L2 chains`);
@@ -599,10 +596,7 @@ export class DeploymentRunner {
    *
    * Callers can customise behaviour via `DeployAndSetupOptions`.
    */
-  async deployAndSetup(
-    anvilManager: AnvilManager,
-    options?: DeployAndSetupOptions
-  ): Promise<FullDeploymentResult> {
+  async deployAndSetup(anvilManager: AnvilManager, options?: DeployAndSetupOptions): Promise<FullDeploymentResult> {
     const startChainOptions: StartChainOptions | undefined = options?.startChainOptions;
 
     const result = await this.runFullDeployment(anvilManager, startChainOptions);

@@ -279,10 +279,10 @@ export function buildInteropBundleLog(params: { txNumberInBatch: number; interop
  *   abi.encodeCall(IAssetTrackerDataEncoding.receiveInteropCallExecuted, (InteropCallExecutedMessage))
  * The log key is bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))
  */
-export function buildInteropCallExecutedLogs(params: {
-  startTxNumberInBatch: number;
-  interopBundle: InteropBundle;
-}): { logs: L2Log[]; messages: string[] } {
+export function buildInteropCallExecutedLogs(params: { startTxNumberInBatch: number; interopBundle: InteropBundle }): {
+  logs: L2Log[];
+  messages: string[];
+} {
   const { interopBundle, startTxNumberInBatch } = params;
   const abiCoder = ethers.utils.defaultAbiCoder;
 
@@ -308,9 +308,7 @@ export function buildInteropCallExecutedLogs(params: {
     const executedMsgTuple = [destinationBaseTokenAssetId, interopCallTuple];
 
     const encodedArgs = abiCoder.encode([INTEROP_CALL_EXECUTED_MSG_TYPE], [executedMsgTuple]);
-    const message = ethers.utils.hexlify(
-      ethers.utils.concat([RECEIVE_INTEROP_CALL_EXECUTED_SELECTOR, encodedArgs])
-    );
+    const message = ethers.utils.hexlify(ethers.utils.concat([RECEIVE_INTEROP_CALL_EXECUTED_SELECTOR, encodedArgs]));
 
     const log: L2Log = {
       l2ShardId: 0,

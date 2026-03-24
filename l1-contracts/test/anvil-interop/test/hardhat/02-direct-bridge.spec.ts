@@ -55,7 +55,12 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
 
       // Snapshot sender's L1 balance and recipient's L2 balance separately
       const senderBefore = await tracker.takeSnapshot(
-        directSettledChainId, assetId, undefined, undefined, senderAddr, false
+        directSettledChainId,
+        assetId,
+        undefined,
+        undefined,
+        senderAddr,
+        false
       );
       const recipientL2Before = await tracker.getL2EthBalance(directSettledChainId, recipientAddr);
 
@@ -72,7 +77,12 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
       depositMintValue = result.mintValue;
 
       const senderAfter = await tracker.takeSnapshot(
-        directSettledChainId, assetId, undefined, undefined, senderAddr, false
+        directSettledChainId,
+        assetId,
+        undefined,
+        undefined,
+        senderAddr,
+        false
       );
       const recipientL2After = await tracker.getL2EthBalance(directSettledChainId, recipientAddr);
 
@@ -116,7 +126,12 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
 
       // Snapshot sender's L2 balance and recipient's L1 balance separately
       const senderBefore = await tracker.takeSnapshot(
-        directSettledChainId, assetId, undefined, undefined, senderAddr, false
+        directSettledChainId,
+        assetId,
+        undefined,
+        undefined,
+        senderAddr,
+        false
       );
       const recipientL1Before = await tracker.getL1EthBalance(recipientAddr);
 
@@ -133,7 +148,12 @@ describe("02 - Direct L1<->L2 Bridge (direct-settled chain)", function () {
       withdrawalAmount = amount;
 
       const senderAfter = await tracker.takeSnapshot(
-        directSettledChainId, assetId, undefined, undefined, senderAddr, false
+        directSettledChainId,
+        assetId,
+        undefined,
+        undefined,
+        senderAddr,
+        false
       );
       const recipientL1After = await tracker.getL1EthBalance(recipientAddr);
 

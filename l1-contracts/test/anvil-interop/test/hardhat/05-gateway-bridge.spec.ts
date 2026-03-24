@@ -77,7 +77,9 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
         `Sender L1 ETH should decrease by at least ${result.mintValue.toString()}, got delta ${deltas.l1TokenDelta.toString()}`
       ).to.equal(true);
 
-      console.log(`   L1AssetTracker.chainBalance[${gwChainId}]: ${BigNumber.from(senderAfter.l1ChainBalance).toString()}`);
+      console.log(
+        `   L1AssetTracker.chainBalance[${gwChainId}]: ${BigNumber.from(senderAfter.l1ChainBalance).toString()}`
+      );
     });
   });
 
@@ -120,7 +122,9 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
         `Recipient L1 ETH balance should increase by ${amount.toString()}, got delta ${recipientL1Delta.toString()}`
       ).to.equal(true);
 
-      console.log(`   L1AssetTracker.chainBalance[${gwChainId}]: ${BigNumber.from(chainAfter.l1ChainBalance).toString()}`);
+      console.log(
+        `   L1AssetTracker.chainBalance[${gwChainId}]: ${BigNumber.from(chainAfter.l1ChainBalance).toString()}`
+      );
       console.log(`   Recipient L1 ETH balance delta: ${ethers.utils.formatEther(recipientL1Delta)} ETH`);
     });
   });

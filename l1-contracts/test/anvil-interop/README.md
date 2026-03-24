@@ -97,11 +97,11 @@ You can also add `.only` to a `describe` or `it` block in the spec file to isola
 
 ### CLI Parameters
 
-| Parameter              | Effect                                                                                                  |
-| ---------------------- | ------------------------------------------------------------------------------------------------------- |
-| `--spec <file>`        | Run only the specified spec file(s). Can be repeated (e.g., `--spec 02-direct-bridge.spec.ts --spec 05-gateway-bridge.spec.ts`). Disables parallel workers. |
-| `--port-offset <N>`    | Offset all chain ports by N (equivalent to `ANVIL_INTEROP_PORT_OFFSET`). Useful for avoiding conflicts with other Anvil instances. |
-| `--keep-chains`        | Keep Anvil processes running after tests finish (equivalent to `ANVIL_INTEROP_KEEP_CHAINS=1`). Disables parallel workers. |
+| Parameter           | Effect                                                                                                                                                      |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--spec <file>`     | Run only the specified spec file(s). Can be repeated (e.g., `--spec 02-direct-bridge.spec.ts --spec 05-gateway-bridge.spec.ts`). Disables parallel workers. |
+| `--port-offset <N>` | Offset all chain ports by N (equivalent to `ANVIL_INTEROP_PORT_OFFSET`). Useful for avoiding conflicts with other Anvil instances.                          |
+| `--keep-chains`     | Keep Anvil processes running after tests finish (equivalent to `ANVIL_INTEROP_KEEP_CHAINS=1`). Disables parallel workers.                                   |
 
 ## Debugging
 
@@ -200,14 +200,14 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 
 ### Impersonation
 
-| What                          | Who                          | Production equivalent                 |
-| ----------------------------- | ---------------------------- | ------------------------------------- |
-| Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR`     | Bootloader executes upgrade tx        |
-| Interop chain registration    | Default Anvil EOA            | Real L1 service-tx flow relayed to L2 |
-| GW chain registration         | `ChainAssetHandler`          | Governance flow                       |
-| Settlement layer notification | `L2_BOOTLOADER_ADDR`         | Bootloader at batch start             |
-| Governance calls              | Governance contract          | Multi-sig / timelock                  |
-| GW L2Bridgehub ownership      | Aliased CTM governance       | Shared governance from deployment     |
+| What                          | Who                      | Production equivalent                 |
+| ----------------------------- | ------------------------ | ------------------------------------- |
+| Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade tx        |
+| Interop chain registration    | Default Anvil EOA        | Real L1 service-tx flow relayed to L2 |
+| GW chain registration         | `ChainAssetHandler`      | Governance flow                       |
+| Settlement layer notification | `L2_BOOTLOADER_ADDR`     | Bootloader at batch start             |
+| Governance calls              | Governance contract      | Multi-sig / timelock                  |
+| GW L2Bridgehub ownership      | Aliased CTM governance   | Shared governance from deployment     |
 
 ### Other Shortcuts
 

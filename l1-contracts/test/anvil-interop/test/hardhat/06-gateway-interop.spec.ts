@@ -134,8 +134,12 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
     const dstChainBalBeforeConfirm = await getGWChainBalance(gwProvider, targetChainId, assetId);
 
     console.log(`   --- Execution confirmation (destination chain ${targetChainId} → GW) ---`);
-    console.log(`   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] before confirm: ${dstPendingBeforeConfirm}`);
-    console.log(`   GWAssetTracker.chainBalance[${targetChainId}][assetId] before confirm: ${dstChainBalBeforeConfirm}`);
+    console.log(
+      `   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] before confirm: ${dstPendingBeforeConfirm}`
+    );
+    console.log(
+      `   GWAssetTracker.chainBalance[${targetChainId}][assetId] before confirm: ${dstChainBalBeforeConfirm}`
+    );
 
     const confirmResult = await callProcessLogsAndMessages({
       gwProvider,
@@ -151,7 +155,9 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
     const dstPendingAfterConfirm = await getGWPendingInteropBalance(gwProvider, targetChainId, assetId);
     const dstChainBalAfterConfirm = await getGWChainBalance(gwProvider, targetChainId, assetId);
 
-    console.log(`   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] after confirm: ${dstPendingAfterConfirm}`);
+    console.log(
+      `   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] after confirm: ${dstPendingAfterConfirm}`
+    );
     console.log(`   GWAssetTracker.chainBalance[${targetChainId}][assetId] after confirm: ${dstChainBalAfterConfirm}`);
 
     const pendingDecrease = dstPendingBeforeConfirm.sub(dstPendingAfterConfirm);

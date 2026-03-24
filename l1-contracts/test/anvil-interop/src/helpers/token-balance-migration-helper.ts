@@ -6,7 +6,11 @@ import {
   L2_ASSET_TRACKER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
-import { assertContractDeployed, buildFinalizeWithdrawalParams, extractAndRelayNewPriorityRequests } from "../core/utils";
+import {
+  assertContractDeployed,
+  buildFinalizeWithdrawalParams,
+  extractAndRelayNewPriorityRequests,
+} from "../core/utils";
 import { encodeNtvAssetId } from "../core/data-encoding";
 import type { ChainAddresses } from "../core/types";
 
