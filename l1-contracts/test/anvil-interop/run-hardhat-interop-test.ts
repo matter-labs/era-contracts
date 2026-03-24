@@ -179,7 +179,6 @@ async function main(): Promise<void> {
 
       const runner = new DeploymentRunner();
       const anvilManager = new AnvilManager();
-      const config = runner.getConfig();
 
       // Try loading pre-generated chain states (much faster — skips deploy + TBM)
       // Set ANVIL_INTEROP_FRESH_DEPLOY=1 to force full deployment instead.

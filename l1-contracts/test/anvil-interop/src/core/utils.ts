@@ -485,7 +485,7 @@ export async function extractAndRelayNewPriorityRequests(
     return relayPriorityRequestsToTargets(receipt, chainsOrPath, log);
   }
 
-  const { l2Provider, l1DiamondProxy, settlementLayerChainId, gwProvider, gwDiamondProxy, nestedL1DiamondProxy } =
+  const { l2Provider, l1DiamondProxy, settlementLayerChainId, gwProvider, nestedL1DiamondProxy } =
     await resolvePriorityRelayPath(chainsOrPath);
 
   if (settlementLayerChainId === 0) {
