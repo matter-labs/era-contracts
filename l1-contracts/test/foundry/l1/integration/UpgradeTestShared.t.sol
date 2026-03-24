@@ -40,8 +40,42 @@ contract UpgradeIntegrationTestBase is Test {
     function setupUpgrade(bool skipFactoryDepsCheck) public virtual {
         console.log("setupUpgrade: Creating EcosystemUpgrade_v31");
         ecosystemUpgrade = createEcosystemUpgrade();
+
+        console.log("setupUpgrade: Reading deployment outputs for initializeWithArgs");
+        string memory root = vm.projectRoot();
+        string memory outputDeployL1Toml = vm.readFile(string.concat(root, ECOSYSTEM_INPUT));
+        string memory outputDeployCTMToml = vm.readFile(string.concat(root, CTM_INPUT));
+
+        address bridgehubProxy = outputDeployL1Toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
+        address ctmProxy = outputDeployCTMToml.readAddress(
+            "$.deployed_addresses.state_transition.state_transition_proxy_addr"
+        );
+        address bytecodesSupplier = outputDeployCTMToml.readAddress(
+            "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
+        );
+        bool isZKsyncOs = outputDeployCTMToml.readBool("$.is_zk_sync_os");
+        address rollupDAManager;
+        if (isZKsyncOs) {
+            rollupDAManager = outputDeployCTMToml.readAddress(
+                "$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr"
+            );
+        } else {
+            rollupDAManager = outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
+        }
+        address governance = outputDeployL1Toml.readAddress("$.deployed_addresses.governance_addr");
+
         console.log("setupUpgrade: Initializing ecosystem upgrade");
-        ecosystemUpgrade.initialize(PERMANENT_VALUES_INPUT, ECOSYSTEM_UPGRADE_INPUT, ECOSYSTEM_OUTPUT);
+        ecosystemUpgrade.initializeWithArgs(
+            bridgehubProxy,
+            ctmProxy,
+            bytecodesSupplier,
+            rollupDAManager,
+            isZKsyncOs,
+            bytes32(0),
+            ECOSYSTEM_UPGRADE_INPUT,
+            ECOSYSTEM_OUTPUT,
+            governance
+        );
         console.log("setupUpgrade: Deploying new ecosystem contracts");
         ecosystemUpgrade.deployNewEcosystemContractsL1();
         console.log("setupUpgrade: Creating ChainUpgrade_v31");
@@ -51,7 +85,7 @@ contract UpgradeIntegrationTestBase is Test {
         ecosystemUpgrade.prepareEcosystemUpgrade();
 
         console.log("Preparing chain for the upgrade");
-        chainUpgrade.prepareChain(chainId, PERMANENT_VALUES_INPUT);
+        chainUpgrade.prepareChainWithBridgehub(chainId, bridgehubProxy);
         console.log("setupUpgrade: Complete");
     }
 

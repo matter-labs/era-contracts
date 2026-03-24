@@ -156,8 +156,6 @@ contract UpgradeIntegrationTest_Local is
         chainId = eraZKChainId;
         acceptPendingAdmin();
         console.log("setUp: Pending admin accepted");
-        PERMANENT_VALUES_INPUT = "/script-out/foundry-upgrade/permanent-ctm.toml";
-
         ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml";
         ECOSYSTEM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
         ECOSYSTEM_OUTPUT = "/script-out/foundry-upgrade/local-core.toml";
@@ -166,8 +164,6 @@ contract UpgradeIntegrationTest_Local is
         CHAIN_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml";
         CHAIN_OUTPUT = "/script-out/foundry-upgrade/local-gateway.toml";
         console.log("setUp: Paths configured");
-        preparePermanentValues();
-        console.log("setUp: Permanent values prepared");
         setupUpgrade(true);
         console.log("setUp: Upgrade setup complete");
         address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
