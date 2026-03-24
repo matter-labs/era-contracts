@@ -56,7 +56,7 @@ import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 
 // TODO: pass this value from zkstack_cli
-uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 6;
+uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 7;
 
 contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
