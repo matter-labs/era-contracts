@@ -216,17 +216,12 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     }
 
     function getFullListOfFactoryDependencies() internal virtual override returns (bytes[] memory factoryDeps) {
-        factoryDeps = super.getFullListOfFactoryDependencies();
         if (!config.isZKsyncOS) {
-            return factoryDeps;
+            return super.getFullListOfFactoryDependencies();
         }
 
-        // ZKsyncOS universal upgrade flow uses deployed bytecode info for L2V31Upgrade.
-        // Ensure the deployed bytecode preimage is also published in BytecodeSupplier.
         bytes memory l2V31UpgradeDeployed = Utils.readFoundryDeployedBytecodeL1("L2V31Upgrade.sol", "L2V31Upgrade");
-        bytes[] memory extra = new bytes[](1);
-        extra[0] = l2V31UpgradeDeployed;
-        factoryDeps = SystemContractsProcessing.mergeBytesArrays(factoryDeps, extra);
-        factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
+        factoryDeps = new bytes[](1);
+        factoryDeps[0] = l2V31UpgradeDeployed;
     }
 }

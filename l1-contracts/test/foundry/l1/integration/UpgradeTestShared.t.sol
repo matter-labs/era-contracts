@@ -175,5 +175,4 @@ contract UpgradeIntegrationTestBase is Test {
 
         vm.stopBroadcast();
     }
-
 }
