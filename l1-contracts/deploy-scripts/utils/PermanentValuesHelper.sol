@@ -23,5 +23,4 @@ library PermanentValuesHelper {
         create2FactoryAddr = DETERMINISTIC_CREATE2_ADDRESS;
         create2FactorySalt = vm.envOr(CREATE2_FACTORY_SALT_ENV, DEFAULT_SALT);
     }
-
 }
