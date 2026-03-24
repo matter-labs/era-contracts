@@ -5,13 +5,9 @@ pragma solidity 0.8.28;
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
-import {L2_GENESIS_UPGRADE_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
-import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
-import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
@@ -44,21 +40,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
 
         require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 
-        bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(s.chainId);
-        INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(nativeTokenVaultAddr);
-
-        uint256 baseTokenOriginChainId = nativeTokenVault.originChainId(baseTokenAssetId);
-        address baseTokenOriginAddress = nativeTokenVault.originToken(baseTokenAssetId);
-        bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
-            IL2V31Upgrade.upgrade,
-            (baseTokenOriginChainId, baseTokenOriginAddress)
-        );
-        bytes memory complexUpgraderCalldata = abi.encodeCall(
-            IComplexUpgrader.upgrade,
-            (L2_GENESIS_UPGRADE_ADDR, l2GenesisUpgradeCalldata)
-        );
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
-        //proposedUpgrade.l2ProtocolUpgradeTx.data = complexUpgraderCalldata;
         super.upgrade(proposedUpgrade);
         IMessageRootBase messageRoot = IMessageRootBase(bridgehub.messageRoot());
 
