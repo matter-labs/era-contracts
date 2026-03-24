@@ -1,7 +1,6 @@
-use std::{fmt, str::FromStr};
 use ethers::types::U64;
 use serde::{de, Deserialize, Deserializer, Serialize};
-
+use std::{fmt, str::FromStr};
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct L1ChainId(u64);

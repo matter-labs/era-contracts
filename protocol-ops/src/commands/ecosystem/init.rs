@@ -1,16 +1,16 @@
 use std::path::PathBuf;
 
-use clap::Parser;
-use ethers::{
-    signers::{LocalWallet, Signer},
-    types::{Address, H256},
-};
 use crate::common::{
     forge::{resolve_execution, ExecutionMode, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth},
     logger,
 };
 use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
 use crate::types::VMOption;
+use clap::Parser;
+use ethers::{
+    signers::{LocalWallet, Signer},
+    types::{Address, H256},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use xshell::Shell;
@@ -83,11 +83,18 @@ pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
     let vm_type = match args.vm_type.to_lowercase().as_str() {
         "eravm" | "era" => VMOption::EraVM,
         "zksyncos" | "zksync" | "zksync-os" => VMOption::ZKSyncOsVM,
-        _ => anyhow::bail!("Invalid VM type '{}'. Use 'zksyncos' or 'eravm'", args.vm_type),
+        _ => anyhow::bail!(
+            "Invalid VM type '{}'. Use 'zksyncos' or 'eravm'",
+            args.vm_type
+        ),
     };
 
-    let (sender_auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
+    let (sender_auth, sender, execution_mode) = resolve_execution(
+        args.private_key,
+        args.sender,
+        args.simulate,
+        &args.l1_rpc_url,
+    )?;
     let owner = args.owner.unwrap_or(sender);
 
     // Resolve owner auth
@@ -177,7 +184,10 @@ pub async fn run(args: EcosystemInitArgs, shell: &Shell) -> anyhow::Result<()> {
     )
     .await?;
 
-    logger::info(format!("CTM initialized. CTM proxy: {:#x}", ctm_output.ctm_proxy));
+    logger::info(format!(
+        "CTM initialized. CTM proxy: {:#x}",
+        ctm_output.ctm_proxy
+    ));
 
     let bridgehub_addr = hub_output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
     let ctm_proxy_addr = ctm_output.ctm_proxy;
@@ -214,10 +224,16 @@ fn build_output(
     let hub = &hub_output.deployed_addresses;
     let ctm = &ctm_output.deploy_output.deployed_addresses;
 
-    let runs: Vec<_> = runner.runs().iter().map(|r| json!({
-        "script": r.script.display().to_string(),
-        "run": r.payload,
-    })).collect();
+    let runs: Vec<_> = runner
+        .runs()
+        .iter()
+        .map(|r| {
+            json!({
+                "script": r.script.display().to_string(),
+                "run": r.payload,
+            })
+        })
+        .collect();
 
     json!({
         "command": "ecosystem.init",

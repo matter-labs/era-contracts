@@ -1,10 +1,9 @@
 use std::path::PathBuf;
 
-use clap::Parser;
-use ethers::{contract::BaseContract, types::{Address, H256}};
-use lazy_static::lazy_static;
 use crate::common::{
-    forge::{resolve_execution, ExecutionMode, Forge, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth},
+    forge::{
+        resolve_execution, ExecutionMode, Forge, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth,
+    },
     logger,
 };
 use crate::config::{
@@ -16,6 +15,12 @@ use crate::config::{
     traits::{ReadConfig, SaveConfig},
 };
 use crate::types::{L1Network, VMOption};
+use clap::Parser;
+use ethers::{
+    contract::BaseContract,
+    types::{Address, H256},
+};
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use xshell::Shell;
@@ -100,7 +105,10 @@ pub fn deploy(ctx: &mut ForgeContext, input: &CtmDeployInput) -> anyhow::Result<
 
     // Encode calldata for runWithBridgehub
     let calldata = DEPLOY_CTM_FUNCTIONS
-        .encode("runWithBridgehub", (input.bridgehub, input.reuse_gov_and_admin))
+        .encode(
+            "runWithBridgehub",
+            (input.bridgehub, input.reuse_gov_and_admin),
+        )
         .map_err(|e| anyhow::anyhow!("Failed to encode calldata: {}", e))?;
 
     // Build forge command
@@ -135,11 +143,18 @@ pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
     let vm_type = match args.vm_type.to_lowercase().as_str() {
         "eravm" | "era" => VMOption::EraVM,
         "zksyncos" | "zksync" | "zksync-os" => VMOption::ZKSyncOsVM,
-        _ => anyhow::bail!("Invalid VM type '{}'. Use 'zksyncos' or 'eravm'", args.vm_type),
+        _ => anyhow::bail!(
+            "Invalid VM type '{}'. Use 'zksyncos' or 'eravm'",
+            args.vm_type
+        ),
     };
 
-    let (auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
+    let (auth, sender, execution_mode) = resolve_execution(
+        args.private_key,
+        args.sender,
+        args.simulate,
+        &args.l1_rpc_url,
+    )?;
     let owner = args.owner.unwrap_or(sender);
 
     let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
@@ -174,7 +189,10 @@ pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
 
     let output = deploy(&mut ctx, &input)?;
 
-    let ctm_proxy_addr = output.deployed_addresses.state_transition.state_transition_proxy_addr;
+    let ctm_proxy_addr = output
+        .deployed_addresses
+        .state_transition
+        .state_transition_proxy_addr;
 
     if let Some(out_path) = &args.out {
         let result = build_output(&output, ctx.runner, &input);
@@ -184,7 +202,10 @@ pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
     }
 
     if is_simulation {
-        logger::outro(format!("CTM deploy simulation complete — CTM Proxy: {:#x}", ctm_proxy_addr));
+        logger::outro(format!(
+            "CTM deploy simulation complete — CTM Proxy: {:#x}",
+            ctm_proxy_addr
+        ));
     } else {
         logger::outro(format!("CTM Proxy deployed at: {:#x}", ctm_proxy_addr));
     }
@@ -194,13 +215,23 @@ pub async fn run(args: CtmDeployArgs, shell: &Shell) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn build_output(output: &DeployCTMOutput, runner: &ForgeRunner, input: &CtmDeployInput) -> serde_json::Value {
+fn build_output(
+    output: &DeployCTMOutput,
+    runner: &ForgeRunner,
+    input: &CtmDeployInput,
+) -> serde_json::Value {
     let deployed = &output.deployed_addresses;
 
-    let runs: Vec<_> = runner.runs().iter().map(|r| json!({
-        "script": r.script.display().to_string(),
-        "run": r.payload,
-    })).collect();
+    let runs: Vec<_> = runner
+        .runs()
+        .iter()
+        .map(|r| {
+            json!({
+                "script": r.script.display().to_string(),
+                "run": r.payload,
+            })
+        })
+        .collect();
 
     json!({
         "command": "ctm.deploy",

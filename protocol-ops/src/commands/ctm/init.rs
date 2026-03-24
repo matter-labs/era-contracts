@@ -1,16 +1,16 @@
 use std::path::PathBuf;
 
-use clap::Parser;
-use ethers::{
-    signers::{LocalWallet, Signer},
-    types::{Address, H256},
-};
 use crate::common::{
     forge::{resolve_execution, ExecutionMode, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth},
     logger,
 };
 use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
 use crate::types::VMOption;
+use clap::Parser;
+use ethers::{
+    signers::{LocalWallet, Signer},
+    types::{Address, H256},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use xshell::Shell;
@@ -190,11 +190,18 @@ pub async fn run(args: CtmInitArgs, shell: &Shell) -> anyhow::Result<()> {
     let vm_type = match args.vm_type.to_lowercase().as_str() {
         "eravm" | "era" => VMOption::EraVM,
         "zksyncos" | "zksync" | "zksync-os" => VMOption::ZKSyncOsVM,
-        _ => anyhow::bail!("Invalid VM type '{}'. Use 'zksyncos' or 'eravm'", args.vm_type),
+        _ => anyhow::bail!(
+            "Invalid VM type '{}'. Use 'zksyncos' or 'eravm'",
+            args.vm_type
+        ),
     };
 
-    let (sender_auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
+    let (sender_auth, sender, execution_mode) = resolve_execution(
+        args.private_key,
+        args.sender,
+        args.simulate,
+        &args.l1_rpc_url,
+    )?;
     let owner = args.owner.unwrap_or(sender);
 
     // Resolve owner auth for accept_ownership and register steps
@@ -349,7 +356,10 @@ pub async fn run(args: CtmInitArgs, shell: &Shell) -> anyhow::Result<()> {
     }
 
     if is_simulation {
-        logger::outro(format!("CTM init simulation complete — CTM Proxy: {:#x}", ctm_proxy));
+        logger::outro(format!(
+            "CTM init simulation complete — CTM Proxy: {:#x}",
+            ctm_proxy
+        ));
     } else {
         logger::outro(format!("CTM Proxy deployed at: {:#x}", ctm_proxy));
     }
@@ -359,13 +369,23 @@ pub async fn run(args: CtmInitArgs, shell: &Shell) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn build_output(input: &CtmDeployInput, output: &DeployCTMOutput, runner: &ForgeRunner) -> serde_json::Value {
+fn build_output(
+    input: &CtmDeployInput,
+    output: &DeployCTMOutput,
+    runner: &ForgeRunner,
+) -> serde_json::Value {
     let deployed = &output.deployed_addresses;
 
-    let runs: Vec<_> = runner.runs().iter().map(|r| json!({
-        "script": r.script.display().to_string(),
-        "run": r.payload,
-    })).collect();
+    let runs: Vec<_> = runner
+        .runs()
+        .iter()
+        .map(|r| {
+            json!({
+                "script": r.script.display().to_string(),
+                "run": r.payload,
+            })
+        })
+        .collect();
 
     json!({
         "command": "ctm.init",

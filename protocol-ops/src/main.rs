@@ -1,21 +1,20 @@
 #![allow(dead_code)]
 
 use crate::commands::{
-    chain::ChainCommands, ctm::CtmCommands, ecosystem::EcosystemCommands,
-    genesis::GenesisCommands, hub::HubCommands,
+    chain::ChainCommands, ctm::CtmCommands, ecosystem::EcosystemCommands, genesis::GenesisCommands,
+    hub::HubCommands,
 };
-use clap::{Parser, Subcommand};
 use crate::common::{
     config::{init_global_config, GlobalConfig},
     error::log_error,
-    logger,
-    versions,
+    logger, versions,
 };
+use clap::{Parser, Subcommand};
 use xshell::Shell;
 
-mod types;
 mod common;
 mod config;
+mod types;
 
 pub mod abi;
 pub mod admin_functions;

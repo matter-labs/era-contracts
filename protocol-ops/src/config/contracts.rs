@@ -1,14 +1,14 @@
 use std::{path::Path, str::FromStr};
 
+use crate::common::contracts::{
+    encode_ntv_asset_id, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS,
+};
+use crate::types::{L1Network, VMOption};
 use ethers::types::{Address, H160, H256};
 use serde::{Deserialize, Serialize};
 use xshell::Shell;
-use crate::common::contracts::{encode_ntv_asset_id, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS};
-use crate::types::{L1Network, VMOption};
 
-use crate::config::{
-    forge_interface::register_chain::input::NewChainParams,
-};
+use crate::config::forge_interface::register_chain::input::NewChainParams;
 
 use crate::config::{
     consts::CONTRACTS_FILE,
@@ -16,8 +16,8 @@ use crate::config::{
         deploy_ctm::output::DeployCTMOutput,
         deploy_ecosystem::output::DeployL1CoreContractsOutput,
         deploy_l2_contracts::output::{
-            ConsensusRegistryOutput, DefaultL2UpgradeOutput, InitializeBridgeOutput, Multicall3Output,
-            TimestampAsserterOutput,
+            ConsensusRegistryOutput, DefaultL2UpgradeOutput, InitializeBridgeOutput,
+            Multicall3Output, TimestampAsserterOutput,
         },
         register_chain::output::RegisterChainOutput,
     },
@@ -82,7 +82,9 @@ impl CoreContractsConfig {
                     .core_ecosystem_contracts
                     .stm_deployment_tracker_proxy_addr,
                 native_token_vault_addr: self.core_ecosystem_contracts.native_token_vault_addr,
-                chain_asset_handler_proxy_addr: self.core_ecosystem_contracts.chain_asset_handler_proxy_addr,
+                chain_asset_handler_proxy_addr: self
+                    .core_ecosystem_contracts
+                    .chain_asset_handler_proxy_addr,
                 ctm: ctm.clone(),
             },
             bridges: self.bridges.clone(),
@@ -206,8 +208,12 @@ impl CoreContractsConfig {
         &mut self,
         deploy_l1_core_contracts_output: &DeployL1CoreContractsOutput,
     ) {
-        self.create2_factory_addr = deploy_l1_core_contracts_output.contracts.create2_factory_addr;
-        self.create2_factory_salt = deploy_l1_core_contracts_output.contracts.create2_factory_salt;
+        self.create2_factory_addr = deploy_l1_core_contracts_output
+            .contracts
+            .create2_factory_addr;
+        self.create2_factory_salt = deploy_l1_core_contracts_output
+            .contracts
+            .create2_factory_salt;
         self.bridges.erc20.l1_address = deploy_l1_core_contracts_output
             .deployed_addresses
             .bridges
@@ -314,7 +320,7 @@ impl CoreContractsConfig {
                 .no_da_validium_l1_validator_addr,
             blobs_zksync_os_l1_da_validator_addr: deploy_ctm_output
                 .deployed_addresses
-                .blobs_zksync_os_l1_da_validator_addr,                
+                .blobs_zksync_os_l1_da_validator_addr,
             avail_l1_da_validator_addr: deploy_ctm_output
                 .deployed_addresses
                 .avail_l1_da_validator_addr,
@@ -542,7 +548,7 @@ pub struct L1Contracts {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub no_da_validium_l1_validator_addr: Option<Address>,
     // `Option` to be able to parse configs from pre-gateway protocol version.
-    #[serde(skip_serializing_if = "Option::is_none")]    
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub blobs_zksync_os_l1_da_validator_addr: Option<Address>,
     // `Option` to be able to parse configs from pre-gateway protocol version.
     #[serde(skip_serializing_if = "Option::is_none")]

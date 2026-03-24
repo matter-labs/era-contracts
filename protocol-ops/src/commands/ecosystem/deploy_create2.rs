@@ -1,12 +1,12 @@
-use clap::Parser;
-use ethers::types::{Address, H256};
 use crate::common::{
     forge::{resolve_execution, ExecutionMode, Forge, ForgeArgs, ForgeRunner, SenderAuth},
     logger,
 };
+use crate::utils::paths;
+use clap::Parser;
+use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 use xshell::Shell;
-use crate::utils::paths;
 
 /// The deterministic CREATE2 factory address (Arachnid's deterministic-deployment-proxy)
 pub const DETERMINISTIC_CREATE2_ADDRESS: &str = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
@@ -31,8 +31,12 @@ pub struct DeployCreate2Args {
 pub async fn run(args: DeployCreate2Args, shell: &Shell) -> anyhow::Result<()> {
     let foundry_scripts_path = paths::path_from_root("l1-contracts");
 
-    let (auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
+    let (auth, sender, execution_mode) = resolve_execution(
+        args.private_key,
+        args.sender,
+        args.simulate,
+        &args.l1_rpc_url,
+    )?;
 
     let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
     if is_simulation {
@@ -72,7 +76,10 @@ pub async fn run(args: DeployCreate2Args, shell: &Shell) -> anyhow::Result<()> {
     if is_simulation {
         logger::outro("CREATE2 factory deployment simulation complete");
     } else {
-        logger::outro(format!("CREATE2 factory deployed at {}", DETERMINISTIC_CREATE2_ADDRESS));
+        logger::outro(format!(
+            "CREATE2 factory deployed at {}",
+            DETERMINISTIC_CREATE2_ADDRESS
+        ));
     }
 
     drop(execution_mode);

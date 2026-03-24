@@ -2,11 +2,8 @@ use clap::Subcommand;
 use xshell::Shell;
 
 use crate::commands::hub::{
-    accept_ownership::HubAcceptOwnershipArgs,
-    deploy::HubDeployArgs,
-    init::HubInitArgs,
-    register_chain::HubRegisterChainArgs,
-    register_ctm::HubRegisterCtmArgs,
+    accept_ownership::HubAcceptOwnershipArgs, deploy::HubDeployArgs, init::HubInitArgs,
+    register_chain::HubRegisterChainArgs, register_ctm::HubRegisterCtmArgs,
 };
 
 pub(crate) mod accept_ownership;

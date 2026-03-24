@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use clap::ValueEnum;
-use ethers::{types::Address};
+use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumIter};
 
@@ -95,4 +95,3 @@ impl TryFrom<(Option<Address>, Option<L2DACommitmentScheme>)> for L2PubdataValid
         }
     }
 }
-

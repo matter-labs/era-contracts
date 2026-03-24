@@ -45,8 +45,7 @@ pub async fn run(args: ChainExecuteSimulatedTransactionsArgs, shell: &Shell) -> 
 
     let content = fs::read_to_string(&args.out)
         .with_context(|| format!("Failed to read out file: {}", args.out.display()))?;
-    let root: Value =
-        serde_json::from_str(&content).context("Failed to parse out file as JSON")?;
+    let root: Value = serde_json::from_str(&content).context("Failed to parse out file as JSON")?;
     let txs = root
         .get("transactions")
         .and_then(|t| t.as_array())

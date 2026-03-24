@@ -1,8 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
-use ethers::{
-    types::{Address, H256, U256},
-};
+use ethers::types::{Address, H256, U256};
 use serde::{Deserialize, Serialize};
 
 use crate::config::{

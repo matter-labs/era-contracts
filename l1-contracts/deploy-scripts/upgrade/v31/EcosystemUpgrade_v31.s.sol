@@ -61,9 +61,7 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
         permanentValuesInputPath;
         upgradeInputPath;
         _ecosystemOutputPath;
-        revert(
-            "EcosystemUpgrade_v31.initialize(permanent-values path,...) is deprecated. Use initializeWithArgs(...)"
-        );
+        revert("EcosystemUpgrade_v31.initialize(permanent-values path,...) is deprecated. Use initializeWithArgs(...)");
     }
 
     function initializeWithArgs(

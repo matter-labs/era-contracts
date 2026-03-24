@@ -1,5 +1,5 @@
-use std::{fmt, str::FromStr};
 use serde_with::{DeserializeFromStr, SerializeDisplay};
+use std::{fmt, str::FromStr};
 
 /// Semantic protocol version.
 #[derive(

@@ -1,6 +1,6 @@
+use crate::types::{L1Network, VMOption};
 use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
-use crate::types::{L1Network, VMOption};
 
 use crate::config::{
     forge_interface::deploy_ecosystem::input::InitialDeploymentConfig, traits::FileConfigTrait,

@@ -2,10 +2,8 @@ use clap::Subcommand;
 use xshell::Shell;
 
 use crate::commands::chain::{
-    execute_simulated_transactions::ChainExecuteSimulatedTransactionsArgs,
-    init::ChainInitArgs,
-    set_upgrade_timestamp::ChainSetUpgradeTimestampArgs,
-    upgrade::ChainUpgradeArgs,
+    execute_simulated_transactions::ChainExecuteSimulatedTransactionsArgs, init::ChainInitArgs,
+    set_upgrade_timestamp::ChainSetUpgradeTimestampArgs, upgrade::ChainUpgradeArgs,
 };
 
 pub(crate) mod admin_call_builder;

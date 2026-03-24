@@ -1,14 +1,14 @@
+use crate::common::{
+    config::global_config,
+    logger::{self},
+};
+use console::style;
 use std::{
     ffi::OsStr,
     fmt::{Display, Formatter},
     io,
     process::{Command, Output, Stdio},
     string::FromUtf8Error,
-};
-use console::style;
-use crate::common::{
-    config::global_config,
-    logger::{self}
 };
 
 /// A wrapper around [`xshell::Cmd`] that allows for improved error handling,
@@ -115,7 +115,6 @@ impl<'a> Cmd<'a> {
 
         Ok(())
     }
-
 }
 
 fn check_output_status(command_text: &str, output: &std::process::Output) -> CmdResult<()> {

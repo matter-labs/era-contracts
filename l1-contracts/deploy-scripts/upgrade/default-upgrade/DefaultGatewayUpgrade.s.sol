@@ -185,9 +185,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     ) internal virtual {
         permanentValuesInputPath;
         newConfigPath;
-        revert(
-            "DefaultGatewayUpgrade.initializeConfigFromFile(...) is deprecated. Use initializeWithArgs(...)"
-        );
+        revert("DefaultGatewayUpgrade.initializeConfigFromFile(...) is deprecated. Use initializeWithArgs(...)");
     }
 
     function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual override returns (bool) {

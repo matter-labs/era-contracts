@@ -145,8 +145,8 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         );
         if (config.isZKsyncOS) {
             require(l2V31UpgradeBytecodeInfo.length > 0, "L2V31Upgrade bytecode info not prepared");
-            IComplexUpgrader.UniversalContractUpgradeInfo[] memory universalDeployments = new IComplexUpgrader
-                .UniversalContractUpgradeInfo[](1);
+            IComplexUpgrader.UniversalContractUpgradeInfo[]
+                memory universalDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
             universalDeployments[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
                 upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
                 deployedBytecodeInfo: l2V31UpgradeBytecodeInfo,
@@ -180,15 +180,16 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         bool isZKsyncOS
     ) public virtual override returns (ProposedUpgrade memory proposedUpgrade) {
         if (!config.isZKsyncOS) {
-            return super.getProposedUpgrade(
-                stateTransition,
-                chainCreationParams,
-                config.l1ChainId,
-                config.ownerAddress,
-                factoryDepsHashes,
-                protocolUpgradeNonce,
-                isZKsyncOS
-            );
+            return
+                super.getProposedUpgrade(
+                    stateTransition,
+                    chainCreationParams,
+                    config.l1ChainId,
+                    config.ownerAddress,
+                    factoryDepsHashes,
+                    protocolUpgradeNonce,
+                    isZKsyncOS
+                );
         }
 
         // For ZKsyncOS v31 upgrades, force-deploy only the version-specific upgrader contract.

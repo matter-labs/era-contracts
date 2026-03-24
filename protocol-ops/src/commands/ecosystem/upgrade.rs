@@ -31,13 +31,16 @@ fn run_payload_to_cast_transactions(payload: &Value) -> Vec<Value> {
             .or_else(|| params.get("input"))
             .and_then(|v| v.as_str())
             .unwrap_or("0x");
-        let value_raw = params.get("value").and_then(|v| {
-            v.get("hex")
-                .and_then(|h| h.as_str())
-                .map(String::from)
-                .or_else(|| v.as_str().map(String::from))
-                .or_else(|| v.as_u64().map(|n| n.to_string()))
-        }).unwrap_or_else(|| "0".to_string());
+        let value_raw = params
+            .get("value")
+            .and_then(|v| {
+                v.get("hex")
+                    .and_then(|h| h.as_str())
+                    .map(String::from)
+                    .or_else(|| v.as_str().map(String::from))
+                    .or_else(|| v.as_u64().map(|n| n.to_string()))
+            })
+            .unwrap_or_else(|| "0".to_string());
         let value = normalize_cast_value(&value_raw);
         out.push(json!({ "to": to, "data": data, "value": value }));
     }
@@ -235,9 +238,9 @@ fn run_no_governance_prepare(
     let bridgehub = args.bridgehub_proxy_address.ok_or_else(|| {
         anyhow::anyhow!("--bridgehub-proxy-address is required for no-governance-prepare")
     })?;
-    let ctm = args
-        .ctm_proxy_address
-        .ok_or_else(|| anyhow::anyhow!("--ctm-proxy-address is required for no-governance-prepare"))?;
+    let ctm = args.ctm_proxy_address.ok_or_else(|| {
+        anyhow::anyhow!("--ctm-proxy-address is required for no-governance-prepare")
+    })?;
     let bytecodes_supplier = args.bytecodes_supplier_address.ok_or_else(|| {
         anyhow::anyhow!("--bytecodes-supplier-address is required for no-governance-prepare")
     })?;
@@ -285,7 +288,11 @@ fn run_no_governance_prepare(
         format!("{:#x}", ctm),
         format!("{:#x}", bytecodes_supplier),
         format!("{:#x}", rollup_da_manager),
-        if is_zk_sync_os { "true".to_string() } else { "false".to_string() },
+        if is_zk_sync_os {
+            "true".to_string()
+        } else {
+            "false".to_string()
+        },
         args.upgrade_input_path.clone(),
         args.upgrade_output_path.clone(),
         format!("{:#x}", governance),
@@ -298,7 +305,9 @@ fn run_no_governance_prepare(
     logger::step("Running ecosystem no-governance-prepare");
     logger::info(format!("RPC URL: {}", effective_rpc));
 
-    runner.run(shell, script).context("Failed to execute forge script for no-governance-prepare")?;
+    runner
+        .run(shell, script)
+        .context("Failed to execute forge script for no-governance-prepare")?;
 
     // Read TOML files written by the script; parse to JSON.
     let script_out = contracts_path.join("script-out");
@@ -324,7 +333,8 @@ fn run_no_governance_prepare(
         .and_then(|v| serde_json::to_value(v).map_err(|e| anyhow::anyhow!("{}", e)))?;
 
     if let Some(ref out_path) = args.out {
-        let out_json = build_output_no_governance_prepare(&runner, &core_json, &ecosystem_json, &ctm_json);
+        let out_json =
+            build_output_no_governance_prepare(&runner, &core_json, &ecosystem_json, &ctm_json);
         let out_str = serde_json::to_string_pretty(&out_json)?;
         fs::write(out_path, out_str)?;
         logger::info(format!("Full output written to: {}", out_path.display()));
@@ -448,7 +458,10 @@ fn run_governance_stage(
     logger::info(format!("RPC URL: {}", effective_rpc));
 
     runner.run(shell, script).with_context(|| {
-        format!("Failed to execute forge script for governance stage {}", stage)
+        format!(
+            "Failed to execute forge script for governance stage {}",
+            stage
+        )
     })?;
 
     if let Some(ref out_path) = args.out {

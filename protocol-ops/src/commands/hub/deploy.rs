@@ -1,28 +1,29 @@
 use std::path::PathBuf;
 
-use clap::Parser;
-use ethers::types::{Address, H256};
 use crate::common::{
     forge::{resolve_execution, ExecutionMode, ForgeArgs, ForgeContext, ForgeRunner},
     logger,
 };
-use crate::config::{
-    forge_interface::{
-        deploy_ecosystem::{
-            input::{DeployL1Config, InitialDeploymentConfig},
-            output::DeployL1CoreContractsOutput,
-        },
-        script_params::DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS,
+use crate::config::forge_interface::{
+    deploy_ecosystem::{
+        input::{DeployL1Config, InitialDeploymentConfig},
+        output::DeployL1CoreContractsOutput,
     },
+    script_params::DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS,
 };
+use crate::utils::paths;
+use clap::Parser;
+use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use xshell::Shell;
-use crate::utils::paths;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct HubDeployArgs {
-    #[clap(long, help = "Owner address for the deployed contracts (default: sender)")]
+    #[clap(
+        long,
+        help = "Owner address for the deployed contracts (default: sender)"
+    )]
     pub owner: Option<Address>,
 
     // Common flags
@@ -39,7 +40,11 @@ pub struct HubDeployArgs {
     pub forge_args: ForgeArgs,
 
     // Options
-    #[clap(long, help = "Enable support for legacy bridge testing", default_value_t = false)]
+    #[clap(
+        long,
+        help = "Enable support for legacy bridge testing",
+        default_value_t = false
+    )]
     pub with_legacy_bridge: bool,
     #[clap(long, help = "Era chain ID", default_value_t = 270)]
     pub era_chain_id: u64,
@@ -60,8 +65,12 @@ pub struct DeployInput {
 pub async fn run(args: HubDeployArgs, shell: &Shell) -> anyhow::Result<()> {
     let foundry_scripts_path = paths::path_from_root("l1-contracts");
 
-    let (auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
+    let (auth, sender, execution_mode) = resolve_execution(
+        args.private_key,
+        args.sender,
+        args.simulate,
+        &args.l1_rpc_url,
+    )?;
     let owner = args.owner.unwrap_or(sender);
 
     let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
@@ -103,9 +112,15 @@ pub async fn run(args: HubDeployArgs, shell: &Shell) -> anyhow::Result<()> {
     }
 
     if is_simulation {
-        logger::outro(format!("Hub deploy simulation complete — Bridgehub Proxy: {:#x}", bridgehub_addr));
+        logger::outro(format!(
+            "Hub deploy simulation complete — Bridgehub Proxy: {:#x}",
+            bridgehub_addr
+        ));
     } else {
-        logger::outro(format!("Bridgehub Proxy deployed at: {:#x}", bridgehub_addr));
+        logger::outro(format!(
+            "Bridgehub Proxy deployed at: {:#x}",
+            bridgehub_addr
+        ));
     }
 
     drop(execution_mode);
@@ -114,7 +129,10 @@ pub async fn run(args: HubDeployArgs, shell: &Shell) -> anyhow::Result<()> {
 }
 
 /// Deploy hub contracts and return the output.
-pub fn deploy(ctx: &mut ForgeContext, input: &DeployInput) -> anyhow::Result<DeployL1CoreContractsOutput> {
+pub fn deploy(
+    ctx: &mut ForgeContext,
+    input: &DeployInput,
+) -> anyhow::Result<DeployL1CoreContractsOutput> {
     let initial_config = InitialDeploymentConfig::default();
 
     let deploy_config = DeployL1Config::new(
@@ -125,16 +143,25 @@ pub fn deploy(ctx: &mut ForgeContext, input: &DeployInput) -> anyhow::Result<Dep
     );
 
     logger::info("Deploying hub contracts...");
-    ctx.run(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS, &deploy_config)
+    ctx.run(
+        &DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS,
+        &deploy_config,
+    )
 }
 
 fn build_output(output: &DeployL1CoreContractsOutput, runner: &ForgeRunner) -> serde_json::Value {
     let deployed = &output.deployed_addresses;
 
-    let runs: Vec<_> = runner.runs().iter().map(|r| json!({
-        "script": r.script.display().to_string(),
-        "run": r.payload,
-    })).collect();
+    let runs: Vec<_> = runner
+        .runs()
+        .iter()
+        .map(|r| {
+            json!({
+                "script": r.script.display().to_string(),
+                "run": r.payload,
+            })
+        })
+        .collect();
 
     json!({
         "command": "hub.deploy",

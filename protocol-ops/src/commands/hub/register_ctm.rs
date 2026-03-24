@@ -1,16 +1,20 @@
 use std::path::PathBuf;
 
-use clap::Parser;
-use ethers::{contract::BaseContract, types::{Address, H256}};
-use lazy_static::lazy_static;
 use crate::common::{
-    forge::{resolve_execution, ExecutionMode, Forge, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth},
+    forge::{
+        resolve_execution, ExecutionMode, Forge, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth,
+    },
     logger,
 };
 use crate::config::{
-    forge_interface::script_params::REGISTER_CTM_SCRIPT_PARAMS,
-    traits::ReadConfig,
+    forge_interface::script_params::REGISTER_CTM_SCRIPT_PARAMS, traits::ReadConfig,
 };
+use clap::Parser;
+use ethers::{
+    contract::BaseContract,
+    types::{Address, H256},
+};
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use xshell::Shell;
@@ -20,7 +24,8 @@ use crate::admin_functions::AdminScriptOutputInner;
 use crate::utils::paths;
 
 lazy_static! {
-    static ref REGISTER_CTM_FUNCTIONS: BaseContract = BaseContract::from(IREGISTERCTMABI_ABI.clone());
+    static ref REGISTER_CTM_FUNCTIONS: BaseContract =
+        BaseContract::from(IREGISTERCTMABI_ABI.clone());
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
@@ -66,7 +71,10 @@ pub struct RegisterCtmOutput {
 }
 
 /// Register a CTM on the bridgehub.
-pub fn register_ctm(ctx: &mut ForgeContext, input: &RegisterCtmInput) -> anyhow::Result<RegisterCtmOutput> {
+pub fn register_ctm(
+    ctx: &mut ForgeContext,
+    input: &RegisterCtmInput,
+) -> anyhow::Result<RegisterCtmOutput> {
     // Encode calldata for registerCTM
     // The third parameter (broadcast) is always true when we're running via ForgeContext
     let calldata = REGISTER_CTM_FUNCTIONS
@@ -98,14 +106,20 @@ pub fn register_ctm(ctx: &mut ForgeContext, input: &RegisterCtmInput) -> anyhow:
     let output_path = REGISTER_CTM_SCRIPT_PARAMS.output(ctx.foundry_scripts_path);
     let admin_script_output = AdminScriptOutputInner::read(ctx.shell, output_path)?;
 
-    Ok(RegisterCtmOutput { admin_script_output })
+    Ok(RegisterCtmOutput {
+        admin_script_output,
+    })
 }
 
 pub async fn run(args: HubRegisterCtmArgs, shell: &Shell) -> anyhow::Result<()> {
     let foundry_scripts_path = paths::path_from_root("l1-contracts");
 
-    let (auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
+    let (auth, sender, execution_mode) = resolve_execution(
+        args.private_key,
+        args.sender,
+        args.simulate,
+        &args.l1_rpc_url,
+    )?;
 
     let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
     if is_simulation {
@@ -157,11 +171,21 @@ pub async fn run(args: HubRegisterCtmArgs, shell: &Shell) -> anyhow::Result<()> 
     Ok(())
 }
 
-fn build_output(input: &RegisterCtmInput, _output: &RegisterCtmOutput, runner: &ForgeRunner) -> serde_json::Value {
-    let runs: Vec<_> = runner.runs().iter().map(|r| json!({
-        "script": r.script.display().to_string(),
-        "run": r.payload,
-    })).collect();
+fn build_output(
+    input: &RegisterCtmInput,
+    _output: &RegisterCtmOutput,
+    runner: &ForgeRunner,
+) -> serde_json::Value {
+    let runs: Vec<_> = runner
+        .runs()
+        .iter()
+        .map(|r| {
+            json!({
+                "script": r.script.display().to_string(),
+                "run": r.payload,
+            })
+        })
+        .collect();
 
     json!({
         "command": "hub.register-ctm",

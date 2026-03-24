@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context};
-use serde::{de::DeserializeOwned, Serialize};
-use xshell::Shell;
 use crate::common::files::{
     read_json_file, read_toml_file, read_yaml_file, save_json_file, save_toml_file, save_yaml_file,
 };
+use anyhow::{bail, Context};
+use serde::{de::DeserializeOwned, Serialize};
+use xshell::Shell;
 
 // Configs that we use only inside ZK Stack CLI, we don't have protobuf implementation for them.
 pub trait FileConfigTrait {}
@@ -176,9 +176,9 @@ where
     } else {
         // File doesn't exist, create default, save, and return
         let default_config = default_gen();
-        default_config.save(shell, path).with_context(|| {
-            format!("Failed to save new default config to {:?}", path)
-        })?;
+        default_config
+            .save(shell, path)
+            .with_context(|| format!("Failed to save new default config to {:?}", path))?;
         Ok(default_config)
     }
 }

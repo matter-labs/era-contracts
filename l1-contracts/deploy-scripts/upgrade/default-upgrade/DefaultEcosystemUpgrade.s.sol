@@ -73,7 +73,9 @@ contract DefaultEcosystemUpgrade is Script {
         permanentValuesInputPath;
         _upgradeInputPath;
         _ecosystemOutputPath;
-        revert("DefaultEcosystemUpgrade.initialize(permanent-values path,...) is deprecated. Use initializeWithArgs(...)");
+        revert(
+            "DefaultEcosystemUpgrade.initialize(permanent-values path,...) is deprecated. Use initializeWithArgs(...)"
+        );
     }
 
     function initializeWithArgs(

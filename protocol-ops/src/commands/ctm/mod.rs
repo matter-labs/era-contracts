@@ -2,9 +2,7 @@ use clap::Subcommand;
 use xshell::Shell;
 
 use crate::commands::ctm::{
-    accept_ownership::CtmAcceptOwnershipArgs,
-    deploy::CtmDeployArgs,
-    init::CtmInitArgs,
+    accept_ownership::CtmAcceptOwnershipArgs, deploy::CtmDeployArgs, init::CtmInitArgs,
 };
 
 pub(crate) mod accept_ownership;

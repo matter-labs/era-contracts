@@ -41,9 +41,7 @@ pub struct ForgeRunner {
 
 impl Default for ForgeRunner {
     fn default() -> Self {
-        Self {
-            runs: Vec::new(),
-        }
+        Self { runs: Vec::new() }
     }
 }
 
@@ -149,7 +147,7 @@ impl ForgeRunner {
     pub fn runs(&self) -> &[ForgeScriptRun] {
         &self.runs
     }
-    
+
     /// Dump accumulated runs into a directory with the following files:
     /// - runs.json (array of ForgeScriptRun)
     /// - NNN-[same_name_as_in_foundry].json (one file per run)

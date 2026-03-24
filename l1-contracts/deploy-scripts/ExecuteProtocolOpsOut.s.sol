@@ -18,7 +18,7 @@ contract ExecuteProtocolOpsOut is Script {
             address to = json.readAddress(string.concat(baseKey, ".to"));
             bytes memory data = json.readBytes(string.concat(baseKey, ".data"));
             uint256 value = json.readUint(string.concat(baseKey, ".value"));
-            (bool success,) = to.call{value: value}(data);
+            (bool success, ) = to.call{value: value}(data);
             require(success, "ExecuteProtocolOpsOut: call reverted");
         }
         vm.stopBroadcast();

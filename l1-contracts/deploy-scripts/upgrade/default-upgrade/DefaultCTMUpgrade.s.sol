@@ -327,7 +327,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
-        revert("DefaultCTMUpgrade.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly");
+        revert(
+            "DefaultCTMUpgrade.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly"
+        );
     }
 
     function getOwnerAddress() public virtual returns (address) {
@@ -951,7 +953,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         }
         return super.getCreationCode(contractName, isZKBytecode);
     }
-
 
     function deployUpgradeStageValidator() internal {
         upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator", false);

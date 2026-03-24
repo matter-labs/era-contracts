@@ -1,5 +1,5 @@
-use anyhow::Context as _;
 use crate::common::{forge::ForgeScript, wallets::Wallet};
+use anyhow::Context as _;
 
 #[derive(Debug)]
 pub enum WalletOwner {

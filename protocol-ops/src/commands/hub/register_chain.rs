@@ -1,15 +1,12 @@
 use std::path::PathBuf;
 
+use crate::common::{forge::ForgeArgs, logger};
+use crate::types::DAValidatorType;
 use clap::Parser;
 use ethers::{
     signers::{LocalWallet, Signer},
     types::{Address, H256},
 };
-use crate::common::{
-    forge::ForgeArgs,
-    logger,
-};
-use crate::types::DAValidatorType;
 use serde::{Deserialize, Serialize};
 use xshell::Shell;
 
@@ -58,9 +55,13 @@ pub struct HubRegisterChainArgs {
     #[clap(long, value_enum, help = "Data availability mode", default_value_t = DAValidatorType::Rollup)]
     pub da_mode: DAValidatorType,
 
-    #[clap(long, help = "Enable support for legacy bridge testing", default_value_t = false)]
+    #[clap(
+        long,
+        help = "Enable support for legacy bridge testing",
+        default_value_t = false
+    )]
     pub with_legacy_bridge: bool,
-    
+
     #[clap(long, help = "L1 RPC URL", default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
     #[clap(long, help = "Sender address")]
@@ -88,12 +89,16 @@ pub async fn run(args: HubRegisterChainArgs, _shell: &Shell) -> anyhow::Result<(
         let pk = args.private_key.unwrap();
         let wallet = LocalWallet::from_bytes(pk.as_bytes()).unwrap();
         if args.sender.is_some() && args.sender.unwrap() != wallet.address() {
-            anyhow::bail!("Sender address does not match private key: got {:#x}, want {:#x}", args.sender.unwrap(), wallet.address());
+            anyhow::bail!(
+                "Sender address does not match private key: got {:#x}, want {:#x}",
+                args.sender.unwrap(),
+                wallet.address()
+            );
         }
         wallet.address()
     } else {
         args.sender.unwrap()
-    }; 
+    };
 
     logger::info("Registering chain...");
     Ok(())

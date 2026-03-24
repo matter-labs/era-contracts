@@ -1,7 +1,7 @@
+use crate::types::{DAValidatorType, L2ChainId};
 use ethers::types::Address;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use crate::types::{L2ChainId, DAValidatorType};
 
 use crate::config::traits::FileConfigTrait;
 
@@ -54,15 +54,18 @@ impl RegisterChainL1Config {
         Ok(Self {
             chain: ChainL1Config {
                 chain_chain_id: chain_params.chain_id,
-                base_token_gas_price_multiplier_nominator: chain_params.base_token_gas_price_multiplier_numerator,
-                base_token_gas_price_multiplier_denominator: chain_params.base_token_gas_price_multiplier_denominator,
+                base_token_gas_price_multiplier_nominator: chain_params
+                    .base_token_gas_price_multiplier_numerator,
+                base_token_gas_price_multiplier_denominator: chain_params
+                    .base_token_gas_price_multiplier_denominator,
                 base_token_addr: chain_params.base_token_addr,
                 // TODO specify
                 governance_security_council_address: Default::default(),
                 governance_min_delay: 0,
                 // TODO verify
                 bridgehub_create_new_chain_salt: rand::thread_rng().gen_range(0..=i64::MAX) as u64,
-                validium_mode: chain_params.da_mode == DAValidatorType::NoDA || chain_params.da_mode == DAValidatorType::Avail,
+                validium_mode: chain_params.da_mode == DAValidatorType::NoDA
+                    || chain_params.da_mode == DAValidatorType::Avail,
                 // For ZKsync OS with blobs, committer role goes to blobs_eth; server uses operator_commit_sk for commit.
                 validator_sender_operator_eth: chain_params.prove_operator,
                 validator_sender_operator_blobs_eth: chain_params.commit_operator,

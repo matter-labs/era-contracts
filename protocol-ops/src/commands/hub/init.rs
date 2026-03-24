@@ -1,15 +1,15 @@
 use std::path::PathBuf;
 
-use clap::Parser;
-use ethers::{
-    signers::{LocalWallet, Signer},
-    types::{Address, H256},
-};
 use crate::common::{
     forge::{resolve_execution, ExecutionMode, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth},
     logger,
 };
 use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
+use clap::Parser;
+use ethers::{
+    signers::{LocalWallet, Signer},
+    types::{Address, H256},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use xshell::Shell;
@@ -59,7 +59,10 @@ pub async fn hub_init(
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct HubInitArgs {
-    #[clap(long, help = "Owner address for the deployed contracts (default: sender)")]
+    #[clap(
+        long,
+        help = "Owner address for the deployed contracts (default: sender)"
+    )]
     pub owner: Option<Address>,
     #[clap(long, alias = "owner-pk", help = "Owner private key")]
     pub owner_private_key: Option<H256>,
@@ -78,7 +81,11 @@ pub struct HubInitArgs {
     pub forge_args: ForgeArgs,
 
     // Options
-    #[clap(long, help = "Enable support for legacy bridge testing", default_value_t = false)]
+    #[clap(
+        long,
+        help = "Enable support for legacy bridge testing",
+        default_value_t = false
+    )]
     pub with_legacy_bridge: bool,
     #[clap(long, help = "Era chain ID", default_value_t = 270)]
     pub era_chain_id: u64,
@@ -91,8 +98,12 @@ pub struct HubInitArgs {
 pub async fn run(args: HubInitArgs, shell: &Shell) -> anyhow::Result<()> {
     let foundry_scripts_path = paths::path_from_root("l1-contracts");
 
-    let (sender_auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
+    let (sender_auth, sender, execution_mode) = resolve_execution(
+        args.private_key,
+        args.sender,
+        args.simulate,
+        &args.l1_rpc_url,
+    )?;
     let owner = args.owner.unwrap_or(sender);
 
     // Resolve owner auth for accept_ownership step
@@ -190,9 +201,15 @@ pub async fn run(args: HubInitArgs, shell: &Shell) -> anyhow::Result<()> {
     }
 
     if is_simulation {
-        logger::outro(format!("Hub init simulation complete — Bridgehub Proxy: {:#x}", bridgehub_addr));
+        logger::outro(format!(
+            "Hub init simulation complete — Bridgehub Proxy: {:#x}",
+            bridgehub_addr
+        ));
     } else {
-        logger::outro(format!("Bridgehub Proxy deployed at: {:#x}", bridgehub_addr));
+        logger::outro(format!(
+            "Bridgehub Proxy deployed at: {:#x}",
+            bridgehub_addr
+        ));
     }
 
     drop(execution_mode);
@@ -203,10 +220,16 @@ pub async fn run(args: HubInitArgs, shell: &Shell) -> anyhow::Result<()> {
 fn build_output(output: &DeployL1CoreContractsOutput, runner: &ForgeRunner) -> serde_json::Value {
     let deployed = &output.deployed_addresses;
 
-    let runs: Vec<_> = runner.runs().iter().map(|r| json!({
-        "script": r.script.display().to_string(),
-        "run": r.payload,
-    })).collect();
+    let runs: Vec<_> = runner
+        .runs()
+        .iter()
+        .map(|r| {
+            json!({
+                "script": r.script.display().to_string(),
+                "run": r.payload,
+            })
+        })
+        .collect();
 
     json!({
         "command": "hub.init",

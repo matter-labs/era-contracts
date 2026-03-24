@@ -1,11 +1,5 @@
 use std::path::Path;
 
-use ethers::{
-    contract::BaseContract,
-    types::{Address, Bytes, U256},
-    utils::hex,
-};
-use lazy_static::lazy_static;
 use crate::common::{
     forge::{Forge, ForgeRunner, ForgeScript, ForgeScriptArgs},
     wallets::Wallet,
@@ -15,6 +9,12 @@ use crate::config::{
     traits::{FileConfigTrait, ReadConfig},
 };
 use crate::types::L2DACommitmentScheme;
+use ethers::{
+    contract::BaseContract,
+    types::{Address, Bytes, U256},
+    utils::hex,
+};
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use xshell::Shell;
 

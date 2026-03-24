@@ -1,18 +1,10 @@
 use std::path::PathBuf;
 
-use clap::Parser;
-use ethers::{
-    contract::BaseContract,
-    middleware::Middleware,
-    signers::{LocalWallet, Signer},
-    types::{Address, H256},
-    utils::hex,
-};
-use lazy_static::lazy_static;
-use tokio::task::block_in_place;
 use crate::common::{
     ethereum::get_ethers_provider,
-    forge::{resolve_execution, ExecutionMode, Forge, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth},
+    forge::{
+        resolve_execution, ExecutionMode, Forge, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth,
+    },
     logger,
 };
 use crate::config::{
@@ -26,16 +18,29 @@ use crate::config::{
     traits::{ReadConfig, SaveConfig},
 };
 use crate::types::{DAValidatorType, L2ChainId, L2DACommitmentScheme, VMOption};
+use clap::Parser;
+use ethers::{
+    contract::BaseContract,
+    middleware::Middleware,
+    signers::{LocalWallet, Signer},
+    types::{Address, H256},
+    utils::hex,
+};
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tokio::task::block_in_place;
 use xshell::Shell;
 
 use crate::abi::IREGISTERZKCHAINABI_ABI;
-use crate::admin_functions::{accept_admin, set_da_validator_pair, unpause_deposits, AdminScriptMode};
+use crate::admin_functions::{
+    accept_admin, set_da_validator_pair, unpause_deposits, AdminScriptMode,
+};
 use crate::utils::paths;
 
 lazy_static! {
-    static ref REGISTER_CHAIN_FUNCTIONS: BaseContract = BaseContract::from(IREGISTERZKCHAINABI_ABI.clone());
+    static ref REGISTER_CHAIN_FUNCTIONS: BaseContract =
+        BaseContract::from(IREGISTERZKCHAINABI_ABI.clone());
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
@@ -149,10 +154,7 @@ pub fn register_chain(
     ctx: &mut ForgeContext,
     input: &ChainInitInput,
 ) -> anyhow::Result<RegisterChainOutput> {
-    let deploy_config = RegisterChainL1Config::new(
-        &input.chain_params,
-        input.with_legacy_bridge,
-    )?;
+    let deploy_config = RegisterChainL1Config::new(&input.chain_params, input.with_legacy_bridge)?;
 
     // Write input config
     let input_path = REGISTER_CHAIN_SCRIPT_PARAMS.input(ctx.foundry_scripts_path);
@@ -168,7 +170,10 @@ pub fn register_chain(
 
     // Build forge command
     let mut forge = Forge::new(ctx.foundry_scripts_path)
-        .script(&REGISTER_CHAIN_SCRIPT_PARAMS.script(), ctx.forge_args.clone())
+        .script(
+            &REGISTER_CHAIN_SCRIPT_PARAMS.script(),
+            ctx.forge_args.clone(),
+        )
         .with_ffi()
         .with_calldata(&calldata)
         .with_rpc_url(ctx.l1_rpc_url.to_string())
@@ -196,12 +201,18 @@ pub fn register_chain(
 fn parse_ratio(s: &str) -> anyhow::Result<(u64, u64)> {
     let parts: Vec<&str> = s.split('/').collect();
     if parts.len() != 2 {
-        anyhow::bail!("Invalid ratio format '{}'. Expected 'numerator/denominator' (e.g. '4000/1')", s);
+        anyhow::bail!(
+            "Invalid ratio format '{}'. Expected 'numerator/denominator' (e.g. '4000/1')",
+            s
+        );
     }
-    let num: u64 = parts[0].trim().parse()
+    let num: u64 = parts[0]
+        .trim()
+        .parse()
         .map_err(|_| anyhow::anyhow!("Invalid numerator '{}' in ratio '{}'", parts[0].trim(), s))?;
-    let den: u64 = parts[1].trim().parse()
-        .map_err(|_| anyhow::anyhow!("Invalid denominator '{}' in ratio '{}'", parts[1].trim(), s))?;
+    let den: u64 = parts[1].trim().parse().map_err(|_| {
+        anyhow::anyhow!("Invalid denominator '{}' in ratio '{}'", parts[1].trim(), s)
+    })?;
     if den == 0 {
         anyhow::bail!("Denominator cannot be zero in ratio '{}'", s);
     }
@@ -227,7 +238,10 @@ fn query_bridgehub(rpc_url: &str, ctm_proxy: Address) -> anyhow::Result<Address>
             .block_on(fut)?
     };
     if result.len() < 32 {
-        anyhow::bail!("Invalid response from BRIDGE_HUB() call on CTM proxy {:#x}", ctm_proxy);
+        anyhow::bail!(
+            "Invalid response from BRIDGE_HUB() call on CTM proxy {:#x}",
+            ctm_proxy
+        );
     }
     Ok(Address::from_slice(&result[12..32]))
 }
@@ -243,8 +257,12 @@ pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
     let execute_operator = args.execute_operator;
     let token_multiplier_setter = args.token_multiplier_setter;
 
-    let (sender_auth, sender, execution_mode) =
-        resolve_execution(args.private_key, args.sender, args.simulate, &args.l1_rpc_url)?;
+    let (sender_auth, sender, execution_mode) = resolve_execution(
+        args.private_key,
+        args.sender,
+        args.simulate,
+        &args.l1_rpc_url,
+    )?;
     let owner = args.owner.unwrap_or(sender);
 
     // Resolve owner auth for accept_admin step
@@ -294,7 +312,10 @@ pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
     let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
 
     // Derive bridgehub address from CTM proxy
-    logger::info(format!("Querying bridgehub from CTM proxy {:#x}...", args.ctm_proxy));
+    logger::info(format!(
+        "Querying bridgehub from CTM proxy {:#x}...",
+        args.ctm_proxy
+    ));
     let bridgehub = query_bridgehub(effective_rpc, args.ctm_proxy)?;
     logger::info(format!("Bridgehub: {:#x}", bridgehub));
 
@@ -341,7 +362,10 @@ pub async fn run(args: ChainInitArgs, shell: &Shell) -> anyhow::Result<()> {
 
     let diamond_proxy = register_output.diamond_proxy_addr;
     let chain_admin = register_output.chain_admin_addr;
-    logger::info(format!("Chain registered. Diamond proxy: {:#x}", diamond_proxy));
+    logger::info(format!(
+        "Chain registered. Diamond proxy: {:#x}",
+        diamond_proxy
+    ));
 
     // Step 2: Accept admin of chain (as owner)
     logger::info("Accepting admin of chain...");
@@ -431,10 +455,16 @@ fn build_output(
     output: &RegisterChainOutput,
     runner: &ForgeRunner,
 ) -> serde_json::Value {
-    let runs: Vec<_> = runner.runs().iter().map(|r| json!({
-        "script": r.script.display().to_string(),
-        "run": r.payload,
-    })).collect();
+    let runs: Vec<_> = runner
+        .runs()
+        .iter()
+        .map(|r| {
+            json!({
+                "script": r.script.display().to_string(),
+                "run": r.payload,
+            })
+        })
+        .collect();
 
     json!({
         "command": "chain.init",

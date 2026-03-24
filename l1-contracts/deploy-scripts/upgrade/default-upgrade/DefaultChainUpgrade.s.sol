@@ -37,7 +37,9 @@ contract DefaultChainUpgrade is Script {
     function prepareChain(uint256 chainId, string memory permanentValuesInputPath) public {
         chainId;
         permanentValuesInputPath;
-        revert("DefaultChainUpgrade.prepareChain(..., permanent-values path) is deprecated. Use prepareChainWithBridgehub(...)");
+        revert(
+            "DefaultChainUpgrade.prepareChain(..., permanent-values path) is deprecated. Use prepareChainWithBridgehub(...)"
+        );
     }
 
     function prepareChainWithBridgehub(uint256 chainId, address bridgehubProxyAddress) public {

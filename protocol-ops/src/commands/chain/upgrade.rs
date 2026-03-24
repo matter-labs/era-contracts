@@ -1,12 +1,12 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use anyhow::Context;
-use clap::Parser;
-use ethers::types::H256;
 use crate::common::forge::ForgeArgs;
 use crate::common::logger;
 use crate::utils::paths;
+use anyhow::Context;
+use clap::Parser;
+use ethers::types::H256;
 use serde::{Deserialize, Serialize};
 use xshell::Shell;
 

@@ -63,8 +63,14 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs, shell: &Shell) -> anyhow::R
             String::from_utf8_lossy(&calldata_output.stderr)
         );
     }
-    let data = String::from_utf8_lossy(&calldata_output.stdout).trim().to_string();
-    let data = if data.starts_with("0x") { data } else { format!("0x{}", data) };
+    let data = String::from_utf8_lossy(&calldata_output.stdout)
+        .trim()
+        .to_string();
+    let data = if data.starts_with("0x") {
+        data
+    } else {
+        format!("0x{}", data)
+    };
 
     let transactions = vec![json!({
         "to": args.admin_address,

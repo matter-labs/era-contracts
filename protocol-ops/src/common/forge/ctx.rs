@@ -1,15 +1,15 @@
 use std::path::Path;
 
-use ethers::{
-    signers::{LocalWallet, Signer},
-    types::{Address, H256},
-};
+use super::{Forge, ForgeRunner, ForgeScriptArgs};
 use crate::common::anvil::{self, AnvilInstance};
 use crate::common::wallets::Wallet;
-use super::{Forge, ForgeRunner, ForgeScriptArgs};
 use crate::config::{
     forge_interface::script_params::ForgeScriptParams,
     traits::{ReadConfig, SaveConfig},
+};
+use ethers::{
+    signers::{LocalWallet, Signer},
+    types::{Address, H256},
 };
 use xshell::Shell;
 
@@ -167,4 +167,3 @@ impl<'a> ForgeContext<'a> {
         O::read(self.shell, output_path)
     }
 }
-

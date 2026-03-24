@@ -90,7 +90,9 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice E2e upgrade generation
     function run() public virtual {
-        revert("DefaultCoreUpgrade.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly");
+        revert(
+            "DefaultCoreUpgrade.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly"
+        );
     }
 
     function getOwnerAddress() public virtual returns (address) {
@@ -127,7 +129,9 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     function initializeConfig(string memory permanentValuesInputPath, string memory upgradeInputPath) public virtual {
         permanentValuesInputPath;
         upgradeInputPath;
-        revert("DefaultCoreUpgrade.initializeConfig(permanent-values path,...) is deprecated. Use initializeConfigWithArgs(...)");
+        revert(
+            "DefaultCoreUpgrade.initializeConfig(permanent-values path,...) is deprecated. Use initializeConfigWithArgs(...)"
+        );
     }
 
     function initializeConfigWithArgs(
