@@ -21,7 +21,7 @@ import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CoreUpgrade_v31} from "./CoreUpgrade_v31.s.sol";
 import {CTMUpgrade_v31} from "./CTMUpgrade_v31.s.sol";
 import {GatewayUpgrade_v31} from "./GatewayUpgrade_v31.s.sol";
-import {PermanentValuesHelper} from "../../utils/PermanentValuesHelper.sol";
+
 
 /// @notice Script used for v31 ecosystem upgrade flow (core + CTM)
 /// TODO: IMPORTANT this script should also contain the following steps:
@@ -75,8 +75,7 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
         string memory _ecosystemOutputPath,
         address governance
     ) public override {
-        create2FactorySalt;
-        (, bytes32 loadedSalt) = PermanentValuesHelper.getPermanentValues();
+        bytes32 loadedSalt = create2FactorySalt;
         string memory root = vm.projectRoot();
         ecosystemOutputPath = string.concat(root, _ecosystemOutputPath);
 

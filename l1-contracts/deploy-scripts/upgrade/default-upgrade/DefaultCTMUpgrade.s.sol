@@ -27,6 +27,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 
@@ -934,6 +935,22 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         // Revert loudly to prevent silent use of wrong bytecode hashes.
         require(!config.isZKsyncOS, "getL2BytecodeHash must not be called for ZKsyncOS chains");
         return super.getL2BytecodeHash(contractName);
+    }
+
+    function getForceDeployment(
+        string memory contractName
+    ) public virtual override returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
+        bytes32 bytecodeHash = config.isZKsyncOS
+            ? keccak256(Utils.readFoundryDeployedBytecodeL1(string.concat(contractName, ".sol"), contractName))
+            : getL2BytecodeHash(contractName);
+        return
+            IL2ContractDeployer.ForceDeployment({
+                bytecodeHash: bytecodeHash,
+                newAddress: getExpectedL2Address(contractName),
+                callConstructor: false,
+                value: 0,
+                input: ""
+            });
     }
 
     function getCreationCode(
