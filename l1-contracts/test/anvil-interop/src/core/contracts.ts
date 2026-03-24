@@ -21,6 +21,7 @@ const ARTIFACTS = {
   ChainRegistrationSender: "ChainRegistrationSender.sol/ChainRegistrationSender.json",
   GettersFacet: "Getters.sol/GettersFacet.json",
   GWAssetTracker: "GWAssetTracker.sol/GWAssetTracker.json",
+  IAssetTrackerDataEncoding: "IAssetTrackerDataEncoding.sol/IAssetTrackerDataEncoding.json",
   IBaseToken: "IBaseToken.sol/IBaseToken.json",
   IL1Bridgehub: "IL1Bridgehub.sol/IL1Bridgehub.json",
   IL1GenesisUpgrade: "IL1GenesisUpgrade.sol/IL1GenesisUpgrade.json",

@@ -200,14 +200,14 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 
 ### Impersonation
 
-| What                          | Who                      | Production equivalent                 |
-| ----------------------------- | ------------------------ | ------------------------------------- |
-| Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade tx        |
-| Interop chain registration    | Default Anvil EOA        | Real L1 service-tx flow relayed to L2 |
-| GW chain registration         | `ChainAssetHandler`      | Governance flow                       |
-| Settlement layer notification | `L2_BOOTLOADER_ADDR`     | Bootloader at batch start             |
-| Governance calls              | Governance contract      | Multi-sig / timelock                  |
-| GW L2Bridgehub ownership      | Aliased CTM governance   | Shared governance from deployment     |
+| What                          | Who                      | Production equivalent                                                                    |
+| ----------------------------- | ------------------------ | ---------------------------------------------------------------------------------------- |
+| Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade tx                                                           |
+| Interop chain registration    | Default Anvil EOA        | L1 service-tx flow relayed via Bridgehub (impersonated, but contract logic is identical) |
+| GW chain registration         | `ChainAssetHandler`      | Governance flow                                                                          |
+| Settlement layer notification | `L2_BOOTLOADER_ADDR`     | Bootloader at batch start                                                                |
+| Governance calls              | Governance contract      | Multi-sig / timelock                                                                     |
+| GW L2Bridgehub ownership      | Aliased CTM governance   | Shared governance from deployment                                                        |
 
 ### Other Shortcuts
 

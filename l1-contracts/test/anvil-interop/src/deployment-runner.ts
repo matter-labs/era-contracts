@@ -132,12 +132,12 @@ export class DeploymentRunner {
     chainConfigsById: Map<number, AnvilConfig["chains"][number]>
   ) {
     return l2Chains.map((l2Chain) => {
-      this.getChainConfigOrThrow(chainConfigsById, l2Chain.chainId);
+      const chainConfig = this.getChainConfigOrThrow(chainConfigsById, l2Chain.chainId);
       return {
-        chainId: l2Chain.chainId,
+        chainId: chainConfig.chainId,
         rpcUrl: l2Chain.rpcUrl,
-        baseToken: ETH_TOKEN_ADDRESS, // TODO: support non-ETH base tokens EVM-1297
-        validiumMode: false, // TODO: support validium mode (requires batch settlement) EVM-1297
+        baseToken: ETH_TOKEN_ADDRESS, // TODO(EVM-1297): support non-ETH base tokens
+        validiumMode: false, // TODO(EVM-1297): support validium mode (requires batch settlement)
       };
     });
   }

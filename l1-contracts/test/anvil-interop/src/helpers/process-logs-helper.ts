@@ -286,11 +286,9 @@ export function buildInteropCallExecutedLogs(params: { startTxNumberInBatch: num
   const { interopBundle, startTxNumberInBatch } = params;
   const abiCoder = ethers.utils.defaultAbiCoder;
 
-  // Compute the selector for receiveInteropCallExecuted(InteropCallExecutedMessage)
-  // InteropCallExecutedMessage is (bytes32, (bytes1, bool, address, address, uint256, bytes))
-  const RECEIVE_INTEROP_CALL_EXECUTED_SELECTOR = ethers.utils
-    .id("receiveInteropCallExecuted((bytes32,(bytes1,bool,address,address,uint256,bytes)))")
-    .slice(0, 10);
+  // Derive the selector from the contract ABI instead of hardcoding the signature
+  const iface = new ethers.utils.Interface(getAbi("IAssetTrackerDataEncoding"));
+  const RECEIVE_INTEROP_CALL_EXECUTED_SELECTOR = iface.getSighash("receiveInteropCallExecuted");
 
   const INTEROP_CALL_EXECUTED_MSG_TYPE = "tuple(bytes32,tuple(bytes1,bool,address,address,uint256,bytes))";
 
@@ -452,12 +450,4 @@ export async function getGWPendingInteropBalance(
 ): Promise<BigNumber> {
   const tracker = new Contract(GW_ASSET_TRACKER_ADDR, getAbi("GWAssetTracker"), gwProvider);
   return tracker.pendingInteropBalance(chainId, assetId);
-}
-
-/**
- * Query the ETH asset ID from the Bridgehub on GW (baseTokenAssetId for a chain).
- */
-export async function getBaseTokenAssetId(gwProvider: providers.JsonRpcProvider, chainId: number): Promise<string> {
-  const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), gwProvider);
-  return bridgehub.baseTokenAssetId(chainId);
 }

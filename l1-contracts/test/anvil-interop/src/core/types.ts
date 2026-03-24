@@ -118,8 +118,8 @@ export interface DeploymentState {
 }
 
 export interface MultiChainTokenTransferParams {
-  sourceChainId?: number;
-  targetChainId?: number;
+  sourceChainId: number;
+  targetChainId: number;
   amount?: string;
   /** Token address on the source chain. If omitted, uses the test token for sourceChainId. */
   sourceTokenAddress?: string;
