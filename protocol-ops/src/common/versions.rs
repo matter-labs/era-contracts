@@ -21,7 +21,7 @@ pub fn assert_versions(shell: &Shell) -> Result<()> {
     let node_v = cmd!(shell, "node --version")
         .read()
         .context("run `node --version`")?;
-    if !node_v.trim().trim_start_matches('v').contains(expected_node.as_str()) {
+    if !node_v.trim().trim_start_matches('v').starts_with(expected_node.as_str()) {
         anyhow::bail!(
             "node version mismatch: expected to contain {:?} (from .nvmrc), got {:?}",
             expected_node,

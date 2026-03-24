@@ -1,6 +1,6 @@
 use ethers::types::{Address, U256};
 use serde::{Deserialize, Serialize};
-use crate::types::{L2ChainId, DAValidatorType};
+use crate::types::L2ChainId;
 
 use crate::config::{
     forge_interface::register_chain::input::NewChainParams,

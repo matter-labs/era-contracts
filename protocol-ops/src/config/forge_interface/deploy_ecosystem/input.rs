@@ -3,9 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use ethers::{
     types::{Address, H256, U256},
 };
-use rand::Rng;
 use serde::{Deserialize, Serialize};
-use crate::types::L1Network;
 
 use crate::config::{
     consts::INITIAL_DEPLOYMENT_FILE,

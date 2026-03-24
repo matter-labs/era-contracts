@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::Parser;
 use ethers::{
@@ -6,22 +6,10 @@ use ethers::{
     types::{Address, H256},
 };
 use crate::common::{
-    forge::{Forge, ForgeArgs, ForgeRunner, ForgeScriptArgs},
+    forge::ForgeArgs,
     logger,
 };
-use crate::config::{
-    DEFAULT_ERA_CHAIN_ID,
-    forge_interface::{
-        deploy_ecosystem::{
-            input::{DeployL1Config, InitialDeploymentConfig},
-            output::DeployL1CoreContractsOutput,
-        },
-        script_params::DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS,
-    },
-    traits::{get_or_create_config, ReadConfig, SaveConfig},
-    CoreContractsConfig,
-};
-use crate::types::{DAValidatorType, L1Network, L2ChainId, L2DACommitmentScheme, VMOption};
+use crate::types::DAValidatorType;
 use serde::{Deserialize, Serialize};
 use xshell::Shell;
 
@@ -88,15 +76,15 @@ pub struct HubRegisterChainArgs {
     pub forge_args: ForgeArgs,
 }
 
-pub async fn run(args: HubRegisterChainArgs, shell: &Shell) -> anyhow::Result<()> {
+pub async fn run(args: HubRegisterChainArgs, _shell: &Shell) -> anyhow::Result<()> {
     let foundry_scripts_path_buf = paths::path_from_root("l1-contracts");
-    let foundry_scripts_path = foundry_scripts_path_buf.as_path();
+    let _foundry_scripts_path = foundry_scripts_path_buf.as_path();
 
     // Parse sender and private_key
     if args.private_key.is_none() && args.sender.is_none() {
         anyhow::bail!("Either private key or sender address must be provided");
     }
-    let sender = if args.private_key.is_some() {
+    let _sender = if args.private_key.is_some() {
         let pk = args.private_key.unwrap();
         let wallet = LocalWallet::from_bytes(pk.as_bytes()).unwrap();
         if args.sender.is_some() && args.sender.unwrap() != wallet.address() {

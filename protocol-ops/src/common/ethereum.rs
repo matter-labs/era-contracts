@@ -1,13 +1,9 @@
-use std::{num::NonZeroUsize, ops::Add, str::FromStr, sync::Arc, time::Duration};
+use std::sync::Arc;
 
-use anyhow::Context;
 use ethers::{
-    contract::abigen,
     core::k256::ecdsa::SigningKey,
     middleware::MiddlewareBuilder,
-    prelude::{BlockId, BlockNumber, Http, LocalWallet, Provider, Signer, SignerMiddleware},
-    providers::Middleware,
-    types::{Address, TransactionRequest},
+    prelude::{Http, LocalWallet, Provider, Signer, SignerMiddleware},
 };
 // use zkstack_cli_types::TokenInfo;
 // use zksync_types::{url::SensitiveUrl, L2ChainId};

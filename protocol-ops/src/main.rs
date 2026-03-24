@@ -1,8 +1,10 @@
+#![allow(dead_code)]
+
 use crate::commands::{
     chain::ChainCommands, ctm::CtmCommands, ecosystem::EcosystemCommands,
     genesis::GenesisCommands, hub::HubCommands,
 };
-use clap::{command, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use crate::common::{
     config::{init_global_config, GlobalConfig},
     error::log_error,

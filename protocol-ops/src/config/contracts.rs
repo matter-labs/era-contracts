@@ -3,8 +3,7 @@ use std::{path::Path, str::FromStr};
 use ethers::types::{Address, H160, H256};
 use serde::{Deserialize, Serialize};
 use xshell::Shell;
-use crate::common::contracts::{encode_ntv_asset_id};
-use crate::common::system_contracts::{L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS};
+use crate::common::contracts::{encode_ntv_asset_id, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS};
 use crate::types::{L1Network, VMOption};
 
 use crate::config::{

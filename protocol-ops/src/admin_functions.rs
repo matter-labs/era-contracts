@@ -1,8 +1,6 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use anyhow::Context;
 use ethers::{
-    abi::{parse_abi, Token},
     contract::BaseContract,
     types::{Address, Bytes, U256},
     utils::hex,
@@ -16,7 +14,7 @@ use crate::config::{
     forge_interface::script_params::ACCEPT_GOVERNANCE_SCRIPT_PARAMS,
     traits::{FileConfigTrait, ReadConfig},
 };
-use crate::types::{L2DACommitmentScheme, VMOption};
+use crate::types::L2DACommitmentScheme;
 use serde::{Deserialize, Serialize};
 use xshell::Shell;
 
@@ -399,7 +397,7 @@ pub async fn call_script(
         .with_rpc_url(l1_rpc_url)
         .with_calldata(&calldata);
 
-    let (forge, spiner_text) = match mode {
+    let (forge, _spiner_text) = match mode {
         AdminScriptMode::OnlySave => (forge, format!("Preparing calldata for {description}")),
         AdminScriptMode::Broadcast(wallet) => {
             let forge = forge.with_broadcast();

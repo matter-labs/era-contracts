@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 
 use clap::Parser;
 pub use ctx::{resolve_execution, ExecutionMode, ForgeContext, SenderAuth};
-pub use runner::{ForgeRunner, ForgeScriptRun};
-pub use script::{ForgeScript, ForgeScriptArg, ForgeScriptArgs, ForgeVerifier};
+pub use runner::ForgeRunner;
+pub use script::{ForgeScript, ForgeScriptArg, ForgeScriptArgs};
 use serde::{Deserialize, Serialize};
 
 /// Forge is a wrapper around the forge binary.

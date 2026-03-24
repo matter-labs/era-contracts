@@ -56,6 +56,10 @@ pub fn step(msg: impl Display) {
     log::step(msg).unwrap();
 }
 
+pub fn success(msg: impl Display) {
+    log::success(msg).unwrap();
+}
+
 pub fn error_note(msg: &str, content: &str) {
     let note = CliclackTheme.format_log(msg, &CliclackTheme.error_symbol());
     term_write(note);
