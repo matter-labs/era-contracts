@@ -6,6 +6,10 @@ pragma solidity 0.8.28;
 // The deployment uses a mix of deployer contracts (for contracts requiring owner initialization)
 // and direct deployments in scripts (for contracts without owner initialization).
 
+// The default verifier version to register in the ZKsync OS dual verifier during deployment.
+// solhint-disable-next-line var-name-mixedcase
+uint32 constant DEFAULT_ZKSYNC_OS_VERIFIER_VERSION = 6;
+
 /// @notice Diamond facet contract addresses.
 // solhint-disable-next-line gas-struct-packing
 struct Facets {
@@ -183,6 +187,9 @@ struct GatewayVerifiersDeployerConfig {
     bool testnetVerifier;
     /// @notice Flag indicating whether to use ZKsync OS mode.
     bool isZKsyncOS;
+    /// @notice Initial verifier version to register in the ZKsync OS dual verifier.
+    /// @dev Only used when isZKsyncOS is true. Set to 0 to skip registration.
+    uint32 initialVerifierVersion;
 }
 
 /// @notice Result from Verifiers deployer.

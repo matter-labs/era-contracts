@@ -16,7 +16,8 @@ import {
     GatewayVerifiersDeployerConfig,
     Verifiers,
     GatewayCTMFinalConfig,
-    GatewayCTMFinalResult
+    GatewayCTMFinalResult,
+    DEFAULT_ZKSYNC_OS_VERIFIER_VERSION
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 import {GatewayCTMDeployerDA} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerDA.sol";
 import {GatewayCTMDeployerProxyAdmin} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployerProxyAdmin.sol";
@@ -268,7 +269,8 @@ contract GatewayCTMDeployerTest is Test {
             salt: deployerConfig.salt,
             aliasedGovernanceAddress: deployerConfig.aliasedGovernanceAddress,
             testnetVerifier: deployerConfig.testnetVerifier,
-            isZKsyncOS: deployerConfig.isZKsyncOS
+            isZKsyncOS: deployerConfig.isZKsyncOS,
+            initialVerifierVersion: DEFAULT_ZKSYNC_OS_VERIFIER_VERSION
         });
         new GatewayCTMDeployerVerifiers(verifiersConfig);
     }

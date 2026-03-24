@@ -42,24 +42,37 @@ contract GatewayCTMDeployerVerifiersZKsyncOS {
         result.verifierFflonk = address(new ZKsyncOSVerifierFflonk{salt: salt}());
         result.verifierPlonk = address(new ZKsyncOSVerifierPlonk{salt: salt}());
 
-        // Deploy main verifier
+        // Deploy main verifier with address(this) as initial owner so we can register
+        // the initial verifier version before transferring ownership to governance.
+        ZKsyncOSDualVerifier verifier;
         if (_config.testnetVerifier) {
-            result.verifier = address(
-                new ZKsyncOSTestnetVerifier{salt: salt}(
-                    IVerifierV2(result.verifierFflonk),
-                    IVerifier(result.verifierPlonk),
-                    _config.aliasedGovernanceAddress
+            verifier = ZKsyncOSDualVerifier(
+                address(
+                    new ZKsyncOSTestnetVerifier{salt: salt}(
+                        IVerifierV2(result.verifierFflonk),
+                        IVerifier(result.verifierPlonk),
+                        address(this)
+                    )
                 )
             );
         } else {
-            result.verifier = address(
-                new ZKsyncOSDualVerifier{salt: salt}(
-                    IVerifierV2(result.verifierFflonk),
-                    IVerifier(result.verifierPlonk),
-                    _config.aliasedGovernanceAddress
-                )
+            verifier = new ZKsyncOSDualVerifier{salt: salt}(
+                IVerifierV2(result.verifierFflonk),
+                IVerifier(result.verifierPlonk),
+                address(this)
             );
         }
+
+        if (_config.initialVerifierVersion != 0) {
+            verifier.addVerifier(
+                _config.initialVerifierVersion,
+                IVerifierV2(result.verifierFflonk),
+                IVerifier(result.verifierPlonk)
+            );
+        }
+
+        verifier.transferOwnership(_config.aliasedGovernanceAddress);
+        result.verifier = address(verifier);
 
         deployedResult = result;
     }

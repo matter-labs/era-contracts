@@ -41,7 +41,8 @@ import {
     GatewayVerifiersDeployerConfig,
     Verifiers,
     GatewayCTMFinalConfig,
-    GatewayCTMFinalResult
+    GatewayCTMFinalResult,
+    DEFAULT_ZKSYNC_OS_VERIFIER_VERSION
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
 import {CTMCoreDeploymentConfig} from "../ctm/DeployCTML1OrGateway.sol";
@@ -266,7 +267,8 @@ library GatewayCTMDeployerHelper {
             salt: config.salt,
             aliasedGovernanceAddress: config.aliasedGovernanceAddress,
             testnetVerifier: config.testnetVerifier,
-            isZKsyncOS: config.isZKsyncOS
+            isZKsyncOS: config.isZKsyncOS,
+            initialVerifierVersion: DEFAULT_ZKSYNC_OS_VERIFIER_VERSION
         });
 
         // Different deployer contracts for each mode
@@ -603,12 +605,14 @@ library GatewayCTMDeployerHelper {
         }
 
         // Deploy main verifier
+        // For ZKsyncOS, the deployer contract (deployerAddr) is the initial owner so it can register
+        // the initial verifier version before transferring ownership to governance.
         if (config.testnetVerifier) {
             if (config.isZKsyncOS) {
                 result.verifier = _deployInternalWithParams(
                     "ZKsyncOSTestnetVerifier",
                     "ZKsyncOSTestnetVerifier.sol",
-                    abi.encode(result.verifierFflonk, result.verifierPlonk, config.aliasedGovernanceAddress),
+                    abi.encode(result.verifierFflonk, result.verifierPlonk, innerConfig.deployerAddr),
                     innerConfig
                 );
             } else {
@@ -624,7 +628,7 @@ library GatewayCTMDeployerHelper {
                 result.verifier = _deployInternalWithParams(
                     "ZKsyncOSDualVerifier",
                     "ZKsyncOSDualVerifier.sol",
-                    abi.encode(result.verifierFflonk, result.verifierPlonk, config.aliasedGovernanceAddress),
+                    abi.encode(result.verifierFflonk, result.verifierPlonk, innerConfig.deployerAddr),
                     innerConfig
                 );
             } else {
@@ -675,12 +679,14 @@ library GatewayCTMDeployerHelper {
         }
 
         // Deploy main verifier
+        // For ZKsyncOS, the deployer contract (deployerAddr) is the initial owner so it can register
+        // the initial verifier version before transferring ownership to governance.
         if (config.testnetVerifier) {
             if (config.isZKsyncOS) {
                 result.verifier = _deployInternalWithParamsWithMode(
                     "ZKsyncOSTestnetVerifier",
                     "ZKsyncOSTestnetVerifier.sol",
-                    abi.encode(result.verifierFflonk, result.verifierPlonk, config.aliasedGovernanceAddress),
+                    abi.encode(result.verifierFflonk, result.verifierPlonk, innerConfig.deployerAddr),
                     innerConfig,
                     isZKsyncOS
                 );
@@ -698,7 +704,7 @@ library GatewayCTMDeployerHelper {
                 result.verifier = _deployInternalWithParamsWithMode(
                     "ZKsyncOSDualVerifier",
                     "ZKsyncOSDualVerifier.sol",
-                    abi.encode(result.verifierFflonk, result.verifierPlonk, config.aliasedGovernanceAddress),
+                    abi.encode(result.verifierFflonk, result.verifierPlonk, innerConfig.deployerAddr),
                     innerConfig,
                     isZKsyncOS
                 );
