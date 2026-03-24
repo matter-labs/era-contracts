@@ -47,7 +47,7 @@ describe("L1Messenger tests", () => {
     // setup
     logData = setupLogData(l1MessengerAccount, l1Messenger);
     bytecode = await getCode(TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS);
-    await setResult("SystemContext", "txNumberInBlock", [], {
+    await setResult("SystemContextEra", "txNumberInBlock", [], {
       failure: false,
       returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [1]),
     });

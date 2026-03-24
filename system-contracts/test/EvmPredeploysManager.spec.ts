@@ -60,7 +60,7 @@ describe("EvmPredeploysManager tests", function () {
     await deployContractOnAddress(TEST_NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS, "NonceHolder");
     await deployContractOnAddress(TEST_EVM_HASHES_STORAGE, "EvmHashesStorage");
     await deployContractOnAddress(TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS, "L1Messenger");
-    await deployContractOnAddress(TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS, "SystemContext");
+    await deployContractOnAddress(TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS, "SystemContextEra");
 
     evmPredeploysManager = EvmPredeploysManagerFactory.connect(TEST_EVM_PREDEPLOYS_MANAGER, wallet);
 

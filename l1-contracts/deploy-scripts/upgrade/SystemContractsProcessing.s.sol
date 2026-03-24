@@ -318,6 +318,8 @@ library SystemContractsProcessing {
                 // L2BaseToken is now in l1-contracts as L2BaseTokenEra
                 if (Utils.compareStrings(systemContracts[i].codeName, "L2BaseToken")) {
                     result[i] = Utils.readZKFoundryBytecodeL1("L2BaseTokenEra.sol", "L2BaseTokenEra");
+                } else if (Utils.compareStrings(systemContracts[i].codeName, "SystemContext")) {
+                    result[i] = Utils.readZKFoundryBytecodeL1("SystemContextEra.sol", "SystemContextEra");
                 } else if (systemContracts[i].lang == Language.Solidity) {
                     result[i] = Utils.readSystemContractsBytecode(systemContracts[i].codeName);
                 } else {

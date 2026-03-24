@@ -76,7 +76,25 @@ export function getWallets(): Wallet[] {
 }
 
 export async function loadArtifact(name: string): Promise<ZkSyncArtifact> {
-  return await deployer.loadArtifact(name);
+  // First try local artifacts, then fall back to l1-contracts zkout
+  try {
+    return await deployer.loadArtifact(name);
+  } catch {
+    const l1Path = `../l1-contracts/zkout/${name}.sol/${name}.json`;
+    if (fs.existsSync(l1Path)) {
+      const artifact = JSON.parse(fs.readFileSync(l1Path, "utf-8"));
+      return {
+        contractName: name,
+        abi: artifact.abi,
+        bytecode: "0x" + artifact.bytecode.object,
+        deployedBytecode: "0x" + artifact.deployedBytecode.object,
+        linkReferences: {},
+        deployedLinkReferences: {},
+        factoryDeps: [],
+      };
+    }
+    throw new Error(`Artifact not found for ${name}`);
+  }
 }
 
 export function loadYulBytecode(codeName: string, path: string): string {

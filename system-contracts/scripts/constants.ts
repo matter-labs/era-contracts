@@ -141,9 +141,9 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
   },
   systemContext: {
     address: "0x000000000000000000000000000000000000800b",
-    codeName: "SystemContext",
+    codeName: "SystemContextEra",
     lang: Language.Solidity,
-    location: SourceLocation.SystemContracts,
+    location: SourceLocation.L1Contracts,
   },
   bootloaderUtilities: {
     address: "0x000000000000000000000000000000000000800c",

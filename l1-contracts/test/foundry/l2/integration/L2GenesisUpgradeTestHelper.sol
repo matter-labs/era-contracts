@@ -68,7 +68,7 @@ contract L2GenesisUpgradeTestHelper {
         // For setUp etching
         names.complexUpgrader = ContractName("L2ComplexUpgrader.sol", "L2ComplexUpgrader");
         names.genesisUpgrade = ContractName("L2GenesisUpgrade.sol", "L2GenesisUpgrade");
-        names.systemContext = ContractName("SystemContext.sol", "SystemContext");
+        names.systemContext = ContractName("SystemContextEra.sol", "SystemContextEra");
         names.wrappedBaseToken = ContractName("L2WrappedBaseToken.sol", "L2WrappedBaseToken");
         names.systemContractProxyAdmin = ContractName("SystemContractProxyAdmin.sol", "SystemContractProxyAdmin");
     }

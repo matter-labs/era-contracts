@@ -79,7 +79,7 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
         // Deploy and etch contracts (bytecode reading must be done in test, not helper contract)
         vm.etch(L2_COMPLEX_UPGRADER_ADDR, _readL1(names.complexUpgrader));
         vm.etch(L2_GENESIS_UPGRADE_ADDR, _readL1(names.genesisUpgrade));
-        vm.etch(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, _readSC(names.systemContext));
+        vm.etch(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, _readL1(names.systemContext));
         vm.etch(L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, _readL1(names.wrappedBaseToken));
         new UpgradeableBeaconDeployer();
         vm.etch(L2_NTV_BEACON_DEPLOYER_ADDR, _readL1(names.beaconDeployer));

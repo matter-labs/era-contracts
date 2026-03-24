@@ -64,10 +64,12 @@ function getPaddedSelector(contractName: string, method: string): string {
 function getSystemContextCodeHash() {
   let bytecode;
   try {
-    const artifact = JSON.parse(fs.readFileSync("zkout/SystemContext.sol/SystemContext.json", { encoding: "utf-8" }));
+    const artifact = JSON.parse(
+      fs.readFileSync("../l1-contracts/zkout/SystemContextEra.sol/SystemContextEra.json", { encoding: "utf-8" })
+    );
     bytecode = "0x" + artifact.bytecode.object;
   } catch (e) {
-    bytecode = hre.artifacts.readArtifactSync("SystemContext").bytecode;
+    bytecode = hre.artifacts.readArtifactSync("SystemContextEra").bytecode;
   }
   return ethers.utils.hexlify(utils.hashBytecode(bytecode));
 }
@@ -86,16 +88,19 @@ const params = {
   // It doesn't used directly now but is important to keep the way to regenerate it when needed
   TX_UTILITIES: getTransactionUtils(),
   RIGHT_PADDED_POST_TRANSACTION_SELECTOR: getPaddedSelector("IPaymaster", "postTransaction"),
-  RIGHT_PADDED_SET_TX_ORIGIN: getPaddedSelector("SystemContext", "setTxOrigin"),
-  RIGHT_PADDED_SET_GAS_PRICE: getPaddedSelector("SystemContext", "setGasPrice"),
-  RIGHT_PADDED_SET_PUBDATA_INFO: getPaddedSelector("SystemContext", "setPubdataInfo"),
-  RIGHT_PADDED_INCREMENT_TX_NUMBER_IN_BLOCK_SELECTOR: getPaddedSelector("SystemContext", "incrementTxNumberInBatch"),
-  RIGHT_PADDED_RESET_TX_NUMBER_IN_BLOCK_SELECTOR: getPaddedSelector("SystemContext", "resetTxNumberInBatch"),
+  RIGHT_PADDED_SET_TX_ORIGIN: getPaddedSelector("SystemContextEra", "setTxOrigin"),
+  RIGHT_PADDED_SET_GAS_PRICE: getPaddedSelector("SystemContextEra", "setGasPrice"),
+  RIGHT_PADDED_SET_PUBDATA_INFO: getPaddedSelector("SystemContextEra", "setPubdataInfo"),
+  RIGHT_PADDED_INCREMENT_TX_NUMBER_IN_BLOCK_SELECTOR: getPaddedSelector("SystemContextEra", "incrementTxNumberInBatch"),
+  RIGHT_PADDED_RESET_TX_NUMBER_IN_BLOCK_SELECTOR: getPaddedSelector("SystemContextEra", "resetTxNumberInBatch"),
   RIGHT_PADDED_SEND_L2_TO_L1_LOG_SELECTOR: getPaddedSelector("L1Messenger", "sendL2ToL1Log"),
   PUBLISH_PUBDATA_SELECTOR: getSelector("L1Messenger", "publishPubdataAndClearState"),
-  RIGHT_PADDED_SET_NEW_BATCH_SELECTOR: getPaddedSelector("SystemContext", "setNewBatch"),
-  RIGHT_PADDED_SET_SETTLEMENT_LAYER_CHAIN_ID_SELECTOR: getPaddedSelector("SystemContext", "setSettlementLayerChainId"),
-  RIGHT_PADDED_OVERRIDE_BATCH_SELECTOR: getPaddedSelector("SystemContext", "unsafeOverrideBatch"),
+  RIGHT_PADDED_SET_NEW_BATCH_SELECTOR: getPaddedSelector("SystemContextEra", "setNewBatch"),
+  RIGHT_PADDED_SET_SETTLEMENT_LAYER_CHAIN_ID_SELECTOR: getPaddedSelector(
+    "SystemContextEra",
+    "setSettlementLayerChainId"
+  ),
+  RIGHT_PADDED_OVERRIDE_BATCH_SELECTOR: getPaddedSelector("SystemContextEra", "unsafeOverrideBatch"),
   // Error
   REVERT_ERROR_SELECTOR: padZeroRight(getRevertSelector(), PADDED_SELECTOR_LENGTH),
   RIGHT_PADDED_VALIDATE_NONCE_USAGE_SELECTOR: getPaddedSelector("INonceHolder", "validateNonceUsage"),
@@ -114,12 +119,12 @@ const params = {
   PUBLISH_COMPRESSED_BYTECODE_SELECTOR: getSelector("Compressor", "publishCompressedBytecode"),
   GET_MARKER_PADDED_SELECTOR: getPaddedSelector("KnownCodesStorage", "getMarker"),
   GET_CODE_SIZE_SELECTOR: getPaddedSelector("AccountCodeStorage", "getCodeSize"),
-  RIGHT_PADDED_SET_L2_BLOCK_SELECTOR: getPaddedSelector("SystemContext", "setL2Block"),
+  RIGHT_PADDED_SET_L2_BLOCK_SELECTOR: getPaddedSelector("SystemContextEra", "setL2Block"),
   RIGHT_PADDED_APPEND_TRANSACTION_TO_L2_BLOCK_SELECTOR: getPaddedSelector(
     "SystemContext",
     "appendTransactionToCurrentL2Block"
   ),
-  RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContext", "publishTimestampDataToL1"),
+  RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContextEra", "publishTimestampDataToL1"),
   RIGHT_PADDED_SET_INTEROP_FEE_SELECTOR: getPaddedSelector("IInteropCenter", "setInteropFee"),
   RIGHT_PADDED_SET_L2_INTEROP_ROOT_SELECTOR: getPaddedSelector("DummyL2InteropRootStorage", "addInteropRoot"),
   COMPRESSED_BYTECODES_SLOTS: 196608,
