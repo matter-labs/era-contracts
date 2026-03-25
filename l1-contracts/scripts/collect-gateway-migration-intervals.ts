@@ -243,10 +243,6 @@ async function collect(rpc: string, envName: string): Promise<void> {
     `\nTotal: ${allStarted.length} MigrationStarted, ${allFinalized.length} MigrationFinalized`
   );
 
-  // Sort both lists chronologically for the state-machine pairing below.
-  allStarted.sort((a, b) => a.blockNumber - b.blockNumber);
-  allFinalized.sort((a, b) => a.blockNumber - b.blockNumber);
-
   // ── Pre-fetch diamond proxy contracts ─────────────────────────────────────
 
   const gwProxy = new ethers.Contract(legacyGwDiamondProxy, zkChainAbi, provider);
@@ -262,42 +258,40 @@ async function collect(rpc: string, envName: string): Promise<void> {
   }
 
   // ── Derive intervals ──────────────────────────────────────────────────────
-  // Walk MigrationStarted events in block order. For each one, find the first
-  // unused MigrationFinalized for the same chain that comes after it. A chain
-  // may have multiple completed intervals (migrated back and forth more than once).
+  // Merge all events into a single chronological stream and walk through it.
+  // MigrationStarted opens a migration for a chain; the next MigrationFinalized
+  // for that chain closes it and produces a completed interval. Chains still
+  // open at the end of the stream have not yet returned from the legacy GW.
+
+  const allEvents = [
+    ...allStarted.map((ev) => ({ kind: "started" as const, ev })),
+    ...allFinalized.map((ev) => ({ kind: "finalized" as const, ev })),
+  ].sort((a, b) => a.ev.blockNumber - b.ev.blockNumber);
 
   const intervals: ChainMigrationInterval[] = [];
-  const usedFinalizedKeys = new Set<string>(); // txHash:logIndex of consumed Finalized events
+  const openMigrations = new Map<number, number>(); // chainId → startedBlock
 
-  for (const startedEv of allStarted) {
-    const chainId = (startedEv.args!.chainId as ethers.BigNumber).toNumber();
-    const slChainId = (startedEv.args!.settlementLayerChainId as ethers.BigNumber).toNumber();
-    if (slChainId !== legacyGwChainId) {
-      throw new Error(
-        `MigrationStarted at block ${startedEv.blockNumber} targets settlement layer ${slChainId}, ` +
-          `expected legacy GW chain ${legacyGwChainId}`
-      );
-    }
+  for (const { kind, ev } of allEvents) {
+    const chainId = (ev.args!.chainId as ethers.BigNumber).toNumber();
 
-    const startedBlock = startedEv.blockNumber;
-
-    // Find the next unused MigrationFinalized for this chain after startedBlock.
-    const finalizedEv = allFinalized.find(
-      (f) =>
-        (f.args!.chainId as ethers.BigNumber).toNumber() === chainId &&
-        f.blockNumber > startedBlock &&
-        !usedFinalizedKeys.has(`${f.transactionHash}:${f.logIndex}`)
-    );
-
-    if (!finalizedEv) {
-      console.log(
-        `❌  chain ${chainId} (MigrationStarted at block ${startedBlock}) has NOT returned from the legacy GW`
-      );
+    if (kind === "started") {
+      const slChainId = (ev.args!.settlementLayerChainId as ethers.BigNumber).toNumber();
+      if (slChainId !== legacyGwChainId) {
+        throw new Error(
+          `MigrationStarted at block ${ev.blockNumber} targets settlement layer ${slChainId}, ` +
+            `expected legacy GW chain ${legacyGwChainId}`
+        );
+      }
+      openMigrations.set(chainId, ev.blockNumber);
       continue;
     }
-    usedFinalizedKeys.add(`${finalizedEv.transactionHash}:${finalizedEv.logIndex}`);
 
-    const finalizedBlock = finalizedEv.blockNumber;
+    // kind === "finalized"
+    const startedBlock = openMigrations.get(chainId);
+    if (startedBlock === undefined) continue; // finalized for a chain we didn't see started (different ecosystem)
+
+    openMigrations.delete(chainId);
+    const finalizedBlock = ev.blockNumber;
     const chainProxy = chainProxies.get(chainId)!;
 
     console.log(
@@ -331,6 +325,12 @@ async function collect(rpc: string, envName: string): Promise<void> {
         gwAtMigrationFinalized: gwAtEnd,
       },
     });
+  }
+
+  for (const [chainId, startBlock] of openMigrations) {
+    console.log(
+      `❌  chain ${chainId} (MigrationStarted at block ${startBlock}) has NOT returned from the legacy GW`
+    );
   }
 
   // ── Persist cache ─────────────────────────────────────────────────────────
