@@ -263,10 +263,19 @@ async function collect(rpc: string, envName: string): Promise<void> {
   // for that chain closes it and produces a completed interval. Chains still
   // open at the end of the stream have not yet returned from the legacy GW.
 
+  // Sort all events chronologically. Within the same block, Started sorts before
+  // Finalized (a chain cannot finalize before it starts); within the same type
+  // and block, order by logIndex to preserve on-chain ordering.
+  const kindOrder = { started: 0, finalized: 1 };
   const allEvents = [
     ...allStarted.map((ev) => ({ kind: "started" as const, ev })),
     ...allFinalized.map((ev) => ({ kind: "finalized" as const, ev })),
-  ].sort((a, b) => a.ev.blockNumber - b.ev.blockNumber);
+  ].sort(
+    (a, b) =>
+      a.ev.blockNumber - b.ev.blockNumber ||
+      kindOrder[a.kind] - kindOrder[b.kind] ||
+      a.ev.logIndex - b.ev.logIndex
+  );
 
   const intervals: ChainMigrationInterval[] = [];
   const openMigrations = new Map<number, number>(); // chainId → startedBlock
@@ -280,6 +289,12 @@ async function collect(rpc: string, envName: string): Promise<void> {
         throw new Error(
           `MigrationStarted at block ${ev.blockNumber} targets settlement layer ${slChainId}, ` +
             `expected legacy GW chain ${legacyGwChainId}`
+        );
+      }
+      if (openMigrations.has(chainId)) {
+        throw new Error(
+          `MigrationStarted at block ${ev.blockNumber} for chain ${chainId} but it already has ` +
+            `an open migration started at block ${openMigrations.get(chainId)}`
         );
       }
       openMigrations.set(chainId, ev.blockNumber);
