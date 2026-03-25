@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {SystemContextBase} from "../SystemContextBase.sol";
-import {SystemContractHelper} from "../SystemContractHelper.sol";
+import {SystemContractHelper} from "system-contracts/contracts/libraries/SystemContractHelper.sol";
 import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {ISystemContextDeprecated} from "system-contracts/contracts/interfaces/ISystemContextDeprecated.sol";
 import {SystemLogKey, HARD_CODED_CHAIN_ID} from "system-contracts/contracts/Constants.sol";
@@ -125,7 +125,7 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
     }
 
     function getCurrentPubdataSpent() public view returns (uint256) {
-        uint256 pubdataPublished = SystemContractHelper.getPubdataPublished();
+        uint256 pubdataPublished = SystemContractHelper.getZkSyncMeta().pubdataPublished;
         return pubdataPublished > _eraBasePubdataSpent ? pubdataPublished - _eraBasePubdataSpent : 0;
     }
 
