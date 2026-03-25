@@ -401,12 +401,19 @@ function write(envName: string): void {
   // Truncate at the first line that begins that section — whether it is a real
   // entry or a commented-out placeholder — then re-append the derived values.
   // This makes the command idempotent.
+  // `chain_intervals` is always the last key/section in the file.
+  // Truncate at the first line that starts with it (covers both the inline
+  // `chain_intervals = []` form and the array-of-tables `[[...]]` form) then
+  // re-append the derived values. This makes the command idempotent.
   const lines = raw.split("\n");
-  const cutoff = lines.findIndex(
-    (l) => l.startsWith("[[legacy_gateway.chain_intervals]]") || l.startsWith("# [[legacy_gateway.chain_intervals]]")
-  );
+  const cutoff = lines.findIndex((l) => l.startsWith("chain_intervals") || l.startsWith("[[legacy_gateway.chain_intervals]]"));
   const base = (cutoff === -1 ? raw : lines.slice(0, cutoff).join("\n")).trimEnd();
-  const content = base + "\n\n" + data.intervals.map(serializeInterval).join("\n") + "\n";
+
+  const intervalContent =
+    data.intervals.length === 0
+      ? "chain_intervals = []"
+      : data.intervals.map(serializeInterval).join("\n");
+  const content = base + "\n\n" + intervalContent + "\n";
 
   fs.writeFileSync(permanentValuesFile, content);
 
