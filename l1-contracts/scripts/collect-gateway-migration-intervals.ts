@@ -220,11 +220,9 @@ async function collect(rpc: string, envName: string): Promise<void> {
     allStarted.push(...startedChunk);
     allFinalized.push(...finalizedChunk);
 
-    if (startedChunk.length > 0 || finalizedChunk.length > 0) {
-      console.log(
-        `  blocks ${from}–${to}: +${startedChunk.length} MigrationStarted, +${finalizedChunk.length} MigrationFinalized`
-      );
-    }
+    console.log(
+      `  blocks ${from}–${to}: +${startedChunk.length} MigrationStarted, +${finalizedChunk.length} MigrationFinalized`
+    );
   }
 
   console.log(
@@ -244,10 +242,19 @@ async function collect(rpc: string, envName: string): Promise<void> {
   }
 
   // ── Build MigrationFinalized lookup (by chainId) ──────────────────────────
+  // Assert there is at most one MigrationFinalized per chain — duplicates would
+  // indicate unexpected on-chain state and the script cannot reliably derive
+  // intervals from ambiguous data.
 
   const finalizedByChainId = new Map<number, ethers.Event>();
   for (const ev of allFinalized) {
     const chainId = (ev.args!.chainId as ethers.BigNumber).toNumber();
+    if (finalizedByChainId.has(chainId)) {
+      throw new Error(
+        `Unexpected duplicate MigrationFinalized for chain ${chainId} ` +
+          `(blocks ${finalizedByChainId.get(chainId)!.blockNumber} and ${ev.blockNumber})`
+      );
+    }
     finalizedByChainId.set(chainId, ev);
   }
 
@@ -272,6 +279,7 @@ async function collect(rpc: string, envName: string): Promise<void> {
   const intervals: ChainMigrationInterval[] = [];
 
   // Track chains for which we have seen MigrationStarted but not yet Finalized.
+  // Assert at most one MigrationStarted per chain targeting the legacy GW.
   const pendingChains = new Map<number, { startedBlock: number }>();
 
   for (const ev of allStarted) {
@@ -279,6 +287,12 @@ async function collect(rpc: string, envName: string): Promise<void> {
     const slChainId = (ev.args!.settlementLayerChainId as ethers.BigNumber).toNumber();
     if (slChainId !== legacyGwChainId) continue;
 
+    if (pendingChains.has(chainId)) {
+      throw new Error(
+        `Unexpected duplicate MigrationStarted (to legacy GW) for chain ${chainId} ` +
+          `(blocks ${pendingChains.get(chainId)!.startedBlock} and ${ev.blockNumber})`
+      );
+    }
     pendingChains.set(chainId, { startedBlock: ev.blockNumber });
   }
 
@@ -368,20 +382,18 @@ function write(envName: string): void {
     throw new Error(`Permanent values file not found: ${permanentValuesFile}`);
   }
 
-  let content = fs.readFileSync(permanentValuesFile, "utf-8");
+  const raw = fs.readFileSync(permanentValuesFile, "utf-8");
 
-  // Guard: refuse to overwrite existing entries.
-  if (content.includes("[[legacy_gateway.chain_intervals]]")) {
-    console.warn(
-      `WARNING: ${permanentValuesFile} already contains [[legacy_gateway.chain_intervals]] entries.\n` +
-        "Remove them manually before re-running write."
-    );
-    return;
-  }
-
-  // Remove the TODO(EVM-1221) placeholder comment block and append intervals.
-  content = content.replace(/\n# TODO\(EVM-1221\)[\s\S]*$/, "");
-  content = content.trimEnd() + "\n\n" + data.intervals.map(serializeInterval).join("\n") + "\n";
+  // `legacy_gateway.chain_intervals` is always the last section in the file.
+  // Truncate at the first line that begins that section — whether it is a real
+  // entry or a commented-out placeholder — then re-append the derived values.
+  // This makes the command idempotent.
+  const lines = raw.split("\n");
+  const cutoff = lines.findIndex(
+    (l) => l.startsWith("[[legacy_gateway.chain_intervals]]") || l.startsWith("# [[legacy_gateway.chain_intervals]]")
+  );
+  const base = (cutoff === -1 ? raw : lines.slice(0, cutoff).join("\n")).trimEnd();
+  const content = base + "\n\n" + data.intervals.map(serializeInterval).join("\n") + "\n";
 
   fs.writeFileSync(permanentValuesFile, content);
 
