@@ -74,7 +74,11 @@ interface BatchSnapshot {
   totalBatchesCommitted: number;
 }
 
-/** A single chain's completed legacy-GW migration interval. */
+/**
+ * One completed migration interval for a chain.
+ * A single chain may have multiple intervals if it migrated to/from the legacy GW
+ * more than once.
+ */
 interface ChainMigrationInterval {
   chainId: number;
   /** Last L1 batch of the chain before it migrated TO the legacy GW. */
@@ -180,15 +184,12 @@ async function collect(rpc: string, envName: string): Promise<void> {
   const chainAssetHandlerAddress: string = await bridgehub.chainAssetHandler();
   console.log(`ChainAssetHandler: ${chainAssetHandlerAddress}`);
 
-  const chainAssetHandler = new ethers.Contract(
-    chainAssetHandlerAddress,
-    LEGACY_CHAIN_ASSET_HANDLER_ABI,
-    provider
-  );
+  // Migration events are emitted by BOTH the Bridgehub (legacy architecture) and the
+  // ChainAssetHandler (new architecture). Query both and deduplicate by txHash+logIndex.
+  const bridgehubContract = new ethers.Contract(bridgehubAddress, LEGACY_CHAIN_ASSET_HANDLER_ABI, provider);
+  const cahContract = new ethers.Contract(chainAssetHandlerAddress, LEGACY_CHAIN_ASSET_HANDLER_ABI, provider);
 
   // ── Determine scan start block ────────────────────────────────────────────
-  // Find the first block at which the legacy GW's diamond proxy has code.
-  // This avoids scanning all of L1 history.
 
   const legacyGwDiamondProxy: string = await bridgehub.getZKChain(legacyGwChainId);
   console.log(`Legacy GW proxy: ${legacyGwDiamondProxy}`);
@@ -201,27 +202,40 @@ async function collect(rpc: string, envName: string): Promise<void> {
   console.log(`Scanning ${firstBlock} – ${latestBlock} in ${BLOCK_STEP}-block chunks…\n`);
 
   // ── Single scan loop ──────────────────────────────────────────────────────
-  // Collect all MigrationStarted and MigrationFinalized events in one pass.
 
-  const startedFilter = chainAssetHandler.filters.MigrationStarted();
-  const finalizedFilter = chainAssetHandler.filters.MigrationFinalized();
+  const startedFilterBH = bridgehubContract.filters.MigrationStarted();
+  const finalizedFilterBH = bridgehubContract.filters.MigrationFinalized();
+  const startedFilterCAH = cahContract.filters.MigrationStarted();
+  const finalizedFilterCAH = cahContract.filters.MigrationFinalized();
 
+  const seenKeys = new Set<string>();
   const allStarted: ethers.Event[] = [];
   const allFinalized: ethers.Event[] = [];
+
+  function dedup(ev: ethers.Event): boolean {
+    const key = `${ev.transactionHash}:${ev.logIndex}`;
+    if (seenKeys.has(key)) return false;
+    seenKeys.add(key);
+    return true;
+  }
 
   for (let from = firstBlock; from <= latestBlock; from += BLOCK_STEP) {
     const to = Math.min(from + BLOCK_STEP - 1, latestBlock);
 
-    const [startedChunk, finalizedChunk] = await Promise.all([
-      chainAssetHandler.queryFilter(startedFilter, from, to),
-      chainAssetHandler.queryFilter(finalizedFilter, from, to),
+    const [bhStarted, bhFinalized, cahStarted, cahFinalized] = await Promise.all([
+      bridgehubContract.queryFilter(startedFilterBH, from, to),
+      bridgehubContract.queryFilter(finalizedFilterBH, from, to),
+      cahContract.queryFilter(startedFilterCAH, from, to),
+      cahContract.queryFilter(finalizedFilterCAH, from, to),
     ]);
 
-    allStarted.push(...startedChunk);
-    allFinalized.push(...finalizedChunk);
+    for (const ev of [...bhStarted, ...cahStarted]) if (dedup(ev)) allStarted.push(ev);
+    for (const ev of [...bhFinalized, ...cahFinalized]) if (dedup(ev)) allFinalized.push(ev);
 
     console.log(
-      `  blocks ${from}–${to}: +${startedChunk.length} MigrationStarted, +${finalizedChunk.length} MigrationFinalized`
+      `  blocks ${from}–${to}:` +
+        ` +${bhStarted.length + cahStarted.length} MigrationStarted (BH:${bhStarted.length}/CAH:${cahStarted.length}),` +
+        ` +${bhFinalized.length + cahFinalized.length} MigrationFinalized (BH:${bhFinalized.length}/CAH:${cahFinalized.length})`
     );
   }
 
@@ -229,36 +243,11 @@ async function collect(rpc: string, envName: string): Promise<void> {
     `\nTotal: ${allStarted.length} MigrationStarted, ${allFinalized.length} MigrationFinalized`
   );
 
-  // ── Validate that all MigrationStarted events targeted the legacy GW ─────
+  // Sort both lists chronologically for the state-machine pairing below.
+  allStarted.sort((a, b) => a.blockNumber - b.blockNumber);
+  allFinalized.sort((a, b) => a.blockNumber - b.blockNumber);
 
-  for (const ev of allStarted) {
-    const slChainId = (ev.args!.settlementLayerChainId as ethers.BigNumber).toNumber();
-    if (slChainId !== legacyGwChainId) {
-      console.warn(
-        `  WARNING: MigrationStarted at block ${ev.blockNumber} targets chainId ${slChainId}, ` +
-          `not the legacy GW (${legacyGwChainId}) — skipping`
-      );
-    }
-  }
-
-  // ── Build MigrationFinalized lookup (by chainId) ──────────────────────────
-  // Assert there is at most one MigrationFinalized per chain — duplicates would
-  // indicate unexpected on-chain state and the script cannot reliably derive
-  // intervals from ambiguous data.
-
-  const finalizedByChainId = new Map<number, ethers.Event>();
-  for (const ev of allFinalized) {
-    const chainId = (ev.args!.chainId as ethers.BigNumber).toNumber();
-    if (finalizedByChainId.has(chainId)) {
-      throw new Error(
-        `Unexpected duplicate MigrationFinalized for chain ${chainId} ` +
-          `(blocks ${finalizedByChainId.get(chainId)!.blockNumber} and ${ev.blockNumber})`
-      );
-    }
-    finalizedByChainId.set(chainId, ev);
-  }
-
-  // ── Pre-fetch diamond proxy contracts for each chain ──────────────────────
+  // ── Pre-fetch diamond proxy contracts ─────────────────────────────────────
 
   const gwProxy = new ethers.Contract(legacyGwDiamondProxy, zkChainAbi, provider);
 
@@ -272,41 +261,46 @@ async function collect(rpc: string, envName: string): Promise<void> {
     }
   }
 
-  // ── Derive intervals ──────────────────────────────────────────────────────
-  // Simple rule: MigrationStarted → remember state; MigrationFinalized → close interval.
-  // If a chain has no MigrationFinalized by the end, log an error.
+  // ── Derive intervals via per-chain state machine ──────────────────────────
+  // Process MigrationStarted events chronologically. For each one targeting the
+  // legacy GW, find the next MigrationFinalized for that chain (by block number).
+  // A chain may have migrated multiple times — each Start/End pair is one interval.
 
   const intervals: ChainMigrationInterval[] = [];
 
-  // Track chains for which we have seen MigrationStarted but not yet Finalized.
-  // Assert at most one MigrationStarted per chain targeting the legacy GW.
-  const pendingChains = new Map<number, { startedBlock: number }>();
+  // Per-chain consumption index into allFinalized (sorted).
+  const finalizedQueues = new Map<number, ethers.Event[]>();
+  for (const ev of allFinalized) {
+    const chainId = (ev.args!.chainId as ethers.BigNumber).toNumber();
+    if (!finalizedQueues.has(chainId)) finalizedQueues.set(chainId, []);
+    finalizedQueues.get(chainId)!.push(ev);
+  }
+  const finalizedIdx = new Map<number, number>();
+
+  // Track chains that started but haven't finalized yet (for the ❌ report).
+  const openMigrations = new Map<number, number>(); // chainId → startedBlock
 
   for (const ev of allStarted) {
     const chainId = (ev.args!.chainId as ethers.BigNumber).toNumber();
     const slChainId = (ev.args!.settlementLayerChainId as ethers.BigNumber).toNumber();
     if (slChainId !== legacyGwChainId) continue;
 
-    if (pendingChains.has(chainId)) {
-      throw new Error(
-        `Unexpected duplicate MigrationStarted (to legacy GW) for chain ${chainId} ` +
-          `(blocks ${pendingChains.get(chainId)!.startedBlock} and ${ev.blockNumber})`
-      );
-    }
-    pendingChains.set(chainId, { startedBlock: ev.blockNumber });
-  }
+    const startedBlock = ev.blockNumber;
+    openMigrations.set(chainId, startedBlock);
 
-  for (const [chainId, { startedBlock }] of pendingChains) {
-    const finalizedEv = finalizedByChainId.get(chainId);
+    // Find the next MigrationFinalized for this chain after startedBlock.
+    const queue = finalizedQueues.get(chainId) ?? [];
+    const idx = finalizedIdx.get(chainId) ?? 0;
+    const matchPos = queue.findIndex((f, i) => i >= idx && f.blockNumber > startedBlock);
 
-    if (!finalizedEv) {
-      console.log(
-        `❌  chain ${chainId} has NOT returned from the legacy GW — no MigrationFinalized event found`
-      );
+    if (matchPos === -1) {
+      // No return yet — will be reported after the loop.
       continue;
     }
+    finalizedIdx.set(chainId, matchPos + 1);
+    openMigrations.delete(chainId);
 
-    const finalizedBlock = finalizedEv.blockNumber;
+    const finalizedBlock = queue[matchPos].blockNumber;
     const chainProxy = chainProxies.get(chainId)!;
 
     console.log(
@@ -340,6 +334,13 @@ async function collect(rpc: string, envName: string): Promise<void> {
         gwAtMigrationFinalized: gwAtEnd,
       },
     });
+  }
+
+  // Report any chains still on the legacy GW.
+  for (const [chainId, startBlock] of openMigrations) {
+    console.log(
+      `❌  chain ${chainId} (MigrationStarted at block ${startBlock}) has NOT returned from the legacy GW`
+    );
   }
 
   // ── Persist cache ─────────────────────────────────────────────────────────
