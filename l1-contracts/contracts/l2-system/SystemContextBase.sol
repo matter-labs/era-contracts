@@ -4,10 +4,7 @@ pragma solidity 0.8.28;
 
 import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {
-    L2_BOOTLOADER_ADDRESS,
-    L2_CHAIN_ASSET_HANDLER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ChainAssetHandler} from "contracts/core/chain-asset-handler/IL2ChainAssetHandler.sol";
 
 /**
