@@ -30,4 +30,11 @@ ignored_warnings_from = [
     "contracts/dev-contracts"
 ]
 
+# Profile for anvil-interop state generation: disables CBOR metadata to produce
+# deterministic bytecode across platforms (macOS vs Linux CI).
+# Usage: FOUNDRY_PROFILE=anvil-interop forge build
+[profile.anvil-interop]
+cbor_metadata = false
+bytecode_hash = "none"
+
 # See more config options https://github.com/foundry-rs/foundry/tree/master/crates/config

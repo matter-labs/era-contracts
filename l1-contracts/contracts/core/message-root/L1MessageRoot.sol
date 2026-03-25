@@ -122,7 +122,7 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
         ProofData memory _proofData,
         bytes32[] calldata _proof,
         uint256 _depth
-    ) internal view override returns (bool) {
+    ) internal view virtual override returns (bool) {
         bool isValid = IL1ChainAssetHandler(CHAIN_ASSET_HANDLER).isValidSettlementLayer(
             _chainId,
             _batchNumber,
@@ -143,7 +143,7 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     }
 
     /// @inheritdoc MessageRootBase
-    function _noBatchFallback(uint256 _chainId, uint256 _batchNumber) internal view override returns (bytes32) {
+    function _noBatchFallback(uint256 _chainId, uint256 _batchNumber) internal view virtual override returns (bytes32) {
         uint256 v31UpgradeBatchNumber = v31UpgradeChainBatchNumber[_chainId];
         if (
             v31UpgradeBatchNumber == V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE ||

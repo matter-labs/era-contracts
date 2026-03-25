@@ -1,0 +1,31 @@
+{
+  "name": "anvil-interop",
+  "version": "1.0.0",
+  "description": "Multi-chain Anvil testing environment for ZKsync interoperability",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist outputs chain-states",
+    "cleanup": "bash cleanup.sh",
+    "test:hardhat": "yarn --cwd ../.. test:hardhat:interop",
+    "deploy:test-token": "ts-node src/helpers/deploy-test-token.ts",
+    "setup-and-dump": "ts-node setup-and-dump-state.ts",
+    "test:v29-to-v31": "ts-node run-v29-to-v31-upgrade-test.ts"
+  },
+  "keywords": [
+    "anvil",
+    "zksync",
+    "testing",
+    "ethereum",
+    "interop"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ethers": "5.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.19",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  }
+}
