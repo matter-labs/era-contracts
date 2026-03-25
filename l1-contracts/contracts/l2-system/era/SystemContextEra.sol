@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {SystemContextBase} from "../SystemContextBase.sol";
+import {SystemContractHelper} from "../SystemContractHelper.sol";
 import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {ISystemContextDeprecated} from "system-contracts/contracts/interfaces/ISystemContextDeprecated.sol";
 import {SystemLogKey, HARD_CODED_CHAIN_ID} from "system-contracts/contracts/Constants.sol";
@@ -124,7 +125,7 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
     }
 
     function getCurrentPubdataSpent() public view returns (uint256) {
-        uint256 pubdataPublished = _getPubdataPublished();
+        uint256 pubdataPublished = SystemContractHelper.getPubdataPublished();
         return pubdataPublished > _eraBasePubdataSpent ? pubdataPublished - _eraBasePubdataSpent : 0;
     }
 
@@ -430,7 +431,11 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
         // In order to spend less pubdata, the packed version is published
         uint256 packedTimestamps = (uint256(currentBatchTimestamp) << 128) | currentL2BlockTimestamp;
 
-        _toL1(false, bytes32(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)), bytes32(packedTimestamps));
+        SystemContractHelper.toL1(
+            false,
+            bytes32(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)),
+            bytes32(packedTimestamps)
+        );
     }
 
     /// @notice Ensures that the timestamp of the batch is greater than or equal to the timestamp of the last L2 block.
@@ -475,7 +480,7 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
         _eraBaseFee = _baseFee;
 
         // The correctness of this block hash:
-        _toL1(false, bytes32(uint256(SystemLogKey.PREV_BATCH_HASH_KEY)), _prevBatchHash);
+        SystemContractHelper.toL1(false, bytes32(uint256(SystemLogKey.PREV_BATCH_HASH_KEY)), _prevBatchHash);
     }
 
     /// @notice A testing method that manually sets the current blocks' number and timestamp.
@@ -549,29 +554,5 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
     // solhint-disable-next-line no-unused-vars
     function blockHash(uint256 _blockNumber) external view returns (bytes32 hash) {
         revert DeprecatedFunction(this.blockHash.selector);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                    ZKSYNC-SPECIFIC ASSEMBLY HELPERS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev Sends an L2-to-L1 log (ZkSync-specific). No-op on standard EVM.
-    function _toL1(bool _isService, bytes32 _key, bytes32 _value) internal {
-        assembly {
-            // TO_L1_CALL_ADDRESS = 0xFFFF on ZkSync
-            _isService := and(_isService, 1)
-            // solhint-disable-next-line no-unused-vars
-            let success := call(_isService, 0xFFFF, _key, _value, 0xFFFF, 0, 0)
-        }
-    }
-
-    /// @dev Gets pubdata published so far (ZkSync-specific). Returns 0 on standard EVM.
-    function _getPubdataPublished() internal view returns (uint32 pubdataPublished) {
-        uint256 meta;
-        assembly {
-            // META_CALL_ADDRESS = 0xFFFC on ZkSync; staticcall returns meta as return value
-            meta := staticcall(0, 0xFFFC, 0, 0xFFFF, 0, 0)
-        }
-        pubdataPublished = uint32(meta);
     }
 }
