@@ -31,6 +31,9 @@ contract SystemContext {
         _;
     }
 
+    /// @notice Function to set the settlement layer chain id, can only be called from the bootloader.
+    /// TODO(EVM-1315): This function is identical to the one in the system-contracts/contracts/SystemContext.sol, 
+    /// we should remove this duplication.
     function setSettlementLayerChainId(uint256 _newSettlementLayerChainId) external onlyCallFromBootloader {
         if (currentSettlementLayerChainId != _newSettlementLayerChainId) {
             // slither-disable-next-line reentrancy-no-eth
