@@ -261,46 +261,43 @@ async function collect(rpc: string, envName: string): Promise<void> {
     }
   }
 
-  // ── Derive intervals via per-chain state machine ──────────────────────────
-  // Process MigrationStarted events chronologically. For each one targeting the
-  // legacy GW, find the next MigrationFinalized for that chain (by block number).
-  // A chain may have migrated multiple times — each Start/End pair is one interval.
+  // ── Derive intervals ──────────────────────────────────────────────────────
+  // Walk MigrationStarted events in block order. For each one, find the first
+  // unused MigrationFinalized for the same chain that comes after it. A chain
+  // may have multiple completed intervals (migrated back and forth more than once).
 
   const intervals: ChainMigrationInterval[] = [];
+  const usedFinalizedKeys = new Set<string>(); // txHash:logIndex of consumed Finalized events
 
-  // Per-chain consumption index into allFinalized (sorted).
-  const finalizedQueues = new Map<number, ethers.Event[]>();
-  for (const ev of allFinalized) {
-    const chainId = (ev.args!.chainId as ethers.BigNumber).toNumber();
-    if (!finalizedQueues.has(chainId)) finalizedQueues.set(chainId, []);
-    finalizedQueues.get(chainId)!.push(ev);
-  }
-  const finalizedIdx = new Map<number, number>();
+  for (const startedEv of allStarted) {
+    const chainId = (startedEv.args!.chainId as ethers.BigNumber).toNumber();
+    const slChainId = (startedEv.args!.settlementLayerChainId as ethers.BigNumber).toNumber();
+    if (slChainId !== legacyGwChainId) {
+      throw new Error(
+        `MigrationStarted at block ${startedEv.blockNumber} targets settlement layer ${slChainId}, ` +
+          `expected legacy GW chain ${legacyGwChainId}`
+      );
+    }
 
-  // Track chains that started but haven't finalized yet (for the ❌ report).
-  const openMigrations = new Map<number, number>(); // chainId → startedBlock
+    const startedBlock = startedEv.blockNumber;
 
-  for (const ev of allStarted) {
-    const chainId = (ev.args!.chainId as ethers.BigNumber).toNumber();
-    const slChainId = (ev.args!.settlementLayerChainId as ethers.BigNumber).toNumber();
-    if (slChainId !== legacyGwChainId) continue;
+    // Find the next unused MigrationFinalized for this chain after startedBlock.
+    const finalizedEv = allFinalized.find(
+      (f) =>
+        (f.args!.chainId as ethers.BigNumber).toNumber() === chainId &&
+        f.blockNumber > startedBlock &&
+        !usedFinalizedKeys.has(`${f.transactionHash}:${f.logIndex}`)
+    );
 
-    const startedBlock = ev.blockNumber;
-    openMigrations.set(chainId, startedBlock);
-
-    // Find the next MigrationFinalized for this chain after startedBlock.
-    const queue = finalizedQueues.get(chainId) ?? [];
-    const idx = finalizedIdx.get(chainId) ?? 0;
-    const matchPos = queue.findIndex((f, i) => i >= idx && f.blockNumber > startedBlock);
-
-    if (matchPos === -1) {
-      // No return yet — will be reported after the loop.
+    if (!finalizedEv) {
+      console.log(
+        `❌  chain ${chainId} (MigrationStarted at block ${startedBlock}) has NOT returned from the legacy GW`
+      );
       continue;
     }
-    finalizedIdx.set(chainId, matchPos + 1);
-    openMigrations.delete(chainId);
+    usedFinalizedKeys.add(`${finalizedEv.transactionHash}:${finalizedEv.logIndex}`);
 
-    const finalizedBlock = queue[matchPos].blockNumber;
+    const finalizedBlock = finalizedEv.blockNumber;
     const chainProxy = chainProxies.get(chainId)!;
 
     console.log(
@@ -334,13 +331,6 @@ async function collect(rpc: string, envName: string): Promise<void> {
         gwAtMigrationFinalized: gwAtEnd,
       },
     });
-  }
-
-  // Report any chains still on the legacy GW.
-  for (const [chainId, startBlock] of openMigrations) {
-    console.log(
-      `❌  chain ${chainId} (MigrationStarted at block ${startBlock}) has NOT returned from the legacy GW`
-    );
   }
 
   // ── Persist cache ─────────────────────────────────────────────────────────
