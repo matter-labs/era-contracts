@@ -26,7 +26,7 @@ import {
     IncorrectL2BlockHash
 } from "system-contracts/contracts/SystemContractErrors.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
-import {SystemContextBase} from "contracts/l2-system/SystemContextBase.sol";
+import {CommonSystemContextLib} from "contracts/l2-system/SystemContextLib.sol";
 
 /// @title SystemContextEraTest
 /// @notice Unit tests for SystemContextEra contract
@@ -149,7 +149,7 @@ contract SystemContextEraTest is Test {
         uint256 newChainId = 506;
 
         vm.expectEmit(true, false, false, false, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR);
-        emit SystemContextBase.SettlementLayerChainIdUpdated(newChainId);
+        emit CommonSystemContextLib.SettlementLayerChainIdUpdated(newChainId);
 
         vm.prank(L2_BOOTLOADER_ADDRESS);
         systemContext.setSettlementLayerChainId(newChainId);

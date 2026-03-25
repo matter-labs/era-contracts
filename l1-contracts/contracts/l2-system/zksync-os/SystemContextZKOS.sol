@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {SystemContextLib, SystemContextStorage} from "../SystemContextLib.sol";
+import {CommonSystemContextLib, CommonSystemContextStorage} from "../SystemContextLib.sol";
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
@@ -11,10 +11,10 @@ import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
  * @custom:security-contact security@matterlabs.dev
  * @notice ZK OS-specific SystemContext contract.
  * @dev Minimal implementation: only manages the settlement layer chain ID.
- * Delegates to SystemContextLib for the shared implementation.
+ * The shared setSettlementLayerChainId logic is delegated to CommonSystemContextLib.
  */
 contract SystemContextZKOS {
-    using SystemContextLib for SystemContextStorage;
+    using CommonSystemContextLib for CommonSystemContextStorage;
 
     modifier onlyBootloader() {
         if (msg.sender != L2_BOOTLOADER_ADDRESS) {
@@ -23,19 +23,15 @@ contract SystemContextZKOS {
         _;
     }
 
-    /// @dev Returns the storage pointer anchored at slot 0.
-    function _sc() private pure returns (SystemContextStorage storage $) {
-        assembly {
-            $.slot := 0
-        }
-    }
+    /// @dev Slot 0. Contains currentSettlementLayerChainId.
+    CommonSystemContextStorage internal _common;
 
     /// @notice The chainId of the settlement layer.
     function currentSettlementLayerChainId() external view returns (uint256) {
-        return _sc().currentSettlementLayerChainId;
+        return _common.currentSettlementLayerChainId;
     }
 
     function setSettlementLayerChainId(uint256 _newSettlementLayerChainId) external onlyBootloader {
-        _sc().setSettlementLayerChainId(_newSettlementLayerChainId);
+        _common.setSettlementLayerChainId(_newSettlementLayerChainId);
     }
 }
