@@ -39,11 +39,9 @@ abstract contract SystemContextBase {
     /// @notice Emitted when the Settlement Layer chain id is modified.
     event SettlementLayerChainIdUpdated(uint256 indexed _newSettlementLayerChainId);
 
-    // ─── Storage slots (must match system-contracts/contracts/SystemContext.sol) ───
-
     /// @notice The chainId of the network. It is set at the genesis.
     /// @dev Slot 0
-    uint256 public chainId;
+    uint256 internal _eraChainId;
 
     /// @notice [Era-specific] The `tx.origin` in the current transaction.
     /// @dev It is updated before each transaction by the bootloader.

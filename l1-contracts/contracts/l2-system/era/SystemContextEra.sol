@@ -38,7 +38,10 @@ import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
  * compatibility. All public methods and Era-specific getters live exclusively in this contract.
  */
 contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
-    // chainId (slot 0) is inherited as a public state variable from SystemContextBase.
+    /// @notice The chainId of the network.
+    function chainId() external view returns (uint256) {
+        return _eraChainId;
+    }
 
     /// @notice The `tx.origin` in the current transaction.
     function origin() external view returns (address) {
@@ -70,15 +73,13 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
         return _eraBaseFee;
     }
 
-    // currentSettlementLayerChainId (slot 270) is inherited as a public state variable from SystemContextBase.
-
     /// @notice Set the chainId origin.
     /// @param _newChainId The chainId
     function setChainId(uint256 _newChainId) external {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
         }
-        chainId = _newChainId;
+        _eraChainId = _newChainId;
     }
 
     /// @notice Updates the settlement layer chain ID.
