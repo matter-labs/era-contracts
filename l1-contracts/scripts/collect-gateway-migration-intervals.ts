@@ -160,10 +160,7 @@ async function collect(rpc: string, envName: string): Promise<void> {
   const bridgehubAddress = getBridgehubAddress(envName);
   const legacyGwChainId = getLegacyGatewayChainId(envName);
 
-  if (legacyGwChainId === 0) {
-    if (envName !== "testnet") {
-      throw new Error(`legacy_gateway.chain_id not configured in ${envName}.toml`);
-    }
+  if (envName === "testnet") {
     console.log("Testnet has no legacy gateway — writing empty interval cache.");
     if (!fs.existsSync(SCRIPT_OUT_DIR)) {
       fs.mkdirSync(SCRIPT_OUT_DIR, { recursive: true });
@@ -172,6 +169,10 @@ async function collect(rpc: string, envName: string): Promise<void> {
     fs.writeFileSync(outFile, JSON.stringify({ firstBlock: 0, lastBlock: 0, intervals: [] }, null, 2));
     console.log(`Saved to: ${outFile}`);
     return;
+  }
+
+  if (legacyGwChainId === 0) {
+    throw new Error(`legacy_gateway.chain_id not configured in ${envName}.toml`);
   }
 
   console.log(`Bridgehub:       ${bridgehubAddress}`);
