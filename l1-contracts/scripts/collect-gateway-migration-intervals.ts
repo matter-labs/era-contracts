@@ -288,7 +288,11 @@ async function collect(rpc: string, envName: string): Promise<void> {
 
     // kind === "finalized"
     const startedBlock = openMigrations.get(chainId);
-    if (startedBlock === undefined) continue; // finalized for a chain we didn't see started (different ecosystem)
+    if (startedBlock === undefined) {
+      throw new Error(
+        `MigrationFinalized at block ${ev.blockNumber} for chain ${chainId} with no preceding MigrationStarted`
+      );
+    }
 
     openMigrations.delete(chainId);
     const finalizedBlock = ev.blockNumber;
