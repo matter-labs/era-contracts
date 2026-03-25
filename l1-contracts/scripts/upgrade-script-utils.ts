@@ -32,12 +32,9 @@ export function readPermanentValues(envName: string): Record<string, unknown> {
 /** Returns the bridgehub proxy address for the given environment (checksummed). */
 export function getBridgehubAddress(envName: string): string {
   const pv = readPermanentValues(envName);
-  const addr = (pv as { core_contracts?: { bridgehub_proxy_addr?: string } }).core_contracts
-    ?.bridgehub_proxy_addr;
+  const addr = (pv as { core_contracts?: { bridgehub_proxy_addr?: string } }).core_contracts?.bridgehub_proxy_addr;
   if (!addr) {
-    throw new Error(
-      `core_contracts.bridgehub_proxy_addr not found in ${envName}.toml`
-    );
+    throw new Error(`core_contracts.bridgehub_proxy_addr not found in ${envName}.toml`);
   }
   return ethers.utils.getAddress(addr);
 }
@@ -61,8 +58,7 @@ export function loadAbiFromFoundryOutput(relativePath: string): ethers.ContractI
   const fullPath = path.join(__dirname, relativePath);
   if (!fs.existsSync(fullPath)) {
     throw new Error(
-      `Foundry output file not found: ${fullPath}\n` +
-        "Run `forge build` in l1-contracts/ to generate ABI files."
+      `Foundry output file not found: ${fullPath}\n` + "Run `forge build` in l1-contracts/ to generate ABI files."
     );
   }
   return JSON.parse(fs.readFileSync(fullPath, "utf-8")).abi;

@@ -137,10 +137,7 @@ async function binarySearchDeployBlock(
 }
 
 /** Reads all three batch counters from a ZK-chain diamond proxy at a given block. */
-async function getBatchSnapshot(
-  diamondProxy: ethers.Contract,
-  blockNumber: number
-): Promise<BatchSnapshot> {
+async function getBatchSnapshot(diamondProxy: ethers.Contract, blockNumber: number): Promise<BatchSnapshot> {
   const [executed, verified, committed] = await Promise.all([
     diamondProxy.callStatic.getTotalBatchesExecuted({ blockTag: blockNumber }) as Promise<ethers.BigNumber>,
     diamondProxy.callStatic.getTotalBatchesVerified({ blockTag: blockNumber }) as Promise<ethers.BigNumber>,
@@ -248,9 +245,7 @@ async function collect(rpc: string, envName: string): Promise<void> {
     );
   }
 
-  console.log(
-    `\nTotal: ${allStarted.length} MigrationStarted, ${allFinalized.length} MigrationFinalized`
-  );
+  console.log(`\nTotal: ${allStarted.length} MigrationStarted, ${allFinalized.length} MigrationFinalized`);
 
   // ── Pre-fetch diamond proxy contracts ─────────────────────────────────────
 
@@ -281,9 +276,7 @@ async function collect(rpc: string, envName: string): Promise<void> {
     ...allFinalized.map((ev) => ({ kind: "finalized" as const, ev })),
   ].sort(
     (a, b) =>
-      a.ev.blockNumber - b.ev.blockNumber ||
-      kindOrder[a.kind] - kindOrder[b.kind] ||
-      a.ev.logIndex - b.ev.logIndex
+      a.ev.blockNumber - b.ev.blockNumber || kindOrder[a.kind] - kindOrder[b.kind] || a.ev.logIndex - b.ev.logIndex
   );
 
   const intervals: ChainMigrationInterval[] = [];
@@ -356,9 +349,7 @@ async function collect(rpc: string, envName: string): Promise<void> {
   }
 
   for (const [chainId, startBlock] of openMigrations) {
-    console.log(
-      `❌  chain ${chainId} (MigrationStarted at block ${startBlock}) has NOT returned from the legacy GW`
-    );
+    console.log(`❌  chain ${chainId} (MigrationStarted at block ${startBlock}) has NOT returned from the legacy GW`);
   }
 
   // ── Persist cache ─────────────────────────────────────────────────────────
@@ -407,13 +398,13 @@ function write(envName: string): void {
   // `chain_intervals = []` form and the array-of-tables `[[...]]` form) then
   // re-append the derived values. This makes the command idempotent.
   const lines = raw.split("\n");
-  const cutoff = lines.findIndex((l) => l.startsWith("chain_intervals") || l.startsWith("[[legacy_gateway.chain_intervals]]"));
+  const cutoff = lines.findIndex(
+    (l) => l.startsWith("chain_intervals") || l.startsWith("[[legacy_gateway.chain_intervals]]")
+  );
   const base = (cutoff === -1 ? raw : lines.slice(0, cutoff).join("\n")).trimEnd();
 
   const intervalContent =
-    data.intervals.length === 0
-      ? "chain_intervals = []"
-      : data.intervals.map(serializeInterval).join("\n");
+    data.intervals.length === 0 ? "chain_intervals = []" : data.intervals.map(serializeInterval).join("\n");
   const content = base + "\n\n" + intervalContent + "\n";
 
   fs.writeFileSync(permanentValuesFile, content);
@@ -434,7 +425,7 @@ function write(envName: string): void {
 
 function serializeInterval(interval: ChainMigrationInterval): string {
   return (
-    `[[legacy_gateway.chain_intervals]]\n` +
+    "[[legacy_gateway.chain_intervals]]\n" +
     `chain_id = ${interval.chainId}\n` +
     `migrate_to_sl_batch = ${interval.migrateToGWBatchNumber}\n` +
     `migrate_from_sl_batch = ${interval.migrateFromGWBatchNumber}\n` +
@@ -452,8 +443,7 @@ async function main(): Promise<void> {
   program
     .command("collect")
     .description(
-      "Scan L1 for legacy-GW migration events and cache results to " +
-        `script-out/<env>-${CACHE_FILE_SUFFIX}`
+      "Scan L1 for legacy-GW migration events and cache results to " + `script-out/<env>-${CACHE_FILE_SUFFIX}`
     )
     .requiredOption("--rpc <url>", "L1 RPC URL")
     .requiredOption("--env <name>", "Environment name: stage | testnet | mainnet")
@@ -464,7 +454,7 @@ async function main(): Promise<void> {
   program
     .command("write")
     .description(
-      `Read the cached JSON file and write [[legacy_gateway.chain_intervals]] entries ` +
+      "Read the cached JSON file and write [[legacy_gateway.chain_intervals]] entries " +
         "into upgrade-envs/permanent-values/<env>.toml"
     )
     .requiredOption("--env <name>", "Environment name: stage | testnet | mainnet")
