@@ -9,6 +9,7 @@ import {
     L2_CHAIN_ASSET_HANDLER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SystemContextZKOS as SystemContext} from "contracts/l2-system/zksync-os/SystemContextZKOS.sol";
+import {SystemContextBase} from "contracts/l2-system/SystemContextBase.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {IL2ChainAssetHandler} from "contracts/core/chain-asset-handler/IL2ChainAssetHandler.sol";
@@ -37,7 +38,7 @@ contract SystemContextTest is Test {
 
         // Expect the event
         vm.expectEmit(true, false, false, false);
-        emit SystemContext.SettlementLayerChainIdUpdated(newChainId);
+        emit SystemContextBase.SettlementLayerChainIdUpdated(newChainId);
 
         systemContext.setSettlementLayerChainId(newChainId);
 

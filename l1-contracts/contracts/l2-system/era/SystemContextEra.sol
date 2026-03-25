@@ -26,20 +26,125 @@ import {
     TimestampsShouldBeIncremental,
     UpgradeTransactionMustBeFirst
 } from "system-contracts/contracts/SystemContractErrors.sol";
-import {
-    L2_COMPLEX_UPGRADER_ADDR,
-    L2_CHAIN_ASSET_HANDLER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IL2ChainAssetHandler} from "contracts/core/chain-asset-handler/IL2ChainAssetHandler.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
  * @notice Era-specific SystemContext contract. Contains all Era block/batch management logic.
- * @dev Inherits SystemContextBase which preserves the original storage layout for backward compatibility.
+ * @dev Inherits SystemContextBase which preserves the original storage layout for backward
+ * compatibility. All public methods and Era-specific getters live exclusively in this contract.
  */
 contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
+    // ─── Backward-compatible getters ────────────────────────────────────────────
+    // The original SystemContext.sol exposed these as public state variables.
+    // We preserve the same external interface while storing them under _era-prefixed
+    // internal variables in the base contract.
+
+    /// @notice The `tx.origin` in the current transaction.
+    function origin() external view returns (address) {
+        return _eraOrigin;
+    }
+
+    /// @notice The `tx.gasPrice` in the current transaction.
+    function gasPrice() external view returns (uint256) {
+        return _eraGasPrice;
+    }
+
+    /// @notice The current block's gasLimit.
+    function blockGasLimit() external view returns (uint256) {
+        return _eraBlockGasLimit;
+    }
+
+    /// @notice The `block.coinbase` in the current transaction.
+    function coinbase() external view returns (address) {
+        return _eraCoinbase;
+    }
+
+    /// @notice Formal `block.difficulty` parameter.
+    function difficulty() external view returns (uint256) {
+        return _eraDifficulty;
+    }
+
+    /// @notice The `block.basefee`.
+    function baseFee() external view returns (uint256) {
+        return _eraBaseFee;
+    }
+
+    /// @notice Number of current transaction in block.
+    function txNumberInBlock() external view returns (uint16) {
+        return _eraTxNumberInBlock;
+    }
+
+    /// @notice The current gas per pubdata byte.
+    function gasPerPubdataByte() external view returns (uint256) {
+        return _eraGasPerPubdataByte;
+    }
+
+    // ─── View functions (Era-specific) ──────────────────────────────────────────
+
+    /// @notice Returns the current block's number and timestamp.
+    /// @return blockNumber and blockTimestamp tuple of the current L2 block's number and the current block's timestamp
+    function getL2BlockNumberAndTimestamp() public view returns (uint128 blockNumber, uint128 blockTimestamp) {
+        ISystemContext.BlockInfo memory blockInfo = _eraCurrentL2BlockInfo;
+        blockNumber = blockInfo.number;
+        blockTimestamp = blockInfo.timestamp;
+    }
+
+    /// @notice Returns the current L2 block's number.
+    /// @dev Since zksolc compiler calls this method to emulate `block.number`,
+    /// its signature can not be changed to `getL2BlockNumber`.
+    /// @return blockNumber The current L2 block's number.
+    function getBlockNumber() public view returns (uint128) {
+        return _eraCurrentVirtualL2BlockInfo.number;
+    }
+
+    /// @notice Returns the current L2 block's timestamp.
+    /// @dev Since zksolc compiler calls this method to emulate `block.timestamp`,
+    /// its signature can not be changed to `getL2BlockTimestamp`.
+    /// @return timestamp The current L2 block's timestamp.
+    function getBlockTimestamp() public view returns (uint128) {
+        return _eraCurrentVirtualL2BlockInfo.timestamp;
+    }
+
+    /// @notice The method that emulates `blockhash` opcode in EVM.
+    /// @dev Just like the blockhash in the EVM, it returns bytes32(0),
+    /// when queried about hashes that are older than 256 blocks ago.
+    /// @dev Since zksolc compiler calls this method to emulate `blockhash`,
+    /// its signature can not be changed to `getL2BlockHashEVM`.
+    /// @return hash The blockhash of the block with the given number.
+    function getBlockHashEVM(uint256 _block) external view returns (bytes32 hash) {
+        uint128 blockNumber = _eraCurrentVirtualL2BlockInfo.number;
+
+        ISystemContext.VirtualBlockUpgradeInfo memory currentVirtualBlockUpgradeInfo = _eraVirtualBlockUpgradeInfo;
+
+        // Due to virtual blocks upgrade, we'll have to use the following logic for retrieving the blockhash:
+        // 1. If the block number is out of the 256-block supported range, return 0.
+        // 2. If the block was created before the upgrade for the virtual blocks (i.e. there we used to use hashes of the batches),
+        // we return the hash of the batch.
+        // 3. If the block was created after the day when the virtual blocks have caught up with the L2 blocks, i.e.
+        // all the information which is returned for users should be for L2 blocks, we return the hash of the corresponding L2 block.
+        // 4. If the block queried is a virtual blocks, calculate it on the fly.
+        if (blockNumber <= _block || blockNumber - _block > 256) {
+            hash = bytes32(0);
+        } else if (_block < currentVirtualBlockUpgradeInfo.virtualBlockStartBatch) {
+            // Note, that we will get into this branch only for a brief moment of time, right after the upgrade
+            // for virtual blocks before 256 virtual blocks are produced.
+            hash = _eraBatchHashes[_block];
+        } else if (
+            _block >= currentVirtualBlockUpgradeInfo.virtualBlockFinishL2Block &&
+            currentVirtualBlockUpgradeInfo.virtualBlockFinishL2Block > 0
+        ) {
+            hash = _getLatest257L2blockHash(_block);
+        } else {
+            // Important: we do not want this number to ever collide with the L2 block hash (either new or old one) and so
+            // that's why the legacy L2 blocks' hashes are keccak256(abi.encodePacked(uint32(_block))), while these are equivalent to
+            // keccak256(abi.encodePacked(_block))
+            hash = keccak256(abi.encode(_block));
+        }
+    }
+
     // ─── Mutating functions (bootloader-only) ───────────────────────────────────
 
     /// @notice Set the chainId origin.
@@ -51,28 +156,27 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
         chainId = _newChainId;
     }
 
+    /// @notice Updates the settlement layer chain ID.
+    /// @dev On the original hard-coded Era chain (block.chainid == HARD_CODED_CHAIN_ID) the
+    /// genesis upgrade is processed before the chain ID is properly set, so we skip the update
+    /// to avoid calling the chain asset handler with a wrong chain ID.
     function setSettlementLayerChainId(uint256 _newSettlementLayerChainId) external onlyBootloader {
-        /// Before the genesis upgrade is processed, the block.chainid is wrong. So we skip the setting of the settlement layer chain id.
-        /// We set it again after the genesis upgrade is processed.
-        if (currentSettlementLayerChainId != _newSettlementLayerChainId && block.chainid != HARD_CODED_CHAIN_ID) {
-            IL2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).setSettlementLayerChainId(
-                currentSettlementLayerChainId,
-                _newSettlementLayerChainId
-            );
-            currentSettlementLayerChainId = _newSettlementLayerChainId;
+        if (block.chainid == HARD_CODED_CHAIN_ID) {
+            return;
         }
+        _setSettlementLayerChainId(_newSettlementLayerChainId);
     }
 
     /// @notice Set the current tx origin.
     /// @param _newOrigin The new tx origin.
     function setTxOrigin(address _newOrigin) external onlyBootloader {
-        origin = _newOrigin;
+        _eraOrigin = _newOrigin;
     }
 
     /// @notice Set the the current gas price.
     /// @param _gasPrice The new tx gasPrice.
     function setGasPrice(uint256 _gasPrice) external onlyBootloader {
-        gasPrice = _gasPrice;
+        _eraGasPrice = _gasPrice;
     }
 
     /// @notice Sets the number of L2 gas that is needed to pay a single byte of pubdata.
@@ -81,17 +185,17 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
     /// @param _gasPerPubdataByte The amount L2 gas that the operator charge the user for single byte of pubdata.
     /// @param _basePubdataSpent The number of pubdata spent as of the start of the transaction.
     function setPubdataInfo(uint256 _gasPerPubdataByte, uint256 _basePubdataSpent) external onlyBootloader {
-        basePubdataSpent = _basePubdataSpent;
-        gasPerPubdataByte = _gasPerPubdataByte;
+        _eraBasePubdataSpent = _basePubdataSpent;
+        _eraGasPerPubdataByte = _gasPerPubdataByte;
     }
 
     function getCurrentPubdataSpent() public view returns (uint256) {
         uint256 pubdataPublished = _getPubdataPublished();
-        return pubdataPublished > basePubdataSpent ? pubdataPublished - basePubdataSpent : 0;
+        return pubdataPublished > _eraBasePubdataSpent ? pubdataPublished - _eraBasePubdataSpent : 0;
     }
 
     function getCurrentPubdataCost() external view returns (uint256) {
-        return gasPerPubdataByte * getCurrentPubdataSpent();
+        return _eraGasPerPubdataByte * getCurrentPubdataSpent();
     }
 
     /// @notice Sets the current block number and timestamp of the L2 block.
@@ -119,7 +223,7 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
     ) external onlyBootloader {
         // We check that the timestamp of the L2 block is consistent with the timestamp of the batch.
         if (_isFirstInBatch) {
-            uint128 currentBatchTimestamp = currentBatchInfo.timestamp;
+            uint128 currentBatchTimestamp = _eraCurrentBatchInfo.timestamp;
             if (_l2BlockTimestamp < currentBatchTimestamp) {
                 revert L2BlockAndBatchTimestampMismatch(_l2BlockTimestamp, currentBatchTimestamp);
             }
@@ -160,7 +264,7 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
                 currentL2BlockNumber,
                 currentL2BlockTimestamp,
                 prevL2BlockHash,
-                currentL2BlockTxsRollingHash
+                _eraCurrentL2BlockTxsRollingHash
             );
 
             if (_expectedPrevL2BlockHash != pendingL2BlockHash) {
@@ -182,7 +286,7 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
     /// @notice Appends the transaction hash to the rolling hash of the current L2 block.
     /// @param _txHash The hash of the transaction.
     function appendTransactionToCurrentL2Block(bytes32 _txHash) external onlyBootloader {
-        currentL2BlockTxsRollingHash = keccak256(abi.encode(currentL2BlockTxsRollingHash, _txHash));
+        _eraCurrentL2BlockTxsRollingHash = keccak256(abi.encode(_eraCurrentL2BlockTxsRollingHash, _txHash));
     }
 
     /// @notice Publishes L2->L1 logs needed to verify the validity of this batch on L1.
@@ -227,12 +331,12 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
 
         _ensureBatchConsistentWithL2Block(_newTimestamp);
 
-        batchHashes[previousBatchNumber] = _prevBatchHash;
+        _eraBatchHashes[previousBatchNumber] = _prevBatchHash;
 
         // Setting new block number and timestamp
-        currentBatchInfo = ISystemContext.BlockInfo({number: previousBatchNumber + 1, timestamp: _newTimestamp});
+        _eraCurrentBatchInfo = ISystemContext.BlockInfo({number: previousBatchNumber + 1, timestamp: _newTimestamp});
 
-        baseFee = _baseFee;
+        _eraBaseFee = _baseFee;
 
         // The correctness of this block hash:
         _toL1(false, bytes32(uint256(SystemLogKey.PREV_BATCH_HASH_KEY)), _prevBatchHash);
@@ -241,25 +345,32 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
     /// @notice A testing method that manually sets the current blocks' number and timestamp.
     /// @dev Should be used only for testing / ethCalls and should never be used in production.
     function unsafeOverrideBatch(uint256 _newTimestamp, uint256 _number, uint256 _baseFee) external onlyBootloader {
-        currentBatchInfo = ISystemContext.BlockInfo({number: uint128(_number), timestamp: uint128(_newTimestamp)});
+        _eraCurrentBatchInfo = ISystemContext.BlockInfo({number: uint128(_number), timestamp: uint128(_newTimestamp)});
 
-        baseFee = _baseFee;
+        _eraBaseFee = _baseFee;
     }
 
     function incrementTxNumberInBatch() external onlyBootloader {
-        ++txNumberInBlock;
+        ++_eraTxNumberInBlock;
     }
 
     function resetTxNumberInBatch() external onlyBootloader {
-        txNumberInBlock = 0;
+        _eraTxNumberInBlock = 0;
     }
 
     // ─── Internal helpers ───────────────────────────────────────────────────────
 
+    /// @notice Assuming that block is one of the last MINIBLOCK_HASHES_TO_STORE ones, returns its hash.
+    /// @param _block The number of the block.
+    /// @return hash The hash of the block.
+    function _getLatest257L2blockHash(uint256 _block) internal view returns (bytes32) {
+        return _eraL2BlockHash[_block % MINIBLOCK_HASHES_TO_STORE];
+    }
+
     /// @notice Returns the current batch's number and timestamp.
     /// @return batchNumber and batchTimestamp tuple of the current batch's number and the current batch's timestamp
     function _getBatchNumberAndTimestamp() internal view returns (uint128 batchNumber, uint128 batchTimestamp) {
-        ISystemContext.BlockInfo memory batchInfo = currentBatchInfo;
+        ISystemContext.BlockInfo memory batchInfo = _eraCurrentBatchInfo;
         batchNumber = batchInfo.number;
         batchTimestamp = batchInfo.timestamp;
     }
@@ -268,7 +379,7 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
     /// @param _block The number of the block.
     /// @param _hash The hash of the block.
     function _setL2BlockHash(uint256 _block, bytes32 _hash) internal {
-        l2BlockHash[_block % MINIBLOCK_HASHES_TO_STORE] = _hash;
+        _eraL2BlockHash[_block % MINIBLOCK_HASHES_TO_STORE] = _hash;
     }
 
     /// @notice Calculates the hash of an L2 block.
@@ -329,24 +440,24 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
         uint128 _maxVirtualBlocksToCreate,
         uint128 _newTimestamp
     ) internal {
-        if (virtualBlockUpgradeInfo.virtualBlockFinishL2Block != 0) {
+        if (_eraVirtualBlockUpgradeInfo.virtualBlockFinishL2Block != 0) {
             // No need to to do anything about virtual blocks anymore
             // All the info is the same as for L2 blocks.
-            currentVirtualL2BlockInfo = currentL2BlockInfo;
+            _eraCurrentVirtualL2BlockInfo = _eraCurrentL2BlockInfo;
             return;
         }
 
-        ISystemContext.BlockInfo memory virtualBlockInfo = currentVirtualL2BlockInfo;
+        ISystemContext.BlockInfo memory virtualBlockInfo = _eraCurrentVirtualL2BlockInfo;
 
-        if (currentVirtualL2BlockInfo.number == 0 && virtualBlockInfo.timestamp == 0) {
-            uint128 currentBatchNumber = currentBatchInfo.number;
+        if (_eraCurrentVirtualL2BlockInfo.number == 0 && virtualBlockInfo.timestamp == 0) {
+            uint128 currentBatchNumber = _eraCurrentBatchInfo.number;
 
             // The virtual block is set for the first time. We can count it as 1 creation of a virtual block.
             // Note, that when setting the virtual block number we use the batch number to make a smoother upgrade from batch number to
             // the L2 block number.
             virtualBlockInfo.number = currentBatchNumber;
             // Remembering the batch number on which the upgrade to the virtual blocks has been done.
-            virtualBlockUpgradeInfo.virtualBlockStartBatch = currentBatchNumber;
+            _eraVirtualBlockUpgradeInfo.virtualBlockStartBatch = currentBatchNumber;
 
             if (_maxVirtualBlocksToCreate == 0) {
                 revert CannotInitializeFirstVirtualBlock();
@@ -367,11 +478,11 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
         // catch up with the L2 block number and so the situation where virtualBlockInfo.number starts getting larger
         // than _l2BlockNumber is expected once virtual blocks have caught up the L2 blocks.
         if (virtualBlockInfo.number >= _l2BlockNumber) {
-            virtualBlockUpgradeInfo.virtualBlockFinishL2Block = _l2BlockNumber;
+            _eraVirtualBlockUpgradeInfo.virtualBlockFinishL2Block = _l2BlockNumber;
             virtualBlockInfo.number = _l2BlockNumber;
         }
 
-        currentVirtualL2BlockInfo = virtualBlockInfo;
+        _eraCurrentVirtualL2BlockInfo = virtualBlockInfo;
     }
 
     /// @notice Sets the current block number and timestamp of the L2 block.
@@ -380,19 +491,19 @@ contract SystemContextEra is SystemContextBase, ISystemContextDeprecated {
     /// @param _prevL2BlockHash The hash of the previous L2 block.
     function _setNewL2BlockData(uint128 _l2BlockNumber, uint128 _l2BlockTimestamp, bytes32 _prevL2BlockHash) internal {
         // In the unsafe version we do not check that the block data is correct
-        currentL2BlockInfo = ISystemContext.BlockInfo({number: _l2BlockNumber, timestamp: _l2BlockTimestamp});
+        _eraCurrentL2BlockInfo = ISystemContext.BlockInfo({number: _l2BlockNumber, timestamp: _l2BlockTimestamp});
 
         // It is always assumed in production that _l2BlockNumber > 0
         _setL2BlockHash(_l2BlockNumber - 1, _prevL2BlockHash);
 
         // Resetting the rolling hash
-        currentL2BlockTxsRollingHash = bytes32(0);
+        _eraCurrentL2BlockTxsRollingHash = bytes32(0);
     }
 
     /// @notice Ensures that the timestamp of the batch is greater than or equal to the timestamp of the last L2 block.
     /// @param _newTimestamp The timestamp of the new batch.
     function _ensureBatchConsistentWithL2Block(uint128 _newTimestamp) internal view {
-        uint128 currentBlockTimestamp = currentL2BlockInfo.timestamp;
+        uint128 currentBlockTimestamp = _eraCurrentL2BlockInfo.timestamp;
         if (_newTimestamp < currentBlockTimestamp) {
             revert InconsistentNewBatchTimestamp(_newTimestamp, currentBlockTimestamp);
         }

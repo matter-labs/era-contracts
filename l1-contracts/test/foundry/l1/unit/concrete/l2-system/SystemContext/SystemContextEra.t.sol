@@ -26,6 +26,7 @@ import {
     IncorrectL2BlockHash
 } from "system-contracts/contracts/SystemContractErrors.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
+import {SystemContextBase} from "contracts/l2-system/SystemContextBase.sol";
 
 /// @title SystemContextEraTest
 /// @notice Unit tests for SystemContextEra contract
@@ -144,6 +145,16 @@ contract SystemContextEraTest is Test {
         assertEq(systemContext.currentSettlementLayerChainId(), newChainId, "currentSettlementLayerChainId updated");
     }
 
+    function test_setSettlementLayerChainId_emitsEvent() public {
+        uint256 newChainId = 506;
+
+        vm.expectEmit(true, false, false, false, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR);
+        emit SystemContextBase.SettlementLayerChainIdUpdated(newChainId);
+
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        systemContext.setSettlementLayerChainId(newChainId);
+    }
+
     function test_setSettlementLayerChainId_revertsWhenNotBootloader() public {
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, alice));
@@ -175,7 +186,7 @@ contract SystemContextEraTest is Test {
         vm.prank(L2_BOOTLOADER_ADDRESS);
         systemContext.setSettlementLayerChainId(newChainId);
 
-        // The condition `block.chainid != HARD_CODED_CHAIN_ID` is false, so nothing happens
+        // block.chainid == HARD_CODED_CHAIN_ID, so we early-return and nothing changes
         assertEq(systemContext.currentSettlementLayerChainId(), 0, "should remain 0 when chainid is HARD_CODED");
     }
 
