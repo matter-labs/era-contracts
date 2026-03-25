@@ -161,9 +161,17 @@ async function collect(rpc: string, envName: string): Promise<void> {
   const legacyGwChainId = getLegacyGatewayChainId(envName);
 
   if (legacyGwChainId === 0) {
-    throw new Error(
-      `legacy_gateway.chain_id not configured in ${envName}.toml — nothing to collect`
-    );
+    if (envName !== "testnet") {
+      throw new Error(`legacy_gateway.chain_id not configured in ${envName}.toml`);
+    }
+    console.log("Testnet has no legacy gateway — writing empty interval cache.");
+    if (!fs.existsSync(SCRIPT_OUT_DIR)) {
+      fs.mkdirSync(SCRIPT_OUT_DIR, { recursive: true });
+    }
+    const outFile = cacheFilePath(envName);
+    fs.writeFileSync(outFile, JSON.stringify({ firstBlock: 0, lastBlock: 0, intervals: [] }, null, 2));
+    console.log(`Saved to: ${outFile}`);
+    return;
   }
 
   console.log(`Bridgehub:       ${bridgehubAddress}`);
@@ -380,11 +388,6 @@ function write(envName: string): void {
   }
 
   const data: CollectedData = JSON.parse(fs.readFileSync(cacheFile, "utf-8"));
-
-  if (data.intervals.length === 0) {
-    console.log(`No completed intervals found in ${cacheFile} — nothing to write.`);
-    return;
-  }
 
   const permanentValuesFile = path.join(PERMANENT_VALUES_DIR, `${envName}.toml`);
 
