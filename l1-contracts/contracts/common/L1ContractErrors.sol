@@ -450,6 +450,8 @@ error UnsupportedProofBatchEncoding(uint8 version);
 error UnsupportedUpgradeType();
 // 0xf093c2e5
 error UpgradeBatchNumberIsNotZero();
+// 0x04d91f9d
+error UpgradeTimestampNotReached(uint256 upgradeTimestamp, uint256 currentTimestamp);
 // 0x47b3b145
 error ValidateTxnNotEnoughGas();
 // 0x626ade30
@@ -470,6 +472,8 @@ error WrongMagicValue(uint256 expectedMagicValue, uint256 providedMagicValue);
 error ZeroAddress();
 // 0xc84885d4
 error ZeroChainId();
+// 0x16787758
+error ZeroUpgradeTimestamp();
 // 0x601b6882
 error ZKChainLimitReached();
 // 0x646ac57e

@@ -24,7 +24,7 @@ import {
     ProtocolVersionMinorDeltaTooBig,
     ProtocolVersionTooSmall
 } from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
-import {TimeNotReached, TooManyFactoryDeps} from "contracts/common/L1ContractErrors.sol";
+import {TimeNotReached, TooManyFactoryDeps, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
@@ -270,5 +270,14 @@ contract BaseZkSyncUpgradeTest is BaseUpgrade {
         assertEq(baseZkSyncUpgrade.getProtocolVersion(), proposedUpgrade.newProtocolVersion);
         assertEq(baseZkSyncUpgrade.getL2DefaultAccountBytecodeHash(), proposedUpgrade.defaultAccountHash);
         assertEq(baseZkSyncUpgrade.getL2BootloaderBytecodeHash(), proposedUpgrade.bootloaderHash);
+    }
+
+    function test_revertWhen_VerifierIsZeroAddress() public {
+        // Mock CTM to return address(0) as verifier for the new protocol version.
+        // After the change from silent return to revert, this should now revert with ZeroAddress.
+        baseZkSyncUpgrade.mockProtocolVersionVerifier(protocolVersion, address(0));
+
+        vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
+        baseZkSyncUpgrade.upgrade(proposedUpgrade);
     }
 }

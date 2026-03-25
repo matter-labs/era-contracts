@@ -4,25 +4,28 @@ pragma solidity 0.8.28;
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {IExecutor} from "../../chain-interfaces/IExecutor.sol";
 import {ICommitter} from "../../chain-interfaces/ICommitter.sol";
+import {IChainUpgrader} from "../../chain-interfaces/IChainUpgrader.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Note: In our CTM we have a single implementation of ValidatorTimelock for everyone,
 /// so the interface must remain backwards compatible as the same timelock is utilized
 /// for chains with different protocol versions.
-interface IValidatorTimelock is IExecutor, ICommitter {
+interface IValidatorTimelock is IExecutor, ICommitter, IChainUpgrader {
     /// @notice Struct specifying which validator roles to grant or revoke in a single call.
     /// @param rotatePrecommitterRole Whether to rotate the PRECOMMITTER_ROLE.
     /// @param rotateCommitterRole Whether to rotate the COMMITTER_ROLE.
     /// @param rotateReverterRole Whether to rotate the REVERTER_ROLE.
     /// @param rotateProverRole Whether to rotate the PROVER_ROLE.
     /// @param rotateExecutorRole Whether to rotate the EXECUTOR_ROLE.
+    /// @param rotateUpgraderRole Whether to rotate the UPGRADER_ROLE.
     struct ValidatorRotationParams {
         bool rotatePrecommitterRole;
         bool rotateCommitterRole;
         bool rotateReverterRole;
         bool rotateProverRole;
         bool rotateExecutorRole;
+        bool rotateUpgraderRole;
     }
 
     /// @notice The delay between committing and executing batches is changed.
@@ -38,6 +41,8 @@ interface IValidatorTimelock is IExecutor, ICommitter {
     function PROVER_ROLE() external view returns (bytes32);
     /// @notice Role hash for addresses allowed to execute batches on a chain.
     function EXECUTOR_ROLE() external view returns (bytes32);
+    /// @notice Role hash for addresses allowed to upgrade chains.
+    function UPGRADER_ROLE() external view returns (bytes32);
     /// @notice Optional admin role hash for managing PRECOMMITTER_ROLE assignments.
     /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
     function OPTIONAL_PRECOMMITTER_ADMIN_ROLE() external view returns (bytes32);
@@ -53,6 +58,9 @@ interface IValidatorTimelock is IExecutor, ICommitter {
     /// @notice Optional admin role hash for managing EXECUTOR_ROLE assignments.
     /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
     function OPTIONAL_EXECUTOR_ADMIN_ROLE() external view returns (bytes32);
+    /// @notice Optional admin role hash for managing UPGRADER_ROLE assignments.
+    /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
+    function OPTIONAL_UPGRADER_ADMIN_ROLE() external view returns (bytes32);
 
     /// @notice The address of the bridgehub
     function BRIDGE_HUB() external view returns (IL1Bridgehub);

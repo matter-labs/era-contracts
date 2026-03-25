@@ -4,9 +4,9 @@
     "minor": 31,
     "patch": 0
   },
-  "genesis_root": "0x53324dc9cab5463345204739ece2a3aeebabbb21a6c095104a805d251692fa6a",
-  "genesis_rollup_leaf_index": 102,
-  "genesis_batch_commitment": "0x87110c440fb243c2ac3d7bceee2cc2c123693855121c5f9cb3e00ffb8fa7991f",
+  "genesis_root": "0x5246541eda96da3af1838f6f8ae17dfd7051bebf25465228a44cddf6a442c54d",
+  "genesis_rollup_leaf_index": 106,
+  "genesis_batch_commitment": "0xc7b15e90506e5c07cbbc3ad92f8f4ca00021cbddbd7825cc15b371450ff783a8",
   "bootloader_hash": "0x0100099b799188da75411d9c2815a792e60e031bc5f89c2938b6deced048ad83",
   "default_aa_hash": "0x010005f9940f6a710cc4332b8a31ad37fb661083e86104e9eb233e8fd745f39c",
   "evm_emulator_hash": "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63",
