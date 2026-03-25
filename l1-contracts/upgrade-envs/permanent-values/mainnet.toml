@@ -17,3 +17,9 @@ rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
 # The chain ID of the legacy Gateway (9075 for mainnet)
 chain_id = 9075
 
+[[legacy_gateway.chain_intervals]]
+chain_id = 324
+migrate_to_sl_batch = 501260
+migrate_from_sl_batch = 505960
+sl_batch_lower_bound = 440
+sl_batch_upper_bound = 2746

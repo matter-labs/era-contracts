@@ -23,3 +23,4 @@ rollup_da_manager = "0x064ac968CCad1948fceE025fD59c20b153c88072"
 # is provided here. 
 chain_id = 531050204
 
+chain_intervals = []
