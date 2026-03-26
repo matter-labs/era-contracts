@@ -1,27 +1,23 @@
-use std::path::Path;
-
-use crate::common::{
-    forge::{Forge, ForgeRunner, ForgeScript, ForgeScriptArgs},
-    wallets::Wallet,
-};
-use crate::config::{
-    forge_interface::script_params::ACCEPT_GOVERNANCE_SCRIPT_PARAMS,
-    traits::{FileConfigTrait, ReadConfig},
-};
-use crate::types::L2DACommitmentScheme;
 use ethers::{
     contract::BaseContract,
     types::{Address, Bytes, U256},
     utils::hex,
 };
 use lazy_static::lazy_static;
+use crate::common::{
+    forge::{Forge, ForgeRunner, ForgeScript},
+    traits::{FileConfigTrait, ReadConfig},
+    wallets::Wallet,
+};
+use crate::config::{
+    forge_interface::script_params::ACCEPT_GOVERNANCE_SCRIPT_PARAMS,
+};
+use crate::types::L2DACommitmentScheme;
 use serde::{Deserialize, Serialize};
-use xshell::Shell;
 
 use crate::{
     abi::ADMINFUNCTIONSABI_ABI,
     commands::chain::admin_call_builder::{decode_admin_calls, AdminCall},
-    utils::forge::{fill_forge_private_key, WalletOwner},
 };
 
 lazy_static! {
@@ -29,64 +25,36 @@ lazy_static! {
 }
 
 pub async fn accept_admin(
-    shell: &Shell,
     runner: &mut ForgeRunner,
-    foundry_contracts_path: &Path,
     admin: Address,
     governor: &Wallet,
     target_address: Address,
-    forge_args: &ForgeScriptArgs,
-    l1_rpc_url: String,
 ) -> anyhow::Result<()> {
     let calldata = ADMIN_FUNCTIONS
         .encode("chainAdminAcceptAdmin", (admin, target_address))
         .unwrap();
-    let forge = Forge::new(&foundry_contracts_path)
-        .script(
-            &ACCEPT_GOVERNANCE_SCRIPT_PARAMS.script(),
-            forge_args.clone(),
-        )
-        .with_ffi()
-        .with_rpc_url(l1_rpc_url)
-        .with_broadcast()
-        .with_calldata(&calldata);
-    accept_ownership(shell, runner, governor, forge).await
+    let forge = build_governance_forge(runner, &calldata).with_broadcast();
+    accept_ownership(runner, governor, forge).await
 }
 
 pub async fn accept_owner(
-    shell: &Shell,
     runner: &mut ForgeRunner,
-    foundry_contracts_path: &Path,
     governor_contract: Address,
     governor: &Wallet,
     target_address: Address,
-    forge_args: &ForgeScriptArgs,
-    l1_rpc_url: String,
 ) -> anyhow::Result<()> {
     let calldata = ADMIN_FUNCTIONS
         .encode("governanceAcceptOwner", (governor_contract, target_address))
         .unwrap();
-    let forge = Forge::new(&foundry_contracts_path)
-        .script(
-            &ACCEPT_GOVERNANCE_SCRIPT_PARAMS.script(),
-            forge_args.clone(),
-        )
-        .with_ffi()
-        .with_rpc_url(l1_rpc_url)
-        .with_broadcast()
-        .with_calldata(&calldata);
-    accept_ownership(shell, runner, governor, forge).await
+    let forge = build_governance_forge(runner, &calldata).with_broadcast();
+    accept_ownership(runner, governor, forge).await
 }
 
 pub async fn accept_owner_aggregated(
-    shell: &Shell,
     runner: &mut ForgeRunner,
-    foundry_contracts_path: &Path,
     governor_contract: Address,
     governor: &Wallet,
     target_address: Address,
-    forge_args: &ForgeScriptArgs,
-    l1_rpc_url: String,
 ) -> anyhow::Result<()> {
     let calldata = ADMIN_FUNCTIONS
         .encode(
@@ -94,26 +62,17 @@ pub async fn accept_owner_aggregated(
             (governor_contract, target_address),
         )
         .unwrap();
-    let forge = Forge::new(&foundry_contracts_path)
-        .script(
-            &ACCEPT_GOVERNANCE_SCRIPT_PARAMS.script(),
-            forge_args.clone(),
-        )
-        .with_ffi()
-        .with_rpc_url(l1_rpc_url)
-        .with_broadcast()
-        .with_calldata(&calldata);
-    accept_ownership(shell, runner, governor, forge).await
+    let forge = build_governance_forge(runner, &calldata).with_broadcast();
+    accept_ownership(runner, governor, forge).await
 }
 
 async fn accept_ownership(
-    shell: &Shell,
     runner: &mut ForgeRunner,
     governor: &Wallet,
-    mut forge: ForgeScript,
+    forge: ForgeScript,
 ) -> anyhow::Result<()> {
-    forge = fill_forge_private_key(forge, Some(governor), WalletOwner::Governor)?;
-    runner.run(shell, forge)?;
+    let forge = forge.with_wallet(governor, runner.simulate);
+    runner.run(forge)?;
     Ok(())
 }
 
@@ -153,53 +112,63 @@ impl From<AdminScriptOutputInner> for AdminScriptOutput {
 }
 
 pub async fn call_script(
-    shell: &Shell,
     runner: &mut ForgeRunner,
-    forge_args: &ForgeScriptArgs,
-    foundry_contracts_path: &Path,
     mode: AdminScriptMode,
     calldata: Bytes,
-    l1_rpc_url: String,
-    description: &str,
 ) -> anyhow::Result<AdminScriptOutput> {
-    let forge = Forge::new(foundry_contracts_path)
-        .script(
-            &ACCEPT_GOVERNANCE_SCRIPT_PARAMS.script(),
-            forge_args.clone(),
-        )
-        .with_ffi()
-        .with_rpc_url(l1_rpc_url)
-        .with_calldata(&calldata);
+    let forge = build_governance_forge(runner, &calldata);
 
-    let (forge, _spiner_text) = match mode {
-        AdminScriptMode::OnlySave => (forge, format!("Preparing calldata for {description}")),
-        AdminScriptMode::Broadcast(wallet) => {
-            let forge = forge.with_broadcast();
-            let forge = fill_forge_private_key(forge, Some(&wallet), WalletOwner::Governor)?;
-            (forge, format!("Executing {description}"))
-        }
+    let forge = match mode {
+        AdminScriptMode::OnlySave => forge,
+        AdminScriptMode::Broadcast(ref wallet) => forge
+            .with_broadcast()
+            .with_wallet(wallet, runner.simulate),
     };
 
-    let output_path = ACCEPT_GOVERNANCE_SCRIPT_PARAMS.output(foundry_contracts_path);
-
-    // let spinner = Spinner::new(&spiner_text);
-    runner.run(shell, forge)?;
-    // spinner.finish();
-    Ok(AdminScriptOutputInner::read(shell, output_path)?.into())
+    let output_path = ACCEPT_GOVERNANCE_SCRIPT_PARAMS.output(&runner.foundry_scripts_path);
+    runner.run(forge)?;
+    Ok(AdminScriptOutputInner::read(&runner.shell, output_path)?.into())
 }
 
-#[allow(clippy::too_many_arguments)]
-pub async fn set_da_validator_pair(
-    shell: &Shell,
+pub async fn unpause_deposits(
     runner: &mut ForgeRunner,
-    forge_args: &ForgeScriptArgs,
-    foundry_contracts_path: &Path,
+    mode: AdminScriptMode,
+    chain_id: u64,
+    bridgehub: Address,
+) -> anyhow::Result<AdminScriptOutput> {
+    let calldata = ADMIN_FUNCTIONS
+        .encode(
+            "unpauseDeposits",
+            (bridgehub, U256::from(chain_id), mode.should_send()),
+        )
+        .unwrap();
+
+    call_script(runner, mode, calldata).await
+}
+
+pub async fn make_permanent_rollup(
+    runner: &mut ForgeRunner,
+    chain_admin_addr: Address,
+    governor: &Wallet,
+    diamond_proxy_address: Address,
+) -> anyhow::Result<()> {
+    let calldata = ADMIN_FUNCTIONS
+        .encode(
+            "makePermanentRollup",
+            (chain_admin_addr, diamond_proxy_address),
+        )
+        .unwrap();
+    let forge = build_governance_forge(runner, &calldata).with_broadcast();
+    accept_ownership(runner, governor, forge).await
+}
+
+pub async fn set_da_validator_pair(
+    runner: &mut ForgeRunner,
     mode: AdminScriptMode,
     chain_id: u64,
     bridgehub: Address,
     l1_da_validator_address: Address,
     l2_da_commitment_scheme: L2DACommitmentScheme,
-    l1_rpc_url: String,
 ) -> anyhow::Result<AdminScriptOutput> {
     let calldata = ADMIN_FUNCTIONS
         .encode(
@@ -214,48 +183,17 @@ pub async fn set_da_validator_pair(
         )
         .unwrap();
 
-    call_script(
-        shell,
-        runner,
-        forge_args,
-        foundry_contracts_path,
-        mode,
-        calldata,
-        l1_rpc_url,
-        &format!(
-            "setting data availability validator pair ({:#?}, {:#?}) for chain {}",
-            l1_da_validator_address, l2_da_commitment_scheme, chain_id
-        ),
-    )
-    .await
+    call_script(runner, mode, calldata).await
 }
 
-pub async fn unpause_deposits(
-    shell: &Shell,
-    runner: &mut ForgeRunner,
-    forge_args: &ForgeScriptArgs,
-    foundry_contracts_path: &Path,
-    mode: AdminScriptMode,
-    chain_id: u64,
-    bridgehub: Address,
-    l1_rpc_url: String,
-) -> anyhow::Result<AdminScriptOutput> {
-    let calldata = ADMIN_FUNCTIONS
-        .encode(
-            "unpauseDeposits",
-            (bridgehub, U256::from(chain_id), mode.should_send()),
+/// Build a standard governance ForgeScript without auth or broadcast (caller adds those).
+fn build_governance_forge(runner: &ForgeRunner, calldata: &Bytes) -> ForgeScript {
+    Forge::new(&runner.foundry_scripts_path)
+        .script(
+            &ACCEPT_GOVERNANCE_SCRIPT_PARAMS.script(),
+            runner.forge_args.clone(),
         )
-        .unwrap();
-
-    call_script(
-        shell,
-        runner,
-        forge_args,
-        foundry_contracts_path,
-        mode,
-        calldata,
-        l1_rpc_url,
-        &format!("unpausing deposits for chain {}", chain_id),
-    )
-    .await
+        .with_ffi()
+        .with_rpc_url(runner.rpc_url.clone())
+        .with_calldata(calldata)
 }

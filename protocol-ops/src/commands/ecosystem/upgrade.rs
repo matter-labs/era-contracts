@@ -6,11 +6,13 @@ use clap::Parser;
 use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use xshell::Shell;
 
-use crate::common::forge::{resolve_execution, Forge, ForgeRunner, ForgeScriptArg};
-use crate::common::logger;
-use crate::utils::paths;
+use crate::common::{
+    forge::{Forge, ForgeRunner, ForgeScriptArg, ForgeScriptArgs},
+    logger,
+    wallets::Wallet,
+};
+use crate::common::paths;
 
 /// Build cast-ready transaction list from a forge run payload (broadcast JSON).
 /// Each item has "to", "data", "value" (normalized for cast).
@@ -131,15 +133,32 @@ fn build_output_governance_stage(
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct EcosystemUpgradeArgs {
+    // Signers
+    /// Sender address
+    #[clap(long, help_heading = "Signers")]
+    pub sender: Option<Address>,
+
+    // Auth
+    /// Sender private key
+    #[clap(long, visible_alias = "pk", help_heading = "Auth")]
+    pub private_key: Option<H256>,
+
+    // Execution
+    /// L1 RPC URL
+    #[clap(long, default_value = "http://localhost:8545", help_heading = "Execution")]
+    pub l1_rpc_url: String,
+    /// Simulate against anvil fork
+    #[clap(long, help_heading = "Execution")]
+    pub simulate: bool,
+
+    // Output
+    /// Write full JSON output to file
+    #[clap(long, help_heading = "Output")]
+    pub out: Option<PathBuf>,
+
     /// Ecosystem upgrade stage (currently supported: no-governance-prepare)
     #[clap(long)]
     pub ecosystem_upgrade_stage: String,
-    /// L1 RPC URL
-    #[clap(long, default_value = "http://localhost:8545")]
-    pub l1_rpc_url: String,
-    /// Deployer private key
-    #[clap(long)]
-    pub private_key: H256,
     /// Governance address (required for governance-stage* stages)
     #[clap(long)]
     pub governance_address: Option<Address>,
@@ -167,66 +186,32 @@ pub struct EcosystemUpgradeArgs {
     /// Path to read ecosystem upgrade output (for governance-stage*). If unset, uses script-out/v31-upgrade-ecosystem.toml under l1-contracts.
     #[clap(long)]
     pub ecosystem_output_path: Option<PathBuf>,
-    /// Simulate against anvil fork (no on-chain changes)
-    #[clap(long, default_value_t = false)]
-    pub simulate: bool,
-    /// Write full JSON output (runs with transactions) to file; implies broadcast when set
-    #[clap(long, help_heading = "Output")]
-    pub out: Option<PathBuf>,
+
     #[clap(flatten)]
     #[serde(flatten)]
-    pub forge_args: crate::common::forge::ForgeArgs,
+    pub forge_args: ForgeScriptArgs,
 }
 
-pub async fn run(args: EcosystemUpgradeArgs, shell: &Shell) -> anyhow::Result<()> {
-    if args.simulate {
-        logger::info(format!(
-            "Simulation mode: forking {} via anvil",
-            args.l1_rpc_url
-        ));
-    }
-    let exec = if args.simulate {
-        Some(resolve_execution(
-            Some(args.private_key),
-            None,
-            true,
-            &args.l1_rpc_url,
-        )?)
-    } else {
-        None
-    };
-    let (effective_rpc, use_sender, sender_or_pk) = match &exec {
-        Some((_, sender, mode)) => (
-            mode.rpc_url(&args.l1_rpc_url).to_string(),
-            true,
-            format!("{:#x}", sender),
-        ),
-        None => (
-            args.l1_rpc_url.clone(),
-            false,
-            format!("{:#x}", args.private_key),
-        ),
-    };
-    let result = match args.ecosystem_upgrade_stage.as_str() {
-        "no-governance-prepare" => run_no_governance_prepare(shell, &args, &effective_rpc, use_sender, &sender_or_pk),
-        "governance-stage0" => run_governance_stage(shell, &args, 0, &effective_rpc, use_sender, &sender_or_pk),
-        "governance-stage1" => run_governance_stage(shell, &args, 1, &effective_rpc, use_sender, &sender_or_pk),
-        "governance-stage2" => run_governance_stage(shell, &args, 2, &effective_rpc, use_sender, &sender_or_pk),
+pub async fn run(args: EcosystemUpgradeArgs) -> anyhow::Result<()> {
+    let sender = Wallet::parse(args.private_key, args.sender)?;
+    let mut runner = ForgeRunner::new(args.simulate, &args.l1_rpc_url, args.forge_args.clone())?;
+
+    match args.ecosystem_upgrade_stage.as_str() {
+        "no-governance-prepare" => run_no_governance_prepare(&mut runner, &sender, &args),
+        "governance-stage0" => run_governance_stage(&mut runner, &sender, &args, 0),
+        "governance-stage1" => run_governance_stage(&mut runner, &sender, &args, 1),
+        "governance-stage2" => run_governance_stage(&mut runner, &sender, &args, 2),
         other => anyhow::bail!(
             "Unsupported ecosystem upgrade stage: {} (supported: no-governance-prepare, governance-stage0, governance-stage1, governance-stage2)",
             other
         ),
-    };
-    drop(exec);
-    result
+    }
 }
 
 fn run_no_governance_prepare(
-    shell: &Shell,
+    runner: &mut ForgeRunner,
+    sender: &Wallet,
     args: &EcosystemUpgradeArgs,
-    effective_rpc: &str,
-    use_sender: bool,
-    sender_or_pk: &str,
 ) -> anyhow::Result<()> {
     let contracts_path = resolve_l1_contracts_path(&paths::contracts_root())?;
     let script_path = "deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol";
@@ -261,28 +246,18 @@ fn run_no_governance_prepare(
     let _ = fs::remove_file(script_out.join("v31-upgrade-ecosystem.toml"));
     let _ = fs::remove_file(script_out.join("v31-upgrade-ctm.toml"));
 
-    let mut script_args = args.forge_args.script.clone();
+    let mut script_args = args.forge_args.clone();
     script_args.add_arg(ForgeScriptArg::Sig {
         sig: "noGovernancePrepareWithArgs(address,address,address,address,bool,string,string,address)".to_string(),
     });
     script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: effective_rpc.to_string(),
+        url: runner.rpc_url.clone(),
     });
     script_args.add_arg(ForgeScriptArg::Broadcast);
     script_args.add_arg(ForgeScriptArg::Ffi);
     script_args.add_arg(ForgeScriptArg::GasLimit {
         gas_limit: 1000000000000,
     });
-    if use_sender {
-        script_args.add_arg(ForgeScriptArg::Sender {
-            address: sender_or_pk.to_string(),
-        });
-        script_args.add_arg(ForgeScriptArg::Unlocked);
-    } else {
-        script_args.add_arg(ForgeScriptArg::PrivateKey {
-            private_key: sender_or_pk.to_string(),
-        });
-    }
     script_args.additional_args.extend([
         format!("{:#x}", bridgehub),
         format!("{:#x}", ctm),
@@ -298,15 +273,15 @@ fn run_no_governance_prepare(
         format!("{:#x}", governance),
     ]);
 
-    let forge = Forge::new(&contracts_path);
-    let script = forge.script(Path::new(script_path), script_args);
-    let mut runner = ForgeRunner::new();
+    let script = Forge::new(&contracts_path)
+        .script(Path::new(script_path), script_args)
+        .with_wallet(sender, runner.simulate);
 
     logger::step("Running ecosystem no-governance-prepare");
-    logger::info(format!("RPC URL: {}", effective_rpc));
+    logger::info(format!("RPC URL: {}", runner.rpc_url));
 
     runner
-        .run(shell, script)
+        .run(script)
         .context("Failed to execute forge script for no-governance-prepare")?;
 
     // Read TOML files written by the script; parse to JSON.
@@ -384,12 +359,10 @@ struct EcosystemUpgradeOutput {
 }
 
 fn run_governance_stage(
-    shell: &Shell,
+    runner: &mut ForgeRunner,
+    sender: &Wallet,
     args: &EcosystemUpgradeArgs,
     stage: u8,
-    effective_rpc: &str,
-    use_sender: bool,
-    sender_or_pk: &str,
 ) -> anyhow::Result<()> {
     let contracts_path = resolve_l1_contracts_path(&paths::contracts_root())?;
     let default_path = contracts_path.join("script-out/v31-upgrade-ecosystem.toml");
@@ -422,42 +395,32 @@ fn run_governance_stage(
     })?;
 
     let script_path = "deploy-scripts/AdminFunctions.s.sol";
-    let mut script_args = args.forge_args.script.clone();
+    let mut script_args = args.forge_args.clone();
     script_args.add_arg(ForgeScriptArg::Sig {
         sig: "governanceExecuteCalls(bytes,address)".to_string(),
     });
     script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: effective_rpc.to_string(),
+        url: runner.rpc_url.clone(),
     });
     script_args.add_arg(ForgeScriptArg::Broadcast);
     script_args.add_arg(ForgeScriptArg::Ffi);
     script_args.add_arg(ForgeScriptArg::GasLimit {
         gas_limit: 1000000000000,
     });
-    if use_sender {
-        script_args.add_arg(ForgeScriptArg::Sender {
-            address: sender_or_pk.to_string(),
-        });
-        script_args.add_arg(ForgeScriptArg::Unlocked);
-    } else {
-        script_args.add_arg(ForgeScriptArg::PrivateKey {
-            private_key: sender_or_pk.to_string(),
-        });
-    }
     script_args.additional_args.extend([
         format!("0x{}", encoded_calls_hex.trim_start_matches("0x")),
         format!("{:#x}", governance_addr),
     ]);
 
-    let forge = Forge::new(&contracts_path);
-    let script = forge.script(Path::new(script_path), script_args);
-    let mut runner = ForgeRunner::new();
+    let script = Forge::new(&contracts_path)
+        .script(Path::new(script_path), script_args)
+        .with_wallet(sender, runner.simulate);
 
     logger::step(format!("Running governance stage {}", stage));
     logger::info(format!("Governance address: {:#x}", governance_addr));
-    logger::info(format!("RPC URL: {}", effective_rpc));
+    logger::info(format!("RPC URL: {}", runner.rpc_url));
 
-    runner.run(shell, script).with_context(|| {
+    runner.run(script).with_context(|| {
         format!(
             "Failed to execute forge script for governance stage {}",
             stage

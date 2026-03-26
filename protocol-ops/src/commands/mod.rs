@@ -3,3 +3,4 @@ pub mod ctm;
 pub mod ecosystem;
 pub mod genesis;
 pub mod hub;
+pub mod output;

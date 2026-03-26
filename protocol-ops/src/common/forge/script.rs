@@ -6,32 +6,25 @@ use std::{
 use clap::{Parser, ValueEnum};
 use ethers::{
     core::types::Bytes,
-    middleware::Middleware,
-    prelude::{LocalWallet, Signer},
+    prelude::{LocalWallet, Middleware, Signer},
     types::{Address, H256, U256},
     utils::{hex, hex::ToHexExt},
 };
 use serde::{Deserialize, Serialize};
 use strum::Display;
-use xshell::Shell;
 
-use super::runner::ForgeRunner;
 use crate::common::ethereum::create_ethers_client;
+use crate::common::wallets::Wallet;
 
 /// ForgeScript is a wrapper around the forge script command.
 pub struct ForgeScript {
     pub(crate) base_path: PathBuf,
     pub(crate) script_path: PathBuf,
     pub(crate) args: ForgeScriptArgs,
+    pub(crate) envs: Vec<(String, String)>,
 }
 
 impl ForgeScript {
-    /// Run the forge script command using default runner configuration.
-    pub fn run(self, shell: &Shell) -> anyhow::Result<()> {
-        let mut runner = ForgeRunner::default();
-        runner.run(shell, self)
-    }
-
     pub fn wallet_args_passed(&self) -> bool {
         self.args.wallet_args_passed()
     }
@@ -93,6 +86,25 @@ impl ForgeScript {
     pub fn with_slow(mut self) -> Self {
         self.args.add_arg(ForgeScriptArg::Slow);
         self
+    }
+
+    /// Add an environment variable that will be set when running the script.
+    pub fn with_env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.envs.push((key.into(), value.into()));
+        self
+    }
+
+    /// Apply wallet authentication.
+    ///
+    /// If `simulate` is true or the wallet has no private key, uses `--sender --unlocked`
+    /// (anvil auto-impersonation or unlocked node). Otherwise uses `--private-key`.
+    pub fn with_wallet(self, wallet: &Wallet, simulate: bool) -> Self {
+        if simulate || wallet.private_key.is_none() {
+            self.with_sender(format!("{:#x}", wallet.address)).with_unlocked()
+        } else {
+            let pk = wallet.private_key_h256().unwrap();
+            self.with_private_key(pk)
+        }
     }
 
     /// Adds the private key of the deployer account.
@@ -278,7 +290,7 @@ pub struct ForgeScriptArgs {
     pub zksync: bool,
     /// List of additional arguments that can be passed through the CLI.
     ///
-    /// e.g.: `zkstack init -a --private-key=<PRIVATE_KEY>`
+    /// e.g.: `[COMMAND] -a --with-gas-price=4000000000`
     #[clap(long, short)]
     #[arg(trailing_var_arg = true, allow_hyphen_values = true, hide = false)]
     pub(crate) additional_args: Vec<String>,

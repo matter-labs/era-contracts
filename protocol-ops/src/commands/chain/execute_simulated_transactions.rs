@@ -5,10 +5,8 @@ use std::process::Command;
 use anyhow::Context;
 use clap::Parser;
 use serde_json::{Map, Value};
-use xshell::Shell;
 
-use crate::common::logger;
-use crate::utils::paths;
+use crate::common::{logger, paths};
 
 #[derive(Debug, Clone, Parser)]
 pub struct ChainExecuteSimulatedTransactionsArgs {
@@ -38,9 +36,7 @@ fn resolve_l1_contracts_path(repo_root: &Path) -> anyhow::Result<PathBuf> {
     )
 }
 
-pub async fn run(args: ChainExecuteSimulatedTransactionsArgs, shell: &Shell) -> anyhow::Result<()> {
-    let _ = shell;
-
+pub async fn run(args: ChainExecuteSimulatedTransactionsArgs) -> anyhow::Result<()> {
     logger::step("Execute simulated transactions from protocol-ops out file");
 
     let content = fs::read_to_string(&args.out)

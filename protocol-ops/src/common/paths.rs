@@ -22,3 +22,7 @@ fn default_contracts_root() -> PathBuf {
         .expect("Failed to resolve default contracts root")
         .to_path_buf()
 }
+
+pub fn path_to_foundry_scripts() -> PathBuf {
+    path_from_root("l1-contracts")
+}

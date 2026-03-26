@@ -2,9 +2,6 @@ use ethers::types::U64;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::{fmt, str::FromStr};
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct L1ChainId(u64);
-
 #[derive(Copy, Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct L2ChainId(u64);
 
@@ -64,15 +61,6 @@ impl L2ChainId {
         self.0
     }
 
-    pub fn inner(&self) -> u64 {
-        self.0
-    }
-
-    /// Returns the zero L2ChainId. This is a temporarily measure to avoid breaking changes.
-    /// Will be removed after prover cluster is integrated on all environments.
-    pub fn zero() -> Self {
-        Self(0)
-    }
 }
 
 impl FromStr for L2ChainId {

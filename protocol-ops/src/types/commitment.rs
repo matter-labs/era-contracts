@@ -1,16 +1,8 @@
 use std::str::FromStr;
 
 use clap::ValueEnum;
-use ethers::types::Address;
 use serde::{Deserialize, Serialize};
-use strum::{Display, EnumIter};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, EnumIter, Display)]
-pub enum L1BatchCommitmentMode {
-    #[default]
-    Rollup,
-    Validium,
-}
+use strum::Display;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, ValueEnum)]
 pub enum DAValidatorType {
@@ -71,27 +63,3 @@ impl FromStr for L2DACommitmentScheme {
     }
 }
 
-#[derive(Copy, Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum L2PubdataValidator {
-    Address(Address),
-    CommitmentScheme(L2DACommitmentScheme),
-}
-
-impl TryFrom<(Option<Address>, Option<L2DACommitmentScheme>)> for L2PubdataValidator {
-    type Error = anyhow::Error;
-
-    fn try_from(
-        value: (Option<Address>, Option<L2DACommitmentScheme>),
-    ) -> Result<Self, Self::Error> {
-        match value {
-            (None, Some(scheme)) => Ok(L2PubdataValidator::CommitmentScheme(scheme)),
-            (Some(address), None) => Ok(L2PubdataValidator::Address(address)),
-            (Some(_), Some(_)) => anyhow::bail!(
-                "Address and L2DACommitmentScheme are specified, should be chosen only one"
-            ),
-            (None, None) => anyhow::bail!(
-                "Address and L2DACommitmentScheme are not specified, should be chosen at least one"
-            ),
-        }
-    }
-}

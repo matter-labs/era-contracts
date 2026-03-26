@@ -1,5 +1,4 @@
 use clap::Subcommand;
-use xshell::Shell;
 
 use crate::commands::chain::{
     execute_simulated_transactions::ChainExecuteSimulatedTransactionsArgs, init::ChainInitArgs,
@@ -25,13 +24,13 @@ pub enum ChainCommands {
     ExecuteSimulatedTransactions(ChainExecuteSimulatedTransactionsArgs),
 }
 
-pub(crate) async fn run(shell: &Shell, args: ChainCommands) -> anyhow::Result<()> {
+pub(crate) async fn run(args: ChainCommands) -> anyhow::Result<()> {
     match args {
-        ChainCommands::Init(args) => init::run(args, shell).await,
-        ChainCommands::Upgrade(args) => upgrade::run(args, shell).await,
-        ChainCommands::SetUpgradeTimestamp(args) => set_upgrade_timestamp::run(args, shell).await,
+        ChainCommands::Init(args) => init::run(args).await,
+        ChainCommands::Upgrade(args) => upgrade::run(args).await,
+        ChainCommands::SetUpgradeTimestamp(args) => set_upgrade_timestamp::run(args).await,
         ChainCommands::ExecuteSimulatedTransactions(args) => {
-            execute_simulated_transactions::run(args, shell).await
+            execute_simulated_transactions::run(args).await
         }
     }
 }

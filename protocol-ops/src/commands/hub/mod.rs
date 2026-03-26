@@ -1,9 +1,6 @@
 use clap::Subcommand;
-use xshell::Shell;
 
-use crate::commands::hub::{
-    init::HubInitArgs,
-};
+use crate::commands::hub::init::HubInitArgs;
 
 pub(crate) mod accept_ownership;
 pub(crate) mod deploy;
@@ -13,12 +10,12 @@ pub(crate) mod register_ctm;
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum HubCommands {
-    /// Initialize Bridgehub contracts
+    /// Initialize hub (deploy + accept ownership)
     Init(HubInitArgs),
 }
 
-pub(crate) async fn run(shell: &Shell, args: HubCommands) -> anyhow::Result<()> {
+pub(crate) async fn run(args: HubCommands) -> anyhow::Result<()> {
     match args {
-        HubCommands::Init(args) => init::run(args, shell).await,
+        HubCommands::Init(args) => init::run(args).await,
     }
 }

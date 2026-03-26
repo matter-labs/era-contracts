@@ -8,7 +8,6 @@ use crate::common::{
     logger,
 };
 use clap::{Parser, Subcommand};
-use xshell::Shell;
 
 mod common;
 mod config;
@@ -17,7 +16,6 @@ mod types;
 pub mod abi;
 pub mod admin_functions;
 mod commands;
-mod utils;
 
 #[derive(Parser, Debug)]
 #[command(name = "protocol-ops", about)]
@@ -36,7 +34,7 @@ pub enum ProtocolOpsSubcommands {
     /// Chain related commands
     #[command(subcommand)]
     Chain(Box<ChainCommands>),
-    /// Hub related commands
+    /// Bridgehub related commands
     #[command(subcommand)]
     Hub(Box<HubCommands>),
     /// Chain Type Manager related commands
@@ -76,14 +74,13 @@ async fn run_subcommand(cli_args: ProtocolOps) -> anyhow::Result<()> {
     logger::intro();
 
     init_global_config_inner(&cli_args.global)?;
-    let shell = Shell::new().unwrap();
 
     match cli_args.command {
-        ProtocolOpsSubcommands::Ecosystem(args) => commands::ecosystem::run(&shell, *args).await?,
-        ProtocolOpsSubcommands::Chain(args) => commands::chain::run(&shell, *args).await?,
-        ProtocolOpsSubcommands::Hub(args) => commands::hub::run(&shell, *args).await?,
-        ProtocolOpsSubcommands::Ctm(args) => commands::ctm::run(&shell, *args).await?,
-        ProtocolOpsSubcommands::Genesis(args) => commands::genesis::run(&shell, *args).await?,
+        ProtocolOpsSubcommands::Ecosystem(args) => commands::ecosystem::run(*args).await?,
+        ProtocolOpsSubcommands::Chain(args) => commands::chain::run(*args).await?,
+        ProtocolOpsSubcommands::Hub(args) => commands::hub::run(*args).await?,
+        ProtocolOpsSubcommands::Ctm(args) => commands::ctm::run(*args).await?,
+        ProtocolOpsSubcommands::Genesis(args) => commands::genesis::run(*args).await?,
     }
     Ok(())
 }

@@ -1,14 +1,13 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::common::forge::ForgeArgs;
+use crate::common::forge::ForgeScriptArgs;
 use crate::common::logger;
-use crate::utils::paths;
+use crate::common::paths;
 use anyhow::Context;
 use clap::Parser;
 use ethers::types::H256;
 use serde::{Deserialize, Serialize};
-use xshell::Shell;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct ChainUpgradeArgs {
@@ -32,11 +31,10 @@ pub struct ChainUpgradeArgs {
     pub skip_broadcast: bool,
     #[clap(flatten)]
     #[serde(flatten)]
-    pub forge_args: ForgeArgs,
+    pub forge_args: ForgeScriptArgs,
 }
 
-pub async fn run(args: ChainUpgradeArgs, shell: &Shell) -> anyhow::Result<()> {
-    let _ = shell;
+pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
     let contracts_path = resolve_l1_contracts_path(&paths::contracts_root())?;
     let script_path = "deploy-scripts/AdminFunctions.s.sol";
 

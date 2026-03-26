@@ -52,6 +52,62 @@ impl Serialize for Wallet {
 }
 
 impl Wallet {
+    /// Parse a wallet from optional CLI `--private-key` / `--sender` args.
+    ///
+    /// - If `private_key`: derive address, validate against `address` if provided.
+    /// - If `address` only: return address-only wallet (needs `--unlocked` at node).
+    /// - If neither: bail.
+    pub fn parse(private_key: Option<H256>, address: Option<Address>) -> anyhow::Result<Self> {
+        if let Some(pk) = private_key {
+            let wallet = LocalWallet::from_bytes(pk.as_bytes())
+                .map_err(|e| anyhow::anyhow!("invalid private key: {}", e))?;
+            if let Some(addr) = address {
+                if addr != wallet.address() {
+                    anyhow::bail!(
+                        "address {:#x} does not match private key (derives {:#x})",
+                        addr,
+                        wallet.address()
+                    );
+                }
+            }
+            Ok(Self::new(wallet))
+        } else if let Some(addr) = address {
+            Ok(Self { address: addr, private_key: None })
+        } else {
+            anyhow::bail!("either --private-key or --sender must be provided")
+        }
+    }
+
+    /// Resolve a wallet from optional address + key, falling back to `fallback` if neither given.
+    ///
+    /// - Both `addr` and `pk`: validate pk derives addr, return keyed wallet.
+    /// - Only `pk`: derive address from pk.
+    /// - Only `addr`: return address-only wallet (unlocked / impersonation).
+    /// - Neither: clone `fallback`.
+    pub fn resolve(
+        addr: Option<Address>,
+        private_key: Option<H256>,
+        fallback: &Wallet,
+    ) -> anyhow::Result<Self> {
+        match (addr, private_key) {
+            (addr, Some(pk)) => {
+                let wallet = LocalWallet::from_bytes(pk.as_bytes())
+                    .map_err(|e| anyhow::anyhow!("invalid private key: {}", e))?;
+                if let Some(addr) = addr {
+                    anyhow::ensure!(
+                        wallet.address() == addr,
+                        "private key derives {:#x} but address is {:#x}",
+                        wallet.address(),
+                        addr
+                    );
+                }
+                Ok(Self::new(wallet))
+            }
+            (Some(addr), None) => Ok(Self { address: addr, private_key: None }),
+            (None, None) => Ok(fallback.clone()),
+        }
+    }
+
     pub fn private_key_h256(&self) -> Option<H256> {
         self.private_key
             .as_ref()

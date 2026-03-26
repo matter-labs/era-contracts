@@ -1,9 +1,6 @@
 use clap::Subcommand;
-use xshell::Shell;
 
-use crate::commands::ctm::{
-    accept_ownership::CtmAcceptOwnershipArgs, deploy::CtmDeployArgs, init::CtmInitArgs,
-};
+use crate::commands::ctm::init::CtmInitArgs;
 
 pub(crate) mod accept_ownership;
 pub(crate) mod deploy;
@@ -12,18 +9,12 @@ pub(crate) mod init;
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum CtmCommands {
-    /// Deploy CTM contracts
-    Deploy(CtmDeployArgs),
-    /// Accept ownership of CTM contracts
-    AcceptOwnership(CtmAcceptOwnershipArgs),
-    /// Initialize CTM (deploy + accept ownership + register)
+    /// Initialize CTM (Chain Type Manager)
     Init(CtmInitArgs),
 }
 
-pub(crate) async fn run(shell: &Shell, args: CtmCommands) -> anyhow::Result<()> {
+pub(crate) async fn run(args: CtmCommands) -> anyhow::Result<()> {
     match args {
-        CtmCommands::Deploy(args) => deploy::run(args, shell).await,
-        CtmCommands::AcceptOwnership(args) => accept_ownership::run(args, shell).await,
-        CtmCommands::Init(args) => init::run(args, shell).await,
+        CtmCommands::Init(args) => init::run(args).await,
     }
 }

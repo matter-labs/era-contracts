@@ -2,10 +2,13 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ValueEnum)]
+#[clap(rename_all = "lower")]
 pub enum VMOption {
     #[default]
-    EraVM,
+    #[clap(alias = "zksyncos")]
     ZKSyncOsVM,
+    #[clap(alias = "era")]
+    EraVM,
 }
 
 impl VMOption {

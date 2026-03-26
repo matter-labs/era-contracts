@@ -1,10 +1,9 @@
-use crate::types::{L1Network, VMOption};
 use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 
-use crate::config::{
-    forge_interface::deploy_ecosystem::input::InitialDeploymentConfig, traits::FileConfigTrait,
-};
+use crate::common::traits::FileConfigTrait;
+use crate::config::forge_interface::deploy_ecosystem::input::InitialDeploymentConfig;
+use crate::types::{L1Network, VMOption};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DeployCTMConfig {
@@ -13,6 +12,7 @@ pub struct DeployCTMConfig {
     pub support_l2_legacy_shared_bridge_test: bool,
     pub contracts: ContractsDeployCTMConfig,
     pub is_zk_sync_os: bool,
+    pub zk_token_asset_id: H256,
 }
 
 impl FileConfigTrait for DeployCTMConfig {}
@@ -31,6 +31,7 @@ impl DeployCTMConfig {
             testnet_verifier,
             owner_address,
             support_l2_legacy_shared_bridge_test,
+            zk_token_asset_id: l1_network.zk_token_asset_id(),
             contracts: ContractsDeployCTMConfig {
                 create2_factory_addr: initial_deployment_config.create2_factory_addr,
                 create2_factory_salt: initial_deployment_config.create2_factory_salt,

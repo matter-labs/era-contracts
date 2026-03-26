@@ -2,10 +2,8 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use clap::Parser;
-use xshell::Shell;
 
-use crate::common::logger;
-use crate::utils::paths;
+use crate::common::{logger, paths};
 
 #[derive(Debug, Clone, Parser)]
 pub struct GenesisGenArgs {
@@ -18,7 +16,7 @@ pub struct GenesisGenArgs {
     pub execution_version: u32,
 }
 
-pub fn run(args: GenesisGenArgs, _shell: &Shell) -> anyhow::Result<()> {
+pub fn run(args: GenesisGenArgs) -> anyhow::Result<()> {
     let root = paths::contracts_root();
     let genesis_gen_manifest = root.join("tools/zksync-os-genesis-gen/Cargo.toml");
     if !genesis_gen_manifest.exists() {

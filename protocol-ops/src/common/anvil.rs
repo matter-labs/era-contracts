@@ -6,8 +6,6 @@ use std::{
 
 use anyhow::{bail, Context};
 
-use crate::common::logger;
-
 /// A running anvil instance. Killed on drop.
 pub struct AnvilInstance {
     child: Child,
@@ -24,10 +22,7 @@ impl AnvilInstance {
 impl Drop for AnvilInstance {
     fn drop(&mut self) {
         if let Err(e) = self.child.kill() {
-            eprintln!(
-                "warning: failed to kill anvil (pid {}): {e}",
-                self.child.id()
-            );
+            eprintln!("warning: failed to kill anvil (pid {}): {e}", self.child.id());
         }
         // Reap the child to avoid zombie processes.
         let _ = self.child.wait();
@@ -39,10 +34,6 @@ impl Drop for AnvilInstance {
 /// Blocks until anvil prints its "Listening on" line, then returns the handle.
 pub fn start_anvil_fork(fork_url: &str) -> anyhow::Result<AnvilInstance> {
     let port = pick_unused_port()?;
-
-    logger::info(format!(
-        "Starting anvil fork of {fork_url} on port {port}..."
-    ));
 
     let mut child = Command::new("anvil")
         .args([
@@ -65,9 +56,10 @@ pub fn start_anvil_fork(fork_url: &str) -> anyhow::Result<AnvilInstance> {
 
     let rpc_url = wait_for_ready(stdout, port, Duration::from_secs(30))?;
 
-    logger::info(format!("Anvil ready at {rpc_url}"));
-
-    Ok(AnvilInstance { child, rpc_url })
+    Ok(AnvilInstance {
+        child,
+        rpc_url,
+    })
 }
 
 /// Read lines from anvil's stdout until we see the listening message.

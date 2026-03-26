@@ -1,13 +1,8 @@
-use std::collections::HashMap;
-
-use ethers::types::{Address, U256};
+use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
-use crate::config::{
-    consts::ERC20_CONFIGS_FILE,
-    forge_interface::Create2Addresses,
-    traits::{FileConfigTrait, FileConfigWithDefaultName},
-};
+use crate::common::traits::FileConfigTrait;
+use crate::config::forge_interface::Create2Addresses;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DeployL1CoreContractsOutput {
@@ -53,24 +48,3 @@ pub struct L1BridgesOutput {
     pub l1_nullifier_implementation_addr: Address,
     pub l1_nullifier_proxy_addr: Address,
 }
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Erc20Token {
-    pub address: Address,
-    pub name: String,
-    pub symbol: String,
-    pub decimals: u64,
-    pub implementation: String,
-    pub mint: U256,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct ERC20Tokens {
-    pub tokens: HashMap<String, Erc20Token>,
-}
-
-impl FileConfigWithDefaultName for ERC20Tokens {
-    const FILE_NAME: &'static str = ERC20_CONFIGS_FILE;
-}
-
-impl FileConfigTrait for ERC20Tokens {}

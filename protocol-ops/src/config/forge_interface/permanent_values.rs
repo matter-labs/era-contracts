@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 
-use crate::config::traits::FileConfigTrait;
+use crate::common::traits::FileConfigTrait;
 
 /// Relative path from the foundry project root to permanent-values.toml.
 const PERMANENT_VALUES_PATH: &str = "script-config/permanent-values.toml";

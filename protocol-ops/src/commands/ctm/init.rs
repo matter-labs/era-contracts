@@ -1,64 +1,133 @@
-use std::path::PathBuf;
-
-use crate::common::{
-    forge::{resolve_execution, ExecutionMode, ForgeArgs, ForgeContext, ForgeRunner, SenderAuth},
-    logger,
-};
-use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
-use crate::types::VMOption;
 use clap::Parser;
-use ethers::{
-    signers::{LocalWallet, Signer},
-    types::{Address, H256},
-};
+use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use xshell::Shell;
 
 use crate::commands::ctm::accept_ownership::{accept_ownership, CtmAcceptOwnershipInput};
 use crate::commands::ctm::deploy::{deploy, CtmDeployInput};
 use crate::commands::hub::register_ctm::{register_ctm, RegisterCtmInput};
-use crate::utils::paths;
+use crate::commands::output::{write_output_if_requested, OutputArgs};
+use crate::common::{
+    forge::{ForgeRunner, ForgeScriptArgs},
+    logger,
+    wallets::Wallet,
+};
+use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
+use crate::types::VMOption;
 
-/// Input parameters for ctm init.
-#[derive(Debug, Clone)]
-pub struct CtmInitInput {
+// ── CLI args ────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, Parser)]
+pub struct CtmInitArgs {
+    // Input
+    /// Bridgehub proxy address
+    #[clap(long, help_heading = "Input")]
     pub bridgehub: Address,
-    pub owner: Address,
+    /// VM type: zksyncos or eravm
+    #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM, help_heading = "Input")]
     pub vm_type: VMOption,
+
+    // Signers
+    /// Sender address
+    #[clap(long, help_heading = "Signers")]
+    pub sender: Option<Address>,
+    /// Owner address (default: sender)
+    #[clap(long, help_heading = "Signers")]
+    pub owner: Option<Address>,
+
+    // Auth
+    /// Sender private key
+    #[clap(long, visible_alias = "pk", help_heading = "Auth")]
+    pub private_key: Option<H256>,
+    /// Owner private key
+    #[clap(long, visible_alias = "owner-pk", help_heading = "Auth")]
+    pub owner_private_key: Option<H256>,
+    /// Bridgehub governance owner private key
+    #[clap(long, visible_alias = "bridgehub-owner-pk", help_heading = "Auth")]
+    pub bridgehub_owner_private_key: Option<H256>,
+    /// Bridgehub admin private key
+    #[clap(long, visible_alias = "bridgehub-admin-pk", help_heading = "Auth")]
+    pub bridgehub_admin_private_key: Option<H256>,
+
+    // Execution
+    /// L1 RPC URL
+    #[clap(long, default_value = "http://localhost:8545", help_heading = "Execution")]
+    pub l1_rpc_url: String,
+    /// Simulate against anvil fork
+    #[clap(long, help_heading = "Execution")]
+    pub simulate: bool,
+
+    // Output
+    #[clap(flatten)]
+    #[serde(flatten)]
+    pub output_args: OutputArgs,
+
+    // Advanced input
+    /// Reuse governance and admin contracts from hub
+    #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub reuse_gov_and_admin: bool,
+    /// Use testnet verifier
+    #[clap(long, default_value_t = true, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_testnet_verifier: bool,
+    /// Enable support for legacy bridge testing
+    #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_legacy_bridge: bool,
+    /// CREATE2 factory address
+    #[clap(long, help_heading = "Advanced input")]
+    pub create2_factory_addr: Option<Address>,
+    /// CREATE2 factory salt
+    #[clap(long, help_heading = "Advanced input")]
+    pub create2_factory_salt: Option<H256>,
+
+    // Forge options
+    #[clap(flatten)]
+    #[serde(flatten)]
+    pub forge_args: ForgeScriptArgs,
 }
 
-/// Output from ctm init.
-#[derive(Debug, Clone)]
-pub struct CtmInitOutput {
-    pub deploy_output: DeployCTMOutput,
-    pub ctm_proxy: Address,
-    pub governance: Address,
-    pub chain_admin: Address,
+// ── run() ───────────────────────────────────────────────────────────────────
+
+pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
+    let deployer = Wallet::parse(args.private_key, args.sender)?;
+    let mut runner = ForgeRunner::new(args.simulate, &args.l1_rpc_url, args.forge_args.clone())?;
+
+    let owner = Wallet::resolve(args.owner, args.owner_private_key, &deployer)?;
+
+    let bridgehub_admin = Wallet::parse(args.bridgehub_admin_private_key, None)?;
+    let bridgehub_owner = Wallet::resolve(
+        None,
+        args.bridgehub_owner_private_key,
+        if args.reuse_gov_and_admin { &bridgehub_admin } else { &owner },
+    )?;
+
+    let ctm_input = CtmInitInput {
+        bridgehub: args.bridgehub,
+        owner: owner.address,
+        vm_type: args.vm_type,
+        reuse_gov_and_admin: args.reuse_gov_and_admin,
+        with_testnet_verifier: args.with_testnet_verifier,
+        with_legacy_bridge: args.with_legacy_bridge,
+        create2_factory_addr: args.create2_factory_addr,
+        create2_factory_salt: args.create2_factory_salt,
+    };
+    let ctm_output = ctm_init(&mut runner, &deployer, &bridgehub_owner, &bridgehub_admin, &ctm_input).await?;
+
+    let ctm_proxy = ctm_output.deployed_addresses.state_transition.state_transition_proxy_addr;
+    write_output_if_requested(&args.output_args, &runner, &ctm_input, &ctm_output)?;
+
+    logger::info("CTM contracts initialized");
+    logger::info(format!("CTM Proxy: {:#x}", ctm_proxy));
+    Ok(())
 }
 
-/// Initialize CTM: deploy contracts, accept ownership, and register on bridgehub.
-///
-/// This function takes three auth contexts:
-/// - `deploy_ctx`: ForgeContext for deployment (uses sender auth)
-/// - `owner_auth`: Auth for accepting ownership
-/// - `admin_auth`: Auth for registering CTM on bridgehub
+/// Initialize CTM contracts.
 pub async fn ctm_init(
-    shell: &Shell,
-    foundry_scripts_path: &std::path::Path,
     runner: &mut ForgeRunner,
-    forge_args: &crate::common::forge::ForgeScriptArgs,
-    l1_rpc_url: &str,
+    deployer: &Wallet,
+    owner: &Wallet,
+    admin: &Wallet,
     input: &CtmInitInput,
-    deploy_auth: &SenderAuth,
-    owner_auth: &SenderAuth,
-    admin_auth: &SenderAuth,
-) -> anyhow::Result<CtmInitOutput> {
-    // Step 1: Deploy CTM contracts
-    logger::info("Deploying CTM contracts...");
+) -> anyhow::Result<DeployCTMOutput> {
+    logger::step("Deploying CTM contracts...");
     let deploy_input = CtmDeployInput {
         bridgehub: input.bridgehub,
         owner: input.owner,
@@ -66,353 +135,42 @@ pub async fn ctm_init(
         reuse_gov_and_admin: input.reuse_gov_and_admin,
         with_testnet_verifier: input.with_testnet_verifier,
         with_legacy_bridge: input.with_legacy_bridge,
+        create2_factory_addr: input.create2_factory_addr,
+        create2_factory_salt: input.create2_factory_salt,
     };
-
-    let deploy_output = {
-        let mut ctx = ForgeContext {
-            shell,
-            foundry_scripts_path,
-            runner,
-            forge_args,
-            l1_rpc_url,
-            auth: deploy_auth,
-        };
-        deploy(&mut ctx, &deploy_input)?
-    };
-
+    let deploy_output = deploy(runner, deployer, &deploy_input)?;
     let deployed = &deploy_output.deployed_addresses;
     let ctm_proxy = deployed.state_transition.state_transition_proxy_addr;
-    let governance = deployed.governance_addr;
-    let chain_admin = deployed.chain_admin;
 
-    // Step 2: Accept ownership of deployed CTM contracts
-    logger::info("Accepting ownership of CTM...");
+    logger::step("Accepting ownership of CTM contracts...");
     let accept_input = CtmAcceptOwnershipInput {
         ctm_proxy,
-        governance,
-        chain_admin,
+        governance: deployed.governance_addr,
+        chain_admin: deployed.chain_admin,
     };
+    accept_ownership(runner, owner, &accept_input).await?;
 
-    {
-        let mut ctx = ForgeContext {
-            shell,
-            foundry_scripts_path,
-            runner,
-            forge_args,
-            l1_rpc_url,
-            auth: owner_auth,
-        };
-        accept_ownership(&mut ctx, &accept_input).await?;
-    }
-
-    // Step 3: Register CTM on Bridgehub
-    logger::info("Registering CTM on Bridgehub...");
+    logger::step("Registering CTM on Bridgehub...");
     let register_input = RegisterCtmInput {
         bridgehub: input.bridgehub,
         ctm_proxy,
     };
+    register_ctm(runner, admin, &register_input)?;
 
-    {
-        let mut ctx = ForgeContext {
-            shell,
-            foundry_scripts_path,
-            runner,
-            forge_args,
-            l1_rpc_url,
-            auth: admin_auth,
-        };
-        register_ctm(&mut ctx, &register_input)?;
-    }
-
-    Ok(CtmInitOutput {
-        deploy_output,
-        ctm_proxy,
-        governance,
-        chain_admin,
-    })
+    Ok(deploy_output)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Parser)]
-pub struct CtmInitArgs {
-    /// Bridgehub proxy address
-    #[clap(long)]
+// ── Internal structs ────────────────────────────────────────────────────────
+
+/// Input parameters for ctm init.
+#[derive(Debug, Clone, Serialize)]
+pub struct CtmInitInput {
     pub bridgehub: Address,
-
-    /// Owner address for the deployed contracts (default: sender)
-    #[clap(long)]
-    pub owner: Option<Address>,
-
-    /// Owner private key
-    #[clap(long, alias = "owner-pk")]
-    pub owner_private_key: Option<H256>,
-    /// Bridgehub governance owner private key for accepting ownership (if reuse_gov_and_admin=true)
-    #[clap(long, alias = "bridgehub-owner-pk")]
-    pub bridgehub_owner_private_key: Option<H256>,
-    /// Bridgehub admin private key for registering CTM (default: uses governance owner key)
-    #[clap(long, alias = "bridgehub-admin-pk")]
-    pub bridgehub_admin_private_key: Option<H256>,
-
-    // Common flags
-    #[clap(long, help = "L1 RPC URL", default_value = "http://localhost:8545")]
-    pub l1_rpc_url: String,
-    #[clap(long, help = "Sender address")]
-    pub sender: Option<Address>,
-    #[clap(long, visible_alias = "pk", help = "Sender private key")]
-    pub private_key: Option<H256>,
-    #[clap(long, help = "Simulate against anvil fork (no on-chain changes)")]
-    pub simulate: bool,
-    #[clap(flatten)]
-    #[serde(flatten)]
-    pub forge_args: ForgeArgs,
-
-    // Options
-    /// VM type: zksyncos (default) or eravm
-    #[clap(long, default_value = "zksyncos")]
-    pub vm_type: String,
-    /// Reuse governance and admin contracts from hub (default: true)
-    #[clap(long, default_value_t = true)]
+    pub owner: Address,
+    pub vm_type: VMOption,
     pub reuse_gov_and_admin: bool,
-    /// Use testnet verifier (default: true)
-    #[clap(long, default_value_t = true)]
     pub with_testnet_verifier: bool,
-    /// Enable support for legacy bridge testing (default: false)
-    #[clap(long, default_value_t = false)]
     pub with_legacy_bridge: bool,
-
-    // Output
-    #[clap(long, help = "Write full JSON output to file", help_heading = "Output")]
-    pub out: Option<PathBuf>,
-}
-
-pub async fn run(args: CtmInitArgs, shell: &Shell) -> anyhow::Result<()> {
-    let foundry_scripts_path = paths::path_from_root("l1-contracts");
-
-    let vm_type = match args.vm_type.to_lowercase().as_str() {
-        "eravm" | "era" => VMOption::EraVM,
-        "zksyncos" | "zksync" | "zksync-os" => VMOption::ZKSyncOsVM,
-        _ => anyhow::bail!(
-            "Invalid VM type '{}'. Use 'zksyncos' or 'eravm'",
-            args.vm_type
-        ),
-    };
-
-    let (sender_auth, sender, execution_mode) = resolve_execution(
-        args.private_key,
-        args.sender,
-        args.simulate,
-        &args.l1_rpc_url,
-    )?;
-    let owner = args.owner.unwrap_or(sender);
-
-    // Resolve owner auth for accept_ownership and register steps
-    let owner_auth = if owner == sender {
-        // Owner is the same as sender, reuse the same auth
-        sender_auth.clone()
-    } else {
-        // Owner is different from sender, need owner's private key
-        let owner_pk = args.owner_private_key.ok_or_else(|| {
-            anyhow::anyhow!(
-                "Owner ({:#x}) differs from sender ({:#x}), --owner-private-key is required",
-                owner,
-                sender
-            )
-        })?;
-        let local_wallet = LocalWallet::from_bytes(owner_pk.as_bytes())
-            .map_err(|e| anyhow::anyhow!("Invalid owner private key: {}", e))?;
-        if local_wallet.address() != owner {
-            anyhow::bail!(
-                "Owner private key does not match owner address: got {:#x}, want {:#x}",
-                local_wallet.address(),
-                owner
-            );
-        }
-        SenderAuth::PrivateKey(owner_pk)
-    };
-
-    // Resolve governance owner auth for accept_ownership step
-    // When reuse_gov_and_admin=true, this must be the HUB's governance owner
-    let bridgehub_owner_auth = if let Some(gov_pk) = args.bridgehub_owner_private_key {
-        let local_wallet = LocalWallet::from_bytes(gov_pk.as_bytes())
-            .map_err(|e| anyhow::anyhow!("Invalid governance owner private key: {}", e))?;
-        logger::info(format!(
-            "Governance owner (for accepting ownership): {:#x}",
-            local_wallet.address()
-        ));
-        SenderAuth::PrivateKey(gov_pk)
-    } else if args.reuse_gov_and_admin {
-        anyhow::bail!(
-            "--bridgehub-owner-private-key is required when --reuse-gov-and-admin=true \
-            (the hub's governance owner must accept ownership)"
-        );
-    } else {
-        // When not reusing, the new owner is also the governance owner
-        owner_auth.clone()
-    };
-
-    // Resolve bridgehub admin auth for register_ctm step (defaults to governance owner)
-    let bridgehub_admin_auth = if let Some(admin_pk) = args.bridgehub_admin_private_key {
-        let local_wallet = LocalWallet::from_bytes(admin_pk.as_bytes())
-            .map_err(|e| anyhow::anyhow!("Invalid bridgehub admin private key: {}", e))?;
-        logger::info(format!(
-            "Bridgehub admin (for CTM registration): {:#x}",
-            local_wallet.address()
-        ));
-        SenderAuth::PrivateKey(admin_pk)
-    } else {
-        // Default to governance owner auth
-        bridgehub_owner_auth.clone()
-    };
-
-    let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
-    if is_simulation {
-        logger::info(format!(
-            "Simulation mode: forking {} via anvil",
-            args.l1_rpc_url
-        ));
-    }
-
-    // In simulation mode, forge targets the anvil fork instead of the original RPC.
-    let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
-
-    let mut runner = ForgeRunner::new();
-
-    // Step 1: Deploy CTM contracts (as sender)
-    logger::info(format!("Deploying CTM contracts as sender: {:#x}", sender));
-    logger::info(format!("Owner will be: {:#x}", owner));
-    logger::info(format!("Bridgehub: {:#x}", args.bridgehub));
-
-    let deploy_input = CtmDeployInput {
-        bridgehub: args.bridgehub,
-        owner,
-        vm_type,
-        reuse_gov_and_admin: args.reuse_gov_and_admin,
-        with_testnet_verifier: args.with_testnet_verifier,
-        with_legacy_bridge: args.with_legacy_bridge,
-    };
-
-    let deploy_output = {
-        let mut ctx = ForgeContext {
-            shell,
-            foundry_scripts_path: foundry_scripts_path.as_path(),
-            runner: &mut runner,
-            forge_args: &args.forge_args.script,
-            l1_rpc_url: effective_rpc,
-            auth: &sender_auth,
-        };
-        deploy(&mut ctx, &deploy_input)?
-    };
-
-    let deployed = &deploy_output.deployed_addresses;
-    let ctm_proxy = deployed.state_transition.state_transition_proxy_addr;
-    let governance = deployed.governance_addr;
-    let chain_admin = deployed.chain_admin;
-
-    // Step 2: Accept ownership of deployed CTM contracts (as governance owner)
-    logger::info("Accepting ownership of CTM...");
-
-    let accept_input = CtmAcceptOwnershipInput {
-        ctm_proxy,
-        governance,
-        chain_admin,
-    };
-
-    {
-        let mut ctx = ForgeContext {
-            shell,
-            foundry_scripts_path: foundry_scripts_path.as_path(),
-            runner: &mut runner,
-            forge_args: &args.forge_args.script,
-            l1_rpc_url: effective_rpc,
-            auth: &bridgehub_owner_auth,
-        };
-        accept_ownership(&mut ctx, &accept_input).await?;
-    }
-
-    // Step 3: Register CTM on Bridgehub (as bridgehub admin)
-    logger::info("Registering CTM on Bridgehub...");
-
-    let register_input = RegisterCtmInput {
-        bridgehub: args.bridgehub,
-        ctm_proxy,
-    };
-
-    {
-        let mut ctx = ForgeContext {
-            shell,
-            foundry_scripts_path: foundry_scripts_path.as_path(),
-            runner: &mut runner,
-            forge_args: &args.forge_args.script,
-            l1_rpc_url: effective_rpc,
-            auth: &bridgehub_admin_auth,
-        };
-        register_ctm(&mut ctx, &register_input)?;
-    }
-
-    if let Some(out_path) = &args.out {
-        let result = build_output(&deploy_input, &deploy_output, &runner);
-        let result_json = serde_json::to_string_pretty(&result)?;
-        std::fs::write(out_path, &result_json)?;
-        logger::info(format!("Full output written to: {}", out_path.display()));
-    }
-
-    if is_simulation {
-        logger::outro(format!(
-            "CTM init simulation complete — CTM Proxy: {:#x}",
-            ctm_proxy
-        ));
-    } else {
-        logger::outro(format!("CTM Proxy deployed at: {:#x}", ctm_proxy));
-    }
-
-    drop(execution_mode);
-
-    Ok(())
-}
-
-fn build_output(
-    input: &CtmDeployInput,
-    output: &DeployCTMOutput,
-    runner: &ForgeRunner,
-) -> serde_json::Value {
-    let deployed = &output.deployed_addresses;
-
-    let runs: Vec<_> = runner
-        .runs()
-        .iter()
-        .map(|r| {
-            json!({
-                "script": r.script.display().to_string(),
-                "run": r.payload,
-            })
-        })
-        .collect();
-
-    json!({
-        "command": "ctm.init",
-        "input": {
-            "bridgehub": format!("{:#x}", input.bridgehub),
-            "vm_type": format!("{:?}", input.vm_type),
-            "reuse_gov_and_admin": input.reuse_gov_and_admin,
-            "with_testnet_verifier": input.with_testnet_verifier,
-            "with_legacy_bridge": input.with_legacy_bridge,
-        },
-        "runs": runs,
-        "output": {
-            "state_transition": {
-                "proxy_addr": format!("{:#x}", deployed.state_transition.state_transition_proxy_addr),
-                "verifier_addr": format!("{:#x}", deployed.state_transition.verifier_addr),
-                "genesis_upgrade_addr": format!("{:#x}", deployed.state_transition.genesis_upgrade_addr),
-                "default_upgrade_addr": format!("{:#x}", deployed.state_transition.default_upgrade_addr),
-                "bytecodes_supplier_addr": format!("{:#x}", deployed.state_transition.bytecodes_supplier_addr),
-            },
-            "governance_addr": format!("{:#x}", deployed.governance_addr),
-            "chain_admin_addr": format!("{:#x}", deployed.chain_admin),
-            "validator_timelock_addr": format!("{:#x}", deployed.validator_timelock_addr),
-            "rollup_l1_da_validator_addr": format!("{:#x}", deployed.rollup_l1_da_validator_addr),
-            "no_da_validium_l1_validator_addr": format!("{:#x}", deployed.no_da_validium_l1_validator_addr),
-            "blobs_zksync_os_l1_da_validator_addr": format!("{:#x}", deployed.blobs_zksync_os_l1_da_validator_addr.unwrap_or(Address::zero())),
-            "server_notifier_proxy_addr": format!("{:#x}", deployed.server_notifier_proxy_addr),
-            "diamond_cut_data": output.contracts_config.diamond_cut_data.clone(),
-        },
-    })
+    pub create2_factory_addr: Option<Address>,
+    pub create2_factory_salt: Option<H256>,
 }

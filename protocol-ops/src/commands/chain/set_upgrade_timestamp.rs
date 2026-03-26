@@ -7,7 +7,6 @@ use clap::Parser;
 use ethers::types::H256;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use xshell::Shell;
 
 use crate::common::logger;
 
@@ -36,9 +35,7 @@ pub struct ChainSetUpgradeTimestampArgs {
     pub out: Option<PathBuf>,
 }
 
-pub async fn run(args: ChainSetUpgradeTimestampArgs, shell: &Shell) -> anyhow::Result<()> {
-    let _ = shell;
-
+pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     logger::step("Setting chain upgrade timestamp via AdminFunctions.s.sol");
     logger::info(format!("Admin address: {}", args.admin_address));
     logger::info(format!(

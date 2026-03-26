@@ -5,17 +5,23 @@ use std::{
 
 use anyhow::Context;
 use chrono::Utc;
-use ethers::middleware::Middleware as _;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::task::block_in_place;
 use xshell::{cmd, Shell};
 
-use super::script::{ForgeScript, ForgeScriptArg};
+use super::script::{ForgeScript, ForgeScriptArg, ForgeScriptArgs};
+// Forge is defined in the parent module (mod.rs); use the full path to avoid confusion.
+use crate::common::forge::Forge;
 use crate::common::{
+    anvil::{self, AnvilInstance},
     cmd::{Cmd, CmdResult},
-    ethereum::get_ethers_provider,
+    ethereum::query_chain_id_sync,
+    logger,
+    paths,
+    traits::{ReadConfig, SaveConfig},
+    wallets::Wallet,
 };
+use crate::config::forge_interface::script_params::ForgeScriptParams;
 
 /// Result of a forge script execution containing the broadcast JSON payload.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -35,29 +41,67 @@ impl ForgeScriptRun {
     }
 }
 
+/// Encapsulates the full execution environment for forge scripts:
+/// shell, forge CLI args, target RPC, foundry path, simulation mode, and run history.
 pub struct ForgeRunner {
+    /// Shell used for file I/O and command execution.
+    pub shell: Shell,
+    /// User-supplied forge CLI flags (--verify, --verifier-url, etc.).
+    pub forge_args: ForgeScriptArgs,
+    /// Effective RPC URL (anvil URL when simulating, original URL otherwise).
+    pub rpc_url: String,
+    /// Whether this runner is in simulation mode (forked anvil, no real broadcast).
+    pub simulate: bool,
+    /// Path to the `l1-contracts` foundry project root.
+    pub foundry_scripts_path: PathBuf,
+    /// Keeps the anvil instance alive while this runner exists.
+    _anvil: Option<AnvilInstance>,
     runs: Vec<ForgeScriptRun>,
 }
 
-impl Default for ForgeRunner {
-    fn default() -> Self {
-        Self { runs: Vec::new() }
-    }
-}
-
 impl ForgeRunner {
-    pub fn new() -> Self {
-        Self::default()
+    /// Create a new runner.
+    ///
+    /// If `simulate` is true, forks `l1_rpc_url` with anvil and targets the fork.
+    pub fn new(
+        simulate: bool,
+        l1_rpc_url: &str,
+        forge_args: ForgeScriptArgs,
+    ) -> anyhow::Result<Self> {
+        let shell = Shell::new().context("failed to create shell")?;
+
+        let (rpc_url, anvil) = if simulate {
+            logger::warn(format!(
+                "[SIMULATION] Forking {} via anvil (no on-chain changes)",
+                l1_rpc_url
+            ));
+            let instance = anvil::start_anvil_fork(l1_rpc_url)?;
+            let url = instance.rpc_url().to_string();
+            (url, Some(instance))
+        } else {
+            (l1_rpc_url.to_string(), None)
+        };
+
+        Ok(ForgeRunner {
+            shell,
+            forge_args,
+            rpc_url,
+            foundry_scripts_path: paths::path_to_foundry_scripts(),
+            simulate,
+            _anvil: anvil,
+            runs: Vec::new(),
+        })
     }
 
-    pub fn run(&mut self, shell: &Shell, mut script: ForgeScript) -> anyhow::Result<()> {
+    /// Run a forge script.
+    pub fn run(&mut self, mut script: ForgeScript) -> anyhow::Result<()> {
         if script.needs_bridgehub_skip() {
             let skip_path: String = String::from("contracts/bridgehub/*");
             script.args.add_arg(ForgeScriptArg::Skip { skip_path });
         }
 
         let args = script.args.build();
-        let command_result = self.execute(shell, &script, &args, false)?;
+        let command_result = self.execute(&script, &args, false)?;
 
         if command_result.proposal_error() {
             return Ok(());
@@ -69,16 +113,43 @@ impl ForgeRunner {
         Ok(command_result?)
     }
 
+    /// Write `input` to the script's input path, run the script with `wallet` auth,
+    /// then read and return the output. Handles the standard input→forge→output pattern.
+    pub fn run_script<I: SaveConfig, O: ReadConfig>(
+        &mut self,
+        params: &ForgeScriptParams,
+        input: &I,
+        wallet: &Wallet,
+    ) -> anyhow::Result<O> {
+        let input_path = params.input(&self.foundry_scripts_path);
+        input.save(&self.shell, &input_path)?;
+
+        let forge = Forge::new(&self.foundry_scripts_path)
+            .script(&params.script(), self.forge_args.clone())
+            .with_ffi()
+            .with_rpc_url(self.rpc_url.clone())
+            .with_broadcast()
+            .with_slow()
+            .with_wallet(wallet, self.simulate);
+
+        self.run(forge)?;
+
+        let output_path = params.output(&self.foundry_scripts_path);
+        O::read(&self.shell, output_path)
+    }
+
     fn execute(
         &self,
-        shell: &Shell,
         script: &ForgeScript,
         args: &[String],
         for_resume: bool,
     ) -> anyhow::Result<CmdResult<()>> {
         let script_path = script.script_name().as_os_str();
-        let _dir_guard = shell.push_dir(script.base_path());
-        let mut cmd = Cmd::new(cmd!(shell, "forge script {script_path} --legacy {args...}"));
+        let _dir_guard = self.shell.push_dir(script.base_path());
+        let mut cmd = Cmd::new(cmd!(self.shell, "forge script {script_path} --legacy {args...}"));
+        for (key, value) in &script.envs {
+            cmd = cmd.env(key, value);
+        }
         if for_resume {
             cmd = cmd.with_piped_std_err();
         }
@@ -117,11 +188,8 @@ impl ForgeRunner {
                 script.script_name().display()
             ));
         };
-        let rpc_url = script
-            .rpc_url()
-            .context("failed to get rpc url to query chain id")?;
-        let l1_chain_id = query_chain_id_sync(&rpc_url)?;
-        let mut script_dir = root.join(script_name).join(l1_chain_id.to_string());
+        let chain_id = query_chain_id_sync(&self.rpc_url)?;
+        let mut script_dir = root.join(script_name).join(chain_id.to_string());
         if !script.is_broadcast() {
             script_dir = script_dir.join("dry-run");
         }
@@ -146,37 +214,6 @@ impl ForgeRunner {
     /// Read-only access to accumulated runs in this runner session.
     pub fn runs(&self) -> &[ForgeScriptRun] {
         &self.runs
-    }
-
-    /// Dump accumulated runs into a directory with the following files:
-    /// - runs.json (array of ForgeScriptRun)
-    /// - NNN-[same_name_as_in_foundry].json (one file per run)
-    /// - transactions.json (flattened array of all transactions across runs)
-    pub fn dump_to_dir(&self, dir: &Path) -> anyhow::Result<()> {
-        fs::create_dir_all(dir)?;
-        // 1) runs.json (full metadata)
-        let runs_path = dir.join("runs.json");
-        let runs_pretty = serde_json::to_string_pretty(&self.runs)?;
-        fs::write(&runs_path, runs_pretty)?;
-        // 2) NNN-run.json (payload per run)
-        for (idx, run) in self.runs.iter().enumerate() {
-            let idx3 = format!("{:03}", idx + 1);
-            let per_run_path = dir.join(format!("{idx3}-run.json"));
-            let pretty = serde_json::to_string_pretty(&run.payload)?;
-            fs::write(per_run_path, pretty)?;
-        }
-        // 3) transactions.json (transactions only, flattened)
-        let mut all_txs: Vec<Value> = Vec::new();
-        for run in &self.runs {
-            if let Some(txs) = run.transactions() {
-                for tx in txs {
-                    all_txs.push(tx.clone());
-                }
-            }
-        }
-        let txs_path = dir.join("transactions.json");
-        fs::write(&txs_path, serde_json::to_string_pretty(&all_txs)?)?;
-        Ok(())
     }
 }
 
@@ -207,8 +244,7 @@ fn check_error(cmd_result: &CmdResult<()>, error_text: &str) -> bool {
 /// Derive the *-latest.json filename from an optional --sig value:
 /// 1) no sig          -> "run-latest.json"
 /// 2) hex sig         -> "<first8hex>-latest.json" (strip 0x)
-/// 3) non-hex sig     -> "<name>-latest.json" where name is the part before '(' (method name).
-///    Forge stores method-call broadcasts as e.g. governanceExecuteCalls-latest.json.
+/// 3) non-hex sig     -> "<sig>-latest.json"
 fn derive_run_latest_filename(sig: Option<String>) -> String {
     fn is_hex_like(s: &str) -> bool {
         let s = s.strip_prefix("0x").unwrap_or(s);
@@ -225,8 +261,7 @@ fn derive_run_latest_filename(sig: Option<String>) -> String {
                 let prefix8 = &lower[..lower.len().min(8)];
                 format!("{prefix8}-latest.json")
             } else {
-                let name = trimmed.split('(').next().unwrap_or(trimmed).trim();
-                format!("{name}-latest.json")
+                format!("{trimmed}-latest.json")
             }
         }
     }
@@ -241,18 +276,4 @@ fn read_json(path: &Path) -> anyhow::Result<Value> {
             path.display()
         )
     })
-}
-
-fn query_chain_id_sync(rpc_url: &str) -> anyhow::Result<u64> {
-    let provider = get_ethers_provider(rpc_url)?;
-    let fut = provider.get_chainid();
-    let id = if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        block_in_place(|| handle.block_on(fut))?
-    } else {
-        tokio::runtime::Runtime::new()
-            .context("failed to create Tokio runtime")?
-            .block_on(fut)?
-    };
-
-    Ok(id.as_u64())
 }

@@ -2,7 +2,6 @@ use std::fmt::Display;
 
 use cliclack::{intro as cliclak_intro, log, outro as cliclak_outro, Theme, ThemeState};
 use console::{style, Emoji, Style, Term};
-use serde::Serialize;
 
 const S_BAR: Emoji = Emoji("│", "|");
 pub struct CliclackTheme;
@@ -52,12 +51,12 @@ pub fn error(msg: impl Display) {
     log::error(style(msg).red()).unwrap();
 }
 
-pub fn step(msg: impl Display) {
-    log::step(msg).unwrap();
-}
-
 pub fn success(msg: impl Display) {
     log::success(msg).unwrap();
+}
+
+pub fn step(msg: impl Display) {
+    log::step(msg).unwrap();
 }
 
 pub fn error_note(msg: &str, content: &str) {
@@ -65,49 +64,6 @@ pub fn error_note(msg: &str, content: &str) {
     term_write(note);
     let note = CliclackTheme.format_log(content, &CliclackTheme.error_symbol());
     term_write(note);
-}
-
-pub fn object_to_string(obj: impl Serialize) -> String {
-    let json = serde_json::to_value(obj).unwrap();
-
-    fn print_object(key: &str, value: &str, indentation: usize) -> String {
-        format!(
-            "{:indent$}∙ {} {}\n",
-            "",
-            style(format!("{key}:")).bold(),
-            style(value),
-            indent = indentation
-        )
-    }
-
-    fn print_header(header: &str, indentation: usize) -> String {
-        format!(
-            "{:indent$}∙ {}\n",
-            "",
-            style(format!("{header}:")).bold(),
-            indent = indentation
-        )
-    }
-
-    fn traverse_json(json: &serde_json::Value, indent: usize) -> String {
-        let mut values = String::new();
-
-        if let serde_json::Value::Object(obj) = json {
-            for (key, value) in obj {
-                match value {
-                    serde_json::Value::Object(_) => {
-                        values.push_str(&print_header(key, indent));
-                        values.push_str(&traverse_json(value, indent + 2));
-                    }
-                    _ => values.push_str(&print_object(key, &value.to_string(), indent)),
-                }
-            }
-        }
-
-        values
-    }
-
-    traverse_json(&json, 2)
 }
 
 pub fn new_empty_line() {

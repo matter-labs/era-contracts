@@ -1,5 +1,4 @@
 use clap::Subcommand;
-use xshell::Shell;
 
 use crate::{
     commands::ecosystem::deploy_create2::DeployCreate2Args,
@@ -22,10 +21,10 @@ pub enum EcosystemCommands {
     Upgrade(EcosystemUpgradeArgs),
 }
 
-pub(crate) async fn run(shell: &Shell, args: EcosystemCommands) -> anyhow::Result<()> {
+pub(crate) async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
     match args {
-        EcosystemCommands::DeployCreate2(args) => deploy_create2::run(args, shell).await,
-        EcosystemCommands::Init(args) => init::run(args, shell).await,
-        EcosystemCommands::Upgrade(args) => upgrade::run(args, shell).await,
+        EcosystemCommands::DeployCreate2(args) => deploy_create2::run(args).await,
+        EcosystemCommands::Init(args) => init::run(args).await,
+        EcosystemCommands::Upgrade(args) => upgrade::run(args).await,
     }
 }
