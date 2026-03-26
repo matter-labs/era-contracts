@@ -9,10 +9,12 @@ import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_DEFAULT_PRIVATE_KEY, L1_CHAIN_ID } fr
 import {
   L2_ASSET_TRACKER_ADDR,
   L2_COMPLEX_UPGRADER_ADDR,
+  L2_CONTRACT_DEPLOYER_ADDR,
   L2_FORCE_DEPLOYER_ADDR,
-  L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../core/const";
-import { getAbi, getCreationBytecode } from "../core/contracts";
+import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
+import type { ContractName } from "../core/contracts";
+import { PREDEPLOY_SYSTEM_CONTRACTS } from "../core/predeploys";
 import { transferOwnable2Step } from "./harness-shims";
 import { impersonateAndRun } from "../core/utils";
 import type { ChainRole } from "../core/types";
@@ -63,27 +65,6 @@ async function seedBatchCounters(
   }
 }
 
-async function seedBaseTokenAssetIds(
-  provider: ethers.providers.JsonRpcProvider,
-  bridgehubAddr: string,
-  chainAddresses: Array<{ chainId: number }>
-): Promise<void> {
-  const bridgehub = new ethers.Contract(bridgehubAddr, getAbi("IL1Bridgehub"), provider);
-  const BASE_TOKEN_ASSET_ID_SLOT = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 32);
-
-  for (const chain of chainAddresses) {
-    const baseTokenAssetId = await bridgehub.baseTokenAssetId(chain.chainId);
-    if (baseTokenAssetId === ethers.constants.HashZero) {
-      throw new Error(`Missing base token asset id for chain ${chain.chainId}`);
-    }
-
-    await provider.send("anvil_setStorageAt", [
-      L2_NATIVE_TOKEN_VAULT_ADDR,
-      BASE_TOKEN_ASSET_ID_SLOT,
-      baseTokenAssetId,
-    ]);
-  }
-}
 
 function replaceTomlStringValue(contents: string, key: string, value: string): string {
   const pattern = new RegExp(`^(${key}\\s*=\\s*\").*(\")$`, "m");
@@ -289,6 +270,80 @@ async function transferOwnership2Step(
   await transferOwnable2Step(provider, contractAddr, getAbi("Ownable2Step"), currentOwner, governanceAddr);
 }
 
+/**
+ * Build an address → ContractName lookup from the predeploys list.
+ */
+function buildAddressToBytecodeMap(): Map<string, ContractName> {
+  const map = new Map<string, ContractName>();
+  for (const { address, contractName } of PREDEPLOY_SYSTEM_CONTRACTS) {
+    map.set(address.toLowerCase(), contractName);
+  }
+  return map;
+}
+
+/**
+ * Decode ForceDeployment[] from the outer forceDeployAndUpgrade calldata and
+ * extract the delegateTo address.
+ *
+ * forceDeployAndUpgrade(ForceDeployment[] _forceDeployments, address _delegateTo, bytes _calldata)
+ *   selector: 0x480d1185
+ *   ForceDeployment = (bytes32 bytecodeHash, address newAddress, bool callConstructor, uint256 value, bytes input)
+ */
+function decodeForceDeployments(upgradeTxData: string): { addresses: string[]; delegateTo: string } {
+  const FORCE_DEPLOY_AND_UPGRADE_SELECTOR = "0x480d1185";
+  if (!upgradeTxData.startsWith(FORCE_DEPLOY_AND_UPGRADE_SELECTOR)) {
+    throw new Error(`Unexpected selector in upgrade tx data: ${upgradeTxData.slice(0, 10)}`);
+  }
+
+  const abiCoder = ethers.utils.defaultAbiCoder;
+  const decoded = abiCoder.decode(
+    ["tuple(bytes32,address,bool,uint256,bytes)[]", "address", "bytes"],
+    "0x" + upgradeTxData.slice(10)
+  );
+
+  const forceDeployments = decoded[0] as Array<[string, string, boolean, ethers.BigNumber, string]>;
+  const delegateTo = decoded[1] as string;
+  const addresses = forceDeployments.map((fd) => fd[1]);
+
+  return { addresses, delegateTo };
+}
+
+/**
+ * Pre-deploy system contracts that the Era-style forceDeployAndUpgrade would
+ * normally deploy via ContractDeployer (0x8006).
+ *
+ * On Anvil EVM the MockContractDeployer is a no-op, so we parse the force
+ * deployments from the actual upgrade calldata and deploy bytecodes via
+ * anvil_setCode for every address we have a known artifact for.
+ */
+async function predeployForceDeploymentTargets(
+  l2Provider: ethers.providers.JsonRpcProvider,
+  upgradeTxData: string
+): Promise<void> {
+  // Ensure MockContractDeployer is present (may be missing in legacy state dumps)
+  const deployerCode = await l2Provider.getCode(L2_CONTRACT_DEPLOYER_ADDR);
+  if (deployerCode === "0x" || deployerCode === "0x0") {
+    await l2Provider.send("anvil_setCode", [L2_CONTRACT_DEPLOYER_ADDR, getBytecode("MockContractDeployer")]);
+  }
+
+  const addressToBytecode = buildAddressToBytecodeMap();
+  const { addresses, delegateTo } = decodeForceDeployments(upgradeTxData);
+
+  // Deploy force deployment targets that we have EVM artifacts for
+  for (const addr of addresses) {
+    const contractName = addressToBytecode.get(addr.toLowerCase());
+    if (!contractName) {
+      continue; // zkVM-only system contract — no EVM artifact
+    }
+    const bytecode = getBytecode(contractName);
+    await l2Provider.send("anvil_setCode", [addr, bytecode]);
+  }
+
+  // Deploy the delegateTo target (L2V31Upgrade) — this is the version-specific
+  // upgrader that ComplexUpgrader delegatecalls after the force deployments.
+  await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V31Upgrade")]);
+}
+
 async function executeL2UpgradeTxs(
   l1Provider: ethers.providers.JsonRpcProvider,
   anvilManager: AnvilManager,
@@ -320,6 +375,12 @@ async function executeL2UpgradeTxs(
       chain.chainId,
       originalUpgradeTxData
     );
+
+    // On Anvil EVM the zkVM ContractDeployer (0x8006) is a no-op mock, so
+    // forceDeployAndUpgrade will not actually deploy any bytecode. Parse the
+    // force deployments from the calldata and pre-deploy all known contracts
+    // via anvil_setCode so the upgrade logic finds the correct bytecodes.
+    await predeployForceDeploymentTargets(l2Provider, rewrittenUpgradeTxData);
 
     const relayReceipt = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
       const tx = await signer.sendTransaction({
@@ -456,8 +517,6 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     if (scenario.seedBatchCounters) {
       await seedBatchCounters(provider, upgradeChainAddresses);
     }
-    await seedBaseTokenAssetIds(provider, l1Addresses.bridgehub, upgradeChainAddresses);
-
     const chainUpgradeBroadcastPath = path.join(
       l1ContractsDir,
       "broadcast/ChainUpgrade_v31.s.sol/31337/run-latest.json"

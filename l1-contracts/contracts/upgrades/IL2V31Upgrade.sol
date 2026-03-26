@@ -4,18 +4,16 @@ pragma solidity ^0.8.24;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL2V31Upgrade {
-    /// @notice Executes the one‑time upgrade.
-    /// @dev Intended to be delegate‑called by the `ComplexUpgrader` contract.
-    /// @param _baseTokenOriginChainId The chainId of the origin chain of the base token.
-    /// @param _baseTokenOriginAddress The address of the base token on the origin chain.
-    /// @param _baseTokenName The base token name.
-    /// @param _baseTokenSymbol The base token symbol.
-    /// @param _baseTokenDecimals The base token decimals.
+    /// @notice Executes the one-time v31 upgrade on L2.
+    /// @dev Intended to be delegate-called by the `ComplexUpgrader` contract.
+    /// @param _isZKsyncOS Whether this is a ZKsync OS chain.
+    /// @param _ctmDeployer The address of the CTM deployer.
+    /// @param _fixedForceDeploymentsData Encoded FixedForceDeploymentsData (same for all chains).
+    /// @param _additionalForceDeploymentsData Encoded ZKChainSpecificForceDeploymentsData (per-chain).
     function upgrade(
-        uint256 _baseTokenOriginChainId,
-        address _baseTokenOriginAddress,
-        string calldata _baseTokenName,
-        string calldata _baseTokenSymbol,
-        uint256 _baseTokenDecimals
+        bool _isZKsyncOS,
+        address _ctmDeployer,
+        bytes calldata _fixedForceDeploymentsData,
+        bytes calldata _additionalForceDeploymentsData
     ) external;
 }

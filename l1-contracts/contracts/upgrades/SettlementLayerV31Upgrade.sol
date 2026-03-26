@@ -13,6 +13,8 @@ import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
+import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {TokenBridgingData, TokenMetadata} from "../common/Messaging.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {IComplexUpgraderZKsyncOSV29} from "../state-transition/l2-deps/IComplexUpgraderZKsyncOSV29.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
@@ -37,10 +39,17 @@ event L2UpgradeTxDataConstructed(address indexed bridgehub, uint256 indexed chai
 contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
     using Bytes for bytes;
 
+    /// @dev The address of the Bridgehub proxy on L1.
+    IBridgehubBase public immutable BRIDGEHUB;
+
+    constructor(IBridgehubBase _bridgehub) {
+        BRIDGEHUB = _bridgehub;
+    }
+
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
-        IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
+        IBridgehubBase bridgehub = BRIDGEHUB;
         address assetRouter = address(bridgehub.assetRouter());
         address nativeTokenVaultAddr = address(IL1AssetRouter(assetRouter).nativeTokenVault());
 
@@ -126,7 +135,6 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         uint256 _chainId,
         bytes memory _existingTxData
     ) public view returns (bytes memory) {
-        bytes memory l2V31UpgradeCalldata = getL2V31UpgradeCalldata(_bridgehub, _chainId);
         bytes4 selector = bytes4(_existingTxData);
 
         if (selector == IComplexUpgrader.forceDeployAndUpgrade.selector) {
@@ -137,6 +145,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
             ) = abi.decode(_existingTxData.slice(4), (IL2ContractDeployer.ForceDeployment[], address, bytes));
 
             _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
+            bytes memory l2V31UpgradeCalldata = getL2V31UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);
 
             return
                 abi.encodeCall(IComplexUpgrader.forceDeployAndUpgrade, (forceDeployments, delegateTo, l2V31UpgradeCalldata));
