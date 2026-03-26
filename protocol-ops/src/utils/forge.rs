@@ -4,7 +4,6 @@ use anyhow::Context as _;
 #[derive(Debug)]
 pub enum WalletOwner {
     Governor,
-    Deployer,
 }
 
 pub fn fill_forge_private_key(

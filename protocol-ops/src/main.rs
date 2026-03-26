@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::commands::{
     chain::ChainCommands, ctm::CtmCommands, ecosystem::EcosystemCommands, genesis::GenesisCommands,
     hub::HubCommands,
@@ -7,7 +5,7 @@ use crate::commands::{
 use crate::common::{
     config::{init_global_config, GlobalConfig},
     error::log_error,
-    logger, versions,
+    logger,
 };
 use clap::{Parser, Subcommand};
 use xshell::Shell;
@@ -22,19 +20,16 @@ mod commands;
 mod utils;
 
 #[derive(Parser, Debug)]
-#[command(name = "protocol-cli", about)]
-struct ProtocolCli {
+#[command(name = "protocol-ops", about)]
+struct ProtocolOps {
     #[command(subcommand)]
-    command: ProtocolCliSubcommands,
+    command: ProtocolOpsSubcommands,
     #[clap(flatten)]
-    global: ProtocolCliGlobalArgs,
+    global: ProtocolOpsGlobalArgs,
 }
 
 #[derive(Subcommand, Debug)]
-pub enum ProtocolCliSubcommands {
-    /// Check that node, yarn, forge, cast, and anvil versions match expected tooling.
-    #[command(name = "check-tooling-versions")]
-    CheckToolingVersions,
+pub enum ProtocolOpsSubcommands {
     /// Ecosystem related commands
     #[command(subcommand, alias = "eco")]
     Ecosystem(Box<EcosystemCommands>),
@@ -54,7 +49,7 @@ pub enum ProtocolCliSubcommands {
 
 #[derive(Parser, Debug)]
 #[clap(next_help_heading = "Global options")]
-struct ProtocolCliGlobalArgs {
+struct ProtocolOpsGlobalArgs {
     /// Verbose mode
     #[clap(short, long, global = true)]
     verbose: bool,
@@ -63,7 +58,7 @@ struct ProtocolCliGlobalArgs {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     human_panic::setup_panic!();
-    let cli_args = ProtocolCli::parse();
+    let cli_args = ProtocolOps::parse();
     match run_subcommand(cli_args).await {
         Ok(_) => {}
         Err(error) => {
@@ -74,7 +69,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn run_subcommand(cli_args: ProtocolCli) -> anyhow::Result<()> {
+async fn run_subcommand(cli_args: ProtocolOps) -> anyhow::Result<()> {
     logger::init_theme();
 
     logger::new_empty_line();
@@ -82,20 +77,18 @@ async fn run_subcommand(cli_args: ProtocolCli) -> anyhow::Result<()> {
 
     init_global_config_inner(&cli_args.global)?;
     let shell = Shell::new().unwrap();
-    versions::assert_versions(&shell)?;
 
     match cli_args.command {
-        ProtocolCliSubcommands::CheckToolingVersions => {}
-        ProtocolCliSubcommands::Ecosystem(args) => commands::ecosystem::run(&shell, *args).await?,
-        ProtocolCliSubcommands::Chain(args) => commands::chain::run(&shell, *args).await?,
-        ProtocolCliSubcommands::Hub(args) => commands::hub::run(&shell, *args).await?,
-        ProtocolCliSubcommands::Ctm(args) => commands::ctm::run(&shell, *args).await?,
-        ProtocolCliSubcommands::Genesis(args) => commands::genesis::run(&shell, *args).await?,
+        ProtocolOpsSubcommands::Ecosystem(args) => commands::ecosystem::run(&shell, *args).await?,
+        ProtocolOpsSubcommands::Chain(args) => commands::chain::run(&shell, *args).await?,
+        ProtocolOpsSubcommands::Hub(args) => commands::hub::run(&shell, *args).await?,
+        ProtocolOpsSubcommands::Ctm(args) => commands::ctm::run(&shell, *args).await?,
+        ProtocolOpsSubcommands::Genesis(args) => commands::genesis::run(&shell, *args).await?,
     }
     Ok(())
 }
 
-fn init_global_config_inner(cli_args: &ProtocolCliGlobalArgs) -> anyhow::Result<()> {
+fn init_global_config_inner(cli_args: &ProtocolOpsGlobalArgs) -> anyhow::Result<()> {
     init_global_config(GlobalConfig {
         verbose: cli_args.verbose,
     });

@@ -1,7 +1,5 @@
-use std::path::PathBuf;
-
 use crate::common::{
-    forge::{resolve_execution, ExecutionMode, ForgeArgs, ForgeContext, ForgeRunner},
+    forge::ForgeContext,
     logger,
 };
 use crate::config::forge_interface::{
@@ -11,50 +9,9 @@ use crate::config::forge_interface::{
     },
     script_params::DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS,
 };
-use crate::utils::paths;
-use clap::Parser;
-use ethers::types::{Address, H256};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
-use xshell::Shell;
+use ethers::types::Address;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Parser)]
-pub struct HubDeployArgs {
-    #[clap(
-        long,
-        help = "Owner address for the deployed contracts (default: sender)"
-    )]
-    pub owner: Option<Address>,
-
-    // Common flags
-    #[clap(long, help = "L1 RPC URL", default_value = "http://localhost:8545")]
-    pub l1_rpc_url: String,
-    #[clap(long, visible_alias = "pk", help = "Sender private key")]
-    pub private_key: Option<H256>,
-    #[clap(long, help = "Sender address")]
-    pub sender: Option<Address>,
-    #[clap(long, help = "Simulate against anvil fork (no on-chain changes)")]
-    pub simulate: bool,
-    #[clap(flatten)]
-    #[serde(flatten)]
-    pub forge_args: ForgeArgs,
-
-    // Options
-    #[clap(
-        long,
-        help = "Enable support for legacy bridge testing",
-        default_value_t = false
-    )]
-    pub with_legacy_bridge: bool,
-    #[clap(long, help = "Era chain ID", default_value_t = 270)]
-    pub era_chain_id: u64,
-
-    // Output
-    #[clap(long, help = "Write full JSON output to file", help_heading = "Output")]
-    pub out: Option<PathBuf>,
-}
-
-/// Input parameters for deploying hub contracts.
+/// Input parameters for deploying Bridgehub contracts.
 #[derive(Debug, Clone)]
 pub struct DeployInput {
     pub owner: Address,
@@ -62,73 +19,7 @@ pub struct DeployInput {
     pub with_legacy_bridge: bool,
 }
 
-pub async fn run(args: HubDeployArgs, shell: &Shell) -> anyhow::Result<()> {
-    let foundry_scripts_path = paths::path_from_root("l1-contracts");
-
-    let (auth, sender, execution_mode) = resolve_execution(
-        args.private_key,
-        args.sender,
-        args.simulate,
-        &args.l1_rpc_url,
-    )?;
-    let owner = args.owner.unwrap_or(sender);
-
-    let is_simulation = matches!(execution_mode, ExecutionMode::Simulate(_));
-    if is_simulation {
-        logger::info(format!(
-            "Simulation mode: forking {} via anvil",
-            args.l1_rpc_url
-        ));
-    }
-
-    // In simulation mode, forge targets the anvil fork instead of the original RPC.
-    let effective_rpc = execution_mode.rpc_url(&args.l1_rpc_url);
-
-    let mut runner = ForgeRunner::new();
-    let mut ctx = ForgeContext {
-        shell,
-        foundry_scripts_path: foundry_scripts_path.as_path(),
-        runner: &mut runner,
-        forge_args: &args.forge_args.script,
-        l1_rpc_url: effective_rpc,
-        auth: &auth,
-    };
-
-    let input = DeployInput {
-        owner,
-        era_chain_id: args.era_chain_id,
-        with_legacy_bridge: args.with_legacy_bridge,
-    };
-
-    let output = deploy(&mut ctx, &input)?;
-
-    let bridgehub_addr = output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
-
-    if let Some(out_path) = &args.out {
-        let result = build_output(&output, ctx.runner);
-        let result_json = serde_json::to_string_pretty(&result)?;
-        std::fs::write(out_path, &result_json)?;
-        logger::info(format!("Full output written to: {}", out_path.display()));
-    }
-
-    if is_simulation {
-        logger::outro(format!(
-            "Hub deploy simulation complete — Bridgehub Proxy: {:#x}",
-            bridgehub_addr
-        ));
-    } else {
-        logger::outro(format!(
-            "Bridgehub Proxy deployed at: {:#x}",
-            bridgehub_addr
-        ));
-    }
-
-    drop(execution_mode);
-
-    Ok(())
-}
-
-/// Deploy hub contracts and return the output.
+/// Deploy Bridgehub contracts
 pub fn deploy(
     ctx: &mut ForgeContext,
     input: &DeployInput,
@@ -147,50 +38,4 @@ pub fn deploy(
         &DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS,
         &deploy_config,
     )
-}
-
-fn build_output(output: &DeployL1CoreContractsOutput, runner: &ForgeRunner) -> serde_json::Value {
-    let deployed = &output.deployed_addresses;
-
-    let runs: Vec<_> = runner
-        .runs()
-        .iter()
-        .map(|r| {
-            json!({
-                "script": r.script.display().to_string(),
-                "run": r.payload,
-            })
-        })
-        .collect();
-
-    json!({
-        "command": "hub.deploy",
-        "runs": runs,
-        "output": {
-            "create2_factory_addr": format!("{:#x}", output.contracts.create2_factory_addr),
-            "create2_factory_salt": format!("{:#x}", output.contracts.create2_factory_salt),
-            "core_ecosystem_contracts": {
-                "bridgehub_proxy_addr": format!("{:#x}", deployed.bridgehub.bridgehub_proxy_addr),
-                "message_root_proxy_addr": format!("{:#x}", deployed.bridgehub.message_root_proxy_addr),
-                "transparent_proxy_admin_addr": format!("{:#x}", deployed.transparent_proxy_admin_addr),
-                "stm_deployment_tracker_proxy_addr": format!("{:#x}", deployed.bridgehub.ctm_deployment_tracker_proxy_addr),
-                "native_token_vault_addr": format!("{:#x}", deployed.native_token_vault_addr),
-                "chain_asset_handler_proxy_addr": format!("{:#x}", deployed.bridgehub.chain_asset_handler_proxy_addr),
-            },
-            "bridges": {
-                "erc20": {
-                    "l1_address": format!("{:#x}", deployed.bridges.erc20_bridge_proxy_addr),
-                },
-                "shared": {
-                    "l1_address": format!("{:#x}", deployed.bridges.shared_bridge_proxy_addr),
-                },
-                "l1_nullifier_addr": format!("{:#x}", deployed.bridges.l1_nullifier_proxy_addr),
-            },
-            "l1": {
-                "governance_addr": format!("{:#x}", deployed.governance_addr),
-                "chain_admin_addr": format!("{:#x}", deployed.chain_admin),
-                "access_control_restriction_addr": format!("{:#x}", deployed.access_control_restriction_addr),
-            },
-        },
-    })
 }

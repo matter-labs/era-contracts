@@ -1,6 +1,5 @@
 mod chain_id;
 mod commitment;
-mod conversions;
 mod l1_network;
 mod protocol_version;
 mod vm_option;

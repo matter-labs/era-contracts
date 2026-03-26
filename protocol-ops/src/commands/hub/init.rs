@@ -18,44 +18,7 @@ use crate::commands::hub::accept_ownership::{accept_ownership, AcceptOwnershipIn
 use crate::commands::hub::deploy::{deploy, DeployInput};
 use crate::utils::paths;
 
-/// Input parameters for hub init.
-#[derive(Debug, Clone)]
-pub struct HubInitInput {
-    pub owner: Address,
-    pub era_chain_id: u64,
-    pub with_legacy_bridge: bool,
-}
-
-/// Initialize hub: deploy contracts and accept ownership.
-/// Returns the deployment output containing all deployed addresses.
-pub async fn hub_init(
-    ctx: &mut ForgeContext<'_>,
-    input: &HubInitInput,
-) -> anyhow::Result<DeployL1CoreContractsOutput> {
-    // Step 1: Deploy hub contracts
-    logger::info("Deploying hub contracts...");
-    let deploy_input = DeployInput {
-        owner: input.owner,
-        era_chain_id: input.era_chain_id,
-        with_legacy_bridge: input.with_legacy_bridge,
-    };
-    let output = deploy(ctx, &deploy_input)?;
-
-    // Step 2: Accept ownership of deployed contracts
-    logger::info("Accepting ownership of hub contracts...");
-    let deployed = &output.deployed_addresses;
-    let accept_input = AcceptOwnershipInput {
-        bridgehub: deployed.bridgehub.bridgehub_proxy_addr,
-        asset_router: deployed.bridges.shared_bridge_proxy_addr,
-        stm_deployment_tracker: deployed.bridgehub.ctm_deployment_tracker_proxy_addr,
-        chain_asset_handler: Some(deployed.bridgehub.chain_asset_handler_proxy_addr),
-        governance: deployed.governance_addr,
-        chain_admin: deployed.chain_admin,
-    };
-    accept_ownership(ctx, &accept_input).await?;
-
-    Ok(output)
-}
+// ── CLI args ────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct HubInitArgs {
@@ -172,9 +135,6 @@ pub async fn run(args: HubInitArgs, shell: &Shell) -> anyhow::Result<()> {
 
     let accept_input = AcceptOwnershipInput {
         bridgehub: deployed.bridgehub.bridgehub_proxy_addr,
-        asset_router: deployed.bridges.shared_bridge_proxy_addr,
-        stm_deployment_tracker: deployed.bridgehub.ctm_deployment_tracker_proxy_addr,
-        chain_asset_handler: Some(deployed.bridgehub.chain_asset_handler_proxy_addr),
         governance: deployed.governance_addr,
         chain_admin: deployed.chain_admin,
     };
@@ -215,6 +175,42 @@ pub async fn run(args: HubInitArgs, shell: &Shell) -> anyhow::Result<()> {
     drop(execution_mode);
 
     Ok(())
+}
+
+/// Input parameters for hub init.
+#[derive(Debug, Clone)]
+pub struct HubInitInput {
+    pub owner: Address,
+    pub era_chain_id: u64,
+    pub with_legacy_bridge: bool,
+}
+
+/// Initialize hub: deploy contracts and accept ownership.
+/// Returns the deployment output containing all deployed addresses.
+pub async fn hub_init(
+    ctx: &mut ForgeContext<'_>,
+    input: &HubInitInput,
+) -> anyhow::Result<DeployL1CoreContractsOutput> {
+    // Step 1: Deploy hub contracts
+    logger::info("Deploying hub contracts...");
+    let deploy_input = DeployInput {
+        owner: input.owner,
+        era_chain_id: input.era_chain_id,
+        with_legacy_bridge: input.with_legacy_bridge,
+    };
+    let output = deploy(ctx, &deploy_input)?;
+
+    // Step 2: Accept ownership of deployed contracts
+    logger::info("Accepting ownership of hub contracts...");
+    let deployed = &output.deployed_addresses;
+    let accept_input = AcceptOwnershipInput {
+        bridgehub: deployed.bridgehub.bridgehub_proxy_addr,
+        governance: deployed.governance_addr,
+        chain_admin: deployed.chain_admin,
+    };
+    accept_ownership(ctx, &accept_input).await?;
+
+    Ok(output)
 }
 
 fn build_output(output: &DeployL1CoreContractsOutput, runner: &ForgeRunner) -> serde_json::Value {
