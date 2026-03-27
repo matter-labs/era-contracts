@@ -26,7 +26,7 @@ use crate::config::forge_interface::script_params::ForgeScriptParams;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ForgeScriptRun {
     pub script: PathBuf,
-    pub broadcast_file: PathBuf,
+    pub broadcast_file: Option<PathBuf>,
     pub payload: Value,
     pub ts_ms: i64,
 }
@@ -100,6 +100,7 @@ impl ForgeRunner {
         }
 
         let args = script.args.build();
+        let pre_run_ts_ms = Utc::now().timestamp_millis();
         let command_result = self.execute(&script, &args, false)?;
 
         if command_result.proposal_error() {
@@ -107,7 +108,7 @@ impl ForgeRunner {
         }
 
         if command_result.is_ok() {
-            self.record_run_latest(&script)?;
+            self.record_run(&script, pre_run_ts_ms)?;
         }
         Ok(command_result?)
     }
@@ -158,31 +159,56 @@ impl ForgeRunner {
         Ok(cmd.run())
     }
 
-    fn record_run_latest(&mut self, script: &ForgeScript) -> anyhow::Result<()> {
-        let broadcast_file = self.find_run_latest_file(script)?;
-        let payload = read_json(&broadcast_file).with_context(|| {
-            format!(
-                "Failed to read JSON from broadcast file: {}",
-                broadcast_file.display()
-            )
-        })?;
-        let run = ForgeScriptRun {
-            script: script.script_name().to_path_buf(),
+    /// Record the broadcast run produced by `script`.
+    /// Note, if script did not send any transactions, run-latest file won't be created.
+    fn record_run(&mut self, script: &ForgeScript, pre_run_ts_ms: i64) -> anyhow::Result<()> {
+        let script_name = script.script_name().to_path_buf();
+        let ts_ms = Utc::now().timestamp_millis();
+
+        let (broadcast_file, payload) = match self.find_run_latest_file(script)? {
+            None => {
+                // Assuming script did not send any transactions
+                (None, serde_json::Value::Null)
+            }
+            Some(broadcast_file) => {
+                let payload = read_json(&broadcast_file).with_context(|| {
+                    format!(
+                        "Failed to read JSON from broadcast file: {}",
+                        broadcast_file.display()
+                    )
+                })?;
+                let run_ts_raw = payload
+                    .get("timestamp")
+                    .and_then(|t| t.as_i64())
+                    .unwrap_or(0);
+                // Forge timestamp can be in seconds or millis. Normalize to millis.
+                let run_ts_ms = if run_ts_raw > 1_000_000_000_000 {
+                    run_ts_raw
+                } else {
+                    run_ts_raw * 1000
+                };
+                if run_ts_ms < pre_run_ts_ms {
+                    // Broadcast file predates this run - likely a stale file from a previous invocation
+                    (Some(broadcast_file), serde_json::Value::Null)
+                } else {
+                    (Some(broadcast_file), payload)
+                }
+            }
+        };
+        self.runs.push(ForgeScriptRun {
+            script: script_name,
             broadcast_file,
             payload,
-            ts_ms: Utc::now().timestamp_millis(),
-        };
-        self.runs.push(run.clone());
+            ts_ms,
+        });
         Ok(())
     }
 
-    fn find_run_latest_file(&self, script: &ForgeScript) -> anyhow::Result<PathBuf> {
+    /// Returns the path to the run latest file for `script` or `None` if doesn't exist.
+    fn find_run_latest_file(&self, script: &ForgeScript) -> anyhow::Result<Option<PathBuf>> {
         let root = script.base_path().join("broadcast");
         if !root.exists() {
-            return Err(anyhow::anyhow!(
-                "Broadcast root directory not found at {}",
-                root.display()
-            ));
+            return Ok(None);
         }
         let Some(script_name) = script.script_name().file_name() else {
             return Err(anyhow::anyhow!(
@@ -196,20 +222,14 @@ impl ForgeRunner {
             script_dir = script_dir.join("dry-run");
         }
         if !script_dir.exists() {
-            return Err(anyhow::anyhow!(
-                "Broadcast script directory not found at {}",
-                script_dir.display()
-            ));
+            return Ok(None);
         }
         let run_latest_filename = derive_run_latest_filename(script.sig());
         let run_latest_path = script_dir.join(run_latest_filename);
         if run_latest_path.exists() {
-            Ok(run_latest_path)
+            Ok(Some(run_latest_path))
         } else {
-            return Err(anyhow::anyhow!(
-                "Broadcast run latest file not found at {}",
-                run_latest_path.display()
-            ));
+            Ok(None)
         }
     }
 
@@ -263,7 +283,8 @@ fn derive_run_latest_filename(sig: Option<String>) -> String {
                 let prefix8 = &lower[..lower.len().min(8)];
                 format!("{prefix8}-latest.json")
             } else {
-                format!("{trimmed}-latest.json")
+                let fname = trimmed.split('(').next().unwrap_or(trimmed);
+                format!("{fname}-latest.json")
             }
         }
     }

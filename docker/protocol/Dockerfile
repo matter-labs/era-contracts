@@ -130,9 +130,10 @@ COPY --from=build /contracts/lib /contracts/lib
 COPY --from=build /contracts/AllContractsHashes.json /contracts/AllContractsHashes.json
 COPY --from=build /contracts/SystemConfig.json /contracts/SystemConfig.json
 
-# Disable foundry-zksync telemetry prompt
+# Disable foundry-zksync telemetry
 RUN mkdir -p /etc/xdg/zksync-tooling && \
-    echo '{"enabled": false}' > /etc/xdg/zksync-tooling/telemetry.json
+    echo '{"enabled":false,"instance_id":"00000000-0000-0000-0000-000000000000","created_at":"2024-01-01T00:00:00Z","config_path":null}' \
+    > /etc/xdg/zksync-tooling/telemetry.json
 
 # Sanity
 RUN forge --version && cast --version && anvil --version && protocol_ops --help
