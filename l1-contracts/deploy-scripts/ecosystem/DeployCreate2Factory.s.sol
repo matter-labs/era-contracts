@@ -29,18 +29,20 @@ contract DeployCreate2Factory is Script {
             return;
         }
 
-        vm.broadcast();
-        (bool success, ) = DETERMINISTIC_DEPLOYER.call{value: DEPLOYER_FUNDING}("");
-        require(success, "Failed to fund deployer");
-        console.log("Funded deployer at:", DETERMINISTIC_DEPLOYER);
+        // Fund deployer if needed
+        if (DETERMINISTIC_DEPLOYER.balance < DEPLOYER_FUNDING) {
+            uint256 toFund = DEPLOYER_FUNDING - DETERMINISTIC_DEPLOYER.balance;
+            vm.broadcast(msg.sender);
+            (bool success, ) = DETERMINISTIC_DEPLOYER.call{value: toFund}("");
+            require(success, "Failed to fund deployer");
+            console.log("Funded deployer at:", DETERMINISTIC_DEPLOYER);
+        }
 
         // Send the pre-signed deployment transaction
-        vm.broadcast();
+        vm.broadcast(DETERMINISTIC_DEPLOYER);
         vm.broadcastRawTransaction(DEPLOYMENT_TX);
 
-        // Verify deployment
         require(Utils.DETERMINISTIC_CREATE2_ADDRESS.code.length > 0, "CREATE2 factory deployment failed");
-
         console.log("CREATE2 factory deployed at:", Utils.DETERMINISTIC_CREATE2_ADDRESS);
     }
 }

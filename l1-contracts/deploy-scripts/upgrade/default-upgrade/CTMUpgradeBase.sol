@@ -26,6 +26,15 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 abstract contract CTMUpgradeBase is DeployCTMScript {
     function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual returns (bool);
 
+    function getEmptyVerifierParams() internal pure returns (VerifierParams memory) {
+        return
+            VerifierParams({
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            });
+    }
+    
     /// @notice Get protocol upgrade nonce from protocol version
     function getProtocolUpgradeNonce(uint256 protocolVersion) internal pure returns (uint256) {
         return (protocolVersion >> 32);

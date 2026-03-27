@@ -3,14 +3,13 @@
 ARG FOUNDRY_ARCH=linux_amd64
 ARG FOUNDRY_ZKSYNC_TAG=nightly-807f47ace7cdd90eed7190dc4481952cfaa25938
 ARG FOUNDRY_VANILLA_VERSION=v1.3.5
-ARG NODE_MAJOR=18
-ARG NODE_VERSION=18.20.8
+ARG NODE_MAJOR=20
 ARG RUST_TARGET=x86_64-unknown-linux-gnu
 ARG RUST_TOOLCHAIN=nightly-2025-09-19
 ARG YARN_VERSION=1.22.19
 
 ########################################
-# 1) Builder: produce artifacts
+# 1) Build
 ########################################
 FROM debian:bookworm-slim AS build
 
@@ -18,13 +17,12 @@ ARG FOUNDRY_ARCH
 ARG FOUNDRY_ZKSYNC_TAG
 ARG FOUNDRY_VANILLA_VERSION
 ARG NODE_MAJOR
-ARG NODE_VERSION
 ARG RUST_TARGET
 ARG RUST_TOOLCHAIN
 ARG YARN_VERSION
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    PATH=/root/.cargo/bin:/root/.local/bin:/usr/local/bin:$PATH \
+    PATH=/usr/local/bin:$PATH \
     YARN_CACHE_FOLDER=/tmp/yarn-cache
 
 # Build deps
@@ -33,10 +31,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential pkg-config libssl-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# Node 20 + Yarn 1.22.19
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+# Node + Yarn
+RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
  && apt-get update && apt-get install -y --no-install-recommends nodejs \
- && npm i -g yarn@1.22.19 \
+ && npm i -g yarn@${YARN_VERSION} \
  && npm cache clean --force \
  && rm -rf /var/lib/apt/lists/*
 
@@ -97,14 +95,15 @@ RUN rm -rf node_modules
 RUN yarn cache clean
 
 ########################################
-# 2) Runtime: sources + artifacts
+# 2) Runtime
 ########################################
 FROM debian:bookworm-slim
 
 # === Pass build arg for copying the correct binary ===
 ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/usr/local/bin:$PATH \
-    FOUNDRY_DISABLE_NIGHTLY_WARNING=1
+    FOUNDRY_DISABLE_NIGHTLY_WARNING=1 \
+    XDG_CONFIG_HOME=/etc/xdg
 
 # Minimal runtime deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -115,7 +114,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=build /usr/local/bin/forge /usr/local/bin/forge
 COPY --from=build /usr/local/bin/cast  /usr/local/bin/cast
 COPY --from=build /usr/local/bin/anvil /usr/local/bin/anvil
-# === Copy the new protocol_ops binary ===
+# === Copy protocol_ops binary ===
 COPY --from=build /usr/local/bin/protocol_ops /usr/local/bin/protocol_ops
 
 # === Set new WORKDIR and copy artifacts to /contracts/ ===
@@ -130,8 +129,8 @@ COPY --from=build /contracts/AllContractsHashes.json /contracts/AllContractsHash
 COPY --from=build /contracts/SystemConfig.json /contracts/SystemConfig.json
 
 # Disable foundry-zksync telemetry prompt
-RUN mkdir -p /root/.config/zksync-tooling && \
-    echo '{"enabled":false}' > /root/.config/zksync-tooling/telemetry.json
+RUN mkdir -p /etc/xdg/zksync-tooling && \
+    echo '{"enabled": false}' > /etc/xdg/zksync-tooling/telemetry.json
 
 # Sanity
 RUN forge --version && cast --version && anvil --version && protocol_ops --help
