@@ -17,13 +17,39 @@ rollup_da_manager = "0x064ac968CCad1948fceE025fD59c20b153c88072"
 # The chain ID of the legacy Gateway (9075 for mainnet)
 chain_id = 123
 
-# TODO(EVM-1221) Historical migration intervals for chains that used the legacy GW
-# Each entry represents a chain that settled on the legacy GW before V31
-# Format: chain_id, migrate_to_sl_batch, migrate_from_sl_batch
-# Note: migrate_from_sl_batch must be > migrate_to_sl_batch
-# These values should be filled in before V31 deployment based on actual historical data
-# Example for Era on mainnet (chain_id = 270):
-# [[legacy_gateway.chain_intervals]]
-# chain_id = 270
-# migrate_to_sl_batch = 0  # Set to actual batch number when Era migrated to legacy GW (0 is valid if migration happened before any batches)
-# migrate_from_sl_batch = 0  # Set to actual batch number when Era migrated back (must be > migrate_to_sl_batch)
+[[legacy_gateway.chain_intervals]]
+chain_id = 270
+migrate_to_sl_batch = 657297
+migrate_from_sl_batch = 661306
+sl_batch_lower_bound = 117
+sl_batch_upper_bound = 1818
+[[legacy_gateway.chain_intervals]]
+chain_id = 270
+migrate_to_sl_batch = 661504
+migrate_from_sl_batch = 665934
+sl_batch_lower_bound = 1828
+sl_batch_upper_bound = 7195
+[[legacy_gateway.chain_intervals]]
+chain_id = 270
+migrate_to_sl_batch = 665948
+migrate_from_sl_batch = 666082
+sl_batch_lower_bound = 7203
+sl_batch_upper_bound = 7460
+[[legacy_gateway.chain_intervals]]
+chain_id = 6475
+migrate_to_sl_batch = 5591
+migrate_from_sl_batch = 10038
+sl_batch_lower_bound = 4677
+sl_batch_upper_bound = 25245
+[[legacy_gateway.chain_intervals]]
+chain_id = 499
+migrate_to_sl_batch = 1775
+migrate_from_sl_batch = 53871
+sl_batch_lower_bound = 2918
+sl_batch_upper_bound = 25494
+[[legacy_gateway.chain_intervals]]
+chain_id = 37111
+migrate_to_sl_batch = 7371
+migrate_from_sl_batch = 8416
+sl_batch_lower_bound = 8663
+sl_batch_upper_bound = 26620
