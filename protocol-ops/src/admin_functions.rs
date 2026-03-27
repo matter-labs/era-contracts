@@ -1,18 +1,16 @@
+use crate::common::{
+    forge::{Forge, ForgeRunner, ForgeScript},
+    traits::{FileConfigTrait, ReadConfig},
+    wallets::Wallet,
+};
+use crate::config::forge_interface::script_params::ACCEPT_GOVERNANCE_SCRIPT_PARAMS;
+use crate::types::L2DACommitmentScheme;
 use ethers::{
     contract::BaseContract,
     types::{Address, Bytes, U256},
     utils::hex,
 };
 use lazy_static::lazy_static;
-use crate::common::{
-    forge::{Forge, ForgeRunner, ForgeScript},
-    traits::{FileConfigTrait, ReadConfig},
-    wallets::Wallet,
-};
-use crate::config::{
-    forge_interface::script_params::ACCEPT_GOVERNANCE_SCRIPT_PARAMS,
-};
-use crate::types::L2DACommitmentScheme;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -120,9 +118,9 @@ pub async fn call_script(
 
     let forge = match mode {
         AdminScriptMode::OnlySave => forge,
-        AdminScriptMode::Broadcast(ref wallet) => forge
-            .with_broadcast()
-            .with_wallet(wallet, runner.simulate),
+        AdminScriptMode::Broadcast(ref wallet) => {
+            forge.with_broadcast().with_wallet(wallet, runner.simulate)
+        }
     };
 
     let output_path = ACCEPT_GOVERNANCE_SCRIPT_PARAMS.output(&runner.foundry_scripts_path);

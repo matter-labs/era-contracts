@@ -36,7 +36,10 @@ pub async fn run(args: DeployCreate2Args) -> anyhow::Result<()> {
         &serde_json::json!({}),
     )?;
 
-    logger::info(format!("CREATE2 factory at: {}", DETERMINISTIC_CREATE2_ADDRESS));
+    logger::info(format!(
+        "CREATE2 factory at: {}",
+        DETERMINISTIC_CREATE2_ADDRESS
+    ));
 
     Ok(())
 }

@@ -5,9 +5,9 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::output::write_output_if_requested;
-use crate::common::SharedRunArgs;
 use crate::common::forge::{Forge, ForgeRunner, ForgeScriptArg};
 use crate::common::logger;
+use crate::common::SharedRunArgs;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct ChainUpgradeArgs {

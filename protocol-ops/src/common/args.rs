@@ -17,7 +17,11 @@ pub struct SharedRunArgs {
     pub private_key: Option<H256>,
 
     /// L1 RPC URL
-    #[clap(long, default_value = "http://localhost:8545", help_heading = "Execution")]
+    #[clap(
+        long,
+        default_value = "http://localhost:8545",
+        help_heading = "Execution"
+    )]
     pub l1_rpc_url: String,
     /// Simulate against anvil fork
     #[clap(long, help_heading = "Execution")]

@@ -11,13 +11,11 @@ use crate::common::{
     traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
 };
-use crate::config::{
-    forge_interface::{
-        deploy_ctm::{input::DeployCTMConfig, output::DeployCTMOutput},
-        deploy_ecosystem::input::InitialDeploymentConfig,
-        permanent_values::PermanentValuesConfig,
-        script_params::DEPLOY_CTM_SCRIPT_PARAMS,
-    },
+use crate::config::forge_interface::{
+    deploy_ctm::{input::DeployCTMConfig, output::DeployCTMOutput},
+    deploy_ecosystem::input::InitialDeploymentConfig,
+    permanent_values::PermanentValuesConfig,
+    script_params::DEPLOY_CTM_SCRIPT_PARAMS,
 };
 use crate::types::{L1Network, VMOption};
 
@@ -39,7 +37,11 @@ pub struct CtmDeployInput {
 }
 
 /// Deploy CTM contracts.
-pub fn deploy(runner: &mut ForgeRunner, auth: &Wallet, input: &CtmDeployInput) -> anyhow::Result<DeployCTMOutput> {
+pub fn deploy(
+    runner: &mut ForgeRunner,
+    auth: &Wallet,
+    input: &CtmDeployInput,
+) -> anyhow::Result<DeployCTMOutput> {
     let l1_network = L1Network::from_l1_rpc(&runner.rpc_url)?;
     let mut initial_deployment_config = InitialDeploymentConfig::default();
 
@@ -54,7 +56,10 @@ pub fn deploy(runner: &mut ForgeRunner, auth: &Wallet, input: &CtmDeployInput) -
         initial_deployment_config.create2_factory_addr,
         initial_deployment_config.create2_factory_salt,
     );
-    permanent_values.save(&runner.shell, PermanentValuesConfig::path(&runner.foundry_scripts_path))?;
+    permanent_values.save(
+        &runner.shell,
+        PermanentValuesConfig::path(&runner.foundry_scripts_path),
+    )?;
 
     let deploy_config = DeployCTMConfig::new(
         input.owner,
@@ -69,11 +74,17 @@ pub fn deploy(runner: &mut ForgeRunner, auth: &Wallet, input: &CtmDeployInput) -
     deploy_config.save(&runner.shell, input_path)?;
 
     let calldata = DEPLOY_CTM_FUNCTIONS
-        .encode("runWithBridgehub", (input.bridgehub, input.reuse_gov_and_admin))
+        .encode(
+            "runWithBridgehub",
+            (input.bridgehub, input.reuse_gov_and_admin),
+        )
         .map_err(|e| anyhow::anyhow!("Failed to encode calldata: {}", e))?;
 
     let forge = Forge::new(&runner.foundry_scripts_path)
-        .script(&DEPLOY_CTM_SCRIPT_PARAMS.script(), runner.forge_args.clone())
+        .script(
+            &DEPLOY_CTM_SCRIPT_PARAMS.script(),
+            runner.forge_args.clone(),
+        )
         .with_ffi()
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())

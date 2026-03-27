@@ -8,13 +8,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::commands::output::write_output_if_requested;
+use crate::common::paths;
 use crate::common::SharedRunArgs;
 use crate::common::{
     forge::{Forge, ForgeRunner, ForgeScriptArg},
     logger,
     wallets::Wallet,
 };
-use crate::common::paths;
 
 #[derive(Serialize)]
 struct EcosystemUpgradeOutInput {

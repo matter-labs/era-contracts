@@ -22,7 +22,10 @@ impl AnvilInstance {
 impl Drop for AnvilInstance {
     fn drop(&mut self) {
         if let Err(e) = self.child.kill() {
-            eprintln!("warning: failed to kill anvil (pid {}): {e}", self.child.id());
+            eprintln!(
+                "warning: failed to kill anvil (pid {}): {e}",
+                self.child.id()
+            );
         }
         // Reap the child to avoid zombie processes.
         let _ = self.child.wait();
@@ -56,10 +59,7 @@ pub fn start_anvil_fork(fork_url: &str) -> anyhow::Result<AnvilInstance> {
 
     let rpc_url = wait_for_ready(stdout, port, Duration::from_secs(30))?;
 
-    Ok(AnvilInstance {
-        child,
-        rpc_url,
-    })
+    Ok(AnvilInstance { child, rpc_url })
 }
 
 /// Read lines from anvil's stdout until we see the listening message.

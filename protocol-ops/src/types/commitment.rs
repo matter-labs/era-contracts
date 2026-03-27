@@ -62,4 +62,3 @@ impl FromStr for L2DACommitmentScheme {
         }
     }
 }
-

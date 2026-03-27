@@ -1,8 +1,6 @@
 use std::str::FromStr;
 
-use ethers::{
-    types::{Address, H256, U256},
-};
+use ethers::types::{Address, H256, U256};
 use serde::{Deserialize, Serialize};
 
 use crate::common::traits::FileConfigTrait;
@@ -37,7 +35,6 @@ impl Default for InitialDeploymentConfig {
 }
 
 impl FileConfigTrait for InitialDeploymentConfig {}
-
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DeployL1Config {

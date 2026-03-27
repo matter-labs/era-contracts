@@ -7,16 +7,13 @@ use serde::{Deserialize, Serialize};
 use crate::commands::ctm::init::{ctm_init, CtmInitInput};
 use crate::commands::ecosystem::deploy_create2::deploy_create2_factory;
 use crate::commands::hub::init::{hub_init, HubInitInput};
-use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
-use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
 use crate::commands::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{
-    constants::DETERMINISTIC_CREATE2_ADDRESS,
-    forge::ForgeRunner,
-    logger,
-    wallets::Wallet,
+    constants::DETERMINISTIC_CREATE2_ADDRESS, forge::ForgeRunner, logger, wallets::Wallet,
 };
+use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
+use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
 use crate::types::VMOption;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
@@ -89,8 +86,18 @@ pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
     )?;
 
     logger::info("Ecosystem initialized");
-    logger::info(format!("Bridgehub Proxy: {:#x}", output.hub.deployed_addresses.bridgehub.bridgehub_proxy_addr));
-    logger::info(format!("CTM Proxy: {:#x}", output.ctm.deployed_addresses.state_transition.state_transition_proxy_addr));
+    logger::info(format!(
+        "Bridgehub Proxy: {:#x}",
+        output.hub.deployed_addresses.bridgehub.bridgehub_proxy_addr
+    ));
+    logger::info(format!(
+        "CTM Proxy: {:#x}",
+        output
+            .ctm
+            .deployed_addresses
+            .state_transition
+            .state_transition_proxy_addr
+    ));
     Ok(())
 }
 

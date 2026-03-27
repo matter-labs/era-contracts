@@ -22,7 +22,9 @@ ARG RUST_TOOLCHAIN
 ARG YARN_VERSION
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    PATH=/usr/local/bin:$PATH \
+    PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH \
+    RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
     YARN_CACHE_FOLDER=/tmp/yarn-cache
 
 # Build deps
@@ -53,7 +55,7 @@ RUN curl -L -o /tmp/foundry-vanilla.tgz https://github.com/foundry-rs/foundry/re
 
 # === Install Rust ===
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-    sh -s -- -y --default-toolchain ${RUST_TOOLCHAIN}
+    sh -s -- -y --default-toolchain ${RUST_TOOLCHAIN} --no-modify-path
 
 # === Install target ===
 RUN rustup target add ${RUST_TARGET}

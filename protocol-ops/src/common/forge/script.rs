@@ -100,7 +100,8 @@ impl ForgeScript {
     /// (anvil auto-impersonation or unlocked node). Otherwise uses `--private-key`.
     pub fn with_wallet(self, wallet: &Wallet, simulate: bool) -> Self {
         if simulate || wallet.private_key.is_none() {
-            self.with_sender(format!("{:#x}", wallet.address)).with_unlocked()
+            self.with_sender(format!("{:#x}", wallet.address))
+                .with_unlocked()
         } else {
             let pk = wallet.private_key_h256().unwrap();
             self.with_private_key(pk)

@@ -7,11 +7,7 @@ use crate::commands::ctm::deploy::{deploy, CtmDeployInput};
 use crate::commands::hub::register_ctm::{register_ctm, RegisterCtmInput};
 use crate::commands::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
-use crate::common::{
-    forge::ForgeRunner,
-    logger,
-    wallets::Wallet,
-};
+use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
 use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
 use crate::types::VMOption;
 
@@ -79,7 +75,11 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
     let bridgehub_owner = Wallet::resolve(
         None,
         args.bridgehub_owner_private_key,
-        if args.reuse_gov_and_admin { &bridgehub_admin } else { &owner },
+        if args.reuse_gov_and_admin {
+            &bridgehub_admin
+        } else {
+            &owner
+        },
     )?;
 
     let ctm_input = CtmInitInput {
@@ -92,9 +92,19 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
         create2_factory_addr: args.create2_factory_addr,
         create2_factory_salt: args.create2_factory_salt,
     };
-    let ctm_output = ctm_init(&mut runner, &deployer, &bridgehub_owner, &bridgehub_admin, &ctm_input).await?;
+    let ctm_output = ctm_init(
+        &mut runner,
+        &deployer,
+        &bridgehub_owner,
+        &bridgehub_admin,
+        &ctm_input,
+    )
+    .await?;
 
-    let ctm_proxy = ctm_output.deployed_addresses.state_transition.state_transition_proxy_addr;
+    let ctm_proxy = ctm_output
+        .deployed_addresses
+        .state_transition
+        .state_transition_proxy_addr;
     write_output_if_requested(
         "ctm.init",
         args.shared.out_path.as_deref(),

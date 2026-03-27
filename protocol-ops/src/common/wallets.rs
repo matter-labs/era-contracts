@@ -72,7 +72,10 @@ impl Wallet {
             }
             Ok(Self::new(wallet))
         } else if let Some(addr) = address {
-            Ok(Self { address: addr, private_key: None })
+            Ok(Self {
+                address: addr,
+                private_key: None,
+            })
         } else {
             anyhow::bail!("either --private-key or --sender must be provided")
         }
@@ -103,7 +106,10 @@ impl Wallet {
                 }
                 Ok(Self::new(wallet))
             }
-            (Some(addr), None) => Ok(Self { address: addr, private_key: None }),
+            (Some(addr), None) => Ok(Self {
+                address: addr,
+                private_key: None,
+            }),
             (None, None) => Ok(fallback.clone()),
         }
     }

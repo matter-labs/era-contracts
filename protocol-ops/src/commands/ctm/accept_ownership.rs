@@ -1,9 +1,6 @@
-use ethers::types::Address;
 use crate::admin_functions::{accept_admin, accept_owner};
-use crate::common::{
-    forge::ForgeRunner,
-    wallets::Wallet,
-};
+use crate::common::{forge::ForgeRunner, wallets::Wallet};
+use ethers::types::Address;
 
 /// Input parameters for accepting ownership of CTM contracts.
 #[derive(Debug, Clone)]

@@ -25,33 +25,36 @@ use crate::common::{
     traits::{FileConfigTrait, ReadConfig, SaveConfig},
     wallets::Wallet,
 };
-use crate::config::{
-    forge_interface::{
-        deploy_l2_contracts::output::{
-            ConsensusRegistryOutput, DefaultL2UpgradeOutput, Multicall3Output,
-            TimestampAsserterOutput,
-        },
-        permanent_values::PermanentValuesConfig,
-        register_chain::{
-            input::{NewChainParams, RegisterChainL1Config},
-            output::RegisterChainOutput,
-        },
-        script_params::{
-            DEPLOY_L2_CONTRACTS_SCRIPT_PARAMS, DEPLOY_PAYMASTER_SCRIPT_PARAMS,
-            ENABLE_EVM_EMULATOR_PARAMS, REGISTER_CHAIN_SCRIPT_PARAMS,
-            REGISTER_ON_ALL_CHAINS_SCRIPT_PARAMS, SETUP_LEGACY_BRIDGE,
-        },
-    }
+use crate::config::forge_interface::{
+    deploy_l2_contracts::output::{
+        ConsensusRegistryOutput, DefaultL2UpgradeOutput, Multicall3Output, TimestampAsserterOutput,
+    },
+    permanent_values::PermanentValuesConfig,
+    register_chain::{
+        input::{NewChainParams, RegisterChainL1Config},
+        output::RegisterChainOutput,
+    },
+    script_params::{
+        DEPLOY_L2_CONTRACTS_SCRIPT_PARAMS, DEPLOY_PAYMASTER_SCRIPT_PARAMS,
+        ENABLE_EVM_EMULATOR_PARAMS, REGISTER_CHAIN_SCRIPT_PARAMS,
+        REGISTER_ON_ALL_CHAINS_SCRIPT_PARAMS, SETUP_LEGACY_BRIDGE,
+    },
 };
 use crate::types::{DAValidatorType, L2ChainId, L2DACommitmentScheme, VMOption};
 
 lazy_static! {
-    static ref REGISTER_CHAIN_FUNCTIONS: BaseContract = BaseContract::from(IREGISTERZKCHAINABI_ABI.clone());
-    static ref DEPLOY_L2_FUNCTIONS: BaseContract = BaseContract::from(IDEPLOYL2CONTRACTSABI_ABI.clone());
-    static ref DEPLOY_PAYMASTER_FUNCTIONS: BaseContract = BaseContract::from(IDEPLOYPAYMASTERABI_ABI.clone());
-    static ref REGISTER_ON_ALL_CHAINS_FUNCTIONS: BaseContract = BaseContract::from(IREGISTERONALLCHAINSABI_ABI.clone());
-    static ref ENABLE_EVM_EMULATOR_FUNCTIONS: BaseContract = BaseContract::from(IENABLEEVMEMULATORABI_ABI.clone());
-    static ref SETUP_LEGACY_BRIDGE_FUNCTIONS: BaseContract = BaseContract::from(ISETUPLEGACYBRIDGEABI_ABI.clone());
+    static ref REGISTER_CHAIN_FUNCTIONS: BaseContract =
+        BaseContract::from(IREGISTERZKCHAINABI_ABI.clone());
+    static ref DEPLOY_L2_FUNCTIONS: BaseContract =
+        BaseContract::from(IDEPLOYL2CONTRACTSABI_ABI.clone());
+    static ref DEPLOY_PAYMASTER_FUNCTIONS: BaseContract =
+        BaseContract::from(IDEPLOYPAYMASTERABI_ABI.clone());
+    static ref REGISTER_ON_ALL_CHAINS_FUNCTIONS: BaseContract =
+        BaseContract::from(IREGISTERONALLCHAINSABI_ABI.clone());
+    static ref ENABLE_EVM_EMULATOR_FUNCTIONS: BaseContract =
+        BaseContract::from(IENABLEEVMEMULATORABI_ABI.clone());
+    static ref SETUP_LEGACY_BRIDGE_FUNCTIONS: BaseContract =
+        BaseContract::from(ISETUPLEGACYBRIDGEABI_ABI.clone());
 }
 
 // ── CLI args ────────────────────────────────────────────────────────────────
@@ -99,10 +102,18 @@ pub struct ChainInitArgs {
 
     // Advanced input
     /// Token multiplier setter address
-    #[clap(long, default_value = "0x0000000000000000000000000000000000000000", help_heading = "Advanced input")]
+    #[clap(
+        long,
+        default_value = "0x0000000000000000000000000000000000000000",
+        help_heading = "Advanced input"
+    )]
     pub token_multiplier_setter: Option<Address>,
     /// Base token address (default: ETH = 0x0...01)
-    #[clap(long, default_value = "0x0000000000000000000000000000000000000001", help_heading = "Advanced input")]
+    #[clap(
+        long,
+        default_value = "0x0000000000000000000000000000000000000001",
+        help_heading = "Advanced input"
+    )]
     pub base_token_addr: Address,
     /// Base token price ratio relative to ETH (numerator/denominator)
     /// e.g. "4000/1" means: 1 ETH = 4000 base tokens
@@ -212,7 +223,10 @@ pub async fn chain_init(
     input: &ChainInitInput,
 ) -> anyhow::Result<FullChainInitOutput> {
     // Register chain on CTM
-    logger::step(format!("Registering chain ({}) on CTM...", input.chain_params.chain_id.as_u64()));
+    logger::step(format!(
+        "Registering chain ({}) on CTM...",
+        input.chain_params.chain_id.as_u64()
+    ));
     let register_output = register_chain(runner, bridgehub_admin, input)?;
     let diamond_proxy = register_output.diamond_proxy_addr;
     let chain_admin = register_output.chain_admin_addr;
@@ -266,8 +280,13 @@ pub async fn chain_init(
 
         logger::step("Deploying L2 contracts...");
         let l2_output = deploy_l2_contracts_step(
-            runner, deployer, input.bridgehub, input.chain_params.chain_id.as_u64(),
-            governance, input.chain_params.owner, input.chain_params.da_mode,
+            runner,
+            deployer,
+            input.bridgehub,
+            input.chain_params.chain_id.as_u64(),
+            governance,
+            input.chain_params.owner,
+            input.chain_params.da_mode,
             input.with_legacy_bridge,
         )?;
         full_output.l2_default_upgrader = Some(l2_output.l2_default_upgrader);
@@ -279,7 +298,10 @@ pub async fn chain_init(
         if input.deploy_paymaster {
             logger::step("Deploying paymaster...");
             let paymaster_addr = deploy_paymaster_step(
-                runner, deployer, input.bridgehub, input.chain_params.chain_id.as_u64(),
+                runner,
+                deployer,
+                input.bridgehub,
+                input.chain_params.chain_id.as_u64(),
             )?;
             full_output.paymaster_addr = Some(paymaster_addr);
             logger::info(format!("Paymaster deployed at: {:#x}", paymaster_addr));
@@ -288,7 +310,10 @@ pub async fn chain_init(
         // Register on all chains
         logger::step("Registering chain on all other chains...");
         register_on_all_chains_step(
-            runner, deployer, input.bridgehub, input.chain_params.chain_id.as_u64(),
+            runner,
+            deployer,
+            input.bridgehub,
+            input.chain_params.chain_id.as_u64(),
         )?;
     }
 
@@ -302,7 +327,10 @@ pub async fn chain_init(
     if input.with_legacy_bridge && !input.skip_priority_txs {
         logger::step("Setting up legacy bridge...");
         setup_legacy_bridge_step(
-            runner, deployer, input.bridgehub, input.chain_params.chain_id.as_u64(),
+            runner,
+            deployer,
+            input.bridgehub,
+            input.chain_params.chain_id.as_u64(),
         )?;
     }
 
@@ -317,7 +345,10 @@ pub fn register_chain(
 ) -> anyhow::Result<RegisterChainOutput> {
     let salt = input.create2_factory_salt.unwrap_or(H256::zero());
     let permanent_values = PermanentValuesConfig::new(input.create2_factory_addr, salt);
-    permanent_values.save(&runner.shell, PermanentValuesConfig::path(&runner.foundry_scripts_path))?;
+    permanent_values.save(
+        &runner.shell,
+        PermanentValuesConfig::path(&runner.foundry_scripts_path),
+    )?;
 
     let deploy_config = RegisterChainL1Config::new(
         &input.chain_params,
@@ -330,11 +361,17 @@ pub fn register_chain(
     deploy_config.save(&runner.shell, input_path)?;
 
     let calldata = REGISTER_CHAIN_FUNCTIONS
-        .encode("run", (input.ctm_proxy, input.chain_params.chain_id.as_u64()))
+        .encode(
+            "run",
+            (input.ctm_proxy, input.chain_params.chain_id.as_u64()),
+        )
         .map_err(|e| anyhow::anyhow!("Failed to encode calldata: {}", e))?;
 
     let forge = Forge::new(&runner.foundry_scripts_path)
-        .script(&REGISTER_CHAIN_SCRIPT_PARAMS.script(), runner.forge_args.clone())
+        .script(
+            &REGISTER_CHAIN_SCRIPT_PARAMS.script(),
+            runner.forge_args.clone(),
+        )
         .with_ffi()
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
@@ -352,12 +389,18 @@ pub fn register_chain(
 fn parse_ratio(s: &str) -> anyhow::Result<(u64, u64)> {
     let parts: Vec<&str> = s.split('/').collect();
     if parts.len() != 2 {
-        anyhow::bail!("Invalid ratio format '{}'. Expected 'numerator/denominator' (e.g. '4000/1')", s);
+        anyhow::bail!(
+            "Invalid ratio format '{}'. Expected 'numerator/denominator' (e.g. '4000/1')",
+            s
+        );
     }
-    let num: u64 = parts[0].trim().parse()
+    let num: u64 = parts[0]
+        .trim()
+        .parse()
         .map_err(|_| anyhow::anyhow!("Invalid numerator '{}' in ratio '{}'", parts[0].trim(), s))?;
-    let den: u64 = parts[1].trim().parse()
-        .map_err(|_| anyhow::anyhow!("Invalid denominator '{}' in ratio '{}'", parts[1].trim(), s))?;
+    let den: u64 = parts[1].trim().parse().map_err(|_| {
+        anyhow::anyhow!("Invalid denominator '{}' in ratio '{}'", parts[1].trim(), s)
+    })?;
     if den == 0 {
         anyhow::bail!("Denominator cannot be zero in ratio '{}'", s);
     }
@@ -382,7 +425,10 @@ fn query_bridgehub(rpc_url: &str, ctm_proxy: Address) -> anyhow::Result<Address>
             .block_on(fut)?
     };
     if result.len() < 32 {
-        anyhow::bail!("Invalid response from BRIDGE_HUB() call on CTM proxy {:#x}", ctm_proxy);
+        anyhow::bail!(
+            "Invalid response from BRIDGE_HUB() call on CTM proxy {:#x}",
+            ctm_proxy
+        );
     }
     Ok(Address::from_slice(&result[12..32]))
 }
@@ -398,7 +444,10 @@ fn enable_evm_emulator_step(
         .map_err(|e| anyhow::anyhow!("Failed to encode calldata: {}", e))?;
 
     let forge = Forge::new(&runner.foundry_scripts_path)
-        .script(&ENABLE_EVM_EMULATOR_PARAMS.script(), runner.forge_args.clone())
+        .script(
+            &ENABLE_EVM_EMULATOR_PARAMS.script(),
+            runner.forge_args.clone(),
+        )
         .with_ffi()
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
@@ -420,16 +469,29 @@ fn deploy_l2_contracts_step(
     da_mode: DAValidatorType,
     with_legacy_bridge: bool,
 ) -> anyhow::Result<FullL2DeployOutput> {
-    let function_name = if with_legacy_bridge { "runWithLegacyBridge" } else { "run" };
+    let function_name = if with_legacy_bridge {
+        "runWithLegacyBridge"
+    } else {
+        "run"
+    };
     let calldata = DEPLOY_L2_FUNCTIONS
-        .encode(function_name, (
-            bridgehub, U256::from(chain_id), governance, consensus_registry_owner,
-            U256::from(da_mode.to_u8()),
-        ))
+        .encode(
+            function_name,
+            (
+                bridgehub,
+                U256::from(chain_id),
+                governance,
+                consensus_registry_owner,
+                U256::from(da_mode.to_u8()),
+            ),
+        )
         .map_err(|e| anyhow::anyhow!("Failed to encode deploy_l2 calldata: {}", e))?;
 
     let forge = Forge::new(&runner.foundry_scripts_path)
-        .script(&DEPLOY_L2_CONTRACTS_SCRIPT_PARAMS.script(), runner.forge_args.clone())
+        .script(
+            &DEPLOY_L2_CONTRACTS_SCRIPT_PARAMS.script(),
+            runner.forge_args.clone(),
+        )
         .with_ffi()
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
@@ -464,7 +526,10 @@ fn deploy_paymaster_step(
         .map_err(|e| anyhow::anyhow!("Failed to encode deploy_paymaster calldata: {}", e))?;
 
     let forge = Forge::new(&runner.foundry_scripts_path)
-        .script(&DEPLOY_PAYMASTER_SCRIPT_PARAMS.script(), runner.forge_args.clone())
+        .script(
+            &DEPLOY_PAYMASTER_SCRIPT_PARAMS.script(),
+            runner.forge_args.clone(),
+        )
         .with_ffi()
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
@@ -490,7 +555,10 @@ fn register_on_all_chains_step(
         .map_err(|e| anyhow::anyhow!("Failed to encode register_on_all_chains calldata: {}", e))?;
 
     let forge = Forge::new(&runner.foundry_scripts_path)
-        .script(&REGISTER_ON_ALL_CHAINS_SCRIPT_PARAMS.script(), runner.forge_args.clone())
+        .script(
+            &REGISTER_ON_ALL_CHAINS_SCRIPT_PARAMS.script(),
+            runner.forge_args.clone(),
+        )
         .with_ffi()
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
@@ -613,8 +681,10 @@ pub struct ChainInitOutputData {
 impl ChainInitOutputData {
     pub fn from_full_output(output: &FullChainInitOutput) -> Self {
         let l2_contracts = match (
-            output.l2_default_upgrader, output.consensus_registry_proxy,
-            output.multicall3, output.timestamp_asserter,
+            output.l2_default_upgrader,
+            output.consensus_registry_proxy,
+            output.multicall3,
+            output.timestamp_asserter,
         ) {
             (Some(upgrader), Some(consensus), Some(multicall3), Some(ts_asserter)) => {
                 Some(ChainInitL2Contracts {

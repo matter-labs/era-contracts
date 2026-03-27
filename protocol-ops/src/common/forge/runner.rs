@@ -16,8 +16,7 @@ use crate::common::{
     anvil::{self, AnvilInstance},
     cmd::{Cmd, CmdResult},
     ethereum::query_chain_id_sync,
-    logger,
-    paths,
+    logger, paths,
     traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
 };
@@ -146,7 +145,10 @@ impl ForgeRunner {
     ) -> anyhow::Result<CmdResult<()>> {
         let script_path = script.script_name().as_os_str();
         let _dir_guard = self.shell.push_dir(script.base_path());
-        let mut cmd = Cmd::new(cmd!(self.shell, "forge script {script_path} --legacy {args...}"));
+        let mut cmd = Cmd::new(cmd!(
+            self.shell,
+            "forge script {script_path} --legacy {args...}"
+        ));
         for (key, value) in &script.envs {
             cmd = cmd.env(key, value);
         }

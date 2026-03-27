@@ -1,11 +1,7 @@
+use crate::common::{forge::ForgeRunner, wallets::Wallet};
 use ethers::types::Address;
-use crate::common::{
-    forge::ForgeRunner,
-    wallets::Wallet,
-};
 
 use crate::admin_functions::{accept_admin, accept_owner_aggregated};
-
 
 /// Input parameters for accepting ownership of hub contracts.
 #[derive(Debug, Clone)]

@@ -5,12 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::commands::hub::accept_ownership::{accept_ownership, AcceptOwnershipInput};
 use crate::commands::hub::deploy::{deploy, DeployInput};
 use crate::commands::output::write_output_if_requested;
-use crate::common::{
-    forge::ForgeRunner,
-    SharedRunArgs,
-    logger,
-    wallets::Wallet,
-};
+use crate::common::{forge::ForgeRunner, logger, wallets::Wallet, SharedRunArgs};
 use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
 
 // ── CLI args ────────────────────────────────────────────────────────────────

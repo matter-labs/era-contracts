@@ -60,7 +60,6 @@ impl L2ChainId {
     pub fn as_u64(&self) -> u64 {
         self.0
     }
-
 }
 
 impl FromStr for L2ChainId {

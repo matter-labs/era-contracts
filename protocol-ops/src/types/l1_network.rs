@@ -29,7 +29,7 @@ pub enum L1Network {
 }
 
 impl L1Network {
-   pub fn from_l1_rpc(rpc_url: &str) -> anyhow::Result<Self> {
+    pub fn from_l1_rpc(rpc_url: &str) -> anyhow::Result<Self> {
         let chain_id = crate::common::ethereum::query_chain_id_sync(rpc_url)?;
         match chain_id {
             1 => Ok(Self::Mainnet),
@@ -45,7 +45,9 @@ impl L1Network {
         match self {
             L1Network::Localhost => None,
             L1Network::Sepolia => None,
-            L1Network::Holesky => Some(Address::from_str("0x73d59fe232fce421d1365d6a5beec49acde3d0d9").unwrap()),
+            L1Network::Holesky => {
+                Some(Address::from_str("0x73d59fe232fce421d1365d6a5beec49acde3d0d9").unwrap())
+            }
             L1Network::Mainnet => None,
         }
     }

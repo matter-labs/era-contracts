@@ -1,19 +1,13 @@
-use ethers::types::{Address, H256};
-use crate::common::{
-    forge::ForgeRunner,
-    traits::SaveConfig,
-    wallets::Wallet,
-};
-use crate::config::{
-    forge_interface::{
-        deploy_ecosystem::{
-            input::{DeployL1Config, InitialDeploymentConfig},
-            output::DeployL1CoreContractsOutput,
-        },
-        permanent_values::PermanentValuesConfig,
-        script_params::DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS,
+use crate::common::{forge::ForgeRunner, traits::SaveConfig, wallets::Wallet};
+use crate::config::forge_interface::{
+    deploy_ecosystem::{
+        input::{DeployL1Config, InitialDeploymentConfig},
+        output::DeployL1CoreContractsOutput,
     },
+    permanent_values::PermanentValuesConfig,
+    script_params::DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS,
 };
+use ethers::types::{Address, H256};
 
 /// Input parameters for deploying hub contracts.
 #[derive(Debug, Clone)]
@@ -26,7 +20,11 @@ pub struct DeployInput {
 }
 
 /// Deploy hub contracts and return the output.
-pub fn deploy(runner: &mut ForgeRunner, auth: &Wallet, input: &DeployInput) -> anyhow::Result<DeployL1CoreContractsOutput> {
+pub fn deploy(
+    runner: &mut ForgeRunner,
+    auth: &Wallet,
+    input: &DeployInput,
+) -> anyhow::Result<DeployL1CoreContractsOutput> {
     let mut initial_config = InitialDeploymentConfig::default();
 
     if let Some(addr) = input.create2_factory_addr {
@@ -40,7 +38,10 @@ pub fn deploy(runner: &mut ForgeRunner, auth: &Wallet, input: &DeployInput) -> a
         initial_config.create2_factory_addr,
         initial_config.create2_factory_salt,
     );
-    permanent_values.save(&runner.shell, PermanentValuesConfig::path(&runner.foundry_scripts_path))?;
+    permanent_values.save(
+        &runner.shell,
+        PermanentValuesConfig::path(&runner.foundry_scripts_path),
+    )?;
 
     let deploy_config = DeployL1Config::new(
         input.owner,
@@ -49,5 +50,9 @@ pub fn deploy(runner: &mut ForgeRunner, auth: &Wallet, input: &DeployInput) -> a
         input.with_legacy_bridge,
     );
 
-    runner.run_script(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS, &deploy_config, auth)
+    runner.run_script(
+        &DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS,
+        &deploy_config,
+        auth,
+    )
 }
