@@ -1,49 +1,40 @@
 use clap::Parser;
-use ethers::types::{Address, H256};
+use serde::{Deserialize, Serialize};
+
+use crate::commands::output::write_output_if_requested;
+use crate::common::SharedRunArgs;
 use crate::common::{
     constants::DETERMINISTIC_CREATE2_ADDRESS,
-    forge::{Forge, ForgeRunner, ForgeScriptArgs},
+    forge::{Forge, ForgeRunner},
     logger,
     wallets::Wallet,
 };
-use crate::commands::output::{write_output_if_requested, OutputArgs};
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct DeployCreate2Args {
-    // Execution
-    /// L1 RPC URL
-    #[clap(long, default_value = "http://localhost:8545", help_heading = "Execution")]
-    pub l1_rpc_url: String,
-    /// Simulate against anvil fork
-    #[clap(long, help_heading = "Execution")]
-    pub simulate: bool,
-    /// Sender address
-    #[clap(long, help_heading = "Execution")]
-    pub sender: Option<Address>,
-    /// Sender private key
-    #[clap(long, visible_alias = "pk", help_heading = "Execution")]
-    pub private_key: Option<H256>,
-
-    // Output
     #[clap(flatten)]
     #[serde(flatten)]
-    pub output_args: OutputArgs,
-
-    // Forge options
-    #[clap(flatten)]
-    #[serde(flatten)]
-    pub forge_args: ForgeScriptArgs,
+    pub shared: SharedRunArgs,
 }
 
 pub async fn run(args: DeployCreate2Args) -> anyhow::Result<()> {
-    let deployer = Wallet::parse(args.private_key, args.sender)?;
-    let mut runner = ForgeRunner::new(args.simulate, &args.l1_rpc_url, args.forge_args.clone())?;
+    let deployer = Wallet::parse(args.shared.private_key, args.shared.sender)?;
+    let mut runner = ForgeRunner::new(
+        args.shared.simulate,
+        &args.shared.l1_rpc_url,
+        args.shared.forge_args.clone(),
+    )?;
 
     logger::step("Deploying CREATE2 factory...");
     deploy_create2_factory(&mut runner, &deployer)?;
 
-    write_output_if_requested(&args.output_args, &runner, &serde_json::json!({}), &serde_json::json!({}))?;
+    write_output_if_requested(
+        "ecosystem.deploy-create2",
+        args.shared.out_path.as_deref(),
+        &runner,
+        &serde_json::json!({}),
+        &serde_json::json!({}),
+    )?;
 
     logger::info(format!("CREATE2 factory at: {}", DETERMINISTIC_CREATE2_ADDRESS));
 

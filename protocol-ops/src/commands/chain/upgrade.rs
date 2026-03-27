@@ -1,22 +1,16 @@
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::Path;
 
-use crate::common::forge::ForgeScriptArgs;
-use crate::common::logger;
-use crate::common::paths;
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::H256;
 use serde::{Deserialize, Serialize};
+
+use crate::commands::output::write_output_if_requested;
+use crate::common::SharedRunArgs;
+use crate::common::forge::{Forge, ForgeRunner, ForgeScriptArg};
+use crate::common::logger;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct ChainUpgradeArgs {
-    /// L1 RPC URL
-    #[clap(long, default_value = "http://localhost:8545")]
-    pub l1_rpc_url: String,
-    /// Governor private key
-    #[clap(long)]
-    pub private_key: H256,
     /// Chain diamond proxy address
     #[clap(long)]
     pub chain_address: String,
@@ -29,35 +23,61 @@ pub struct ChainUpgradeArgs {
     /// Skip broadcasting transactions
     #[clap(long, default_value_t = false)]
     pub skip_broadcast: bool,
+
     #[clap(flatten)]
     #[serde(flatten)]
-    pub forge_args: ForgeScriptArgs,
+    pub shared: SharedRunArgs,
+}
+
+#[derive(Serialize)]
+struct ChainUpgradeOutputPayload {
+    chain_address: String,
+    admin_address: String,
+    access_control_restriction: String,
+    skip_broadcast: bool,
 }
 
 pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
-    let contracts_path = resolve_l1_contracts_path(&paths::contracts_root())?;
-    let script_path = "deploy-scripts/AdminFunctions.s.sol";
+    let private_key = args
+        .shared
+        .private_key
+        .ok_or_else(|| anyhow::anyhow!("--private-key is required"))?;
 
-    let mut cmd = Command::new("forge");
-    cmd.arg("script")
-        .arg(script_path)
-        .arg("--sig")
-        .arg("upgradeChainFromCTM(address,address,address)")
-        .arg(&args.chain_address)
-        .arg(&args.admin_address)
-        .arg(&args.access_control_restriction)
-        .arg("--rpc-url")
-        .arg(&args.l1_rpc_url)
-        .arg("--private-key")
-        .arg(format!("{:#x}", args.private_key))
-        .arg("--ffi")
-        .arg("--gas-limit")
-        .arg("1000000000000")
-        .current_dir(&contracts_path);
-
-    if !args.skip_broadcast {
-        cmd.arg("--broadcast");
+    let mut runner = ForgeRunner::new(
+        args.shared.simulate,
+        &args.shared.l1_rpc_url,
+        args.shared.forge_args.clone(),
+    )?;
+    let script_path = Path::new("deploy-scripts/AdminFunctions.s.sol");
+    let script_full_path = runner.foundry_scripts_path.join(script_path);
+    if !script_full_path.exists() {
+        anyhow::bail!("Script not found: {}", script_full_path.display());
     }
+
+    let mut script_args = runner.forge_args.clone();
+    script_args.add_arg(ForgeScriptArg::Sig {
+        sig: "upgradeChainFromCTM(address,address,address)".to_string(),
+    });
+    script_args.add_arg(ForgeScriptArg::RpcUrl {
+        url: runner.rpc_url.clone(),
+    });
+    script_args.add_arg(ForgeScriptArg::Ffi);
+    script_args.add_arg(ForgeScriptArg::GasLimit {
+        gas_limit: 1000000000000,
+    });
+    script_args.add_arg(ForgeScriptArg::PrivateKey {
+        private_key: format!("{:#x}", private_key),
+    });
+    if !args.skip_broadcast {
+        script_args.add_arg(ForgeScriptArg::Broadcast);
+    }
+    script_args.additional_args.extend([
+        args.chain_address.clone(),
+        args.admin_address.clone(),
+        args.access_control_restriction.clone(),
+    ]);
+
+    let forge = Forge::new(&runner.foundry_scripts_path).script(script_path, script_args);
 
     logger::step("Running chain upgrade via AdminFunctions.s.sol");
     logger::info(format!("Chain address: {}", args.chain_address));
@@ -66,35 +86,28 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
         "Access control restriction: {}",
         args.access_control_restriction
     ));
-    logger::info(format!("RPC URL: {}", args.l1_rpc_url));
+    logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
     logger::info(format!("Broadcast: {}", !args.skip_broadcast));
 
-    let output = cmd
-        .output()
+    runner
+        .run(forge)
         .context("Failed to execute forge script for chain upgrade")?;
-    if !output.status.success() {
-        anyhow::bail!(
-            "Forge script failed:\nSTDOUT:\n{}\nSTDERR:\n{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+
+    let empty_input = serde_json::json!({});
+    let out_payload = ChainUpgradeOutputPayload {
+        chain_address: args.chain_address.clone(),
+        admin_address: args.admin_address.clone(),
+        access_control_restriction: args.access_control_restriction.clone(),
+        skip_broadcast: args.skip_broadcast,
+    };
+    write_output_if_requested(
+        "chain.upgrade",
+        args.shared.out_path.as_deref(),
+        &runner,
+        &empty_input,
+        &out_payload,
+    )?;
 
     logger::success("Chain upgrade completed");
     Ok(())
-}
-
-fn resolve_l1_contracts_path(repo_root: &Path) -> anyhow::Result<PathBuf> {
-    let direct = repo_root.join("l1-contracts");
-    if direct.exists() {
-        return Ok(direct);
-    }
-    let nested = repo_root.join("contracts").join("l1-contracts");
-    if nested.exists() {
-        return Ok(nested);
-    }
-    anyhow::bail!(
-        "Could not locate l1-contracts under {} (checked l1-contracts and contracts/l1-contracts)",
-        repo_root.display()
-    )
 }

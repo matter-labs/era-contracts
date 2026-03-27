@@ -4,9 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::commands::hub::accept_ownership::{accept_ownership, AcceptOwnershipInput};
 use crate::commands::hub::deploy::{deploy, DeployInput};
-use crate::commands::output::{write_output_if_requested, OutputArgs};
+use crate::commands::output::write_output_if_requested;
 use crate::common::{
-    forge::{ForgeRunner, ForgeScriptArgs},
+    forge::ForgeRunner,
+    SharedRunArgs,
     logger,
     wallets::Wallet,
 };
@@ -16,35 +17,18 @@ use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContra
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct HubInitArgs {
-    // Signers
-    /// Sender address
-    #[clap(long, help_heading = "Signers")]
-    pub sender: Option<Address>,
     /// Owner address (default: sender)
     #[clap(long, help_heading = "Signers")]
     pub owner: Option<Address>,
 
-    // Auth
-    /// Sender private key
-    #[clap(long, visible_alias = "pk", help_heading = "Auth")]
-    pub private_key: Option<H256>,
     /// Owner private key
     #[clap(long, visible_alias = "owner-pk", help_heading = "Auth")]
     pub owner_private_key: Option<H256>,
 
-    // Execution
-    /// L1 RPC URL
-    #[clap(long, default_value = "http://localhost:8545", help_heading = "Execution")]
-    pub l1_rpc_url: String,
-    /// Simulate against anvil fork
-    #[clap(long, help_heading = "Execution")]
-    pub simulate: bool,
-
-    // Output
     #[clap(flatten)]
     #[serde(flatten)]
-    pub output_args: OutputArgs,
-    
+    pub shared: SharedRunArgs,
+
     // Advanced input
     /// Era chain ID
     #[clap(long, default_value_t = 270, help_heading = "Advanced input")]
@@ -58,20 +42,19 @@ pub struct HubInitArgs {
     /// CREATE2 factory salt
     #[clap(long, help_heading = "Advanced input")]
     pub create2_factory_salt: Option<H256>,
-
-    // Forge options
-    #[clap(flatten)]
-    #[serde(flatten)]
-    pub forge_args: ForgeScriptArgs,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
 
 pub async fn run(args: HubInitArgs) -> anyhow::Result<()> {
-    let sender = Wallet::parse(args.private_key, args.sender)?;
+    let sender = Wallet::parse(args.shared.private_key, args.shared.sender)?;
     let owner = Wallet::resolve(args.owner, args.owner_private_key, &sender)?;
 
-    let mut runner = ForgeRunner::new(args.simulate, &args.l1_rpc_url, args.forge_args.clone())?;
+    let mut runner = ForgeRunner::new(
+        args.shared.simulate,
+        &args.shared.l1_rpc_url,
+        args.shared.forge_args.clone(),
+    )?;
 
     let input = HubInitInput {
         owner: owner.address,
@@ -83,7 +66,13 @@ pub async fn run(args: HubInitArgs) -> anyhow::Result<()> {
     let output = hub_init(&mut runner, &sender, &owner, &input).await?;
     let bridgehub_addr = output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
 
-    write_output_if_requested(&args.output_args, &runner, &input, &output)?;
+    write_output_if_requested(
+        "hub.init",
+        args.shared.out_path.as_deref(),
+        &runner,
+        &input,
+        &output,
+    )?;
 
     logger::info("Bridgehub contracts initialized");
     logger::info(format!("Bridgehub Proxy: {:#x}", bridgehub_addr));

@@ -16,10 +16,11 @@ use crate::abi::{
 use crate::admin_functions::{
     accept_admin, make_permanent_rollup, set_da_validator_pair, unpause_deposits, AdminScriptMode,
 };
-use crate::commands::output::{write_output_if_requested, OutputArgs};
+use crate::commands::output::write_output_if_requested;
+use crate::common::SharedRunArgs;
 use crate::common::{
     ethereum::get_ethers_provider,
-    forge::{Forge, ForgeRunner, ForgeScriptArgs},
+    forge::{Forge, ForgeRunner},
     logger,
     traits::{FileConfigTrait, ReadConfig, SaveConfig},
     wallets::Wallet,
@@ -80,18 +81,11 @@ pub struct ChainInitArgs {
     #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM, help_heading = "Input")]
     pub vm_type: VMOption,
 
-    // Signers
-    /// Sender address
-    #[clap(long, help_heading = "Signers")]
-    pub sender: Option<Address>,
     /// Owner address for the chain (default: sender)
     #[clap(long, help_heading = "Signers")]
     pub owner: Option<Address>,
 
-    // Auth
-    /// Sender private key
-    #[clap(long, visible_alias = "pk", help_heading = "Auth")]
-    pub private_key: Option<H256>,
+    // Auth (owner and bridgehub; sender key lives in `shared`)
     /// Owner private key
     #[clap(long, visible_alias = "owner-pk", help_heading = "Auth")]
     pub owner_private_key: Option<H256>,
@@ -99,18 +93,9 @@ pub struct ChainInitArgs {
     #[clap(long, visible_alias = "bridgehub-admin-pk", help_heading = "Auth")]
     pub bridgehub_admin_private_key: Option<H256>,
 
-    // Execution
-    /// L1 RPC URL
-    #[clap(long, default_value = "http://localhost:8545", help_heading = "Execution")]
-    pub l1_rpc_url: String,
-    /// Simulate against anvil fork
-    #[clap(long, help_heading = "Execution")]
-    pub simulate: bool,
-
-    // Output
     #[clap(flatten)]
     #[serde(flatten)]
-    pub output_args: OutputArgs,
+    pub shared: SharedRunArgs,
 
     // Advanced input
     /// Token multiplier setter address
@@ -150,11 +135,6 @@ pub struct ChainInitArgs {
     /// CREATE2 factory salt
     #[clap(long, help_heading = "Advanced input")]
     pub create2_factory_salt: Option<H256>,
-
-    // Forge options
-    #[clap(flatten)]
-    #[serde(flatten)]
-    pub forge_args: ForgeScriptArgs,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
@@ -162,8 +142,12 @@ pub struct ChainInitArgs {
 pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
     let (price_ratio_num, price_ratio_den) = parse_ratio(&args.base_token_price_ratio)?;
 
-    let deployer = Wallet::parse(args.private_key, args.sender)?;
-    let mut runner = ForgeRunner::new(args.simulate, &args.l1_rpc_url, args.forge_args.clone())?;
+    let deployer = Wallet::parse(args.shared.private_key, args.shared.sender)?;
+    let mut runner = ForgeRunner::new(
+        args.shared.simulate,
+        &args.shared.l1_rpc_url,
+        args.shared.forge_args.clone(),
+    )?;
 
     let owner = Wallet::resolve(args.owner, args.owner_private_key, &deployer)?;
 
@@ -205,7 +189,13 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
     };
     let output = chain_init(&mut runner, &deployer, &owner, &bridgehub_admin, &input).await?;
 
-    write_output_if_requested(&args.output_args, &runner, &input, &ChainInitOutputData::from_full_output(&output))?;
+    write_output_if_requested(
+        "chain.init",
+        args.shared.out_path.as_deref(),
+        &runner,
+        &input,
+        &ChainInitOutputData::from_full_output(&output),
+    )?;
 
     logger::info("Chain initialized");
     logger::info(format!("Diamond proxy: {:#x}", output.diamond_proxy_addr));

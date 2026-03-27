@@ -3,158 +3,43 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::{Address, H256};
+use ethers::types::Address;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 
+use crate::commands::output::write_output_if_requested;
+use crate::common::SharedRunArgs;
 use crate::common::{
-    forge::{Forge, ForgeRunner, ForgeScriptArg, ForgeScriptArgs},
+    forge::{Forge, ForgeRunner, ForgeScriptArg},
     logger,
     wallets::Wallet,
 };
 use crate::common::paths;
 
-/// Build cast-ready transaction list from a forge run payload (broadcast JSON).
-/// Each item has "to", "data", "value" (normalized for cast).
-fn run_payload_to_cast_transactions(payload: &Value) -> Vec<Value> {
-    let txs = match payload.get("transactions").and_then(|t| t.as_array()) {
-        Some(a) => a,
-        None => return vec![],
-    };
-    let mut out = Vec::with_capacity(txs.len());
-    for tx in txs {
-        let params = tx.get("transaction").unwrap_or(tx);
-        let to = match params.get("to").and_then(|v| v.as_str()) {
-            Some(s) => s,
-            None => continue,
-        };
-        let data = params
-            .get("data")
-            .or_else(|| params.get("input"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("0x");
-        let value_raw = params
-            .get("value")
-            .and_then(|v| {
-                v.get("hex")
-                    .and_then(|h| h.as_str())
-                    .map(String::from)
-                    .or_else(|| v.as_str().map(String::from))
-                    .or_else(|| v.as_u64().map(|n| n.to_string()))
-            })
-            .unwrap_or_else(|| "0".to_string());
-        let value = normalize_cast_value(&value_raw);
-        out.push(json!({ "to": to, "data": data, "value": value }));
-    }
-    out
+#[derive(Serialize)]
+struct EcosystemUpgradeOutInput {
+    stage: String,
 }
 
-fn normalize_cast_value(raw: &str) -> String {
-    let s = raw.trim();
-    if s.is_empty() || s == "0" || s == "0x0" || s == "0x" {
-        return "0".to_string();
-    }
-    if let Some(hex) = s.strip_prefix("0x") {
-        if hex.chars().all(|c| c.is_ascii_hexdigit()) {
-            let hex = hex.trim_start_matches('0');
-            if hex.is_empty() {
-                return "0".to_string();
-            }
-            return format!("0x{}", hex);
-        }
-    }
-    s.to_string()
+#[derive(Serialize)]
+struct NoGovernancePrepareOutput<'a> {
+    core: &'a Value,
+    ecosystem: &'a Value,
+    ctm: &'a Value,
+    run_json: Value,
 }
 
-/// Build structured --out JSON for no-governance-prepare (like init's build_output).
-fn build_output_no_governance_prepare(
-    runner: &ForgeRunner,
-    core_json: &Value,
-    ecosystem_json: &Value,
-    ctm_json: &Value,
-) -> Value {
-    let runs: Vec<_> = runner
-        .runs()
-        .iter()
-        .map(|r| json!({ "script": r.script.display().to_string(), "run": r.payload }))
-        .collect();
-    let transactions = runner
-        .runs()
-        .first()
-        .map(|r| run_payload_to_cast_transactions(&r.payload))
-        .unwrap_or_default();
-    let run_json = runner
-        .runs()
-        .last()
-        .map(|r| r.payload.clone())
-        .unwrap_or(Value::Object(Default::default()));
-    json!({
-        "command": "ecosystem.upgrade",
-        "stage": "no-governance-prepare",
-        "runs": runs,
-        "transactions": transactions,
-        "output": {
-            "core": core_json,
-            "ecosystem": ecosystem_json,
-            "ctm": ctm_json,
-            "run_json": run_json,
-        },
-    })
-}
-
-/// Build structured --out JSON for governance-stage* (like init's build_output).
-fn build_output_governance_stage(
-    runner: &ForgeRunner,
+#[derive(Serialize)]
+struct GovernanceStageOutput {
     stage: u8,
-    governance_addr: Address,
-) -> Value {
-    let runs: Vec<_> = runner
-        .runs()
-        .iter()
-        .map(|r| json!({ "script": r.script.display().to_string(), "run": r.payload }))
-        .collect();
-    let transactions = runner
-        .runs()
-        .first()
-        .map(|r| run_payload_to_cast_transactions(&r.payload))
-        .unwrap_or_default();
-    let stage_name = format!("governance-stage{}", stage);
-    json!({
-        "command": "ecosystem.upgrade",
-        "stage": stage_name,
-        "runs": runs,
-        "transactions": transactions,
-        "output": {
-            "stage": stage,
-            "governance_address": format!("{:#x}", governance_addr),
-        },
-    })
+    governance_address: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct EcosystemUpgradeArgs {
-    // Signers
-    /// Sender address
-    #[clap(long, help_heading = "Signers")]
-    pub sender: Option<Address>,
-
-    // Auth
-    /// Sender private key
-    #[clap(long, visible_alias = "pk", help_heading = "Auth")]
-    pub private_key: Option<H256>,
-
-    // Execution
-    /// L1 RPC URL
-    #[clap(long, default_value = "http://localhost:8545", help_heading = "Execution")]
-    pub l1_rpc_url: String,
-    /// Simulate against anvil fork
-    #[clap(long, help_heading = "Execution")]
-    pub simulate: bool,
-
-    // Output
-    /// Write full JSON output to file
-    #[clap(long, help_heading = "Output")]
-    pub out: Option<PathBuf>,
+    #[clap(flatten)]
+    #[serde(flatten)]
+    pub shared: SharedRunArgs,
 
     /// Ecosystem upgrade stage (currently supported: no-governance-prepare)
     #[clap(long)]
@@ -186,15 +71,15 @@ pub struct EcosystemUpgradeArgs {
     /// Path to read ecosystem upgrade output (for governance-stage*). If unset, uses script-out/v31-upgrade-ecosystem.toml under l1-contracts.
     #[clap(long)]
     pub ecosystem_output_path: Option<PathBuf>,
-
-    #[clap(flatten)]
-    #[serde(flatten)]
-    pub forge_args: ForgeScriptArgs,
 }
 
 pub async fn run(args: EcosystemUpgradeArgs) -> anyhow::Result<()> {
-    let sender = Wallet::parse(args.private_key, args.sender)?;
-    let mut runner = ForgeRunner::new(args.simulate, &args.l1_rpc_url, args.forge_args.clone())?;
+    let sender = Wallet::parse(args.shared.private_key, args.shared.sender)?;
+    let mut runner = ForgeRunner::new(
+        args.shared.simulate,
+        &args.shared.l1_rpc_url,
+        args.shared.forge_args.clone(),
+    )?;
 
     match args.ecosystem_upgrade_stage.as_str() {
         "no-governance-prepare" => run_no_governance_prepare(&mut runner, &sender, &args),
@@ -246,7 +131,7 @@ fn run_no_governance_prepare(
     let _ = fs::remove_file(script_out.join("v31-upgrade-ecosystem.toml"));
     let _ = fs::remove_file(script_out.join("v31-upgrade-ctm.toml"));
 
-    let mut script_args = args.forge_args.clone();
+    let mut script_args = args.shared.forge_args.clone();
     script_args.add_arg(ForgeScriptArg::Sig {
         sig: "noGovernancePrepareWithArgs(address,address,address,address,bool,string,string,address)".to_string(),
     });
@@ -307,16 +192,30 @@ fn run_no_governance_prepare(
         .context("Failed to parse CTM TOML")
         .and_then(|v| serde_json::to_value(v).map_err(|e| anyhow::anyhow!("{}", e)))?;
 
-    if let Some(ref out_path) = args.out {
-        let out_json =
-            build_output_no_governance_prepare(&runner, &core_json, &ecosystem_json, &ctm_json);
-        let out_str = serde_json::to_string_pretty(&out_json)?;
-        fs::write(out_path, out_str)?;
-        logger::info(format!("Full output written to: {}", out_path.display()));
-    }
+    let run_json = runner
+        .runs()
+        .last()
+        .map(|r| r.payload.clone())
+        .unwrap_or_else(|| Value::Object(Default::default()));
+    let out_payload = NoGovernancePrepareOutput {
+        core: &core_json,
+        ecosystem: &ecosystem_json,
+        ctm: &ctm_json,
+        run_json,
+    };
+    let input_env = EcosystemUpgradeOutInput {
+        stage: "no-governance-prepare".to_string(),
+    };
+    write_output_if_requested(
+        "ecosystem.upgrade",
+        args.shared.out_path.as_deref(),
+        runner,
+        &input_env,
+        &out_payload,
+    )?;
 
     logger::success("No-governance-prepare completed");
-    if let Some(ref out_path) = args.out {
+    if let Some(ref out_path) = args.shared.out_path {
         logger::outro(format!(
             "No-governance-prepare complete. Output written to: {}",
             out_path.display()
@@ -395,7 +294,7 @@ fn run_governance_stage(
     })?;
 
     let script_path = "deploy-scripts/AdminFunctions.s.sol";
-    let mut script_args = args.forge_args.clone();
+    let mut script_args = args.shared.forge_args.clone();
     script_args.add_arg(ForgeScriptArg::Sig {
         sig: "governanceExecuteCalls(bytes,address)".to_string(),
     });
@@ -427,15 +326,23 @@ fn run_governance_stage(
         )
     })?;
 
-    if let Some(ref out_path) = args.out {
-        let out_json = build_output_governance_stage(&runner, stage, governance_addr);
-        let out_str = serde_json::to_string_pretty(&out_json)?;
-        fs::write(out_path, out_str)?;
-        logger::info(format!("Full output written to: {}", out_path.display()));
-    }
+    let input_env = EcosystemUpgradeOutInput {
+        stage: format!("governance-stage{}", stage),
+    };
+    let out_payload = GovernanceStageOutput {
+        stage,
+        governance_address: format!("{:#x}", governance_addr),
+    };
+    write_output_if_requested(
+        "ecosystem.upgrade",
+        args.shared.out_path.as_deref(),
+        runner,
+        &input_env,
+        &out_payload,
+    )?;
 
     logger::success(format!("Governance stage {} completed", stage));
-    if let Some(ref out_path) = args.out {
+    if let Some(ref out_path) = args.shared.out_path {
         logger::outro(format!(
             "Governance stage {} complete. Output written to: {}",
             stage,

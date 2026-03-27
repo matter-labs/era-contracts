@@ -5,9 +5,10 @@ use serde::{Deserialize, Serialize};
 use crate::commands::ctm::accept_ownership::{accept_ownership, CtmAcceptOwnershipInput};
 use crate::commands::ctm::deploy::{deploy, CtmDeployInput};
 use crate::commands::hub::register_ctm::{register_ctm, RegisterCtmInput};
-use crate::commands::output::{write_output_if_requested, OutputArgs};
+use crate::commands::output::write_output_if_requested;
+use crate::common::SharedRunArgs;
 use crate::common::{
-    forge::{ForgeRunner, ForgeScriptArgs},
+    forge::ForgeRunner,
     logger,
     wallets::Wallet,
 };
@@ -26,18 +27,10 @@ pub struct CtmInitArgs {
     #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM, help_heading = "Input")]
     pub vm_type: VMOption,
 
-    // Signers
-    /// Sender address
-    #[clap(long, help_heading = "Signers")]
-    pub sender: Option<Address>,
     /// Owner address (default: sender)
     #[clap(long, help_heading = "Signers")]
     pub owner: Option<Address>,
 
-    // Auth
-    /// Sender private key
-    #[clap(long, visible_alias = "pk", help_heading = "Auth")]
-    pub private_key: Option<H256>,
     /// Owner private key
     #[clap(long, visible_alias = "owner-pk", help_heading = "Auth")]
     pub owner_private_key: Option<H256>,
@@ -48,18 +41,9 @@ pub struct CtmInitArgs {
     #[clap(long, visible_alias = "bridgehub-admin-pk", help_heading = "Auth")]
     pub bridgehub_admin_private_key: Option<H256>,
 
-    // Execution
-    /// L1 RPC URL
-    #[clap(long, default_value = "http://localhost:8545", help_heading = "Execution")]
-    pub l1_rpc_url: String,
-    /// Simulate against anvil fork
-    #[clap(long, help_heading = "Execution")]
-    pub simulate: bool,
-
-    // Output
     #[clap(flatten)]
     #[serde(flatten)]
-    pub output_args: OutputArgs,
+    pub shared: SharedRunArgs,
 
     // Advanced input
     /// Reuse governance and admin contracts from hub
@@ -77,18 +61,17 @@ pub struct CtmInitArgs {
     /// CREATE2 factory salt
     #[clap(long, help_heading = "Advanced input")]
     pub create2_factory_salt: Option<H256>,
-
-    // Forge options
-    #[clap(flatten)]
-    #[serde(flatten)]
-    pub forge_args: ForgeScriptArgs,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
 
 pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
-    let deployer = Wallet::parse(args.private_key, args.sender)?;
-    let mut runner = ForgeRunner::new(args.simulate, &args.l1_rpc_url, args.forge_args.clone())?;
+    let deployer = Wallet::parse(args.shared.private_key, args.shared.sender)?;
+    let mut runner = ForgeRunner::new(
+        args.shared.simulate,
+        &args.shared.l1_rpc_url,
+        args.shared.forge_args.clone(),
+    )?;
 
     let owner = Wallet::resolve(args.owner, args.owner_private_key, &deployer)?;
 
@@ -112,7 +95,13 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
     let ctm_output = ctm_init(&mut runner, &deployer, &bridgehub_owner, &bridgehub_admin, &ctm_input).await?;
 
     let ctm_proxy = ctm_output.deployed_addresses.state_transition.state_transition_proxy_addr;
-    write_output_if_requested(&args.output_args, &runner, &ctm_input, &ctm_output)?;
+    write_output_if_requested(
+        "ctm.init",
+        args.shared.out_path.as_deref(),
+        &runner,
+        &ctm_input,
+        &ctm_output,
+    )?;
 
     logger::info("CTM contracts initialized");
     logger::info(format!("CTM Proxy: {:#x}", ctm_proxy));

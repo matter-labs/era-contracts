@@ -1,37 +1,24 @@
-use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value;
 
-use crate::common::{forge::ForgeRunner, logger};
+use crate::common::forge::{all_runs_cast_transactions, ForgeRunner};
+use crate::common::logger;
 
 /// Current output format version.
 pub const OUTPUT_VERSION: u32 = 1;
 
-/// Shared output arguments, flattened into every `*Args` struct.
-#[derive(Debug, Clone, Serialize, Deserialize, clap::Args)]
-pub struct OutputArgs {
-    /// Write full JSON output to file
-    #[clap(long, help_heading = "Output")]
-    pub out: Option<PathBuf>,
-}
-
-/// Standard envelope for all protocol_ops command outputs.
+/// Standard envelope for all protocol_ops command `--out` JSON.
 ///
-/// Every command writes JSON with this structure:
-/// ```json
-/// {
-///   "version": 1,
-///   "input": { ... },
-///   "output": { ... },
-///   "runs": [ ... ]
-/// }
-/// ```
+/// Includes flat **`transactions`** (`to` / `data` / `value`) for
+/// `chain execute-simulated-transactions` / `ExecuteProtocolOpsOut.s.sol`.
 #[derive(Serialize)]
 pub struct CommandEnvelope {
+    pub command: String,
     pub version: u32,
+    pub runs: Vec<RunEntry>,
+    pub transactions: Vec<Value>,
     pub input: Value,
     pub output: Value,
-    pub runs: Vec<RunEntry>,
 }
 
 /// A single forge script execution record.
@@ -43,6 +30,7 @@ pub struct RunEntry {
 
 impl CommandEnvelope {
     pub fn new<I: Serialize, O: Serialize>(
+        command: &str,
         runner: &ForgeRunner,
         input: &I,
         output: &O,
@@ -55,12 +43,15 @@ impl CommandEnvelope {
                 run: r.payload.clone(),
             })
             .collect();
+        let transactions = all_runs_cast_transactions(runner);
 
         Ok(Self {
+            command: command.to_string(),
             version: OUTPUT_VERSION,
+            runs,
+            transactions,
             input: serde_json::to_value(input)?,
             output: serde_json::to_value(output)?,
-            runs,
         })
     }
 
@@ -73,7 +64,8 @@ impl CommandEnvelope {
 
 /// Write `--out` JSON file if the user requested it. No-op otherwise.
 pub fn write_output_if_requested<I, O>(
-    output_args: &OutputArgs,
+    command: &str,
+    out_path: Option<&std::path::Path>,
     runner: &ForgeRunner,
     input: &I,
     output: &O,
@@ -82,8 +74,8 @@ where
     I: Serialize,
     O: Serialize,
 {
-    if let Some(out_path) = &output_args.out {
-        let envelope = CommandEnvelope::new(runner, input, output)?;
+    if let Some(out_path) = out_path {
+        let envelope = CommandEnvelope::new(command, runner, input, output)?;
         envelope.write_to_file(out_path)?;
         logger::info(format!("Full output written to: {}", out_path.display()));
     }

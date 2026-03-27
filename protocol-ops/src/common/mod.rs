@@ -1,5 +1,6 @@
 mod term;
 
+pub mod args;
 pub mod anvil;
 pub mod cmd;
 pub mod constants;
@@ -11,4 +12,5 @@ pub mod paths;
 pub mod traits;
 pub mod wallets;
 
+pub use args::SharedRunArgs;
 pub use term::{error, logger};
