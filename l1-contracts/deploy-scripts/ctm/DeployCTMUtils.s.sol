@@ -425,7 +425,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "SettlementLayerV31Upgrade")) {
-            return abi.encode();
+            return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
         } else if (compareStrings(contractName, "Governance")) {
             return
                 abi.encode(

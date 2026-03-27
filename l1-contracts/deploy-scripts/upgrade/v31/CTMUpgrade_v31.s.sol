@@ -100,9 +100,12 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     function getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
     ) internal virtual override returns (address, bytes memory) {
+        // The fixedForceDeploymentsData is ecosystem-wide (same for all chains).
+        // The additionalForceDeploymentsData placeholder is rewritten per-chain by
+        // SettlementLayerV31Upgrade.getL2V31UpgradeCalldata at upgrade time.
         bytes memory l2UpgradeCalldata = abi.encodeCall(
             IL2V31Upgrade.upgrade,
-            (uint256(0), address(0), "", "", uint256(0))
+            (config.isZKsyncOS, address(0), newlyGeneratedData.fixedForceDeploymentsData, "")
         );
 
         if (config.isZKsyncOS) {

@@ -278,7 +278,9 @@ library L2GenesisForceDeploymentsHelper {
             ? IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade
             : IComplexUpgrader.ContractUpgradeType.EraForceDeployment;
 
-        _setupProxyAdmin();
+        if (_isGenesisUpgrade) {
+            _setupProxyAdmin();
+        }
         _deployCoreContracts({
             expectedUpgradeType: expectedUpgradeType,
             fixedForceDeploymentsData: fixedForceDeploymentsData,
@@ -367,11 +369,9 @@ library L2GenesisForceDeploymentsHelper {
             );
         }
 
-        // For new chains, there is no legacy shared bridge, but the already existing ones,
-        // we should be able to query it.
-        address l2LegacySharedBridge = _isGenesisUpgrade
-            ? address(0)
-            : address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
+        // For new chains, there is no legacy shared bridge. For existing chains,
+        // use the L1-provided value instead of reading circularly from the L2 AssetRouter.
+        address l2LegacySharedBridge = additionalForceDeploymentsData.l2LegacySharedBridge;
 
         // During the genesis of zksync os. Contracts has been already deployed and initialized.
         // It's not necessary to redeploy or reinitialize them.
@@ -413,12 +413,15 @@ library L2GenesisForceDeploymentsHelper {
         bool _isGenesisUpgrade,
         bool _isZKsyncOS
     ) private {
+        // For genesis, these values are zero (will be set during initL2).
+        // For non-genesis upgrades, use the L1-provided values from the deployment data
+        // instead of reading circularly from the L2 NTV contract.
         address predeployedL2WethAddress = _isGenesisUpgrade
             ? address(0)
-            : L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN();
+            : additionalForceDeploymentsData.predeployedL2WethAddress;
         bytes32 previousL2TokenProxyBytecodeHash = _isGenesisUpgrade
             ? bytes32(0)
-            : L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).L2_TOKEN_PROXY_BYTECODE_HASH();
+            : fixedForceDeploymentsData.l2TokenProxyBytecodeHash;
 
         // Ensure the WETH token is deployed and retrieve its address.
         emit WethTokenEnsureStarted();
@@ -475,12 +478,11 @@ library L2GenesisForceDeploymentsHelper {
                 additionalForceDeploymentsData.baseTokenMetadata
             );
         } else {
-            address l2LegacySharedBridge = address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
             // solhint-disable-next-line func-named-parameters
             L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateL2(
                 fixedForceDeploymentsData.l1ChainId,
                 previousL2TokenProxyBytecodeHash,
-                l2LegacySharedBridge,
+                additionalForceDeploymentsData.l2LegacySharedBridge,
                 wrappedBaseTokenAddress,
                 additionalForceDeploymentsData.baseTokenBridgingData,
                 additionalForceDeploymentsData.baseTokenMetadata

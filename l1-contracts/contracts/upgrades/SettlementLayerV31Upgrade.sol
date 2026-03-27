@@ -96,13 +96,41 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
-    function getL2V31UpgradeCalldata(address _bridgehub, uint256 _chainId) public view returns (bytes memory) {
+    function getL2V31UpgradeCalldata(
+        address _bridgehub,
+        uint256 _chainId,
+        bytes memory _existingUpgradeCalldata
+    ) public view returns (bytes memory) {
+        // Decode the placeholder to extract isZKsyncOS, ctmDeployer, and fixedForceDeploymentsData
+        // (these are ecosystem-wide and don't change per chain).
+        (
+            bool isZKsyncOS,
+            address ctmDeployer,
+            bytes memory fixedForceDeploymentsData,
+            // ignore placeholder additionalForceDeploymentsData
+        ) = abi.decode(_existingUpgradeCalldata.slice(4), (bool, address, bytes, bytes));
+
+        // Construct per-chain ZKChainSpecificForceDeploymentsData from L1 state.
+        bytes memory additionalForceDeploymentsData = _buildChainSpecificForceDeploymentsData(_bridgehub, _chainId);
+
+        return
+            abi.encodeCall(
+                IL2V31Upgrade.upgrade,
+                (isZKsyncOS, ctmDeployer, fixedForceDeploymentsData, additionalForceDeploymentsData)
+            );
+    }
+
+    function _buildChainSpecificForceDeploymentsData(
+        address _bridgehub,
+        uint256 _chainId
+    ) internal view returns (bytes memory) {
         IBridgehubBase bridgehub = IBridgehubBase(_bridgehub);
         address assetRouter = address(bridgehub.assetRouter());
         address nativeTokenVaultAddr = address(IL1AssetRouter(assetRouter).nativeTokenVault());
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(_chainId);
         INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(nativeTokenVaultAddr);
         address originToken = nativeTokenVault.originToken(baseTokenAssetId);
+
         string memory baseTokenName;
         string memory baseTokenSymbol;
         uint256 baseTokenDecimals;
@@ -118,15 +146,22 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         }
 
         return
-            abi.encodeCall(
-                IL2V31Upgrade.upgrade,
-                (
-                    nativeTokenVault.originChainId(baseTokenAssetId),
-                    originToken,
-                    baseTokenName,
-                    baseTokenSymbol,
-                    baseTokenDecimals
-                )
+            abi.encode(
+                ZKChainSpecificForceDeploymentsData({
+                    l2LegacySharedBridge: address(0),
+                    predeployedL2WethAddress: address(0),
+                    baseTokenL1Address: originToken,
+                    baseTokenMetadata: TokenMetadata({
+                        name: baseTokenName,
+                        symbol: baseTokenSymbol,
+                        decimals: baseTokenDecimals
+                    }),
+                    baseTokenBridgingData: TokenBridgingData({
+                        assetId: baseTokenAssetId,
+                        originChainId: nativeTokenVault.originChainId(baseTokenAssetId),
+                        originToken: originToken
+                    })
+                })
             );
     }
 
@@ -162,6 +197,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
             );
 
             _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
+            bytes memory l2V31UpgradeCalldata = getL2V31UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);
 
             return
                 abi.encodeCall(
@@ -181,6 +217,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
             );
 
             _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
+            bytes memory l2V31UpgradeCalldata = getL2V31UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);
 
             return
                 abi.encodeCall(
@@ -196,6 +233,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
             );
 
             _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
+            bytes memory l2V31UpgradeCalldata = getL2V31UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);
 
             return abi.encodeCall(IComplexUpgrader.upgrade, (delegateTo, l2V31UpgradeCalldata));
         }
@@ -203,8 +241,12 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         revert UnsupportedL2UpgradeSelector(selector);
     }
 
-    function emitL2V31UpgradeCalldata(address _bridgehub, uint256 _chainId) external returns (bytes memory data) {
-        data = getL2V31UpgradeCalldata(_bridgehub, _chainId);
+    function emitL2V31UpgradeCalldata(
+        address _bridgehub,
+        uint256 _chainId,
+        bytes calldata _existingUpgradeCalldata
+    ) external returns (bytes memory data) {
+        data = getL2V31UpgradeCalldata(_bridgehub, _chainId, _existingUpgradeCalldata);
         emit L2V31UpgradeCalldataConstructed(_bridgehub, _chainId, data);
     }
 

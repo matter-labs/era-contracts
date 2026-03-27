@@ -342,6 +342,20 @@ async function predeployForceDeploymentTargets(
   // Deploy the delegateTo target (L2V31Upgrade) — this is the version-specific
   // upgrader that ComplexUpgrader delegatecalls after the force deployments.
   await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V31Upgrade")]);
+
+  // Also deploy any predeploy contracts that don't have code yet. These are
+  // v31-only contracts (InteropCenter, InteropHandler, L2AssetTracker, etc.)
+  // that are not in the Era-style force deployments array but are deployed by
+  // performForceDeployedContractsInit via conductContractUpgrade. On Anvil EVM,
+  // conductContractUpgrade goes to MockContractDeployer (no-op), so we must
+  // ensure they have code before the updateL2/initL2 calls.
+  for (const { address, contractName } of PREDEPLOY_SYSTEM_CONTRACTS) {
+    const existing = await l2Provider.getCode(address);
+    if (existing !== "0x" && existing !== "0x0") {
+      continue;
+    }
+    await l2Provider.send("anvil_setCode", [address, getBytecode(contractName)]);
+  }
 }
 
 async function executeL2UpgradeTxs(

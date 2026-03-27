@@ -32,6 +32,7 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 contract DummySettlementLayerV31Upgrade is SettlementLayerV31Upgrade, BaseUpgradeUtils {
+    constructor(IBridgehubBase _bridgehub) SettlementLayerV31Upgrade(_bridgehub) {}
     function setTotalBatchesCommitted(uint256 _totalBatchesCommitted) public {
         s.totalBatchesCommitted = _totalBatchesCommitted;
     }
@@ -64,8 +65,19 @@ contract DummySettlementLayerV31Upgrade is SettlementLayerV31Upgrade, BaseUpgrad
         return s.l2SystemContractsUpgradeTxHash;
     }
 
-    function getConstructedCalldata(address _bridgehub, uint256 _chainId) public view returns (bytes memory) {
-        return getL2V31UpgradeCalldata(_bridgehub, _chainId);
+    function getConstructedCalldata(
+        address _bridgehub,
+        uint256 _chainId,
+        bytes memory _existingUpgradeCalldata
+    ) public view returns (bytes memory) {
+        return getL2V31UpgradeCalldata(_bridgehub, _chainId, _existingUpgradeCalldata);
+    }
+
+    function exposeBuildChainSpecificForceDeploymentsData(
+        address _bridgehub,
+        uint256 _chainId
+    ) public view returns (bytes memory) {
+        return _buildChainSpecificForceDeploymentsData(_bridgehub, _chainId);
     }
 
     function setChainTypeManager(address _chainTypeManager) public override {
@@ -97,7 +109,7 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
             IComplexUpgrader.upgrade,
             (
                 L2_VERSION_SPECIFIC_UPGRADER_ADDR,
-                abi.encodeCall(IL2V31Upgrade.upgrade, (uint256(0), address(0), "", "", uint256(0)))
+                _placeholderV31Calldata()
             )
         );
     }
@@ -112,8 +124,7 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
         mockGWChain = makeAddr("gwChain");
         mockChainTypeManager = makeAddr("chainTypeManager");
 
-        upgrade = new DummySettlementLayerV31Upgrade();
-        upgrade.setBridgehub(mockBridgehub);
+        upgrade = new DummySettlementLayerV31Upgrade(IBridgehubBase(mockBridgehub));
         upgrade.setChainId(testChainId);
         upgrade.setChainTypeManager(mockChainTypeManager);
         upgrade.setTotalBatchesCommitted(100);
@@ -228,8 +239,22 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
         );
     }
 
+    function _placeholderV31Calldata() internal pure returns (bytes memory) {
+        return abi.encodeCall(IL2V31Upgrade.upgrade, (false, address(0), "", ""));
+    }
+
     function _expectedV31Calldata() internal view returns (bytes memory) {
-        return abi.encodeCall(IL2V31Upgrade.upgrade, (block.chainid, address(1), "Ether", "ETH", uint256(18)));
+        // The rewrite preserves isZKsyncOS, ctmDeployer, fixedForceDeploymentsData from
+        // the placeholder and replaces additionalForceDeploymentsData with chain-specific data.
+        return abi.encodeCall(
+            IL2V31Upgrade.upgrade,
+            (
+                false,
+                address(0),
+                "",
+                upgrade.exposeBuildChainSpecificForceDeploymentsData(mockBridgehub, testChainId)
+            )
+        );
     }
 
     function _assertUpgradeRewritesTx(bytes memory originalUpgradeTxData) internal {
@@ -322,7 +347,7 @@ contract SettlementLayerV31UpgradeSharedTest is SettlementLayerV31UpgradeTestBas
     function test_ConstructsChainSpecificL2V31UpgradeCalldata() public {
         _setupMocks();
 
-        bytes memory data = upgrade.getConstructedCalldata(mockBridgehub, testChainId);
+        bytes memory data = upgrade.getConstructedCalldata(mockBridgehub, testChainId, _placeholderV31Calldata());
 
         assertEq(data, _expectedV31Calldata());
     }
@@ -334,7 +359,7 @@ contract SettlementLayerV31UpgradeSharedTest is SettlementLayerV31UpgradeTestBas
         address wrongTarget = makeAddr("wrongTarget");
         proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
             IComplexUpgrader.upgrade,
-            (wrongTarget, abi.encodeCall(IL2V31Upgrade.upgrade, (uint256(0), address(0), "", "", uint256(0))))
+            (wrongTarget, _placeholderV31Calldata())
         );
 
         vm.expectRevert(abi.encodeWithSelector(UnexpectedUpgradeTarget.selector, wrongTarget));
@@ -396,7 +421,7 @@ contract SettlementLayerV31UpgradeEraV29Test is SettlementLayerV31UpgradeTestBas
             input: hex""
         });
 
-        bytes memory originalV31Calldata = abi.encodeCall(IL2V31Upgrade.upgrade, (uint256(0), address(0), "", "", uint256(0)));
+        bytes memory originalV31Calldata = _placeholderV31Calldata();
         bytes memory originalUpgradeTxData = abi.encodeCall(
             IComplexUpgrader.forceDeployAndUpgrade,
             (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, originalV31Calldata)
@@ -425,7 +450,7 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is SettlementLayerV31UpgradeTe
             newAddress: makeAddr("newAddress")
         });
 
-        bytes memory originalV31Calldata = abi.encodeCall(IL2V31Upgrade.upgrade, (uint256(0), address(0), "", "", uint256(0)));
+        bytes memory originalV31Calldata = _placeholderV31Calldata();
         bytes memory originalUpgradeTxData = abi.encodeCall(
             IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal,
             (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, originalV31Calldata)

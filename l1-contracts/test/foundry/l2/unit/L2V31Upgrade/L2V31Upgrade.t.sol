@@ -6,6 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_BRIDGEHUB_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
     L2_FORCE_DEPLOYER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
@@ -37,8 +38,8 @@ contract MockV31UpgradeNativeTokenVault {
     constructor(bytes32 _assetId, uint256 _l1ChainId) {
         BASE_TOKEN_ASSET_ID = _assetId;
         L1_CHAIN_ID = _l1ChainId;
-        L2_TOKEN_PROXY_BYTECODE_HASH = keccak256("proxy-bytecode");
-        WETH_TOKEN = address(0xBEEF);
+        L2_TOKEN_PROXY_BYTECODE_HASH = keccak256("proxy");
+        WETH_TOKEN = address(0xdead);
         BASE_TOKEN_NAME = "Ether";
         BASE_TOKEN_SYMBOL = "ETH";
         BASE_TOKEN_DECIMALS = 18;
@@ -127,6 +128,14 @@ contract MockV31UpgradeBaseToken {
     }
 }
 
+contract MockV31UpgradeBridgehub {
+    uint256 public immutable L1_CHAIN_ID;
+
+    constructor(uint256 _l1ChainId) {
+        L1_CHAIN_ID = _l1ChainId;
+    }
+}
+
 contract TestL2V31Upgrade is L2V31Upgrade {
     function getAcrossInfo() internal pure override returns (AcrossInfo memory) {
         return
@@ -158,6 +167,7 @@ contract L2V31UpgradeUnitTest is Test {
         bytes memory complexUpgraderBytecode = vm.getDeployedCode("L2ComplexUpgrader.sol:L2ComplexUpgrader");
         vm.etch(L2_COMPLEX_UPGRADER_ADDR, complexUpgraderBytecode);
 
+        _etchCode(L2_BRIDGEHUB_ADDR, address(new MockV31UpgradeBridgehub(L1_CHAIN_ID)));
         _etchCode(
             L2_NATIVE_TOKEN_VAULT_ADDR,
             address(new MockV31UpgradeNativeTokenVault(BASE_TOKEN_ASSET_ID, L1_CHAIN_ID))
@@ -174,7 +184,7 @@ contract L2V31UpgradeUnitTest is Test {
             address(testUpgrade),
             abi.encodeCall(
                 IL2V31Upgrade.upgrade,
-                (BASE_TOKEN_ORIGIN_CHAIN_ID, BASE_TOKEN_ORIGIN_ADDRESS, "Ether", "ETH", uint256(18))
+                (false, address(0), "", "")
             )
         );
 
