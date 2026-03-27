@@ -34,14 +34,14 @@ See `chain init --help` for owners, bridgehub admin keys, and forge passthrough 
 
 Most subcommands flatten **`SharedRunArgs`** from `common/args.rs`:
 
-| Flag | Role |
-|------|------|
-| **`--sender`** | Optional sender address (with `--private-key`). |
-| **`--private-key`** / **`--pk`** | Sender private key. |
-| **`--l1-rpc-url`** | L1 RPC (default `http://localhost:8545`). |
-| **`--simulate`** | Run against a temporary Anvil fork of that RPC. |
-| **`--out`** | Write the JSON envelope below to this path. |
-| *(forge passthrough)* | Forwarded via **`ForgeScriptArgs`** (see `--help` on each command). |
+| Flag                             | Role                                                                |
+| -------------------------------- | ------------------------------------------------------------------- |
+| **`--sender`**                   | Optional sender address (with `--private-key`).                     |
+| **`--private-key`** / **`--pk`** | Sender private key.                                                 |
+| **`--l1-rpc-url`**               | L1 RPC (default `http://localhost:8545`).                           |
+| **`--simulate`**                 | Run against a temporary Anvil fork of that RPC.                     |
+| **`--out`**                      | Write the JSON envelope below to this path.                         |
+| _(forge passthrough)_            | Forwarded via **`ForgeScriptArgs`** (see `--help` on each command). |
 
 Extra signers (e.g. **`--owner`**, **`--owner-pk`**, bridgehub keys) stay on the specific command; they are not part of `SharedRunArgs`.
 
@@ -53,14 +53,14 @@ Pass **`--simulate`** (where supported) to run against a temporary **Anvil fork*
 
 Commands that support **`--out`** write a **`CommandEnvelope`** snapshot after a successful run:
 
-| Field | Meaning |
-|--------|--------|
-| **`command`** | CLI path id (e.g. `chain.init`, `ecosystem.upgrade`). |
-| **`version`** | Envelope format version (currently `1`). |
-| **`runs`** | One entry per Forge script: `script` (path) and `run` (broadcast JSON for that script). |
+| Field              | Meaning                                                                                                                      |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| **`command`**      | CLI path id (e.g. `chain.init`, `ecosystem.upgrade`).                                                                        |
+| **`version`**      | Envelope format version (currently `1`).                                                                                     |
+| **`runs`**         | One entry per Forge script: `script` (path) and `run` (broadcast JSON for that script).                                      |
 | **`transactions`** | Flat array in execution order: `{ "to", "data", "value" }` for replay (normalized like `cast send`). Built from every `run`. |
-| **`input`** | Serialized command input (may be `{}` if the command passes an empty object). |
-| **`output`** | Command-specific result object (may be `{}`). |
+| **`input`**        | Serialized command input (may be `{}` if the command passes an empty object).                                                |
+| **`output`**       | Command-specific result object (may be `{}`).                                                                                |
 
 **Replay on a real RPC:** `chain execute-simulated-transactions` reads a previously written envelope, extracts **`transactions`**, and runs `l1-contracts/deploy-scripts/ExecuteProtocolOpsOut.s.sol`. Example:
 

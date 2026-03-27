@@ -34,7 +34,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
                 recursionCircuitsSetVksHash: bytes32(0)
             });
     }
-    
+
     /// @notice Get protocol upgrade nonce from protocol version
     function getProtocolUpgradeNonce(uint256 protocolVersion) internal pure returns (uint256) {
         return (protocolVersion >> 32);
