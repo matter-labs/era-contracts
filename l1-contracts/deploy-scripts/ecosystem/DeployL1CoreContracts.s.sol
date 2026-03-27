@@ -30,7 +30,6 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
 import {Config, CoreDeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
 import {IDeployL1CoreContracts} from "contracts/script-interfaces/IDeployL1CoreContracts.sol";
-import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 
 contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1CoreContracts {
     using stdToml for string;

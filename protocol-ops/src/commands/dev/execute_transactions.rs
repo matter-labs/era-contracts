@@ -9,8 +9,8 @@ use serde_json::{Map, Value};
 use crate::common::{logger, paths};
 
 #[derive(Debug, Clone, Parser)]
-pub struct ChainExecuteSimulatedTransactionsArgs {
-    /// Path to protocol-ops --out JSON file (full file; only transactions are extracted for Forge)
+pub struct DevExecuteTransactionsArgs {
+    /// Path to protocol-ops --out JSON file
     #[clap(long)]
     pub out: PathBuf,
     /// L1 RPC URL
@@ -36,7 +36,7 @@ fn resolve_l1_contracts_path(repo_root: &Path) -> anyhow::Result<PathBuf> {
     )
 }
 
-pub async fn run(args: ChainExecuteSimulatedTransactionsArgs) -> anyhow::Result<()> {
+pub async fn run(args: DevExecuteTransactionsArgs) -> anyhow::Result<()> {
     logger::step("Execute simulated transactions from protocol-ops out file");
 
     let content = fs::read_to_string(&args.out)

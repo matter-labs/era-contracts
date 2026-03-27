@@ -1,12 +1,11 @@
 use clap::Subcommand;
 
 use crate::commands::chain::{
-    execute_simulated_transactions::ChainExecuteSimulatedTransactionsArgs, init::ChainInitArgs,
-    set_upgrade_timestamp::ChainSetUpgradeTimestampArgs, upgrade::ChainUpgradeArgs,
+    init::ChainInitArgs, set_upgrade_timestamp::ChainSetUpgradeTimestampArgs,
+    upgrade::ChainUpgradeArgs,
 };
 
 pub(crate) mod admin_call_builder;
-pub(crate) mod execute_simulated_transactions;
 pub(crate) mod init;
 pub(crate) mod set_upgrade_timestamp;
 pub(crate) mod upgrade;
@@ -20,8 +19,6 @@ pub enum ChainCommands {
     Upgrade(ChainUpgradeArgs),
     /// Set upgrade timestamp so server can detect pending upgrade
     SetUpgradeTimestamp(ChainSetUpgradeTimestampArgs),
-    /// Execute transactions from a protocol-ops --out file (extracts only transactions, runs Forge script)
-    ExecuteSimulatedTransactions(ChainExecuteSimulatedTransactionsArgs),
 }
 
 pub(crate) async fn run(args: ChainCommands) -> anyhow::Result<()> {
@@ -29,8 +26,5 @@ pub(crate) async fn run(args: ChainCommands) -> anyhow::Result<()> {
         ChainCommands::Init(args) => init::run(args).await,
         ChainCommands::Upgrade(args) => upgrade::run(args).await,
         ChainCommands::SetUpgradeTimestamp(args) => set_upgrade_timestamp::run(args).await,
-        ChainCommands::ExecuteSimulatedTransactions(args) => {
-            execute_simulated_transactions::run(args).await
-        }
     }
 }

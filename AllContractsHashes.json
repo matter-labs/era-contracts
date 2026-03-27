@@ -1931,13 +1931,13 @@
   },
   {
     "contractName": "l1-contracts/SettlementLayerV31Upgrade",
-    "zkBytecodeHash": "0x0100033383d72db8f8938d5a4dff5c286b88de2c7008218920aacbf4774390ce",
+    "zkBytecodeHash": "0x01000335555cc23975196b60905f32b9ed400da605f1dd21dd8375801ca23ffe",
     "zkBytecodePath": "/l1-contracts/zkout/SettlementLayerV31Upgrade.sol/SettlementLayerV31Upgrade.json",
-    "evmBytecodeHash": "0xe0847d1f40d4db7cda326dca136ef6d1b567b90fc28bce3c163a8190a4bf7ecc",
+    "evmBytecodeHash": "0xc5a591015b2f74e9207d0b0b8fef024c37d0b9055f27dd7f5526ad803b626899",
     "evmBytecodePath": "/l1-contracts/out/SettlementLayerV31Upgrade.sol/SettlementLayerV31Upgrade.json",
-    "evmDeployedBytecodeHash": "0x4c90b3d9749521fbb15ed28a1d623a6f034e5913305a2fb130e35292b4b2f783",
-    "evmDeployedBytecodeBlakeHash": "0xcc383f4290cf3e12dc056d045456a4fc49a65c27dd3a855e7d7496f482359076",
-    "evmDeployedBytecodeLength": 8523
+    "evmDeployedBytecodeHash": "0x680dd1d6a833b92078b413d4bbc72817d733bd13c788f97b19a9b3d88a695386",
+    "evmDeployedBytecodeBlakeHash": "0x22a11fb3b1cf4b5b0c537224fc80e80ffcd01b16b1bc2a8dc8531d0ddc30d80f",
+    "evmDeployedBytecodeLength": 8570
   },
   {
     "contractName": "l1-contracts/SignatureCheckerUpgradeable",

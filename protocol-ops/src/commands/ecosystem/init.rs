@@ -5,7 +5,6 @@ use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 
 use crate::commands::ctm::init::{ctm_init, CtmInitInput};
-use crate::commands::ecosystem::deploy_create2::deploy_create2_factory;
 use crate::commands::hub::init::{hub_init, HubInitInput};
 use crate::commands::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
@@ -107,14 +106,10 @@ pub async fn ecosystem_init(
     owner: &Wallet,
     input: &EcosystemInitInput,
 ) -> anyhow::Result<EcosystemInitOutputData> {
-    // Determine CREATE2 factory address
-    let create2_factory_addr = if input.create2_factory_addr.is_none() {
-        logger::step("Deploying CREATE2 factory...");
-        deploy_create2_factory(runner, &sender)?;
-        Address::from_str(DETERMINISTIC_CREATE2_ADDRESS).unwrap()
-    } else {
-        input.create2_factory_addr.unwrap()
-    };
+    // Determine CREATE2 factory address (pre-deployed at genesis)
+    let create2_factory_addr = input
+        .create2_factory_addr
+        .unwrap_or_else(|| Address::from_str(DETERMINISTIC_CREATE2_ADDRESS).unwrap());
 
     // Initialize Bridgehub contracts
     let hub_input = HubInitInput {
