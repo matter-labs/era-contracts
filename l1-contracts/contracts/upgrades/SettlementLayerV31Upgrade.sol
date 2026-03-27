@@ -40,6 +40,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
 
         require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 
+        // TODO(EVM-1219): provide correct calldata for the full upgrade impl.
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
         super.upgrade(proposedUpgrade);
         IMessageRootBase messageRoot = IMessageRootBase(bridgehub.messageRoot());
