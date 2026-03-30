@@ -9,7 +9,7 @@ import {
     PriorityOpsRequestTimestampMissing,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
-import {PriorityModeAlreadyAllowed} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {NotZKsyncOS, PriorityModeAlreadyAllowed} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract PriorityModeAdminTest is AdminTest {
     /// @dev Fakes a priority tx with a non-zero timestamp so permanentlyAllowPriorityMode can succeed.
@@ -18,7 +18,16 @@ contract PriorityModeAdminTest is AdminTest {
         utilsFacet.util_setPriorityOpsRequestTimestamp(0, block.timestamp);
     }
 
+    function test_revertWhen_permanentlyAllowPriorityMode_notZKsyncOS() public {
+        address admin = utilsFacet.util_getAdmin();
+
+        vm.prank(admin);
+        vm.expectRevert(NotZKsyncOS.selector);
+        adminFacet.permanentlyAllowPriorityMode();
+    }
+
     function test_revertWhen_permanentlyAllowPriorityMode_noPriorityTxs() public {
+        utilsFacet.util_setZksyncOS(true);
         address admin = utilsFacet.util_getAdmin();
 
         vm.prank(admin);
@@ -27,6 +36,7 @@ contract PriorityModeAdminTest is AdminTest {
     }
 
     function test_revertWhen_permanentlyAllowPriorityMode_calledTwice() public {
+        utilsFacet.util_setZksyncOS(true);
         _fakePriorityTx();
         address admin = utilsFacet.util_getAdmin();
 
@@ -52,6 +62,7 @@ contract PriorityModeAdminTest is AdminTest {
     }
 
     function test_setPriorityModeTransactionFilterer_updatesTransactionFiltererWhenAllowed() public {
+        utilsFacet.util_setZksyncOS(true);
         _fakePriorityTx();
         address admin = utilsFacet.util_getAdmin();
         address chainTypeManager = makeAddr("chainTypeManager");
@@ -70,6 +81,7 @@ contract PriorityModeAdminTest is AdminTest {
     }
 
     function test_permanentlyAllowPriorityMode_usesPriorityModeFilterer() public {
+        utilsFacet.util_setZksyncOS(true);
         _fakePriorityTx();
         address admin = utilsFacet.util_getAdmin();
         address chainTypeManager = makeAddr("chainTypeManager");
