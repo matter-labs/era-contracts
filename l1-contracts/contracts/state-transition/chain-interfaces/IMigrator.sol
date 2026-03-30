@@ -11,7 +11,8 @@ import {TxStatus} from "../../common/Messaging.sol";
 /// @custom:security-contact security@matterlabs.dev
 interface IMigrator is IZKChainBase {
     /// @notice Emitted when the migration to the new settlement layer is complete.
-    event MigrationComplete();
+    /// @param migrationNumber The migration number for this migration.
+    event MigrationComplete(uint256 migrationNumber);
 
     /// @notice Emitted when deposits are paused before migration.
     event DepositsPaused(uint256 chainId, uint256 pausedDepositsTimestamp);

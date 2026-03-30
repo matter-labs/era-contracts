@@ -19,6 +19,7 @@ import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1ChainAssetHandler} from "../../../core/chain-asset-handler/IL1ChainAssetHandler.sol";
+import {IChainAssetHandlerBase} from "../../../core/chain-asset-handler/IChainAssetHandler.sol";
 import {
     AlreadyMigrated,
     PriorityQueueNotFullyProcessed,
@@ -285,7 +286,10 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         _setDAValidatorPair(address(0), L2DACommitmentScheme.NONE);
         _unpauseDeposits();
 
-        emit MigrationComplete();
+        uint256 migNum = IChainAssetHandlerBase(IL1Bridgehub(s.bridgehub).chainAssetHandler()).migrationNumber(
+            s.chainId
+        );
+        emit MigrationComplete(migNum);
     }
 
     /// @inheritdoc IMigrator

@@ -2390,7 +2390,14 @@
   {
     "type": "event",
     "name": "MigrationComplete",
-    "inputs": [],
+    "inputs": [
+      {
+        "name": "migrationNumber",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
     "anonymous": false
   },
   {
