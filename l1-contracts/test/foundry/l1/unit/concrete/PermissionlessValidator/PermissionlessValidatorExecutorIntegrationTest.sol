@@ -52,8 +52,13 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
         CommitBatchInfoZKsyncOS memory commitInfo = _prepareCommitInfo(priorityOps);
         _mockDAValidator(commitInfo.batchNumber);
 
-        (uint256 txFrom, uint256 txTo, bytes memory commitData, bytes memory proveData, bytes memory executeData) =
-            _encodeSettleData(commitInfo, priorityOps);
+        (
+            uint256 txFrom,
+            uint256 txTo,
+            bytes memory commitData,
+            bytes memory proveData,
+            bytes memory executeData
+        ) = _encodeSettleData(commitInfo, priorityOps);
 
         permissionlessValidator.settleBatchesSharedBridge(
             address(executor),
