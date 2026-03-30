@@ -48,6 +48,7 @@ import {
     TokenMultiplierChangeTooFrequent,
     TooMuchGas,
     Unauthorized,
+    UpgradeTimestampNotReached,
     NotCompatibleWithPriorityMode
 } from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
@@ -57,6 +58,7 @@ import {
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
 } from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
+import {IChainAdmin} from "../../../governance/IChainAdmin.sol";
 import {IL2BaseTokenZKOS} from "../../../l2-system/zksync-os/interfaces/IL2BaseTokenZKOS.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -471,9 +473,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function upgradeChainFromVersion(
+        address, // _chainAddress (unused in this specific implementation)
         uint256 _oldProtocolVersion,
         Diamond.DiamondCutData calldata _diamondCut
-    ) external onlyAdminOrChainTypeManager {
+    ) external onlyAdminOrChainTypeManagerOrValidator {
         bytes32 cutHashInput = keccak256(abi.encode(_diamondCut));
         bytes32 upgradeCutHash = IChainTypeManager(s.chainTypeManager).upgradeCutHash(_oldProtocolVersion);
         if (cutHashInput != upgradeCutHash) {
@@ -482,6 +485,16 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
         if (s.protocolVersion != _oldProtocolVersion) {
             revert ProtocolIdMismatch(s.protocolVersion, _oldProtocolVersion);
+        }
+
+        // Check that the auto upgrade timestamp has passed if the sender is not admin or chainTypeManager.
+        // The timestamp is keyed on _oldProtocolVersion (the version we are upgrading *from*), because
+        // the new version is not known until the diamond cut is executed.
+        if (msg.sender != s.admin && msg.sender != s.chainTypeManager) {
+            uint256 timestamp = IChainAdmin(s.admin).protocolVersionToUpgradeTimestamp(_oldProtocolVersion);
+            if (timestamp == 0 || block.timestamp < timestamp) {
+                revert UpgradeTimestampNotReached(timestamp, block.timestamp);
+            }
         }
         _executeDiamondCut(_diamondCut);
         if (s.protocolVersion <= _oldProtocolVersion) {
