@@ -24,6 +24,7 @@ import {ZKChainCommitment} from "contracts/common/Config.sol";
 import {TxStatus} from "contracts/common/Messaging.sol";
 import {PriorityTreeCommitment} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
@@ -344,6 +345,60 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
 
         vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(InvalidNumberOfBatchHashes.selector, 2, 6));
+        migratorFacet.forwardedBridgeMint(data, false);
+    }
+
+    function test_forwardedBridgeMint_EmitsMigrationComplete_WithMigrationNumber() public {
+        // Use a non-L1 chain ID so we take the gateway path (_contractAlreadyDeployed=false)
+        uint256 gatewayChainId = 505;
+        vm.chainId(gatewayChainId);
+
+        // Set chain ID in storage so migrationNumber is queried for the right chain
+        uint256 thisChainId = 300;
+        utilsFacet.util_setChainId(thisChainId);
+
+        address ctm = utilsFacet.util_getChainTypeManager();
+        uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
+        vm.mockCall(
+            ctm,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
+            abi.encode(currentProtocolVersion)
+        );
+
+        uint256 expectedMigrationNumber = 3;
+        vm.mockCall(
+            chainAssetHandler,
+            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector, thisChainId),
+            abi.encode(expectedMigrationNumber)
+        );
+
+        bytes32[] memory sides = new bytes32[](1);
+        sides[0] = bytes32(uint256(1));
+        PriorityTreeCommitment memory priorityTreeCommitment = PriorityTreeCommitment({
+            nextLeafIndex: 0,
+            startIndex: 0,
+            unprocessedIndex: 0,
+            sides: sides
+        });
+
+        ZKChainCommitment memory commitment = ZKChainCommitment({
+            totalBatchesExecuted: 0,
+            totalBatchesVerified: 0,
+            totalBatchesCommitted: 0,
+            l2SystemContractsUpgradeTxHash: bytes32(0),
+            l2SystemContractsUpgradeBatchNumber: 0,
+            batchHashes: new bytes32[](1),
+            priorityTree: priorityTreeCommitment,
+            isPermanentRollup: false,
+            precommitmentForTheLatestBatch: bytes32(0)
+        });
+
+        bytes memory data = abi.encode(commitment);
+
+        vm.expectEmit(true, true, true, true);
+        emit IMigrator.MigrationComplete(expectedMigrationNumber);
+
+        vm.prank(chainAssetHandler);
         migratorFacet.forwardedBridgeMint(data, false);
     }
 

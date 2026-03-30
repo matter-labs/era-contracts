@@ -286,10 +286,9 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         _setDAValidatorPair(address(0), L2DACommitmentScheme.NONE);
         _unpauseDeposits();
 
-        uint256 migNum = IChainAssetHandlerBase(IL1Bridgehub(s.bridgehub).chainAssetHandler()).migrationNumber(
-            s.chainId
-        );
-        emit MigrationComplete(migNum);
+        uint256 migrationNumber = IChainAssetHandlerBase(IL1Bridgehub(s.bridgehub).chainAssetHandler())
+            .migrationNumber(s.chainId);
+        emit MigrationComplete(migrationNumber);
     }
 
     /// @inheritdoc IMigrator
