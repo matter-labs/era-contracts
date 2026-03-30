@@ -6,7 +6,7 @@ import {FeeParams, PriorityModeInformation, PubdataPricingMode, ZKChainStorage} 
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {NotSettlementLayer, NotZKsyncOS} from "../../L1StateTransitionErrors.sol";
 import {
     BatchHashMismatch,
     BaseTokenGasPriceDenominatorNotSet,
@@ -74,6 +74,12 @@ contract ZKChainBase is ReentrancyGuard {
     /// @notice Ensures that the chain uses EraVM
     modifier onlyEra() {
         require(!s.zksyncOS, MustBeEraChain());
+        _;
+    }
+
+    /// @notice Ensures that the chain uses ZKsync OS
+    modifier onlyZKsyncOS() {
+        require(s.zksyncOS, NotZKsyncOS());
         _;
     }
 

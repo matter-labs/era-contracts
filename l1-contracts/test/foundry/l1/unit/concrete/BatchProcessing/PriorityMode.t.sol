@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../Utils/Utils.sol";
+import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
-import {
-    IExecutor,
-    SystemLogKey,
-    TOTAL_BLOBS_IN_COMMITMENT
-} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {
     InvalidTxCountInPriorityMode,
     OnlyNormalMode,
@@ -19,14 +15,14 @@ import {
     PriorityOpsRequestTimestampMissing,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
-import {
-    PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS,
-    PRIORITY_EXPIRATION,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-} from "contracts/common/Config.sol";
+import {PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract PriorityModeExecutorTest is ExecutorTest {
+    function isZKsyncOS() internal pure override returns (bool) {
+        return true;
+    }
+
     function test_revertWhen_activatePriorityMode_notAllowed() public {
         vm.expectRevert(PriorityModeIsNotAllowed.selector);
         admin.activatePriorityMode();
@@ -86,82 +82,45 @@ contract PriorityModeExecutorTest is ExecutorTest {
     function test_revertWhen_priorityModeBatchHasL2Txs() public {
         _activatePriorityMode();
 
-        CommitBatchInfo memory commitInfo = newCommitBatchInfo;
-
-        (bytes32 l2DAValidatorOutputHash, bytes memory operatorDAInput) = _mockDAForCommit(commitInfo.batchNumber);
-        bytes[] memory logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
+        _mockDAForCommit(newCommitBatchInfoZKsyncOS.batchNumber);
 
         uint256 l2TxCount = 1;
-        uint256 packedTxCounts = l2TxCount << PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS;
-        logs[uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)] = Utils.constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
-            bytes32(packedTxCounts)
-        );
+        CommitBatchInfoZKsyncOS memory commitInfo = newCommitBatchInfoZKsyncOS;
+        commitInfo.numberOfLayer2Txs = l2TxCount;
+        commitInfo.numberOfLayer1Txs = 1;
 
-        commitInfo.systemLogs = Utils.encodePacked(logs);
-        commitInfo.operatorDAInput = operatorDAInput;
-        commitInfo.timestamp = uint64(currentTimestamp);
-
-        CommitBatchInfo[] memory commitInfos = new CommitBatchInfo[](1);
+        CommitBatchInfoZKsyncOS[] memory commitInfos = new CommitBatchInfoZKsyncOS[](1);
         commitInfos[0] = commitInfo;
 
-        (uint256 commitFrom, uint256 commitTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+        (uint256 commitFrom, uint256 commitTo, bytes memory commitData) = Utils.encodeCommitBatchesDataZKsyncOS(
             genesisStoredBatchInfo,
             commitInfos
         );
 
         vm.prank(address(permissionlessValidator));
-        vm.expectRevert(abi.encodeWithSelector(InvalidTxCountInPriorityMode.selector, l2TxCount, 0));
+        vm.expectRevert(abi.encodeWithSelector(InvalidTxCountInPriorityMode.selector, l2TxCount, 1));
         committer.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
     }
 
     function test_revertWhen_priorityModeBatchHasNoL1Txs() public {
         _activatePriorityMode();
 
-        CommitBatchInfo memory commitInfo = newCommitBatchInfo;
+        _mockDAForCommit(newCommitBatchInfoZKsyncOS.batchNumber);
 
-        (bytes32 l2DAValidatorOutputHash, bytes memory operatorDAInput) = _mockDAForCommit(commitInfo.batchNumber);
-        bytes[] memory logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
+        CommitBatchInfoZKsyncOS memory commitInfo = newCommitBatchInfoZKsyncOS;
+        commitInfo.numberOfLayer2Txs = 0;
+        commitInfo.numberOfLayer1Txs = 0;
 
-        uint256 l1TxCount = 0;
-        uint256 l2TxCount = 0;
-        uint256 packedTxCounts = l1TxCount | (l2TxCount << PACKED_NUMBER_OF_L2_TRANSACTIONS_LOG_SPLIT_BITS);
-        logs[uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)] = Utils.constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
-            bytes32(packedTxCounts)
-        );
-
-        commitInfo.numberOfLayer1Txs = l1TxCount;
-        commitInfo.systemLogs = Utils.encodePacked(logs);
-        commitInfo.operatorDAInput = operatorDAInput;
-        commitInfo.timestamp = uint64(currentTimestamp);
-
-        CommitBatchInfo[] memory commitInfos = new CommitBatchInfo[](1);
+        CommitBatchInfoZKsyncOS[] memory commitInfos = new CommitBatchInfoZKsyncOS[](1);
         commitInfos[0] = commitInfo;
 
-        (uint256 commitFrom, uint256 commitTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+        (uint256 commitFrom, uint256 commitTo, bytes memory commitData) = Utils.encodeCommitBatchesDataZKsyncOS(
             genesisStoredBatchInfo,
             commitInfos
         );
 
         vm.prank(address(permissionlessValidator));
-        vm.expectRevert(abi.encodeWithSelector(InvalidTxCountInPriorityMode.selector, l2TxCount, l1TxCount));
+        vm.expectRevert(abi.encodeWithSelector(InvalidTxCountInPriorityMode.selector, 0, 0));
         committer.commitBatchesSharedBridge(address(0), commitFrom, commitTo, commitData);
     }
 
@@ -197,12 +156,7 @@ contract PriorityModeExecutorTest is ExecutorTest {
         );
     }
 
-    function _mockDAForCommit(
-        uint256 batchNumber
-    ) internal returns (bytes32 l2DAValidatorOutputHash, bytes memory operatorDAInput) {
-        l2DAValidatorOutputHash = bytes32(0);
-        operatorDAInput = "";
-
+    function _mockDAForCommit(uint256 batchNumber) internal {
         bytes32[] memory blobHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
         bytes32[] memory blobCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
         L1DAValidatorOutput memory daOutput = L1DAValidatorOutput({
@@ -210,16 +164,10 @@ contract PriorityModeExecutorTest is ExecutorTest {
             blobsLinearHashes: blobHashes,
             blobsOpeningCommitments: blobCommitments
         });
+        // Match any checkDA call for this batch regardless of DA input encoding
         vm.mockCall(
             rollupL1DAValidator,
-            abi.encodeWithSelector(
-                IL1DAValidator.checkDA.selector,
-                l2ChainId,
-                batchNumber,
-                l2DAValidatorOutputHash,
-                operatorDAInput,
-                TOTAL_BLOBS_IN_COMMITMENT
-            ),
+            abi.encodeWithSelector(IL1DAValidator.checkDA.selector, l2ChainId, batchNumber),
             abi.encode(daOutput)
         );
     }

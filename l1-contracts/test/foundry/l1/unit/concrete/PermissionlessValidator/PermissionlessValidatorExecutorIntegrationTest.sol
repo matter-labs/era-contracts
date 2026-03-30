@@ -1,67 +1,23 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {
-    ExecutorTest,
-    EMPTY_PREPUBLISHED_COMMITMENT,
-    POINT_EVALUATION_PRECOMPILE_RESULT
-} from "../BatchProcessing/_Executor_Shared.t.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../Utils/Utils.sol";
-import {
-    IExecutor,
-    SystemLogKey,
-    TOTAL_BLOBS_IN_COMMITMENT
-} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
+import {ExecutorTest} from "../BatchProcessing/_Executor_Shared.t.sol";
+import {Utils} from "../Utils/Utils.sol";
+import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {CommitBatchInfoZKsyncOS} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
-import {
-    POINT_EVALUATION_PRECOMPILE_ADDR,
-    PRIORITY_EXPIRATION,
-    REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-} from "contracts/common/Config.sol";
+import {PRIORITY_EXPIRATION, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestDirect} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
-    bytes32[] internal defaultBlobVersionedHashes;
-    bytes internal operatorDAInput;
-    bytes32 internal l2DAValidatorOutputHash;
+    function isZKsyncOS() internal pure override returns (bool) {
+        return true;
+    }
 
     function setUp() public {
         _activatePriorityMode();
-
-        bytes1 source = 0x01;
-        bytes memory defaultBlobCommitment = Utils.getDefaultBlobCommitment();
-
-        bytes32 uncompressedStateDiffHash = Utils.randomBytes32("uncompressedStateDiffHash");
-        bytes32 totalL2PubdataHash = Utils.randomBytes32("totalL2PubdataHash");
-        uint8 numberOfBlobs = 1;
-        bytes32[] memory blobsLinearHashes = new bytes32[](1);
-        blobsLinearHashes[0] = Utils.randomBytes32("blobsLinearHashes");
-
-        operatorDAInput = abi.encodePacked(
-            uncompressedStateDiffHash,
-            totalL2PubdataHash,
-            numberOfBlobs,
-            blobsLinearHashes,
-            source,
-            defaultBlobCommitment,
-            EMPTY_PREPUBLISHED_COMMITMENT
-        );
-
-        l2DAValidatorOutputHash = Utils.constructRollupL2DAValidatorOutputHash(
-            uncompressedStateDiffHash,
-            totalL2PubdataHash,
-            numberOfBlobs,
-            blobsLinearHashes
-        );
-
-        defaultBlobVersionedHashes = new bytes32[](1);
-        defaultBlobVersionedHashes[0] = 0x01c024b4740620a5849f95930cefe298933bdf588123ea897cdf0f2462f6d2d5;
-
-        bytes memory precompileInput = Utils.defaultPointEvaluationPrecompileInput(defaultBlobVersionedHashes[0]);
-        vm.mockCall(POINT_EVALUATION_PRECOMPILE_ADDR, precompileInput, POINT_EVALUATION_PRECOMPILE_RESULT);
     }
 
     function _activatePriorityMode() internal {
@@ -93,57 +49,21 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
 
     function test_settleBatchesSharedBridge_withExecutor() public {
         PriorityOpsBatchInfo[] memory priorityOps = Utils.generatePriorityOps(1, 1);
-        CommitBatchInfo memory commitInfo;
-        {
-            bytes32 rollingHash = _rollingHash(priorityOps[0].itemHashes);
-            bytes32[] memory merkleItemHashes = new bytes32[](priorityOps[0].itemHashes.length);
-            for (uint256 i = 0; i < priorityOps[0].itemHashes.length; ++i) {
-                merkleItemHashes[i] = priorityOps[0].itemHashes[i];
-            }
-            bytes32 expectedRoot = Merkle.calculateRootPaths(
-                priorityOps[0].leftPath,
-                priorityOps[0].rightPath,
-                0,
-                merkleItemHashes
-            );
-            executor.setPriorityTreeHistoricalRoot(expectedRoot);
-            commitInfo = _buildCommitInfo(rollingHash, priorityOps[0].itemHashes.length);
-        }
+        CommitBatchInfoZKsyncOS memory commitInfo = _prepareCommitInfo(priorityOps);
+        _mockDAValidator(commitInfo.batchNumber);
 
-        CommitBatchInfo[] memory commitInfos = new CommitBatchInfo[](1);
-        commitInfos[0] = commitInfo;
+        (
+            uint256 txFrom,
+            uint256 txTo,
+            bytes memory commitData,
+            bytes memory proveData,
+            bytes memory executeData
+        ) = _encodeSettleData(commitInfo, priorityOps);
 
-        vm.blobhashes(defaultBlobVersionedHashes);
-        (uint256 commitFrom, uint256 commitTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            commitInfos
-        );
-
-        IExecutor.StoredBatchInfo memory storedInfo = _buildStoredBatchInfo(commitInfo);
-        IExecutor.StoredBatchInfo[] memory storedArray = new IExecutor.StoredBatchInfo[](1);
-        storedArray[0] = storedInfo;
-
-        (uint256 proveFrom, uint256 proveTo, bytes memory proveData) = Utils.encodeProveBatchesData(
-            genesisStoredBatchInfo,
-            storedArray,
-            proofInput
-        );
-
-        (uint256 executeFrom, uint256 executeTo, bytes memory executeData) = Utils.encodeExecuteBatchesDataZeroLogs(
-            storedArray,
-            priorityOps
-        );
-
-        assertEq(commitFrom, proveFrom);
-        assertEq(commitFrom, executeFrom);
-        assertEq(commitTo, proveTo);
-        assertEq(commitTo, executeTo);
-
-        vm.blobhashes(defaultBlobVersionedHashes);
         permissionlessValidator.settleBatchesSharedBridge(
             address(executor),
-            commitFrom,
-            commitTo,
+            txFrom,
+            txTo,
             commitData,
             proveData,
             executeData
@@ -152,71 +72,118 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
         assertEq(getters.getTotalBatchesCommitted(), 1);
         assertEq(getters.getTotalBatchesVerified(), 1);
         assertEq(getters.getTotalBatchesExecuted(), 1);
-        assertEq(getters.l2LogsRootHash(1), storedInfo.l2LogsTreeRoot);
+        assertEq(getters.l2LogsRootHash(1), commitInfo.l2LogsTreeRoot);
     }
 
-    function _buildCommitInfo(
+    function _prepareCommitInfo(
+        PriorityOpsBatchInfo[] memory priorityOps
+    ) internal returns (CommitBatchInfoZKsyncOS memory commitInfo) {
+        bytes32 rollingHash = _rollingHash(priorityOps[0].itemHashes);
+        bytes32[] memory merkleItemHashes = new bytes32[](priorityOps[0].itemHashes.length);
+        for (uint256 i = 0; i < priorityOps[0].itemHashes.length; ++i) {
+            merkleItemHashes[i] = priorityOps[0].itemHashes[i];
+        }
+        bytes32 expectedRoot = Merkle.calculateRootPaths(
+            priorityOps[0].leftPath,
+            priorityOps[0].rightPath,
+            0,
+            merkleItemHashes
+        );
+        executor.setPriorityTreeHistoricalRoot(expectedRoot);
+        commitInfo = _buildCommitInfoZKsyncOS(rollingHash, priorityOps[0].itemHashes.length);
+    }
+
+    function _mockDAValidator(uint256 batchNumber) internal {
+        bytes32[] memory blobHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        bytes32[] memory blobCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        vm.mockCall(
+            rollupL1DAValidator,
+            abi.encodeWithSelector(IL1DAValidator.checkDA.selector, l2ChainId, batchNumber),
+            abi.encode(
+                L1DAValidatorOutput({
+                    stateDiffHash: bytes32(0),
+                    blobsLinearHashes: blobHashes,
+                    blobsOpeningCommitments: blobCommitments
+                })
+            )
+        );
+    }
+
+    function _encodeSettleData(
+        CommitBatchInfoZKsyncOS memory commitInfo,
+        PriorityOpsBatchInfo[] memory priorityOps
+    )
+        internal
+        view
+        returns (
+            uint256 txFrom,
+            uint256 txTo,
+            bytes memory commitData,
+            bytes memory proveData,
+            bytes memory executeData
+        )
+    {
+        CommitBatchInfoZKsyncOS[] memory commitInfos = new CommitBatchInfoZKsyncOS[](1);
+        commitInfos[0] = commitInfo;
+        (txFrom, txTo, commitData) = Utils.encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, commitInfos);
+
+        IExecutor.StoredBatchInfo[] memory storedArray = new IExecutor.StoredBatchInfo[](1);
+        storedArray[0] = _buildStoredBatchInfoZKsyncOS(commitInfo);
+
+        (, , proveData) = Utils.encodeProveBatchesData(genesisStoredBatchInfo, storedArray, proofInput);
+        (, , executeData) = Utils.encodeExecuteBatchesDataZeroLogs(storedArray, priorityOps);
+    }
+
+    /// @dev Builds a ZKsync OS commit batch info for a priority-mode batch (no L2 txs).
+    function _buildCommitInfoZKsyncOS(
         bytes32 priorityOpsHash,
         uint256 numberOfLayer1Txs
-    ) internal returns (CommitBatchInfo memory) {
-        CommitBatchInfo memory info = newCommitBatchInfo;
-        bytes[] memory logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
-        logs[uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY)] = Utils.constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
-            priorityOpsHash
-        );
-        logs[uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)] = Utils.constructL2Log(
-            true,
-            L2_BOOTLOADER_ADDRESS,
-            uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
-            bytes32(numberOfLayer1Txs)
-        );
-        info.systemLogs = Utils.encodePacked(logs);
-        info.operatorDAInput = operatorDAInput;
-        info.priorityOperationsHash = priorityOpsHash;
+    ) internal view returns (CommitBatchInfoZKsyncOS memory info) {
+        info = newCommitBatchInfoZKsyncOS;
         info.numberOfLayer1Txs = numberOfLayer1Txs;
-        return info;
+        info.numberOfLayer2Txs = 0;
+        info.priorityOperationsHash = priorityOpsHash;
+        // No interop roots are submitted during execution so the accumulated value is bytes32(0)
+        info.dependencyRootsRollingHash = bytes32(0);
     }
 
-    function _buildStoredBatchInfo(
-        CommitBatchInfo memory commitInfo
-    ) internal returns (IExecutor.StoredBatchInfo memory) {
-        vm.blobhashes(defaultBlobVersionedHashes);
-        L1DAValidatorOutput memory daOutput = IL1DAValidator(rollupL1DAValidator).checkDA({
-            _chainId: l2ChainId,
-            _batchNumber: commitInfo.batchNumber,
-            _l2DAValidatorOutputHash: l2DAValidatorOutputHash,
-            _operatorDAInput: commitInfo.operatorDAInput,
-            _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
-        });
-
-        bytes32 commitment = Utils.createBatchCommitment(
-            commitInfo,
-            daOutput.stateDiffHash,
-            daOutput.blobsOpeningCommitments,
-            daOutput.blobsLinearHashes
-        );
-
+    /// @dev Replicates the stored batch info that _commitOneBatchZKsyncOS produces for the given commit info.
+    function _buildStoredBatchInfoZKsyncOS(
+        CommitBatchInfoZKsyncOS memory commitInfo
+    ) internal view returns (IExecutor.StoredBatchInfo memory) {
         return
             IExecutor.StoredBatchInfo({
                 batchNumber: commitInfo.batchNumber,
-                batchHash: commitInfo.newStateRoot,
-                indexRepeatedStorageChanges: commitInfo.indexRepeatedStorageChanges,
+                batchHash: commitInfo.newStateCommitment,
+                indexRepeatedStorageChanges: 0,
                 numberOfLayer1Txs: commitInfo.numberOfLayer1Txs,
                 priorityOperationsHash: commitInfo.priorityOperationsHash,
-                dependencyRootsRollingHash: bytes32(0),
-                l2LogsTreeRoot: bytes32(0),
-                timestamp: commitInfo.timestamp,
-                commitment: commitment
+                l2LogsTreeRoot: commitInfo.l2LogsTreeRoot,
+                dependencyRootsRollingHash: commitInfo.dependencyRootsRollingHash,
+                timestamp: 0,
+                commitment: _batchOutputHash(commitInfo)
             });
+    }
+
+    /// @dev Mirror the batchOutputHash formula from Committer._commitOneBatchZKsyncOS.
+    function _batchOutputHash(CommitBatchInfoZKsyncOS memory c) internal pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    c.chainId,
+                    c.firstBlockTimestamp,
+                    c.lastBlockTimestamp,
+                    uint256(c.daCommitmentScheme),
+                    c.daCommitment,
+                    c.numberOfLayer1Txs,
+                    c.numberOfLayer2Txs,
+                    c.priorityOperationsHash,
+                    c.l2LogsTreeRoot,
+                    bytes32(0), // no system-contract upgrade tx
+                    c.dependencyRootsRollingHash,
+                    c.slChainId
+                )
+            );
     }
 
     function _rollingHash(bytes32[] memory hashes) internal pure returns (bytes32) {

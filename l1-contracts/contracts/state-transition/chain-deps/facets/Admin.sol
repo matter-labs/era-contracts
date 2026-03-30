@@ -22,7 +22,6 @@ import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {
     L1DAValidatorAddressIsZero,
     NotL1,
-    NotZKsyncOS,
     PriorityModeAlreadyAllowed,
     ExecutedIsNotConsistentWithVerified,
     VerifiedIsNotConsistentWithCommitted,
@@ -377,7 +376,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function permanentlyAllowPriorityMode() external onlyAdmin onlySettlementLayer onlyL1 {
+    function permanentlyAllowPriorityMode() external onlyAdmin onlySettlementLayer onlyL1 onlyZKsyncOS {
         if (s.priorityModeInfo.canBeActivated) {
             revert PriorityModeAlreadyAllowed();
         }
@@ -454,10 +453,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @inheritdoc IAdmin
     function setZKsyncOSPreV31TotalSupply(
         uint256 _totalSupply
-    ) external onlyAdmin onlyL1 notPriorityMode returns (bytes32 canonicalTxHash) {
-        if (!s.zksyncOS) {
-            revert NotZKsyncOS();
-        }
+    ) external onlyAdmin onlyL1 notPriorityMode onlyZKsyncOS returns (bytes32 canonicalTxHash) {
         if (s.baseTokenHasTotalSupply) {
             revert BaseTokenPreV31TotalSupplyAlreadySet();
         }
