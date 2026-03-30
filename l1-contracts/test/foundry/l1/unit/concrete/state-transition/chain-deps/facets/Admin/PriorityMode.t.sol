@@ -12,6 +12,11 @@ import {
 import {NotZKsyncOS, PriorityModeAlreadyAllowed} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract PriorityModeAdminTest is AdminTest {
+    function setUp() public override {
+        super.setUp();
+        utilsFacet.util_setZksyncOS(true);
+    }
+
     /// @dev Fakes a priority tx with a non-zero timestamp so permanentlyAllowPriorityMode can succeed.
     function _fakePriorityTx() internal {
         utilsFacet.util_setPriorityTreeNextLeafIndex(1);
@@ -19,6 +24,7 @@ contract PriorityModeAdminTest is AdminTest {
     }
 
     function test_revertWhen_permanentlyAllowPriorityMode_notZKsyncOS() public {
+        utilsFacet.util_setZksyncOS(false);
         address admin = utilsFacet.util_getAdmin();
 
         vm.prank(admin);
@@ -27,7 +33,6 @@ contract PriorityModeAdminTest is AdminTest {
     }
 
     function test_revertWhen_permanentlyAllowPriorityMode_noPriorityTxs() public {
-        utilsFacet.util_setZksyncOS(true);
         address admin = utilsFacet.util_getAdmin();
 
         vm.prank(admin);
@@ -36,7 +41,6 @@ contract PriorityModeAdminTest is AdminTest {
     }
 
     function test_revertWhen_permanentlyAllowPriorityMode_calledTwice() public {
-        utilsFacet.util_setZksyncOS(true);
         _fakePriorityTx();
         address admin = utilsFacet.util_getAdmin();
 
@@ -62,7 +66,6 @@ contract PriorityModeAdminTest is AdminTest {
     }
 
     function test_setPriorityModeTransactionFilterer_updatesTransactionFiltererWhenAllowed() public {
-        utilsFacet.util_setZksyncOS(true);
         _fakePriorityTx();
         address admin = utilsFacet.util_getAdmin();
         address chainTypeManager = makeAddr("chainTypeManager");
@@ -81,7 +84,6 @@ contract PriorityModeAdminTest is AdminTest {
     }
 
     function test_permanentlyAllowPriorityMode_usesPriorityModeFilterer() public {
-        utilsFacet.util_setZksyncOS(true);
         _fakePriorityTx();
         address admin = utilsFacet.util_getAdmin();
         address chainTypeManager = makeAddr("chainTypeManager");
