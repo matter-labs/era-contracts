@@ -226,27 +226,24 @@ library L2GenesisForceDeploymentsHelper {
         IComplexUpgrader.ContractUpgradeType expectedUpgradeType = _isZKsyncOS
             ? IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade
             : IComplexUpgrader.ContractUpgradeType.EraForceDeployment;
-        bool shouldUpgradeContracts = !(_isZKsyncOS && _isGenesisUpgrade);
 
         _setupProxyAdmin();
         _deployCoreContracts({
-            expectedUpgradeType: expectedUpgradeType,
-            fixedForceDeploymentsData: fixedForceDeploymentsData,
-            additionalForceDeploymentsData: additionalForceDeploymentsData,
-            _isGenesisUpgrade: _isGenesisUpgrade,
-            shouldUpgradeContracts: shouldUpgradeContracts
+            _expectedUpgradeType: expectedUpgradeType,
+            _fixedForceDeploymentsData: fixedForceDeploymentsData,
+            _additionalForceDeploymentsData: additionalForceDeploymentsData,
+            _isGenesisUpgrade: _isGenesisUpgrade
         });
         _deployTokenInfrastructure({
-            expectedUpgradeType: expectedUpgradeType,
-            fixedForceDeploymentsData: fixedForceDeploymentsData,
-            additionalForceDeploymentsData: additionalForceDeploymentsData,
-            _isGenesisUpgrade: _isGenesisUpgrade,
-            shouldUpgradeContracts: shouldUpgradeContracts
+            _expectedUpgradeType: expectedUpgradeType,
+            _fixedForceDeploymentsData: fixedForceDeploymentsData,
+            _additionalForceDeploymentsData: additionalForceDeploymentsData,
+            _isGenesisUpgrade: _isGenesisUpgrade
         });
         _finalizeDeployments({
             _ctmDeployer: _ctmDeployer,
-            fixedForceDeploymentsData: fixedForceDeploymentsData,
-            additionalForceDeploymentsData: additionalForceDeploymentsData,
+            _fixedForceDeploymentsData: fixedForceDeploymentsData,
+            _additionalForceDeploymentsData: additionalForceDeploymentsData,
             _isZKsyncOS: _isZKsyncOS,
             _isGenesisUpgrade: _isGenesisUpgrade
         });
@@ -266,51 +263,50 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function _deployCoreContracts(
-        IComplexUpgrader.ContractUpgradeType expectedUpgradeType,
-        FixedForceDeploymentsData memory fixedForceDeploymentsData,
-        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData,
-        bool _isGenesisUpgrade,
-        bool shouldUpgradeContracts
+        IComplexUpgrader.ContractUpgradeType _expectedUpgradeType,
+        FixedForceDeploymentsData memory _fixedForceDeploymentsData,
+        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
+        bool _isGenesisUpgrade
     ) private {
-        // During the genesis of ZKsync OS, these system contracts have already been deployed and initialized.
-        // It's not necessary to redeploy or reinitialize them.
-        if (shouldUpgradeContracts) {
+        // During genesis (both Era and ZKsync OS), all system contracts are expected to be predeployed already.
+        // It's not necessary to redeploy them.
+        if (!_isGenesisUpgrade) {
             conductContractUpgrade(
-                expectedUpgradeType,
-                fixedForceDeploymentsData.messageRootBytecodeInfo,
+                _expectedUpgradeType,
+                _fixedForceDeploymentsData.messageRootBytecodeInfo,
                 address(L2_MESSAGE_ROOT_ADDR)
             );
         }
         // If this is a genesis upgrade, we need to initialize the MessageRoot contract.
         if (_isGenesisUpgrade) {
             L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(
-                fixedForceDeploymentsData.l1ChainId,
-                fixedForceDeploymentsData.gatewayChainId
+                _fixedForceDeploymentsData.l1ChainId,
+                _fixedForceDeploymentsData.gatewayChainId
             );
         } else {
             L2MessageRoot(L2_MESSAGE_ROOT_ADDR).updateL2(
-                fixedForceDeploymentsData.l1ChainId,
-                fixedForceDeploymentsData.gatewayChainId
+                _fixedForceDeploymentsData.l1ChainId,
+                _fixedForceDeploymentsData.gatewayChainId
             );
         }
 
-        if (shouldUpgradeContracts) {
+        if (!_isGenesisUpgrade) {
             conductContractUpgrade(
-                expectedUpgradeType,
-                fixedForceDeploymentsData.bridgehubBytecodeInfo,
+                _expectedUpgradeType,
+                _fixedForceDeploymentsData.bridgehubBytecodeInfo,
                 address(L2_BRIDGEHUB_ADDR)
             );
         }
         if (_isGenesisUpgrade) {
             L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(
-                fixedForceDeploymentsData.l1ChainId,
-                fixedForceDeploymentsData.aliasedL1Governance,
-                fixedForceDeploymentsData.maxNumberOfZKChains
+                _fixedForceDeploymentsData.l1ChainId,
+                _fixedForceDeploymentsData.aliasedL1Governance,
+                _fixedForceDeploymentsData.maxNumberOfZKChains
             );
         } else {
             L2Bridgehub(L2_BRIDGEHUB_ADDR).updateL2(
-                fixedForceDeploymentsData.l1ChainId,
-                fixedForceDeploymentsData.maxNumberOfZKChains
+                _fixedForceDeploymentsData.l1ChainId,
+                _fixedForceDeploymentsData.maxNumberOfZKChains
             );
         }
 
@@ -320,41 +316,40 @@ library L2GenesisForceDeploymentsHelper {
             ? address(0)
             : address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
 
-        if (shouldUpgradeContracts) {
+        if (!_isGenesisUpgrade) {
             conductContractUpgrade(
-                expectedUpgradeType,
-                fixedForceDeploymentsData.l2AssetRouterBytecodeInfo,
+                _expectedUpgradeType,
+                _fixedForceDeploymentsData.l2AssetRouterBytecodeInfo,
                 address(L2_ASSET_ROUTER_ADDR)
             );
         }
         if (_isGenesisUpgrade) {
             // solhint-disable-next-line func-named-parameters
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
-                fixedForceDeploymentsData.l1ChainId,
-                fixedForceDeploymentsData.eraChainId,
-                IL1AssetRouter(fixedForceDeploymentsData.l1AssetRouter),
+                _fixedForceDeploymentsData.l1ChainId,
+                _fixedForceDeploymentsData.eraChainId,
+                IL1AssetRouter(_fixedForceDeploymentsData.l1AssetRouter),
                 IL2SharedBridgeLegacy(l2LegacySharedBridge),
-                additionalForceDeploymentsData.baseTokenBridgingData.assetId,
-                fixedForceDeploymentsData.aliasedL1Governance
+                _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
+                _fixedForceDeploymentsData.aliasedL1Governance
             );
         } else {
             // solhint-disable-next-line func-named-parameters
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).updateL2(
-                fixedForceDeploymentsData.l1ChainId,
-                fixedForceDeploymentsData.eraChainId,
-                IL1AssetRouter(fixedForceDeploymentsData.l1AssetRouter),
+                _fixedForceDeploymentsData.l1ChainId,
+                _fixedForceDeploymentsData.eraChainId,
+                IL1AssetRouter(_fixedForceDeploymentsData.l1AssetRouter),
                 IL2SharedBridgeLegacy(l2LegacySharedBridge),
-                additionalForceDeploymentsData.baseTokenBridgingData.assetId
+                _additionalForceDeploymentsData.baseTokenBridgingData.assetId
             );
         }
     }
 
     function _deployTokenInfrastructure(
-        IComplexUpgrader.ContractUpgradeType expectedUpgradeType,
-        FixedForceDeploymentsData memory fixedForceDeploymentsData,
-        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData,
-        bool _isGenesisUpgrade,
-        bool shouldUpgradeContracts
+        IComplexUpgrader.ContractUpgradeType _expectedUpgradeType,
+        FixedForceDeploymentsData memory _fixedForceDeploymentsData,
+        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
+        bool _isGenesisUpgrade
     ) private {
         address predeployedL2WethAddress = _isGenesisUpgrade
             ? address(0)
@@ -365,126 +360,120 @@ library L2GenesisForceDeploymentsHelper {
 
         address wrappedBaseTokenAddress = _ensureWethToken({
             _predeployedWethToken: predeployedL2WethAddress,
-            _aliasedL1Governance: fixedForceDeploymentsData.aliasedL1Governance,
-            _baseTokenL1Address: additionalForceDeploymentsData.baseTokenL1Address,
-            _baseTokenAssetId: additionalForceDeploymentsData.baseTokenBridgingData.assetId,
-            _baseTokenName: additionalForceDeploymentsData.baseTokenMetadata.name,
-            _baseTokenSymbol: additionalForceDeploymentsData.baseTokenMetadata.symbol
+            _aliasedL1Governance: _fixedForceDeploymentsData.aliasedL1Governance,
+            _baseTokenL1Address: _additionalForceDeploymentsData.baseTokenL1Address,
+            _baseTokenAssetId: _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
+            _baseTokenName: _additionalForceDeploymentsData.baseTokenMetadata.name,
+            _baseTokenSymbol: _additionalForceDeploymentsData.baseTokenMetadata.symbol
         });
 
-        if (shouldUpgradeContracts) {
+        if (!_isGenesisUpgrade) {
             conductContractUpgrade(
-                expectedUpgradeType,
-                fixedForceDeploymentsData.l2NtvBytecodeInfo,
+                _expectedUpgradeType,
+                _fixedForceDeploymentsData.l2NtvBytecodeInfo,
                 L2_NATIVE_TOKEN_VAULT_ADDR
             );
         }
         if (_isGenesisUpgrade) {
             address deployedTokenBeacon;
-            // In production, the `fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon` must always
+            // In production, the `_fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon` must always
             // be equal to 0. It is only for simplifying testing.
-            if (fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon == address(0)) {
+            if (_fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon == address(0)) {
                 // We deploy the beacon through a dedicated helper contract to reduce the code size here.
-                if (shouldUpgradeContracts) {
-                    conductContractUpgrade(
-                        expectedUpgradeType,
-                        fixedForceDeploymentsData.beaconDeployerInfo,
-                        L2_NTV_BEACON_DEPLOYER_ADDR
-                    );
-                }
+                // The UpgradeableBeaconDeployer is predeployed at genesis, so no force deployment needed here.
                 deployedTokenBeacon = UpgradeableBeaconDeployer(L2_NTV_BEACON_DEPLOYER_ADDR).deployUpgradeableBeacon(
-                    fixedForceDeploymentsData.aliasedL1Governance
+                    _fixedForceDeploymentsData.aliasedL1Governance
                 );
             } else {
-                deployedTokenBeacon = fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon;
+                deployedTokenBeacon = _fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon;
             }
 
             // solhint-disable-next-line func-named-parameters
             L2NativeTokenVaultZKOS(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
-                fixedForceDeploymentsData.l1ChainId,
-                fixedForceDeploymentsData.aliasedL1Governance,
-                fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
-                additionalForceDeploymentsData.l2LegacySharedBridge,
+                _fixedForceDeploymentsData.l1ChainId,
+                _fixedForceDeploymentsData.aliasedL1Governance,
+                _fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
+                _additionalForceDeploymentsData.l2LegacySharedBridge,
                 deployedTokenBeacon,
                 wrappedBaseTokenAddress,
-                additionalForceDeploymentsData.baseTokenBridgingData,
-                additionalForceDeploymentsData.baseTokenMetadata
+                _additionalForceDeploymentsData.baseTokenBridgingData,
+                _additionalForceDeploymentsData.baseTokenMetadata
             );
         } else {
             address l2LegacySharedBridge = address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
             // solhint-disable-next-line func-named-parameters
             L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateL2(
-                fixedForceDeploymentsData.l1ChainId,
+                _fixedForceDeploymentsData.l1ChainId,
                 previousL2TokenProxyBytecodeHash,
                 l2LegacySharedBridge,
                 wrappedBaseTokenAddress,
-                additionalForceDeploymentsData.baseTokenBridgingData,
-                additionalForceDeploymentsData.baseTokenMetadata
+                _additionalForceDeploymentsData.baseTokenBridgingData,
+                _additionalForceDeploymentsData.baseTokenMetadata
             );
         }
 
-        if (shouldUpgradeContracts) {
+        if (!_isGenesisUpgrade) {
             conductContractUpgrade(
-                expectedUpgradeType,
-                fixedForceDeploymentsData.chainAssetHandlerBytecodeInfo,
+                _expectedUpgradeType,
+                _fixedForceDeploymentsData.chainAssetHandlerBytecodeInfo,
                 address(L2_CHAIN_ASSET_HANDLER_ADDR)
             );
         }
         if (_isGenesisUpgrade) {
             // solhint-disable-next-line func-named-parameters
             L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
-                fixedForceDeploymentsData.l1ChainId,
-                fixedForceDeploymentsData.aliasedL1Governance,
+                _fixedForceDeploymentsData.l1ChainId,
+                _fixedForceDeploymentsData.aliasedL1Governance,
                 L2_BRIDGEHUB_ADDR,
                 L2_ASSET_ROUTER_ADDR,
                 L2_MESSAGE_ROOT_ADDR
             );
         } else {
             L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).updateL2(
-                fixedForceDeploymentsData.l1ChainId,
+                _fixedForceDeploymentsData.l1ChainId,
                 L2_BRIDGEHUB_ADDR,
                 L2_ASSET_ROUTER_ADDR,
                 L2_MESSAGE_ROOT_ADDR
             );
         }
 
-        if (shouldUpgradeContracts) {
+        if (!_isGenesisUpgrade) {
             conductContractUpgrade(
-                expectedUpgradeType,
-                fixedForceDeploymentsData.assetTrackerBytecodeInfo,
+                _expectedUpgradeType,
+                _fixedForceDeploymentsData.assetTrackerBytecodeInfo,
                 L2_ASSET_TRACKER_ADDR
             );
 
             conductContractUpgrade(
-                expectedUpgradeType,
-                fixedForceDeploymentsData.interopCenterBytecodeInfo,
+                _expectedUpgradeType,
+                _fixedForceDeploymentsData.interopCenterBytecodeInfo,
                 L2_INTEROP_CENTER_ADDR
             );
         }
 
         if (_isGenesisUpgrade) {
             InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
-                fixedForceDeploymentsData.l1ChainId,
-                fixedForceDeploymentsData.aliasedL1Governance,
-                fixedForceDeploymentsData.zkTokenAssetId
+                _fixedForceDeploymentsData.l1ChainId,
+                _fixedForceDeploymentsData.aliasedL1Governance,
+                _fixedForceDeploymentsData.zkTokenAssetId
             );
         } else {
             InteropCenter(L2_INTEROP_CENTER_ADDR).updateL2(
-                fixedForceDeploymentsData.l1ChainId,
-                fixedForceDeploymentsData.aliasedL1Governance
+                _fixedForceDeploymentsData.l1ChainId,
+                _fixedForceDeploymentsData.aliasedL1Governance
             );
         }
 
-        if (shouldUpgradeContracts) {
+        if (!_isGenesisUpgrade) {
             conductContractUpgrade(
-                expectedUpgradeType,
-                fixedForceDeploymentsData.interopHandlerBytecodeInfo,
+                _expectedUpgradeType,
+                _fixedForceDeploymentsData.interopHandlerBytecodeInfo,
                 L2_INTEROP_HANDLER_ADDR
             );
 
             conductContractUpgrade(
-                expectedUpgradeType,
-                fixedForceDeploymentsData.baseTokenHolderBytecodeInfo,
+                _expectedUpgradeType,
+                _fixedForceDeploymentsData.baseTokenHolderBytecodeInfo,
                 L2_BASE_TOKEN_HOLDER_ADDR
             );
         }
@@ -492,8 +481,8 @@ library L2GenesisForceDeploymentsHelper {
 
     function _finalizeDeployments(
         address _ctmDeployer,
-        FixedForceDeploymentsData memory fixedForceDeploymentsData,
-        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData,
+        FixedForceDeploymentsData memory _fixedForceDeploymentsData,
+        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
         bool _isZKsyncOS,
         bool _isGenesisUpgrade
     ) private {
@@ -505,32 +494,32 @@ library L2GenesisForceDeploymentsHelper {
             _l1CtmDeployer: ICTMDeploymentTracker(_ctmDeployer),
             _messageRoot: IMessageRootBase(L2_MESSAGE_ROOT_ADDR),
             _chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
-            _chainRegistrationSender: fixedForceDeploymentsData.aliasedChainRegistrationSender
+            _chainRegistrationSender: _fixedForceDeploymentsData.aliasedChainRegistrationSender
         });
 
         // These contracts are introduced by the v31 force-deployment flow itself, so both the genesis path and
         // the existing-chain upgrade path need their first-time initialization rather than an update.
         L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(
-            fixedForceDeploymentsData.l1ChainId,
-            additionalForceDeploymentsData.baseTokenBridgingData.assetId,
+            _fixedForceDeploymentsData.l1ChainId,
+            _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
             // The only chains that need backfill for the base token's total supply are ZKsync OS
             // chains that existed before the v31 upgrade (i.e. isGenesis is false).
             _isZKsyncOS && !_isGenesisUpgrade
         );
 
         GWAssetTracker(GW_ASSET_TRACKER_ADDR).initL2(
-            fixedForceDeploymentsData.l1ChainId,
-            fixedForceDeploymentsData.aliasedL1Governance
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.aliasedL1Governance
         );
 
-        InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
+        InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
 
         // Initialize L2BaseToken during genesis for both Era and ZKOS chains.
         // Sets L1_CHAIN_ID and initializes the BaseTokenHolder balance.
         // For Era: reads __DEPRECATED_totalSupply and computes holder balance
         // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder
         if (_isGenesisUpgrade) {
-            IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
+            IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
         }
 
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
