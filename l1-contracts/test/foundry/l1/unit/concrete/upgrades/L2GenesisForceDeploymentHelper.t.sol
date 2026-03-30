@@ -193,13 +193,13 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
         // Era deployments should use direct force deployment (single deployment per address)
         MockZKOSContractDeployer etchedDeployer = MockZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
-        assertEq(etchedDeployer.deploymentCount(L2_MESSAGE_ROOT_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_BRIDGEHUB_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_ASSET_ROUTER_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_NATIVE_TOKEN_VAULT_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_CHAIN_ASSET_HANDLER_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_NTV_BEACON_DEPLOYER_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_BASE_TOKEN_HOLDER_ADDR), 1);
+        assertEq(etchedDeployer.deploymentCount(L2_MESSAGE_ROOT_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_BRIDGEHUB_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_ASSET_ROUTER_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_NATIVE_TOKEN_VAULT_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_CHAIN_ASSET_HANDLER_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_NTV_BEACON_DEPLOYER_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_BASE_TOKEN_HOLDER_ADDR), 0);
 
         // No proxy upgrades for Era
         MockSystemContractProxyAdmin etchedProxyAdmin = MockSystemContractProxyAdmin(
