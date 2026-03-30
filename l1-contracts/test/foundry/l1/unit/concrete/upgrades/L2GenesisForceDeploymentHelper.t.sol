@@ -81,7 +81,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
         bytes memory fixedEncoded = abi.encode(fixedData);
         bytes memory additionalEncoded = abi.encode(additionalData);
-        _deployMockContract(GW_ASSET_TRACKER_ADDR);
 
         // Mock the SystemContractProxyAdmin.owner() call to return the expected owner
         vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
@@ -175,10 +174,9 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
         bytes memory fixedEncoded = abi.encode(fixedData);
         bytes memory additionalEncoded = abi.encode(additionalData);
-        _deployMockContract(GW_ASSET_TRACKER_ADDR);
 
-        // Etch L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR for initL2 call during genesis
-        _deployMockContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        // Pre-deploy some mock contracts to simulate existing deployments
+        _etchAllDeferredContracts();
 
         // For Era deployments, no proxy admin is needed
         vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
@@ -326,7 +324,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
     function _etchAllDeferredContracts() internal {
         // Etch contracts to addresses that need function calls to work
-        address[] memory addressesToEtch = new address[](10);
+        address[] memory addressesToEtch = new address[](11);
         addressesToEtch[0] = L2_MESSAGE_ROOT_ADDR;
         addressesToEtch[1] = L2_BRIDGEHUB_ADDR;
         addressesToEtch[2] = L2_ASSET_ROUTER_ADDR;
@@ -337,6 +335,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         addressesToEtch[7] = L2_INTEROP_HANDLER_ADDR;
         addressesToEtch[8] = L2_ASSET_TRACKER_ADDR;
         addressesToEtch[9] = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
+        addressesToEtch[10] = GW_ASSET_TRACKER_ADDR;
 
         for (uint256 i = 0; i < addressesToEtch.length; i++) {
             if (addressesToEtch[i].code.length == 0) {
