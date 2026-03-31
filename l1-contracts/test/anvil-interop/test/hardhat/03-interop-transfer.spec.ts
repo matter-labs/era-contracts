@@ -2,15 +2,13 @@ import { expect } from "chai";
 import { BigNumber } from "ethers";
 import { executeTokenTransfer } from "../../src/helpers/token-transfer";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getChainIdByRole, getChainIdsByRole } from "../../src/core/utils";
+import { getChainIdsByRole } from "../../src/core/utils";
 
-describe("03 - Interop Transfer (Direct Settlement)", function () {
+describe("03 - Interop Transfer (GW-Settled Chains)", function () {
   this.timeout(0);
 
   const runner = new DeploymentRunner();
   let state: ReturnType<typeof runner.loadState>;
-  let gatewayChainId: number;
-  let directSettledChainId: number;
   let gwSettledChainIds: number[];
 
   before(() => {
@@ -18,16 +16,17 @@ describe("03 - Interop Transfer (Direct Settlement)", function () {
     if (!state.chains || !state.testTokens) {
       throw new Error("Deployment state incomplete. Run setup first.");
     }
-    gatewayChainId = getChainIdByRole(state.chains.config, "gateway");
-    directSettledChainId = getChainIdByRole(state.chains.config, "directSettled");
     gwSettledChainIds = getChainIdsByRole(state.chains.config, "gwSettled");
+    if (gwSettledChainIds.length < 2) {
+      throw new Error("Need at least 2 GW-settled chains for interop transfer tests");
+    }
   });
 
-  it("transfers tokens from gateway to first GW-settled chain via InteropCenter", async () => {
-    const sourceToken = state.testTokens![gatewayChainId];
+  it("transfers tokens from first GW-settled chain to second GW-settled chain", async () => {
+    const sourceToken = state.testTokens![gwSettledChainIds[0]];
     const result = await executeTokenTransfer({
-      sourceChainId: gatewayChainId,
-      targetChainId: gwSettledChainIds[0],
+      sourceChainId: gwSettledChainIds[0],
+      targetChainId: gwSettledChainIds[1],
       amount: "10",
       sourceTokenAddress: sourceToken,
       logger: (line: string) => console.log(`[interop] ${line}`),
@@ -43,11 +42,11 @@ describe("03 - Interop Transfer (Direct Settlement)", function () {
     expect(destinationBalanceDelta.eq(result.amountWei), "destination chain minted amount mismatch").to.eq(true);
   });
 
-  it("transfers tokens from first GW-settled chain to gateway via InteropCenter", async () => {
-    const sourceToken = state.testTokens![gwSettledChainIds[0]];
+  it("transfers tokens from second GW-settled chain to first GW-settled chain", async () => {
+    const sourceToken = state.testTokens![gwSettledChainIds[1]];
     const result = await executeTokenTransfer({
-      sourceChainId: gwSettledChainIds[0],
-      targetChainId: gatewayChainId,
+      sourceChainId: gwSettledChainIds[1],
+      targetChainId: gwSettledChainIds[0],
       amount: "5",
       sourceTokenAddress: sourceToken,
       logger: (line: string) => console.log(`[interop] ${line}`),
@@ -63,11 +62,11 @@ describe("03 - Interop Transfer (Direct Settlement)", function () {
     expect(destinationBalanceDelta.eq(result.amountWei), "destination chain minted amount mismatch").to.eq(true);
   });
 
-  it("transfers tokens from direct-settled to gateway chain via InteropCenter", async () => {
-    const sourceToken = state.testTokens![directSettledChainId];
+  it("transfers tokens between two different GW-settled chains (reverse direction)", async () => {
+    const sourceToken = state.testTokens![gwSettledChainIds[0]];
     const result = await executeTokenTransfer({
-      sourceChainId: directSettledChainId,
-      targetChainId: gatewayChainId,
+      sourceChainId: gwSettledChainIds[0],
+      targetChainId: gwSettledChainIds[1],
       amount: "3",
       sourceTokenAddress: sourceToken,
       logger: (line: string) => console.log(`[interop] ${line}`),
