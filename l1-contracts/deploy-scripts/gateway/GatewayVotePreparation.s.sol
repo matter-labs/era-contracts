@@ -42,6 +42,7 @@ import {
     DeployerAddresses,
     DirectDeployedAddresses
 } from "./GatewayCTMDeployerHelper.sol";
+import {EraZkosRouter} from "../utils/EraZkosRouter.sol";
 import {
     DeployedContracts,
     GatewayCTMDeployerConfig
@@ -148,16 +149,17 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     }
 
     function deployGatewayCTM() internal {
+        EraZkosRouter vms = new EraZkosRouter(gatewayCTMDeployerConfig.isZKsyncOS);
         (
             DeployedContracts memory expectedGatewayContracts,
             DeployerCreate2Calldata memory deployerCalldata,
             ,
             DirectCreate2Calldata memory directCalldata,
             address create2FactoryAddress
-        ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
+        ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), gatewayCTMDeployerConfig, vms);
 
         // Deploy all factory dependencies
-        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps(gatewayCTMDeployerConfig.isZKsyncOS);
+        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps(vms);
         address l1AssetRouter = address(IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).assetRouter());
 
         for (uint i = 0; i < deps.length; i++) {

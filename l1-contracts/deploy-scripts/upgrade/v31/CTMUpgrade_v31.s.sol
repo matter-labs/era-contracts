@@ -34,32 +34,11 @@ import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
+import {EraZkosContract} from "../../utils/EraZkosRouter.sol";
 
 /// @notice Script used for v31 upgrade flow
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     bytes internal l2V31UpgradeBytecodeInfo;
-
-    function initializeWithArgs(
-        address ctmProxy,
-        address bytecodesSupplier,
-        bool isZKsyncOS,
-        address rollupDAManager,
-        bytes32 create2FactorySalt,
-        string memory newConfigPath,
-        string memory upgradeEcosystemOutputPath,
-        address governance
-    ) public virtual override {
-        super.initializeWithArgs(
-            ctmProxy,
-            bytecodesSupplier,
-            isZKsyncOS,
-            rollupDAManager,
-            create2FactorySalt,
-            newConfigPath,
-            upgradeEcosystemOutputPath,
-            governance
-        );
-    }
 
     /// @notice Deploy everything that should be deployed
     function deployNewCTMContracts() public virtual override {
@@ -82,7 +61,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // Deploy new ChainTypeManager implementation
         // The constructor will receive the new BytecodesSupplier proxy address
         // Select the correct ChainTypeManager based on chain type (Era vs ZKsyncOS)
-        string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        (, string memory ctmContractName) = vms.resolve(EraZkosContract.ChainTypeManager);
         console.log("Deploying ChainTypeManager:", ctmContractName);
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
 
@@ -123,12 +102,12 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             IL2V31Upgrade.upgrade,
             (baseTokenOriginChainId, baseTokenOriginAddress)
         );
-        if (config.isZKsyncOS) {
+        if (vms.isZKsyncOS()) {
             require(l2V31UpgradeBytecodeInfo.length > 0, "L2V31Upgrade bytecode info not prepared");
             IComplexUpgrader.UniversalContractUpgradeInfo[]
                 memory universalDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
             universalDeployments[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
-                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
                 deployedBytecodeInfo: l2V31UpgradeBytecodeInfo,
                 newAddress: L2_VERSION_SPECIFIC_UPGRADER_ADDR
             });
@@ -156,10 +135,9 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         uint256,
         address,
         uint256[] memory factoryDepsHashes,
-        uint256 protocolUpgradeNonce,
-        bool isZKsyncOS
+        uint256 protocolUpgradeNonce
     ) public virtual override returns (ProposedUpgrade memory proposedUpgrade) {
-        if (!config.isZKsyncOS) {
+        if (!vms.isZKsyncOS()) {
             return
                 super.getProposedUpgrade(
                     stateTransition,
@@ -167,21 +145,25 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
                     config.l1ChainId,
                     config.ownerAddress,
                     factoryDepsHashes,
-                    protocolUpgradeNonce,
-                    isZKsyncOS
+                    protocolUpgradeNonce
                 );
         }
 
-        // For ZKsyncOS v31 upgrades, force-deploy only the version-specific upgrader contract.
-        l2V31UpgradeBytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade");
-        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = getAdditionalForceDeployments();
+        // For ZKsyncOS v31 upgrades, upgrade the version-specific upgrader via proxy upgrade.
+        // Prepare bytecode info for getL2UpgradeTargetAndData (used in composeUpgradeTx).
+        l2V31UpgradeBytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo("L2V31Upgrade.sol", "L2V31Upgrade");
+        // ZKsyncOS uses UniversalContractUpgradeInfo instead of ForceDeployment[];
+        // buildUpgradeForceDeployments returns empty for ZKsyncOS.
+        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = buildUpgradeForceDeployments(
+            config.l1ChainId,
+            config.ownerAddress
+        );
 
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: composeUpgradeTx(
                 forceDeployments,
                 factoryDepsHashes,
-                protocolUpgradeNonce,
-                isZKsyncOS
+                protocolUpgradeNonce
             ),
             bootloaderHash: chainCreationParams.bootloaderHash,
             defaultAccountHash: chainCreationParams.defaultAAHash,
@@ -196,7 +178,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     }
 
     function getFullListOfFactoryDependencies() internal virtual override returns (bytes[] memory factoryDeps) {
-        if (!config.isZKsyncOS) {
+        if (!vms.isZKsyncOS()) {
             return super.getFullListOfFactoryDependencies();
         }
 

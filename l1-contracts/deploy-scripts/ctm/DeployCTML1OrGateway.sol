@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.28;
 
+import {EraZkosRouter} from "../utils/EraZkosRouter.sol";
+
 struct CTMCoreDeploymentConfig {
     bool isZKsyncOS;
     bool testnetVerifier;
@@ -36,6 +38,7 @@ enum CTMContract {
 library DeployCTML1OrGateway {
     function getCreationCalldata(
         CTMCoreDeploymentConfig memory config,
+        EraZkosRouter vms,
         CTMContract contractName,
         bool isZKBytecode
     ) internal view returns (bytes memory) {
@@ -59,15 +62,9 @@ library DeployCTML1OrGateway {
         } else if (contractName == CTMContract.CommitterFacet) {
             return abi.encode(config.l1ChainId);
         } else if (contractName == CTMContract.DiamondInit) {
-            return abi.encode(config.isZKsyncOS);
+            return abi.encode(vms.isZKsyncOS());
         } else if (contractName == CTMContract.Verifier) {
-            if (config.isZKsyncOS) {
-                // ZKsyncOS DualVerifier/TestnetVerifier take (fflonkVerifier, plonkVerifier, owner)
-                return abi.encode(config.verifierFflonk, config.verifierPlonk, config.verifierOwner);
-            } else {
-                // Era DualVerifier/TestnetVerifier take (fflonkVerifier, plonkVerifier)
-                return abi.encode(config.verifierFflonk, config.verifierPlonk);
-            }
+            return vms.verifierCreationArgs(config.verifierFflonk, config.verifierPlonk, config.verifierOwner);
         } else if (contractName == CTMContract.ZKsyncOSChainTypeManager) {
             return
                 abi.encode(

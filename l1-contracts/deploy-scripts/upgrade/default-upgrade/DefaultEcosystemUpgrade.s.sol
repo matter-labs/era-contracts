@@ -11,6 +11,7 @@ import {DefaultCoreUpgrade} from "./DefaultCoreUpgrade.s.sol";
 import {DefaultCTMUpgrade} from "./DefaultCTMUpgrade.s.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {BridgehubAddresses, CTMDeployedAddresses, CoreDeployedAddresses} from "../../utils/Types.sol";
+import {EcosystemUpgradeParams} from "./UpgradeParams.sol";
 
 /// @notice Unified script that runs both ecosystem core upgrade and CTM upgrade
 /// @dev This script combines DefaultCoreUpgrade and DefaultCTMUpgrade, running them in sequence
@@ -64,23 +65,13 @@ contract DefaultEcosystemUpgrade is Script {
         }
     }
 
-    function initializeWithArgs(
-        address bridgehubProxyAddress,
-        address ctmProxy,
-        address bytecodesSupplier,
-        address rollupDAManager,
-        bool isZKsyncOS,
-        bytes32 create2FactorySalt,
-        string memory _upgradeInputPath,
-        string memory _ecosystemOutputPath,
-        address governance
-    ) public virtual {
+    function initializeWithArgs(EcosystemUpgradeParams memory _params) public virtual {
         string memory root = vm.projectRoot();
-        ecosystemOutputPath = string.concat(root, _ecosystemOutputPath);
-        upgradeInputPath = _upgradeInputPath;
+        ecosystemOutputPath = string.concat(root, _params.ecosystemOutputPath);
+        upgradeInputPath = _params.upgradeInputPath;
 
         // Get output paths (these return relative paths)
-        string memory _coreOutputPath = getCoreOutputPath(_ecosystemOutputPath);
+        string memory _coreOutputPath = getCoreOutputPath(_params.ecosystemOutputPath);
         string memory _ctmOutputPath = getCTMOutputPath();
 
         // Store full paths for later use
@@ -90,10 +81,10 @@ contract DefaultEcosystemUpgrade is Script {
         // Initialize core upgrade with its own output path
         coreUpgrade = createCoreUpgrade();
         coreUpgrade.initializeWithArgs(
-            bridgehubProxyAddress,
-            isZKsyncOS,
-            create2FactorySalt,
-            _upgradeInputPath,
+            _params.bridgehubProxyAddress,
+            _params.isZKsyncOS,
+            _params.create2FactorySalt,
+            _params.upgradeInputPath,
             _coreOutputPath
         );
         _coreInitialized = true;
@@ -101,19 +92,19 @@ contract DefaultEcosystemUpgrade is Script {
         // Initialize CTM upgrade with its own output path
         ctmUpgrade = createCTMUpgrade();
         ctmUpgrade.initializeWithArgs(
-            ctmProxy,
-            bytecodesSupplier,
-            isZKsyncOS,
-            rollupDAManager,
-            create2FactorySalt,
-            _upgradeInputPath,
+            _params.ctmProxy,
+            _params.bytecodesSupplier,
+            _params.isZKsyncOS,
+            _params.rollupDAManager,
+            _params.create2FactorySalt,
+            _params.upgradeInputPath,
             _ctmOutputPath,
-            governance
+            _params.governance
         );
         _ctmInitialized = true;
 
         // Configure optional output sections based on upgrade config (default: false)
-        string memory upgradeToml = vm.readFile(string.concat(root, _upgradeInputPath));
+        string memory upgradeToml = vm.readFile(string.concat(root, _params.upgradeInputPath));
         if (upgradeToml.keyExists("$.include_state_transition_in_ecosystem_output")) {
             includeStateTransitionInEcosystemOutput = upgradeToml.readBool(
                 "$.include_state_transition_in_ecosystem_output"
@@ -126,7 +117,7 @@ contract DefaultEcosystemUpgrade is Script {
         }
 
         // Allow subclasses to override protocol version for local testing
-        overrideProtocolVersionForLocalTesting(_upgradeInputPath);
+        overrideProtocolVersionForLocalTesting(_params.upgradeInputPath);
     }
 
     /// @notice Override this in test environments to set protocol version from config instead of genesis

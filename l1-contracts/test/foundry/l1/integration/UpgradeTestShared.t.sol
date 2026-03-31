@@ -13,6 +13,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
 // import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
+import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 import {ChainUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -66,15 +67,17 @@ contract UpgradeIntegrationTestBase is Test {
 
         console.log("setupUpgrade: Initializing ecosystem upgrade");
         ecosystemUpgrade.initializeWithArgs(
-            bridgehubProxy,
-            ctmProxy,
-            bytecodesSupplier,
-            rollupDAManager,
-            isZKsyncOs,
-            bytes32(0),
-            ECOSYSTEM_UPGRADE_INPUT,
-            ECOSYSTEM_OUTPUT,
-            governance
+            EcosystemUpgradeParams({
+                bridgehubProxyAddress: bridgehubProxy,
+                ctmProxy: ctmProxy,
+                bytecodesSupplier: bytecodesSupplier,
+                rollupDAManager: rollupDAManager,
+                isZKsyncOS: isZKsyncOs,
+                create2FactorySalt: bytes32(0),
+                upgradeInputPath: ECOSYSTEM_UPGRADE_INPUT,
+                ecosystemOutputPath: ECOSYSTEM_OUTPUT,
+                governance: governance
+            })
         );
         console.log("setupUpgrade: Deploying new ecosystem contracts");
         ecosystemUpgrade.deployNewEcosystemContractsL1();

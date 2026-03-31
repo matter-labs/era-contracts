@@ -42,6 +42,7 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
+import {EraZkosContract, EraZkosPaths, EraZkosRouter} from "../../utils/EraZkosRouter.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
 /// @notice Script used for default CTM on gateway upgrade flow, should be run after L1 CTM upgrade
@@ -111,7 +112,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         initializeConfig(
             _create2FactorySalt,
             _isZKsyncOS,
-            getChainCreationParamsConfig(chainCreationParamsPath(_isZKsyncOS)),
+            getChainCreationParamsConfig(EraZkosPaths.genesisConfigPath(_isZKsyncOS)),
             _eraChainId,
             _priorityTxsL2GasLimit,
             _maxExpectedL1GasPrice,
@@ -135,11 +136,14 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         // Optional
         address _governance
     ) public {
-        setCreate2Salt(_create2FactorySalt);
+        if (_create2FactorySalt != bytes32(0)) {
+            setCreate2Salt(_create2FactorySalt);
+        }
         config.l1ChainId = block.chainid;
         config.eraChainId = _eraChainId;
         setAddressesBasedOnBridgehub();
         config.isZKsyncOS = _isZKsyncOS;
+        vms = new EraZkosRouter(_isZKsyncOS);
         config.contracts.chainCreationParams = _chainCreationParams;
         if (_governance != address(0)) {
             config.ownerAddress = _governance;
@@ -204,8 +208,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             config.l1ChainId,
             config.ownerAddress,
             factoryDepsHashes,
-            discoveredEraZkChain.zkChainProxy,
-            config.isZKsyncOS
+            discoveredEraZkChain.zkChainProxy
         );
         gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
         upgradeConfig.upgradeCutPrepared = true;
@@ -354,8 +357,8 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     function deployNewEcosystemContractsGW() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
 
-        gatewayConfig.gatewayStateTransition.verifiers.verifierFflonk = deployGWContract("EraVerifierFflonk");
-        gatewayConfig.gatewayStateTransition.verifiers.verifierPlonk = deployGWContract("EraVerifierPlonk");
+        gatewayConfig.gatewayStateTransition.verifiers.verifierFflonk = deployGWContract("VerifierFflonk");
+        gatewayConfig.gatewayStateTransition.verifiers.verifierPlonk = deployGWContract("VerifierPlonk");
         gatewayConfig.gatewayStateTransition.verifiers.verifier = deployGWContract("Verifier");
 
         gatewayConfig.gatewayStateTransition.facets.executorFacet = deployGWContract("ExecutorFacet");
@@ -366,7 +369,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
-        string memory gwCtmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        (, string memory gwCtmContractName) = vms.resolve(EraZkosContract.ChainTypeManager);
         gatewayConfig.gatewayStateTransition.implementations.chainTypeManager = deployGWContract(gwCtmContractName);
 
         deployUpgradeSpecificContractsGW();

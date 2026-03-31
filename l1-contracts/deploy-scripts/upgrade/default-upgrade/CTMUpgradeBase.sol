@@ -12,7 +12,7 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+import {EraZkosRouter} from "../../utils/EraZkosRouter.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
@@ -73,8 +73,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     function composeUpgradeTx(
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments,
         uint256[] memory factoryDepsHashes,
-        uint256 protocolUpgradeNonce,
-        bool isZKsyncOS
+        uint256 protocolUpgradeNonce
     ) internal view returns (L2CanonicalTransaction memory transaction) {
         // Sanity check
         for (uint256 i; i < forceDeployments.length; i++) {
@@ -83,7 +82,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
 
         (address target, bytes memory data) = getL2UpgradeTargetAndData(forceDeployments);
 
-        uint256 txType = isZKsyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+        uint256 txType = vms.upgradeL2TxType();
         transaction = L2CanonicalTransaction({
             txType: txType,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
@@ -164,8 +163,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         uint256 l1ChainId,
         address ownerAddress,
         uint256[] memory factoryDepsHashes,
-        address registeredChainIdDiamondProxy,
-        bool isZKsyncOS
+        address registeredChainIdDiamondProxy
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion(registeredChainIdDiamondProxy);
 
@@ -179,8 +177,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             l1ChainId,
             ownerAddress,
             factoryDepsHashes,
-            nonce,
-            isZKsyncOS
+            nonce
         );
 
         upgradeCutData = Diamond.DiamondCutData({
@@ -202,32 +199,18 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         uint256 l1ChainId,
         address ownerAddress,
         uint256[] memory factoryDepsHashes,
-        uint256 protocolUpgradeNonce,
-        bool isZKsyncOS
+        uint256 protocolUpgradeNonce
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
-        IL2ContractDeployer.ForceDeployment[] memory forceDeployments;
-
-        if (isZKsyncOS) {
-            // ZKsyncOS uses FixedForceDeploymentsData (built in DeployCTM) instead of
-            // Era-style ForceDeployment[] arrays. Return empty — the upgrade tx for
-            // ZKsyncOS chains carries data through a different path.
-            forceDeployments = new IL2ContractDeployer.ForceDeployment[](0);
-        } else {
-            IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
-                .getBaseForceDeployments(l1ChainId, ownerAddress);
-            IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalForceDeployments();
-            forceDeployments = SystemContractsProcessing.mergeForceDeployments(
-                baseForceDeployments,
-                additionalForceDeployments
-            );
-        }
+        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = buildUpgradeForceDeployments(
+            l1ChainId,
+            ownerAddress
+        );
 
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: composeUpgradeTx(
                 forceDeployments,
                 factoryDepsHashes,
-                protocolUpgradeNonce,
-                isZKsyncOS
+                protocolUpgradeNonce
             ),
             bootloaderHash: chainCreationParams.bootloaderHash,
             defaultAccountHash: chainCreationParams.defaultAAHash,
@@ -240,6 +223,25 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             upgradeTimestamp: 0,
             newProtocolVersion: chainCreationParams.latestProtocolVersion
         });
+    }
+
+    /// @notice Build the full force deployment list for an upgrade.
+    ///         Era: merges base system contract deployments with additional deployments.
+    ///         ZKsyncOS: returns empty array (system contracts use proxy pattern).
+    function buildUpgradeForceDeployments(
+        uint256 _l1ChainId,
+        address _ownerAddress
+    ) internal returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
+        if (vms.isZKsyncOS()) {
+            return new IL2ContractDeployer.ForceDeployment[](0);
+        }
+        IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
+            .getBaseForceDeployments(_l1ChainId, _ownerAddress);
+        IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalForceDeployments();
+        forceDeployments = SystemContractsProcessing.mergeForceDeployments(
+            baseForceDeployments,
+            additionalForceDeployments
+        );
     }
 
     function getForceDeployment(

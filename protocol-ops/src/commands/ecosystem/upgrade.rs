@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::Address;
+use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -62,6 +62,12 @@ pub struct EcosystemUpgradeArgs {
     /// Whether target chain is ZKsync OS (required for no-governance-prepare)
     #[clap(long)]
     pub is_zk_sync_os: Option<bool>,
+    /// Explicit CREATE2 salt (hex-encoded bytes32). Mutually exclusive with --random-salt.
+    #[clap(long, conflicts_with = "random_salt")]
+    pub create2_salt: Option<H256>,
+    /// Use a random CREATE2 salt. Mutually exclusive with --create2-salt.
+    #[clap(long, conflicts_with = "create2_salt")]
+    pub random_salt: bool,
     /// Upgrade input path relative to l1-contracts root (for no-governance-prepare)
     #[clap(long, default_value = "/upgrade-envs/v0.31.0-interopB/local.toml")]
     pub upgrade_input_path: String,
@@ -119,6 +125,11 @@ fn run_no_governance_prepare(
         .ok_or_else(|| anyhow::anyhow!("--is-zk-sync-os is required for no-governance-prepare"))?;
     let rollup_da_manager = args.rollup_da_manager_address.unwrap_or_default();
     let governance = args.governance_address.unwrap_or_default();
+    let create2_salt = if args.random_salt {
+        H256::random()
+    } else {
+        args.create2_salt.unwrap_or_default()
+    };
 
     let upgrade_input = contracts_path.join(args.upgrade_input_path.trim_start_matches('/'));
     if !upgrade_input.exists() {
@@ -132,8 +143,9 @@ fn run_no_governance_prepare(
     let _ = fs::remove_file(script_out.join("v31-upgrade-ctm.toml"));
 
     let mut script_args = args.shared.forge_args.clone();
+    // The Solidity function takes an EcosystemUpgradeParams struct, which is ABI-encoded as a tuple.
     script_args.add_arg(ForgeScriptArg::Sig {
-        sig: "noGovernancePrepareWithArgs(address,address,address,address,bool,string,string,address)".to_string(),
+        sig: "noGovernancePrepare((address,address,address,address,bool,bytes32,string,string,address))".to_string(),
     });
     script_args.add_arg(ForgeScriptArg::RpcUrl {
         url: runner.rpc_url.clone(),
@@ -143,20 +155,20 @@ fn run_no_governance_prepare(
     script_args.add_arg(ForgeScriptArg::GasLimit {
         gas_limit: 1000000000000,
     });
-    script_args.additional_args.extend([
-        format!("{:#x}", bridgehub),
-        format!("{:#x}", ctm),
-        format!("{:#x}", bytecodes_supplier),
-        format!("{:#x}", rollup_da_manager),
-        if is_zk_sync_os {
-            "true".to_string()
-        } else {
-            "false".to_string()
-        },
-        args.upgrade_input_path.clone(),
-        args.upgrade_output_path.clone(),
-        format!("{:#x}", governance),
-    ]);
+    // Struct fields are passed as a single tuple argument in parentheses.
+    let params_tuple = format!(
+        "({:#x},{:#x},{:#x},{:#x},{},{:#x},{},{},{:#x})",
+        bridgehub,
+        ctm,
+        bytecodes_supplier,
+        rollup_da_manager,
+        is_zk_sync_os,
+        create2_salt,
+        args.upgrade_input_path,
+        args.upgrade_output_path,
+        governance,
+    );
+    script_args.additional_args.push(params_tuple);
 
     let script = Forge::new(&contracts_path)
         .script(Path::new(script_path), script_args)

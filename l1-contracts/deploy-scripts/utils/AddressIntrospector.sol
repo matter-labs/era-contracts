@@ -49,8 +49,7 @@ import {
     CTMAdminAddresses,
     DataAvailabilityDeployedAddresses
 } from "./Types.sol";
-import {IEraDualVerifier} from "contracts/state-transition/chain-interfaces/IEraDualVerifier.sol";
-import {IZKsyncOSDualVerifier} from "contracts/state-transition/chain-interfaces/IZKsyncOSDualVerifier.sol";
+import {EraZkosVerifierLifecycle} from "./vm/EraZkosVerifierLifecycle.sol";
 
 library AddressIntrospector {
     error NoUptoDateZkChainFound();
@@ -510,18 +509,6 @@ library AddressIntrospector {
         address _verifier,
         bool _isZKsyncOS
     ) private view returns (address fflonk, address plonk) {
-        if (_verifier == address(0)) {
-            return (address(0), address(0));
-        }
-
-        if (_isZKsyncOS) {
-            IZKsyncOSDualVerifier verifier = IZKsyncOSDualVerifier(_verifier);
-            fflonk = address(verifier.fflonkVerifiers(0));
-            plonk = address(verifier.plonkVerifiers(0));
-        } else {
-            IEraDualVerifier verifier = IEraDualVerifier(_verifier);
-            fflonk = address(verifier.FFLONK_VERIFIER());
-            plonk = address(verifier.PLONK_VERIFIER());
-        }
+        return EraZkosVerifierLifecycle.getSubVerifiers(_verifier, _isZKsyncOS);
     }
 }

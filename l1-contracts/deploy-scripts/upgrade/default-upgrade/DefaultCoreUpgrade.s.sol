@@ -26,7 +26,8 @@ import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {Utils} from "../../utils/Utils.sol";
 
-import {ChainCreationParamsLib} from "../../ctm/ChainCreationParamsLib.sol";
+// ChainCreationParamsLib is now accessed through EraZkosRouter.getChainCreationParams()
+import {EraZkosRouter} from "../../utils/EraZkosRouter.sol";
 
 /// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
@@ -46,6 +47,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         bool useV29IntrospectionOverride;
     }
     AdditionalConfigParams internal additionalConfig;
+    EraZkosRouter public vms;
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
@@ -115,9 +117,14 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     ) public virtual {
         string memory upgradeToml = vm.readFile(upgradeInputPath);
 
-        setCreate2Salt(create2FactorySalt);
+        // Only override the salt when explicitly provided (non-zero).
+        // When zero, the script falls back to the CREATE2_FACTORY_SALT env var or built-in default.
+        if (create2FactorySalt != bytes32(0)) {
+            setCreate2Salt(create2FactorySalt);
+        }
 
         additionalConfig.isZKsyncOS = isZKsyncOS;
+        vms = new EraZkosRouter(isZKsyncOS);
 
         // Optional override for v29 introspection selection
         if (upgradeToml.keyExists("$.use_v29_introspection")) {
@@ -458,14 +465,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     // add this to be excluded from coverage report
 
     /// @notice Load protocol version from genesis config
-    /// @dev Reads from Era or ZKsync OS genesis based on config.isZKsyncOS flag
     function loadProtocolVersionFromGenesis() internal virtual returns (uint256) {
-        string memory genesisFilename = additionalConfig.isZKsyncOS ? "zksync-os/latest.json" : "era/latest.json";
-        string memory genesisPath = string.concat(vm.projectRoot(), "/../configs/genesis/", genesisFilename);
+        string memory genesisPath = vms.genesisConfigPath();
         return
-            ChainCreationParamsLib
-                .getChainCreationParams(genesisPath, additionalConfig.isZKsyncOS)
-                .latestProtocolVersion;
+            vms.getChainCreationParams(genesisPath).latestProtocolVersion;
     }
 
     function getBroadcasterAddress() internal view virtual returns (address) {

@@ -31,7 +31,6 @@ import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeploy
 
 import {Governance} from "contracts/governance/Governance.sol";
 
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ContractsBytecodesLib} from "../../utils/bytecode/ContractsBytecodesLib.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -39,9 +38,9 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
+import {EraZkosRouter, EraZkosContract, FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
 
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
-import {BytecodePublisher} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -150,10 +149,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual override returns (bool) {
-        // For ZKsync OS, factory deps are handled differently, so skip the check
-        if (config.isZKsyncOS) {
-            return true;
-        }
+        // For ZKsyncOS, isHashInFactoryDeps is never populated (empty from publishAndProcessFactoryDeps),
+        // and force deployments are empty, so this is never called. For Era, check the map.
         return isHashInFactoryDeps[bytecodeHash];
     }
 
@@ -163,13 +160,18 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         // Optional
         address governance
     ) public {
-        setCreate2Salt(permanentConfig.create2FactorySalt);
+        // Only override the salt when explicitly provided (non-zero).
+        // When zero, the script falls back to the CREATE2_FACTORY_SALT env var or built-in default.
+        if (permanentConfig.create2FactorySalt != bytes32(0)) {
+            setCreate2Salt(permanentConfig.create2FactorySalt);
+        }
         config.l1ChainId = block.chainid;
         newConfig.ctm = permanentConfig.ctmProxy;
 
         // Pass bytecodesSupplier to introspection - will overwrite incorrect V29 value
         setAddressesBasedOnCTM(permanentConfig.bytecodesSupplier);
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
+        vms = new EraZkosRouter(config.isZKsyncOS);
         config.contracts.chainCreationParams = chainCreationParams;
 
         if (governance != address(0)) {
@@ -210,13 +212,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             isZKsyncOS: isZKsyncOS,
             create2FactorySalt: create2FactorySalt
         });
-        // Set config.isZKsyncOS BEFORE calling getChainCreationParamsConfig, because
-        // getChainCreationParamsConfig calls ChainCreationParamsLib.getChainCreationParams
-        // which reads from config.isZKsyncOS
+        // Set config.isZKsyncOS and vms before getChainCreationParamsConfig (uses vms.isZKsyncOS()).
         config.isZKsyncOS = isZKsyncOS;
-        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
-            chainCreationParamsPath(isZKsyncOS)
-        );
+        vms = new EraZkosRouter(isZKsyncOS);
+        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(vms.genesisConfigPath());
 
         // Optional override for v29 introspection selection
         if (toml.keyExists("$.use_v29_introspection")) {
@@ -298,8 +297,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             config.l1ChainId,
             config.ownerAddress,
             factoryDepsHashes,
-            upToDateZkChain.zkChainProxy,
-            config.isZKsyncOS
+            upToDateZkChain.zkChainProxy
         );
     }
 
@@ -370,7 +368,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // Use appropriate introspection based on version
         if (useV29Introspection) {
-            ctmAddresses = AddressIntrospector.getCTMAddressesV29(ctm, config.isZKsyncOS);
+            ctmAddresses = AddressIntrospector.getCTMAddressesV29(ctm, vms.isZKsyncOS());
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV29(bridgehubAddr);
 
             // V29 introspection returns zero for bytecodesSupplier, overwrite with correct value
@@ -438,62 +436,27 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             eraChainId: config.eraChainId,
             gatewayChainId: config.gatewayChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: getUpgradeBytecodeHash("BeaconProxy"),
+            l2TokenProxyBytecodeHash: vms.getBytecodeHash(EraZkosContract.BeaconProxy),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: getUpgradeBytecodeInfo("L2Bridgehub"),
-            l2AssetRouterBytecodeInfo: getUpgradeBytecodeInfo("L2AssetRouter"),
-            l2NtvBytecodeInfo: getUpgradeBytecodeInfo(
-                "L2NativeTokenVault",
-                "L2NativeTokenVaultZKOS.sol",
-                "L2NativeTokenVaultZKOS"
-            ),
-            messageRootBytecodeInfo: getUpgradeBytecodeInfo("L2MessageRoot"),
-            chainAssetHandlerBytecodeInfo: getUpgradeBytecodeInfo("L2ChainAssetHandler"),
-            beaconDeployerInfo: getUpgradeBytecodeInfo("UpgradeableBeaconDeployer"),
-            baseTokenHolderBytecodeInfo: getUpgradeBytecodeInfo("BaseTokenHolder"),
-            interopCenterBytecodeInfo: getUpgradeBytecodeInfo("InteropCenter"),
-            interopHandlerBytecodeInfo: getUpgradeBytecodeInfo("InteropHandler"),
-            assetTrackerBytecodeInfo: getUpgradeBytecodeInfo("L2AssetTracker"),
+            bridgehubBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2Bridgehub),
+            l2AssetRouterBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2AssetRouter),
+            l2NtvBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2NativeTokenVault),
+            messageRootBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2MessageRoot),
+            chainAssetHandlerBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2ChainAssetHandler),
+            beaconDeployerInfo: vms.getBytecodeInfo(EraZkosContract.UpgradeableBeaconDeployer),
+            baseTokenHolderBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.BaseTokenHolder),
+            interopCenterBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.InteropCenter),
+            interopHandlerBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.InteropHandler),
+            assetTrackerBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
                 coreAddresses.bridgehub.proxies.chainRegistrationSender
             ),
-            // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
             dangerousTestOnlyForcedBeacon: address(0),
             zkTokenAssetId: config.zkTokenAssetId
         });
-    }
-
-    function getUpgradeBytecodeInfo(string memory contractName) internal returns (bytes memory) {
-        return getUpgradeBytecodeInfo(contractName, string.concat(contractName, ".sol"), contractName);
-    }
-
-    function getUpgradeBytecodeInfo(
-        string memory eraContractName,
-        string memory zksyncOSFileName,
-        string memory zksyncOSContractName
-    ) internal returns (bytes memory) {
-        if (config.isZKsyncOS) {
-            return Utils.getZKOSProxyUpgradeBytecodeInfo(zksyncOSFileName, zksyncOSContractName);
-        }
-        return abi.encode(getL2BytecodeHash(eraContractName));
-    }
-
-    function getUpgradeBytecodeHash(string memory contractName) internal view returns (bytes32) {
-        return getUpgradeBytecodeHash(string.concat(contractName, ".sol"), contractName, contractName);
-    }
-
-    function getUpgradeBytecodeHash(
-        string memory zksyncOSFileName,
-        string memory zksyncOSContractName,
-        string memory eraContractName
-    ) internal view returns (bytes32) {
-        if (config.isZKsyncOS) {
-            return keccak256(Utils.readFoundryDeployedBytecodeL1(zksyncOSFileName, zksyncOSContractName));
-        }
-        return getL2BytecodeHash(eraContractName);
     }
 
     function getUpgradeAddedFacetCuts(
@@ -512,55 +475,41 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     function publishBytecodes() public virtual {
         bytes[] memory allDeps = getFullListOfFactoryDependencies();
+        BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
-        if (config.isZKsyncOS) {
-            BytecodePublisher.publishEVMBytecodesInBatches(
-                BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier),
-                allDeps
-            );
-            upgradeConfig.factoryDepsPublished = true;
-            return;
+        FactoryDepsResult memory result = vms.publishAndProcessFactoryDeps(supplier, allDeps);
+
+        // For Era, populate the factory deps tracking state and validate consistency.
+        // For ZKsyncOS, factoryDepsHashes is empty so all loops are no-ops.
+        for (uint256 i = 0; i < result.factoryDepsHashes.length; i++) {
+            isHashInFactoryDeps[bytes32(result.factoryDepsHashes[i])] = true;
         }
 
-        uint256[] memory factoryDeps = new uint256[](allDeps.length);
-        require(factoryDeps.length <= 64, "Too many deps");
+        if (result.factoryDepsHashes.length > 0) {
+            console.logBytes32(config.contracts.chainCreationParams.bootloaderHash);
+            console.log(result.factoryDepsHashes[0]);
+            console.logBytes32(config.contracts.chainCreationParams.defaultAAHash);
+            console.log(result.factoryDepsHashes[1]);
+            console.logBytes32(config.contracts.chainCreationParams.evmEmulatorHash);
+            console.log(result.factoryDepsHashes[2]);
 
-        BytecodePublisher.publishEraBytecodesInBatches(
-            BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier),
-            allDeps
-        );
-
-        for (uint256 i = 0; i < allDeps.length; i++) {
-            bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(allDeps[i]);
-            factoryDeps[i] = uint256(bytecodeHash);
-            isHashInFactoryDeps[bytecodeHash] = true;
+            if (!skipFactoryDepsCheck) {
+                require(
+                    bytes32(result.factoryDepsHashes[0]) == config.contracts.chainCreationParams.bootloaderHash,
+                    "bootloader hash factory dep mismatch"
+                );
+                require(
+                    bytes32(result.factoryDepsHashes[1]) == config.contracts.chainCreationParams.defaultAAHash,
+                    "default aa hash factory dep mismatch"
+                );
+                require(
+                    bytes32(result.factoryDepsHashes[2]) == config.contracts.chainCreationParams.evmEmulatorHash,
+                    "EVM emulator hash factory dep mismatch"
+                );
+            }
         }
 
-        console.logBytes32(config.contracts.chainCreationParams.bootloaderHash);
-        console.log(factoryDeps[0]);
-        console.logBytes32(config.contracts.chainCreationParams.defaultAAHash);
-        console.log(factoryDeps[1]);
-        console.logBytes32(config.contracts.chainCreationParams.evmEmulatorHash);
-        console.log(factoryDeps[2]);
-
-        if (!skipFactoryDepsCheck) {
-            // Double check for consistency:
-            require(
-                bytes32(factoryDeps[0]) == config.contracts.chainCreationParams.bootloaderHash,
-                "bootloader hash factory dep mismatch"
-            );
-            require(
-                bytes32(factoryDeps[1]) == config.contracts.chainCreationParams.defaultAAHash,
-                "default aa hash factory dep mismatch"
-            );
-            require(
-                bytes32(factoryDeps[2]) == config.contracts.chainCreationParams.evmEmulatorHash,
-                "EVM emulator hash factory dep mismatch"
-            );
-        }
-
-        factoryDepsHashes = factoryDeps;
-
+        factoryDepsHashes = result.factoryDepsHashes;
         upgradeConfig.factoryDepsPublished = true;
     }
 
@@ -899,20 +848,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         calls[0] = prepareCreateNewChainCall(555)[0];
     }
 
-    function getL2BytecodeHash(string memory contractName) public view virtual override returns (bytes32) {
-        // ZKsyncOS chains use FixedForceDeploymentsData (built in DeployCTM) instead of
-        // Era-style ForceDeployment[] arrays, so this function should never be called.
-        // Revert loudly to prevent silent use of wrong bytecode hashes.
-        require(!config.isZKsyncOS, "getL2BytecodeHash must not be called for ZKsyncOS chains");
-        return super.getL2BytecodeHash(contractName);
-    }
-
     function getForceDeployment(
         string memory contractName
     ) public virtual override returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
-        bytes32 bytecodeHash = config.isZKsyncOS
-            ? keccak256(Utils.readFoundryDeployedBytecodeL1(string.concat(contractName, ".sol"), contractName))
-            : getL2BytecodeHash(contractName);
+        bytes32 bytecodeHash = vms.getForceDeploymentBytecodeHash(contractName);
         return
             IL2ContractDeployer.ForceDeployment({
                 bytecodeHash: bytecodeHash,

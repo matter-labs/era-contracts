@@ -21,6 +21,7 @@ import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CoreUpgrade_v31} from "./CoreUpgrade_v31.s.sol";
 import {CTMUpgrade_v31} from "./CTMUpgrade_v31.s.sol";
 import {GatewayUpgrade_v31} from "./GatewayUpgrade_v31.s.sol";
+import {EcosystemUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
 
 /// @notice Script used for v31 ecosystem upgrade flow (core + CTM)
 /// TODO: IMPORTANT this script should also contain the following steps:
@@ -51,79 +52,12 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
         return "/script-out/v31-upgrade-ctm.toml";
     }
 
-    function initializeWithArgs(
-        address bridgehubProxyAddress,
-        address ctmProxy,
-        address bytecodesSupplier,
-        address rollupDAManager,
-        bool isZKsyncOS,
-        bytes32 create2FactorySalt,
-        string memory upgradeInputPath,
-        string memory _ecosystemOutputPath,
-        address governance
-    ) public override {
-        bytes32 loadedSalt = create2FactorySalt;
-        string memory root = vm.projectRoot();
-        ecosystemOutputPath = string.concat(root, _ecosystemOutputPath);
+    // v31 uses the default initialization flow from DefaultEcosystemUpgrade.
+    // Version-specific behavior is handled via createCoreUpgrade/createCTMUpgrade overrides.
 
-        // Get output paths (these return relative paths)
-        string memory _coreOutputPath = getCoreOutputPath(_ecosystemOutputPath);
-        string memory _ctmOutputPath = getCTMOutputPath();
-
-        // Store full paths for later use
-        coreOutputPath = string.concat(root, _coreOutputPath);
-        ctmOutputPath = string.concat(root, _ctmOutputPath);
-
-        // Create v31 core upgrade
-        coreUpgrade = createCoreUpgrade();
-        coreUpgrade.initializeWithArgs(
-            bridgehubProxyAddress,
-            isZKsyncOS,
-            loadedSalt,
-            upgradeInputPath,
-            _coreOutputPath
-        );
-        _coreInitialized = true;
-
-        // Initialize CTM upgrade with its own output path
-        ctmUpgrade = createCTMUpgrade();
-        ctmUpgrade.initializeWithArgs(
-            ctmProxy,
-            bytecodesSupplier,
-            isZKsyncOS,
-            rollupDAManager,
-            loadedSalt,
-            upgradeInputPath,
-            _ctmOutputPath,
-            governance
-        );
-        _ctmInitialized = true;
-
-        // Allow subclasses to override protocol version for local testing
-        overrideProtocolVersionForLocalTesting(upgradeInputPath);
-    }
-
-    function noGovernancePrepareWithArgs(
-        address bridgehubProxyAddress,
-        address ctmProxy,
-        address bytecodesSupplier,
-        address rollupDAManager,
-        bool isZKsyncOS,
-        string memory upgradeInputPath,
-        string memory _ecosystemOutputPath,
-        address governance
-    ) public {
-        initializeWithArgs(
-            bridgehubProxyAddress,
-            ctmProxy,
-            bytecodesSupplier,
-            rollupDAManager,
-            isZKsyncOS,
-            bytes32(0),
-            upgradeInputPath,
-            _ecosystemOutputPath,
-            governance
-        );
+    /// @notice Entry point called by protocol-ops CLI.
+    function noGovernancePrepare(EcosystemUpgradeParams memory _params) public {
+        initializeWithArgs(_params);
         prepareEcosystemUpgrade();
         prepareDefaultGovernanceCalls();
     }

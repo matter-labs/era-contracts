@@ -13,10 +13,9 @@ import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../utils/Utils.sol";
-import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
-import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
+// Verifier lifecycle is now handled through EraZkosRouter
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -30,11 +29,6 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 
-import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
-import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
-import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -56,7 +50,7 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
-
+import {EraZkosRouter, EraZkosContract, EraZkosPaths} from "../utils/EraZkosRouter.sol";
 
 import {
     StateTransitionDeployedAddresses,
@@ -65,11 +59,10 @@ import {
     BridgehubAddresses,
     CoreDeployedAddresses
 } from "../utils/Types.sol";
-import {ChainCreationParamsLib} from "./ChainCreationParamsLib.sol";
+// ChainCreationParamsLib is now accessed through EraZkosRouter.getChainCreationParams()
 
 import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 
-import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
 import {CTMDeployedAddresses} from "../utils/Types.sol";
 import {SettlementLayerV31Upgrade} from "contracts/upgrades/SettlementLayerV31Upgrade.sol";
 
@@ -108,9 +101,8 @@ struct GeneratedData {
 abstract contract DeployCTMUtils is DeployUtils {
     using stdToml for string;
 
-    string public constant ERA_CHAIN_CREATION_PARAMS_PATH = "/../configs/genesis/era/latest.json";
-    string public constant ZKSYNC_OS_CHAIN_CREATION_PARAMS_PATH = "/../configs/genesis/zksync-os/latest.json";
     Config public config;
+    EraZkosRouter public vms;
     // Note: This variable is initialized by concrete implementations before use
     GeneratedData internal generatedData; //slither-disable-line uninitialized-state
     CTMDeployedAddresses internal ctmAddresses;
@@ -129,12 +121,8 @@ abstract contract DeployCTMUtils is DeployUtils {
         ctmAddresses.stateTransition.facets.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
-    function chainCreationParamsPath(bool isZKsyncOs) internal virtual returns (string memory) {
-        if (isZKsyncOs) {
-            return string.concat(vm.projectRoot(), ZKSYNC_OS_CHAIN_CREATION_PARAMS_PATH);
-        } else {
-            return string.concat(vm.projectRoot(), ERA_CHAIN_CREATION_PARAMS_PATH);
-        }
+    function chainCreationParamsPath(bool _isZKsyncOS) internal virtual returns (string memory) {
+        return EraZkosPaths.genesisConfigPath(_isZKsyncOS);
     }
 
     function initializeConfig(
@@ -157,6 +145,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         if (toml.keyExists("$.is_zk_sync_os")) {
             config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
         }
+        vms = new EraZkosRouter(config.isZKsyncOS);
         if (toml.keyExists("$.zk_token_asset_id")) {
             config.zkTokenAssetId = toml.readBytes32("$.zk_token_asset_id");
         }
@@ -170,7 +159,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.contracts.validatorTimelockExecutionDelay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
         );
-        config.contracts.chainCreationParams = getChainCreationParamsConfig(chainCreationParamsPath(config.isZKsyncOS));
+        config.contracts.chainCreationParams = getChainCreationParamsConfig(vms.genesisConfigPath());
 
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
@@ -180,7 +169,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getChainCreationParamsConfig(
         string memory _config
     ) internal virtual returns (ChainCreationParamsConfig memory chainCreationParams) {
-        return ChainCreationParamsLib.getChainCreationParams(_config, config.isZKsyncOS);
+        return vms.getChainCreationParams(_config);
     }
 
     /// @notice Get all six facet cuts
@@ -278,7 +267,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (DiamondInitializeDataNewChain memory) {
         require(stateTransition.verifiers.verifier != address(0), "verifier is zero");
-        if (!config.isZKsyncOS) {
+        if (!vms.isZKsyncOS()) {
             require(config.contracts.chainCreationParams.bootloaderHash != bytes32(0), "bootloader hash is zero");
             require(
                 config.contracts.chainCreationParams.defaultAAHash != bytes32(0),
@@ -323,27 +312,11 @@ abstract contract DeployCTMUtils is DeployUtils {
             } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
                 return type(ValidiumL1DAValidator).creationCode;
             } else if (compareStrings(contractName, "Verifier")) {
-                if (config.testnetVerifier) {
-                    if (config.isZKsyncOS) {
-                        return type(ZKsyncOSTestnetVerifier).creationCode;
-                    } else {
-                        return type(EraTestnetVerifier).creationCode;
-                    }
-                } else {
-                    if (config.isZKsyncOS) {
-                        return type(ZKsyncOSDualVerifier).creationCode;
-                    } else {
-                        return type(EraDualVerifier).creationCode;
-                    }
-                }
-            } else if (compareStrings(contractName, "EraVerifierFflonk")) {
-                return type(EraVerifierFflonk).creationCode;
-            } else if (compareStrings(contractName, "EraVerifierPlonk")) {
-                return type(EraVerifierPlonk).creationCode;
-            } else if (compareStrings(contractName, "ZKsyncOSVerifierFflonk")) {
-                return type(ZKsyncOSVerifierFflonk).creationCode;
-            } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
-                return type(ZKsyncOSVerifierPlonk).creationCode;
+                return vms.getVerifierCreationCode(config.testnetVerifier);
+            } else if (compareStrings(contractName, "VerifierFflonk")) {
+                return vms.getVerifierFflonkCreationCode();
+            } else if (compareStrings(contractName, "VerifierPlonk")) {
+                return vms.getVerifierPlonkCreationCode();
             } else if (compareStrings(contractName, "DefaultUpgrade")) {
                 return type(DefaultUpgrade).creationCode;
             } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
@@ -384,6 +357,12 @@ abstract contract DeployCTMUtils is DeployUtils {
                 } else {
                     return getCreationCode("DualVerifier", true);
                 }
+            } else if (compareStrings(contractName, "VerifierFflonk")) {
+                (, string memory resolved) = vms.resolve(EraZkosContract.VerifierFflonk);
+                return ContractsBytecodesLib.getCreationCode(resolved);
+            } else if (compareStrings(contractName, "VerifierPlonk")) {
+                (, string memory resolved) = vms.resolve(EraZkosContract.VerifierPlonk);
+                return ContractsBytecodesLib.getCreationCode(resolved);
             }
         }
         return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
@@ -411,13 +390,9 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode(ctmAddresses.daAddresses.availBridge);
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "EraVerifierFflonk")) {
+        } else if (compareStrings(contractName, "VerifierFflonk")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "EraVerifierPlonk")) {
-            return abi.encode();
-        } else if (compareStrings(contractName, "ZKsyncOSVerifierFflonk")) {
-            return abi.encode();
-        } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
+        } else if (compareStrings(contractName, "VerifierPlonk")) {
             return abi.encode();
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
@@ -463,6 +438,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             return
                 DeployCTML1OrGateway.getCreationCalldata(
                     getCTMCoreDeploymentConfig(config),
+                    vms,
                     DeployCTML1OrGateway.getCTMContractFromName(contractName),
                     isZKBytecode
                 );
@@ -472,7 +448,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getCTMCoreDeploymentConfig(Config memory _config) internal view returns (CTMCoreDeploymentConfig memory) {
         return
             CTMCoreDeploymentConfig({
-                isZKsyncOS: _config.isZKsyncOS,
+                isZKsyncOS: vms.isZKsyncOS(),
                 testnetVerifier: _config.testnetVerifier,
                 eraChainId: _config.eraChainId,
                 l1ChainId: _config.l1ChainId,

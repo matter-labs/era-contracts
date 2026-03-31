@@ -63,6 +63,7 @@ import {
     DeployerCreate2Calldata,
     DeployerAddresses
 } from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
+import {EraZkosRouter} from "deploy-scripts/utils/EraZkosRouter.sol";
 
 import {
     AllDeployerResults,
@@ -215,7 +216,11 @@ contract GatewayCTMDeployerTest is Test {
             DeployerAddresses memory expectedDeployers, // DirectCreate2Calldata and create2FactoryAddress not needed for this test
             ,
 
-        ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), deployerConfig);
+        ) = GatewayCTMDeployerHelper.calculateAddresses(
+                bytes32(0),
+                deployerConfig,
+                new EraZkosRouter(deployerConfig.isZKsyncOS)
+            );
 
         // Publish bytecodes for all deployers using calculated addresses
         _publishDeployerBytecodes(calculatedContracts);

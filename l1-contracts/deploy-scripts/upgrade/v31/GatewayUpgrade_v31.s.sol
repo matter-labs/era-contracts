@@ -23,14 +23,23 @@ import {
     L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 
+import {Utils} from "../../utils/Utils.sol";
+import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
 import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.sol";
 
-/// @notice Script used for v31 upgrade flow
+/// @notice Script used for v31 gateway upgrade flow
 contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
+    /// @dev Prepared in getProposedUpgrade, consumed in getL2UpgradeTargetAndData (which must be view).
+    bytes internal l2V29UpgradeBytecodeInfo;
+
     function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
+        if (vms.isZKsyncOS()) {
+            return new string[](0);
+        }
         forceDeploymentNames = new string[](1);
         forceDeploymentNames[0] = "L2V29Upgrade";
     }
@@ -43,6 +52,51 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
         return super.getExpectedL2Address(contractName);
     }
 
+    function getProposedUpgrade(
+        StateTransitionDeployedAddresses memory stateTransition,
+        ChainCreationParamsConfig memory chainCreationParams,
+        uint256,
+        address,
+        uint256[] memory factoryDepsHashes,
+        uint256 protocolUpgradeNonce
+    ) public virtual override returns (ProposedUpgrade memory proposedUpgrade) {
+        if (!vms.isZKsyncOS()) {
+            return
+                super.getProposedUpgrade(
+                    stateTransition,
+                    chainCreationParams,
+                    config.l1ChainId,
+                    config.ownerAddress,
+                    factoryDepsHashes,
+                    protocolUpgradeNonce
+                );
+        }
+
+        // For ZKsyncOS, prepare bytecode info before composeUpgradeTx calls getL2UpgradeTargetAndData.
+        l2V29UpgradeBytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo("L2V29Upgrade.sol", "L2V29Upgrade");
+        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = buildUpgradeForceDeployments(
+            config.l1ChainId,
+            config.ownerAddress
+        );
+
+        proposedUpgrade = ProposedUpgrade({
+            l2ProtocolUpgradeTx: composeUpgradeTx(
+                forceDeployments,
+                factoryDepsHashes,
+                protocolUpgradeNonce
+            ),
+            bootloaderHash: chainCreationParams.bootloaderHash,
+            defaultAccountHash: chainCreationParams.defaultAAHash,
+            evmEmulatorHash: chainCreationParams.evmEmulatorHash,
+            verifier: address(0),
+            verifierParams: getEmptyVerifierParams(),
+            l1ContractsUpgradeCalldata: new bytes(0),
+            postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
+            upgradeTimestamp: 0,
+            newProtocolVersion: chainCreationParams.latestProtocolVersion
+        });
+    }
+
     function getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
     ) internal view override returns (address, bytes memory) {
@@ -51,6 +105,25 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
             IL2V29Upgrade.upgrade,
             (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), ethAssetId)
         );
+
+        if (vms.isZKsyncOS()) {
+            require(l2V29UpgradeBytecodeInfo.length > 0, "L2V29Upgrade bytecode info not prepared");
+            IComplexUpgrader.UniversalContractUpgradeInfo[]
+                memory universalDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
+            universalDeployments[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
+                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
+                deployedBytecodeInfo: l2V29UpgradeBytecodeInfo,
+                newAddress: L2_VERSION_SPECIFIC_UPGRADER_ADDR
+            });
+            return (
+                address(L2_COMPLEX_UPGRADER_ADDR),
+                abi.encodeCall(
+                    IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                    (universalDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, v29UpgradeCalldata)
+                )
+            );
+        }
+
         return (
             address(L2_COMPLEX_UPGRADER_ADDR),
             abi.encodeCall(
