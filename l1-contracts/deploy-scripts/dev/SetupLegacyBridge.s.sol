@@ -6,7 +6,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "./../utils/Utils.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {CoreDeployedAddresses} from "../utils/Types.sol";
-import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
+import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {DummyL1ERC20Bridge} from "contracts/dev-contracts/DummyL1ERC20Bridge.sol";
@@ -21,7 +21,7 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {ISetupLegacyBridge} from "contracts/script-interfaces/ISetupLegacyBridge.sol";
 
 /// This scripts is only for developer
-contract SetupLegacyBridge is Script, ISetupLegacyBridge {
+contract SetupLegacyBridge is Create2FactoryUtils, ISetupLegacyBridge {
     using stdToml for string;
 
     Config internal config;
@@ -29,11 +29,9 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
 
     struct Config {
         uint256 chainId;
-        bytes32 create2FactorySalt;
     }
 
     struct SetupLegacyBridgeAddresses {
-        address create2FactoryAddr;
         address bridgehub;
         address l1Nullifier;
         address diamondProxy;
@@ -64,11 +62,6 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
 
         // Query diamond proxy from bridgehub using chain ID
         addresses.diamondProxy = IL1Bridgehub(bridgehub).getZKChain(chainId);
-
-        // Read create2 factory parameters from permanent-values.toml
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues();
-        addresses.create2FactoryAddr = create2FactoryAddr;
-        config.create2FactorySalt = create2FactorySalt;
 
         // Use AddressIntrospector to get addresses from deployed contracts
         CoreDeployedAddresses memory coreAddresses = AddressIntrospector.getCoreDeployedAddresses(bridgehub);
@@ -173,7 +166,4 @@ contract SetupLegacyBridge is Script, ISetupLegacyBridge {
         );
     }
 
-    function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
-        return Utils.deployViaCreate2(_bytecode, config.create2FactorySalt, addresses.create2FactoryAddr);
-    }
 }

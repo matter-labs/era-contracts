@@ -344,7 +344,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         string memory contracts = vm.serializeBytes32(
             "contracts",
             "create2_factory_salt",
-            create2FactoryParams.factorySalt
+            _create2FactorySalt
         );
 
         vm.serializeString("root", "contracts", contracts);

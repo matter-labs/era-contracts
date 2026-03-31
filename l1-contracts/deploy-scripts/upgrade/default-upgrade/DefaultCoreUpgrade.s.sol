@@ -49,17 +49,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
-    function initialize(
-        string memory permanentValuesInputPath,
-        string memory upgradeInputPath,
-        string memory _outputPath
-    ) public virtual {
-        permanentValuesInputPath;
-        upgradeInputPath;
-        _outputPath;
-        revert("DefaultCoreUpgrade.initialize(permanent-values path,...) is deprecated. Use initializeWithArgs(...)");
-    }
-
     function initializeWithArgs(
         address bridgehubProxyAddress,
         bool isZKsyncOS,
@@ -71,7 +60,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         upgradeInputPath = string.concat(root, upgradeInputPath);
 
         initializeConfigWithArgs(bridgehubProxyAddress, isZKsyncOS, create2FactorySalt, upgradeInputPath);
-        instantiateCreate2Factory();
 
         upgradeConfig.outputPath = string.concat(root, _outputPath);
         upgradeConfig.initialized = true;
@@ -87,13 +75,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice Deploy everything that should be deployed
     function deployNewEcosystemContractsL1() public virtual {}
-
-    /// @notice E2e upgrade generation
-    function run() public virtual {
-        revert(
-            "DefaultCoreUpgrade.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly"
-        );
-    }
 
     function getOwnerAddress() public virtual returns (address) {
         return config.ownerAddress;
@@ -126,14 +107,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         return coreAddresses;
     }
 
-    function initializeConfig(string memory permanentValuesInputPath, string memory upgradeInputPath) public virtual {
-        permanentValuesInputPath;
-        upgradeInputPath;
-        revert(
-            "DefaultCoreUpgrade.initializeConfig(permanent-values path,...) is deprecated. Use initializeConfigWithArgs(...)"
-        );
-    }
-
     function initializeConfigWithArgs(
         address bridgehubProxyAddress,
         bool isZKsyncOS,
@@ -142,7 +115,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     ) public virtual {
         string memory upgradeToml = vm.readFile(upgradeInputPath);
 
-        _initCreate2FactoryParams(Utils.DETERMINISTIC_CREATE2_ADDRESS, create2FactorySalt);
+        setCreate2Salt(create2FactorySalt);
 
         additionalConfig.isZKsyncOS = isZKsyncOS;
 

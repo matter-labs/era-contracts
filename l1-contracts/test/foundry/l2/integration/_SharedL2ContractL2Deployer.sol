@@ -93,7 +93,6 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         // Generate mock force deployments data for L2 tests
         _generateMockForceDeploymentsData(_l1ChainId);
         console.log("Deploying L2 contracts");
-        instantiateCreate2Factory();
         ctmAddresses.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade());
         ctmAddresses.stateTransition.verifiers.verifier = address(
             new EraTestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE))
@@ -165,7 +164,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         bytes memory constructorArgs
     ) internal virtual override returns (address) {
         console.log("Deploying via create2 L2");
-        return L2Utils.deployViaCreat2L2(creationCode, constructorArgs, create2FactoryParams.factorySalt);
+        return L2Utils.deployViaCreat2L2(creationCode, constructorArgs, _create2FactorySalt);
     }
 
     // add this to be excluded from coverage report

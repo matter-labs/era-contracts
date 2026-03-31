@@ -301,7 +301,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 gatewayChainId: gatewayChainId
             })
         );
-        instantiateCreate2Factory();
 
         Call[] memory ecosystemAdminCalls;
         if (serverNotifier == address(0)) {

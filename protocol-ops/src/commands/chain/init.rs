@@ -71,15 +71,18 @@ pub struct ChainInitArgs {
     /// Chain ID
     #[clap(long, help_heading = "Input")]
     pub chain_id: u64,
-    /// Commit operator address
+    /// ZKsync Era eth-path validator (not the OS batch commit/prove/execute accounts)
+    #[clap(long, help_heading = "Input")]
+    pub era_validator_operator: Address,
+    /// ZKsync OS operator for L1 batch commit (blobs-eth path / committer role)
     #[clap(long, help_heading = "Input")]
     pub commit_operator: Address,
-    /// Prove operator address
+    /// ZKsync OS operator for L1 batch prove
     #[clap(long, help_heading = "Input")]
     pub prove_operator: Address,
-    /// Execute operator address
+    /// ZKsync OS operator for L1 batch execute
     #[clap(long, help_heading = "Input")]
-    pub execute_operator: Option<Address>,
+    pub execute_operator: Address,
     /// VM type: zksyncos or eravm
     #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM, help_heading = "Input")]
     pub vm_type: VMOption,
@@ -122,6 +125,9 @@ pub struct ChainInitArgs {
     /// Data availability mode
     #[clap(long, value_enum, default_value_t = DAValidatorType::Rollup, help_heading = "Advanced input")]
     pub da_mode: DAValidatorType,
+    /// Override L2 DA commitment scheme (default: Rollup + ZKsync OS VM uses BlobsZKSyncOS, etc.)
+    #[clap(long, value_enum, help_heading = "Advanced input")]
+    pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
     /// Keep deposits paused after init
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub pause_deposits: bool,
@@ -176,10 +182,11 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         base_token_gas_price_multiplier_numerator: price_ratio_num,
         base_token_gas_price_multiplier_denominator: price_ratio_den,
         owner: owner.address,
+        era_validator_operator: args.era_validator_operator,
         commit_operator: args.commit_operator,
         prove_operator: args.prove_operator,
         execute_operator: args.execute_operator,
-        token_multiplier_setter: args.token_multiplier_setter,
+        _token_multiplier_setter: args.token_multiplier_setter,
         da_mode: args.da_mode,
         vm_type: args.vm_type,
     };
@@ -190,6 +197,7 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         l1_da_validator: args.l1_da_validator,
         chain_params,
         vm_type: args.vm_type,
+        l2_da_commitment_scheme: args.l2_da_commitment_scheme,
         with_legacy_bridge: args.with_legacy_bridge,
         create2_factory_addr: args.create2_factory_addr,
         create2_factory_salt: args.create2_factory_salt,
@@ -253,14 +261,16 @@ pub async fn chain_init(
 
     // Set DA validator pair (as owner)
     logger::step("Setting DA validator pair...");
-    let commitment_scheme = match input.chain_params.da_mode {
-        DAValidatorType::Rollup => match input.vm_type {
-            VMOption::EraVM => L2DACommitmentScheme::BlobsAndPubdataKeccak256,
-            VMOption::ZKSyncOsVM => L2DACommitmentScheme::BlobsZKSyncOS,
-        },
-        DAValidatorType::Avail | DAValidatorType::Eigen => L2DACommitmentScheme::PubdataKeccak256,
-        DAValidatorType::NoDA => L2DACommitmentScheme::EmptyNoDA,
-    };
+    let commitment_scheme = input.l2_da_commitment_scheme.unwrap_or_else(|| {
+        match input.chain_params.da_mode {
+            DAValidatorType::Rollup => match input.vm_type {
+                VMOption::EraVM => L2DACommitmentScheme::BlobsAndPubdataKeccak256,
+                VMOption::ZKSyncOsVM => L2DACommitmentScheme::BlobsZKSyncOS,
+            },
+            DAValidatorType::Avail | DAValidatorType::Eigen => L2DACommitmentScheme::PubdataKeccak256,
+            DAValidatorType::NoDA => L2DACommitmentScheme::EmptyNoDA,
+        }
+    });
     set_da_validator_pair(
         runner,
         AdminScriptMode::Broadcast(owner.clone()),
@@ -605,6 +615,7 @@ pub struct ChainInitInput {
     pub l1_da_validator: Address,
     pub chain_params: NewChainParams,
     pub vm_type: VMOption,
+    pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
     pub with_legacy_bridge: bool,
     pub create2_factory_addr: Option<Address>,
     pub create2_factory_salt: Option<H256>,

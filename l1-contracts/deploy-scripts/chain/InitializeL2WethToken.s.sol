@@ -9,7 +9,6 @@ import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tra
 
 import {Utils} from "../utils/Utils.sol";
 import {IL1Bridgehub, L2TransactionRequestDirect} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
 
 contract InitializeL2WethTokenScript is Script {
     using stdToml for string;
@@ -17,8 +16,6 @@ contract InitializeL2WethTokenScript is Script {
     // solhint-disable-next-line gas-struct-packing
     struct Config {
         address deployerAddress;
-        address create2FactoryAddr;
-        bytes32 create2FactorySalt;
         uint256 eraChainId;
         address l1WethTokenAddr;
         string l1WethTokenName;
@@ -44,11 +41,6 @@ contract InitializeL2WethTokenScript is Script {
 
         // Parse some config from output of l1 deployment
         string memory root = vm.projectRoot();
-
-        // Read create2 factory values from permanent values file
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues();
-        config.create2FactoryAddr = create2FactoryAddr;
-        config.create2FactorySalt = create2FactorySalt;
 
         // Use AddressIntrospector to get addresses from deployed contracts
         BridgehubAddresses memory bhAddresses = AddressIntrospector.getBridgehubAddresses(

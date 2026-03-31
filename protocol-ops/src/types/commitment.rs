@@ -24,7 +24,7 @@ impl DAValidatorType {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Display, ValueEnum)]
 #[repr(u8)]
 pub enum L2DACommitmentScheme {
     None = 0,
@@ -58,7 +58,9 @@ impl FromStr for L2DACommitmentScheme {
             "PubdataKeccak256" => Ok(Self::PubdataKeccak256),
             "BlobsAndPubdataKeccak256" => Ok(Self::BlobsAndPubdataKeccak256),
             "BlobsZKSyncOS" => Ok(Self::BlobsZKSyncOS),
-            _ => Err("Incorrect L2 DA commitment scheme; expected one of `None`, `EmptyNoDA`, `PubdataKeccak256`, `BlobsAndPubdataKeccak256`"),
+            _ => Err(
+                "Incorrect L2 DA commitment scheme; expected one of `None`, `EmptyNoDA`, `PubdataKeccak256`, `BlobsAndPubdataKeccak256`, `BlobsZKSyncOS`",
+            ),
         }
     }
 }

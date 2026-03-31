@@ -33,7 +33,7 @@ impl L1Network {
         let chain_id = crate::common::ethereum::query_chain_id_sync(rpc_url)?;
         match chain_id {
             1 => Ok(Self::Mainnet),
-            9 => Ok(Self::Localhost),
+            9 | 31337 => Ok(Self::Localhost),
             17000 => Ok(Self::Holesky),
             11155111 => Ok(Self::Sepolia),
             other => anyhow::bail!("Unrecognized L1 chain ID: {}", other),

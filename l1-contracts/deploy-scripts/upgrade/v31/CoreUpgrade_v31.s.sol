@@ -32,13 +32,6 @@ import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 
 /// @notice Script used for v31 upgrade flow
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
-    /// @notice E2e upgrade generation
-    function run() public virtual override {
-        revert(
-            "CoreUpgrade_v31.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly"
-        );
-    }
-
     function deployNewEcosystemContractsL1() public virtual override {
         coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
         coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);

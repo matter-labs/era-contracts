@@ -51,18 +51,6 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
         return "/script-out/v31-upgrade-ctm.toml";
     }
 
-    /// @notice Initialize with v31-specific permanent values preparation
-    function initialize(
-        string memory permanentValuesInputPath,
-        string memory upgradeInputPath,
-        string memory _ecosystemOutputPath
-    ) public override {
-        permanentValuesInputPath;
-        upgradeInputPath;
-        _ecosystemOutputPath;
-        revert("EcosystemUpgrade_v31.initialize(permanent-values path,...) is deprecated. Use initializeWithArgs(...)");
-    }
-
     function initializeWithArgs(
         address bridgehubProxyAddress,
         address ctmProxy,
@@ -138,13 +126,6 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
         );
         prepareEcosystemUpgrade();
         prepareDefaultGovernanceCalls();
-    }
-
-    /// @notice E2e upgrade generation
-    function run() public override {
-        revert(
-            "EcosystemUpgrade_v31.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly"
-        );
     }
 
     /// @notice Stage 3: Post-governance migration tasks

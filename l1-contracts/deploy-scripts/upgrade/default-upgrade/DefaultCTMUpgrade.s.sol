@@ -99,7 +99,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     struct PermanentCTMConfig {
-        address create2FactoryAddr;
         bytes32 create2FactorySalt;
         address ctmProxy;
         address bytecodesSupplier;
@@ -123,17 +122,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     uint256[] internal factoryDepsHashes;
     mapping(bytes32 => bool) internal isHashInFactoryDeps;
 
-    function initialize(
-        string memory permanentValuesInputPath,
-        string memory newConfigPath,
-        string memory _outputPath
-    ) public virtual {
-        permanentValuesInputPath;
-        newConfigPath;
-        _outputPath;
-        revert("DefaultCTMUpgrade.initialize(permanent-values path,...) is deprecated. Use initializeWithArgs(...)");
-    }
-
     function initializeWithArgs(
         address ctmProxy,
         address bytecodesSupplier,
@@ -155,7 +143,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             newConfigPath,
             governance
         );
-        instantiateCreate2Factory();
 
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
@@ -176,7 +163,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         // Optional
         address governance
     ) public {
-        _initCreate2FactoryParams(permanentConfig.create2FactoryAddr, permanentConfig.create2FactorySalt);
+        setCreate2Salt(permanentConfig.create2FactorySalt);
         config.l1ChainId = block.chainid;
         newConfig.ctm = permanentConfig.ctmProxy;
 
@@ -206,15 +193,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
-    function initializeConfigFromFile(
-        string memory permanentValuesInputPath,
-        string memory newConfigPath
-    ) internal virtual {
-        permanentValuesInputPath;
-        newConfigPath;
-        revert("DefaultCTMUpgrade.initializeConfigFromFile(...) is deprecated. Use initializeConfigFromArgs(...)");
-    }
-
     function initializeConfigFromArgs(
         address ctmProxy,
         address bytecodesSupplier,
@@ -230,7 +208,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             ctmProxy: ctmProxy,
             bytecodesSupplier: bytecodesSupplier,
             isZKsyncOS: isZKsyncOS,
-            create2FactoryAddr: Utils.DETERMINISTIC_CREATE2_ADDRESS,
             create2FactorySalt: create2FactorySalt
         });
         // Set config.isZKsyncOS BEFORE calling getChainCreationParamsConfig, because
@@ -323,13 +300,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             factoryDepsHashes,
             upToDateZkChain.zkChainProxy,
             config.isZKsyncOS
-        );
-    }
-
-    /// @notice E2e upgrade generation
-    function run() public virtual override {
-        revert(
-            "DefaultCTMUpgrade.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly"
         );
     }
 

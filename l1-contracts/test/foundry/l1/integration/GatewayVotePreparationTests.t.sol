@@ -36,7 +36,6 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
         string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
 
         initializeConfig(configPath, permanentValuesPath, bridgehubProxy, ctmRepresentativeChainId);
-        instantiateCreate2Factory();
 
         (contracts, , , directCalldata, ) = GatewayCTMDeployerHelper.calculateAddresses(
             bytes32(uint256(1)),

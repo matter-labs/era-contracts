@@ -15,10 +15,15 @@ pub struct NewChainParams {
     pub base_token_gas_price_multiplier_numerator: u64,
     pub base_token_gas_price_multiplier_denominator: u64,
     pub owner: Address,
+    /// Eth-path ZKsync Era validator (`validator_sender_operator_eth` — not OS commit/prove/execute).
+    pub era_validator_operator: Address,
+    /// ZKsync OS L1 commit operator (`validator_sender_operator_blobs_eth`, committer role).
     pub commit_operator: Address,
+    /// ZKsync OS L1 prove operator (`validator_sender_operator_prove`).
     pub prove_operator: Address,
-    pub execute_operator: Option<Address>,
-    pub token_multiplier_setter: Option<Address>,
+    /// ZKsync OS L1 execute operator (`validator_sender_operator_execute`).
+    pub execute_operator: Address,
+    pub _token_multiplier_setter: Option<Address>,
     pub da_mode: DAValidatorType,
     pub vm_type: VMOption,
 }
@@ -39,10 +44,8 @@ pub struct ChainL1Config {
     pub validium_mode: bool,
     pub validator_sender_operator_eth: Address,
     pub validator_sender_operator_blobs_eth: Address,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub validator_sender_operator_prove: Option<Address>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub validator_sender_operator_execute: Option<Address>,
+    pub validator_sender_operator_prove: Address,
+    pub validator_sender_operator_execute: Address,
     pub base_token_gas_price_multiplier_nominator: u64,
     pub base_token_gas_price_multiplier_denominator: u64,
     pub governance_security_council_address: Address,
@@ -59,14 +62,6 @@ impl RegisterChainL1Config {
         create2_factory_salt: Option<H256>,
         initialize_legacy_bridge: bool,
     ) -> anyhow::Result<Self> {
-        let (validator_sender_operator_eth, validator_sender_operator_prove) =
-            match chain_params.vm_type {
-                VMOption::EraVM => (chain_params.prove_operator, None),
-                VMOption::ZKSyncOsVM => (
-                    chain_params.prove_operator,
-                    Some(chain_params.prove_operator),
-                ),
-            };
         Ok(Self {
             chain: ChainL1Config {
                 chain_chain_id: chain_params.chain_id,
@@ -82,9 +77,9 @@ impl RegisterChainL1Config {
                 bridgehub_create_new_chain_salt: rand::thread_rng().gen_range(0..=i64::MAX) as u64,
                 validium_mode: chain_params.da_mode == DAValidatorType::NoDA
                     || chain_params.da_mode == DAValidatorType::Avail,
-                validator_sender_operator_eth,
+                validator_sender_operator_eth: chain_params.era_validator_operator,
                 validator_sender_operator_blobs_eth: chain_params.commit_operator,
-                validator_sender_operator_prove,
+                validator_sender_operator_prove: chain_params.prove_operator,
                 validator_sender_operator_execute: chain_params.execute_operator,
                 allow_evm_emulator: true,
             },

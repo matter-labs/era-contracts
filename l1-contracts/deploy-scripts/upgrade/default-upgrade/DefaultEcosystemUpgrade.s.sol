@@ -64,20 +64,6 @@ contract DefaultEcosystemUpgrade is Script {
         }
     }
 
-    /// @notice Initialize both core and CTM upgrades
-    function initialize(
-        string memory permanentValuesInputPath,
-        string memory _upgradeInputPath,
-        string memory _ecosystemOutputPath
-    ) public virtual {
-        permanentValuesInputPath;
-        _upgradeInputPath;
-        _ecosystemOutputPath;
-        revert(
-            "DefaultEcosystemUpgrade.initialize(permanent-values path,...) is deprecated. Use initializeWithArgs(...)"
-        );
-    }
-
     function initializeWithArgs(
         address bridgehubProxyAddress,
         address ctmProxy,
@@ -337,10 +323,4 @@ contract DefaultEcosystemUpgrade is Script {
         console.log("Stage 2 calls:", stage2Calls.length);
     }
 
-    /// @notice E2e upgrade generation
-    function run() public virtual {
-        revert(
-            "DefaultEcosystemUpgrade.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly"
-        );
-    }
 }

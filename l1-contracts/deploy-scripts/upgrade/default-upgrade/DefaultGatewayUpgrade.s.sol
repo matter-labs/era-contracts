@@ -94,19 +94,6 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
-    function initialize(
-        string memory permanentValuesInputPath,
-        string memory newConfigPath,
-        string memory _outputPath
-    ) public virtual {
-        permanentValuesInputPath;
-        newConfigPath;
-        _outputPath;
-        revert(
-            "DefaultGatewayUpgrade.initialize(permanent-values path,...) is deprecated. Use initializeWithArgs(...)"
-        );
-    }
-
     function initializeWithArgs(
         bool _isZKsyncOS,
         bytes32 _create2FactorySalt,
@@ -123,7 +110,6 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
         initializeConfig(
             _create2FactorySalt,
-            Utils.DETERMINISTIC_CREATE2_ADDRESS,
             _isZKsyncOS,
             getChainCreationParamsConfig(chainCreationParamsPath(_isZKsyncOS)),
             _eraChainId,
@@ -140,7 +126,6 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
     function initializeConfig(
         bytes32 _create2FactorySalt,
-        address _create2FactoryAddr,
         bool _isZKsyncOS,
         ChainCreationParamsConfig memory _chainCreationParams,
         uint256 _eraChainId,
@@ -150,7 +135,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         // Optional
         address _governance
     ) public {
-        _initCreate2FactoryParams(_create2FactoryAddr, _create2FactorySalt);
+        setCreate2Salt(_create2FactorySalt);
         config.l1ChainId = block.chainid;
         config.eraChainId = _eraChainId;
         setAddressesBasedOnBridgehub();
@@ -177,15 +162,6 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         );
         config.testnetVerifier = ok;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
-    }
-
-    function initializeConfigFromFile(
-        string memory permanentValuesInputPath,
-        string memory newConfigPath
-    ) internal virtual {
-        permanentValuesInputPath;
-        newConfigPath;
-        revert("DefaultGatewayUpgrade.initializeConfigFromFile(...) is deprecated. Use initializeWithArgs(...)");
     }
 
     function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual override returns (bool) {
@@ -235,13 +211,6 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         upgradeConfig.upgradeCutPrepared = true;
         console.log("UpgradeCutGenerated");
         saveOutput(upgradeConfig.outputPath);
-    }
-
-    /// @notice E2e upgrade generation
-    function run() public virtual override {
-        revert(
-            "DefaultGatewayUpgrade.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly"
-        );
     }
 
     function getNewProtocolVersion() public virtual returns (uint256) {

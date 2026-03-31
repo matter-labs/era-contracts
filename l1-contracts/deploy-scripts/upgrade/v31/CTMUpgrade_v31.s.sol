@@ -31,8 +31,6 @@ import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../..
 import {Utils} from "../../utils/Utils.sol";
 import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 
-import {DefaultEcosystemUpgrade} from "../default-upgrade/DefaultEcosystemUpgrade.s.sol";
-
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
@@ -40,24 +38,6 @@ import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 /// @notice Script used for v31 upgrade flow
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     bytes internal l2V31UpgradeBytecodeInfo;
-
-    /// @notice E2e upgrade generation
-    function run() public virtual override {
-        revert(
-            "CTMUpgrade_v31.run() is deprecated. Use --sig initializeWithArgs(...) and call preparation methods explicitly"
-        );
-    }
-
-    function initialize(
-        string memory permanentValuesInputPath,
-        string memory newConfigPath,
-        string memory upgradeEcosystemOutputPath
-    ) public virtual override {
-        permanentValuesInputPath;
-        newConfigPath;
-        upgradeEcosystemOutputPath;
-        revert("CTMUpgrade_v31.initialize(permanent-values path,...) is deprecated. Use initializeWithArgs(...)");
-    }
 
     function initializeWithArgs(
         address ctmProxy,

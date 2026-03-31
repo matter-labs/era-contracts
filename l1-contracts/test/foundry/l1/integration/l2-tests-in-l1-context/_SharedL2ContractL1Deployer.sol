@@ -60,9 +60,6 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         coreAddresses.bridges.proxies.l1NativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
-        if (!_skip) {
-            instantiateCreate2Factory();
-        }
 
         // TODO refactor
         ctmAddresses.admin.transparentProxyAdmin = makeAddr("transparentProxyAdmin");

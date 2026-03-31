@@ -34,14 +34,6 @@ contract DefaultChainUpgrade is Script {
         return config;
     }
 
-    function prepareChain(uint256 chainId, string memory permanentValuesInputPath) public {
-        chainId;
-        permanentValuesInputPath;
-        revert(
-            "DefaultChainUpgrade.prepareChain(..., permanent-values path) is deprecated. Use prepareChainWithBridgehub(...)"
-        );
-    }
-
     function prepareChainWithBridgehub(uint256 chainId, address bridgehubProxyAddress) public {
         config.chainChainId = chainId;
         config.bridgehubProxyAddress = bridgehubProxyAddress;

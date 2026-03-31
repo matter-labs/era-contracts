@@ -47,8 +47,6 @@ contract EcosystemUpgrade_v29_2 is Script, DefaultCTMUpgrade {
     function deployNewEcosystemContractsL1() public override {
         require(upgradeConfig.initialized, "Not initialized");
 
-        instantiateCreate2Factory();
-
         deployVerifiers();
         deployUpgradeStageValidator();
 

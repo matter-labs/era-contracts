@@ -139,10 +139,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         initializeConfig(inputPath, permanentValuesInputPath, bridgehub);
 
-        if (!skipL1Deployments) {
-            instantiateCreate2Factory();
-        }
-
         console.log("Initializing core contracts from BH");
         IL1Bridgehub bridgehubProxy = IL1Bridgehub(bridgehub);
         // Populate discovered addresses via inspector
@@ -472,7 +468,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         string memory contracts = vm.serializeBytes32(
             "contracts",
             "create2_factory_salt",
-            create2FactoryParams.factorySalt
+            _create2FactorySalt
         );
 
         vm.serializeString("root", "chain_creation_params", chainCreationParams);
