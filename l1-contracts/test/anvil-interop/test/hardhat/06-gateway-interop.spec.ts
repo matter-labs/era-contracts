@@ -5,6 +5,7 @@ import { executeTokenTransfer } from "../../src/helpers/token-transfer";
 import type { MultiChainTokenTransferResult } from "../../src/core/types";
 import {
   buildInteropBundleLog,
+  buildInteropCallExecutedLogs,
   callProcessLogsAndMessages,
   getGWChainBalance,
 } from "../../src/helpers/process-logs-helper";
@@ -142,6 +143,25 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
 
     expect(processResult.txHash).to.not.be.null;
 
+    // Process the destination chain's interopCallExecuted logs.
+    // The merged InteropHandler now sends L2→L1 messages via _sendCallExecutedMessage
+    // for each executed call. GWAssetTracker needs these to credit the destination chain balance.
+    const { logs: executedLogs, messages: executedMessages } = buildInteropCallExecutedLogs({
+      startTxNumberInBatch: 0,
+      interopBundle,
+    });
+
+    const destProcessResult = await callProcessLogsAndMessages({
+      gwProvider,
+      gwRpcUrl: gwChain.rpcUrl,
+      chainId: targetChainId,
+      logs: executedLogs,
+      messages: executedMessages,
+      logger: (line) => console.log(line),
+    });
+
+    expect(destProcessResult.txHash).to.not.be.null;
+
     const srcGwBalanceAfter = await getGWChainBalance(gwProvider, sourceChainId, assetId);
     const dstGwBalanceAfter = await getGWChainBalance(gwProvider, targetChainId, assetId);
 
@@ -187,12 +207,7 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
     });
   });
 
-  it("transfers tokens from GW-settled chain to GW and processes logs", async () => {
-    await transferAndProcessLogs({
-      sourceChainId: gwSettledChainIds[0],
-      targetChainId: gwChainId,
-      amount: "2",
-      sourceTokenAddress: state.testTokens![gwSettledChainIds[0]],
-    });
-  });
+  // NOTE: Transfers to the gateway chain are no longer supported because
+  // the gateway settles on L1 and InteropHandler now requires
+  // settlementLayer(chainId) != L1_CHAIN_ID (CannotClaimInteropOnL1Settlement).
 });
