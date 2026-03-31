@@ -16,4 +16,24 @@ contract EcosystemUpgradeV31ForTests is EcosystemUpgrade_v31 {
     function createCTMUpgrade() internal override returns (DefaultCTMUpgrade) {
         return new CTMUpgradeV31ForTests();
     }
+
+    /// @notice Step 1: Deploy core L1 ecosystem contracts only.
+    /// @dev Produces ~12 transactions. Call step2() afterward.
+    function step1() public {
+        initialize(getPermanentValuesInputPath(), getUpgradeInputPath(), getEcosystemOutputPath());
+        coreUpgrade.prepareEcosystemUpgrade();
+    }
+
+    /// @notice Step 2: Deploy CTM contracts, publish bytecodes, generate governance calls.
+    /// @dev Re-initializes from the same config (create2 deploys are idempotent).
+    /// Produces ~25 transactions.
+    function step2() public {
+        initialize(getPermanentValuesInputPath(), getUpgradeInputPath(), getEcosystemOutputPath());
+        // Re-run core to populate addresses (all create2 deploys are skipped since already deployed)
+        coreUpgrade.prepareEcosystemUpgrade();
+        // Now run CTM upgrade + governance calls
+        ctmUpgrade.prepareCTMUpgrade();
+        saveCombinedOutput();
+        prepareDefaultGovernanceCalls();
+    }
 }

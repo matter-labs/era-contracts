@@ -36,6 +36,7 @@ const ARTIFACTS = {
   L1Nullifier: "L1Nullifier.sol/L1Nullifier.json",
   L2AssetRouter: "L2AssetRouter.sol/L2AssetRouter.json",
   L2AssetTracker: "L2AssetTracker.sol/L2AssetTracker.json",
+  L2BaseTokenEra: "L2BaseTokenEra.sol/L2BaseTokenEra.json",
   L2BaseTokenZKOS: "L2BaseTokenZKOS.sol/L2BaseTokenZKOS.json",
   L2Bridgehub: "L2Bridgehub.sol/L2Bridgehub.json",
   L2ChainAssetHandler: "L2ChainAssetHandler.sol/L2ChainAssetHandler.json",

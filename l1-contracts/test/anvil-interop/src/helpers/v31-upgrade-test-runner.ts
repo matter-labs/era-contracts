@@ -8,6 +8,7 @@ import { runForgeScript } from "../core/forge";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_DEFAULT_PRIVATE_KEY, L1_CHAIN_ID } from "../core/const";
 import {
   L2_ASSET_TRACKER_ADDR,
+  L2_BASE_TOKEN_ADDR,
   L2_COMPLEX_UPGRADER_ADDR,
   L2_CONTRACT_DEPLOYER_ADDR,
   L2_FORCE_DEPLOYER_ADDR,
@@ -318,7 +319,8 @@ function decodeForceDeployments(upgradeTxData: string): { addresses: string[]; d
  */
 async function predeployForceDeploymentTargets(
   l2Provider: ethers.providers.JsonRpcProvider,
-  upgradeTxData: string
+  upgradeTxData: string,
+  isZKsyncOS: boolean
 ): Promise<void> {
   // Ensure MockContractDeployer is present (may be missing in legacy state dumps)
   const deployerCode = await l2Provider.getCode(L2_CONTRACT_DEPLOYER_ADDR);
@@ -356,6 +358,13 @@ async function predeployForceDeploymentTargets(
     }
     await l2Provider.send("anvil_setCode", [address, getBytecode(contractName)]);
   }
+
+  // The predeploy list uses L2BaseTokenZKOS by default. For Era chains, override
+  // with L2BaseTokenEra which uses storage-based balance tracking instead of
+  // calling MINT_BASE_TOKEN_HOOK (which requires real native ETH on Anvil EVM).
+  if (!isZKsyncOS) {
+    await l2Provider.send("anvil_setCode", [L2_BASE_TOKEN_ADDR, getBytecode("L2BaseTokenEra")]);
+  }
 }
 
 async function executeL2UpgradeTxs(
@@ -364,7 +373,8 @@ async function executeL2UpgradeTxs(
   bridgehubAddr: string,
   settlementLayerUpgradeAddr: string,
   chainAddresses: Array<{ chainId: number; diamondProxy: string }>,
-  upgradeTxDataByChainId: Map<number, string>
+  upgradeTxDataByChainId: Map<number, string>,
+  isZKsyncOS: boolean
 ): Promise<void> {
   const settlementLayerUpgrade = new ethers.Contract(
     settlementLayerUpgradeAddr,
@@ -394,7 +404,7 @@ async function executeL2UpgradeTxs(
     // forceDeployAndUpgrade will not actually deploy any bytecode. Parse the
     // force deployments from the calldata and pre-deploy all known contracts
     // via anvil_setCode so the upgrade logic finds the correct bytecodes.
-    await predeployForceDeploymentTargets(l2Provider, rewrittenUpgradeTxData);
+    await predeployForceDeploymentTargets(l2Provider, rewrittenUpgradeTxData, isZKsyncOS);
 
     const relayReceipt = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
       const tx = await signer.sendTransaction({
@@ -501,13 +511,25 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     });
     cleanupUpgradeHarnessInputs = upgradeHarnessInputs.cleanup;
 
+    // Split into two forge script calls to avoid broadcast deadlock with --block-time 1.
+    // Step 1 deploys core L1 contracts (~12 txns), step 2 deploys CTM contracts + governance (~25 txns).
+    // Create2 deploys are idempotent, so step 2 re-initializing is safe.
     await runForgeScript({
       scriptPath: ECOSYSTEM_UPGRADE_TEST_SCRIPT,
       envVars: upgradeHarnessInputs.envVars,
       rpcUrl: l1Chain.rpcUrl,
       senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
       projectRoot: l1ContractsDir,
-      sig: "run()",
+      sig: "step1()",
+    });
+
+    await runForgeScript({
+      scriptPath: ECOSYSTEM_UPGRADE_TEST_SCRIPT,
+      envVars: upgradeHarnessInputs.envVars,
+      rpcUrl: l1Chain.rpcUrl,
+      senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
+      projectRoot: l1ContractsDir,
+      sig: "step2()",
     });
 
     const ecosystemOutputPath = upgradeHarnessInputs.ecosystemOutputPath;
@@ -562,7 +584,8 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       l1Addresses.bridgehub,
       settlementLayerUpgradeAddr,
       upgradeChainAddresses,
-      upgradeTxDataByChainId
+      upgradeTxDataByChainId,
+      scenario.isZKsyncOS
     );
 
     await runForgeScript({
