@@ -97,7 +97,12 @@ jobs:
         with:
           submodules: true
 
-      - name: Install foundry-zksync
+      - name: Install Foundry (for Anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Install foundry-zksync (for forge --zksync)
         uses: ./.github/actions/install-zksync-foundry
 
       - name: Use Node.js
@@ -146,7 +151,12 @@ jobs:
         with:
           submodules: true
 
-      - name: Install foundry-zksync
+      - name: Install Foundry (for Anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Install foundry-zksync (for forge --zksync)
         uses: ./.github/actions/install-zksync-foundry
 
       - name: Use Node.js

@@ -11,7 +11,7 @@ runV31UpgradeScenario({
   targetRoles: ["gateway", "gwSettled"],
   clearGenesisUpgradeTxHash: true,
   seedBatchCounters: true,
-  transferL1AssetTrackerOwnership: false,
+  transferL1AssetTrackerOwnership: true,
 }).catch((error) => {
   console.error("V30 ZKsync OS -> V31 upgrade test failed:", error.message || error);
   process.exit(1);
