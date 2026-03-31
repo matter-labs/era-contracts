@@ -258,3 +258,193 @@ export async function executeTokenTransfer(
     targetTxHash,
   };
 }
+
+export interface InteropTokenTransferOptions {
+  sourceChainId: number;
+  targetChainId: number;
+  amount: string;
+  sourceTokenAddress: string;
+  sourceAddresses: PrivateInteropAddresses;
+  targetAddresses: PrivateInteropAddresses;
+  logger?: Logger;
+}
+
+/**
+ * Execute an interop token transfer using custom (private) contract addresses
+ * instead of the system contract predeploys.
+ */
+export async function executeInteropTokenTransfer(
+  options: InteropTokenTransferOptions
+): Promise<MultiChainTokenTransferResult> {
+  const log = options.logger || defaultLogger;
+  const { sourceChainId, targetChainId, sourceAddresses, targetAddresses } = options;
+  const amount = options.amount || "10";
+
+  const runner = new DeploymentRunner();
+  const state = runner.loadState();
+  if (!state.chains?.l2) {
+    throw new Error("State missing. Run setup first.");
+  }
+
+  const sourceChain = state.chains.l2.find((c) => c.chainId === sourceChainId);
+  const targetChain = state.chains.l2.find((c) => c.chainId === targetChainId);
+  if (!sourceChain || !targetChain) {
+    throw new Error(`Chain not found. Available: ${state.chains.l2.map((c) => c.chainId).join(", ")}`);
+  }
+
+  const sourceTokenAddr = options.sourceTokenAddress;
+  const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
+  const sourceProvider = new providers.JsonRpcProvider(sourceChain.rpcUrl);
+  const targetProvider = new providers.JsonRpcProvider(targetChain.rpcUrl);
+  const sourceWallet = new Wallet(privateKey, sourceProvider);
+  const targetWallet = new Wallet(privateKey, targetProvider);
+
+  const amountWei = ethers.utils.parseUnits(amount, 18);
+  const abiCoder = ethers.utils.defaultAbiCoder;
+
+  // Use private contract addresses
+  const sourceToken = new Contract(sourceTokenAddr, getAbi("TestnetERC20Token"), sourceWallet);
+  const interopCenter = new Contract(sourceAddresses.interopCenter, getAbi("InteropCenter"), sourceWallet);
+  const sourceVault = new Contract(sourceAddresses.ntv, getAbi("L2NativeTokenVault"), sourceProvider);
+  const targetVault = new Contract(targetAddresses.ntv, getAbi("L2NativeTokenVault"), targetProvider);
+
+  const transferStart = Date.now();
+  const elapsed = () => `${((Date.now() - transferStart) / 1000).toFixed(1)}s`;
+
+  log(`⏱️  [${elapsed()}] Checking source balance...`);
+  const sourceBalanceBefore = await sourceToken.balanceOf(sourceWallet.address);
+  log(`💰 Source balance: ${sourceBalanceBefore.toString()}`);
+  if (sourceBalanceBefore.lt(amountWei)) {
+    throw new Error(`Insufficient balance. Have: ${sourceBalanceBefore.toString()}, Need: ${amountWei.toString()}`);
+  }
+
+  log(`⏱️  [${elapsed()}] Checking allowance...`);
+  const currentAllowance = await sourceToken.allowance(sourceWallet.address, sourceAddresses.ntv);
+  if (currentAllowance.lt(amountWei)) {
+    log(`📝 Approving NTV to spend ${amount} tokens...`);
+    const approveTx = await sourceToken.approve(sourceAddresses.ntv, amountWei);
+    await approveTx.wait();
+    log("   ✅ Approval confirmed");
+  }
+
+  log(`⏱️  [${elapsed()}] Checking token registration...`);
+  let assetId = await sourceVault.assetId(sourceTokenAddr);
+  if (assetId === ethers.constants.HashZero) {
+    log("📝 Registering token in NTV...");
+    const sourceVaultWithWallet = sourceVault.connect(sourceWallet);
+    const registerTx = await sourceVaultWithWallet.registerToken(sourceTokenAddr);
+    await registerTx.wait();
+    assetId = await sourceVault.assetId(sourceTokenAddr);
+    log("   ✅ Token registered");
+  }
+  log(`🔑 Asset ID: ${assetId}`);
+
+  log(`⏱️  [${elapsed()}] Reading destination balance before...`);
+  const destinationTokenBefore = await targetVault.tokenAddress(assetId);
+  const destinationBalanceBefore =
+    destinationTokenBefore === ethers.constants.AddressZero
+      ? BigNumber.from(0)
+      : await new Contract(destinationTokenBefore, getAbi("TestnetERC20Token"), targetProvider).balanceOf(
+          targetWallet.address
+        );
+
+  const transferData = encodeBridgeBurnData(amountWei, sourceWallet.address, sourceTokenAddr);
+  const depositData = encodeAssetRouterBridgehubDepositData(assetId, transferData);
+
+  const destinationChainIdBytes = encodeEvmChain(targetChainId);
+  const targetAddressBytes = encodeEvmAddress(targetAddresses.assetRouter);
+  const indirectCallSelector = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("indirectCall(uint256)")).slice(0, 10);
+  const interopCallValueSelector = ethers.utils
+    .keccak256(ethers.utils.toUtf8Bytes("interopCallValue(uint256)"))
+    .slice(0, 10);
+  const indirectCallAttribute = indirectCallSelector + abiCoder.encode(["uint256"], [0]).slice(2);
+  const interopCallValueAttribute = interopCallValueSelector + abiCoder.encode(["uint256"], [0]).slice(2);
+
+  const callStarter = {
+    to: targetAddressBytes,
+    data: depositData,
+    callAttributes: [indirectCallAttribute, interopCallValueAttribute],
+  };
+
+  log(`⏱️  [${elapsed()}] Sending token transfer via InteropCenter...`);
+  const sourceTx = await interopCenter.sendBundle(destinationChainIdBytes, [callStarter], [], {
+    gasLimit: INTEROP_SEND_BUNDLE_GAS_LIMIT,
+    value: 0,
+  });
+  log(`   Transaction sent: cast run ${sourceTx.hash} -r ${sourceChain.rpcUrl}`);
+  const sourceReceipt = await sourceTx.wait();
+  log(`   ✅ Transaction confirmed in block ${sourceReceipt?.blockNumber} [${elapsed()}]`);
+
+  let interopBundle: unknown = null;
+  if (sourceReceipt?.logs) {
+    for (const logEntry of sourceReceipt.logs) {
+      try {
+        const parsed = interopCenter.interface.parseLog({
+          topics: logEntry.topics as string[],
+          data: logEntry.data,
+        });
+        if (parsed && parsed.name === "InteropBundleSent") {
+          interopBundle = parsed.args["interopBundle"];
+          break;
+        }
+      } catch {
+        // Ignore non-InteropCenter logs
+      }
+    }
+  }
+  if (!interopBundle) {
+    throw new Error("InteropBundleSent event not found in source transaction receipt");
+  }
+
+  let targetTxHash: string | null = null;
+  {
+    log(`⏱️  [${elapsed()}] Executing bundle on destination chain via InteropHandler...`);
+    const interopHandler = new Contract(targetAddresses.interopHandler, getAbi("InteropHandler"), targetWallet);
+    const mockProof = buildMockInteropProof(sourceChainId);
+    const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
+    try {
+      const executeTx = await interopHandler.executeBundle(bundleData, mockProof, { gasLimit: DEFAULT_TX_GAS_LIMIT });
+      await executeTx.wait();
+      targetTxHash = executeTx.hash;
+      log(`   ✅ executeBundle tx: cast run ${executeTx.hash} -r ${targetChain.rpcUrl}`);
+    } catch (error: unknown) {
+      const message = (error as Error)?.message || String(error);
+      log(`   ⚠️ executeBundle failed: ${message}`);
+      const failedTxHash = (error as { transactionHash?: string })?.transactionHash;
+      if (!targetTxHash && failedTxHash) {
+        targetTxHash = failedTxHash;
+        log(`   ⚠️ using reverted executeBundle tx: cast run ${failedTxHash} -r ${targetChain.rpcUrl}`);
+      }
+    }
+  }
+
+  log(`⏱️  [${elapsed()}] Reading final balances...`);
+  const sourceBalanceAfter = await sourceToken.balanceOf(sourceWallet.address);
+  const destinationToken = await targetVault.tokenAddress(assetId);
+  const destinationBalanceAfter =
+    destinationToken === ethers.constants.AddressZero
+      ? BigNumber.from(0)
+      : await new Contract(destinationToken, getAbi("TestnetERC20Token"), targetProvider).balanceOf(
+          targetWallet.address
+        );
+
+  log(`⏱️  [${elapsed()}] Token transfer complete`);
+
+  return {
+    sourceChainId,
+    targetChainId,
+    sourceRpcUrl: sourceChain.rpcUrl,
+    targetRpcUrl: targetChain.rpcUrl,
+    sender: sourceWallet.address,
+    sourceToken: sourceTokenAddr,
+    destinationToken,
+    assetId,
+    amountWei: amountWei.toString(),
+    sourceBalanceBefore: sourceBalanceBefore.toString(),
+    sourceBalanceAfter: sourceBalanceAfter.toString(),
+    destinationBalanceBefore: destinationBalanceBefore.toString(),
+    destinationBalanceAfter: destinationBalanceAfter.toString(),
+    sourceTxHash: sourceTx.hash,
+    targetTxHash,
+  };
+}
