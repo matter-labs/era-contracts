@@ -384,10 +384,18 @@ export class DeploymentRunner {
    * Uses --load-state CLI for maximum compatibility across anvil versions.
    * State files from --dump-state are hex-gzip; we decompress to native JSON first.
    */
-  async loadChainStates(anvilManager: AnvilManager, stateDir: string): Promise<FullDeploymentResult> {
+  async loadChainStates(
+    anvilManager: AnvilManager,
+    stateDir: string,
+    options?: { chainIds?: number[] }
+  ): Promise<FullDeploymentResult> {
     console.log(`\n=== Loading Pre-Generated Chain States from ${stateDir} ===\n`);
 
-    const config = this.getConfig();
+    const fullConfig = this.getConfig();
+    // Optionally filter to a subset of chains (e.g. v29 states only have chains 10-13 + 31337)
+    const config = options?.chainIds
+      ? { chains: fullConfig.chains.filter((c) => options.chainIds!.includes(c.chainId)) }
+      : fullConfig;
 
     // Load addresses saved alongside chain states
     const addressesPath = path.join(stateDir, "addresses.json");
