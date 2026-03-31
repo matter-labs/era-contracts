@@ -1,6 +1,7 @@
 import { BigNumber, Contract, ethers, providers, Wallet } from "ethers";
 import { DeploymentRunner } from "../deployment-runner";
 import type { MultiChainTokenTransferParams, MultiChainTokenTransferResult } from "../core/types";
+import type { PrivateInteropAddresses } from "./private-interop-deployer";
 import { getAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,

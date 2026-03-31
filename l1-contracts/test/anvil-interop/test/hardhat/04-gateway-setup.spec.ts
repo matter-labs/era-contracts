@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { Contract, ethers, providers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { l1BridgehubAbi, l2BridgehubAbi } from "../../src/core/contracts";
+import { getAbi } from "../../src/core/contracts";
 import {
   L2_BRIDGEHUB_ADDR,
   L2_ASSET_ROUTER_ADDR,
@@ -66,7 +66,7 @@ describe("04 - Gateway State Verification", function () {
     });
 
     it("has GW-settled chains registered on GW L2Bridgehub", async () => {
-      const l2BhAbi = l2BridgehubAbi();
+      const l2BhAbi = getAbi("L2Bridgehub");
       const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BhAbi, gwProvider);
 
       // Only GW-settled chains should be registered on the GW L2Bridgehub
@@ -81,7 +81,7 @@ describe("04 - Gateway State Verification", function () {
     });
 
     it("returns zero for direct-settled chain on GW L2Bridgehub", async () => {
-      const l2BhAbi = l2BridgehubAbi();
+      const l2BhAbi = getAbi("L2Bridgehub");
       const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BhAbi, gwProvider);
 
       // The direct-settled chain should not be registered on the GW L2Bridgehub
@@ -108,7 +108,7 @@ describe("04 - Gateway State Verification", function () {
     });
 
     it("CTM is registered in Bridgehub", async () => {
-      const bridgehubAbi = l1BridgehubAbi();
+      const bridgehubAbi = getAbi("L1Bridgehub");
       const bridgehub = new Contract(state.l1Addresses!.bridgehub, bridgehubAbi, l1Provider);
       const isRegistered = await bridgehub.chainTypeManagerIsRegistered(state.ctmAddresses!.chainTypeManager);
       expect(isRegistered).to.equal(true);

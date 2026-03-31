@@ -9,7 +9,7 @@ import {
   getGWChainBalance,
 } from "../../src/helpers/process-logs-helper";
 import { migrateTokenBalanceToGW } from "../../src/helpers/token-balance-migration-helper";
-import { interopCenterAbi } from "../../src/core/contracts";
+import { getAbi } from "../../src/core/contracts";
 import { L2_NATIVE_TOKEN_VAULT_ADDR } from "../../src/core/const";
 import { getChainIdByRole, getChainIdsByRole, getL2Chain, getChainDiamondProxy } from "../../src/core/utils";
 
@@ -24,7 +24,7 @@ async function extractInteropBundle(
 ): Promise<any> {
   const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
   const receipt = await provider.getTransactionReceipt(txHash);
-  const iface = new ethers.utils.Interface(interopCenterAbi());
+  const iface = new ethers.utils.Interface(getAbi("InteropCenter"));
 
   for (const logEntry of receipt.logs) {
     try {

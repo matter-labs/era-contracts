@@ -22,6 +22,13 @@ import { getAbi } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./core/const";
 import { deployTestTokens } from "./helpers/deploy-test-token";
 import { registerAndMigrateTestTokens } from "./helpers/token-balance-migration-helper";
+import {
+  deployPrivateInteropStack,
+  registerRemoteRouters,
+  PRIVATE_DEPLOYER_KEY,
+} from "./helpers/private-interop-deployer";
+import type { PrivateInteropAddresses } from "./core/types";
+import { L1_CHAIN_ID } from "./core/const";
 
 export interface StartChainOptions {
   blockTime?: number;
@@ -388,7 +395,7 @@ export class DeploymentRunner {
       throw new Error(`addresses.json not found in ${stateDir}`);
     }
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
-    const { l1Addresses, ctmAddresses, chainAddresses, testTokens } = addresses;
+    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, privateInteropAddresses } = addresses;
 
     // Decompress hex-gzip state files to native JSON for --load-state CLI.
     // This is more portable than anvil_loadState RPC across anvil versions.
@@ -442,6 +449,9 @@ export class DeploymentRunner {
     state.chainAddresses = chainAddresses;
     if (testTokens) {
       state.testTokens = testTokens;
+    }
+    if (privateInteropAddresses) {
+      state.privateInteropAddresses = privateInteropAddresses;
     }
     this.saveState(state);
 
@@ -649,9 +659,47 @@ export class DeploymentRunner {
           logger: (line) => console.log(line),
         });
       }
+
+      // Deploy private interop stack on GW-settled chains
+      await this.deployPrivateInterop(gwSettledChainIds);
     }
 
     return result;
+  }
+
+  /**
+   * Deploy the private interop contract stack on the given chains and
+   * cross-register their routers. Saves addresses to deployment state.
+   */
+  private async deployPrivateInterop(chainIds: number[]): Promise<void> {
+    const state = this.loadState();
+    const l2Chains = state.chains!.l2;
+
+    const privateAddresses: Record<number, PrivateInteropAddresses> = {};
+    const chainsInfo: Array<{ chainId: number; rpcUrl: string }> = [];
+
+    for (const chainId of chainIds) {
+      const chain = l2Chains.find((c) => c.chainId === chainId);
+      if (!chain) continue;
+      console.log(`\nDeploying private interop stack on chain ${chainId}...`);
+      privateAddresses[chainId] = await deployPrivateInteropStack(
+        chain.rpcUrl,
+        chainId,
+        L1_CHAIN_ID,
+        (line) => console.log(`  ${line}`),
+        { destinationChainIds: chainIds }
+      );
+      chainsInfo.push({ chainId, rpcUrl: chain.rpcUrl });
+    }
+
+    // Cross-register remote routers
+    if (chainsInfo.length > 1) {
+      console.log("\nRegistering remote routers...");
+      await registerRemoteRouters(chainsInfo, privateAddresses, PRIVATE_DEPLOYER_KEY, (line) => console.log(`  ${line}`));
+    }
+
+    state.privateInteropAddresses = privateAddresses;
+    this.saveState(state);
   }
 }
 
