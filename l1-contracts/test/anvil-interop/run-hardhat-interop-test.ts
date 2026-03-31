@@ -112,8 +112,17 @@ async function runParallelWorker(label: string, specs: string[], portOffset: num
       stdio: ["ignore", "pipe", "pipe"],
     });
 
-    child.stdout?.pipe(logStream);
-    child.stderr?.pipe(logStream);
+    // Collect output in memory so we always have it for error reporting,
+    // even if the write stream hasn't flushed before the process exits.
+    const outputChunks: Buffer[] = [];
+    child.stdout?.on("data", (chunk: Buffer) => {
+      outputChunks.push(chunk);
+      logStream.write(chunk);
+    });
+    child.stderr?.on("data", (chunk: Buffer) => {
+      outputChunks.push(chunk);
+      logStream.write(chunk);
+    });
 
     child.once("error", (error) => {
       logStream.end();
@@ -130,11 +139,15 @@ async function runParallelWorker(label: string, specs: string[], portOffset: num
         console.log(
           `❌ ${label} [${specNames.join(", ")}] failed (offset ${portOffset}, total elapsed: ${elapsedSince(totalStart)})`
         );
+        // Use in-memory output if log file isn't available yet
         const tail = readLogTail(logPath);
+        const inMemoryTail = tail !== "log file not found"
+          ? tail
+          : Buffer.concat(outputChunks).toString("utf-8").split("\n").slice(-40).join("\n");
         reject(
           new Error(
             `${label} failed with exit code ${code ?? "unknown"}. Log: ${logPath}\n` +
-              `--- ${label} log tail ---\n${tail}\n--- end log tail ---`
+              `--- ${label} log tail ---\n${inMemoryTail}\n--- end log tail ---`
           )
         );
       }
@@ -145,9 +158,9 @@ async function runParallelWorker(label: string, specs: string[], portOffset: num
 async function main(): Promise<void> {
   const keepChains = process.argv.includes("--keep-chains") || process.env.ANVIL_INTEROP_KEEP_CHAINS === "1";
   const skipSetup = process.env.ANVIL_INTEROP_SKIP_SETUP === "1";
-  const skipCleanup = keepChains || process.env.ANVIL_INTEROP_SKIP_CLEANUP === "1";
-  const requestedSpecs = parseRequestedSpecs(process.argv.slice(2));
   const workerMode = process.env.ANVIL_INTEROP_PARALLEL_WORKER === "1";
+  const skipCleanup = keepChains || workerMode || process.env.ANVIL_INTEROP_SKIP_CLEANUP === "1";
+  const requestedSpecs = parseRequestedSpecs(process.argv.slice(2));
   const freshDeploy = process.env.ANVIL_INTEROP_FRESH_DEPLOY === "1";
 
   // Parse --port-offset <N> flag and propagate via env var
@@ -159,6 +172,8 @@ async function main(): Promise<void> {
   const shouldParallelize = !workerMode && !keepChains && !skipSetup && !freshDeploy && requestedSpecs.length === 0;
 
   if (shouldParallelize) {
+    // Run cleanup once before spawning workers (workers skip cleanup to avoid nuking each other)
+    timedRun("cleanup", "yarn", ["cleanup"], anvilInteropDir);
     await timedAsync("parallel hardhat interop workers", async () => {
       await Promise.all(
         parallelSpecGroups.map((specs, index) =>
@@ -172,13 +187,18 @@ async function main(): Promise<void> {
 
   const specsToRun = requestedSpecs.length > 0 ? requestedSpecs : allSpecFiles;
 
+  let anvilManager: AnvilManager | null = null;
   try {
     if (!skipSetup) {
       // Cleanup previous state (still uses shell script for process killing)
-      timedRun("cleanup", "yarn", ["cleanup"], anvilInteropDir);
+      // Skip cleanup in worker mode — the parent already cleaned up before spawning workers.
+      // Running cleanup here would nuke other workers' outputs and anvil instances.
+      if (!workerMode) {
+        timedRun("cleanup", "yarn", ["cleanup"], anvilInteropDir);
+      }
 
       const runner = new DeploymentRunner();
-      const anvilManager = new AnvilManager();
+      anvilManager = new AnvilManager();
 
       // Try loading pre-generated chain states (much faster — skips deploy + TBM)
       // Set ANVIL_INTEROP_FRESH_DEPLOY=1 to force full deployment instead.
@@ -186,10 +206,10 @@ async function main(): Promise<void> {
       if (!freshDeploy && runner.hasChainStates()) {
         const stateDir = runner.getChainStatesDir();
         console.log(`\nFound pre-generated chain states at ${stateDir}`);
-        await timedAsync("load chain states", () => runner.loadChainStates(anvilManager, stateDir));
+        await timedAsync("load chain states", () => runner.loadChainStates(anvilManager!, stateDir));
       } else {
         console.log("\nNo pre-generated chain states found, running full deployment...");
-        await timedAsync("full deployment + test tokens + TBM", () => runner.deployAndSetupWithTBM(anvilManager));
+        await timedAsync("full deployment + test tokens + TBM", () => runner.deployAndSetupWithTBM(anvilManager!));
       }
     }
 
@@ -207,7 +227,13 @@ async function main(): Promise<void> {
 
     console.log(`\n⏱️  [TIMING] Total test run: ${elapsedSince(totalStart)}`);
   } finally {
-    if (!skipCleanup) {
+    if (workerMode) {
+      // Workers only stop their own anvil instances (don't run full cleanup
+      // which would rm -rf outputs and kill other workers' state).
+      if (anvilManager) {
+        await anvilManager.stopAll();
+      }
+    } else if (!skipCleanup) {
       runOrThrow("yarn", ["cleanup"], anvilInteropDir);
     } else if (keepChains) {
       console.log("ℹ️ Keeping Anvil chains running (--keep-chains enabled).");
