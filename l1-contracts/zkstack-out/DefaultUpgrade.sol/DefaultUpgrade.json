@@ -623,5 +623,10 @@
     "type": "error",
     "name": "ValidateTxnNotEnoughGas",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroAddress",
+    "inputs": []
   }
 ]

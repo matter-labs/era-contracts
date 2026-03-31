@@ -336,6 +336,30 @@
   },
   {
     "type": "function",
+    "name": "pendingInteropBalance",
+    "inputs": [
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "balance",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "pendingOwner",
     "inputs": [],
     "outputs": [
@@ -841,6 +865,17 @@
   },
   {
     "type": "error",
+    "name": "CanNotSendInteropToL1",
+    "inputs": [
+      {
+        "name": "destinationChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ChainIdNotRegistered",
     "inputs": [
       {
@@ -858,6 +893,27 @@
   {
     "type": "error",
     "name": "InsufficientChainBalance",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InsufficientPendingInteropBalance",
     "inputs": [
       {
         "name": "_chainId",
@@ -1047,6 +1103,17 @@
       },
       {
         "name": "maxNodeNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "MustBeWithdrawalToL1",
+    "inputs": [
+      {
+        "name": "destinationChainId",
         "type": "uint256",
         "internalType": "uint256"
       }

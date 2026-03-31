@@ -15,7 +15,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2_BRIDGEHUB_ADDRESS, Utils} from "../Utils.sol";
+import {L2_BRIDGEHUB_ADDRESS, Utils} from "../utils/Utils.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";

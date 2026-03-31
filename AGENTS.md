@@ -8,6 +8,13 @@ Never run `pkill -f anvil`, `killall anvil`, or any blanket kill command for Anv
 
 Instead, use the `cleanup.sh` script in the anvil-interop directory, which targets only processes on known ports.
 
+## Code style requirements
+
+1. Avoid using magic numbers. Most constant numbers especially for system params / well known chain ids must be represented as a constant.
+2. All constants should be placed in the dedicated file (e.g. `common/Config.sol` in `l1-contracts`, `Constants.sol` in `system-contracts`, etc). if you do not know where to put the constant to, please closely analyze the corresponding project. If this file can not be found, please create one.
+3. Function parameters must be prefixed with `_` (e.g. `_value`, `_owner`). This convention applies to all functions across all contracts.
+
+
 ## ⚠️ CRITICAL SOLIDITY CODE RULES ⚠️
 
 ### NEVER USE try-catch OR staticcall
@@ -248,7 +255,7 @@ ANVIL_INTEROP_FRESH_DEPLOY=1 yarn test:hardhat:interop
 ANVIL_INTEROP_KEEP_CHAINS=1 yarn test:hardhat:interop
 ```
 
-After modifying mock system contracts (e.g., `MockL2BaseToken`, `MockL2ToL1Messenger`), regenerate chain states:
+After modifying mock system contracts (e.g., `MockL2ToL1Messenger`, `MockMintBaseTokenHook`), regenerate chain states:
 
 ```bash
 cd l1-contracts

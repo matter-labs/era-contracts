@@ -290,6 +290,15 @@ enum BundleStatus {
     Unbundled
 }
 
+/// @dev Message sent by InteropHandler to GWAssetTracker for each successfully executed interop call.
+/// @dev Allows GWAssetTracker to move the corresponding balance from pendingInteropBalance to chainBalance.
+/// @param destinationBaseTokenAssetId Asset ID of the base token of the destination chain.
+/// @param interopCall The interop call that was executed.
+struct InteropCallExecutedMessage {
+    bytes32 destinationBaseTokenAssetId;
+    InteropCall interopCall;
+}
+
 /// @dev Inclusion proof for a cross-chain message payload (bundle) coming from L2→L1.
 /// @param chainId Source chain identifier.
 /// @param l1BatchNumber Batch number on L1 where the message root was committed.

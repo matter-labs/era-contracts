@@ -5,15 +5,6 @@ import * as path from "path";
 import { execSync } from "child_process";
 import { AnvilManager } from "./src/daemons/anvil-manager";
 import { DeploymentRunner } from "./src/deployment-runner";
-import { deployTestTokens } from "./src/helpers/deploy-test-token";
-import {
-  deployPrivateInteropStack,
-  registerRemoteRouters,
-  PRIVATE_DEPLOYER_KEY,
-} from "./src/helpers/private-interop-deployer";
-import { getChainIdsByRole } from "./src/core/utils";
-import { L1_CHAIN_ID } from "./src/core/const";
-import type { PrivateInteropAddresses } from "./src/core/types";
 
 async function main(): Promise<void> {
   // Use the anvil-interop Foundry profile which disables CBOR metadata,
@@ -21,6 +12,9 @@ async function main(): Promise<void> {
   process.env.FOUNDRY_PROFILE = "anvil-interop";
 
   const runner = new DeploymentRunner();
+  // Clear stale state from previous runs. Without this, cached testTokens in
+  // chains.json causes deployAndSetup to skip token deployment on fresh chains.
+  runner.clearState();
   const anvilManager = new AnvilManager();
 
   try {
@@ -30,54 +24,24 @@ async function main(): Promise<void> {
     const stateDir = path.join(__dirname, "chain-states", version);
     const dumpStatePaths = runner.buildDumpStatePaths(stateDir);
 
-    // Run full deployment in deterministic mode:
+    // Run full deployment + test tokens + TBM in deterministic mode:
     // - blockTime 0 = instant mining (blocks mined only on transactions)
     // - timestamp 1 = fixed genesis timestamp
     // - dumpStatePaths = Anvil will dump state to these files on exit
     // This ensures state is fully deterministic regardless of wall clock.
-    const { l1Addresses, ctmAddresses, chainAddresses } = await runner.runFullDeployment(anvilManager, {
-      blockTime: 0,
-      timestamp: 1,
-      dumpStatePaths,
+    // TBM is included so pregenerated state is ready for tests without re-running TBM.
+    const { l1Addresses, ctmAddresses, chainAddresses } = await runner.deployAndSetupWithTBM(anvilManager, {
+      startChainOptions: { blockTime: 0, timestamp: 1, dumpStatePaths },
     });
 
-    // Deploy test tokens before dumping state so they're included in the preloaded chain state.
-    // This eliminates the need for forge build artifacts at test time.
-    await deployTestTokens();
-    const stateAfterTokens = runner.loadState();
-    const testTokens = stateAfterTokens.testTokens;
-
-    // Deploy private interop stack on all GW-settled chains.
-    const config = runner.getConfig();
-    const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
-    let privateInteropAddresses: Record<number, PrivateInteropAddresses> | undefined;
-    if (gwSettledChainIds.length > 0) {
-      privateInteropAddresses = {};
-      for (const chainId of gwSettledChainIds) {
-        const chain = stateAfterTokens.chains!.l2.find((c) => c.chainId === chainId);
-        if (!chain) continue;
-        console.log(`Deploying private interop on chain ${chainId}...`);
-        privateInteropAddresses[chainId] = await deployPrivateInteropStack(chain.rpcUrl, chainId, L1_CHAIN_ID, (line) =>
-          console.log(`  [chain ${chainId}] ${line}`)
-        );
-      }
-      // Cross-register remote router addresses so each chain knows the others' AssetRouter.
-      console.log("Registering remote routers...");
-      const chainsForRouters = gwSettledChainIds
-        .map((id) => stateAfterTokens.chains!.l2.find((c) => c.chainId === id))
-        .filter((c): c is { chainId: number; rpcUrl: string; port: number } => !!c);
-      await registerRemoteRouters(chainsForRouters, privateInteropAddresses, PRIVATE_DEPLOYER_KEY, console.log);
-
-      const s = runner.loadState();
-      s.privateInteropAddresses = privateInteropAddresses;
-      runner.saveState(s);
-    }
+    const stateAfterSetup = runner.loadState();
+    const testTokens = stateAfterSetup.testTokens;
 
     // Stop all chains — this triggers Anvil's --dump-state file writes.
     await runner.dumpAllStates(anvilManager, stateDir);
 
     // Save addresses alongside the chain states
-    const addresses = { l1Addresses, ctmAddresses, chainAddresses, testTokens, privateInteropAddresses };
+    const addresses = { l1Addresses, ctmAddresses, chainAddresses, testTokens };
     fs.writeFileSync(path.join(stateDir, "addresses.json"), JSON.stringify(addresses, null, 2));
     console.log(`Addresses saved to ${path.join(stateDir, "addresses.json")}`);
 

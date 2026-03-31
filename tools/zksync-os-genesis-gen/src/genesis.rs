@@ -1,35 +1,68 @@
 use crate::consts::{
-    BASE_TOKEN_HOLDER_ADDR, ContractSource, EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT, INITIAL_CONTRACTS,
-    L2_COMPLEX_UPGRADER_ADDR, L2_COMPLEX_UPGRADER_IMPL_ADDR, SYSTEM_CONTRACT_PROXY_ADMIN,
+    ContractDeployment, ContractSource, EIP1967_ADMIN_SLOT, EIP1967_IMPLEMENTATION_SLOT,
+    INITIAL_CONTRACTS, L2_COMPLEX_UPGRADER_ADDR, SYSTEM_CONTRACT_PROXY_ADMIN,
     SYSTEM_PROXY_ADMIN_OWNER_SLOT,
 };
 use crate::types::{InitialGenesisInput, LeafInfo, MAX_B256_VALUE, MERKLE_TREE_DEPTH};
-use crate::utils::{address_to_b256, da_contract_name_to_code, l1_contract_name_to_code};
-use alloy::consensus::{Header, EMPTY_OMMER_ROOT_HASH};
+use crate::utils::{
+    address_to_b256, da_contract_name_to_code, generate_random_address, l1_contract_name_to_code,
+};
+use alloy::consensus::{EMPTY_OMMER_ROOT_HASH, Header};
 use alloy::eips::eip1559::INITIAL_BASE_FEE;
-use alloy::primitives::{Address, Bloom, B256, B64, U256, Uint};
+use alloy::primitives::{Address, B64, B256, Bloom, U256};
 use blake2::{Blake2s256, Digest};
 use std::collections::BTreeMap;
 use zk_os_api::helpers::{set_properties_code, set_properties_nonce};
 use zk_os_basic_system::system_implementation::flat_storage_model::{
-    AccountProperties, ACCOUNT_PROPERTIES_STORAGE_ADDRESS,
+    ACCOUNT_PROPERTIES_STORAGE_ADDRESS, AccountProperties,
 };
+
+/// Loads the bytecode for a given contract source.
+fn load_bytecode(source: ContractSource) -> Vec<u8> {
+    match source {
+        ContractSource::L1ContractName(name) => l1_contract_name_to_code(name),
+        ContractSource::DAContractName(name) => da_contract_name_to_code(name),
+        ContractSource::Bytecode(bytecode) => bytecode.to_vec(),
+    }
+}
 
 impl InitialGenesisInput {
     pub(crate) fn local() -> Self {
+        let system_proxy_bytecode = l1_contract_name_to_code("SystemContractProxy");
+
+        let mut initial_contracts: Vec<(Address, alloy::primitives::Bytes)> = Vec::new();
+        // Tracks (proxy_address, impl_address) for all SystemProxy deployments.
+        let mut proxy_impls: Vec<(Address, Address)> = Vec::new();
+
+        for (addr, deployment) in INITIAL_CONTRACTS.iter() {
+            match deployment {
+                ContractDeployment::Direct(source) => {
+                    let code = load_bytecode(*source);
+                    initial_contracts.push((*addr, alloy::primitives::Bytes::from(code)));
+                }
+                ContractDeployment::SystemProxy(source) => {
+                    let impl_bytecode = load_bytecode(*source);
+                    let impl_addr = generate_random_address(&impl_bytecode);
+
+                    // The well-known address holds the proxy skeleton.
+                    initial_contracts.push((
+                        *addr,
+                        alloy::primitives::Bytes::from(system_proxy_bytecode.clone()),
+                    ));
+                    // The implementation lives at the randomly derived address.
+                    initial_contracts.push((
+                        impl_addr,
+                        alloy::primitives::Bytes::from(impl_bytecode),
+                    ));
+
+                    proxy_impls.push((*addr, impl_addr));
+                }
+            }
+        }
+
         InitialGenesisInput {
-            initial_contracts: INITIAL_CONTRACTS
-                .iter()
-                .map(|(addr, source)| {
-                    let code = match source {
-                        ContractSource::L1ContractName(name) => l1_contract_name_to_code(name),
-                        ContractSource::DAContractName(name) => da_contract_name_to_code(name),
-                        ContractSource::Bytecode(bytecode) => bytecode.to_vec(),
-                    };
-                    (*addr, alloy::primitives::Bytes::from(code))
-                })
-                .collect(),
-            additional_storage: construct_additional_storage(),
+            initial_contracts,
+            additional_storage: construct_additional_storage(&proxy_impls),
             additional_storage_raw: Default::default(),
         }
     }
@@ -236,7 +269,15 @@ pub fn build_genesis_root_hash(genesis_input: &InitialGenesisInput) -> anyhow::R
     build_initial_genesis_commitment(storage_logs, header)
 }
 
-fn construct_additional_storage() -> BTreeMap<Address, BTreeMap<B256, B256>> {
+/// Builds the additional EIP-1967 proxy storage for every `SystemProxy` contract and sets the
+/// owner slot on `SYSTEM_CONTRACT_PROXY_ADMIN`.
+///
+/// For each proxy:
+/// - `EIP1967_IMPLEMENTATION_SLOT` → impl address
+/// - `EIP1967_ADMIN_SLOT`          → `SYSTEM_CONTRACT_PROXY_ADMIN`
+fn construct_additional_storage(
+    proxy_impls: &[(Address, Address)],
+) -> BTreeMap<Address, BTreeMap<B256, B256>> {
     let mut map: BTreeMap<Address, BTreeMap<B256, B256>> = BTreeMap::new();
 
     let mut system_contract_proxy_admin_storage = BTreeMap::new();
@@ -249,26 +290,15 @@ fn construct_additional_storage() -> BTreeMap<Address, BTreeMap<B256, B256>> {
         system_contract_proxy_admin_storage,
     );
 
-    let mut l2_complex_upgrader_storage = BTreeMap::new();
-    l2_complex_upgrader_storage.insert(
-        EIP1967_IMPLEMENTATION_SLOT,
-        address_to_b256(&L2_COMPLEX_UPGRADER_IMPL_ADDR),
-    );
-    l2_complex_upgrader_storage.insert(
-        EIP1967_ADMIN_SLOT,
-        address_to_b256(&SYSTEM_CONTRACT_PROXY_ADMIN),
-    );
-    map.insert(L2_COMPLEX_UPGRADER_ADDR, l2_complex_upgrader_storage);
-
-    let mut account_properties_storage = BTreeMap::new();
-    account_properties_storage.insert(
-        address_to_b256(&BASE_TOKEN_HOLDER_ADDR),
-        AccountProperties {
-            balance: Uint::from(u128::MAX),
-            ..Default::default()
-        }.compute_hash().as_u8_array().into(),
-    );
-    map.insert(ACCOUNT_PROPERTIES_STORAGE_ADDRESS.to_be_bytes().into(), account_properties_storage);
+    for (proxy_addr, impl_addr) in proxy_impls {
+        let mut proxy_storage = BTreeMap::new();
+        proxy_storage.insert(EIP1967_IMPLEMENTATION_SLOT, address_to_b256(impl_addr));
+        proxy_storage.insert(
+            EIP1967_ADMIN_SLOT,
+            address_to_b256(&SYSTEM_CONTRACT_PROXY_ADMIN),
+        );
+        map.insert(*proxy_addr, proxy_storage);
+    }
 
     map
 }

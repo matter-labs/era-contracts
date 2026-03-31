@@ -41,7 +41,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
     }
 
     function runForTest() public {
-        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
+        _runFromEnv();
 
         // In the production environment, there will be a separate script dedicated to accepting the adminship
         // but for testing purposes we'll have to do it here.
@@ -51,12 +51,14 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
     }
 
     function runForAnvil() public {
-        // For Anvil testing: deploy contracts but skip acceptAdmin() which requires
-        // broadcasting from a contract address (ChainAdminOwnable)
-        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
+        // Deploy contracts but skip acceptAdmin() which requires
+        // broadcasting from a contract address (ChainAdminOwnable).
+        // The admin can be accepted manually if needed for testing.
+        _runFromEnv();
+    }
 
-        // Note: acceptAdmin() is skipped for local Anvil testing
-        // The admin can be accepted manually if needed for testing
+    function _runFromEnv() private {
+        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
     }
 
     function getAddresses() public view returns (CoreDeployedAddresses memory) {

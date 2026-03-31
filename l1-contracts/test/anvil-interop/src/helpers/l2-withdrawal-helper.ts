@@ -1,19 +1,11 @@
 import type { BigNumber } from "ethers";
 import { Contract, providers, Wallet, ethers } from "ethers";
 import { buildWithdrawalMerkleProof, getSettlementLayerChainId } from "../core/utils";
-import { encodeBridgeBurnData } from "../core/data-encoding";
-import {
-  iBaseTokenAbi,
-  l1NativeTokenVaultAbi,
-  testnetERC20TokenAbi,
-  il2AssetRouterAbi,
-  l1NullifierAbi,
-} from "../core/contracts";
+import { getAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   ETH_TOKEN_ADDRESS,
   L2_ASSET_ROUTER_ADDR,
-  L2_NATIVE_TOKEN_VAULT_ADDR,
   L2_BASE_TOKEN_ADDR,
   FINALIZE_DEPOSIT_SIG,
 } from "../core/const";
@@ -32,24 +24,6 @@ export interface WithdrawETHResult {
   l2TxHash: string;
   l1TxHash: string | null;
   amount: BigNumber;
-}
-
-export interface WithdrawERC20Params {
-  l1RpcUrl: string;
-  l2RpcUrl: string;
-  chainId: number;
-  l1Addresses: CoreDeployedAddresses;
-  l2TokenAddress: string;
-  assetId: string;
-  amount: BigNumber;
-  l1Recipient?: string;
-}
-
-export interface WithdrawERC20Result {
-  l2TxHash: string;
-  l1TxHash: string | null;
-  amount: BigNumber;
-  assetId: string;
 }
 
 /**
@@ -71,11 +45,11 @@ export async function withdrawETHFromL2(params: WithdrawETHParams): Promise<With
   const l1Recipient = params.l1Recipient || l2Wallet.address;
 
   // L1 uses asset ID from the deployed L1NTV contract
-  const ntv = new Contract(l1Addresses.l1NativeTokenVault, l1NativeTokenVaultAbi(), l1Provider);
+  const ntv = new Contract(l1Addresses.l1NativeTokenVault, getAbi("L1NativeTokenVault"), l1Provider);
   const l1EthAssetId = await ntv.assetId(ETH_TOKEN_ADDRESS);
 
   // Call L2BaseToken.withdraw(l1Recipient) with value = amount
-  const l2BaseToken = new Contract(L2_BASE_TOKEN_ADDR, iBaseTokenAbi(), l2Wallet);
+  const l2BaseToken = new Contract(L2_BASE_TOKEN_ADDR, getAbi("IBaseToken"), l2Wallet);
 
   console.log(`   Initiating ETH withdrawal from chain ${chainId} via L2BaseToken.withdraw()...`);
   const l2Tx = await l2BaseToken.withdraw(l1Recipient, { value: amount, gasLimit: 5_000_000 });
@@ -98,58 +72,6 @@ export async function withdrawETHFromL2(params: WithdrawETHParams): Promise<With
     l2TxHash: l2Tx.hash,
     l1TxHash,
     amount,
-  };
-}
-
-/**
- * Initiate an ERC20 withdrawal from L2 to L1 via L2AssetRouter.withdraw.
- */
-export async function withdrawERC20FromL2(params: WithdrawERC20Params): Promise<WithdrawERC20Result> {
-  const { l1RpcUrl, l2RpcUrl, chainId, l1Addresses, l2TokenAddress, assetId, amount } = params;
-  const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
-
-  const l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
-  const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
-  const l2Wallet = new Wallet(privateKey, l2Provider);
-  const l1Recipient = params.l1Recipient || l2Wallet.address;
-
-  // Approve L2NativeTokenVault to spend tokens
-  const l2Token = new Contract(l2TokenAddress, testnetERC20TokenAbi(), l2Wallet);
-
-  console.log("   Approving L2NativeTokenVault for withdrawal...");
-  const approveTx = await l2Token.approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount);
-  await approveTx.wait();
-
-  // Encode withdrawal data: (amount, l1Recipient, l2TokenAddress)
-  const withdrawalData = encodeBridgeBurnData(amount, l1Recipient, l2TokenAddress);
-
-  // Use IL2AssetRouter interface (no overloaded withdraw) for cleaner call syntax
-  const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, il2AssetRouterAbi(), l2Wallet);
-
-  console.log(`   Initiating ERC20 withdrawal from chain ${chainId}...`);
-  const l2Tx = await l2AssetRouter.withdraw(assetId, withdrawalData, {
-    gasLimit: 5_000_000,
-  });
-  await l2Tx.wait();
-  console.log(`   L2 withdrawal tx: cast run ${l2Tx.hash} -r ${l2RpcUrl}`);
-
-  // Finalize on L1
-  const l1TxHash = await finalizeWithdrawalOnL1(
-    l1Provider,
-    chainId,
-    l1Addresses,
-    assetId,
-    amount,
-    l1Recipient,
-    l2TokenAddress,
-    l2Wallet.address
-  );
-
-  return {
-    l2TxHash: l2Tx.hash,
-    l1TxHash,
-    amount,
-    assetId,
   };
 }
 
@@ -215,7 +137,7 @@ async function finalizeWithdrawalOnL1(
   // 4. Build FinalizeL1DepositParams and call L1Nullifier.finalizeDeposit
   const l2BatchNumber = ++finalizationCounter;
   const l1Wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
-  const l1Nullifier = new Contract(l1Addresses.l1NullifierProxy, l1NullifierAbi(), l1Wallet);
+  const l1Nullifier = new Contract(l1Addresses.l1NullifierProxy, getAbi("L1Nullifier"), l1Wallet);
 
   console.log(
     `   Finalizing withdrawal on L1 via L1Nullifier (settlement layer: ${settlementLayerChainId || "direct"})...`

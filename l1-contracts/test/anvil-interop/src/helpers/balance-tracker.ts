@@ -1,6 +1,6 @@
 import { BigNumber, Contract, providers } from "ethers";
-import type { BalanceSnapshot, CoreDeployedAddresses, DeploymentState } from "../core/types";
-import { l1AssetTrackerAbi, gwAssetTrackerAbi, testnetERC20TokenAbi, l1NativeTokenVaultAbi } from "../core/contracts";
+import type { BalanceSnapshot, ChainBalanceSnapshot, CoreDeployedAddresses, DeploymentState } from "../core/types";
+import { getAbi } from "../core/contracts";
 import { ETH_TOKEN_ADDRESS, GW_ASSET_TRACKER_ADDR } from "../core/const";
 
 /**
@@ -33,7 +33,7 @@ export class BalanceTracker {
    * Read L1AssetTracker.chainBalance(chainId, assetId) on L1.
    */
   async getL1ChainBalance(chainId: number, assetId: string): Promise<BigNumber> {
-    const tracker = new Contract(this.l1AssetTrackerAddr, l1AssetTrackerAbi(), this.l1Provider);
+    const tracker = new Contract(this.l1AssetTrackerAddr, getAbi("L1AssetTracker"), this.l1Provider);
     return tracker.chainBalance(chainId, assetId);
   }
 
@@ -48,7 +48,7 @@ export class BalanceTracker {
     if (!gwProvider) {
       throw new Error(`GW provider not found for chain ${this.gwChainId}`);
     }
-    const tracker = new Contract(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAbi(), gwProvider);
+    const tracker = new Contract(GW_ASSET_TRACKER_ADDR, getAbi("GWAssetTracker"), gwProvider);
     return tracker.chainBalance(chainId, assetId);
   }
 
@@ -75,7 +75,7 @@ export class BalanceTracker {
    */
   async getL2TokenBalance(chainId: number, tokenAddress: string, walletAddress: string): Promise<BigNumber> {
     const provider = this.getL2Provider(chainId);
-    const token = new Contract(tokenAddress, testnetERC20TokenAbi(), provider);
+    const token = new Contract(tokenAddress, getAbi("TestnetERC20Token"), provider);
     return token.balanceOf(walletAddress);
   }
 
@@ -83,7 +83,7 @@ export class BalanceTracker {
    * Read an ERC20 token balance for an address on L1.
    */
   async getL1TokenBalance(tokenAddress: string, walletAddress: string): Promise<BigNumber> {
-    const token = new Contract(tokenAddress, testnetERC20TokenAbi(), this.l1Provider);
+    const token = new Contract(tokenAddress, getAbi("TestnetERC20Token"), this.l1Provider);
     return token.balanceOf(walletAddress);
   }
 
@@ -130,10 +130,8 @@ export class BalanceTracker {
         ? await this.getL2TokenBalance(chainId, l2TokenAddress, walletAddress)
         : await this.getL2EthBalance(chainId, walletAddress);
 
-    // For GW-settled chains, L1AssetTracker tracks balance under the GW chainId.
-    // We store the L1 chain balance under the appropriate key (GW chainId for GW-settled).
-    const l1ChainBalanceChainId = isGWSettled && this.gwChainId ? this.gwChainId : chainId;
-    const l1ChainBalance = await this.getL1ChainBalance(l1ChainBalanceChainId, assetId);
+    // Always track L1AssetTracker.chainBalance under the chain's own ID
+    const l1ChainBalance = await this.getL1ChainBalance(chainId, assetId);
 
     const snapshot: BalanceSnapshot = {
       l1TokenBalance: l1TokenBalance.toString(),
@@ -141,8 +139,12 @@ export class BalanceTracker {
       l1ChainBalance: l1ChainBalance.toString(),
     };
 
-    // For GW-settled chains, also track GWAssetTracker.chainBalance[chainId]
+    // For GW-settled chains, also track L1AssetTracker.chainBalance under the GW chain ID
+    // and GWAssetTracker.chainBalance[chainId]
     if (isGWSettled && this.gwChainId) {
+      const l1GwChainBalance = await this.getL1ChainBalance(this.gwChainId, assetId);
+      snapshot.l1GwChainBalance = l1GwChainBalance.toString();
+
       const gwChainBalance = await this.getGWChainBalance(chainId, assetId);
       snapshot.gwChainBalance = gwChainBalance.toString();
     }
@@ -157,15 +159,20 @@ export class BalanceTracker {
     chainId: number,
     assetId: string,
     isGWSettled: boolean = false
-  ): Promise<{ l1ChainBalance: string; gwChainBalance?: string }> {
-    const l1ChainBalanceChainId = isGWSettled && this.gwChainId ? this.gwChainId : chainId;
-    const l1ChainBalance = await this.getL1ChainBalance(l1ChainBalanceChainId, assetId);
+  ): Promise<ChainBalanceSnapshot> {
+    // Always track L1AssetTracker.chainBalance under the chain's own ID
+    const l1ChainBalance = await this.getL1ChainBalance(chainId, assetId);
 
-    const result: { l1ChainBalance: string; gwChainBalance?: string } = {
+    const result: ChainBalanceSnapshot = {
       l1ChainBalance: l1ChainBalance.toString(),
     };
 
+    // For GW-settled chains, also track L1AssetTracker.chainBalance under the GW chain ID
+    // and GWAssetTracker.chainBalance[chainId]
     if (isGWSettled && this.gwChainId) {
+      const l1GwChainBalance = await this.getL1ChainBalance(this.gwChainId, assetId);
+      result.l1GwChainBalance = l1GwChainBalance.toString();
+
       const gwChainBalance = await this.getGWChainBalance(chainId, assetId);
       result.gwChainBalance = gwChainBalance.toString();
     }
@@ -185,6 +192,7 @@ export function computeBalanceDeltas(
   l1TokenDelta: BigNumber;
   l2TokenDelta: BigNumber;
   l1ChainBalanceDelta: BigNumber;
+  l1GwChainBalanceDelta?: BigNumber;
   gwChainBalanceDelta?: BigNumber;
 } {
   const l1TokenDelta = BigNumber.from(after.l1TokenBalance).sub(before.l1TokenBalance);
@@ -196,6 +204,10 @@ export function computeBalanceDeltas(
     l2TokenDelta,
     l1ChainBalanceDelta,
   };
+
+  if (before.l1GwChainBalance && after.l1GwChainBalance) {
+    result.l1GwChainBalanceDelta = BigNumber.from(after.l1GwChainBalance).sub(before.l1GwChainBalance);
+  }
 
   if (before.gwChainBalance && after.gwChainBalance) {
     result.gwChainBalanceDelta = BigNumber.from(after.gwChainBalance).sub(before.gwChainBalance);
@@ -212,7 +224,7 @@ export async function queryEthAssetId(
   l1Provider: providers.JsonRpcProvider,
   l1NativeTokenVaultAddr: string
 ): Promise<string> {
-  const ntv = new Contract(l1NativeTokenVaultAddr, l1NativeTokenVaultAbi(), l1Provider);
+  const ntv = new Contract(l1NativeTokenVaultAddr, getAbi("L1NativeTokenVault"), l1Provider);
   return ntv.assetId(ETH_TOKEN_ADDRESS);
 }
 
@@ -242,7 +254,7 @@ export function createBalanceTrackerFromState(state: DeploymentState): BalanceTr
     l2Providers.set(l2.chainId, new providers.JsonRpcProvider(l2.rpcUrl));
   }
 
-  const gwChainId = state.chains.config.find((c) => c.isGateway)?.chainId;
+  const gwChainId = state.chains.config.find((c) => c.role === "gateway")?.chainId;
 
   return new BalanceTracker(l1Provider, l2Providers, state.l1Addresses, gwChainId);
 }

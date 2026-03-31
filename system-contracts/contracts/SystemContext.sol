@@ -103,6 +103,15 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     /// @notice The information about the virtual blocks upgrade, which tracks when the migration to the L2 blocks has started and finished.
     VirtualBlockUpgradeInfo internal virtualBlockUpgradeInfo;
 
+    /// @notice Number of current transaction in block.
+    uint16 public txNumberInBlock;
+
+    /// @notice The current gas per pubdata byte
+    uint256 public gasPerPubdataByte;
+
+    /// @notice The number of pubdata spent as of the start of the transaction
+    uint256 internal basePubdataSpent;
+
     /// @notice The chainId of the settlement layer.
     /// @notice This value will be deprecated in the future, it should not be used by external contracts.
     uint256 public currentSettlementLayerChainId;
@@ -121,15 +130,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
             currentSettlementLayerChainId = _newSettlementLayerChainId;
         }
     }
-
-    /// @notice Number of current transaction in block.
-    uint16 public txNumberInBlock;
-
-    /// @notice The current gas per pubdata byte
-    uint256 public gasPerPubdataByte;
-
-    /// @notice The number of pubdata spent as of the start of the transaction
-    uint256 internal basePubdataSpent;
 
     /// @notice Set the current tx origin.
     /// @param _newOrigin The new tx origin.

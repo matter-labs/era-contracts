@@ -47,6 +47,7 @@ contract SetTransactionFiltererTest is AdminTest {
         address admin = utilsFacet.util_getAdmin();
 
         // Fake a priority tx so permanentlyAllowPriorityMode can succeed
+        utilsFacet.util_setZksyncOS(true);
         utilsFacet.util_setPriorityTreeNextLeafIndex(1);
         utilsFacet.util_setPriorityOpsRequestTimestamp(0, block.timestamp);
 

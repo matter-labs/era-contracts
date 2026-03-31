@@ -4,10 +4,12 @@ pragma solidity 0.8.28;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "../AccessControlEnumerablePerChainAddressUpgradeable.sol";
 import {LibMap} from "../libraries/LibMap.sol";
+import {Diamond} from "../libraries/Diamond.sol";
 import {IZKChain} from "../chain-interfaces/IZKChain.sol";
 import {NotAZKChain, TimeNotReached} from "../../common/L1ContractErrors.sol";
 import {IL1Bridgehub} from "../../core/bridgehub/IL1Bridgehub.sol";
 import {IValidatorTimelock} from "./interfaces/IValidatorTimelock.sol";
+import {IChainUpgrader} from "../chain-interfaces/IChainUpgrader.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -48,6 +50,9 @@ contract ValidatorTimelock is
     bytes32 public constant override EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
 
     /// @inheritdoc IValidatorTimelock
+    bytes32 public constant override UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+
+    /// @inheritdoc IValidatorTimelock
     bytes32 public constant override OPTIONAL_PRECOMMITTER_ADMIN_ROLE = keccak256("OPTIONAL_PRECOMMITTER_ADMIN_ROLE");
 
     /// @inheritdoc IValidatorTimelock
@@ -61,6 +66,9 @@ contract ValidatorTimelock is
 
     /// @inheritdoc IValidatorTimelock
     bytes32 public constant override OPTIONAL_EXECUTOR_ADMIN_ROLE = keccak256("OPTIONAL_EXECUTOR_ADMIN_ROLE");
+
+    /// @inheritdoc IValidatorTimelock
+    bytes32 public constant override OPTIONAL_UPGRADER_ADMIN_ROLE = keccak256("OPTIONAL_UPGRADER_ADMIN_ROLE");
 
     /// @inheritdoc IValidatorTimelock
     IL1Bridgehub public immutable override BRIDGE_HUB;
@@ -122,6 +130,9 @@ contract ValidatorTimelock is
         if (params.rotateExecutorRole) {
             revokeRole(_chainAddress, EXECUTOR_ROLE, _validator);
         }
+        if (params.rotateUpgraderRole) {
+            revokeRole(_chainAddress, UPGRADER_ROLE, _validator);
+        }
     }
 
     /// @inheritdoc IValidatorTimelock
@@ -134,7 +145,8 @@ contract ValidatorTimelock is
                 rotateCommitterRole: true,
                 rotateReverterRole: true,
                 rotateProverRole: true,
-                rotateExecutorRole: true
+                rotateExecutorRole: true,
+                rotateUpgraderRole: true
             })
         );
     }
@@ -165,6 +177,9 @@ contract ValidatorTimelock is
         if (params.rotateExecutorRole) {
             grantRole(_chainAddress, EXECUTOR_ROLE, _validator);
         }
+        if (params.rotateUpgraderRole) {
+            grantRole(_chainAddress, UPGRADER_ROLE, _validator);
+        }
     }
 
     /// @inheritdoc IValidatorTimelock
@@ -177,7 +192,8 @@ contract ValidatorTimelock is
                 rotateCommitterRole: true,
                 rotateReverterRole: true,
                 rotateProverRole: true,
-                rotateExecutorRole: true
+                rotateExecutorRole: true,
+                rotateUpgraderRole: true
             })
         );
     }
@@ -269,6 +285,15 @@ contract ValidatorTimelock is
                 }
             }
         }
+        _propagateToAddress(_getPropagationAddress(_chainAddress));
+    }
+
+    /// @inheritdoc IChainUpgrader
+    function upgradeChainFromVersion(
+        address _chainAddress,
+        uint256, // _oldProtocolVersion (unused in this specific implementation)
+        Diamond.DiamondCutData calldata // _diamondCut (unused in this specific implementation)
+    ) external onlyRole(_chainAddress, UPGRADER_ROLE) {
         _propagateToAddress(_getPropagationAddress(_chainAddress));
     }
 

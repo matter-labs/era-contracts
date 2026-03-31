@@ -58,6 +58,10 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
     GatewayVotePreparationForTest votePreparationScript;
 
     uint256 constant GATEWAY_CHAIN_ID = 506;
+    string internal constant GATEWAY_VOTE_PREPARATION_CONFIG_PATH =
+        "/script-out/foundry-gateway-vote-preparation/config.toml";
+    string internal constant GATEWAY_VOTE_PREPARATION_OUTPUT_PATH =
+        "/script-out/foundry-gateway-vote-preparation/output.toml";
 
     function setUp() public {
         _deployL1Contracts();
@@ -67,14 +71,8 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
 
         _writeGatewayVotePreparationConfig();
 
-        vm.setEnv(
-            "GATEWAY_VOTE_PREPARATION_INPUT",
-            "/test/foundry/l1/integration/deploy-scripts/script-config/config-gateway-vote-preparation.toml"
-        );
-        vm.setEnv(
-            "GATEWAY_VOTE_PREPARATION_OUTPUT",
-            "/test/foundry/l1/integration/deploy-scripts/script-out/output-gateway-vote-preparation.toml"
-        );
+        vm.setEnv("GATEWAY_VOTE_PREPARATION_INPUT", GATEWAY_VOTE_PREPARATION_CONFIG_PATH);
+        vm.setEnv("GATEWAY_VOTE_PREPARATION_OUTPUT", GATEWAY_VOTE_PREPARATION_OUTPUT_PATH);
     }
 
     /// @notice Calls calculateAddresses through GatewayVotePreparation's real initialization path.
@@ -269,6 +267,8 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
     }
 
     function _writeGatewayVotePreparationConfig() internal {
+        vm.createDir(string.concat(vm.projectRoot(), "/script-out/foundry-gateway-vote-preparation"), true);
+
         vm.serializeAddress("contracts", "governance_security_council_address", address(0));
         vm.serializeUint("contracts", "governance_min_delay", 0);
         string memory contractsToml = vm.serializeUint("contracts", "validator_timelock_execution_delay", 0);
@@ -288,10 +288,7 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         vm.serializeUint("gw_vote_prep", "gateway_settlement_fee", 0);
         string memory toml = vm.serializeString("gw_vote_prep", "contracts", contractsToml);
 
-        string memory path = string.concat(
-            vm.projectRoot(),
-            "/test/foundry/l1/integration/deploy-scripts/script-config/config-gateway-vote-preparation.toml"
-        );
+        string memory path = string.concat(vm.projectRoot(), GATEWAY_VOTE_PREPARATION_CONFIG_PATH);
         vm.writeToml(toml, path);
     }
 

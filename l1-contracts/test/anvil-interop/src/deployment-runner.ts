@@ -8,15 +8,20 @@ import { ChainRegistry } from "./deployers/chain-registry";
 import { GatewaySetup } from "./deployers/gateway-setup";
 import type {
   AnvilConfig,
+  AnvilChainConfig,
   ChainAddresses,
   ChainInfo,
   CoreDeployedAddresses,
   CTMDeployedAddresses,
   DeploymentState,
+  L2ChainInfo,
+  PriorityRequestData,
 } from "./core/types";
 import { getChainIdsByRole, timeIt } from "./core/utils";
-import { migratorFacetAbi } from "./core/contracts";
+import { getAbi } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./core/const";
+import { deployTestTokens } from "./helpers/deploy-test-token";
+import { registerAndMigrateTestTokens } from "./helpers/token-balance-migration-helper";
 
 export interface StartChainOptions {
   blockTime?: number;
@@ -38,7 +43,8 @@ export class DeploymentRunner {
   private configPath: string;
 
   constructor(baseDir: string = __dirname + "/..") {
-    this.stateDir = path.join(baseDir, "outputs/state");
+    const runSuffix = process.env.ANVIL_INTEROP_RUN_SUFFIX || "";
+    this.stateDir = path.join(baseDir, `outputs/state${runSuffix}`);
     this.configDir = path.join(baseDir, "config");
     this.configPath = path.join(this.configDir, "anvil-config.json");
     fs.mkdirSync(this.stateDir, { recursive: true });
@@ -73,6 +79,130 @@ export class DeploymentRunner {
     fs.writeFileSync(path.join(this.stateDir, "chains.json"), JSON.stringify(state, null, 2));
   }
 
+  /** Clear cached deployment state so a fresh run doesn't see stale data. */
+  clearState(): void {
+    this.saveState({});
+  }
+
+  private toChainConfigMap(chainConfigs: AnvilConfig["chains"]): Map<number, AnvilConfig["chains"][number]> {
+    return new Map(chainConfigs.map((chainConfig) => [chainConfig.chainId, chainConfig]));
+  }
+
+  private toRpcUrlMap(l2Chains: L2ChainInfo[]): Map<number, string> {
+    return new Map(l2Chains.map((chain) => [chain.chainId, chain.rpcUrl]));
+  }
+
+  private getChainConfigOrThrow(
+    chainConfigsById: Map<number, AnvilConfig["chains"][number]>,
+    chainId: number
+  ): AnvilChainConfig {
+    const chainConfig = chainConfigsById.get(chainId);
+    if (!chainConfig) {
+      throw new Error(`Chain config not found for chain ${chainId}`);
+    }
+    return chainConfig;
+  }
+
+  private computeInteropChainIds(chainId: number, chainConfigs: AnvilChainConfig[]): number[] {
+    const l2Chains = chainConfigs.filter((chainConfig) => chainConfig.role !== "l1");
+    const thisChain = l2Chains.find((chainConfig) => chainConfig.chainId === chainId);
+    if (!thisChain || thisChain.settlement === "l1" || !thisChain.settlement || thisChain.role !== "gwSettled") {
+      return [];
+    }
+
+    return l2Chains
+      .filter((chainConfig) => chainConfig.chainId !== chainId)
+      .filter((chainConfig) => chainConfig.role === "gwSettled")
+      .filter((chainConfig) => chainConfig.settlement === thisChain.settlement)
+      .map((chainConfig) => chainConfig.chainId);
+  }
+
+  private buildInteropChainMap(chainConfigs: AnvilConfig["chains"]): Map<number, number[]> {
+    const l2ChainConfigs = chainConfigs.filter((chainConfig) => chainConfig.role !== "l1");
+    return new Map(
+      l2ChainConfigs.map((chainConfig) => [
+        chainConfig.chainId,
+        this.computeInteropChainIds(chainConfig.chainId, chainConfigs),
+      ])
+    );
+  }
+
+  private buildRegistrationConfigs(
+    l2Chains: L2ChainInfo[],
+    chainConfigsById: Map<number, AnvilConfig["chains"][number]>
+  ) {
+    return l2Chains.map((l2Chain) => {
+      const chainConfig = this.getChainConfigOrThrow(chainConfigsById, l2Chain.chainId);
+      return {
+        chainId: chainConfig.chainId,
+        rpcUrl: l2Chain.rpcUrl,
+        baseToken: ETH_TOKEN_ADDRESS, // TODO(EVM-1297): support non-ETH base tokens
+        validiumMode: false, // TODO(EVM-1297): support validium mode (requires batch settlement)
+      };
+    });
+  }
+
+  private getGatewayChainOrThrow(gatewayChainId: number, l2Chains: L2ChainInfo[]): L2ChainInfo {
+    const gwChain = l2Chains.find((chain) => chain.chainId === gatewayChainId);
+    if (!gwChain) {
+      throw new Error(`Gateway chain ${gatewayChainId} not found in started L2 chains`);
+    }
+    return gwChain;
+  }
+
+  private async initializeL2Chain(
+    registry: ChainRegistry,
+    chain: ChainAddresses,
+    l2RpcUrlsByChainId: Map<number, string>,
+    genesisPriorityTxs: Map<number, PriorityRequestData>
+  ): Promise<void> {
+    const rpcUrl = l2RpcUrlsByChainId.get(chain.chainId);
+    if (!rpcUrl) {
+      throw new Error(`L2 chain ${chain.chainId} not found`);
+    }
+    const genesisTx = genesisPriorityTxs.get(chain.chainId);
+    if (!genesisTx) {
+      throw new Error(`Genesis tx not found for chain ${chain.chainId}`);
+    }
+    const done = timeIt(`initializeL2 chain ${chain.chainId}`);
+    await registry.initializeL2SystemContracts(chain.chainId, chain.diamondProxy, rpcUrl, genesisTx);
+    done();
+    console.log(`  Chain ${chain.chainId} system contracts initialized`);
+  }
+
+  private async registerInteropChainsForL2Chain(
+    registry: ChainRegistry,
+    chain: ChainAddresses,
+    l2RpcUrlsByChainId: Map<number, string>,
+    interopChainIdsByChainId: Map<number, number[]>
+  ): Promise<void> {
+    const rpcUrl = l2RpcUrlsByChainId.get(chain.chainId);
+    if (!rpcUrl) {
+      throw new Error(`L2 chain ${chain.chainId} not found`);
+    }
+    const interopChainIds = interopChainIdsByChainId.get(chain.chainId);
+    if (!interopChainIds) {
+      throw new Error(`Interop chain plan not found for chain ${chain.chainId}`);
+    }
+
+    const done = timeIt(`registerInterop chain ${chain.chainId}`);
+    await registry.registerInteropChainsOnL2(chain.chainId, chain.diamondProxy, rpcUrl, interopChainIds);
+    done();
+    console.log(`  Chain ${chain.chainId} interop registrations completed`);
+  }
+
+  private async unpauseChainDeposits(
+    wallet: Wallet,
+    chain: ChainAddresses,
+    nonce: number,
+    migratorAbi: ReturnType<typeof getAbi>
+  ): Promise<void> {
+    const migrator = new Contract(chain.diamondProxy, migratorAbi, wallet);
+    const tx = await migrator.unpauseDeposits({ gasLimit: 500_000, nonce });
+    await tx.wait();
+    console.log(`  Deposits unpaused on chain ${chain.chainId}`);
+  }
+
   async step1StartChains(
     anvilManager: AnvilManager,
     startChainOptions?: StartChainOptions
@@ -87,7 +217,7 @@ export class DeploymentRunner {
         anvilManager.startChain({
           chainId: chainConfig.chainId,
           port: chainConfig.port,
-          isL1: chainConfig.isL1,
+          role: chainConfig.role,
           ...baseOptions,
           dumpStatePath: dumpStatePaths?.[chainConfig.chainId],
         })
@@ -151,7 +281,7 @@ export class DeploymentRunner {
 
   async step3And4RegisterAndInitChains(
     l1RpcUrl: string,
-    l2Chains: Array<{ chainId: number; rpcUrl: string }>,
+    l2Chains: L2ChainInfo[],
     chainConfigs: AnvilConfig["chains"],
     l1Addresses: CoreDeployedAddresses,
     ctmAddresses: CTMDeployedAddresses
@@ -162,21 +292,14 @@ export class DeploymentRunner {
 
     const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
     const registry = new ChainRegistry(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
+    const chainConfigsById = this.toChainConfigMap(chainConfigs);
+    const l2RpcUrlsByChainId = this.toRpcUrlMap(l2Chains);
 
     // Batch-register all chains in a single forge call (avoids nonce conflicts)
-    const configs = l2Chains.map((l2Chain) => {
-      const chainConfig = chainConfigs.find((c) => c.chainId === l2Chain.chainId);
-      return {
-        chainId: l2Chain.chainId,
-        rpcUrl: l2Chain.rpcUrl,
-        baseToken: ETH_TOKEN_ADDRESS,
-        validiumMode: false,
-        isGateway: chainConfig?.isGateway || false,
-      };
-    });
+    const configs = this.buildRegistrationConfigs(l2Chains, chainConfigsById);
 
     const regDone = timeIt(`registerChains batch [${configs.map((c) => c.chainId).join(",")}]`);
-    const chainAddresses = await registry.registerChainBatch(configs);
+    const { chainAddresses, genesisPriorityTxs } = await registry.registerChainBatch(configs);
     regDone();
 
     for (const addr of chainAddresses) {
@@ -186,30 +309,17 @@ export class DeploymentRunner {
     // Initialize all L2 chains in parallel (each goes to a separate Anvil instance)
     console.log("\nInitializing L2 system contracts (in parallel)...\n");
     await Promise.all(
-      chainAddresses.map(async (chain) => {
-        const l2Chain = l2Chains.find((c) => c.chainId === chain.chainId);
-        if (!l2Chain) {
-          throw new Error(`L2 chain ${chain.chainId} not found`);
-        }
-        const done = timeIt(`initializeL2 chain ${chain.chainId}`);
-        await registry.initializeL2SystemContracts(chain.chainId, chain.diamondProxy, l2Chain.rpcUrl);
-        done();
-        console.log(`  Chain ${chain.chainId} system contracts initialized`);
-      })
+      chainAddresses.map((chain) => this.initializeL2Chain(registry, chain, l2RpcUrlsByChainId, genesisPriorityTxs))
     );
 
     // Unpause deposits on all chains in parallel using explicit nonces
     console.log("\nUnpausing deposits on all chains...");
     const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
     const wallet = new Wallet(privateKey, l1Provider);
+    const migratorAbi = getAbi("MigratorFacet");
     const baseNonce = await wallet.getTransactionCount();
     await Promise.all(
-      chainAddresses.map(async (chain, i) => {
-        const migrator = new Contract(chain.diamondProxy, migratorFacetAbi(), wallet);
-        const tx = await migrator.unpauseDeposits({ gasLimit: 500_000, nonce: baseNonce + i });
-        await tx.wait();
-        console.log(`  Deposits unpaused on chain ${chain.chainId}`);
-      })
+      chainAddresses.map((chain, i) => this.unpauseChainDeposits(wallet, chain, baseNonce + i, migratorAbi))
     );
 
     const state = this.loadState();
@@ -217,6 +327,26 @@ export class DeploymentRunner {
     this.saveState(state);
 
     return { chainAddresses };
+  }
+
+  async step6RegisterInteropChains(
+    l1RpcUrl: string,
+    l2Chains: L2ChainInfo[],
+    chainConfigs: AnvilConfig["chains"],
+    l1Addresses: CoreDeployedAddresses,
+    ctmAddresses: CTMDeployedAddresses,
+    chainAddresses: ChainAddresses[]
+  ): Promise<void> {
+    console.log("\n=== Step 6: Register Interop Chains ===\n");
+
+    const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
+    const registry = new ChainRegistry(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
+    const l2RpcUrlsByChainId = this.toRpcUrlMap(l2Chains);
+    const interopChainIdsByChainId = this.buildInteropChainMap(chainConfigs);
+
+    for (const chain of chainAddresses) {
+      await this.registerInteropChainsForL2Chain(registry, chain, l2RpcUrlsByChainId, interopChainIdsByChainId);
+    }
   }
 
   /**
@@ -258,37 +388,32 @@ export class DeploymentRunner {
       throw new Error(`addresses.json not found in ${stateDir}`);
     }
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
-    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, privateInteropAddresses } = addresses;
+    const { l1Addresses, ctmAddresses, chainAddresses, testTokens } = addresses;
 
     // Decompress hex-gzip state files to native JSON for --load-state CLI.
     // This is more portable than anvil_loadState RPC across anvil versions.
-    const tmpDir = path.join(stateDir, ".tmp");
+    const runSuffix = process.env.ANVIL_INTEROP_RUN_SUFFIX || "";
+    const tmpDir = path.join(stateDir, `.tmp${runSuffix}`);
     fs.mkdirSync(tmpDir, { recursive: true });
 
     const loadStatePaths: Record<number, string> = {};
-    const skippedChains: number[] = [];
     for (const chainConfig of config.chains) {
       const stateFile = path.join(stateDir, `${chainConfig.chainId}.json`);
       if (!fs.existsSync(stateFile)) {
-        skippedChains.push(chainConfig.chainId);
-        continue;
+        throw new Error(`State file not found: ${stateFile}`);
       }
       const nativeFile = path.join(tmpDir, `${chainConfig.chainId}.json`);
       this.decompressStateFile(stateFile, nativeFile);
       loadStatePaths[chainConfig.chainId] = nativeFile;
     }
-    if (skippedChains.length > 0) {
-      console.log(`  Skipping chains without state files: ${skippedChains.join(", ")}`);
-    }
 
-    // Start only chains that have state files
-    const chainsToStart = config.chains.filter((c) => loadStatePaths[c.chainId]);
+    // Start all chains with --load-state pointing to the decompressed native JSON
     await Promise.all(
-      chainsToStart.map((chainConfig) =>
+      config.chains.map((chainConfig) =>
         anvilManager.startChain({
           chainId: chainConfig.chainId,
           port: chainConfig.port,
-          isL1: chainConfig.isL1,
+          role: chainConfig.role,
           loadStatePath: loadStatePaths[chainConfig.chainId],
         })
       )
@@ -317,9 +442,6 @@ export class DeploymentRunner {
     state.chainAddresses = chainAddresses;
     if (testTokens) {
       state.testTokens = testTokens;
-    }
-    if (privateInteropAddresses) {
-      state.privateInteropAddresses = privateInteropAddresses;
     }
     this.saveState(state);
 
@@ -411,13 +533,10 @@ export class DeploymentRunner {
     );
 
     // Step 5: Setup gateway if configured
-    const gatewayConfig = config.chains.find((c) => c.isGateway);
+    const gatewayConfig = config.chains.find((c) => c.role === "gateway");
     if (gatewayConfig) {
-      const gwChain = chains.l2.find((c) => c.chainId === gatewayConfig.chainId);
-      const l2ChainRpcUrls = new Map<number, string>();
-      for (const l2Chain of chains.l2) {
-        l2ChainRpcUrls.set(l2Chain.chainId, l2Chain.rpcUrl);
-      }
+      const gwChain = this.getGatewayChainOrThrow(gatewayConfig.chainId, chains.l2);
+      const l2ChainRpcUrls = this.toRpcUrlMap(chains.l2);
       const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
       await this.step5SetupGateway(
         chains.l1.rpcUrl,
@@ -429,6 +548,15 @@ export class DeploymentRunner {
         l2ChainRpcUrls
       );
     }
+
+    await this.step6RegisterInteropChains(
+      chains.l1.rpcUrl,
+      chains.l2,
+      chains.config,
+      l1Addresses,
+      ctmAddresses,
+      chainAddresses
+    );
 
     return { chains, l1Addresses, ctmAddresses, chainAddresses };
   }
@@ -457,4 +585,82 @@ export class DeploymentRunner {
 
     return { gatewayCTMAddr };
   }
+
+  /**
+   * Run full deployment and deploy test tokens.
+   *
+   * This is the shared setup flow used by both `setup-and-dump-state.ts` and
+   * `run-hardhat-interop-test.ts`.  It encapsulates:
+   *   1. Run full deployment (start chains + deploy contracts)
+   *   2. Deploy test tokens (if not already present in state)
+   *
+   * Callers can customise behaviour via `DeployAndSetupOptions`.
+   */
+  async deployAndSetup(anvilManager: AnvilManager, options?: DeployAndSetupOptions): Promise<FullDeploymentResult> {
+    const startChainOptions: StartChainOptions | undefined = options?.startChainOptions;
+
+    const result = await this.runFullDeployment(anvilManager, startChainOptions);
+
+    // Deploy test tokens unless the caller opted out.
+    if (options?.deployTestTokens !== false) {
+      const state = this.loadState();
+      const hasTestTokens = state.testTokens && Object.keys(state.testTokens).length > 0;
+      if (!hasTestTokens) {
+        await deployTestTokens();
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Full setup: deploy + test tokens + Token Balance Migration (TBM).
+   *
+   * Used by both `setup-and-dump-state.ts` and `run-hardhat-interop-test.ts` (fresh deploy path).
+   * TBM registers and migrates test tokens on GW-settled chains so that
+   * assetMigrationNumber matches migrationNumber (required for interop transfers).
+   */
+  async deployAndSetupWithTBM(
+    anvilManager: AnvilManager,
+    options?: DeployAndSetupOptions
+  ): Promise<FullDeploymentResult> {
+    const result = await this.deployAndSetup(anvilManager, options);
+
+    const config = this.getConfig();
+    const gwSettledChainIds = getChainIdsByRole(config.chains, "gwSettled");
+    const gatewayConfig = config.chains.find((c) => c.role === "gateway");
+
+    if (gwSettledChainIds.length > 0 && gatewayConfig) {
+      const state = this.loadState();
+      if (state.testTokens && Object.keys(state.testTokens).length > 0) {
+        const gwChain = state.chains!.l2.find((c) => c.chainId === gatewayConfig.chainId)!;
+        const gwDiamondProxy = state.chainAddresses!.find((c) => c.chainId === gatewayConfig.chainId)!.diamondProxy;
+        const l2ChainRpcUrls = new Map(state.chains!.l2.map((c) => [c.chainId, c.rpcUrl]));
+
+        await registerAndMigrateTestTokens({
+          gwSettledChainIds,
+          l2ChainRpcUrls,
+          testTokens: state.testTokens,
+          l1RpcUrl: state.chains!.l1!.rpcUrl,
+          gwRpcUrl: gwChain.rpcUrl,
+          l1AssetTrackerAddr: result.l1Addresses.l1AssetTracker,
+          gwDiamondProxyAddr: gwDiamondProxy,
+          chainAddresses: state.chainAddresses!,
+          logger: (line) => console.log(line),
+        });
+      }
+    }
+
+    return result;
+  }
+}
+
+export interface DeployAndSetupOptions {
+  /** Options forwarded to `runFullDeployment` → `step1StartChains`. */
+  startChainOptions?: StartChainOptions;
+  /**
+   * Whether to deploy test ERC-20 tokens after deployment.
+   * Defaults to `true`.  Set to `false` to skip token deployment.
+   */
+  deployTestTokens?: boolean;
 }

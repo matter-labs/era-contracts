@@ -16,7 +16,8 @@ import {
     NoCallsProvided,
     NotARestriction,
     RestrictionWasAlreadyPresent,
-    RestrictionWasNotPresent
+    RestrictionWasNotPresent,
+    ZeroUpgradeTimestamp
 } from "contracts/common/L1ContractErrors.sol";
 
 contract ChainAdminTest is Test {
@@ -123,6 +124,7 @@ contract ChainAdminTest is Test {
     }
 
     function test_setUpgradeTimestamp(uint256 semverMinorVersionMultiplier, uint256 timestamp) public {
+        vm.assume(timestamp != 0);
         (major, minor, patch) = gettersFacet.getSemverProtocolVersion();
         uint256 protocolVersion = packSemver(major, minor, patch + 1, semverMinorVersionMultiplier);
 
@@ -131,6 +133,15 @@ contract ChainAdminTest is Test {
 
         vm.prank(address(chainAdmin));
         chainAdmin.setUpgradeTimestamp(protocolVersion, timestamp);
+    }
+
+    function test_setUpgradeTimestamp_revertsOnZeroTimestamp(uint256 semverMinorVersionMultiplier) public {
+        (major, minor, patch) = gettersFacet.getSemverProtocolVersion();
+        uint256 protocolVersion = packSemver(major, minor, patch + 1, semverMinorVersionMultiplier);
+
+        vm.prank(address(chainAdmin));
+        vm.expectRevert(ZeroUpgradeTimestamp.selector);
+        chainAdmin.setUpgradeTimestamp(protocolVersion, 0);
     }
 
     function test_multicallRevertNoCalls() public {

@@ -16,7 +16,7 @@ import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "co
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
-import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
+import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
@@ -25,15 +25,6 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 
 abstract contract CTMUpgradeBase is DeployCTMScript {
     function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual returns (bool);
-
-    function getEmptyVerifierParams() internal pure returns (VerifierParams memory) {
-        return
-            VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            });
-    }
 
     /// @notice Get protocol upgrade nonce from protocol version
     function getProtocolUpgradeNonce(uint256 protocolVersion) internal pure returns (uint256) {
@@ -55,27 +46,8 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
 
     /// @notice Build empty L1 -> L2 upgrade tx
     /// @dev Only useful for patch upgrades
-    function emptyUpgradeTx() internal pure returns (L2CanonicalTransaction memory transaction) {
-        transaction = L2CanonicalTransaction({
-            txType: 0,
-            from: uint256(0),
-            to: uint256(0),
-            gasLimit: 0,
-            gasPerPubdataByteLimit: 0,
-            maxFeePerGas: 0,
-            maxPriorityFeePerGas: 0,
-            paymaster: uint256(uint160(address(0))),
-            nonce: 0,
-            value: 0,
-            reserved: [uint256(0), uint256(0), uint256(0), uint256(0)],
-            data: new bytes(0),
-            signature: new bytes(0),
-            factoryDeps: new uint256[](0),
-            paymasterInput: new bytes(0),
-            // Reserved dynamic type for the future use-case. Using it should be avoided,
-            // But it is still here, just in case we want to enable some additional functionality
-            reservedDynamic: new bytes(0)
-        });
+    function emptyUpgradeTx() internal pure returns (L2CanonicalTransaction memory) {
+        return ProposedUpgradeLib.emptyL2CanonicalTransaction();
     }
 
     /// @notice Get L2 upgrade target and data
@@ -212,19 +184,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     function getProposedPatchUpgrade(
         uint256 newProtocolVersion
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
-        proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: emptyUpgradeTx(),
-            bootloaderHash: bytes32(0),
-            defaultAccountHash: bytes32(0),
-            evmEmulatorHash: bytes32(0),
-            // Verifier is resolved from CTM; keep zeroed fields for calldata compatibility.
-            verifier: address(0),
-            verifierParams: getEmptyVerifierParams(),
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: new bytes(0),
-            upgradeTimestamp: 0,
-            newProtocolVersion: newProtocolVersion
-        });
+        proposedUpgrade = ProposedUpgradeLib.emptyProposedUpgrade(newProtocolVersion);
     }
 
     function getProposedUpgrade(
@@ -239,9 +199,10 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments;
 
         if (isZKsyncOS) {
-            // ZKsyncOS chains do not use L2 bytecodes from zkout/, so skip
-            // getBaseForceDeployments which reads system contract bytecodes.
-            forceDeployments = getAdditionalForceDeployments();
+            // ZKsyncOS uses FixedForceDeploymentsData (built in DeployCTM) instead of
+            // Era-style ForceDeployment[] arrays. Return empty — the upgrade tx for
+            // ZKsyncOS chains carries data through a different path.
+            forceDeployments = new IL2ContractDeployer.ForceDeployment[](0);
         } else {
             IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
                 .getBaseForceDeployments(l1ChainId, ownerAddress);
@@ -264,7 +225,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             evmEmulatorHash: chainCreationParams.evmEmulatorHash,
             // Verifier is resolved from CTM; keep zeroed fields for calldata compatibility.
             verifier: address(0),
-            verifierParams: getEmptyVerifierParams(),
+            verifierParams: ProposedUpgradeLib.emptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
             upgradeTimestamp: 0,

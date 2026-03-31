@@ -9,13 +9,27 @@ import {
     PriorityOpsRequestTimestampMissing,
     Unauthorized
 } from "contracts/common/L1ContractErrors.sol";
-import {PriorityModeAlreadyAllowed} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {NotZKsyncOS, PriorityModeAlreadyAllowed} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 contract PriorityModeAdminTest is AdminTest {
+    function setUp() public override {
+        super.setUp();
+        utilsFacet.util_setZksyncOS(true);
+    }
+
     /// @dev Fakes a priority tx with a non-zero timestamp so permanentlyAllowPriorityMode can succeed.
     function _fakePriorityTx() internal {
         utilsFacet.util_setPriorityTreeNextLeafIndex(1);
         utilsFacet.util_setPriorityOpsRequestTimestamp(0, block.timestamp);
+    }
+
+    function test_revertWhen_permanentlyAllowPriorityMode_notZKsyncOS() public {
+        utilsFacet.util_setZksyncOS(false);
+        address admin = utilsFacet.util_getAdmin();
+
+        vm.prank(admin);
+        vm.expectRevert(NotZKsyncOS.selector);
+        adminFacet.permanentlyAllowPriorityMode();
     }
 
     function test_revertWhen_permanentlyAllowPriorityMode_noPriorityTxs() public {

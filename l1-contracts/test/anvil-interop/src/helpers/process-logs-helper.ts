@@ -1,6 +1,7 @@
 import type { BigNumber, providers } from "ethers";
+import type { InteropBundle, InteropCall } from "../core/types";
 import { Contract, ethers } from "ethers";
-import { gwAssetTrackerAbi, l2BridgehubAbi, l2MessageRootAbi } from "../core/contracts";
+import { getAbi } from "../core/contracts";
 import { impersonateAndRun } from "../core/utils";
 import { encodeTokenData, encodeBridgeMintData } from "../core/data-encoding";
 import {
@@ -11,6 +12,7 @@ import {
   INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_BRIDGEHUB_ADDR,
+  L2_INTEROP_HANDLER_ADDR,
   L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
   L2_MESSAGE_ROOT_ADDR,
   L2_TO_L1_LOGS_MERKLE_TREE_DEPTH,
@@ -268,6 +270,60 @@ export function buildInteropBundleLog(params: { txNumberInBatch: number; interop
   return { log, message };
 }
 
+/**
+ * Build L2Log + message entries for each InteropCall in a bundle, representing
+ * the execution confirmation messages that InteropHandler sends via L2→L1 messenger
+ * when executeBundle succeeds.
+ *
+ * Each call produces one log/message pair. The message format matches:
+ *   abi.encodeCall(IAssetTrackerDataEncoding.receiveInteropCallExecuted, (InteropCallExecutedMessage))
+ * The log key is bytes32(uint256(uint160(L2_INTEROP_HANDLER_ADDR)))
+ */
+export function buildInteropCallExecutedLogs(params: { startTxNumberInBatch: number; interopBundle: InteropBundle }): {
+  logs: L2Log[];
+  messages: string[];
+} {
+  const { interopBundle, startTxNumberInBatch } = params;
+  const abiCoder = ethers.utils.defaultAbiCoder;
+
+  // Derive the selector from the contract ABI instead of hardcoding the signature
+  const iface = new ethers.utils.Interface(getAbi("IAssetTrackerDataEncoding"));
+  const RECEIVE_INTEROP_CALL_EXECUTED_SELECTOR = iface.getSighash("receiveInteropCallExecuted");
+
+  const INTEROP_CALL_EXECUTED_MSG_TYPE = "tuple(bytes32,tuple(bytes1,bool,address,address,uint256,bytes))";
+
+  const logs: L2Log[] = [];
+  const messages: string[] = [];
+
+  const calls: InteropCall[] = interopBundle.calls;
+  const destinationBaseTokenAssetId: string = interopBundle.destinationBaseTokenAssetId;
+
+  for (let i = 0; i < calls.length; i++) {
+    const call = calls[i];
+
+    const interopCallTuple = [call.version, call.shadowAccount, call.to, call.from, call.value, call.data];
+
+    const executedMsgTuple = [destinationBaseTokenAssetId, interopCallTuple];
+
+    const encodedArgs = abiCoder.encode([INTEROP_CALL_EXECUTED_MSG_TYPE], [executedMsgTuple]);
+    const message = ethers.utils.hexlify(ethers.utils.concat([RECEIVE_INTEROP_CALL_EXECUTED_SELECTOR, encodedArgs]));
+
+    const log: L2Log = {
+      l2ShardId: 0,
+      isService: true,
+      txNumberInBatch: startTxNumberInBatch + i,
+      sender: L2_TO_L1_MESSENGER_ADDR,
+      key: ethers.utils.hexZeroPad(L2_INTEROP_HANDLER_ADDR, 32),
+      value: ethers.utils.keccak256(message),
+    };
+
+    logs.push(log);
+    messages.push(message);
+  }
+
+  return { logs, messages };
+}
+
 // ───────────────────────────────────────────────────────────────
 // callProcessLogsAndMessages
 // ───────────────────────────────────────────────────────────────
@@ -277,7 +333,7 @@ export function buildInteropBundleLog(params: { txNumberInBatch: number; interop
  * Chains must be registered during setup (step 5) via gateway-setup.ts.
  */
 async function getZKChainAddressOnGW(gwProvider: providers.JsonRpcProvider, chainId: number): Promise<string> {
-  const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbi(), gwProvider);
+  const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, getAbi("L2Bridgehub"), gwProvider);
   const addr: string = await bridgehub.getZKChain(chainId);
   if (addr === ethers.constants.AddressZero) {
     throw new Error(`Chain ${chainId} not registered on GW Bridgehub. Ensure step 5 (gateway setup) ran correctly.`);
@@ -312,7 +368,7 @@ export async function callProcessLogsAndMessages(params: {
   // Auto-detect batch number if not provided: query currentChainBatchNumber + 1
   let batchNumber = params.batchNumber;
   if (batchNumber === undefined) {
-    const messageRoot = new Contract(L2_MESSAGE_ROOT_ADDR, l2MessageRootAbi(), gwProvider);
+    const messageRoot = new Contract(L2_MESSAGE_ROOT_ADDR, getAbi("L2MessageRoot"), gwProvider);
     const currentBatch: BigNumber = await messageRoot.currentChainBatchNumber(chainId);
     batchNumber = currentBatch.toNumber() + 1;
   }
@@ -343,9 +399,9 @@ export async function callProcessLogsAndMessages(params: {
   // Convert logs to the Solidity tuple format
   const solidityLogs = logs.map((l) => [l.l2ShardId, l.isService, l.txNumberInBatch, l.sender, l.key, l.value]);
 
-  // 6. Impersonate the diamond proxy address (passes onlyChain modifier)
-  // TODO: In a future release, impersonate the operator instead of the diamond proxy.
-  const gwAssetTracker = new Contract(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAbi(), gwProvider);
+  // 6. Impersonate the diamond proxy address (passes onlyChain modifier).
+  // TODO(EVM-1300): Impersonate the operator instead of the diamond proxy (requires operator role setup).
+  const gwAssetTracker = new Contract(GW_ASSET_TRACKER_ADDR, getAbi("GWAssetTracker"), gwProvider);
 
   const txHash = await impersonateAndRun(gwProvider, zkChainAddr, async (signer) => {
     const trackerAsSigner = gwAssetTracker.connect(signer);
@@ -357,6 +413,7 @@ export async function callProcessLogsAndMessages(params: {
       batchNumber,
       chainBatchRoot,
       multichainBatchRoot: messageRoot,
+      // TODO(EVM-1300): Interop fees are currently zero. Add non-zero fee testing when fee logic is implemented.
       settlementFeePayer: ethers.constants.AddressZero,
     };
 
@@ -379,16 +436,18 @@ export async function getGWChainBalance(
   chainId: number,
   assetId: string
 ): Promise<BigNumber> {
-  const abi = gwAssetTrackerAbi();
-  const tracker = new Contract(GW_ASSET_TRACKER_ADDR, abi, gwProvider);
+  const tracker = new Contract(GW_ASSET_TRACKER_ADDR, getAbi("GWAssetTracker"), gwProvider);
   return tracker.chainBalance(chainId, assetId);
 }
 
 /**
- * Query the ETH asset ID from the Bridgehub on GW (baseTokenAssetId for a chain).
+ * Helper to read GWAssetTracker.pendingInteropBalance(chainId, assetId) on the GW.
  */
-export async function getBaseTokenAssetId(gwProvider: providers.JsonRpcProvider, chainId: number): Promise<string> {
-  const bridgehubAbi = l2BridgehubAbi();
-  const bridgehub = new Contract(L2_BRIDGEHUB_ADDR, bridgehubAbi, gwProvider);
-  return bridgehub.baseTokenAssetId(chainId);
+export async function getGWPendingInteropBalance(
+  gwProvider: providers.JsonRpcProvider,
+  chainId: number,
+  assetId: string
+): Promise<BigNumber> {
+  const tracker = new Contract(GW_ASSET_TRACKER_ADDR, getAbi("GWAssetTracker"), gwProvider);
+  return tracker.pendingInteropBalance(chainId, assetId);
 }

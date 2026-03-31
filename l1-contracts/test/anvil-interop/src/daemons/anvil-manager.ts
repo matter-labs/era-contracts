@@ -10,7 +10,8 @@ export class AnvilManager {
   private pidFilePath: string;
 
   constructor() {
-    this.pidFilePath = path.join(__dirname, "../../outputs/anvil-pids.json");
+    const runSuffix = process.env.ANVIL_INTEROP_RUN_SUFFIX || "";
+    this.pidFilePath = path.join(__dirname, `../../outputs/anvil-pids${runSuffix}.json`);
   }
 
   private resolveAnvilBinary(): string {
@@ -43,7 +44,8 @@ export class AnvilManager {
       loadStatePath?: string;
     }
   ): Promise<void> {
-    const { chainId, port, isL1, blockTime, timestamp, dumpStatePath, loadStatePath } = config;
+    const { chainId, port, role, blockTime, timestamp, dumpStatePath, loadStatePath } = config;
+    const isL1 = role === "l1";
     const rpcUrl = `http://127.0.0.1:${port}`;
 
     console.log(`🚀 Starting ${formatChainInfo(chainId, port, isL1)}...`);
@@ -128,7 +130,7 @@ export class AnvilManager {
     const chain: AnvilChain = {
       chainId,
       port,
-      isL1,
+      role,
       rpcUrl,
       process: childProcess,
     };
@@ -224,10 +226,10 @@ export class AnvilManager {
   }
 
   getL1Chain(): AnvilChain | undefined {
-    return Array.from(this.chains.values()).find((chain) => chain.isL1);
+    return Array.from(this.chains.values()).find((chain) => chain.role === "l1");
   }
 
   getL2Chains(): AnvilChain[] {
-    return Array.from(this.chains.values()).filter((chain) => !chain.isL1);
+    return Array.from(this.chains.values()).filter((chain) => chain.role !== "l1");
   }
 }

@@ -5,27 +5,32 @@
  * to serve as the foundation that both contracts.ts and utils.ts can import from
  * without circular dependencies.
  */
+import type { JsonFragment } from "@ethersproject/abi";
 import * as fs from "fs";
 import * as path from "path";
 
 const ZKSTACK_OUT_ROOT = path.resolve(__dirname, "../../../../zkstack-out");
 const FORGE_OUT_ROOT = path.resolve(__dirname, "../../../../out");
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function loadArtifactFromOut(artifactRelativePath: string): any {
+interface ForgeArtifact {
+  abi: JsonFragment[];
+  bytecode?: { object?: string };
+  deployedBytecode?: { object?: string };
+}
+
+function loadArtifactFromOut(artifactRelativePath: string): ForgeArtifact {
   const artifactPath = path.join(FORGE_OUT_ROOT, artifactRelativePath);
-  return JSON.parse(fs.readFileSync(artifactPath, "utf-8"));
+  return JSON.parse(fs.readFileSync(artifactPath, "utf-8")) as ForgeArtifact;
 }
 
 /**
  * Load an ABI array from compiled artifacts.
  * Prefers zkstack-out/ (committed, ABI-only files) over out/ (forge build output).
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function loadAbiFromOut(artifactRelativePath: string): any[] {
+export function loadAbiFromOut(artifactRelativePath: string): JsonFragment[] {
   const zkstackPath = path.join(ZKSTACK_OUT_ROOT, artifactRelativePath);
   if (fs.existsSync(zkstackPath)) {
-    return JSON.parse(fs.readFileSync(zkstackPath, "utf-8"));
+    return JSON.parse(fs.readFileSync(zkstackPath, "utf-8")) as JsonFragment[];
   }
   return loadArtifactFromOut(artifactRelativePath).abi;
 }

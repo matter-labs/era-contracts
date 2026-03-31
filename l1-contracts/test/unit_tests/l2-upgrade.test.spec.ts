@@ -1005,7 +1005,7 @@ async function executeUpgrade(
       partialUpgrade.newProtocolVersion
     )
   ).wait();
-  return proxyAdmin.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
+  return proxyAdmin.upgradeChainFromVersion(proxyAdmin.address, oldProtocolVersion, diamondCutData);
 }
 
 // we rollback the protocolVersion ( we don't clear the upgradeHash mapping, but that is ok)
@@ -1073,5 +1073,5 @@ async function executeCustomUpgrade(
       partialUpgrade.newProtocolVersion
     )
   ).wait();
-  return proxyAdmin.upgradeChainFromVersion(oldProtocolVersion, diamondCutData);
+  return proxyAdmin.upgradeChainFromVersion(proxyAdmin.address, oldProtocolVersion, diamondCutData);
 }

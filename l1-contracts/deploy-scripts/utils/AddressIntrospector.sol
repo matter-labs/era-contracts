@@ -242,7 +242,7 @@ library AddressIntrospector {
 
         Facets memory facets = _getFacetsFromUptoDateZkChain(ctm);
         address verifier = _getVerifierFromUptoDateZkChain(ctm);
-        // V29 verifier is not a dual verifier, skip sub-verifier introspection
+        // V29 verifier is a dual verifier, but the sub-verifier getters were added in V31
         (address verifierFflonk, address verifierPlonk) = isV29
             ? (address(0), address(0))
             : _getSubVerifiers(verifier, isZKsyncOS);

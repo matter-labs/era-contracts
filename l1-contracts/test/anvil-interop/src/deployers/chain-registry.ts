@@ -1,17 +1,23 @@
 import * as path from "path";
-import * as fs from "fs";
 import { ethers, providers, Wallet } from "ethers";
 import type {
   ChainConfig,
   ChainAddresses,
   CoreDeployedAddresses,
   CTMDeployedAddresses,
-  AnvilConfig,
+  PriorityRequestData,
 } from "../core/types";
 import { parseForgeScriptOutput, ensureDirectoryExists, saveTomlConfig } from "../core/utils";
-import { SystemContractsDeployer } from "./system-contracts-deployer";
 import { L2GenesisUpgradeDeployer } from "./l2-genesis-upgrade-deployer";
+import { InteropChainRegistrar } from "./interop-chain-registrar";
 import { runForgeScript } from "../core/forge";
+import { GENESIS_UPGRADE_EVENT_SIG } from "../core/const";
+import { getAbi } from "../core/contracts";
+import {
+  ANVIL_INTEROP_CTM_OUTPUT_RELATIVE,
+  ANVIL_INTEROP_PERMANENT_VALUES_RELATIVE,
+  ANVIL_INTEROP_REGISTER_CHAIN_SCRIPT,
+} from "../core/paths";
 
 export class ChainRegistry {
   private l1RpcUrl: string;
@@ -44,30 +50,14 @@ export class ChainRegistry {
     console.log(`📝 Registering L2 chain ${config.chainId}...`);
 
     const configPath = await this.generateChainConfig(config);
-    const outputPath = path.join(this.outputDir, `chain-${config.chainId}-output.toml`);
-
-    const scriptPath = "deploy-scripts/ctm/RegisterZKChain.s.sol:RegisterZKChainScript";
+    const outputPath = this.getChainOutputPath(config.chainId);
     const sig = "runForTest(address,uint256)";
     const args = `${this.ctmAddresses.chainTypeManager} ${config.chainId}`;
 
-    // Paths relative to project root (must start with /)
-    const ctmOutputRelPath = "/test/anvil-interop/outputs/ctm-output.toml";
-    const chainConfigRelPath = configPath.replace(this.projectRoot, "");
-    const chainOutputRelPath = outputPath.replace(this.projectRoot, "");
-
-    const envVars = {
-      CHAIN_CONFIG: configPath,
-      CHAIN_OUTPUT: outputPath,
-      BRIDGEHUB_ADDR: this.l1Addresses.bridgehub,
-      CTM_ADDR: this.ctmAddresses.chainTypeManager,
-      CTM_OUTPUT: ctmOutputRelPath,
-      ZK_CHAIN_CONFIG: chainConfigRelPath,
-      ZK_CHAIN_OUT: chainOutputRelPath,
-      PERMANENT_VALUES_INPUT: "/test/anvil-interop/config/permanent-values.toml",
-    };
+    const envVars = this.buildRegisterChainEnv(configPath, outputPath);
 
     await runForgeScript({
-      scriptPath,
+      scriptPath: ANVIL_INTEROP_REGISTER_CHAIN_SCRIPT,
       envVars,
       rpcUrl: this.l1RpcUrl,
       privateKey: this.privateKey,
@@ -86,28 +76,27 @@ export class ChainRegistry {
     };
   }
 
-  async registerChainBatch(configs: ChainConfig[]): Promise<ChainAddresses[]> {
+  async registerChainBatch(
+    configs: ChainConfig[]
+  ): Promise<{ chainAddresses: ChainAddresses[]; genesisPriorityTxs: Map<number, PriorityRequestData> }> {
     console.log(`📝 Registering ${configs.length} L2 chains in batch...`);
 
     // Generate all config files first
-    for (const config of configs) {
-      await this.generateChainConfig(config);
-    }
+    await Promise.all(configs.map((config) => this.generateChainConfig(config)));
 
     const chainIds = configs.map((c) => c.chainId);
-    const scriptPath = "deploy-scripts/ctm/RegisterZKChain.s.sol:RegisterZKChainScript";
     const sig = "runForTestBatch(address,uint256[])";
     // Encode chainIds array as ABI: [id1,id2,id3]
     const chainIdsArg = `[${chainIds.join(",")}]`;
     const args = `${this.ctmAddresses.chainTypeManager} ${chainIdsArg}`;
 
-    const envVars = {
-      CTM_OUTPUT: "/test/anvil-interop/outputs/ctm-output.toml",
-      PERMANENT_VALUES_INPUT: "/test/anvil-interop/config/permanent-values.toml",
-    };
+    const envVars = this.buildBatchRegisterChainEnv();
+
+    // Record L1 block before forge script so we can scan for NewPriorityRequest events after
+    const blockBeforeRegistration = await this.l1Provider.getBlockNumber();
 
     await runForgeScript({
-      scriptPath,
+      scriptPath: ANVIL_INTEROP_REGISTER_CHAIN_SCRIPT,
       envVars,
       rpcUrl: this.l1RpcUrl,
       privateKey: this.privateKey,
@@ -117,70 +106,108 @@ export class ChainRegistry {
     });
 
     // Parse per-chain outputs
-    const results: ChainAddresses[] = [];
-    for (const config of configs) {
-      const outputPath = path.join(this.outputDir, `chain-${config.chainId}-output.toml`);
-      const output = parseForgeScriptOutput(outputPath);
+    const chainAddresses = configs.map((config) => {
+      const output = parseForgeScriptOutput(this.getChainOutputPath(config.chainId));
       console.log(`✅ Chain ${config.chainId} registered`);
-      results.push({
+      return {
         chainId: config.chainId,
         diamondProxy: (output.diamond_proxy_addr || output.diamond_proxy) as string,
+      };
+    });
+
+    // Extract genesis upgrade L2 transactions from L1 GenesisUpgrade events.
+    // During createNewChain(), L1GenesisUpgrade.genesisUpgrade() is executed via delegatecall
+    // from the diamond proxy, emitting GenesisUpgrade with the full L2CanonicalTransaction.
+    const genesisPriorityTxs = await this.extractGenesisTxs(chainAddresses, blockBeforeRegistration + 1);
+
+    return { chainAddresses, genesisPriorityTxs };
+  }
+
+  /**
+   * Scan L1 blocks for GenesisUpgrade events emitted during chain registration.
+   * Each diamond proxy emits exactly one GenesisUpgrade event containing the L2 upgrade tx.
+   *
+   * The genesis upgrade does not emit NewPriorityRequest. The upgrade tx is emitted in the
+   * GenesisUpgrade event and must be replayed directly on the target L2 Anvil instance.
+   */
+  private async extractGenesisTxs(
+    chainAddresses: ChainAddresses[],
+    fromBlock: number
+  ): Promise<Map<number, PriorityRequestData>> {
+    const genesisUpgradeTopic = ethers.utils.id(GENESIS_UPGRADE_EVENT_SIG);
+    const latestBlock = await this.l1Provider.getBlockNumber();
+
+    const genesisTxs = new Map<number, PriorityRequestData>();
+    const genesisIface = new ethers.utils.Interface(getAbi("IL1GenesisUpgrade"));
+
+    for (const chain of chainAddresses) {
+      const logs = await this.l1Provider.getLogs({
+        address: chain.diamondProxy,
+        topics: [genesisUpgradeTopic],
+        fromBlock,
+        toBlock: latestBlock,
       });
+
+      if (logs.length === 0) {
+        throw new Error(
+          `No GenesisUpgrade event found for chain ${chain.chainId} at ${chain.diamondProxy}. ` +
+            `Scanned blocks ${fromBlock}..${latestBlock}.`
+        );
+      }
+
+      const parsed = genesisIface.parseLog({ topics: logs[0].topics, data: logs[0].data });
+      const l2Tx = parsed.args._l2Transaction;
+      const fromUint256 = ethers.BigNumber.from(l2Tx.from);
+      const toUint256 = ethers.BigNumber.from(l2Tx.to);
+
+      genesisTxs.set(chain.chainId, {
+        from: ethers.utils.getAddress(ethers.utils.hexZeroPad(fromUint256.toHexString(), 20)),
+        to: ethers.utils.getAddress(ethers.utils.hexZeroPad(toUint256.toHexString(), 20)),
+        calldata: l2Tx.data,
+        value: ethers.BigNumber.from(l2Tx.value),
+      });
+      console.log(`   Captured genesis upgrade tx for chain ${chain.chainId}`);
     }
-    return results;
+
+    return genesisTxs;
   }
 
-  private computeInteropChainIds(chainId: number, config: AnvilConfig): number[] {
-    const l2Chains = config.chains.filter((c) => !c.isL1);
-    const thisChain = l2Chains.find((c) => c.chainId === chainId);
-
-    if (thisChain?.isGateway) {
-      // GW chain: only GW-settled chains + itself
-      return l2Chains.filter((c) => c.settlement === "gateway" || c.chainId === chainId).map((c) => c.chainId);
-    }
-
-    // Non-GW L2 chains: all other L2 chain IDs + GW
-    return l2Chains.map((c) => c.chainId);
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async initializeL2SystemContracts(chainId: number, _chainProxy: string, l2RpcUrl: string): Promise<void> {
+  async initializeL2SystemContracts(
+    chainId: number,
+    diamondProxy: string,
+    l2RpcUrl: string,
+    genesisPriorityTx: PriorityRequestData
+  ): Promise<void> {
     console.log(`🔧 Initializing L2 system contracts for chain ${chainId}...`);
 
-    const configPath = path.join(__dirname, "../../config/anvil-config.json");
-    let gatewayChainId = 1;
-    let interopChainIds: number[] | undefined;
-    if (fs.existsSync(configPath)) {
-      const config: AnvilConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-      gatewayChainId = config.chains?.find((chain) => chain.isGateway)?.chainId ?? 1;
-      interopChainIds = this.computeInteropChainIds(chainId, config);
-    }
-
-    const useGenesisUpgradeDeployer = process.env.ANVIL_INTEROP_USE_L2_GENESIS_UPGRADE !== "0";
-    const deployer = useGenesisUpgradeDeployer
-      ? new L2GenesisUpgradeDeployer(
-          l2RpcUrl,
-          this.privateKey,
-          this.l1Addresses.l1SharedBridge,
-          this.l1Addresses.ctmDeploymentTracker,
-          this.l1Addresses.governance,
-          this.l1Addresses.chainRegistrationSender,
-          gatewayChainId
-        )
-      : new SystemContractsDeployer(l2RpcUrl, this.privateKey, this.l1Addresses.l1SharedBridge);
-
-    if (useGenesisUpgradeDeployer) {
-      console.log("   Using L2GenesisUpgrade deployer path");
-    } else {
-      console.log("   Using direct SystemContractsDeployer path");
-    }
-    await deployer.deployAllSystemContracts(chainId, interopChainIds);
+    console.log("   Using real genesis upgrade (relaying L1 genesis tx)");
+    const deployer = new L2GenesisUpgradeDeployer(l2RpcUrl);
+    await deployer.deployAllSystemContracts(chainId, genesisPriorityTx);
 
     console.log(`✅ L2 system contracts initialized for chain ${chainId}`);
   }
 
+  async registerInteropChainsOnL2(
+    chainId: number,
+    diamondProxy: string,
+    l2RpcUrl: string,
+    interopChainIds: number[]
+  ): Promise<void> {
+    console.log(`🔗 Registering interop chains for chain ${chainId} via L1 ChainRegistrationSender...`);
+
+    const registrar = new InteropChainRegistrar(
+      l2RpcUrl,
+      this.l1RpcUrl,
+      this.l1Addresses.chainRegistrationSender,
+      diamondProxy
+    );
+    await registrar.registerInteropChains(chainId, interopChainIds);
+
+    console.log(`✅ Interop chains registered for chain ${chainId}`);
+  }
+
   private async generateChainConfig(config: ChainConfig): Promise<string> {
-    const configPath = path.join(__dirname, `../../config/chain-${config.chainId}.toml`);
+    const configPath = this.getChainConfigPath(config.chainId);
 
     const ownerAddress = await this.wallet.getAddress();
 
@@ -204,5 +231,33 @@ export class ChainRegistry {
     saveTomlConfig(configPath, chainConfig);
 
     return configPath;
+  }
+
+  private getChainConfigPath(chainId: number): string {
+    return path.join(__dirname, `../../config/chain-${chainId}.toml`);
+  }
+
+  private getChainOutputPath(chainId: number): string {
+    return path.join(this.outputDir, `chain-${chainId}-output.toml`);
+  }
+
+  private buildRegisterChainEnv(configPath: string, outputPath: string): Record<string, string> {
+    return {
+      CHAIN_CONFIG: configPath,
+      CHAIN_OUTPUT: outputPath,
+      BRIDGEHUB_ADDR: this.l1Addresses.bridgehub,
+      CTM_ADDR: this.ctmAddresses.chainTypeManager,
+      CTM_OUTPUT: ANVIL_INTEROP_CTM_OUTPUT_RELATIVE,
+      ZK_CHAIN_CONFIG: configPath.replace(this.projectRoot, ""),
+      ZK_CHAIN_OUT: outputPath.replace(this.projectRoot, ""),
+      PERMANENT_VALUES_INPUT: ANVIL_INTEROP_PERMANENT_VALUES_RELATIVE,
+    };
+  }
+
+  private buildBatchRegisterChainEnv(): Record<string, string> {
+    return {
+      CTM_OUTPUT: ANVIL_INTEROP_CTM_OUTPUT_RELATIVE,
+      PERMANENT_VALUES_INPUT: ANVIL_INTEROP_PERMANENT_VALUES_RELATIVE,
+    };
   }
 }
