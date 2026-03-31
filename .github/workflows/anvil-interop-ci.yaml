@@ -121,8 +121,7 @@ jobs:
         run: yarn sc build:foundry
 
       - name: Build l1-contracts artifacts
-        working-directory: l1-contracts
-        run: forge build --optimizer-runs 200
+        run: yarn l1 build:foundry
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
@@ -175,8 +174,7 @@ jobs:
         run: yarn sc build:foundry
 
       - name: Build l1-contracts artifacts
-        working-directory: l1-contracts
-        run: forge build --optimizer-runs 200
+        run: yarn l1 build:foundry
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
