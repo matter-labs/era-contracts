@@ -3,15 +3,7 @@ import * as path from "path";
 import { ethers, providers, Contract, Wallet, utils } from "ethers";
 import { impersonateAndRun } from "../core/utils";
 import { encodeNtvAssetId } from "../core/data-encoding";
-import {
-  l2BridgehubAbi,
-  interopCenterAbi,
-  interopHandlerAbi,
-  l2AssetRouterAbi,
-  l2AssetTrackerAbi,
-  l2NativeTokenVaultAbi,
-  l2NativeTokenVaultDevAbi,
-} from "../core/contracts";
+import { getAbi } from "../core/contracts";
 import {
   ETH_TOKEN_ADDRESS,
   INTEROP_CENTER_ADDR,
@@ -84,7 +76,8 @@ export class SystemContractsDeployer {
    */
   private async initializeContract(
     contractAddress: string,
-    abi: string[],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    abi: any[],
     initFunction: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     args: any[],
@@ -245,7 +238,7 @@ export class SystemContractsDeployer {
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async deployL2Bridgehub(_chainId: number, interopChainIds?: number[]): Promise<void> {
-    const l2BridgehubAbiData = l2BridgehubAbi();
+    const l2BridgehubAbiData = getAbi("L2Bridgehub");
 
     // Check if already initialized
     const l2Bridgehub = new Contract(L2_BRIDGEHUB_ADDR, l2BridgehubAbiData, this.l2Provider);
@@ -317,7 +310,7 @@ export class SystemContractsDeployer {
    * Deploy and initialize InteropCenter
    */
   private async deployInteropCenter(): Promise<void> {
-    const interopCenterAbiData = interopCenterAbi();
+    const interopCenterAbiData = getAbi("InteropCenter");
 
     const interopCenter = new Contract(INTEROP_CENTER_ADDR, interopCenterAbiData, this.l2Provider);
 
@@ -375,7 +368,7 @@ export class SystemContractsDeployer {
     );
 
     // Initialize L2InteropHandler
-    const interopHandlerAbiData = interopHandlerAbi();
+    const interopHandlerAbiData = getAbi("InteropHandler");
 
     const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, interopHandlerAbiData, this.l2Provider);
 
@@ -407,7 +400,7 @@ export class SystemContractsDeployer {
    * Deploy and initialize L2AssetRouter for token bridging
    */
   private async deployL2AssetRouter(): Promise<void> {
-    const l2AssetRouterAbiData = l2AssetRouterAbi();
+    const l2AssetRouterAbiData = getAbi("L2AssetRouter");
 
     const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbiData, this.l2Provider);
 
@@ -486,7 +479,7 @@ export class SystemContractsDeployer {
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private async deployL2AssetTracker(_chainId: number): Promise<void> {
-    const l2AssetTrackerAbiData = l2AssetTrackerAbi();
+    const l2AssetTrackerAbiData = getAbi("L2AssetTracker");
 
     const l2AssetTracker = new Contract(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAbiData, this.l2Provider);
 
@@ -533,8 +526,8 @@ export class SystemContractsDeployer {
    * Deploy L2NativeTokenVault for token management
    */
   private async deployL2NativeTokenVault(): Promise<void> {
-    const l2NativeTokenVaultAbiData = l2NativeTokenVaultAbi();
-    const l2NativeTokenVaultDevAbiData = l2NativeTokenVaultDevAbi();
+    const l2NativeTokenVaultAbiData = getAbi("L2NativeTokenVault");
+    const l2NativeTokenVaultDevAbiData = getAbi("L2NativeTokenVaultDev");
 
     const l2NativeTokenVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbiData, this.l2Provider);
 
@@ -634,7 +627,7 @@ export class SystemContractsDeployer {
     console.log(`   Registering asset handler for token ${tokenAddress}...`);
     console.log(`   Asset ID: ${assetId}`);
 
-    const l2AssetRouterAbiData2 = l2AssetRouterAbi();
+    const l2AssetRouterAbiData2 = getAbi("L2AssetRouter");
 
     const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, l2AssetRouterAbiData2, this.l2Provider);
 
@@ -656,7 +649,7 @@ export class SystemContractsDeployer {
     }
 
     // Now register the token in L2NativeTokenVault
-    const l2NativeTokenVaultAbiData2 = l2NativeTokenVaultAbi();
+    const l2NativeTokenVaultAbiData2 = getAbi("L2NativeTokenVault");
 
     const l2NativeTokenVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, l2NativeTokenVaultAbiData2, this.l2Provider);
 
