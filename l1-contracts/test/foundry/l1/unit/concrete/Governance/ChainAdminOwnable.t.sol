@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {NoCallsProvided, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {NoCallsProvided, Unauthorized, ZeroAddress, ZeroUpgradeTimestamp} from "contracts/common/L1ContractErrors.sol";
 
 /// @notice Mock contract to test setTokenMultiplier functionality
 contract MockChainContract {
@@ -120,6 +120,7 @@ contract ChainAdminOwnableTest is Test {
     // ============ setUpgradeTimestamp Tests ============
 
     function test_setUpgradeTimestamp_updatesMapping(uint256 protocolVersion, uint256 timestamp) public {
+        vm.assume(timestamp != 0);
         vm.prank(owner);
         chainAdminOwnable.setUpgradeTimestamp(protocolVersion, timestamp);
 
@@ -127,6 +128,7 @@ contract ChainAdminOwnableTest is Test {
     }
 
     function test_setUpgradeTimestamp_emitsEvent(uint256 protocolVersion, uint256 timestamp) public {
+        vm.assume(timestamp != 0);
         vm.expectEmit(true, false, false, true);
         emit UpdateUpgradeTimestamp(protocolVersion, timestamp);
 
@@ -135,9 +137,16 @@ contract ChainAdminOwnableTest is Test {
     }
 
     function test_setUpgradeTimestamp_revertsIfNotOwner(uint256 protocolVersion, uint256 timestamp) public {
+        vm.assume(timestamp != 0);
         vm.prank(randomUser);
         vm.expectRevert("Ownable: caller is not the owner");
         chainAdminOwnable.setUpgradeTimestamp(protocolVersion, timestamp);
+    }
+
+    function test_setUpgradeTimestamp_revertsOnZeroTimestamp(uint256 protocolVersion) public {
+        vm.prank(owner);
+        vm.expectRevert(ZeroUpgradeTimestamp.selector);
+        chainAdminOwnable.setUpgradeTimestamp(protocolVersion, 0);
     }
 
     function test_setUpgradeTimestamp_canOverwrite(uint256 protocolVersion) public {

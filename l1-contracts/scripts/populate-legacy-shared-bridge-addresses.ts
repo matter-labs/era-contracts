@@ -22,11 +22,7 @@ import * as path from "path";
 import * as toml from "toml";
 import { ethers } from "ethers";
 import { Command } from "commander";
-
-// ─── Paths ───────────────────────────────────────────────────────────────────
-
-/** Directory containing per-environment permanent-values TOML files. */
-const PERMANENT_VALUES_DIR = path.join(__dirname, "../upgrade-envs/permanent-values");
+import { getBridgehubAddress, loadAbiFromFoundryOutput } from "./upgrade-script-utils";
 
 /**
  * Directory where fetched bridge data TOML files are stored (one per env).
@@ -50,13 +46,10 @@ function loadAbis(): {
   l1AssetRouterAbi: ethers.ContractInterface;
   l1NullifierAbi: ethers.ContractInterface;
 } {
-  const read = (relativePath: string): ethers.ContractInterface =>
-    JSON.parse(fs.readFileSync(path.join(__dirname, relativePath), "utf-8")).abi;
-
   return {
-    bridgehubAbi: read("../out/IBridgehubBase.sol/IBridgehubBase.json"),
-    l1AssetRouterAbi: read("../out/IL1AssetRouter.sol/IL1AssetRouter.json"),
-    l1NullifierAbi: read("../out/L1Nullifier.sol/L1Nullifier.json"),
+    bridgehubAbi: loadAbiFromFoundryOutput("../out/IBridgehubBase.sol/IBridgehubBase.json"),
+    l1AssetRouterAbi: loadAbiFromFoundryOutput("../out/IL1AssetRouter.sol/IL1AssetRouter.json"),
+    l1NullifierAbi: loadAbiFromFoundryOutput("../out/L1Nullifier.sol/L1Nullifier.json"),
   };
 }
 
@@ -79,19 +72,7 @@ interface EnvBridgeData {
 // ─── fetch command ────────────────────────────────────────────────────────────
 
 async function fetchBridgeAddresses(rpc: string, envName: string): Promise<void> {
-  const permanentValuesFile = path.join(PERMANENT_VALUES_DIR, `${envName}.toml`);
-
-  if (!fs.existsSync(permanentValuesFile)) {
-    throw new Error(`Permanent values file not found: ${permanentValuesFile}`);
-  }
-
-  const permanentValues = toml.parse(fs.readFileSync(permanentValuesFile, "utf-8"));
-  const bridgehubAddress: string | undefined = permanentValues.core_contracts?.bridgehub_proxy_addr;
-
-  if (!bridgehubAddress) {
-    throw new Error(`core_contracts.bridgehub_proxy_addr not found in ${permanentValuesFile}`);
-  }
-
+  const bridgehubAddress = getBridgehubAddress(envName);
   console.log(`Bridgehub:      ${bridgehubAddress}`);
 
   const { bridgehubAbi, l1AssetRouterAbi, l1NullifierAbi } = loadAbis();

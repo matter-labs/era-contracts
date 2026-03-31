@@ -5,10 +5,11 @@ pragma solidity 0.8.28;
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol";
-import {IVerifier, VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
+import {IVerifier} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
+import {ProposedUpgrade} from "../state-transition/libraries/ProposedUpgradeLib.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {
@@ -26,36 +27,9 @@ import {
     ProtocolVersionTooSmall,
     SettlementLayerUpgradeMustPrecedeChainUpgrade
 } from "./ZkSyncUpgradeErrors.sol";
-import {TimeNotReached, TooManyFactoryDeps} from "../common/L1ContractErrors.sol";
+import {TimeNotReached, TooManyFactoryDeps, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
-
-/// @notice The struct that represents the upgrade proposal.
-/// @param l2ProtocolUpgradeTx The system upgrade transaction.
-/// @param bootloaderHash The hash of the new bootloader bytecode. If zero, it will not be updated.
-/// @param defaultAccountHash The hash of the new default account bytecode. If zero, it will not be updated.
-/// @param evmEmulatorHash The hash of the new EVM emulator bytecode. If zero, it will not be updated.
-/// @param verifier Deprecated. Verifier is fetched from CTM based on protocol version.
-/// @param verifierParams Deprecated. Verifier params are kept for backward compatibility.
-/// @param l1ContractsUpgradeCalldata Custom calldata for L1 contracts upgrade, it may be interpreted differently
-/// in each upgrade. Usually empty.
-/// @param postUpgradeCalldata Custom calldata for post upgrade hook, it may be interpreted differently in each
-/// upgrade. Usually empty.
-/// @param upgradeTimestamp The timestamp after which the upgrade can be executed.
-/// @param newProtocolVersion The new version number for the protocol after this upgrade. Should be greater than
-/// the previous protocol version.
-struct ProposedUpgrade {
-    L2CanonicalTransaction l2ProtocolUpgradeTx;
-    bytes32 bootloaderHash;
-    bytes32 defaultAccountHash;
-    bytes32 evmEmulatorHash;
-    address verifier;
-    VerifierParams verifierParams;
-    bytes l1ContractsUpgradeCalldata;
-    bytes postUpgradeCalldata;
-    uint256 upgradeTimestamp;
-    uint256 newProtocolVersion;
-}
 
 error UpgradeInnerFailed();
 
@@ -114,7 +88,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         );
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
         // Fetch verifier from CTM based on new protocol version.
-        // In production it must be set for every protocol version; zero is only expected in tests.
+        // It must be set for every protocol version.
         address ctmVerifier = IChainTypeManager(s.chainTypeManager).protocolVersionVerifier(
             _proposedUpgrade.newProtocolVersion
         );
@@ -211,7 +185,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         // Batches committed expecting the old verifier will fail. Ensure all committed batches are finalized before the
         // verifier is upgraded.
         if (_newVerifier == IVerifier(address(0))) {
-            return;
+            revert ZeroAddress();
         }
 
         IVerifier oldVerifier = s.verifier;

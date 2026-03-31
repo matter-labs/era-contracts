@@ -6,7 +6,7 @@ import {FeeParams, PriorityModeInformation, PubdataPricingMode, ZKChainStorage} 
 import {ReentrancyGuard} from "../../../common/ReentrancyGuard.sol";
 import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
-import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {NotSettlementLayer, NotZKsyncOS} from "../../L1StateTransitionErrors.sol";
 import {
     BatchHashMismatch,
     BaseTokenGasPriceDenominatorNotSet,
@@ -77,6 +77,12 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
+    /// @notice Ensures that the chain uses ZKsync OS
+    modifier onlyZKsyncOS() {
+        require(s.zksyncOS, NotZKsyncOS());
+        _;
+    }
+
     /// @notice Allows whitelisted validators, or the `PermissionlessValidator` when Priority Mode is active.
     /// @dev Reverts with {Unauthorized} if `msg.sender` is not authorized for the current mode.
     modifier onlyValidatorOrPriorityMode() {
@@ -126,6 +132,13 @@ contract ZKChainBase is ReentrancyGuard {
 
     modifier onlyAdminOrChainTypeManager() {
         if (msg.sender != s.admin && msg.sender != s.chainTypeManager) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    modifier onlyAdminOrChainTypeManagerOrValidator() {
+        if (msg.sender != s.admin && msg.sender != s.chainTypeManager && !s.validators[msg.sender]) {
             revert Unauthorized(msg.sender);
         }
         _;

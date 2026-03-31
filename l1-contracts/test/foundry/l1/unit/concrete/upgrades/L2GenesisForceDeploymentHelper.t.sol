@@ -32,6 +32,10 @@ import "contracts/l2-upgrades/ISystemContractProxy.sol";
 contract L2GenesisForceDeploymentsHelperTest is Test {
     using L2GenesisForceDeploymentsHelper for *;
 
+    bytes32 internal constant CONTRACT_UPGRADED_SIG = keccak256("ContractUpgraded(uint8,address)");
+    bytes32 internal constant FORCE_DEPLOYED_CONTRACTS_INITIALIZED_SIG =
+        keccak256("ForceDeployedContractsInitialized(bool,bool)");
+
     // Test constants
     uint256 constant L1_CHAIN_ID = 1;
     uint256 constant ERA_CHAIN_ID = 270;
@@ -77,7 +81,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
         bytes memory fixedEncoded = abi.encode(fixedData);
         bytes memory additionalEncoded = abi.encode(additionalData);
-        _deployMockContract(GW_ASSET_TRACKER_ADDR);
 
         // Mock the SystemContractProxyAdmin.owner() call to return the expected owner
         vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
@@ -97,6 +100,10 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
             true // _isGenesisUpgrade
         );
         vm.stopPrank();
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        assertEq(_countLogs(logs, CONTRACT_UPGRADED_SIG), 0);
+        assertEq(_countLogs(logs, FORCE_DEPLOYED_CONTRACTS_INITIALIZED_SIG), 1);
 
         // Verify deployments occurred - use the etched contract at the system address
         MockZKOSContractDeployer etchedDeployer = MockZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
@@ -167,10 +174,9 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
         bytes memory fixedEncoded = abi.encode(fixedData);
         bytes memory additionalEncoded = abi.encode(additionalData);
-        _deployMockContract(GW_ASSET_TRACKER_ADDR);
 
-        // Etch L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR for initL2 call during genesis
-        _deployMockContract(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
+        // Pre-deploy some mock contracts to simulate existing deployments
+        _etchAllDeferredContracts();
 
         // For Era deployments, no proxy admin is needed
         vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
@@ -185,13 +191,13 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
         // Era deployments should use direct force deployment (single deployment per address)
         MockZKOSContractDeployer etchedDeployer = MockZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
-        assertEq(etchedDeployer.deploymentCount(L2_MESSAGE_ROOT_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_BRIDGEHUB_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_ASSET_ROUTER_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_NATIVE_TOKEN_VAULT_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_CHAIN_ASSET_HANDLER_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_NTV_BEACON_DEPLOYER_ADDR), 1);
-        assertEq(etchedDeployer.deploymentCount(L2_BASE_TOKEN_HOLDER_ADDR), 1);
+        assertEq(etchedDeployer.deploymentCount(L2_MESSAGE_ROOT_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_BRIDGEHUB_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_ASSET_ROUTER_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_NATIVE_TOKEN_VAULT_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_CHAIN_ASSET_HANDLER_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_NTV_BEACON_DEPLOYER_ADDR), 0);
+        assertEq(etchedDeployer.deploymentCount(L2_BASE_TOKEN_HOLDER_ADDR), 0);
 
         // No proxy upgrades for Era
         MockSystemContractProxyAdmin etchedProxyAdmin = MockSystemContractProxyAdmin(
@@ -201,6 +207,14 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     }
 
     // Helper functions
+
+    function _countLogs(Vm.Log[] memory logs, bytes32 signature) internal pure returns (uint256 count) {
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics.length > 0 && logs[i].topics[0] == signature) {
+                count++;
+            }
+        }
+    }
 
     function _createFixedForceDeploymentsData(bool isGenesis) internal returns (FixedForceDeploymentsData memory) {
         FixedForceDeploymentsData memory data;
@@ -310,7 +324,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
 
     function _etchAllDeferredContracts() internal {
         // Etch contracts to addresses that need function calls to work
-        address[] memory addressesToEtch = new address[](10);
+        address[] memory addressesToEtch = new address[](11);
         addressesToEtch[0] = L2_MESSAGE_ROOT_ADDR;
         addressesToEtch[1] = L2_BRIDGEHUB_ADDR;
         addressesToEtch[2] = L2_ASSET_ROUTER_ADDR;
@@ -321,6 +335,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         addressesToEtch[7] = L2_INTEROP_HANDLER_ADDR;
         addressesToEtch[8] = L2_ASSET_TRACKER_ADDR;
         addressesToEtch[9] = L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
+        addressesToEtch[10] = GW_ASSET_TRACKER_ADDR;
 
         for (uint256 i = 0; i < addressesToEtch.length; i++) {
             if (addressesToEtch[i].code.length == 0) {
