@@ -314,7 +314,7 @@ library L2GenesisForceDeploymentsHelper {
 
         // For new chains, there is no legacy shared bridge. For existing chains,
         // use the L1-provided value instead of reading circularly from the L2 AssetRouter.
-        address l2LegacySharedBridge = additionalForceDeploymentsData.l2LegacySharedBridge;
+        address l2LegacySharedBridge = _additionalForceDeploymentsData.l2LegacySharedBridge;
 
         if (!_isGenesisUpgrade) {
             conductContractUpgrade(
@@ -356,10 +356,10 @@ library L2GenesisForceDeploymentsHelper {
         // instead of reading circularly from the L2 NTV contract.
         address predeployedL2WethAddress = _isGenesisUpgrade
             ? address(0)
-            : additionalForceDeploymentsData.predeployedL2WethAddress;
+            : _additionalForceDeploymentsData.predeployedL2WethAddress;
         bytes32 previousL2TokenProxyBytecodeHash = _isGenesisUpgrade
             ? bytes32(0)
-            : fixedForceDeploymentsData.l2TokenProxyBytecodeHash;
+            : _fixedForceDeploymentsData.l2TokenProxyBytecodeHash;
 
         address wrappedBaseTokenAddress = _ensureWethToken({
             _predeployedWethToken: predeployedL2WethAddress,
@@ -407,7 +407,7 @@ library L2GenesisForceDeploymentsHelper {
             L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateL2(
                 _fixedForceDeploymentsData.l1ChainId,
                 previousL2TokenProxyBytecodeHash,
-                additionalForceDeploymentsData.l2LegacySharedBridge,
+                _additionalForceDeploymentsData.l2LegacySharedBridge,
                 wrappedBaseTokenAddress,
                 _additionalForceDeploymentsData.baseTokenBridgingData,
                 _additionalForceDeploymentsData.baseTokenMetadata
