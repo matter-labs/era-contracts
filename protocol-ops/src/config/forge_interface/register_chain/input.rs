@@ -1,4 +1,4 @@
-use crate::types::{DAValidatorType, L2ChainId};
+use crate::types::{DAValidatorType, L2ChainId, VMOption};
 use ethers::types::Address;
 use ethers::types::H256;
 use rand::Rng;
@@ -17,9 +17,10 @@ pub struct NewChainParams {
     pub owner: Address,
     pub commit_operator: Address,
     pub prove_operator: Address,
-    pub _execute_operator: Option<Address>,
-    pub _token_multiplier_setter: Option<Address>,
+    pub execute_operator: Option<Address>,
+    pub token_multiplier_setter: Option<Address>,
     pub da_mode: DAValidatorType,
+    pub vm_type: VMOption,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -38,6 +39,10 @@ pub struct ChainL1Config {
     pub validium_mode: bool,
     pub validator_sender_operator_eth: Address,
     pub validator_sender_operator_blobs_eth: Address,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub validator_sender_operator_prove: Option<Address>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub validator_sender_operator_execute: Option<Address>,
     pub base_token_gas_price_multiplier_nominator: u64,
     pub base_token_gas_price_multiplier_denominator: u64,
     pub governance_security_council_address: Address,
@@ -54,6 +59,13 @@ impl RegisterChainL1Config {
         create2_factory_salt: Option<H256>,
         initialize_legacy_bridge: bool,
     ) -> anyhow::Result<Self> {
+        let (validator_sender_operator_eth, validator_sender_operator_prove) =
+            match chain_params.vm_type {
+                VMOption::EraVM => (chain_params.prove_operator, None),
+                VMOption::ZKSyncOsVM => {
+                    (chain_params.prove_operator, Some(chain_params.prove_operator))
+                }
+            };
         Ok(Self {
             chain: ChainL1Config {
                 chain_chain_id: chain_params.chain_id,
@@ -69,8 +81,10 @@ impl RegisterChainL1Config {
                 bridgehub_create_new_chain_salt: rand::thread_rng().gen_range(0..=i64::MAX) as u64,
                 validium_mode: chain_params.da_mode == DAValidatorType::NoDA
                     || chain_params.da_mode == DAValidatorType::Avail,
-                validator_sender_operator_eth: chain_params.commit_operator,
-                validator_sender_operator_blobs_eth: chain_params.prove_operator,
+                validator_sender_operator_eth,
+                validator_sender_operator_blobs_eth: chain_params.commit_operator,
+                validator_sender_operator_prove,
+                validator_sender_operator_execute: chain_params.execute_operator,
                 allow_evm_emulator: true,
             },
             owner_address: chain_params.owner,

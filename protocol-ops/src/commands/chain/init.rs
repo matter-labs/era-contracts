@@ -178,9 +178,10 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         owner: owner.address,
         commit_operator: args.commit_operator,
         prove_operator: args.prove_operator,
-        _execute_operator: args.execute_operator,
-        _token_multiplier_setter: args.token_multiplier_setter,
+        execute_operator: args.execute_operator,
+        token_multiplier_setter: args.token_multiplier_setter,
         da_mode: args.da_mode,
+        vm_type: args.vm_type,
     };
 
     let input = ChainInitInput {
@@ -236,8 +237,10 @@ pub async fn chain_init(
     logger::step("Accepting adminship of chain...");
     accept_admin(runner, chain_admin, owner, diamond_proxy).await?;
 
-    // Unpause deposits (unless pause_deposits is set)
-    if !input.pause_deposits {
+    // Unpause deposits unless:
+    // - pause_deposits=true (caller wants them to stay paused), or
+    // - with_legacy_bridge=true (RegisterZKChain.s.sol already unpaused them internally)
+    if !input.pause_deposits && !input.with_legacy_bridge {
         logger::step("Unpausing deposits...");
         unpause_deposits(
             runner,
