@@ -62,9 +62,10 @@ impl RegisterChainL1Config {
         let (validator_sender_operator_eth, validator_sender_operator_prove) =
             match chain_params.vm_type {
                 VMOption::EraVM => (chain_params.prove_operator, None),
-                VMOption::ZKSyncOsVM => {
-                    (chain_params.prove_operator, Some(chain_params.prove_operator))
-                }
+                VMOption::ZKSyncOsVM => (
+                    chain_params.prove_operator,
+                    Some(chain_params.prove_operator),
+                ),
             };
         Ok(Self {
             chain: ChainL1Config {

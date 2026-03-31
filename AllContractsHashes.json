@@ -1931,12 +1931,12 @@
   },
   {
     "contractName": "l1-contracts/SettlementLayerV31Upgrade",
-    "zkBytecodeHash": "0x01000335555cc23975196b60905f32b9ed400da605f1dd21dd8375801ca23ffe",
+    "zkBytecodeHash": "0x010003353d854cc97644e0154c0b4b136318e97767afd7de5f5159abbad9e841",
     "zkBytecodePath": "/l1-contracts/zkout/SettlementLayerV31Upgrade.sol/SettlementLayerV31Upgrade.json",
-    "evmBytecodeHash": "0xc5a591015b2f74e9207d0b0b8fef024c37d0b9055f27dd7f5526ad803b626899",
+    "evmBytecodeHash": "0x9c58b0ae6100a2ee24830c25df1d36c7ca7953ce38e433e9107c21a5a6610279",
     "evmBytecodePath": "/l1-contracts/out/SettlementLayerV31Upgrade.sol/SettlementLayerV31Upgrade.json",
-    "evmDeployedBytecodeHash": "0x680dd1d6a833b92078b413d4bbc72817d733bd13c788f97b19a9b3d88a695386",
-    "evmDeployedBytecodeBlakeHash": "0x22a11fb3b1cf4b5b0c537224fc80e80ffcd01b16b1bc2a8dc8531d0ddc30d80f",
+    "evmDeployedBytecodeHash": "0x6d04d18dbd34330629625a9632dcaad74f6c8b89971652629f8cf3c182e7c0b8",
+    "evmDeployedBytecodeBlakeHash": "0x0c72484801998f96d989e696f2327567256808949a6d975ff9b1c7be0df1ba0c",
     "evmDeployedBytecodeLength": 8570
   },
   {
