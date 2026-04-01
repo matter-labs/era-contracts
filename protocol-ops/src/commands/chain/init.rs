@@ -302,6 +302,26 @@ pub async fn chain_init(
     )
     .await?;
 
+    // TODO: remove (pass as constructor parameter for chain admin)
+    // Set token multiplier setter (only needed for non-ETH base tokens)
+    let eth_base_token = Address::from_low_u64_be(1);
+    if input.chain_params.base_token_addr != eth_base_token {
+        if let Some(setter) = input.chain_params.token_multiplier_setter {
+            if !setter.is_zero() {
+                logger::step("Setting token multiplier setter...");
+                set_token_multiplier_setter(
+                    runner,
+                    owner,
+                    register_output.chain_admin_addr,
+                    register_output.access_control_restriction_addr,
+                    diamond_proxy,
+                    setter,
+                )
+                .await?;
+            }
+        }
+    }
+
     // Enable EVM emulator (if requested, as owner)
     if input.evm_emulator {
         logger::step("Enabling EVM emulator...");
