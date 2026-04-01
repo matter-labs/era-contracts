@@ -45,6 +45,14 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
     }
 
     function deployNewEcosystemContractsL1() public virtual override {
+        deployNewEcosystemContractsL1NoConnections();
+        // Configure AssetTracker connections after deployment
+        updateContractConnections();
+    }
+
+    /// @notice Deploy contracts only (no side effects like setAddresses / transferOwnership).
+    /// @dev Used by the test harness for idempotent re-runs where connections are already set up.
+    function deployNewEcosystemContractsL1NoConnections() public virtual {
         coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
         coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
         coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
@@ -63,9 +71,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
             "ChainRegistrationSender",
             false
         );
-        // deploySimpleContract("L1ChainTypeManager", false);
-        // Configure AssetTracker connections after deployment
-        updateContractConnections();
     }
 
     /// @notice Configure contract connections after deployment

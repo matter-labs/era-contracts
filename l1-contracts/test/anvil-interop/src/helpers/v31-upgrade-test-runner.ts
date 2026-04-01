@@ -1,3 +1,4 @@
+import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { parse as parseToml } from "toml";
@@ -141,9 +142,9 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       projectRoot: l1ContractsDir,
       sig: "stage3()",
     });
-
-    // ── Verify final protocol version ──
+    console.log("\n── Stage 3 complete, verifying final protocol versions ──");
     await verifyProtocolVersions(l1Provider, upgradeChainAddresses);
+    console.log("✅ All protocol versions verified successfully!\n");
   } finally {
     if (cleanupUpgradeHarnessInputs) {
       cleanupUpgradeHarnessInputs();
@@ -168,10 +169,15 @@ async function transferL1Ownership(
   await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1SharedBridge);
   await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1NativeTokenVault);
   await transferOwnership2Step(provider, defaultSigner, gov, ctmAddresses.chainTypeManager);
-  // AssetTracker ownership is transferred by the ecosystem upgrade script itself
-  // (after calling setAddresses), so we only pre-transfer if explicitly requested.
+  // The l1AssetTracker address points to the old L1ChainAssetHandler in pre-v31 states.
+  // Governance needs ownership for pauseMigration() in stage 0.
+  // This may fail if ownership was already transferred or the contract has a different model.
   if (scenario.transferL1AssetTrackerOwnership) {
-    await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1AssetTracker);
+    try {
+      await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1AssetTracker);
+    } catch (e) {
+      console.log(`  Note: could not transfer l1AssetTracker ownership (may already be transferred): ${(e as Error).message?.slice(0, 120)}`);
+    }
   }
 }
 
@@ -256,6 +262,7 @@ async function runChainUpgradesAndRelayL2(params: {
   const broadcastPath = path.join(l1ContractsDir, "broadcast/ChainUpgrade_v31.s.sol/31337/run-latest.json");
 
   for (const chain of upgradeChainAddresses) {
+    console.log(`\n── Chain ${chain.chainId}: running L1 upgrade + L2 relay ──`);
     // Run the L1 chain upgrade forge script
     await runForgeScript({
       scriptPath: "deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol:ChainUpgrade_v31",
@@ -284,7 +291,9 @@ async function runChainUpgradesAndRelayL2(params: {
     }
     const l2Provider = new ethers.providers.JsonRpcProvider(l2Chain.rpcUrl);
 
-    await prepareAndRelayL2Upgrade(l2Provider, rewrittenUpgradeTxData, isZKsyncOS);
+    const l2TxHash = await prepareAndRelayL2Upgrade(l2Provider, rewrittenUpgradeTxData, isZKsyncOS);
+    console.log(`  ✅ L2 upgrade relay tx: ${l2TxHash}`);
+    printCastRunTrace(l2TxHash, l2Chain.rpcUrl);
 
     // Verify the L2 upgrade succeeded
     await verifyL2UpgradeResult(l2Provider, chain.chainId);
@@ -304,7 +313,7 @@ async function prepareAndRelayL2Upgrade(
   l2Provider: ethers.providers.JsonRpcProvider,
   upgradeTxData: string,
   isZKsyncOS: boolean
-): Promise<void> {
+): Promise<string> {
   // Decode the force deployment calldata to extract addresses, delegateTo, and inner calldata
   const { forceDeployAddresses, delegateTo, innerCalldata } = decodeUpgradeTxData(upgradeTxData);
 
@@ -316,17 +325,30 @@ async function prepareAndRelayL2Upgrade(
   const finalCalldata = upgradeIface.encodeFunctionData("upgrade", [delegateTo, innerCalldata]);
 
   // Send from L2_FORCE_DEPLOYER_ADDR (required by ComplexUpgrader's onlyForceDeployer)
-  const receipt = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
-    const tx = await signer.sendTransaction({
-      to: L2_COMPLEX_UPGRADER_ADDR,
-      data: finalCalldata,
-      gasLimit: 100_000_000,
+  try {
+    const receipt = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
+      const tx = await signer.sendTransaction({
+        to: L2_COMPLEX_UPGRADER_ADDR,
+        data: finalCalldata,
+        gasLimit: 100_000_000,
+      });
+      return tx.wait();
     });
-    return tx.wait();
-  });
 
-  if (receipt.status !== 1) {
-    throw new Error(`L2 upgrade relay reverted: ${receipt.transactionHash}`);
+    if (receipt.status !== 1) {
+      const trace = await traceFailedTx(l2Provider, receipt.transactionHash);
+      throw new Error(`L2 upgrade relay reverted:\n${trace}`);
+    }
+    return receipt.transactionHash;
+  } catch (err: unknown) {
+    // ethers v5 throws CALL_EXCEPTION with the receipt embedded
+    const ethersErr = err as { receipt?: { transactionHash?: string }; transactionHash?: string };
+    const txHash = ethersErr.receipt?.transactionHash ?? ethersErr.transactionHash;
+    if (txHash) {
+      const trace = await traceFailedTx(l2Provider, txHash);
+      throw new Error(`L2 upgrade relay reverted:\n${trace}`);
+    }
+    throw err;
   }
 }
 
@@ -478,15 +500,18 @@ function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
         continue;
       }
 
-      // Try current ABI (3-param) then legacy (2-param)
-      let diamondCutData: { initCalldata: string };
+      // Try current ABI (3-param) then legacy (2-param).
+      // The DiamondCutData tuple is (facetCuts[], initAddress, initCalldata) — initCalldata is at index 2.
+      let initCalldata: string;
       try {
-        diamondCutData = adminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data)[2];
+        const diamondCut = adminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data)[2];
+        initCalldata = diamondCut.initCalldata ?? diamondCut[2];
       } catch {
-        diamondCutData = legacyAdminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data)[1];
+        const diamondCut = legacyAdminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data)[1];
+        initCalldata = diamondCut.initCalldata ?? diamondCut[2];
       }
 
-      const [proposedUpgrade] = settlementLayerIface.decodeFunctionData("upgrade", diamondCutData.initCalldata);
+      const [proposedUpgrade] = settlementLayerIface.decodeFunctionData("upgrade", initCalldata);
       return proposedUpgrade.l2ProtocolUpgradeTx.data;
     } catch (e) {
       errors.push(`tx decode failed: ${e instanceof Error ? e.message.slice(0, 120) : String(e)}`);
@@ -499,6 +524,61 @@ function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
       `  Transactions: ${transactions.length}\n` +
       errors.map((e) => `  - ${e}`).join("\n")
   );
+}
+
+/**
+ * Run `cast run` to print the full transaction trace to stdout.
+ * Non-fatal: logs a warning if cast is not available.
+ */
+function printCastRunTrace(txHash: string, rpcUrl: string): void {
+  const cmd = `cast run ${txHash} -r ${rpcUrl}`;
+  console.log(`\n  $ ${cmd}\n`);
+  try {
+    execSync(cmd, { stdio: "inherit", timeout: 30_000 });
+  } catch {
+    console.warn(`  ⚠ cast run failed or not available — run manually: ${cmd}`);
+  }
+}
+
+/**
+ * Trace a failed transaction via debug_traceTransaction and return a human-readable summary.
+ */
+async function traceFailedTx(
+  provider: ethers.providers.JsonRpcProvider,
+  txHash: string
+): Promise<string> {
+  try {
+    const tx = await provider.getTransaction(txHash);
+    const receipt = await provider.getTransactionReceipt(txHash);
+    const selector = tx.data?.slice(0, 10) ?? "unknown";
+    const lines = [
+      `  tx: ${txHash}`,
+      `  from: ${tx.from}`,
+      `  to: ${tx.to}`,
+      `  selector: ${selector}`,
+      `  gasUsed: ${receipt?.gasUsed?.toString() ?? "?"}`,
+      `  block: ${receipt?.blockNumber ?? "?"}`,
+    ];
+
+    // Try to get revert reason via eth_call replay
+    try {
+      await provider.call(
+        { from: tx.from, to: tx.to!, data: tx.data, value: tx.value, gasLimit: tx.gasLimit },
+        receipt?.blockNumber ? receipt.blockNumber - 1 : "latest"
+      );
+    } catch (callErr: unknown) {
+      const reason =
+        callErr instanceof Error
+          ? (callErr as { reason?: string }).reason ?? callErr.message.slice(0, 200)
+          : String(callErr).slice(0, 200);
+      lines.push(`  revert reason: ${reason}`);
+    }
+
+    lines.push(`  Debug: cast run ${txHash} --rpc-url ${provider.connection.url}`);
+    return lines.join("\n");
+  } catch {
+    return `  tx: ${txHash}\n  (could not fetch trace details)`;
+  }
 }
 
 function extractTxInput(transaction: Record<string, unknown>): string | undefined {
@@ -561,15 +641,26 @@ async function executeGovernanceCalls(
   const signer = provider.getSigner(governanceAddr);
 
   for (let i = 0; i < calls.length; i++) {
-    const tx = await signer.sendTransaction({
-      to: calls[i].target,
-      value: calls[i].value,
-      data: calls[i].data,
-      gasLimit: 30_000_000,
-    });
-    const receipt = await tx.wait();
-    if (receipt.status !== 1) {
-      throw new Error(`${stageName} call ${i + 1} reverted (tx: ${receipt.transactionHash})`);
+    try {
+      const tx = await signer.sendTransaction({
+        to: calls[i].target,
+        value: calls[i].value,
+        data: calls[i].data,
+        gasLimit: 30_000_000,
+      });
+      const receipt = await tx.wait();
+      if (receipt.status !== 1) {
+        const trace = await traceFailedTx(provider, receipt.transactionHash);
+        throw new Error(`${stageName} call ${i + 1}/${calls.length} reverted:\n${trace}`);
+      }
+    } catch (err: unknown) {
+      const ethersErr = err as { receipt?: { transactionHash?: string }; transactionHash?: string };
+      const txHash = ethersErr.receipt?.transactionHash ?? ethersErr.transactionHash;
+      if (txHash) {
+        const trace = await traceFailedTx(provider, txHash);
+        throw new Error(`${stageName} call ${i + 1}/${calls.length} reverted:\n${trace}`);
+      }
+      throw err;
     }
   }
 
