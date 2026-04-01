@@ -38,7 +38,7 @@ enum CTMContract {
 library DeployCTML1OrGateway {
     function getCreationCalldata(
         CTMCoreDeploymentConfig memory config,
-        EraZkosRouter vms,
+        bool _isZKsyncOS,
         CTMContract contractName,
         bool isZKBytecode
     ) internal view returns (bytes memory) {
@@ -62,9 +62,9 @@ library DeployCTML1OrGateway {
         } else if (contractName == CTMContract.CommitterFacet) {
             return abi.encode(config.l1ChainId);
         } else if (contractName == CTMContract.DiamondInit) {
-            return abi.encode(vms.isZKsyncOS());
+            return abi.encode(_isZKsyncOS);
         } else if (contractName == CTMContract.Verifier) {
-            return vms.verifierCreationArgs(config.verifierFflonk, config.verifierPlonk, config.verifierOwner);
+            return EraZkosRouter.verifierCreationArgs(_isZKsyncOS, config.verifierFflonk, config.verifierPlonk, config.verifierOwner);
         } else if (contractName == CTMContract.ZKsyncOSChainTypeManager) {
             return
                 abi.encode(

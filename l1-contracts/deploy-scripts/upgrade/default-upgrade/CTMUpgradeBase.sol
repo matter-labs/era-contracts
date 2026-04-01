@@ -82,7 +82,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
 
         (address target, bytes memory data) = getL2UpgradeTargetAndData(forceDeployments);
 
-        uint256 txType = vms.upgradeL2TxType();
+        uint256 txType = EraZkosRouter.upgradeL2TxType(config.isZKsyncOS);
         transaction = L2CanonicalTransaction({
             txType: txType,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
@@ -228,7 +228,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         uint256 _l1ChainId,
         address _ownerAddress
     ) internal returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
-        if (vms.isZKsyncOS()) {
+        if (config.isZKsyncOS) {
             return new IL2ContractDeployer.ForceDeployment[](0);
         }
         IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing

@@ -102,7 +102,6 @@ abstract contract DeployCTMUtils is DeployUtils {
     using stdToml for string;
 
     Config public config;
-    EraZkosRouter public vms;
     // Note: This variable is initialized by concrete implementations before use
     GeneratedData internal generatedData; //slither-disable-line uninitialized-state
     CTMDeployedAddresses internal ctmAddresses;
@@ -145,7 +144,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         if (toml.keyExists("$.is_zk_sync_os")) {
             config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
         }
-        vms = new EraZkosRouter(config.isZKsyncOS);
         if (toml.keyExists("$.zk_token_asset_id")) {
             config.zkTokenAssetId = toml.readBytes32("$.zk_token_asset_id");
         }
@@ -159,7 +157,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.contracts.validatorTimelockExecutionDelay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
         );
-        config.contracts.chainCreationParams = getChainCreationParamsConfig(vms.genesisConfigPath());
+        config.contracts.chainCreationParams = getChainCreationParamsConfig(EraZkosRouter.genesisConfigPath(config.isZKsyncOS));
 
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
@@ -169,7 +167,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getChainCreationParamsConfig(
         string memory _config
     ) internal virtual returns (ChainCreationParamsConfig memory chainCreationParams) {
-        return vms.getChainCreationParams(_config);
+        return EraZkosRouter.getChainCreationParams(config.isZKsyncOS, _config);
     }
 
     /// @notice Get all six facet cuts
@@ -267,7 +265,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (DiamondInitializeDataNewChain memory) {
         require(stateTransition.verifiers.verifier != address(0), "verifier is zero");
-        if (!vms.isZKsyncOS()) {
+        if (!config.isZKsyncOS) {
             require(config.contracts.chainCreationParams.bootloaderHash != bytes32(0), "bootloader hash is zero");
             require(
                 config.contracts.chainCreationParams.defaultAAHash != bytes32(0),
@@ -312,11 +310,11 @@ abstract contract DeployCTMUtils is DeployUtils {
             } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
                 return type(ValidiumL1DAValidator).creationCode;
             } else if (compareStrings(contractName, "Verifier")) {
-                return vms.getVerifierCreationCode(config.testnetVerifier);
+                return EraZkosRouter.getVerifierCreationCode(config.isZKsyncOS, config.testnetVerifier);
             } else if (compareStrings(contractName, "VerifierFflonk")) {
-                return vms.getVerifierFflonkCreationCode();
+                return EraZkosRouter.getVerifierFflonkCreationCode(config.isZKsyncOS);
             } else if (compareStrings(contractName, "VerifierPlonk")) {
-                return vms.getVerifierPlonkCreationCode();
+                return EraZkosRouter.getVerifierPlonkCreationCode(config.isZKsyncOS);
             } else if (compareStrings(contractName, "DefaultUpgrade")) {
                 return type(DefaultUpgrade).creationCode;
             } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
@@ -358,10 +356,10 @@ abstract contract DeployCTMUtils is DeployUtils {
                     return getCreationCode("DualVerifier", true);
                 }
             } else if (compareStrings(contractName, "VerifierFflonk")) {
-                (, string memory resolved) = vms.resolve(EraZkosContract.VerifierFflonk);
+                (, string memory resolved) = EraZkosRouter.resolve(config.isZKsyncOS, EraZkosContract.VerifierFflonk);
                 return ContractsBytecodesLib.getCreationCode(resolved);
             } else if (compareStrings(contractName, "VerifierPlonk")) {
-                (, string memory resolved) = vms.resolve(EraZkosContract.VerifierPlonk);
+                (, string memory resolved) = EraZkosRouter.resolve(config.isZKsyncOS, EraZkosContract.VerifierPlonk);
                 return ContractsBytecodesLib.getCreationCode(resolved);
             }
         }
@@ -438,7 +436,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             return
                 DeployCTML1OrGateway.getCreationCalldata(
                     getCTMCoreDeploymentConfig(config),
-                    vms,
+                    config.isZKsyncOS,
                     DeployCTML1OrGateway.getCTMContractFromName(contractName),
                     isZKBytecode
                 );
@@ -448,7 +446,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getCTMCoreDeploymentConfig(Config memory _config) internal view returns (CTMCoreDeploymentConfig memory) {
         return
             CTMCoreDeploymentConfig({
-                isZKsyncOS: vms.isZKsyncOS(),
+                isZKsyncOS: config.isZKsyncOS,
                 testnetVerifier: _config.testnetVerifier,
                 eraChainId: _config.eraChainId,
                 l1ChainId: _config.l1ChainId,

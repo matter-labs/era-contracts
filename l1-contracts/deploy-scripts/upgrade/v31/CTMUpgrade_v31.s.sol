@@ -34,7 +34,7 @@ import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
-import {EraZkosContract} from "../../utils/EraZkosRouter.sol";
+import {EraZkosContract, EraZkosRouter} from "../../utils/EraZkosRouter.sol";
 
 /// @notice Script used for v31 upgrade flow
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
@@ -61,7 +61,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // Deploy new ChainTypeManager implementation
         // The constructor will receive the new BytecodesSupplier proxy address
         // Select the correct ChainTypeManager based on chain type (Era vs ZKsyncOS)
-        (, string memory ctmContractName) = vms.resolve(EraZkosContract.ChainTypeManager);
+        (, string memory ctmContractName) = EraZkosRouter.resolve(config.isZKsyncOS, EraZkosContract.ChainTypeManager);
         console.log("Deploying ChainTypeManager:", ctmContractName);
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
 
@@ -102,7 +102,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             IL2V31Upgrade.upgrade,
             (baseTokenOriginChainId, baseTokenOriginAddress)
         );
-        if (vms.isZKsyncOS()) {
+        if (config.isZKsyncOS) {
             require(l2V31UpgradeBytecodeInfo.length > 0, "L2V31Upgrade bytecode info not prepared");
             IComplexUpgrader.UniversalContractUpgradeInfo[]
                 memory universalDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
@@ -137,7 +137,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         uint256[] memory factoryDepsHashes,
         uint256 protocolUpgradeNonce
     ) public virtual override returns (ProposedUpgrade memory proposedUpgrade) {
-        if (!vms.isZKsyncOS()) {
+        if (!config.isZKsyncOS) {
             return
                 super.getProposedUpgrade(
                     stateTransition,
@@ -174,7 +174,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     }
 
     function getFullListOfFactoryDependencies() internal virtual override returns (bytes[] memory factoryDeps) {
-        if (!vms.isZKsyncOS()) {
+        if (!config.isZKsyncOS) {
             return super.getFullListOfFactoryDependencies();
         }
 

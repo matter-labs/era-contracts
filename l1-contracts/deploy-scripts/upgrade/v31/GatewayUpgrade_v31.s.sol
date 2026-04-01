@@ -37,7 +37,7 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
     bytes internal l2V29UpgradeBytecodeInfo;
 
     function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
-        if (vms.isZKsyncOS()) {
+        if (config.isZKsyncOS) {
             return new string[](0);
         }
         forceDeploymentNames = new string[](1);
@@ -60,7 +60,7 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
         uint256[] memory factoryDepsHashes,
         uint256 protocolUpgradeNonce
     ) public virtual override returns (ProposedUpgrade memory proposedUpgrade) {
-        if (!vms.isZKsyncOS()) {
+        if (!config.isZKsyncOS) {
             return
                 super.getProposedUpgrade(
                     stateTransition,
@@ -102,7 +102,7 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
             (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), ethAssetId)
         );
 
-        if (vms.isZKsyncOS()) {
+        if (config.isZKsyncOS) {
             require(l2V29UpgradeBytecodeInfo.length > 0, "L2V29Upgrade bytecode info not prepared");
             IComplexUpgrader.UniversalContractUpgradeInfo[]
                 memory universalDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);

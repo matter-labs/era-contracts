@@ -171,7 +171,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         // Pass bytecodesSupplier to introspection - will overwrite incorrect V29 value
         setAddressesBasedOnCTM(permanentConfig.bytecodesSupplier);
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
-        vms = new EraZkosRouter(config.isZKsyncOS);
         config.contracts.chainCreationParams = chainCreationParams;
 
         if (governance != address(0)) {
@@ -212,10 +211,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             isZKsyncOS: isZKsyncOS,
             create2FactorySalt: create2FactorySalt
         });
-        // Set config.isZKsyncOS and vms before getChainCreationParamsConfig (uses vms.isZKsyncOS()).
+        // Set config.isZKsyncOS before getChainCreationParamsConfig.
         config.isZKsyncOS = isZKsyncOS;
-        vms = new EraZkosRouter(isZKsyncOS);
-        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(vms.genesisConfigPath());
+        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(EraZkosRouter.genesisConfigPath(isZKsyncOS));
 
         // Optional override for v29 introspection selection
         if (toml.keyExists("$.use_v29_introspection")) {
@@ -368,7 +366,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // Use appropriate introspection based on version
         if (useV29Introspection) {
-            ctmAddresses = AddressIntrospector.getCTMAddressesV29(ctm, vms.isZKsyncOS());
+            ctmAddresses = AddressIntrospector.getCTMAddressesV29(ctm, config.isZKsyncOS);
             coreAddresses = AddressIntrospector.getCoreDeployedAddressesV29(bridgehubAddr);
 
             // V29 introspection returns zero for bytecodesSupplier, overwrite with correct value
@@ -436,19 +434,19 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             eraChainId: config.eraChainId,
             gatewayChainId: config.gatewayChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: vms.getBytecodeHash(EraZkosContract.BeaconProxy),
+            l2TokenProxyBytecodeHash: EraZkosRouter.getBytecodeHash(config.isZKsyncOS, EraZkosContract.BeaconProxy),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2Bridgehub),
-            l2AssetRouterBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2AssetRouter),
-            l2NtvBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2NativeTokenVault),
-            messageRootBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2MessageRoot),
-            chainAssetHandlerBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2ChainAssetHandler),
-            beaconDeployerInfo: vms.getBytecodeInfo(EraZkosContract.UpgradeableBeaconDeployer),
-            baseTokenHolderBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.BaseTokenHolder),
-            interopCenterBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.InteropCenter),
-            interopHandlerBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.InteropHandler),
-            assetTrackerBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2AssetTracker),
+            bridgehubBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2Bridgehub),
+            l2AssetRouterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2AssetRouter),
+            l2NtvBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2NativeTokenVault),
+            messageRootBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2MessageRoot),
+            chainAssetHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2ChainAssetHandler),
+            beaconDeployerInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.UpgradeableBeaconDeployer),
+            baseTokenHolderBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.BaseTokenHolder),
+            interopCenterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.InteropCenter),
+            interopHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.InteropHandler),
+            assetTrackerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
@@ -477,7 +475,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         bytes[] memory allDeps = getFullListOfFactoryDependencies();
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
-        FactoryDepsResult memory result = vms.publishAndProcessFactoryDeps(supplier, allDeps);
+        FactoryDepsResult memory result = EraZkosRouter.publishAndProcessFactoryDeps(config.isZKsyncOS, supplier, allDeps);
 
         // For Era, populate the factory deps tracking state and validate consistency.
         // For ZKsyncOS, factoryDepsHashes is empty so all loops are no-ops.
@@ -851,7 +849,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     function getForceDeployment(
         string memory contractName
     ) public virtual override returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
-        bytes32 bytecodeHash = vms.getForceDeploymentBytecodeHash(contractName);
+        bytes32 bytecodeHash = EraZkosRouter.getForceDeploymentBytecodeHash(config.isZKsyncOS, contractName);
         return
             IL2ContractDeployer.ForceDeployment({
                 bytecodeHash: bytecodeHash,

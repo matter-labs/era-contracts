@@ -50,7 +50,7 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {CTMDeployedAddresses, Config, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
-import {EraZkosContract} from "../utils/EraZkosRouter.sol";
+import {EraZkosContract, EraZkosRouter} from "../utils/EraZkosRouter.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
@@ -181,7 +181,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         initializeGeneratedData();
 
         deployStateTransitionDiamondFacets();
-        (, string memory ctmContractName) = vms.resolve(EraZkosContract.ChainTypeManager);
+        (, string memory ctmContractName) = EraZkosRouter.resolve(config.isZKsyncOS, EraZkosContract.ChainTypeManager);
         (
             ctmAddresses.stateTransition.implementations.chainTypeManager,
             ctmAddresses.stateTransition.proxies.chainTypeManager
@@ -222,7 +222,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.stateTransition.verifiers.verifierFflonk,
             ctmAddresses.stateTransition.verifiers.verifierPlonk,
             config.ownerAddress,
-            vms.isZKsyncOS()
+            config.isZKsyncOS
         );
         vm.stopBroadcast();
     }
@@ -248,7 +248,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
         ctmAddresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator", false);
-        if (vms.isZKsyncOS()) {
+        if (config.isZKsyncOS) {
             ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS = deploySimpleContract(
                 "BlobsL1DAValidatorZKsyncOS",
                 false
@@ -270,7 +270,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             getRollupL2DACommitmentScheme(),
             true
         );
-        if (vms.isZKsyncOS()) {
+        if (config.isZKsyncOS) {
             rollupDAManager.updateDAPair(
                 ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS,
                 getRollupL2DACommitmentScheme(),
@@ -310,7 +310,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         EraZkosVerifierLifecycle.transferVerifierOwnership(
             ctmAddresses.stateTransition.verifiers.verifier,
             ctmAddresses.admin.governance,
-            vms.isZKsyncOS()
+            config.isZKsyncOS
         );
 
         IOwnable(ctmAddresses.daAddresses.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
@@ -392,7 +392,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "no_da_validium_l1_validator_addr",
             ctmAddresses.daAddresses.noDAValidiumL1DAValidator
         );
-        if (vms.isZKsyncOS()) {
+        if (config.isZKsyncOS) {
             vm.serializeAddress(
                 "deployed_addresses",
                 "blobs_zksync_os_l1_da_validator_addr",
@@ -482,19 +482,19 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             gatewayChainId: config.gatewayChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: vms.getBytecodeHash(EraZkosContract.BeaconProxy),
+            l2TokenProxyBytecodeHash: EraZkosRouter.getBytecodeHash(config.isZKsyncOS, EraZkosContract.BeaconProxy),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(ctmAddresses.admin.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2Bridgehub),
-            l2AssetRouterBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2AssetRouter),
-            l2NtvBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2NativeTokenVault),
-            messageRootBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2MessageRoot),
-            beaconDeployerInfo: vms.getBytecodeInfo(EraZkosContract.UpgradeableBeaconDeployer),
-            baseTokenHolderBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.BaseTokenHolder),
-            chainAssetHandlerBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2ChainAssetHandler),
-            interopCenterBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.InteropCenter),
-            interopHandlerBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.InteropHandler),
-            assetTrackerBytecodeInfo: vms.getBytecodeInfo(EraZkosContract.L2AssetTracker),
+            bridgehubBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2Bridgehub),
+            l2AssetRouterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2AssetRouter),
+            l2NtvBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2NativeTokenVault),
+            messageRootBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2MessageRoot),
+            beaconDeployerInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.UpgradeableBeaconDeployer),
+            baseTokenHolderBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.BaseTokenHolder),
+            chainAssetHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2ChainAssetHandler),
+            interopCenterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.InteropCenter),
+            interopHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.InteropHandler),
+            assetTrackerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(

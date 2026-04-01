@@ -26,7 +26,6 @@ import {
     DirectDeployedAddresses,
     DirectCreate2Calldata
 } from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
-import {EraZkosRouter} from "deploy-scripts/utils/EraZkosRouter.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 
 import {
@@ -169,7 +168,7 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
         ) = GatewayCTMDeployerHelper.calculateAddresses(
                 bytes32(0),
                 deployerConfig,
-                new EraZkosRouter(deployerConfig.isZKsyncOS)
+                deployerConfig.isZKsyncOS
             );
 
         // Verify we're using the deterministic CREATE2 factory

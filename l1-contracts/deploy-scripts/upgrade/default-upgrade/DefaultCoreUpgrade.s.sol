@@ -47,7 +47,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         bool useV29IntrospectionOverride;
     }
     AdditionalConfigParams internal additionalConfig;
-    EraZkosRouter public vms;
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
@@ -124,7 +123,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         }
 
         additionalConfig.isZKsyncOS = isZKsyncOS;
-        vms = new EraZkosRouter(isZKsyncOS);
 
         // Optional override for v29 introspection selection
         if (upgradeToml.keyExists("$.use_v29_introspection")) {
@@ -466,8 +464,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice Load protocol version from genesis config
     function loadProtocolVersionFromGenesis() internal virtual returns (uint256) {
-        string memory genesisPath = vms.genesisConfigPath();
-        return vms.getChainCreationParams(genesisPath).latestProtocolVersion;
+        string memory genesisPath = EraZkosRouter.genesisConfigPath(additionalConfig.isZKsyncOS);
+        return EraZkosRouter.getChainCreationParams(additionalConfig.isZKsyncOS, genesisPath).latestProtocolVersion;
     }
 
     function getBroadcasterAddress() internal view virtual returns (address) {

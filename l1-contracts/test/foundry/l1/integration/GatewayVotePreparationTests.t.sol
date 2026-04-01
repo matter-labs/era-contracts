@@ -10,7 +10,6 @@ import {
     DeployerAddresses,
     DirectCreate2Calldata
 } from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
-import {EraZkosRouter} from "deploy-scripts/utils/EraZkosRouter.sol";
 import {
     DeployedContracts,
     GatewayCTMDeployerConfig
@@ -38,11 +37,10 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
 
         initializeConfig(configPath, permanentValuesPath, bridgehubProxy, ctmRepresentativeChainId);
 
-        EraZkosRouter vms = new EraZkosRouter(gatewayCTMDeployerConfig.isZKsyncOS);
         (contracts, , , directCalldata, ) = GatewayCTMDeployerHelper.calculateAddresses(
             bytes32(uint256(1)),
             gatewayCTMDeployerConfig,
-            vms
+            gatewayCTMDeployerConfig.isZKsyncOS
         );
     }
 
