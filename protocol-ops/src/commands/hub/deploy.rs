@@ -1,10 +1,9 @@
-use crate::common::{forge::ForgeRunner, traits::SaveConfig, wallets::Wallet};
+use crate::common::{forge::ForgeRunner, wallets::Wallet};
 use crate::config::forge_interface::{
     deploy_ecosystem::{
         input::{DeployL1Config, InitialDeploymentConfig},
         output::DeployL1CoreContractsOutput,
     },
-    permanent_values::PermanentValuesConfig,
     script_params::DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS,
 };
 use ethers::types::{Address, H256};
@@ -33,15 +32,6 @@ pub fn deploy(
     if let Some(salt) = input.create2_factory_salt {
         initial_config.create2_factory_salt = salt;
     }
-
-    let permanent_values = PermanentValuesConfig::new(
-        initial_config.create2_factory_addr,
-        initial_config.create2_factory_salt,
-    );
-    permanent_values.save(
-        &runner.shell,
-        PermanentValuesConfig::path(&runner.foundry_scripts_path),
-    )?;
 
     let deploy_config = DeployL1Config::new(
         input.owner,

@@ -14,7 +14,6 @@ use crate::common::{
 use crate::config::forge_interface::{
     deploy_ctm::{input::DeployCTMConfig, output::DeployCTMOutput},
     deploy_ecosystem::input::InitialDeploymentConfig,
-    permanent_values::PermanentValuesConfig,
     script_params::DEPLOY_CTM_SCRIPT_PARAMS,
 };
 use crate::types::{L1Network, VMOption};
@@ -51,15 +50,6 @@ pub fn deploy(
     if let Some(salt) = input.create2_factory_salt {
         initial_deployment_config.create2_factory_salt = salt;
     }
-
-    let permanent_values = PermanentValuesConfig::new(
-        initial_deployment_config.create2_factory_addr,
-        initial_deployment_config.create2_factory_salt,
-    );
-    permanent_values.save(
-        &runner.shell,
-        PermanentValuesConfig::path(&runner.foundry_scripts_path),
-    )?;
 
     let deploy_config = DeployCTMConfig::new(
         input.owner,

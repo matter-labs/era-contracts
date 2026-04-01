@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 pub mod deploy_ctm;
 pub mod deploy_ecosystem;
 pub mod deploy_l2_contracts;
-pub mod permanent_values;
 pub mod register_chain;
 pub mod script_params;
 
