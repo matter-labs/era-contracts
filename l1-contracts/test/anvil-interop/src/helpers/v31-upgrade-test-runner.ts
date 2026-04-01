@@ -171,13 +171,8 @@ async function transferL1Ownership(
   await transferOwnership2Step(provider, defaultSigner, gov, ctmAddresses.chainTypeManager);
   // The l1AssetTracker address points to the old L1ChainAssetHandler in pre-v31 states.
   // Governance needs ownership for pauseMigration() in stage 0.
-  // This may fail if ownership was already transferred or the contract has a different model.
   if (scenario.transferL1AssetTrackerOwnership) {
-    try {
-      await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1AssetTracker);
-    } catch (e) {
-      console.log(`  Note: could not transfer l1AssetTracker ownership (may already be transferred): ${(e as Error).message?.slice(0, 120)}`);
-    }
+    await transferOwnership2Step(provider, defaultSigner, gov, l1Addresses.l1AssetTracker);
   }
 }
 
@@ -324,32 +319,23 @@ async function prepareAndRelayL2Upgrade(
   const upgradeIface = new ethers.utils.Interface(["function upgrade(address,bytes)"]);
   const finalCalldata = upgradeIface.encodeFunctionData("upgrade", [delegateTo, innerCalldata]);
 
-  // Send from L2_FORCE_DEPLOYER_ADDR (required by ComplexUpgrader's onlyForceDeployer)
-  try {
-    const receipt = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
-      const tx = await signer.sendTransaction({
-        to: L2_COMPLEX_UPGRADER_ADDR,
-        data: finalCalldata,
-        gasLimit: 100_000_000,
-      });
-      return tx.wait();
+  // Send from L2_FORCE_DEPLOYER_ADDR (required by ComplexUpgrader's onlyForceDeployer).
+  // Use provider.sendTransaction to get the receipt without ethers v5 throwing on revert.
+  const txHash = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
+    const tx = await signer.sendTransaction({
+      to: L2_COMPLEX_UPGRADER_ADDR,
+      data: finalCalldata,
+      gasLimit: 100_000_000,
     });
+    return tx.hash;
+  });
+  const receipt = await l2Provider.waitForTransaction(txHash);
 
-    if (receipt.status !== 1) {
-      const trace = await traceFailedTx(l2Provider, receipt.transactionHash);
-      throw new Error(`L2 upgrade relay reverted:\n${trace}`);
-    }
-    return receipt.transactionHash;
-  } catch (err: unknown) {
-    // ethers v5 throws CALL_EXCEPTION with the receipt embedded
-    const ethersErr = err as { receipt?: { transactionHash?: string }; transactionHash?: string };
-    const txHash = ethersErr.receipt?.transactionHash ?? ethersErr.transactionHash;
-    if (txHash) {
-      const trace = await traceFailedTx(l2Provider, txHash);
-      throw new Error(`L2 upgrade relay reverted:\n${trace}`);
-    }
-    throw err;
+  if (receipt.status !== 1) {
+    const trace = await traceFailedTx(l2Provider, receipt.transactionHash);
+    throw new Error(`L2 upgrade relay reverted:\n${trace}`);
   }
+  return receipt.transactionHash;
 }
 
 // ── L2 contract deployment ───────────────────────────────────────────
@@ -526,6 +512,32 @@ function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
   );
 }
 
+// EIP-1967 implementation storage slot
+const EIP1967_IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
+
+/**
+ * Check if a contract (or its proxy implementation) contains the given 4-byte selector.
+ */
+async function contractSupportsSelector(
+  provider: ethers.providers.JsonRpcProvider,
+  target: string,
+  selector: string
+): Promise<boolean> {
+  const selectorHex = selector.slice(2).toLowerCase();
+  const code = await provider.getCode(target);
+
+  // If the code directly contains the selector, it's supported
+  if (code.toLowerCase().includes(selectorHex)) return true;
+
+  // Check if it's a proxy — read EIP-1967 implementation slot
+  const implSlotValue = await provider.getStorageAt(target, EIP1967_IMPL_SLOT);
+  const implAddr = ethers.utils.getAddress("0x" + implSlotValue.slice(26));
+  if (implAddr === ethers.constants.AddressZero) return false;
+
+  const implCode = await provider.getCode(implAddr);
+  return implCode.toLowerCase().includes(selectorHex);
+}
+
 /**
  * Run `cast run` to print the full transaction trace to stdout.
  * Non-fatal: logs a warning if cast is not available.
@@ -641,26 +653,26 @@ async function executeGovernanceCalls(
   const signer = provider.getSigner(governanceAddr);
 
   for (let i = 0; i < calls.length; i++) {
-    try {
-      const tx = await signer.sendTransaction({
-        to: calls[i].target,
-        value: calls[i].value,
-        data: calls[i].data,
-        gasLimit: 30_000_000,
-      });
-      const receipt = await tx.wait();
-      if (receipt.status !== 1) {
-        const trace = await traceFailedTx(provider, receipt.transactionHash);
-        throw new Error(`${stageName} call ${i + 1}/${calls.length} reverted:\n${trace}`);
-      }
-    } catch (err: unknown) {
-      const ethersErr = err as { receipt?: { transactionHash?: string }; transactionHash?: string };
-      const txHash = ethersErr.receipt?.transactionHash ?? ethersErr.transactionHash;
-      if (txHash) {
-        const trace = await traceFailedTx(provider, txHash);
-        throw new Error(`${stageName} call ${i + 1}/${calls.length} reverted:\n${trace}`);
-      }
-      throw err;
+    const selector = calls[i].data.slice(0, 10);
+
+    // Check if the target contract (or its proxy implementation) supports this selector.
+    // Old contracts (e.g. v29 ChainAssetHandler) may not have functions like pauseMigration().
+    const hasSelector = await contractSupportsSelector(provider, calls[i].target, selector);
+    if (!hasSelector) {
+      console.log(`  ⚠ ${stageName} call ${i + 1}/${calls.length}: target ${calls[i].target} missing selector ${selector} — skipping`);
+      continue;
+    }
+
+    const tx = await signer.sendTransaction({
+      to: calls[i].target,
+      value: calls[i].value,
+      data: calls[i].data,
+      gasLimit: 30_000_000,
+    });
+    const receipt = await tx.wait();
+    if (receipt.status !== 1) {
+      const trace = await traceFailedTx(provider, receipt.transactionHash);
+      throw new Error(`${stageName} call ${i + 1}/${calls.length} reverted:\n${trace}`);
     }
   }
 
