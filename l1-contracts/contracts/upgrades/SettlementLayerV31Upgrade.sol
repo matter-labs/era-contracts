@@ -103,13 +103,10 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
     ) public view returns (bytes memory) {
         // Decode the placeholder to extract isZKsyncOS, ctmDeployer, and fixedForceDeploymentsData
         // (these are ecosystem-wide and don't change per chain).
-        (
-            bool isZKsyncOS,
-            address ctmDeployer,
-            bytes memory fixedForceDeploymentsData,
-
-        ) = // ignore placeholder additionalForceDeploymentsData
-            abi.decode(_existingUpgradeCalldata.slice(4), (bool, address, bytes, bytes));
+        (bool isZKsyncOS, address ctmDeployer, bytes memory fixedForceDeploymentsData, ) = abi.decode( // ignore placeholder additionalForceDeploymentsData
+                _existingUpgradeCalldata.slice(4),
+                (bool, address, bytes, bytes)
+            );
 
         // Construct per-chain ZKChainSpecificForceDeploymentsData from L1 state.
         bytes memory additionalForceDeploymentsData = _buildChainSpecificForceDeploymentsData(_bridgehub, _chainId);
