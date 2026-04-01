@@ -4,6 +4,8 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
+use crate::types::VMOption;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, ValueEnum)]
 pub enum DAValidatorType {
     #[default]
@@ -32,6 +34,21 @@ pub enum L2DACommitmentScheme {
     PubdataKeccak256 = 2,
     BlobsAndPubdataKeccak256 = 3,
     BlobsZKSyncOS = 4,
+}
+
+impl L2DACommitmentScheme {
+    pub fn from_da_and_vm_types(da_type: DAValidatorType, vm_type: VMOption) -> Self {
+        match da_type {
+            DAValidatorType::Rollup => match vm_type {
+                VMOption::EraVM => L2DACommitmentScheme::BlobsAndPubdataKeccak256,
+                VMOption::ZKSyncOsVM => L2DACommitmentScheme::BlobsZKSyncOS,
+            },
+            DAValidatorType::Avail | DAValidatorType::Eigen => {
+                L2DACommitmentScheme::PubdataKeccak256
+            }
+            DAValidatorType::NoDA => L2DACommitmentScheme::EmptyNoDA,
+        }
+    }
 }
 
 impl TryFrom<u8> for L2DACommitmentScheme {

@@ -14,7 +14,8 @@ use crate::abi::{
     IREGISTERONALLCHAINSABI_ABI, IREGISTERZKCHAINABI_ABI, ISETUPLEGACYBRIDGEABI_ABI,
 };
 use crate::admin_functions::{
-    accept_admin, make_permanent_rollup, set_da_validator_pair, unpause_deposits, AdminScriptMode,
+    accept_admin, make_permanent_rollup, set_da_validator_pair, set_token_multiplier_setter,
+    unpause_deposits, AdminScriptMode,
 };
 use crate::commands::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
@@ -35,8 +36,8 @@ use crate::config::forge_interface::{
     },
     script_params::{
         DEPLOY_L2_CONTRACTS_SCRIPT_PARAMS, DEPLOY_PAYMASTER_SCRIPT_PARAMS,
-        ENABLE_EVM_EMULATOR_PARAMS, REGISTER_CHAIN_SCRIPT_PARAMS,
-        REGISTER_ON_ALL_CHAINS_SCRIPT_PARAMS, SETUP_LEGACY_BRIDGE,
+        ENABLE_EVM_EMULATOR_PARAMS, REGISTER_CHAIN_SCRIPT_PARAMS, SETUP_LEGACY_BRIDGE,
+        _REGISTER_ON_ALL_CHAINS_SCRIPT_PARAMS,
     },
 };
 use crate::types::{DAValidatorType, L2ChainId, L2DACommitmentScheme, VMOption};
@@ -48,7 +49,7 @@ lazy_static! {
         BaseContract::from(IDEPLOYL2CONTRACTSABI_ABI.clone());
     static ref DEPLOY_PAYMASTER_FUNCTIONS: BaseContract =
         BaseContract::from(IDEPLOYPAYMASTERABI_ABI.clone());
-    static ref REGISTER_ON_ALL_CHAINS_FUNCTIONS: BaseContract =
+    static ref _REGISTER_ON_ALL_CHAINS_FUNCTIONS: BaseContract =
         BaseContract::from(IREGISTERONALLCHAINSABI_ABI.clone());
     static ref ENABLE_EVM_EMULATOR_FUNCTIONS: BaseContract =
         BaseContract::from(IENABLEEVMEMULATORABI_ABI.clone());
@@ -70,16 +71,13 @@ pub struct ChainInitArgs {
     /// Chain ID
     #[clap(long, help_heading = "Input")]
     pub chain_id: u64,
-    /// ZKsync Era eth-path validator (not the OS batch commit/prove/execute accounts)
-    #[clap(long, help_heading = "Input")]
-    pub era_validator_operator: Address,
-    /// ZKsync OS operator for L1 batch commit (blobs-eth path / committer role)
+    /// L1 batch commit operator
     #[clap(long, help_heading = "Input")]
     pub commit_operator: Address,
-    /// ZKsync OS operator for L1 batch prove
+    /// L1 batch prove operator (also execute operator for EraVM)
     #[clap(long, help_heading = "Input")]
     pub prove_operator: Address,
-    /// ZKsync OS operator for L1 batch execute
+    /// L1 batch execute operator (ZKSync OS only)
     #[clap(long, help_heading = "Input")]
     pub execute_operator: Address,
     /// VM type: zksyncos or eravm
@@ -173,6 +171,7 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         deployer.clone()
     };
 
+    // TODO: move this to forge script
     let bridgehub = query_bridgehub(&runner.rpc_url, args.ctm_proxy)?;
 
     let chain_params = NewChainParams {
@@ -181,11 +180,10 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         base_token_gas_price_multiplier_numerator: price_ratio_num,
         base_token_gas_price_multiplier_denominator: price_ratio_den,
         owner: owner.address,
-        era_validator_operator: args.era_validator_operator,
         commit_operator: args.commit_operator,
         prove_operator: args.prove_operator,
         execute_operator: args.execute_operator,
-        _token_multiplier_setter: args.token_multiplier_setter,
+        token_multiplier_setter: args.token_multiplier_setter,
         da_mode: args.da_mode,
         vm_type: args.vm_type,
     };
@@ -241,9 +239,10 @@ pub async fn chain_init(
     let mut full_output = FullChainInitOutput::from_register(&register_output);
 
     // Accept admin (as owner)
-    logger::step("Accepting adminship of chain...");
+    logger::step("Accepting ownership of chain admin...");
     accept_admin(runner, chain_admin, owner, diamond_proxy).await?;
 
+    // TODO: make this more straightforward
     // Unpause deposits unless:
     // - pause_deposits=true (caller wants them to stay paused), or
     // - with_legacy_bridge=true (RegisterZKChain.s.sol already unpaused them internally)
@@ -258,38 +257,51 @@ pub async fn chain_init(
         .await?;
     }
 
-    // Set DA validator pair (as owner)
-    logger::step("Setting DA validator pair...");
-    let commitment_scheme = input.l2_da_commitment_scheme.unwrap_or_else(|| {
-        match input.chain_params.da_mode {
-            DAValidatorType::Rollup => match input.vm_type {
-                VMOption::EraVM => L2DACommitmentScheme::BlobsAndPubdataKeccak256,
-                VMOption::ZKSyncOsVM => L2DACommitmentScheme::BlobsZKSyncOS,
-            },
-            DAValidatorType::Avail | DAValidatorType::Eigen => L2DACommitmentScheme::PubdataKeccak256,
-            DAValidatorType::NoDA => L2DACommitmentScheme::EmptyNoDA,
+    // TODO: remove (pass as constructor parameter for chain admin)
+    // Set token multiplier setter (only needed for non-ETH base tokens)
+    let eth_base_token = Address::from_low_u64_be(1);
+    if input.chain_params.base_token_addr != eth_base_token {
+        if let Some(setter) = input.chain_params.token_multiplier_setter {
+            if !setter.is_zero() {
+                logger::step("Setting token multiplier setter...");
+                set_token_multiplier_setter(
+                    runner,
+                    owner,
+                    register_output.chain_admin_addr,
+                    register_output.access_control_restriction_addr,
+                    diamond_proxy,
+                    setter,
+                )
+                .await?;
+            }
         }
-    });
-    set_da_validator_pair(
-        runner,
-        AdminScriptMode::Broadcast(owner.clone()),
-        input.chain_params.chain_id.as_u64(),
-        input.bridgehub,
-        input.l1_da_validator,
-        commitment_scheme,
-    )
-    .await?;
-
-    // Enable EVM emulator (if requested, as owner)
-    if input.evm_emulator {
-        logger::step("Enabling EVM emulator...");
-        enable_evm_emulator_step(runner, owner, chain_admin, diamond_proxy)?;
     }
 
-    // Deploy L2 contracts (if not skipping priority txs)
+    // TODO: for now, just replicating logic from `zkstack`, but not all of these are
+    // priority txs, so we need to fix this + skip steps irrelevant for ZKSync OS.
     if !input.skip_priority_txs {
+        // Set DA validator pair
+        logger::step("Setting DA validator pair...");
+        let commitment_scheme =
+            L2DACommitmentScheme::from_da_and_vm_types(input.chain_params.da_mode, input.vm_type);
+        set_da_validator_pair(
+            runner,
+            AdminScriptMode::Broadcast(owner.clone()),
+            input.chain_params.chain_id.as_u64(),
+            input.bridgehub,
+            input.l1_da_validator,
+            commitment_scheme,
+        )
+        .await?;
+
+        // Enable EVM emulator (if requested)
+        if input.evm_emulator {
+            logger::step("Enabling EVM emulator...");
+            enable_evm_emulator_step(runner, owner, chain_admin, diamond_proxy)?;
+        }
         let governance = register_output.governance_addr;
 
+        // Deploy L2 contracts
         logger::step("Deploying L2 contracts...");
         let l2_output = deploy_l2_contracts_step(
             runner,
@@ -311,22 +323,13 @@ pub async fn chain_init(
             logger::step("Deploying paymaster...");
             let paymaster_addr = deploy_paymaster_step(
                 runner,
-                deployer,
+                owner,
                 input.bridgehub,
                 input.chain_params.chain_id.as_u64(),
             )?;
             full_output.paymaster_addr = Some(paymaster_addr);
             logger::info(format!("Paymaster deployed at: {:#x}", paymaster_addr));
         }
-
-        // Register on all chains
-        logger::step("Registering chain on all other chains...");
-        register_on_all_chains_step(
-            runner,
-            deployer,
-            input.bridgehub,
-            input.chain_params.chain_id.as_u64(),
-        )?;
     }
 
     // Make permanent rollup (if requested, as owner)
@@ -336,11 +339,11 @@ pub async fn chain_init(
     }
 
     // Setup legacy bridge (if requested)
-    if input.with_legacy_bridge && !input.skip_priority_txs {
+    if input.with_legacy_bridge {
         logger::step("Setting up legacy bridge...");
         setup_legacy_bridge_step(
             runner,
-            deployer,
+            bridgehub_admin,
             input.bridgehub,
             input.chain_params.chain_id.as_u64(),
         )?;
@@ -360,6 +363,7 @@ pub fn register_chain(
         input.create2_factory_addr.unwrap_or(Address::zero()),
         input.create2_factory_salt,
         input.with_legacy_bridge,
+        input.evm_emulator,
     )?;
 
     let input_path = REGISTER_CHAIN_SCRIPT_PARAMS.input(&runner.foundry_scripts_path);
@@ -549,19 +553,19 @@ fn deploy_paymaster_step(
     Ok(output.paymaster)
 }
 
-fn register_on_all_chains_step(
+fn _register_on_all_chains_step(
     runner: &mut ForgeRunner,
     auth: &Wallet,
     bridgehub: Address,
     chain_id: u64,
 ) -> anyhow::Result<()> {
-    let calldata = REGISTER_ON_ALL_CHAINS_FUNCTIONS
+    let calldata = _REGISTER_ON_ALL_CHAINS_FUNCTIONS
         .encode("registerOnOtherChains", (bridgehub, U256::from(chain_id)))
         .map_err(|e| anyhow::anyhow!("Failed to encode register_on_all_chains calldata: {}", e))?;
 
     let forge = Forge::new(&runner.foundry_scripts_path)
         .script(
-            &REGISTER_ON_ALL_CHAINS_SCRIPT_PARAMS.script(),
+            &_REGISTER_ON_ALL_CHAINS_SCRIPT_PARAMS.script(),
             runner.forge_args.clone(),
         )
         .with_ffi()

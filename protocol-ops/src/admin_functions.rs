@@ -3,7 +3,7 @@ use crate::common::{
     traits::{FileConfigTrait, ReadConfig},
     wallets::Wallet,
 };
-use crate::config::forge_interface::script_params::ACCEPT_GOVERNANCE_SCRIPT_PARAMS;
+use crate::config::forge_interface::script_params::ADMIN_FUNCTIONS_SCRIPT_PARAMS;
 use crate::types::L2DACommitmentScheme;
 use ethers::{
     contract::BaseContract,
@@ -123,7 +123,7 @@ pub async fn call_script(
         }
     };
 
-    let output_path = ACCEPT_GOVERNANCE_SCRIPT_PARAMS.output(&runner.foundry_scripts_path);
+    let output_path = ADMIN_FUNCTIONS_SCRIPT_PARAMS.output(&runner.foundry_scripts_path);
     runner.run(forge)?;
     Ok(AdminScriptOutputInner::read(&runner.shell, output_path)?.into())
 }
@@ -160,6 +160,29 @@ pub async fn make_permanent_rollup(
     accept_ownership(runner, governor, forge).await
 }
 
+pub async fn set_token_multiplier_setter(
+    runner: &mut ForgeRunner,
+    governor: &Wallet,
+    chain_admin_addr: Address,
+    access_control_restriction_addr: Address,
+    diamond_proxy_addr: Address,
+    new_setter: Address,
+) -> anyhow::Result<()> {
+    let calldata = ADMIN_FUNCTIONS
+        .encode(
+            "chainSetTokenMultiplierSetter",
+            (
+                chain_admin_addr,
+                access_control_restriction_addr,
+                diamond_proxy_addr,
+                new_setter,
+            ),
+        )
+        .unwrap();
+    let forge = build_governance_forge(runner, &calldata).with_broadcast();
+    accept_ownership(runner, governor, forge).await
+}
+
 pub async fn set_da_validator_pair(
     runner: &mut ForgeRunner,
     mode: AdminScriptMode,
@@ -188,7 +211,7 @@ pub async fn set_da_validator_pair(
 fn build_governance_forge(runner: &ForgeRunner, calldata: &Bytes) -> ForgeScript {
     Forge::new(&runner.foundry_scripts_path)
         .script(
-            &ACCEPT_GOVERNANCE_SCRIPT_PARAMS.script(),
+            &ADMIN_FUNCTIONS_SCRIPT_PARAMS.script(),
             runner.forge_args.clone(),
         )
         .with_ffi()

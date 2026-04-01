@@ -1,11 +1,9 @@
-use crate::types::{DAValidatorType, L2ChainId, VMOption};
-use ethers::types::Address;
-use ethers::types::H256;
-use rand::Rng;
+use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 
 use crate::common::traits::FileConfigTrait;
 use crate::config::forge_interface::Create2Addresses;
+use crate::types::{DAValidatorType, L2ChainId, VMOption};
 
 /// Chain parameters
 #[derive(Debug, Clone, Serialize)]
@@ -15,15 +13,10 @@ pub struct NewChainParams {
     pub base_token_gas_price_multiplier_numerator: u64,
     pub base_token_gas_price_multiplier_denominator: u64,
     pub owner: Address,
-    /// Eth-path ZKsync Era validator (`validator_sender_operator_eth` — not OS commit/prove/execute).
-    pub era_validator_operator: Address,
-    /// ZKsync OS L1 commit operator (`validator_sender_operator_blobs_eth`, committer role).
     pub commit_operator: Address,
-    /// ZKsync OS L1 prove operator (`validator_sender_operator_prove`).
     pub prove_operator: Address,
-    /// ZKsync OS L1 execute operator (`validator_sender_operator_execute`).
     pub execute_operator: Address,
-    pub _token_multiplier_setter: Option<Address>,
+    pub token_multiplier_setter: Option<Address>,
     pub da_mode: DAValidatorType,
     pub vm_type: VMOption,
 }
@@ -61,6 +54,7 @@ impl RegisterChainL1Config {
         create2_factory_addr: Address,
         create2_factory_salt: Option<H256>,
         initialize_legacy_bridge: bool,
+        evm_emulator: bool,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             chain: ChainL1Config {
@@ -73,15 +67,20 @@ impl RegisterChainL1Config {
                 // TODO specify
                 governance_security_council_address: Default::default(),
                 governance_min_delay: 0,
-                // TODO verify
-                bridgehub_create_new_chain_salt: rand::thread_rng().gen_range(0..=i64::MAX) as u64,
-                validium_mode: chain_params.da_mode == DAValidatorType::NoDA
-                    || chain_params.da_mode == DAValidatorType::Avail,
-                validator_sender_operator_eth: chain_params.era_validator_operator,
+                bridgehub_create_new_chain_salt: 0,
+                validium_mode: chain_params.da_mode != DAValidatorType::Rollup,
+                // TODO fix script to assign roles correctly
+                validator_sender_operator_eth: chain_params.prove_operator,
                 validator_sender_operator_blobs_eth: chain_params.commit_operator,
-                validator_sender_operator_prove: chain_params.prove_operator,
-                validator_sender_operator_execute: chain_params.execute_operator,
-                allow_evm_emulator: true,
+                validator_sender_operator_prove: match chain_params.vm_type {
+                    VMOption::EraVM => Address::zero(),
+                    VMOption::ZKSyncOsVM => chain_params.prove_operator,
+                },
+                validator_sender_operator_execute: match chain_params.vm_type {
+                    VMOption::EraVM => Address::zero(),
+                    VMOption::ZKSyncOsVM => chain_params.execute_operator,
+                },
+                allow_evm_emulator: evm_emulator,
             },
             owner_address: chain_params.owner,
             contracts: Create2Addresses {

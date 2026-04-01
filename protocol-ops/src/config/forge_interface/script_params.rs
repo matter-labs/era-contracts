@@ -42,7 +42,7 @@ pub const REGISTER_CTM_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
     script_path: "deploy-scripts/ecosystem/RegisterCTM.s.sol",
 };
 
-pub const ACCEPT_GOVERNANCE_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
+pub const ADMIN_FUNCTIONS_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
     input: "script-config/config-admin-functions.toml",
     output: "script-out/output-admin-functions.toml",
     script_path: "deploy-scripts/AdminFunctions.s.sol",
@@ -78,7 +78,7 @@ pub const ENABLE_EVM_EMULATOR_PARAMS: ForgeScriptParams = ForgeScriptParams {
     script_path: "deploy-scripts/chain/EnableEvmEmulator.s.sol",
 };
 
-pub const REGISTER_ON_ALL_CHAINS_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
+pub const _REGISTER_ON_ALL_CHAINS_SCRIPT_PARAMS: ForgeScriptParams = ForgeScriptParams {
     input: "script-config/register-on-all-chains.toml",
     output: "script-out/output-register-on-all-chains.toml",
     script_path: "deploy-scripts/ecosystem/RegisterOnAllChains.s.sol",
