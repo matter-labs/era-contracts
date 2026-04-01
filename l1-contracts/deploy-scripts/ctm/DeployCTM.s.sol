@@ -489,11 +489,23 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             l2AssetRouterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2AssetRouter),
             l2NtvBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2NativeTokenVault),
             messageRootBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2MessageRoot),
-            beaconDeployerInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.UpgradeableBeaconDeployer),
-            baseTokenHolderBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.BaseTokenHolder),
-            chainAssetHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2ChainAssetHandler),
+            beaconDeployerInfo: EraZkosRouter.getBytecodeInfo(
+                config.isZKsyncOS,
+                EraZkosContract.UpgradeableBeaconDeployer
+            ),
+            baseTokenHolderBytecodeInfo: EraZkosRouter.getBytecodeInfo(
+                config.isZKsyncOS,
+                EraZkosContract.BaseTokenHolder
+            ),
+            chainAssetHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(
+                config.isZKsyncOS,
+                EraZkosContract.L2ChainAssetHandler
+            ),
             interopCenterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.InteropCenter),
-            interopHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.InteropHandler),
+            interopHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(
+                config.isZKsyncOS,
+                EraZkosContract.InteropHandler
+            ),
             assetTrackerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),

@@ -368,7 +368,10 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
-        (, string memory gwCtmContractName) = EraZkosRouter.resolve(config.isZKsyncOS, EraZkosContract.ChainTypeManager);
+        (, string memory gwCtmContractName) = EraZkosRouter.resolve(
+            config.isZKsyncOS,
+            EraZkosContract.ChainTypeManager
+        );
         gatewayConfig.gatewayStateTransition.implementations.chainTypeManager = deployGWContract(gwCtmContractName);
 
         deployUpgradeSpecificContractsGW();

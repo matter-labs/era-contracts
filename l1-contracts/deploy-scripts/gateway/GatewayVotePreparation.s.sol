@@ -154,7 +154,11 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             ,
             DirectCreate2Calldata memory directCalldata,
             address create2FactoryAddress
-        ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), gatewayCTMDeployerConfig, gatewayCTMDeployerConfig.isZKsyncOS);
+        ) = GatewayCTMDeployerHelper.calculateAddresses(
+                bytes32(0),
+                gatewayCTMDeployerConfig,
+                gatewayCTMDeployerConfig.isZKsyncOS
+            );
 
         // Deploy all factory dependencies
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps(gatewayCTMDeployerConfig.isZKsyncOS);

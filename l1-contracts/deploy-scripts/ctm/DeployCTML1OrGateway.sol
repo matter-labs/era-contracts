@@ -64,7 +64,13 @@ library DeployCTML1OrGateway {
         } else if (contractName == CTMContract.DiamondInit) {
             return abi.encode(_isZKsyncOS);
         } else if (contractName == CTMContract.Verifier) {
-            return EraZkosRouter.verifierCreationArgs(_isZKsyncOS, config.verifierFflonk, config.verifierPlonk, config.verifierOwner);
+            return
+                EraZkosRouter.verifierCreationArgs(
+                    _isZKsyncOS,
+                    config.verifierFflonk,
+                    config.verifierPlonk,
+                    config.verifierOwner
+                );
         } else if (contractName == CTMContract.ZKsyncOSChainTypeManager) {
             return
                 abi.encode(

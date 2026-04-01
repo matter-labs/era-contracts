@@ -323,9 +323,7 @@ library EraZkosRouter {
 
     /// @notice Bytecodes required for Gateway CTM deployers on Era; empty array on ZKsyncOS.
     // solhint-disable-next-line code-complexity
-    function gatewayCTMEraFactoryDependencies(
-        bool _isZKsyncOS
-    ) internal returns (bytes[] memory dependencies) {
+    function gatewayCTMEraFactoryDependencies(bool _isZKsyncOS) internal returns (bytes[] memory dependencies) {
         if (_isZKsyncOS) {
             return dependencies;
         }
@@ -375,11 +373,7 @@ library EraZkosRouter {
     // ======================== Internal helpers ========================
 
     /// @notice Publish bytecodes to BytecodesSupplier using the VM-appropriate method.
-    function _publishBytecodes(
-        bool _isZKsyncOS,
-        BytecodesSupplier _supplier,
-        bytes[] memory _deps
-    ) private {
+    function _publishBytecodes(bool _isZKsyncOS, BytecodesSupplier _supplier, bytes[] memory _deps) private {
         if (_isZKsyncOS) {
             BytecodePublisher.publishEVMBytecodesInBatches(_supplier, _deps);
         } else {

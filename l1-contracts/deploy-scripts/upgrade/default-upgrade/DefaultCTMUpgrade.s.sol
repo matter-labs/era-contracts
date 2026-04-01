@@ -213,7 +213,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         });
         // Set config.isZKsyncOS before getChainCreationParamsConfig.
         config.isZKsyncOS = isZKsyncOS;
-        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(EraZkosRouter.genesisConfigPath(isZKsyncOS));
+        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
+            EraZkosRouter.genesisConfigPath(isZKsyncOS)
+        );
 
         // Optional override for v29 introspection selection
         if (toml.keyExists("$.use_v29_introspection")) {
@@ -360,9 +362,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         bridgehub = L1Bridgehub(bridgehubAddr);
 
         // Determine which introspection method to use based on protocol version or override
-        bool useV29Introspection = newConfig.hasV29IntrospectionOverride
-            ? newConfig.useV29IntrospectionOverride
-            : AddressIntrospector.shouldUseV29Introspection(bridgehubAddr);
+        bool useV29Introspection =
+            newConfig.hasV29IntrospectionOverride
+                ? newConfig.useV29IntrospectionOverride
+                : AddressIntrospector.shouldUseV29Introspection(bridgehubAddr);
 
         // Use appropriate introspection based on version
         if (useV29Introspection) {
@@ -441,11 +444,23 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             l2AssetRouterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2AssetRouter),
             l2NtvBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2NativeTokenVault),
             messageRootBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2MessageRoot),
-            chainAssetHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2ChainAssetHandler),
-            beaconDeployerInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.UpgradeableBeaconDeployer),
-            baseTokenHolderBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.BaseTokenHolder),
+            chainAssetHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(
+                config.isZKsyncOS,
+                EraZkosContract.L2ChainAssetHandler
+            ),
+            beaconDeployerInfo: EraZkosRouter.getBytecodeInfo(
+                config.isZKsyncOS,
+                EraZkosContract.UpgradeableBeaconDeployer
+            ),
+            baseTokenHolderBytecodeInfo: EraZkosRouter.getBytecodeInfo(
+                config.isZKsyncOS,
+                EraZkosContract.BaseTokenHolder
+            ),
             interopCenterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.InteropCenter),
-            interopHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.InteropHandler),
+            interopHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(
+                config.isZKsyncOS,
+                EraZkosContract.InteropHandler
+            ),
             assetTrackerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
@@ -475,7 +490,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         bytes[] memory allDeps = getFullListOfFactoryDependencies();
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
-        FactoryDepsResult memory result = EraZkosRouter.publishAndProcessFactoryDeps(config.isZKsyncOS, supplier, allDeps);
+        FactoryDepsResult memory result = EraZkosRouter.publishAndProcessFactoryDeps(
+            config.isZKsyncOS,
+            supplier,
+            allDeps
+        );
 
         // For Era, populate the factory deps tracking state and validate consistency.
         // For ZKsyncOS, factoryDepsHashes is empty so all loops are no-ops.
