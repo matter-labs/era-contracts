@@ -170,9 +170,17 @@ function selectUpgradeChains(
   });
 }
 
+function extractTxInput(transaction: Record<string, unknown>): string | undefined {
+  // Different foundry versions use different field names for calldata.
+  // Standard foundry uses `transaction.input`, foundry-zksync may use `transaction.data`.
+  const inner = transaction.transaction as Record<string, unknown> | undefined;
+  const candidate = inner?.input ?? inner?.data ?? transaction.input ?? transaction.data;
+  return typeof candidate === "string" ? candidate : undefined;
+}
+
 function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
   const broadcast = JSON.parse(fs.readFileSync(broadcastPath, "utf8")) as {
-    transactions?: Array<{ input?: string; transaction?: { input?: string } }>;
+    transactions?: Array<Record<string, unknown>>;
   };
   const transactions = broadcast.transactions || [];
   if (transactions.length === 0) {
@@ -181,11 +189,18 @@ function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
 
   const chainAdminIface = new ethers.utils.Interface(getAbi("ChainAdminOwnable"));
   const adminIface = new ethers.utils.Interface(getAbi("AdminFacet"));
+  // Legacy ABI for v29/v30 states where upgradeChainFromVersion has 2 params (no address prefix).
+  const legacyAdminIface = new ethers.utils.Interface([
+    "function upgradeChainFromVersion(uint256 _oldProtocolVersion, tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata) _diamondCut)",
+  ]);
   const settlementLayerUpgradeIface = new ethers.utils.Interface(getAbi("SettlementLayerV31Upgrade"));
 
+  const errors: string[] = [];
+
   for (const transaction of [...transactions].reverse()) {
-    const input = transaction.transaction?.input ?? transaction.input;
+    const input = extractTxInput(transaction);
     if (typeof input !== "string" || input.length <= 10) {
+      errors.push(`tx skipped: input missing or too short (keys: ${Object.keys(transaction).join(",")})`);
       continue;
     }
 
@@ -193,22 +208,36 @@ function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
       const multicallDecoded = chainAdminIface.decodeFunctionData("multicall", input);
       const calls = multicallDecoded[0] as Array<{ target: string; value: ethers.BigNumber; data: string }>;
       if (calls.length !== 1) {
+        errors.push(`tx skipped: multicall has ${calls.length} calls, expected 1`);
         continue;
       }
 
-      const adminCall = adminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data);
-      const diamondCutData = adminCall[1] as { initCalldata: string };
+      // Try current ABI first (3-param: address, uint256, DiamondCutData), then legacy (2-param).
+      let diamondCutData: { initCalldata: string };
+      try {
+        const adminCall = adminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data);
+        diamondCutData = adminCall[2] as { initCalldata: string };
+      } catch {
+        const legacyCall = legacyAdminIface.decodeFunctionData("upgradeChainFromVersion", calls[0].data);
+        diamondCutData = legacyCall[1] as { initCalldata: string };
+      }
+
       const proposedUpgrade = settlementLayerUpgradeIface.decodeFunctionData("upgrade", diamondCutData.initCalldata)[0] as {
         l2ProtocolUpgradeTx: { data: string };
       };
 
       return proposedUpgrade.l2ProtocolUpgradeTx.data;
-    } catch {
+    } catch (e) {
+      errors.push(`tx decode failed: ${e instanceof Error ? e.message : String(e)}`);
       continue;
     }
   }
 
-  throw new Error(`Missing upgradeChainFromVersion multicall input in ${broadcastPath}`);
+  throw new Error(
+    `Missing upgradeChainFromVersion multicall input in ${broadcastPath}\n` +
+      `  Transactions: ${transactions.length}\n` +
+      `  Errors:\n${errors.map((e) => `    - ${e}`).join("\n")}`
+  );
 }
 
 function decodeGovernanceCalls(hexBytes: string): Array<{ target: string; value: ethers.BigNumber; data: string }> {
@@ -290,23 +319,51 @@ function buildAddressToBytecodeMap(): Map<string, ContractName> {
  *   selector: 0x480d1185
  *   ForceDeployment = (bytes32 bytecodeHash, address newAddress, bool callConstructor, uint256 value, bytes input)
  */
-function decodeForceDeployments(upgradeTxData: string): { addresses: string[]; delegateTo: string } {
+function decodeForceDeployments(upgradeTxData: string): {
+  addresses: string[];
+  delegateTo: string;
+  innerCalldata: string;
+} {
   const FORCE_DEPLOY_AND_UPGRADE_SELECTOR = "0x480d1185";
-  if (!upgradeTxData.startsWith(FORCE_DEPLOY_AND_UPGRADE_SELECTOR)) {
+  // v29 ZKsyncOS: forceDeployAndUpgradeUniversal((bool,bytes,address)[],address,bytes)
+  const FORCE_DEPLOY_UNIVERSAL_V29_SELECTOR = "0x05a33414";
+  // v31: forceDeployAndUpgradeUniversal((uint8,bytes,address)[],address,bytes)
+  const FORCE_DEPLOY_UNIVERSAL_V31_SELECTOR = "0xd8cfca80";
+
+  const abiCoder = ethers.utils.defaultAbiCoder;
+  let forceDeployAddresses: string[];
+  let delegateTo: string;
+  let innerCalldata: string;
+
+  if (upgradeTxData.startsWith(FORCE_DEPLOY_AND_UPGRADE_SELECTOR)) {
+    const decoded = abiCoder.decode(
+      ["tuple(bytes32,address,bool,uint256,bytes)[]", "address", "bytes"],
+      "0x" + upgradeTxData.slice(10)
+    );
+    const forceDeployments = decoded[0] as Array<[string, string, boolean, ethers.BigNumber, string]>;
+    delegateTo = decoded[1] as string;
+    innerCalldata = decoded[2] as string;
+    forceDeployAddresses = forceDeployments.map((fd) => fd[1]);
+  } else if (
+    upgradeTxData.startsWith(FORCE_DEPLOY_UNIVERSAL_V29_SELECTOR) ||
+    upgradeTxData.startsWith(FORCE_DEPLOY_UNIVERSAL_V31_SELECTOR)
+  ) {
+    // Both v29 (bool,bytes,address) and v31 (uint8,bytes,address) have identical ABI encoding
+    const decoded = abiCoder.decode(
+      ["tuple(uint8,bytes,address)[]", "address", "bytes"],
+      "0x" + upgradeTxData.slice(10)
+    );
+    const forceDeployments = decoded[0] as Array<[number, string, string]>;
+    delegateTo = decoded[1] as string;
+    innerCalldata = decoded[2] as string;
+    forceDeployAddresses = forceDeployments.map((fd) => fd[2]);
+  } else {
     throw new Error(`Unexpected selector in upgrade tx data: ${upgradeTxData.slice(0, 10)}`);
   }
 
-  const abiCoder = ethers.utils.defaultAbiCoder;
-  const decoded = abiCoder.decode(
-    ["tuple(bytes32,address,bool,uint256,bytes)[]", "address", "bytes"],
-    "0x" + upgradeTxData.slice(10)
-  );
+  const addresses = forceDeployAddresses;
 
-  const forceDeployments = decoded[0] as Array<[string, string, boolean, ethers.BigNumber, string]>;
-  const delegateTo = decoded[1] as string;
-  const addresses = forceDeployments.map((fd) => fd[1]);
-
-  return { addresses, delegateTo };
+  return { addresses, delegateTo, innerCalldata };
 }
 
 /**
@@ -344,6 +401,11 @@ async function predeployForceDeploymentTargets(
   // Deploy the delegateTo target (L2V31Upgrade) — this is the version-specific
   // upgrader that ComplexUpgrader delegatecalls after the force deployments.
   await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V31Upgrade")]);
+
+  // Always deploy the current L2ComplexUpgrader. Older states may have a version
+  // with a different forceDeployAndUpgradeUniversal struct layout. The test will
+  // patch the calldata selector to match the new version.
+  await l2Provider.send("anvil_setCode", [L2_COMPLEX_UPGRADER_ADDR, getBytecode("L2ComplexUpgrader")]);
 
   // Also deploy any predeploy contracts that don't have code yet. These are
   // v31-only contracts (InteropCenter, InteropHandler, L2AssetTracker, etc.)
@@ -406,10 +468,19 @@ async function executeL2UpgradeTxs(
     // via anvil_setCode so the upgrade logic finds the correct bytecodes.
     await predeployForceDeploymentTargets(l2Provider, rewrittenUpgradeTxData, isZKsyncOS);
 
+    // On Anvil EVM, all L2 contracts have already been pre-deployed via anvil_setCode.
+    // The force-deployment phase inside forceDeployAndUpgrade / forceDeployAndUpgradeUniversal
+    // can't run because it needs real zkVM/ZKsyncOS contract deployer infrastructure.
+    // Instead, re-encode the calldata as `upgrade(delegateTo, calldata)` which skips
+    // the force deployments and just delegatecalls to the upgrade contract.
+    const { delegateTo, innerCalldata } = decodeForceDeployments(rewrittenUpgradeTxData);
+    const upgradeIface = new ethers.utils.Interface(["function upgrade(address,bytes)"]);
+    const finalUpgradeTxData = upgradeIface.encodeFunctionData("upgrade", [delegateTo, innerCalldata]);
+
     const relayReceipt = await impersonateAndRun(l2Provider, L2_FORCE_DEPLOYER_ADDR, async (signer) => {
       const tx = await signer.sendTransaction({
         to: L2_COMPLEX_UPGRADER_ADDR,
-        data: rewrittenUpgradeTxData,
+        data: finalUpgradeTxData,
         gasLimit: 100_000_000,
       });
       return tx.wait();
