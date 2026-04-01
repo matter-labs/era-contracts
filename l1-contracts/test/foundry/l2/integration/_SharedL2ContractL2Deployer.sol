@@ -93,6 +93,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         // Generate mock force deployments data for L2 tests
         _generateMockForceDeploymentsData(_l1ChainId);
         console.log("Deploying L2 contracts");
+        instantiateCreate2Factory();
         ctmAddresses.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade());
         ctmAddresses.stateTransition.verifiers.verifier = address(
             new EraTestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE))
