@@ -14,10 +14,21 @@ import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeploy
 import {Call} from "contracts/governance/Common.sol";
 
 import {
+    GW_ASSET_TRACKER_ADDR,
+    L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
+    L2_BASE_TOKEN_HOLDER_ADDR,
+    L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
-    L2_VERSION_SPECIFIC_UPGRADER_ADDR
+    L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_HANDLER_ADDR,
+    L2_MESSAGE_ROOT_ADDR,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_VERSION_SPECIFIC_UPGRADER_ADDR,
+    L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {IComplexUpgraderZKsyncOSV29} from "contracts/state-transition/l2-deps/IComplexUpgraderZKsyncOSV29.sol";
 
@@ -109,20 +120,36 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         );
 
         if (config.isZKsyncOS) {
-            // The tx is executed by the pre-v31 L2ComplexUpgrader, so it must use the
-            // latest pre-upgrade ABI exposed on zksync-os-stable.
-            IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[]
-                memory universalForceDeployments = new IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[](1);
-            universalForceDeployments[0] = IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo({
-                isZKsyncOS: true,
-                deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade"),
-                newAddress: L2_VERSION_SPECIFIC_UPGRADER_ADDR
-            });
+            if (newConfig.useV29IntrospectionOverride) {
+                // v29 ZKsyncOS ComplexUpgrader uses the v29 ABI variant.
+                IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[]
+                    memory v29ForceDeployments = new IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[](1);
+                v29ForceDeployments[0] = IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo({
+                    isZKsyncOS: true,
+                    deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade"),
+                    newAddress: L2_VERSION_SPECIFIC_UPGRADER_ADDR
+                });
+
+                return (
+                    address(L2_COMPLEX_UPGRADER_ADDR),
+                    abi.encodeCall(
+                        IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal,
+                        (v29ForceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
+                    )
+                );
+            }
+
+            // v30+ ZKsyncOS ComplexUpgrader uses the current ABI.
+            // Include all system contracts in the outer force deployment list so
+            // that the test harness (which reads addresses from this list) can
+            // pre-deploy EVM bytecodes at every address the upgrade touches.
+            IComplexUpgrader.UniversalContractUpgradeInfo[]
+                memory universalForceDeployments = _buildZKsyncOSForceDeployments();
 
             return (
                 address(L2_COMPLEX_UPGRADER_ADDR),
                 abi.encodeCall(
-                    IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal,
+                    IComplexUpgrader.forceDeployAndUpgradeUniversal,
                     (universalForceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
                 )
             );
@@ -136,4 +163,65 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             )
         );
     }
+
+    /// @dev Build the full ZKsyncOS force deployment array from FixedForceDeploymentsData.
+    /// Maps each bytecodeInfo field to its well-known L2 address and includes L2V31Upgrade.
+    /// TODO: The base system contract entries could be moved to CTMUpgradeBase for reuse
+    /// by future version upgrades. Kept here for now since it references v31-specific data.
+    function _buildZKsyncOSForceDeployments()
+        internal
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
+    {
+        FixedForceDeploymentsData memory data = abi.decode(
+            newlyGeneratedData.fixedForceDeploymentsData,
+            (FixedForceDeploymentsData)
+        );
+
+        // All system contracts that performForceDeployedContractsInit deploys via
+        // conductContractUpgrade, plus contracts called during the upgrade (GWAssetTracker,
+        // WrappedBaseToken), plus the L2V31Upgrade delegateTo target.
+        uint256 count = 12;
+        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](count);
+
+        uint256 i = 0;
+        deployments[i++] = _zkosEntry(data.messageRootBytecodeInfo, address(L2_MESSAGE_ROOT_ADDR));
+        deployments[i++] = _zkosEntry(data.bridgehubBytecodeInfo, address(L2_BRIDGEHUB_ADDR));
+        deployments[i++] = _zkosEntry(data.l2AssetRouterBytecodeInfo, address(L2_ASSET_ROUTER_ADDR));
+        deployments[i++] = _zkosEntry(data.l2NtvBytecodeInfo, L2_NATIVE_TOKEN_VAULT_ADDR);
+        deployments[i++] = _zkosEntry(data.chainAssetHandlerBytecodeInfo, address(L2_CHAIN_ASSET_HANDLER_ADDR));
+        deployments[i++] = _zkosEntry(data.assetTrackerBytecodeInfo, L2_ASSET_TRACKER_ADDR);
+        deployments[i++] = _zkosEntry(data.interopCenterBytecodeInfo, address(L2_INTEROP_CENTER_ADDR));
+        deployments[i++] = _zkosEntry(data.interopHandlerBytecodeInfo, address(L2_INTEROP_HANDLER_ADDR));
+        deployments[i++] = _zkosEntry(data.baseTokenHolderBytecodeInfo, L2_BASE_TOKEN_HOLDER_ADDR);
+        // GWAssetTracker and WrappedBaseToken: called during upgrade (initL2, _ensureWethToken)
+        // but not deployed via conductContractUpgrade — include as unsafe force deployments.
+        deployments[i++] = IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+            deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("GWAssetTracker.sol", "GWAssetTracker"),
+            newAddress: GW_ASSET_TRACKER_ADDR
+        });
+        deployments[i++] = IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+            deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2WrappedBaseToken.sol", "L2WrappedBaseToken"),
+            newAddress: L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
+        });
+        // L2V31Upgrade: the delegateTo target
+        deployments[i++] = IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+            deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade"),
+            newAddress: L2_VERSION_SPECIFIC_UPGRADER_ADDR
+        });
+    }
+
+    function _zkosEntry(
+        bytes memory _bytecodeInfo,
+        address _addr
+    ) private pure returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
+        return IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
+            deployedBytecodeInfo: _bytecodeInfo,
+            newAddress: _addr
+        });
+    }
+
 }

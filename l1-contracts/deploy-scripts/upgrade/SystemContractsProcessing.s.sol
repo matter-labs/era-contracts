@@ -4,10 +4,14 @@ pragma solidity 0.8.28;
 import {console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../utils/Utils.sol";
 import {
+    GW_ASSET_TRACKER_ADDR,
     L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_HANDLER_ADDR,
     L2_INTEROP_ROOT_STORAGE,
     L2_MESSAGE_ROOT_ADDR,
     L2_MESSAGE_VERIFICATION,
@@ -38,7 +42,7 @@ struct SystemContract {
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
 uint256 constant SYSTEM_CONTRACTS_COUNT = 30;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
-uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 9;
+uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 13;
 
 library SystemContractsProcessing {
     /// @notice Retrieves the entire list of system contracts as a memory array
@@ -359,6 +363,10 @@ library SystemContractsProcessing {
         result[6] = ContractsBytecodesLib.getCreationCode("L2ChainAssetHandler");
         result[7] = ContractsBytecodesLib.getCreationCode("L2InteropRootStorage");
         result[8] = ContractsBytecodesLib.getCreationCode("BaseTokenHolder");
+        result[9] = ContractsBytecodesLib.getCreationCode("L2AssetTracker");
+        result[10] = ContractsBytecodesLib.getCreationCode("InteropCenter");
+        result[11] = ContractsBytecodesLib.getCreationCode("InteropHandler");
+        result[12] = ContractsBytecodesLib.getCreationCode("GWAssetTracker");
     }
 
     /// Note, that while proper initialization may require multiple steps,
@@ -436,6 +444,34 @@ library SystemContractsProcessing {
         forceDeployments[8] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[8]),
             newAddress: L2_BASE_TOKEN_HOLDER_ADDR,
+            callConstructor: false,
+            value: 0,
+            input: ""
+        });
+        forceDeployments[9] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[9]),
+            newAddress: L2_ASSET_TRACKER_ADDR,
+            callConstructor: false,
+            value: 0,
+            input: ""
+        });
+        forceDeployments[10] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[10]),
+            newAddress: L2_INTEROP_CENTER_ADDR,
+            callConstructor: false,
+            value: 0,
+            input: ""
+        });
+        forceDeployments[11] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[11]),
+            newAddress: L2_INTEROP_HANDLER_ADDR,
+            callConstructor: false,
+            value: 0,
+            input: ""
+        });
+        forceDeployments[12] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[12]),
+            newAddress: GW_ASSET_TRACKER_ADDR,
             callConstructor: false,
             value: 0,
             input: ""
