@@ -362,10 +362,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         bridgehub = L1Bridgehub(bridgehubAddr);
 
         // Determine which introspection method to use based on protocol version or override
-        bool useV29Introspection =
-            newConfig.hasV29IntrospectionOverride
-                ? newConfig.useV29IntrospectionOverride
-                : AddressIntrospector.shouldUseV29Introspection(bridgehubAddr);
+        bool useV29Introspection = newConfig.hasV29IntrospectionOverride
+            ? newConfig.useV29IntrospectionOverride
+            : AddressIntrospector.shouldUseV29Introspection(bridgehubAddr);
 
         // Use appropriate introspection based on version
         if (useV29Introspection) {
