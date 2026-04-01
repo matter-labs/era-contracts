@@ -16,6 +16,37 @@ use crate::common::{
     wallets::Wallet,
 };
 
+#[derive(Debug, Clone, Copy, clap::ValueEnum, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum EcosystemUpgradeStage {
+    NoGovernancePrepare,
+    GovernanceStage0,
+    GovernanceStage1,
+    GovernanceStage2,
+}
+
+impl std::fmt::Display for EcosystemUpgradeStage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoGovernancePrepare => write!(f, "no-governance-prepare"),
+            Self::GovernanceStage0 => write!(f, "governance-stage0"),
+            Self::GovernanceStage1 => write!(f, "governance-stage1"),
+            Self::GovernanceStage2 => write!(f, "governance-stage2"),
+        }
+    }
+}
+
+impl EcosystemUpgradeStage {
+    fn governance_stage_index(&self) -> Option<u8> {
+        match self {
+            Self::GovernanceStage0 => Some(0),
+            Self::GovernanceStage1 => Some(1),
+            Self::GovernanceStage2 => Some(2),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Serialize)]
 struct EcosystemUpgradeOutInput {
     stage: String,
@@ -41,9 +72,8 @@ pub struct EcosystemUpgradeArgs {
     #[serde(flatten)]
     pub shared: SharedRunArgs,
 
-    /// Ecosystem upgrade stage (currently supported: no-governance-prepare)
-    #[clap(long)]
-    pub ecosystem_upgrade_stage: String,
+    #[clap(long, value_enum)]
+    pub ecosystem_upgrade_stage: EcosystemUpgradeStage,
     /// Governance address (required for governance-stage* stages)
     #[clap(long)]
     pub governance_address: Option<Address>,
@@ -87,15 +117,14 @@ pub async fn run(args: EcosystemUpgradeArgs) -> anyhow::Result<()> {
         args.shared.forge_args.clone(),
     )?;
 
-    match args.ecosystem_upgrade_stage.as_str() {
-        "no-governance-prepare" => run_no_governance_prepare(&mut runner, &sender, &args),
-        "governance-stage0" => run_governance_stage(&mut runner, &sender, &args, 0),
-        "governance-stage1" => run_governance_stage(&mut runner, &sender, &args, 1),
-        "governance-stage2" => run_governance_stage(&mut runner, &sender, &args, 2),
-        other => anyhow::bail!(
-            "Unsupported ecosystem upgrade stage: {} (supported: no-governance-prepare, governance-stage0, governance-stage1, governance-stage2)",
-            other
-        ),
+    match args.ecosystem_upgrade_stage {
+        EcosystemUpgradeStage::NoGovernancePrepare => {
+            run_no_governance_prepare(&mut runner, &sender, &args)
+        }
+        stage => {
+            let idx = stage.governance_stage_index().unwrap();
+            run_governance_stage(&mut runner, &sender, &args, idx)
+        }
     }
 }
 
@@ -216,7 +245,7 @@ fn run_no_governance_prepare(
         run_json,
     };
     let input_env = EcosystemUpgradeOutInput {
-        stage: "no-governance-prepare".to_string(),
+        stage: EcosystemUpgradeStage::NoGovernancePrepare.to_string(),
     };
     write_output_if_requested(
         "ecosystem.upgrade",
@@ -339,7 +368,7 @@ fn run_governance_stage(
     })?;
 
     let input_env = EcosystemUpgradeOutInput {
-        stage: format!("governance-stage{}", stage),
+        stage: format!("governance-stage{stage}"),
     };
     let out_payload = GovernanceStageOutput {
         stage,
