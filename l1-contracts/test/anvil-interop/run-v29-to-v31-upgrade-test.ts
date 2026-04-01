@@ -275,17 +275,18 @@ async function main(): Promise<void> {
       rpcUrl: l1Chain.rpcUrl,
       senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
       projectRoot: l1ContractsDir,
-      sig: "noGovernancePrepareWithArgs(address,address,address,address,bool,string,string,address)",
-      args: [
+      sig: "noGovernancePrepare((address,address,address,address,bool,bytes32,string,string,address))",
+      args: `(${[
         l1Addresses.bridgehub,
         ctmAddress,
         ethers.constants.AddressZero,
         ethers.constants.AddressZero,
         "true",
+        "0x0000000000000000000000000000000000000000000000000000000000000000",
         upgradeHarnessInputs.upgradeInputPath,
         ecosystemOutputRelPath,
         governanceAddr,
-      ].join(" "),
+      ].join(",")})`,
     });
 
     // ── Step 5: Execute governance calls ──────────────────────────
