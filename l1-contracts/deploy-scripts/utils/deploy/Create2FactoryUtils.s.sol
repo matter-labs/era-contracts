@@ -76,12 +76,7 @@ abstract contract Create2FactoryUtils is Script {
     /// @return The deployed contract address.
     function deployViaCreate2(bytes memory bytecode) internal virtual returns (address) {
         _ensureCreate2Factory();
-        return
-            Utils.deployViaCreate2(
-                bytecode,
-                _create2FactorySalt,
-                create2FactoryState.create2FactoryAddress
-            );
+        return Utils.deployViaCreate2(bytecode, _create2FactorySalt, create2FactoryState.create2FactoryAddress);
     }
 
     /// @notice Deploys a contract via Create2 by concatenating the creation code and constructor arguments.

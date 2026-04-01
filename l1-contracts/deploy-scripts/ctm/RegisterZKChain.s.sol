@@ -418,8 +418,8 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
 
         // Eth-path operator (ZKsync Era): precommit / revert / upgrader. When dedicated ZKsync OS prove
         // and execute operators are set, they receive PROVER / EXECUTOR instead (see below).
-        bool zkSyncOsValidatorSplit = config.validatorSenderOperatorProve != address(0)
-            && config.validatorSenderOperatorExecute != address(0);
+        bool zkSyncOsValidatorSplit = config.validatorSenderOperatorProve != address(0) &&
+            config.validatorSenderOperatorExecute != address(0);
         validatorTimelock.addValidatorRoles(
             chainAddress,
             config.validatorSenderOperatorEth,

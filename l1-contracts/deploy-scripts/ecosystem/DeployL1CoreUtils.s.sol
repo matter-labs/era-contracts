@@ -27,7 +27,6 @@ import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol
 import {CoreDeployedAddresses} from "../utils/Types.sol";
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
 
-
 // solhint-disable-next-line gas-struct-packing
 struct Config {
     uint256 l1ChainId;

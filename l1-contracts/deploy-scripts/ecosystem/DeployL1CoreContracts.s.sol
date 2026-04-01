@@ -341,11 +341,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         );
 
         vm.serializeAddress("contracts", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
-        string memory contracts = vm.serializeBytes32(
-            "contracts",
-            "create2_factory_salt",
-            _create2FactorySalt
-        );
+        string memory contracts = vm.serializeBytes32("contracts", "create2_factory_salt", _create2FactorySalt);
 
         vm.serializeString("root", "contracts", contracts);
         vm.serializeUint("root", "l1_chain_id", config.l1ChainId);

@@ -121,11 +121,7 @@ library GatewayCTMDeployerHelper {
         )
     {
         create2FactoryAddress = _vms.getDeploymentTarget();
-        (contracts, deployerCalldata, deployers, directCalldata) = _calculateAddressesInner(
-            _create2Salt,
-            config,
-            _vms
-        );
+        (contracts, deployerCalldata, deployers, directCalldata) = _calculateAddressesInner(_create2Salt, config, _vms);
     }
 
     function _calculateAddressesInner(
@@ -409,11 +405,7 @@ library GatewayCTMDeployerHelper {
         EraZkosRouter _vms
     ) internal returns (address addr, bytes memory data) {
         bytes memory bytecode = _vms.readBytecodeL1Raw(fileName, contractName);
-        L1L2DeployPrepareResult memory result = _vms.prepareL1L2Deployment(
-            _create2Salt,
-            bytecode,
-            constructorArgs
-        );
+        L1L2DeployPrepareResult memory result = _vms.prepareL1L2Deployment(_create2Salt, bytecode, constructorArgs);
         addr = result.expectedAddress;
         data = result.data;
     }
@@ -462,14 +454,15 @@ library GatewayCTMDeployerHelper {
         GatewayValidatorTimelockDeployerResult memory validatorTimelockResult,
         Verifiers memory verifiersResult
     ) internal pure returns (GatewayCTMFinalConfig memory) {
-        return GatewayCTMFinalConfig({
-            baseConfig: config,
-            chainTypeManagerProxyAdmin: proxyAdminResult.chainTypeManagerProxyAdmin,
-            validatorTimelockProxy: validatorTimelockResult.validatorTimelockProxy,
-            facets: directAddresses.facets,
-            genesisUpgrade: directAddresses.genesisUpgrade,
-            verifier: verifiersResult.verifier
-        });
+        return
+            GatewayCTMFinalConfig({
+                baseConfig: config,
+                chainTypeManagerProxyAdmin: proxyAdminResult.chainTypeManagerProxyAdmin,
+                validatorTimelockProxy: validatorTimelockResult.validatorTimelockProxy,
+                facets: directAddresses.facets,
+                genesisUpgrade: directAddresses.genesisUpgrade,
+                verifier: verifiersResult.verifier
+            });
     }
 
     // ============ Address Calculation Helpers ============

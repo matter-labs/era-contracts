@@ -59,7 +59,6 @@ import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
 contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
 
-
     function run() public virtual {
         // Had to leave the function due to scripts that inherit this one, as well as for tests
         return ();
@@ -440,11 +439,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         );
 
         vm.serializeAddress("contracts", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
-        string memory contracts = vm.serializeBytes32(
-            "contracts",
-            "create2_factory_salt",
-            _create2FactorySalt
-        );
+        string memory contracts = vm.serializeBytes32("contracts", "create2_factory_salt", _create2FactorySalt);
 
         vm.serializeString("root", "chain_creation_params", chainCreationParams);
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);

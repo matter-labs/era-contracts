@@ -37,10 +37,7 @@ library EraZkosVerifierLifecycle {
     /// @notice Return the creation bytecode for the main (dual or testnet) verifier.
     function getVerifierCreationCode(bool _testnetVerifier, bool _isZKsyncOS) internal pure returns (bytes memory) {
         if (_testnetVerifier) {
-            return
-                _isZKsyncOS
-                    ? type(ZKsyncOSTestnetVerifier).creationCode
-                    : type(EraTestnetVerifier).creationCode;
+            return _isZKsyncOS ? type(ZKsyncOSTestnetVerifier).creationCode : type(EraTestnetVerifier).creationCode;
         }
         return _isZKsyncOS ? type(ZKsyncOSDualVerifier).creationCode : type(EraDualVerifier).creationCode;
     }

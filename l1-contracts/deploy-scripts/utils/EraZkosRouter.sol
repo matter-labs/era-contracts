@@ -21,11 +21,8 @@ library EraZkosPaths {
 
     /// @notice Absolute path to genesis / chain-creation JSON for the given VM mode.
     function genesisConfigPath(bool _isZKsyncOS) internal returns (string memory) {
-        return string.concat(
-            Utils.vm.projectRoot(),
-            "/../configs/genesis/",
-            _isZKsyncOS ? FILENAME_ZKOS : FILENAME_ERA
-        );
+        return
+            string.concat(Utils.vm.projectRoot(), "/../configs/genesis/", _isZKsyncOS ? FILENAME_ZKOS : FILENAME_ERA);
     }
 }
 
@@ -100,7 +97,9 @@ contract EraZkosRouter {
     }
 
     /// @notice Resolve the main verifier (dual or testnet) for the active VM.
-    function resolveMainVerifier(bool _testnet) public view returns (string memory fileName, string memory contractName) {
+    function resolveMainVerifier(
+        bool _testnet
+    ) public view returns (string memory fileName, string memory contractName) {
         return resolve(_testnet ? EraZkosContract.TestnetVerifier : EraZkosContract.DualVerifier);
     }
 
@@ -133,9 +132,7 @@ contract EraZkosRouter {
         if (IS_ZKSYNC_OS) {
             return Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
         }
-        return abi.encode(
-            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1(fileName, contractName))
-        );
+        return abi.encode(L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1(fileName, contractName)));
     }
 
     /// @notice Get a bytecode hash suitable for force deployments / upgrades.
@@ -164,12 +161,13 @@ contract EraZkosRouter {
             bytes memory initCode = abi.encodePacked(_bytecode, _constructorArgs);
             return Utils.vm.computeCreate2Address(_salt, keccak256(initCode), _deployer);
         }
-        return L2ContractHelper.computeCreate2Address(
-            _deployer,
-            _salt,
-            L2ContractHelper.hashL2Bytecode(_bytecode),
-            keccak256(_constructorArgs)
-        );
+        return
+            L2ContractHelper.computeCreate2Address(
+                _deployer,
+                _salt,
+                L2ContractHelper.hashL2Bytecode(_bytecode),
+                keccak256(_constructorArgs)
+            );
     }
 
     // ======================== Factory deps / bytecode publishing ========================
@@ -199,10 +197,7 @@ contract EraZkosRouter {
 
     /// @notice Check if a bytecode hash is present in the factory deps result.
     ///         For ZKsyncOS (empty result), always returns true since factory deps are not used.
-    function isHashInFactoryDeps(
-        FactoryDepsResult memory _result,
-        bytes32 _hash
-    ) public pure returns (bool) {
+    function isHashInFactoryDeps(FactoryDepsResult memory _result, bytes32 _hash) public pure returns (bool) {
         if (_result.factoryDepsHashes.length == 0) {
             return true;
         }
@@ -221,20 +216,14 @@ contract EraZkosRouter {
     }
 
     /// @notice Load chain creation params from the genesis config file at the given path.
-    function getChainCreationParams(
-        string memory _configPath
-    ) public returns (ChainCreationParamsConfig memory) {
+    function getChainCreationParams(string memory _configPath) public returns (ChainCreationParamsConfig memory) {
         return EraZkosGenesisConfig.getChainCreationParams(_configPath, IS_ZKSYNC_OS);
     }
 
     // ======================== Verifier lifecycle (delegated to EraZkosVerifierLifecycle) ========================
 
     /// @notice ZKsyncOS verifiers take an extra `owner` parameter.
-    function verifierCreationArgs(
-        address _fflonk,
-        address _plonk,
-        address _owner
-    ) public view returns (bytes memory) {
+    function verifierCreationArgs(address _fflonk, address _plonk, address _owner) public view returns (bytes memory) {
         return EraZkosVerifierLifecycle.getVerifierCreationArgs(_fflonk, _plonk, _owner, IS_ZKSYNC_OS);
     }
 
@@ -257,12 +246,7 @@ contract EraZkosRouter {
     /// @dev WARNING: This routes through EraZkosRouter, changing msg.sender.
     ///      For broadcast contexts where the caller must be the verifier owner,
     ///      use EraZkosVerifierLifecycle.initializeVerifier() directly as a library call.
-    function initializeVerifier(
-        address _verifier,
-        address _fflonk,
-        address _plonk,
-        address _owner
-    ) public {
+    function initializeVerifier(address _verifier, address _fflonk, address _plonk, address _owner) public {
         EraZkosVerifierLifecycle.initializeVerifier(_verifier, _fflonk, _plonk, _owner, IS_ZKSYNC_OS);
     }
 
@@ -383,25 +367,26 @@ contract EraZkosRouter {
         }
     }
 
-    function _readBytecodeL1(
-        string memory _fileName,
-        string memory _contractName
-    ) private returns (bytes memory) {
-        return IS_ZKSYNC_OS
-            ? Utils.readFoundryBytecodeL1(_fileName, _contractName)
-            : Utils.readZKFoundryBytecodeL1(_fileName, _contractName);
+    function _readBytecodeL1(string memory _fileName, string memory _contractName) private returns (bytes memory) {
+        return
+            IS_ZKSYNC_OS
+                ? Utils.readFoundryBytecodeL1(_fileName, _contractName)
+                : Utils.readZKFoundryBytecodeL1(_fileName, _contractName);
     }
 
     /// @notice Resolve a EraZkosContract enum to its contract name for the active VM.
     // solhint-disable-next-line code-complexity
     function _resolveContractName(EraZkosContract _c) private view returns (string memory) {
         // Contracts with different names per VM
-        if (_c == EraZkosContract.L2NativeTokenVault) return IS_ZKSYNC_OS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault";
-        if (_c == EraZkosContract.ChainTypeManager) return IS_ZKSYNC_OS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        if (_c == EraZkosContract.L2NativeTokenVault)
+            return IS_ZKSYNC_OS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault";
+        if (_c == EraZkosContract.ChainTypeManager)
+            return IS_ZKSYNC_OS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         if (_c == EraZkosContract.VerifierFflonk) return IS_ZKSYNC_OS ? "ZKsyncOSVerifierFflonk" : "EraVerifierFflonk";
         if (_c == EraZkosContract.VerifierPlonk) return IS_ZKSYNC_OS ? "ZKsyncOSVerifierPlonk" : "EraVerifierPlonk";
         if (_c == EraZkosContract.DualVerifier) return IS_ZKSYNC_OS ? "ZKsyncOSDualVerifier" : "EraDualVerifier";
-        if (_c == EraZkosContract.TestnetVerifier) return IS_ZKSYNC_OS ? "ZKsyncOSTestnetVerifier" : "EraTestnetVerifier";
+        if (_c == EraZkosContract.TestnetVerifier)
+            return IS_ZKSYNC_OS ? "ZKsyncOSTestnetVerifier" : "EraTestnetVerifier";
         if (_c == EraZkosContract.L2BaseToken) return IS_ZKSYNC_OS ? "L2BaseTokenZKOS" : "L2BaseTokenEra";
         if (_c == EraZkosContract.GatewayCTMDeployerCTM) {
             return IS_ZKSYNC_OS ? "GatewayCTMDeployerCTMZKsyncOS" : "GatewayCTMDeployerCTM";

@@ -313,5 +313,4 @@ contract DefaultEcosystemUpgrade is Script {
         console.log("Stage 1 calls:", stage1Calls.length);
         console.log("Stage 2 calls:", stage2Calls.length);
     }
-
 }

@@ -207,11 +207,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         );
 
         proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: composeUpgradeTx(
-                forceDeployments,
-                factoryDepsHashes,
-                protocolUpgradeNonce
-            ),
+            l2ProtocolUpgradeTx: composeUpgradeTx(forceDeployments, factoryDepsHashes, protocolUpgradeNonce),
             bootloaderHash: chainCreationParams.bootloaderHash,
             defaultAccountHash: chainCreationParams.defaultAAHash,
             evmEmulatorHash: chainCreationParams.evmEmulatorHash,

@@ -79,7 +79,7 @@ pub struct ChainInitArgs {
     pub prove_operator: Address,
     /// L1 batch execute operator (ZKSync OS only)
     #[clap(long, help_heading = "Input")]
-    pub execute_operator: Address,
+    pub execute_operator: Option<Address>,
     /// VM type: zksyncos or eravm
     #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM, help_heading = "Input")]
     pub vm_type: VMOption,
@@ -182,7 +182,7 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         owner: owner.address,
         commit_operator: args.commit_operator,
         prove_operator: args.prove_operator,
-        execute_operator: args.execute_operator,
+        execute_operator: args.execute_operator.unwrap_or_else(|| Address::zero()),
         token_multiplier_setter: args.token_multiplier_setter,
         da_mode: args.da_mode,
         vm_type: args.vm_type,

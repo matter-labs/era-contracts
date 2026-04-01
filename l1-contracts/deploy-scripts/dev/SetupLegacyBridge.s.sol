@@ -165,5 +165,4 @@ contract SetupLegacyBridge is Create2FactoryUtils, ISetupLegacyBridge {
             keccak256(constructorargs)
         );
     }
-
 }
