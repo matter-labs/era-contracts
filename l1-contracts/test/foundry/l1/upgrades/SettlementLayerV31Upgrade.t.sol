@@ -107,10 +107,7 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
         proposedUpgrade.l2ProtocolUpgradeTx.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
         proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
             IComplexUpgrader.upgrade,
-            (
-                L2_VERSION_SPECIFIC_UPGRADER_ADDR,
-                _placeholderV31Calldata()
-            )
+            (L2_VERSION_SPECIFIC_UPGRADER_ADDR, _placeholderV31Calldata())
         );
     }
 
@@ -246,19 +243,24 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
     function _expectedV31Calldata() internal view returns (bytes memory) {
         // The rewrite preserves isZKsyncOS, ctmDeployer, fixedForceDeploymentsData from
         // the placeholder and replaces additionalForceDeploymentsData with chain-specific data.
-        return abi.encodeCall(
-            IL2V31Upgrade.upgrade,
-            (
-                false,
-                address(0),
-                "",
-                upgrade.exposeBuildChainSpecificForceDeploymentsData(mockBridgehub, testChainId)
-            )
-        );
+        return
+            abi.encodeCall(
+                IL2V31Upgrade.upgrade,
+                (
+                    false,
+                    address(0),
+                    "",
+                    upgrade.exposeBuildChainSpecificForceDeploymentsData(mockBridgehub, testChainId)
+                )
+            );
     }
 
     function _assertUpgradeRewritesTx(bytes memory originalUpgradeTxData) internal {
-        bytes memory expectedUpgradeTxData = upgrade.getL2UpgradeTxData(mockBridgehub, testChainId, originalUpgradeTxData);
+        bytes memory expectedUpgradeTxData = upgrade.getL2UpgradeTxData(
+            mockBridgehub,
+            testChainId,
+            originalUpgradeTxData
+        );
         proposedUpgrade.l2ProtocolUpgradeTx.data = expectedUpgradeTxData;
         bytes32 expectedTxHash = keccak256(abi.encode(proposedUpgrade.l2ProtocolUpgradeTx));
 
@@ -270,7 +272,6 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
 }
 
 contract SettlementLayerV31UpgradeSharedTest is SettlementLayerV31UpgradeTestBase {
-
     function test_RevertWhen_NotAllBatchesExecuted() public {
         _setupMocks();
 
@@ -375,7 +376,9 @@ contract SettlementLayerV31UpgradeSharedTest is SettlementLayerV31UpgradeTestBas
             (L2_VERSION_SPECIFIC_UPGRADER_ADDR, abi.encodeWithSignature("wrongSelector()"))
         );
 
-        vm.expectRevert(abi.encodeWithSelector(UnsupportedL2UpgradeSelector.selector, bytes4(keccak256("wrongSelector()"))));
+        vm.expectRevert(
+            abi.encodeWithSelector(UnsupportedL2UpgradeSelector.selector, bytes4(keccak256("wrongSelector()")))
+        );
         upgrade.upgrade(proposedUpgrade);
     }
 
