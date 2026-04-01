@@ -182,7 +182,7 @@ fn run_no_governance_prepare(
     script_args.add_arg(ForgeScriptArg::Broadcast);
     script_args.add_arg(ForgeScriptArg::Ffi);
     script_args.add_arg(ForgeScriptArg::GasLimit {
-        gas_limit: 1000000000000,
+        gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
     });
     // Struct fields are passed as a single tuple argument in parentheses.
     let params_tuple = format!(
@@ -345,7 +345,7 @@ fn run_governance_stage(
     script_args.add_arg(ForgeScriptArg::Broadcast);
     script_args.add_arg(ForgeScriptArg::Ffi);
     script_args.add_arg(ForgeScriptArg::GasLimit {
-        gas_limit: 1000000000000,
+        gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
     });
     script_args.additional_args.extend([
         format!("0x{}", encoded_calls_hex.trim_start_matches("0x")),

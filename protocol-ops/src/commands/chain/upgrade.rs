@@ -63,7 +63,7 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
     });
     script_args.add_arg(ForgeScriptArg::Ffi);
     script_args.add_arg(ForgeScriptArg::GasLimit {
-        gas_limit: 1000000000000,
+        gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
     });
     script_args.add_arg(ForgeScriptArg::PrivateKey {
         private_key: format!("{:#x}", private_key),
