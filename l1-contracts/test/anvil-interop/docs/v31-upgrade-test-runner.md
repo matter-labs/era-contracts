@@ -178,7 +178,7 @@ The existing ComplexUpgrader from the v29/v30 state is used as-is. The L1 side
 calldata using the matching ABI (Era `forceDeployAndUpgrade` for v29, ZKsyncOS
 `forceDeployAndUpgradeUniversal` for v30). No replacement needed.
 
-**Patch: L2BaseToken replacement (Era chains only)**
+### Patch: L2BaseToken replacement (Era chains only)
 
 - Production: `L2V31Upgrade.upgrade()` calls `L2BaseToken.initL2(l1ChainId)`.
   On Era, `L2BaseTokenEra.initL2()` reads `__DEPRECATED_totalSupply` from storage and
@@ -191,7 +191,7 @@ calldata using the matching ABI (Era `forceDeployAndUpgrade` for v29, ZKsyncOS
 - Why needed: Without this, `initL2()` on ZKsyncOS-style BaseToken would call a nonexistent
   precompile and revert.
 
-**Patch: SystemContractProxyAdmin owner (ZKsyncOS chains only)**
+### Patch: SystemContractProxyAdmin owner (ZKsyncOS chains only)
 
 - Production: On ZKsyncOS chains, `performForceDeployedContractsInit(false)` calls
   `conductContractUpgrade(ZKsyncOSSystemProxyUpgrade, ...)` → `updateZKsyncOSContract()`
@@ -211,24 +211,25 @@ token balances from NTV to AssetTracker. **No patches** — this is pure L1 logi
 ### 8. Verification
 
 No patches. Reads on-chain state to assert:
+
 - `L2AssetTracker.L1_CHAIN_ID` is set correctly on each L2 chain
 - The base token is registered in L2AssetTracker on each L2 chain
 - `getProtocolVersion()` on each diamond proxy returns `0x1f00000000` (v31)
 
 ## Summary table
 
-| # | Patch | Where | Production behavior | Test behavior | Mechanism |
-|---|-------|-------|-------------------|---------------|-----------|
-| 1 | Ownership transfers | `transferL1Ownership` | Governance already owns contracts | Transfer from deployer to governance | `transferOwnership()` + `acceptOwnership()` |
-| 2 | ChainAdmin deployment | `deployChainAdmins` | Chain admins already exist | Deploy fresh ChainAdminOwnable | `new ChainAdminOwnable()` + `setPendingAdmin` + `acceptAdmin` |
-| 3 | Script splitting | `_EcosystemUpgradeV31ForTests.sol` | Single `run()` call | Split into step1 + step2 | Separate Forge invocations |
-| 4 | Idempotent core upgrade | `CoreUpgradeV31Idempotent` | N/A (single run) | step2 skips `updateContractConnections()` | Override `deployNewEcosystemContractsL1()` |
-| 5 | Skip factory deps check | `CTMUpgradeV31ForTests` | Validates ZK bytecode lengths | Skip validation | `setSkipFactoryDepsCheck_TestOnly(true)` |
-| 6 | Clear genesis upgrade hash | `clearGenesisUpgradeTxHash` | Server clears after batch processing | Clear via storage write | `anvil_setStorageAt(proxy, 0x22, 0x0)` |
-| 7 | Seed batch counters | `seedBatchCounters` | Real batches executed | Set counters to 1 | `anvil_setStorageAt(proxy, slot11/13, 1)` |
-| 8 | Pre-deploy L2 contracts + MockContractDeployer | `deployL2Contracts` | ContractDeployer force-deploys ZK bytecodes | `anvil_setCode` places EVM bytecodes at addresses from the force deployment calldata; MockContractDeployer (no-op fallback) at 0x8006 makes force-deploy calls succeed | `anvil_setCode` for each address in calldata |
-| 9 | L2BaseToken (Era) | `deployL2Contracts` | `L2BaseTokenEra.initL2()` reads storage; `L2BaseTokenZKOS.initL2()` calls MINT precompile | Use `L2BaseTokenEra` (storage-based) | `anvil_setCode` — MINT_BASE_TOKEN_HOOK precompile doesn't exist on Anvil |
-| 10 | SystemContractProxyAdmin (ZKsyncOS) | `deployL2Contracts` | Owner = ComplexUpgrader from genesis | Set owner via storage write | `anvil_setStorageAt(proxyAdmin, slot0, upgrader)` — `upgrade()` requires `onlyOwner` |
+| #   | Patch                                          | Where                              | Production behavior                                                                       | Test behavior                                                                                                                                                          | Mechanism                                                                            |
+| --- | ---------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 1   | Ownership transfers                            | `transferL1Ownership`              | Governance already owns contracts                                                         | Transfer from deployer to governance                                                                                                                                   | `transferOwnership()` + `acceptOwnership()`                                          |
+| 2   | ChainAdmin deployment                          | `deployChainAdmins`                | Chain admins already exist                                                                | Deploy fresh ChainAdminOwnable                                                                                                                                         | `new ChainAdminOwnable()` + `setPendingAdmin` + `acceptAdmin`                        |
+| 3   | Script splitting                               | `_EcosystemUpgradeV31ForTests.sol` | Single `run()` call                                                                       | Split into step1 + step2                                                                                                                                               | Separate Forge invocations                                                           |
+| 4   | Idempotent core upgrade                        | `CoreUpgradeV31Idempotent`         | N/A (single run)                                                                          | step2 skips `updateContractConnections()`                                                                                                                              | Override `deployNewEcosystemContractsL1()`                                           |
+| 5   | Skip factory deps check                        | `CTMUpgradeV31ForTests`            | Validates ZK bytecode lengths                                                             | Skip validation                                                                                                                                                        | `setSkipFactoryDepsCheck_TestOnly(true)`                                             |
+| 6   | Clear genesis upgrade hash                     | `clearGenesisUpgradeTxHash`        | Server clears after batch processing                                                      | Clear via storage write                                                                                                                                                | `anvil_setStorageAt(proxy, 0x22, 0x0)`                                               |
+| 7   | Seed batch counters                            | `seedBatchCounters`                | Real batches executed                                                                     | Set counters to 1                                                                                                                                                      | `anvil_setStorageAt(proxy, slot11/13, 1)`                                            |
+| 8   | Pre-deploy L2 contracts + MockContractDeployer | `deployL2Contracts`                | ContractDeployer force-deploys ZK bytecodes                                               | `anvil_setCode` places EVM bytecodes at addresses from the force deployment calldata; MockContractDeployer (no-op fallback) at 0x8006 makes force-deploy calls succeed | `anvil_setCode` for each address in calldata                                         |
+| 9   | L2BaseToken (Era)                              | `deployL2Contracts`                | `L2BaseTokenEra.initL2()` reads storage; `L2BaseTokenZKOS.initL2()` calls MINT precompile | Use `L2BaseTokenEra` (storage-based)                                                                                                                                   | `anvil_setCode` — MINT_BASE_TOKEN_HOOK precompile doesn't exist on Anvil             |
+| 10  | SystemContractProxyAdmin (ZKsyncOS)            | `deployL2Contracts`                | Owner = ComplexUpgrader from genesis                                                      | Set owner via storage write                                                                                                                                            | `anvil_setStorageAt(proxyAdmin, slot0, upgrader)` — `upgrade()` requires `onlyOwner` |
 
 ## What IS tested end-to-end (unpatched production code)
 

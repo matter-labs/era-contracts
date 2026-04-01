@@ -9,6 +9,7 @@ non-genesis initialization of all L2 system contracts. It takes `_isGenesisUpgra
 - **Non-genesis upgrade** (`_isGenesisUpgrade=false`): calls `updateL2()` on each contract
 
 For non-genesis, `performForceDeployedContractsInit` already:
+
 1. Calls `NTV.updateL2()` with all required params from `FixedForceDeploymentsData` + `ZKChainSpecificForceDeploymentsData`
 2. Calls `L2Bridgehub.updateL2()` and `setAddresses()`
 3. Calls `L2AssetRouter.updateL2()`
@@ -29,6 +30,7 @@ already does, plus adds v31-specific logic:
 ## Problem: duplication and circularity
 
 `L2V31Upgrade` reimplements the NTV `updateL2` call but:
+
 - Reads `L2_TOKEN_PROXY_BYTECODE_HASH`, `L2_LEGACY_SHARED_BRIDGE`, `WETH_TOKEN` from NTV
   and passes them back — circular, wasteful
 - Doesn't handle the other contracts (Bridgehub, AssetRouter, ChainAssetHandler, InteropCenter)
@@ -47,33 +49,32 @@ for the standard contract initialization, and only add the v31-specific logic on
 
 ```solidity
 function upgrade(
-    bool _isZKsyncOS,
-    address _ctmDeployer,
-    bytes calldata _fixedForceDeploymentsData,
-    bytes calldata _additionalForceDeploymentsData
+  bool _isZKsyncOS,
+  address _ctmDeployer,
+  bytes calldata _fixedForceDeploymentsData,
+  bytes calldata _additionalForceDeploymentsData
 ) external {
-    acrossRecovery();
+  acrossRecovery();
 
-    // Standard non-genesis initialization of all L2 system contracts
-    L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
-        _isZKsyncOS,
-        _ctmDeployer,
-        _fixedForceDeploymentsData,
-        _additionalForceDeploymentsData,
-        false // isGenesisUpgrade
-    );
+  // Standard non-genesis initialization of all L2 system contracts
+  L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
+    _isZKsyncOS,
+    _ctmDeployer,
+    _fixedForceDeploymentsData,
+    _additionalForceDeploymentsData,
+    false // isGenesisUpgrade
+  );
 
-    // V31-specific: register base token in the new AssetTracker
-    IL2AssetTracker(L2_ASSET_TRACKER_ADDR).registerBaseTokenDuringUpgrade();
+  // V31-specific: register base token in the new AssetTracker
+  IL2AssetTracker(L2_ASSET_TRACKER_ADDR).registerBaseTokenDuringUpgrade();
 
-    // V31-specific: initialize BaseToken (sets L1_CHAIN_ID and BaseTokenHolder balance)
-    IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(
-        L2AssetTracker(L2_ASSET_TRACKER_ADDR).L1_CHAIN_ID()
-    );
+  // V31-specific: initialize BaseToken (sets L1_CHAIN_ID and BaseTokenHolder balance)
+  IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(L2AssetTracker(L2_ASSET_TRACKER_ADDR).L1_CHAIN_ID());
 }
 ```
 
 This eliminates:
+
 - The `L2V31UpgradeData` struct entirely
 - The circular NTV reads
 - Duplication between L2V31Upgrade and L2GenesisForceDeploymentsHelper
@@ -86,6 +87,7 @@ path already produces, which is available from the CTM's chain creation params.
 ## What L2GenesisForceDeploymentsHelper non-genesis path does NOT do
 
 These are v31-specific and must remain in `L2V31Upgrade`:
+
 - `acrossRecovery()` — one-time Across protocol fix
 - `registerBaseTokenDuringUpgrade()` — registers base token in the new L2AssetTracker
 - `baseToken.initL2()` — only called during genesis normally, but v31 needs it for existing chains
@@ -96,5 +98,6 @@ These are v31-specific and must remain in `L2V31Upgrade`:
 With this approach, the Anvil test no longer needs to worry about NTV circularity. The
 `FixedForceDeploymentsData` and `ZKChainSpecificForceDeploymentsData` carry all values from L1.
 The Anvil L2 state only needs:
+
 1. `MockContractDeployer` at 0x8006 (for Era-style `forceDeployAndUpgrade`)
 2. `L2V31Upgrade` bytecode at 0x10001 (the delegateTo target)

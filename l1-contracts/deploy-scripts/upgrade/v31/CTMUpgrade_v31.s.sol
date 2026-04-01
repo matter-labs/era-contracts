@@ -217,11 +217,11 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         bytes memory _bytecodeInfo,
         address _addr
     ) private pure returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
-        return IComplexUpgrader.UniversalContractUpgradeInfo({
-            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
-            deployedBytecodeInfo: _bytecodeInfo,
-            newAddress: _addr
-        });
+        return
+            IComplexUpgrader.UniversalContractUpgradeInfo({
+                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
+                deployedBytecodeInfo: _bytecodeInfo,
+                newAddress: _addr
+            });
     }
-
 }

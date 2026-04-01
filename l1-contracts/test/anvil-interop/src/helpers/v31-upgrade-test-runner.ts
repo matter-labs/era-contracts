@@ -114,9 +114,24 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     if (!govCalls) {
       throw new Error("No governance_calls section in ecosystem output");
     }
-    await executeGovernanceCalls(l1Provider, l1Addresses.governance, decodeGovernanceCalls(govCalls.stage0_calls), "Stage 0");
-    await executeGovernanceCalls(l1Provider, l1Addresses.governance, decodeGovernanceCalls(govCalls.stage1_calls), "Stage 1");
-    await executeGovernanceCalls(l1Provider, l1Addresses.governance, decodeGovernanceCalls(govCalls.stage2_calls), "Stage 2");
+    await executeGovernanceCalls(
+      l1Provider,
+      l1Addresses.governance,
+      decodeGovernanceCalls(govCalls.stage0_calls),
+      "Stage 0"
+    );
+    await executeGovernanceCalls(
+      l1Provider,
+      l1Addresses.governance,
+      decodeGovernanceCalls(govCalls.stage1_calls),
+      "Stage 1"
+    );
+    await executeGovernanceCalls(
+      l1Provider,
+      l1Addresses.governance,
+      decodeGovernanceCalls(govCalls.stage2_calls),
+      "Stage 2"
+    );
 
     // ── Prepare diamond state for chain upgrades ──
     if (scenario.clearGenesisUpgradeTxHash) {
@@ -169,7 +184,13 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
 async function transferL1Ownership(
   provider: ethers.providers.JsonRpcProvider,
   defaultSigner: ethers.Wallet,
-  l1Addresses: { governance: string; bridgehub: string; l1SharedBridge: string; l1NativeTokenVault: string; l1AssetTracker: string },
+  l1Addresses: {
+    governance: string;
+    bridgehub: string;
+    l1SharedBridge: string;
+    l1NativeTokenVault: string;
+    l1AssetTracker: string;
+  },
   ctmAddresses: { chainTypeManager: string },
   scenario: V31UpgradeScenario
 ): Promise<void> {
@@ -225,10 +246,7 @@ async function deployChainAdmins(
 
 // ── Ecosystem upgrade (L1 forge scripts) ─────────────────────────────
 
-async function runEcosystemUpgradeScripts(
-  rpcUrl: string,
-  envVars: Record<string, string>
-): Promise<void> {
+async function runEcosystemUpgradeScripts(rpcUrl: string, envVars: Record<string, string>): Promise<void> {
   const baseParams = {
     scriptPath: ECOSYSTEM_UPGRADE_TEST_SCRIPT,
     envVars,
@@ -254,8 +272,15 @@ async function runChainUpgradesAndRelayL2(params: {
   upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>;
   isZKsyncOS: boolean;
 }): Promise<void> {
-  const { l1Provider, anvilManager, bridgehubAddr, settlementLayerUpgradeAddr, ctmAddr, upgradeChainAddresses, isZKsyncOS } =
-    params;
+  const {
+    l1Provider,
+    anvilManager,
+    bridgehubAddr,
+    settlementLayerUpgradeAddr,
+    ctmAddr,
+    upgradeChainAddresses,
+    isZKsyncOS,
+  } = params;
 
   const settlementLayerUpgrade = new ethers.Contract(
     settlementLayerUpgradeAddr,
@@ -399,7 +424,6 @@ async function deployL2Contracts(
   await l2Provider.send("anvil_setCode", [L2_BASE_TOKEN_ADDR, getBytecode("L2BaseTokenEra")]);
 }
 
-
 // ── Calldata decoding ────────────────────────────────────────────────
 
 /**
@@ -473,7 +497,7 @@ function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
   for (const transaction of [...transactions].reverse()) {
     const input = extractTxInput(transaction);
     if (typeof input !== "string" || input.length <= 10) {
-      errors.push(`tx skipped: input too short`);
+      errors.push("tx skipped: input too short");
       continue;
     }
 
@@ -527,10 +551,7 @@ function printCastRunTrace(txHash: string, rpcUrl: string): void {
 /**
  * Trace a failed transaction via debug_traceTransaction and return a human-readable summary.
  */
-async function traceFailedTx(
-  provider: ethers.providers.JsonRpcProvider,
-  txHash: string
-): Promise<string> {
+async function traceFailedTx(provider: ethers.providers.JsonRpcProvider, txHash: string): Promise<string> {
   try {
     const tx = await provider.getTransaction(txHash);
     const receipt = await provider.getTransactionReceipt(txHash);
@@ -553,7 +574,7 @@ async function traceFailedTx(
     } catch (callErr: unknown) {
       const reason =
         callErr instanceof Error
-          ? (callErr as { reason?: string }).reason ?? callErr.message.slice(0, 200)
+          ? ((callErr as { reason?: string }).reason ?? callErr.message.slice(0, 200))
           : String(callErr).slice(0, 200);
       lines.push(`  revert reason: ${reason}`);
     }
@@ -686,6 +707,7 @@ async function transferOwnership2Step(
 // ── TOML config helpers ──────────────────────────────────────────────
 
 function replaceTomlStringValue(contents: string, key: string, value: string): string {
+  // eslint-disable-next-line no-useless-escape
   const pattern = new RegExp(`^(${key}\\s*=\\s*\").*(\")$`, "m");
   return pattern.test(contents) ? contents.replace(pattern, `$1${value}$2`) : contents;
 }

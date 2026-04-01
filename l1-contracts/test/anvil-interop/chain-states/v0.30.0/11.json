@@ -434,9 +434,7 @@
         "traces": [
           {
             "parent": null,
-            "children": [
-              1
-            ],
+            "children": [1],
             "idx": 0,
             "trace": {
               "depth": 0,
@@ -466,10 +464,7 @@
           },
           {
             "parent": 0,
-            "children": [
-              2,
-              3
-            ],
+            "children": [2, 3],
             "idx": 1,
             "trace": {
               "depth": 1,
@@ -493,9 +488,7 @@
             "logs": [
               {
                 "raw_log": {
-                  "topics": [
-                    "0xd01e21be66147e834d803d6e8b8656aabf0c7c4cb36947b8c3cac47be96afd84"
-                  ],
+                  "topics": ["0xd01e21be66147e834d803d6e8b8656aabf0c7c4cb36947b8c3cac47be96afd84"],
                   "data": "0x000000000000000000000000000000000000000000000000000000000000000b"
                 },
                 "decoded": null,
@@ -580,9 +573,7 @@
         "logs": [
           {
             "address": "0x000000000000000000000000000000000000800f",
-            "topics": [
-              "0xd01e21be66147e834d803d6e8b8656aabf0c7c4cb36947b8c3cac47be96afd84"
-            ],
+            "topics": ["0xd01e21be66147e834d803d6e8b8656aabf0c7c4cb36947b8c3cac47be96afd84"],
             "data": "0x000000000000000000000000000000000000000000000000000000000000000b"
           }
         ],

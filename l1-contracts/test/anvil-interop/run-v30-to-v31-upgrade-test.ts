@@ -14,9 +14,11 @@ runV31UpgradeScenario({
   // In v30, l1AssetTracker address is actually the old L1ChainAssetHandler.
   // Governance needs ownership to call pauseMigration() in stage 0.
   transferL1AssetTrackerOwnership: true,
-}).then(() => {
-  process.exit(0);
-}).catch((error) => {
-  console.error("V30 ZKsync OS -> V31 upgrade test failed:", error.message || error);
-  process.exit(1);
-});
+})
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error("V30 ZKsync OS -> V31 upgrade test failed:", error.message || error);
+    process.exit(1);
+  });

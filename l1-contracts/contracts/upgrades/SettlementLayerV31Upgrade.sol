@@ -107,8 +107,9 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
             bool isZKsyncOS,
             address ctmDeployer,
             bytes memory fixedForceDeploymentsData,
-            // ignore placeholder additionalForceDeploymentsData
-        ) = abi.decode(_existingUpgradeCalldata.slice(4), (bool, address, bytes, bytes));
+
+        ) = // ignore placeholder additionalForceDeploymentsData
+            abi.decode(_existingUpgradeCalldata.slice(4), (bool, address, bytes, bytes));
 
         // Construct per-chain ZKChainSpecificForceDeploymentsData from L1 state.
         bytes memory additionalForceDeploymentsData = _buildChainSpecificForceDeploymentsData(_bridgehub, _chainId);
@@ -183,7 +184,10 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
             bytes memory l2V31UpgradeCalldata = getL2V31UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);
 
             return
-                abi.encodeCall(IComplexUpgrader.forceDeployAndUpgrade, (forceDeployments, delegateTo, l2V31UpgradeCalldata));
+                abi.encodeCall(
+                    IComplexUpgrader.forceDeployAndUpgrade,
+                    (forceDeployments, delegateTo, l2V31UpgradeCalldata)
+                );
         }
 
         if (selector == IComplexUpgrader.forceDeployAndUpgradeUniversal.selector) {
@@ -191,10 +195,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
                 IComplexUpgrader.UniversalContractUpgradeInfo[] memory forceDeployments,
                 address delegateTo,
                 bytes memory existingUpgradeCalldata
-            ) = abi.decode(
-                _existingTxData.slice(4),
-                (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes)
-            );
+            ) = abi.decode(_existingTxData.slice(4), (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes));
 
             _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
             bytes memory l2V31UpgradeCalldata = getL2V31UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);
@@ -212,9 +213,9 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
                 address delegateTo,
                 bytes memory existingUpgradeCalldata
             ) = abi.decode(
-                _existingTxData.slice(4),
-                (IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[], address, bytes)
-            );
+                    _existingTxData.slice(4),
+                    (IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[], address, bytes)
+                );
 
             _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
             bytes memory l2V31UpgradeCalldata = getL2V31UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);

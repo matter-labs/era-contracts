@@ -22,7 +22,10 @@ export class AnvilManager {
     try {
       const output = execSync(`lsof -ti :${port}`, { encoding: "utf-8" }).trim();
       if (output) {
-        const pids = output.split("\n").map((p) => p.trim()).filter(Boolean);
+        const pids = output
+          .split("\n")
+          .map((p) => p.trim())
+          .filter(Boolean);
         for (const pid of pids) {
           try {
             process.kill(Number(pid), "SIGKILL");
