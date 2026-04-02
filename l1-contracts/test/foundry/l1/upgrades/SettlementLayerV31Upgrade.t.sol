@@ -18,8 +18,8 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {IComplexUpgraderZKsyncOSV29} from "contracts/state-transition/l2-deps/IComplexUpgraderZKsyncOSV29.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
+import {ZKsyncOSSettlementLayerV31Upgrade} from "contracts/upgrades/ZKsyncOSSettlementLayerV31Upgrade.sol";
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 import {
     L2_COMPLEX_UPGRADER_ADDR,
@@ -99,9 +99,12 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
     function _prepareV31ProposedUpgrade() internal {
         _prepareProposedUpgrade();
         proposedUpgrade.l2ProtocolUpgradeTx.to = uint256(uint160(L2_COMPLEX_UPGRADER_ADDR));
+
+        // Era format: forceDeployAndUpgrade(ForceDeployment[], delegateTo, calldata)
+        IL2ContractDeployer.ForceDeployment[] memory emptyDeployments = new IL2ContractDeployer.ForceDeployment[](0);
         proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
-            IComplexUpgrader.upgrade,
-            (L2_VERSION_SPECIFIC_UPGRADER_ADDR, _placeholderV31Calldata())
+            IComplexUpgrader.forceDeployAndUpgrade,
+            (emptyDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, _placeholderV31Calldata())
         );
     }
 
@@ -406,31 +409,114 @@ contract SettlementLayerV31UpgradeEraV29Test is SettlementLayerV31UpgradeTestBas
     }
 }
 
-contract SettlementLayerV31UpgradeZKsyncOSV30Test is SettlementLayerV31UpgradeTestBase {
-    function test_RewritesZKsyncOSV30UniversalUpgradeWithChainSpecificV31Arguments() public {
-        _setupMocks();
-        _prepareV31ProposedUpgrade();
+contract DummyZKsyncOSSettlementLayerV31Upgrade is ZKsyncOSSettlementLayerV31Upgrade, BaseUpgradeUtils {
+    function setBridgehub(address _bridgehub) public {
+        s.bridgehub = _bridgehub;
+    }
 
-        IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[]
-            memory forceDeployments = new IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[](1);
-        forceDeployments[0] = IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo({
-            isZKsyncOS: true,
+    function setChainId(uint256 _chainId) public {
+        s.chainId = _chainId;
+    }
+
+    function setTotalBatchesCommitted(uint256 _v) public {
+        s.totalBatchesCommitted = _v;
+    }
+
+    function setTotalBatchesExecuted(uint256 _v) public {
+        s.totalBatchesExecuted = _v;
+    }
+
+    function setChainTypeManager(address _ctm) public override {
+        s.chainTypeManager = _ctm;
+    }
+
+    function exposeBuildChainSpecificForceDeploymentsData(
+        address _bridgehub,
+        uint256 _chainId
+    ) public view returns (bytes memory) {
+        return _buildChainSpecificForceDeploymentsData(_bridgehub, _chainId);
+    }
+}
+
+contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
+    DummyZKsyncOSSettlementLayerV31Upgrade internal zkosUpgrade;
+
+    address internal mockBridgehub;
+    address internal mockAssetRouter;
+    address internal mockNativeTokenVault;
+    address internal mockAssetTracker;
+    address internal mockMessageRoot;
+    address internal mockChainTypeManager;
+    address internal mockVerifier = makeAddr("mockVerifier");
+    uint256 internal testChainId = 123;
+    bytes32 internal baseTokenAssetId = keccak256("baseTokenAssetId");
+
+    function setUp() public {
+        mockBridgehub = makeAddr("bridgehub");
+        mockAssetRouter = makeAddr("assetRouter");
+        mockNativeTokenVault = makeAddr("nativeTokenVault");
+        mockAssetTracker = makeAddr("assetTracker");
+        mockMessageRoot = makeAddr("messageRoot");
+        mockChainTypeManager = makeAddr("chainTypeManager");
+
+        zkosUpgrade = new DummyZKsyncOSSettlementLayerV31Upgrade();
+        zkosUpgrade.setBridgehub(mockBridgehub);
+        zkosUpgrade.setChainId(testChainId);
+        zkosUpgrade.setChainTypeManager(mockChainTypeManager);
+        zkosUpgrade.setTotalBatchesCommitted(100);
+        zkosUpgrade.setTotalBatchesExecuted(100);
+        zkosUpgrade.setPriorityTxMaxGasLimit(1 ether);
+        zkosUpgrade.setPriorityTxMaxPubdata(1000000);
+        zkosUpgrade.mockProtocolVersionVerifier(protocolVersion, mockVerifier);
+
+        _setupMocks();
+    }
+
+    function _setupMocks() internal {
+        vm.mockCall(mockBridgehub, abi.encodeWithSelector(IBridgehubBase.assetRouter.selector), abi.encode(mockAssetRouter));
+        vm.mockCall(mockAssetRouter, abi.encodeWithSelector(IL1AssetRouter.nativeTokenVault.selector), abi.encode(mockNativeTokenVault));
+        vm.mockCall(mockNativeTokenVault, abi.encodeWithSelector(IL1NativeTokenVault.l1AssetTracker.selector), abi.encode(mockAssetTracker));
+        vm.mockCall(mockBridgehub, abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, testChainId), abi.encode(baseTokenAssetId));
+        vm.mockCall(mockNativeTokenVault, abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, baseTokenAssetId), abi.encode(block.chainid));
+        vm.mockCall(mockNativeTokenVault, abi.encodeWithSelector(INativeTokenVaultBase.originToken.selector, baseTokenAssetId), abi.encode(address(1)));
+        vm.mockCall(mockBridgehub, abi.encodeWithSelector(IBridgehubBase.messageRoot.selector), abi.encode(mockMessageRoot));
+        vm.mockCall(mockMessageRoot, abi.encodeWithSelector(IL1MessageRoot.saveV31UpgradeChainBatchNumber.selector, testChainId), abi.encode());
+        vm.mockCall(mockBridgehub, abi.encodeWithSelector(IBridgehubBase.whitelistedSettlementLayers.selector, testChainId), abi.encode(false));
+        vm.mockCall(mockChainTypeManager, abi.encodeWithSelector(IChainTypeManager.PERMISSIONLESS_VALIDATOR.selector), abi.encode(makeAddr("permissionlessValidator")));
+    }
+
+    function test_RewritesZKsyncOSV30UniversalUpgradeWithChainSpecificV31Arguments() public {
+        IComplexUpgrader.UniversalContractUpgradeInfo[]
+            memory forceDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
+        forceDeployments[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
             deployedBytecodeInfo: abi.encode(bytes32(uint256(1)), uint32(1), bytes32(uint256(2))),
             newAddress: makeAddr("newAddress")
         });
 
-        bytes memory originalV31Calldata = _placeholderV31Calldata();
+        bytes memory placeholderCalldata = abi.encodeCall(IL2V31Upgrade.upgrade, (true, address(0), "", ""));
         bytes memory originalUpgradeTxData = abi.encodeCall(
-            IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal,
-            (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, originalV31Calldata)
+            IComplexUpgrader.forceDeployAndUpgradeUniversal,
+            (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, placeholderCalldata)
         );
 
+        bytes memory expectedInnerCalldata = abi.encodeCall(
+            IL2V31Upgrade.upgrade,
+            (
+                true,
+                address(0),
+                "",
+                zkosUpgrade.exposeBuildChainSpecificForceDeploymentsData(mockBridgehub, testChainId)
+            )
+        );
         bytes memory expectedUpgradeTxData = abi.encodeCall(
-            IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal,
-            (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, _expectedV31Calldata())
+            IComplexUpgrader.forceDeployAndUpgradeUniversal,
+            (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, expectedInnerCalldata)
         );
 
-        assertEq(upgrade.getL2UpgradeTxData(mockBridgehub, testChainId, originalUpgradeTxData), expectedUpgradeTxData);
-        _assertUpgradeRewritesTx(originalUpgradeTxData);
+        assertEq(
+            zkosUpgrade.getL2UpgradeTxData(mockBridgehub, testChainId, originalUpgradeTxData),
+            expectedUpgradeTxData
+        );
     }
 }
