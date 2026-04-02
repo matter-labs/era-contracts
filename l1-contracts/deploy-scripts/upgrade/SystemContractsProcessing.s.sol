@@ -359,25 +359,60 @@ library SystemContractsProcessing {
 
     /// @notice Returns address+bytecode pairs for all "other built-in" contracts.
     /// @dev Single source of truth for both Era and ZKsyncOS force deployment builders.
-    function getOtherBuiltinContracts()
-        internal
-        view
-        returns (BuiltinContractDeployInfo[] memory contracts)
-    {
+    function getOtherBuiltinContracts() internal view returns (BuiltinContractDeployInfo[] memory contracts) {
         contracts = new BuiltinContractDeployInfo[](OTHER_BUILT_IN_CONTRACTS_COUNT);
-        contracts[0] = BuiltinContractDeployInfo(L2_BRIDGEHUB_ADDR, ContractsBytecodesLib.getCreationCode("L2Bridgehub"));
-        contracts[1] = BuiltinContractDeployInfo(L2_ASSET_ROUTER_ADDR, ContractsBytecodesLib.getCreationCode("L2AssetRouter"));
-        contracts[2] = BuiltinContractDeployInfo(L2_NATIVE_TOKEN_VAULT_ADDR, ContractsBytecodesLib.getCreationCode("L2NativeTokenVault"));
-        contracts[3] = BuiltinContractDeployInfo(L2_MESSAGE_ROOT_ADDR, ContractsBytecodesLib.getCreationCode("L2MessageRoot"));
-        contracts[4] = BuiltinContractDeployInfo(L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken"));
-        contracts[5] = BuiltinContractDeployInfo(address(L2_MESSAGE_VERIFICATION), ContractsBytecodesLib.getCreationCode("L2MessageVerification"));
-        contracts[6] = BuiltinContractDeployInfo(L2_CHAIN_ASSET_HANDLER_ADDR, ContractsBytecodesLib.getCreationCode("L2ChainAssetHandler"));
-        contracts[7] = BuiltinContractDeployInfo(address(L2_INTEROP_ROOT_STORAGE), ContractsBytecodesLib.getCreationCode("L2InteropRootStorage"));
-        contracts[8] = BuiltinContractDeployInfo(L2_BASE_TOKEN_HOLDER_ADDR, ContractsBytecodesLib.getCreationCode("BaseTokenHolder"));
-        contracts[9] = BuiltinContractDeployInfo(L2_ASSET_TRACKER_ADDR, ContractsBytecodesLib.getCreationCode("L2AssetTracker"));
-        contracts[10] = BuiltinContractDeployInfo(L2_INTEROP_CENTER_ADDR, ContractsBytecodesLib.getCreationCode("InteropCenter"));
-        contracts[11] = BuiltinContractDeployInfo(L2_INTEROP_HANDLER_ADDR, ContractsBytecodesLib.getCreationCode("InteropHandler"));
-        contracts[12] = BuiltinContractDeployInfo(GW_ASSET_TRACKER_ADDR, ContractsBytecodesLib.getCreationCode("GWAssetTracker"));
+        contracts[0] = BuiltinContractDeployInfo(
+            L2_BRIDGEHUB_ADDR,
+            ContractsBytecodesLib.getCreationCode("L2Bridgehub")
+        );
+        contracts[1] = BuiltinContractDeployInfo(
+            L2_ASSET_ROUTER_ADDR,
+            ContractsBytecodesLib.getCreationCode("L2AssetRouter")
+        );
+        contracts[2] = BuiltinContractDeployInfo(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            ContractsBytecodesLib.getCreationCode("L2NativeTokenVault")
+        );
+        contracts[3] = BuiltinContractDeployInfo(
+            L2_MESSAGE_ROOT_ADDR,
+            ContractsBytecodesLib.getCreationCode("L2MessageRoot")
+        );
+        contracts[4] = BuiltinContractDeployInfo(
+            L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
+            ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken")
+        );
+        contracts[5] = BuiltinContractDeployInfo(
+            address(L2_MESSAGE_VERIFICATION),
+            ContractsBytecodesLib.getCreationCode("L2MessageVerification")
+        );
+        contracts[6] = BuiltinContractDeployInfo(
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            ContractsBytecodesLib.getCreationCode("L2ChainAssetHandler")
+        );
+        contracts[7] = BuiltinContractDeployInfo(
+            address(L2_INTEROP_ROOT_STORAGE),
+            ContractsBytecodesLib.getCreationCode("L2InteropRootStorage")
+        );
+        contracts[8] = BuiltinContractDeployInfo(
+            L2_BASE_TOKEN_HOLDER_ADDR,
+            ContractsBytecodesLib.getCreationCode("BaseTokenHolder")
+        );
+        contracts[9] = BuiltinContractDeployInfo(
+            L2_ASSET_TRACKER_ADDR,
+            ContractsBytecodesLib.getCreationCode("L2AssetTracker")
+        );
+        contracts[10] = BuiltinContractDeployInfo(
+            L2_INTEROP_CENTER_ADDR,
+            ContractsBytecodesLib.getCreationCode("InteropCenter")
+        );
+        contracts[11] = BuiltinContractDeployInfo(
+            L2_INTEROP_HANDLER_ADDR,
+            ContractsBytecodesLib.getCreationCode("InteropHandler")
+        );
+        contracts[12] = BuiltinContractDeployInfo(
+            GW_ASSET_TRACKER_ADDR,
+            ContractsBytecodesLib.getCreationCode("GWAssetTracker")
+        );
     }
 
     /// @notice Build Era-style ForceDeployment[] from the built-in contracts list.

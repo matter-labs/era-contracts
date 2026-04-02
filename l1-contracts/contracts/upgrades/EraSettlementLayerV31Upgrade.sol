@@ -30,6 +30,10 @@ contract EraSettlementLayerV31Upgrade is SettlementLayerV31UpgradeBase {
         _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
         bytes memory l2V31UpgradeCalldata = _buildL2V31UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);
 
-        return abi.encodeCall(IComplexUpgrader.forceDeployAndUpgrade, (forceDeployments, delegateTo, l2V31UpgradeCalldata));
+        return
+            abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgrade,
+                (forceDeployments, delegateTo, l2V31UpgradeCalldata)
+            );
     }
 }

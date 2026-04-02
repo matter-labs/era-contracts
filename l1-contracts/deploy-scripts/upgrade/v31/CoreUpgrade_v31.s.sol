@@ -119,7 +119,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
         return super.getCreationCalldata(contractName, isZKBytecode);
     }
 
-
     /// @notice Override to properly set deployerAddress in upgrade context
     /// @dev In upgrade scripts, msg.sender is the script address, not the broadcast address
     ///      We need to use tx.origin which is the actual transaction sender (private key holder)

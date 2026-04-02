@@ -294,10 +294,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     function getBaseZKsyncOSForceDeployments(
         bytes memory _fixedForceDeploymentsData
     ) internal view returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments) {
-        FixedForceDeploymentsData memory data = abi.decode(
-            _fixedForceDeploymentsData,
-            (FixedForceDeploymentsData)
-        );
+        FixedForceDeploymentsData memory data = abi.decode(_fixedForceDeploymentsData, (FixedForceDeploymentsData));
 
         // Get the canonical address list (same order as Era force deployments).
         BuiltinContractDeployInfo[] memory contracts = SystemContractsProcessing.getOtherBuiltinContracts();

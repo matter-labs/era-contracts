@@ -24,10 +24,7 @@ contract ZKsyncOSSettlementLayerV31Upgrade is SettlementLayerV31UpgradeBase {
             IComplexUpgrader.UniversalContractUpgradeInfo[] memory forceDeployments,
             address delegateTo,
             bytes memory existingUpgradeCalldata
-        ) = abi.decode(
-                _existingTxData.slice(4),
-                (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes)
-            );
+        ) = abi.decode(_existingTxData.slice(4), (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes));
 
         _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
         bytes memory l2V31UpgradeCalldata = _buildL2V31UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);

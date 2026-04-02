@@ -9,10 +9,8 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 
@@ -21,6 +19,7 @@ import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CoreUpgrade_v31} from "./CoreUpgrade_v31.s.sol";
 import {CTMUpgrade_v31} from "./CTMUpgrade_v31.s.sol";
+import {TokenMigrationUtils} from "./TokenMigrationUtils.s.sol";
 
 /// @notice Script used for v31 ecosystem upgrade flow (core + CTM)
 /// TODO: IMPORTANT this script should also contain the following steps:
@@ -134,111 +133,11 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
 
         require(address(assetTracker) != address(0), "AssetTracker not set");
 
-        // Migrate token balances from NTV to AssetTracker
-        registerBridgedTokensInNTV(address(bridgehub));
-        migrateTokenBalances(address(ntv), address(assetTracker), bridgehub);
+        // Register bridged tokens in NTV and migrate balances to AssetTracker
+        TokenMigrationUtils.registerBridgedTokensInNTV(address(bridgehub));
+        TokenMigrationUtils.migrateAllTokenBalances(address(ntv), address(assetTracker), bridgehub);
 
         console.log("v31 stage3 migration complete!");
-    }
-
-    /// @notice Migrate token balances for a specific chain
-    function migrateTokenBalancesForChain(
-        uint256 chainId,
-        L1NativeTokenVault ntv,
-        IL1AssetTracker assetTracker
-    ) internal {
-        console.log("Processing chain:", chainId);
-
-        uint256 tokenCount = ntv.bridgedTokensCount();
-
-        for (uint256 j = 0; j < tokenCount; ++j) {
-            bytes32 assetId = ntv.bridgedTokens(j);
-
-            // Check if there's a balance to migrate
-            uint256 balance = ntv.chainBalance(chainId, assetId);
-            if (balance > 0) {
-                address tokenAddress = ntv.tokenAddress(assetId);
-                console.log("  Migrating token:", tokenAddress);
-                console.log("  AssetId:", vm.toString(assetId));
-                console.log("  Balance:", balance);
-
-                // Call AssetTracker to migrate the balance
-                vm.broadcast(getBroadcasterAddress());
-                assetTracker.registerLegacyToken(assetId);
-
-                console.log("  Migration successful");
-            }
-        }
-    }
-
-    /// @notice Migrate token balances from DEPRECATED_chainBalance to AssetTracker
-    function migrateTokenBalances(address _ntv, address _assetTracker, IBridgehubBase _bridgehub) internal {
-        console.log("Migrating token balances...");
-
-        L1NativeTokenVault ntv = L1NativeTokenVault(payable(_ntv));
-        IL1AssetTracker assetTracker = IL1AssetTracker(_assetTracker);
-
-        // Get bridged token count
-        uint256 tokenCount = ntv.bridgedTokensCount();
-        console.log("Number of bridged tokens:", tokenCount);
-
-        // First, migrate balances for the L1 chain itself
-        uint256 l1ChainId = block.chainid;
-        console.log("Migrating L1 chain balances (chainId:", l1ChainId, ")");
-        migrateTokenBalancesForChain(l1ChainId, ntv, assetTracker);
-
-        // Get list of registered L2 chains
-        uint256[] memory chainIds = _bridgehub.getAllZKChainChainIDs();
-        console.log("Number of L2 chains:", chainIds.length);
-
-        // For each L2 chain and each token, migrate the balance
-        for (uint256 i = 0; i < chainIds.length; ++i) {
-            migrateTokenBalancesForChain(chainIds[i], ntv, assetTracker);
-        }
-
-        console.log("Token balance migration complete");
-    }
-
-    /// @notice Register legacy bridged tokens (if needed)
-    /// @dev For production use, this function should be extended to register all bridged tokens
-    /// from a config file or by querying on-chain state. Currently only registers ETH for fresh deployments.
-    function registerBridgedTokensInNTV(address _bridgehub) public {
-        console.log("Registering bridged tokens in NTV...");
-
-        NativeTokenVaultBase ntv = NativeTokenVaultBase(
-            address(IL1AssetRouter(address(IBridgehubBase(_bridgehub).assetRouter())).nativeTokenVault())
-        );
-
-        // For fresh deployments, register the ETH base token
-        // ETH token address is 0x0000000000000000000000000000000000000001
-        address ethTokenAddress = address(0x0000000000000000000000000000000000000001);
-
-        // Get the assetId for ETH from NTV
-        bytes32 ethAssetId = ntv.assetId(ethTokenAddress);
-        console.log("ETH token address:", ethTokenAddress);
-        console.log("ETH assetId:", vm.toString(ethAssetId));
-
-        // TODO: For production, extend this to register all bridged tokens from config
-        // Create array with ETH assetId
-        bytes32[] memory savedBridgedTokens = new bytes32[](1);
-        savedBridgedTokens[0] = ethAssetId;
-
-        console.log("Registering tokens, count:", savedBridgedTokens.length);
-
-        /// Register tokens in the bridged token list
-        for (uint256 i = 0; i < savedBridgedTokens.length; ++i) {
-            bytes32 assetId = savedBridgedTokens[i];
-            address tokenAddress = ntv.tokenAddress(assetId);
-            console.log("  Registering assetId:", vm.toString(assetId));
-            console.log("  Token address:", tokenAddress);
-
-            vm.broadcast(getBroadcasterAddress());
-            ntv.addLegacyTokenToBridgedTokensList(tokenAddress);
-
-            console.log("  Token registered successfully");
-        }
-
-        console.log("Bridged tokens registration complete");
     }
 
     function getBroadcasterAddress() internal view virtual returns (address) {
