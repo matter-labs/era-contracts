@@ -46,14 +46,6 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
         forceDeploymentContracts[0] = EraZkosContract.L2V29Upgrade;
     }
 
-    function getExpectedL2Address(string memory contractName) public override returns (address) {
-        if (compareStrings(contractName, "L2V29Upgrade")) {
-            return address(L2_VERSION_SPECIFIC_UPGRADER_ADDR);
-        }
-
-        return super.getExpectedL2Address(contractName);
-    }
-
     function getProposedUpgrade(
         StateTransitionDeployedAddresses memory stateTransition,
         ChainCreationParamsConfig memory chainCreationParams,

@@ -276,7 +276,4 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         return new bytes(0);
     }
 
-    function getExpectedL2Address(string memory contractName) public virtual returns (address) {
-        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
-    }
 }

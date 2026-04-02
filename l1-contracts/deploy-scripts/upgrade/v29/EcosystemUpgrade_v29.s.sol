@@ -150,13 +150,6 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
         return forceDeploymentContracts;
     }
 
-    function getExpectedL2Address(string memory contractName) public override returns (address) {
-        if (compareStrings(contractName, "L2V29Upgrade")) {
-            return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
-        }
-        return super.getExpectedL2Address(contractName);
-    }
-
     function getCreationCode(
         string memory contractName,
         bool isZKBytecode

@@ -8,11 +8,13 @@ import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "co
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {BytecodePublisher} from "./bytecode/BytecodePublisher.s.sol";
+import {ContractsBytecodesLib} from "./bytecode/ContractsBytecodesLib.sol";
 
 // Sub-module libraries (internal implementation details)
 import {EraZkosVerifierLifecycle} from "./vm/EraZkosVerifierLifecycle.sol";
 import {ChainCreationParamsLib} from "../ctm/ChainCreationParamsLib.sol";
 import {ChainCreationParamsConfig} from "./Types.sol";
+import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 
 /// @notice Canonical identifier for contracts that participate in CTM deployment.
 ///         The enum value is VM-neutral; the strategy resolves it to the correct
@@ -32,6 +34,10 @@ enum EraZkosContract {
     BeaconProxy,
     L2V29Upgrade,
     L2V31Upgrade,
+    L2SharedBridgeLegacy,
+    BridgedStandardERC20,
+    DiamondProxy,
+    ProxyAdmin,
     // ---- CTM / state-transition contracts ----
     ChainTypeManager,
     VerifierFflonk,
@@ -184,6 +190,22 @@ library EraZkosRouter {
         for (uint256 i = 0; i < depsLen; i++) {
             result.factoryDepsHashes[i] = uint256(L2ContractHelper.hashL2Bytecode(_allDeps[i]));
         }
+    }
+
+    function getFullListOfFactoryDependencies(
+        bool _isZKsyncOS,
+        EraZkosContract[] memory _additionalDependencyContracts
+    ) internal returns (bytes[] memory factoryDeps) {
+        bytes[] memory basicDependencies = _getBaseFactoryDependencies(_isZKsyncOS);
+        bytes[] memory sharedDependencies = _getFactoryDependencyBytecodes(
+            _isZKsyncOS,
+            _getSharedFactoryDependencyContracts(_isZKsyncOS)
+        );
+        bytes[] memory additionalDependencies = _getFactoryDependencyBytecodes(_isZKsyncOS, _additionalDependencyContracts);
+
+        factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, sharedDependencies);
+        factoryDeps = SystemContractsProcessing.mergeBytesArrays(factoryDeps, additionalDependencies);
+        factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
     }
 
     /// @notice Check if a bytecode hash is present in the factory deps result.
@@ -392,6 +414,45 @@ library EraZkosRouter {
         }
     }
 
+    function _getBaseFactoryDependencies(bool _isZKsyncOS) private view returns (bytes[] memory basicDependencies) {
+        if (_isZKsyncOS) {
+            // FIXME: add support for base factory dependencies on ZKsyncOS in scripts.
+            return new bytes[](0);
+        }
+        return SystemContractsProcessing.getBaseListOfDependencies();
+    }
+
+    function _getSharedFactoryDependencyContracts(
+        bool _isZKsyncOS
+    ) private pure returns (EraZkosContract[] memory dependencyContracts) {
+        if (_isZKsyncOS) {
+            return new EraZkosContract[](0);
+        }
+
+        dependencyContracts = new EraZkosContract[](4);
+        dependencyContracts[0] = EraZkosContract.L2SharedBridgeLegacy;
+        dependencyContracts[1] = EraZkosContract.BridgedStandardERC20;
+        dependencyContracts[2] = EraZkosContract.DiamondProxy;
+        dependencyContracts[3] = EraZkosContract.ProxyAdmin;
+    }
+
+    function _getFactoryDependencyBytecodes(
+        bool _isZKsyncOS,
+        EraZkosContract[] memory _dependencyContracts
+    ) private returns (bytes[] memory dependencyBytecodes) {
+        dependencyBytecodes = new bytes[](_dependencyContracts.length);
+
+        for (uint256 i; i < _dependencyContracts.length; i++) {
+            if (_isZKsyncOS) {
+                (string memory fileName, string memory contractName) = resolve(_isZKsyncOS, _dependencyContracts[i]);
+                dependencyBytecodes[i] = Utils.readFoundryDeployedBytecodeL1(fileName, contractName);
+            } else {
+                (, string memory contractName) = resolve(false, _dependencyContracts[i]);
+                dependencyBytecodes[i] = ContractsBytecodesLib.getCreationCodeEra(contractName);
+            }
+        }
+    }
+
     function _readBytecodeL1(
         bool _isZKsyncOS,
         string memory _fileName,
@@ -437,6 +498,10 @@ library EraZkosRouter {
         if (_c == EraZkosContract.BeaconProxy) return "BeaconProxy";
         if (_c == EraZkosContract.L2V29Upgrade) return "L2V29Upgrade";
         if (_c == EraZkosContract.L2V31Upgrade) return "L2V31Upgrade";
+        if (_c == EraZkosContract.L2SharedBridgeLegacy) return "L2SharedBridgeLegacy";
+        if (_c == EraZkosContract.BridgedStandardERC20) return "BridgedStandardERC20";
+        if (_c == EraZkosContract.DiamondProxy) return "DiamondProxy";
+        if (_c == EraZkosContract.ProxyAdmin) return "ProxyAdmin";
 
         revert("EraZkosRouter: unknown EraZkosContract");
     }

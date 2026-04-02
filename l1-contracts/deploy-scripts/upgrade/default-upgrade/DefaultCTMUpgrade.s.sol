@@ -32,15 +32,12 @@ import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeploy
 import {Governance} from "contracts/governance/Governance.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ContractsBytecodesLib} from "../../utils/bytecode/ContractsBytecodesLib.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
 import {EraZkosRouter, EraZkosContract, FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
-
-import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -178,6 +175,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
             ctmAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
+        // FIXME: need to provide the params as the input for the function, since
+        // on mainnet testnetVerifier must be false. Right now the introspection is not available
+        // due to the previous version being v29.
         // TODO: restore introspection when L1 state is regenerated with ZKsyncOSTestnetVerifier.IS_TESTNET_VERIFIER
         // (bool ok, bytes memory data) = ctmAddresses.stateTransition.verifiers.verifier.staticcall(
         //     abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
@@ -402,26 +402,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
 
-    function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
-        bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
-
-        EraZkosContract[] memory additionalForceDeployments = getAdditionalDependencyContracts();
-
-        bytes[] memory additionalDependencies = new bytes[](4 + additionalForceDeployments.length); // Deps after Gateway upgrade
-        additionalDependencies[0] = ContractsBytecodesLib.getCreationCodeEra("L2SharedBridgeLegacy");
-        additionalDependencies[1] = ContractsBytecodesLib.getCreationCodeEra("BridgedStandardERC20");
-        additionalDependencies[2] = ContractsBytecodesLib.getCreationCodeEra("DiamondProxy");
-        additionalDependencies[3] = ContractsBytecodesLib.getCreationCodeEra("ProxyAdmin");
-
-        for (uint256 i; i < additionalForceDeployments.length; i++) {
-            (, string memory contractName) = EraZkosRouter.resolve(config.isZKsyncOS, additionalForceDeployments[i]);
-            additionalDependencies[4 + i] = ContractsBytecodesLib.getCreationCodeEra(contractName);
-        }
-
-        factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, additionalDependencies);
-        factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
-    }
-
     function prepareFixedForceDeploymentsData() public virtual returns (FixedForceDeploymentsData memory data) {
         require(config.ownerAddress != address(0), "owner not set");
 
@@ -483,7 +463,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function publishBytecodes() public virtual {
-        bytes[] memory allDeps = getFullListOfFactoryDependencies();
+        bytes[] memory allDeps = EraZkosRouter.getFullListOfFactoryDependencies(
+            config.isZKsyncOS,
+            getAdditionalDependencyContracts()
+        );
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
         FactoryDepsResult memory result = EraZkosRouter.publishAndProcessFactoryDeps(

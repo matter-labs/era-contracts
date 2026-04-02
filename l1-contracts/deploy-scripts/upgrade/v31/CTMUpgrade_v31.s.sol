@@ -29,7 +29,6 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
 import {Utils} from "../../utils/Utils.sol";
-import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
@@ -77,14 +76,6 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     function getForceDeploymentContracts() internal override returns (EraZkosContract[] memory forceDeploymentContracts) {
         forceDeploymentContracts = new EraZkosContract[](1);
         forceDeploymentContracts[0] = EraZkosContract.L2V31Upgrade;
-    }
-
-    function getExpectedL2Address(string memory contractName) public override returns (address) {
-        if (compareStrings(contractName, "L2V31Upgrade")) {
-            return address(L2_VERSION_SPECIFIC_UPGRADER_ADDR);
-        }
-
-        return super.getExpectedL2Address(contractName);
     }
 
     function getL2UpgradeTargetAndData(
@@ -171,15 +162,5 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             upgradeTimestamp: 0,
             newProtocolVersion: chainCreationParams.latestProtocolVersion
         });
-    }
-
-    function getFullListOfFactoryDependencies() internal virtual override returns (bytes[] memory factoryDeps) {
-        if (!config.isZKsyncOS) {
-            return super.getFullListOfFactoryDependencies();
-        }
-
-        bytes memory l2V31UpgradeDeployed = Utils.readFoundryDeployedBytecodeL1("L2V31Upgrade.sol", "L2V31Upgrade");
-        factoryDeps = new bytes[](1);
-        factoryDeps[0] = l2V31UpgradeDeployed;
     }
 }
