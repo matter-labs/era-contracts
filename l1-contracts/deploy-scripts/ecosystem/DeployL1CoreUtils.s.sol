@@ -199,11 +199,47 @@ contract DeployL1CoreUtils is DeployUtils {
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            // L1Nullifier has a config-dependent implementation swap
-            if (compareStrings(contractName, "L1Nullifier")) {
-                string memory resolved = config.supportL2LegacySharedBridgeTest ? "L1NullifierDev" : "L1Nullifier";
-                return ContractsBytecodesLib.getCreationCodeEVM(resolved);
+            // Use compiler-provided bytecode for EVM contracts (zero runtime memory cost).
+            if (compareStrings(contractName, "L1Bridgehub")) {
+                return type(L1Bridgehub).creationCode;
+            } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
+                return type(L1ChainAssetHandler).creationCode;
+            } else if (compareStrings(contractName, "ChainRegistrationSender")) {
+                return type(ChainRegistrationSender).creationCode;
+            } else if (compareStrings(contractName, "L1MessageRoot")) {
+                return type(L1MessageRoot).creationCode;
+            } else if (compareStrings(contractName, "DummyL1MessageRoot")) {
+                return type(DummyL1MessageRoot).creationCode;
+            } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+                return type(CTMDeploymentTracker).creationCode;
+            } else if (compareStrings(contractName, "L1Nullifier")) {
+                if (config.supportL2LegacySharedBridgeTest) {
+                    return type(L1NullifierDev).creationCode;
+                } else {
+                    return type(L1Nullifier).creationCode;
+                }
+            } else if (compareStrings(contractName, "L1AssetRouter")) {
+                return type(L1AssetRouter).creationCode;
+            } else if (compareStrings(contractName, "L1AssetTracker")) {
+                return type(L1AssetTracker).creationCode;
+            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+                return type(L1ERC20Bridge).creationCode;
+            } else if (compareStrings(contractName, "L1NativeTokenVault")) {
+                return type(L1NativeTokenVault).creationCode;
+            } else if (compareStrings(contractName, "BridgedStandardERC20")) {
+                return type(BridgedStandardERC20).creationCode;
+            } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
+                return type(UpgradeableBeacon).creationCode;
+            } else if (compareStrings(contractName, "Governance")) {
+                return type(Governance).creationCode;
+            } else if (compareStrings(contractName, "ChainAdminOwnable")) {
+                return type(ChainAdminOwnable).creationCode;
+            } else if (compareStrings(contractName, "ChainAdmin")) {
+                return type(ChainAdmin).creationCode;
+            } else if (compareStrings(contractName, "ProxyAdmin")) {
+                return type(ProxyAdmin).creationCode;
             }
+            // Fall through to ContractsBytecodesLib for unrecognized contracts
             return ContractsBytecodesLib.getCreationCodeEVM(contractName);
         }
         return ContractsBytecodesLib.getCreationCodeEra(contractName);
