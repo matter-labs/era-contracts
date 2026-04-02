@@ -317,13 +317,11 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
         } else if (
-            compareStrings(contractName, "EraVerifierFflonk") ||
-            compareStrings(contractName, "ZKsyncOSVerifierFflonk")
+            compareStrings(contractName, "EraVerifierFflonk") || compareStrings(contractName, "ZKsyncOSVerifierFflonk")
         ) {
             return abi.encode();
         } else if (
-            compareStrings(contractName, "EraVerifierPlonk") ||
-            compareStrings(contractName, "ZKsyncOSVerifierPlonk")
+            compareStrings(contractName, "EraVerifierPlonk") || compareStrings(contractName, "ZKsyncOSVerifierPlonk")
         ) {
             return abi.encode();
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
