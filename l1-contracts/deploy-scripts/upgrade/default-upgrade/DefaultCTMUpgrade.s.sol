@@ -408,13 +408,13 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         string[] memory additionalForceDeployments = getAdditionalDependenciesNames();
 
         bytes[] memory additionalDependencies = new bytes[](4 + additionalForceDeployments.length); // Deps after Gateway upgrade
-        additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
-        additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-        additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
-        additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ProxyAdmin");
+        additionalDependencies[0] = ContractsBytecodesLib.getCreationCodeEra("L2SharedBridgeLegacy");
+        additionalDependencies[1] = ContractsBytecodesLib.getCreationCodeEra("BridgedStandardERC20");
+        additionalDependencies[2] = ContractsBytecodesLib.getCreationCodeEra("DiamondProxy");
+        additionalDependencies[3] = ContractsBytecodesLib.getCreationCodeEra("ProxyAdmin");
 
         for (uint256 i; i < additionalForceDeployments.length; i++) {
-            additionalDependencies[4 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
+            additionalDependencies[4 + i] = ContractsBytecodesLib.getCreationCodeEra(additionalForceDeployments[i]);
         }
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, additionalDependencies);

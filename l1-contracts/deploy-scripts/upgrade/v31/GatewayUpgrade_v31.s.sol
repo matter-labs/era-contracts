@@ -32,6 +32,7 @@ import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../..
 import {FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
 import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.sol";
 
+// FIXME: consider deleting this script, it is not used.
 /// @notice Script used for v31 gateway upgrade flow
 contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
     /// @dev Prepared in getProposedUpgrade, consumed in getL2UpgradeTargetAndData (which must be view).

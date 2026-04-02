@@ -13,10 +13,6 @@ library ContractsBytecodesLib {
     /// @return The bytecode of the contract.
     /// @dev Reverts if the contractIdentifier is unknown or unsupported.
 
-    function getCreationCode(string memory contractIdentifier) internal view returns (bytes memory) {
-        return getCreationCodeEra(contractIdentifier);
-    }
-
     function getCreationCode(string memory contractIdentifier, bool isZKBytecode) internal view returns (bytes memory) {
         if (isZKBytecode) {
             return getCreationCodeEra(contractIdentifier);
@@ -73,7 +69,7 @@ library ContractsBytecodesLib {
     function getCreationCodeEra(string memory contractIdentifier) internal view returns (bytes memory) {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
-        // These are handled by the generic L1 case in getCreationCode.
+        // These are handled by the generic L1 case in getCreationCodeEra.
         string[52] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction",
             /// ??
