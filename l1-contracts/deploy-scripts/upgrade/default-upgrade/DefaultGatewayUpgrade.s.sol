@@ -42,7 +42,7 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
-import {EraZkosContract, EraZkosPaths, EraZkosRouter} from "../../utils/EraZkosRouter.sol";
+import {EraZkosContract, EraZkosRouter, FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
 /// @notice Script used for default CTM on gateway upgrade flow, should be run after L1 CTM upgrade
@@ -90,8 +90,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     CTMDeployedAddresses internal ctmDeployedAddresses;
 
     // TODO We need for composing upgrade transaction. but seems we don't need an upgrade transaction on gateway
-    uint256[] internal factoryDepsHashes;
-    mapping(bytes32 => bool) internal isHashInFactoryDeps;
+    FactoryDepsResult internal factoryDepsResult;
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
@@ -112,7 +111,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         initializeConfig(
             _create2FactorySalt,
             _isZKsyncOS,
-            getChainCreationParamsConfig(EraZkosPaths.genesisConfigPath(_isZKsyncOS)),
+            getChainCreationParamsConfig(EraZkosRouter.genesisConfigPath(_isZKsyncOS)),
             _eraChainId,
             _priorityTxsL2GasLimit,
             _maxExpectedL1GasPrice,
@@ -167,9 +166,6 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
-    function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual override returns (bool) {
-        return isHashInFactoryDeps[bytecodeHash];
-    }
 
     /// @notice Full default upgrade preparation flow
     function prepareEcosystemUpgrade() public virtual {
@@ -206,7 +202,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             config.contracts.chainCreationParams,
             config.l1ChainId,
             config.ownerAddress,
-            factoryDepsHashes,
+            factoryDepsResult,
             discoveredEraZkChain.zkChainProxy
         );
         gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);

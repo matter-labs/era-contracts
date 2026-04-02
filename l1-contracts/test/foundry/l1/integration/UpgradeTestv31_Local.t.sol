@@ -32,35 +32,23 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
     function publishBytecodes() public override {
         console.log("Test mode: Skipping bytecode publishing to avoid MemoryOOG");
 
-        // Initialize factoryDepsHashes with dummy values
+        // Initialize factoryDepsResult with dummy values
         // The upgrade process expects at least 3 hashes: bootloader, defaultAA, evmEmulator
-        factoryDepsHashes = new uint256[](45); // Same size as real deployment
+        factoryDepsResult.factoryDepsHashes = new uint256[](45); // Same size as real deployment
 
         // Use the configured chain creation params hashes
-        factoryDepsHashes[0] = uint256(config.contracts.chainCreationParams.bootloaderHash);
-        factoryDepsHashes[1] = uint256(config.contracts.chainCreationParams.defaultAAHash);
-        factoryDepsHashes[2] = uint256(config.contracts.chainCreationParams.evmEmulatorHash);
+        factoryDepsResult.factoryDepsHashes[0] = uint256(config.contracts.chainCreationParams.bootloaderHash);
+        factoryDepsResult.factoryDepsHashes[1] = uint256(config.contracts.chainCreationParams.defaultAAHash);
+        factoryDepsResult.factoryDepsHashes[2] = uint256(config.contracts.chainCreationParams.evmEmulatorHash);
 
-        // Fill rest with dummy valid bytecode hashes and mark them as in factory deps
+        // Fill rest with dummy valid bytecode hashes
         bytes32 dummyHash = bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001));
         for (uint256 i = 3; i < 45; i++) {
-            factoryDepsHashes[i] = uint256(dummyHash);
+            factoryDepsResult.factoryDepsHashes[i] = uint256(dummyHash);
         }
-
-        // Mark all hashes as being in factory deps to pass validation
-        isHashInFactoryDeps[config.contracts.chainCreationParams.bootloaderHash] = true;
-        isHashInFactoryDeps[config.contracts.chainCreationParams.defaultAAHash] = true;
-        isHashInFactoryDeps[config.contracts.chainCreationParams.evmEmulatorHash] = true;
-        isHashInFactoryDeps[dummyHash] = true;
 
         // Set the flag to indicate bytecodes are "published" for test purposes
         upgradeConfig.factoryDepsPublished = true;
-    }
-
-    /// @notice Override to skip validation of bytecode hashes in factory deps
-    function isHashInFactoryDepsCheck(bytes32 _hash) internal view override returns (bool) {
-        // In test mode, always return true to skip validation
-        return true;
     }
 }
 

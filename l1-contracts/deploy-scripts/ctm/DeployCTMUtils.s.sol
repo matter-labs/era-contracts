@@ -50,7 +50,7 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
-import {EraZkosRouter, EraZkosContract, EraZkosPaths} from "../utils/EraZkosRouter.sol";
+import {EraZkosRouter, EraZkosContract} from "../utils/EraZkosRouter.sol";
 
 import {
     StateTransitionDeployedAddresses,
@@ -121,7 +121,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     }
 
     function chainCreationParamsPath(bool _isZKsyncOS) internal virtual returns (string memory) {
-        return EraZkosPaths.genesisConfigPath(_isZKsyncOS);
+        return EraZkosRouter.genesisConfigPath(_isZKsyncOS);
     }
 
     function initializeConfig(

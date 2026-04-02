@@ -34,7 +34,7 @@ import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
-import {EraZkosContract, EraZkosRouter} from "../../utils/EraZkosRouter.sol";
+import {EraZkosContract, EraZkosRouter, FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
 
 /// @notice Script used for v31 upgrade flow
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
@@ -134,7 +134,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         ChainCreationParamsConfig memory chainCreationParams,
         uint256,
         address,
-        uint256[] memory factoryDepsHashes,
+        FactoryDepsResult memory _factoryDepsResult,
         uint256 protocolUpgradeNonce
     ) public virtual override returns (ProposedUpgrade memory proposedUpgrade) {
         if (!config.isZKsyncOS) {
@@ -144,7 +144,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
                     chainCreationParams,
                     config.l1ChainId,
                     config.ownerAddress,
-                    factoryDepsHashes,
+                    _factoryDepsResult,
                     protocolUpgradeNonce
                 );
         }
@@ -160,7 +160,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         );
 
         proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: composeUpgradeTx(forceDeployments, factoryDepsHashes, protocolUpgradeNonce),
+            l2ProtocolUpgradeTx: composeUpgradeTx(forceDeployments, _factoryDepsResult, protocolUpgradeNonce),
             bootloaderHash: chainCreationParams.bootloaderHash,
             defaultAccountHash: chainCreationParams.defaultAAHash,
             evmEmulatorHash: chainCreationParams.evmEmulatorHash,

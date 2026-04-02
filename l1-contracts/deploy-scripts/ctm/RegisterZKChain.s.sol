@@ -446,8 +446,8 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
             })
         );
 
-        // Add prover role to the third address, only if set
-        if (config.validatorSenderOperatorProve != address(0)) {
+        // ZKsync OS split: dedicated prove / execute operators.
+        if (zkSyncOsValidatorSplit) {
             validatorTimelock.addValidatorRoles(
                 chainAddress,
                 config.validatorSenderOperatorProve,
@@ -460,10 +460,6 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
                     rotateUpgraderRole: false
                 })
             );
-        }
-
-        // Add executor role to the fourth address, only if set
-        if (config.validatorSenderOperatorExecute != address(0)) {
             validatorTimelock.addValidatorRoles(
                 chainAddress,
                 config.validatorSenderOperatorExecute,

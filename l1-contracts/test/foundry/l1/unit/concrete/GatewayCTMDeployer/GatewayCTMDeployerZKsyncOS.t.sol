@@ -165,7 +165,7 @@ contract GatewayCTMDeployerZKsyncOSTest is Test {
             DeployerAddresses memory expectedDeployers,
             DirectCreate2Calldata memory directCalldata,
             address create2FactoryAddress
-        ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), deployerConfig, deployerConfig.isZKsyncOS);
+        ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), deployerConfig);
 
         // Verify we're using the deterministic CREATE2 factory
         assertEq(

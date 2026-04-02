@@ -118,8 +118,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     ZkChainAddresses internal upToDateZkChain;
     L1Bridgehub internal bridgehub;
 
-    uint256[] internal factoryDepsHashes;
-    mapping(bytes32 => bool) internal isHashInFactoryDeps;
+    FactoryDepsResult internal factoryDepsResult;
 
     function initializeWithArgs(
         address ctmProxy,
@@ -146,12 +145,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
         upgradeConfig.initialized = true;
-    }
-
-    function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual override returns (bool) {
-        // For ZKsyncOS, isHashInFactoryDeps is never populated (empty from publishAndProcessFactoryDeps),
-        // and force deployments are empty, so this is never called. For Era, check the map.
-        return isHashInFactoryDeps[bytecodeHash];
     }
 
     function initializeConfig(
@@ -296,7 +289,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             config.contracts.chainCreationParams,
             config.l1ChainId,
             config.ownerAddress,
-            factoryDepsHashes,
+            factoryDepsResult,
             upToDateZkChain.zkChainProxy
         );
     }
@@ -495,12 +488,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             allDeps
         );
 
-        // For Era, populate the factory deps tracking state and validate consistency.
-        // For ZKsyncOS, factoryDepsHashes is empty so all loops are no-ops.
-        for (uint256 i = 0; i < result.factoryDepsHashes.length; i++) {
-            isHashInFactoryDeps[bytes32(result.factoryDepsHashes[i])] = true;
-        }
-
         if (result.factoryDepsHashes.length > 0) {
             console.logBytes32(config.contracts.chainCreationParams.bootloaderHash);
             console.log(result.factoryDepsHashes[0]);
@@ -525,7 +512,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             }
         }
 
-        factoryDepsHashes = result.factoryDepsHashes;
+        factoryDepsResult = result;
         upgradeConfig.factoryDepsPublished = true;
     }
 

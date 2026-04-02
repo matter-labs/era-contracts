@@ -29,6 +29,7 @@ import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 
 import {Utils} from "../../utils/Utils.sol";
 import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
+import {FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
 import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.sol";
 
 /// @notice Script used for v31 gateway upgrade flow
@@ -57,7 +58,7 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
         ChainCreationParamsConfig memory chainCreationParams,
         uint256,
         address,
-        uint256[] memory factoryDepsHashes,
+        FactoryDepsResult memory _factoryDepsResult,
         uint256 protocolUpgradeNonce
     ) public virtual override returns (ProposedUpgrade memory proposedUpgrade) {
         if (!config.isZKsyncOS) {
@@ -67,7 +68,7 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
                     chainCreationParams,
                     config.l1ChainId,
                     config.ownerAddress,
-                    factoryDepsHashes,
+                    _factoryDepsResult,
                     protocolUpgradeNonce
                 );
         }
@@ -80,7 +81,7 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
         );
 
         proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: composeUpgradeTx(forceDeployments, factoryDepsHashes, protocolUpgradeNonce),
+            l2ProtocolUpgradeTx: composeUpgradeTx(forceDeployments, _factoryDepsResult, protocolUpgradeNonce),
             bootloaderHash: chainCreationParams.bootloaderHash,
             defaultAccountHash: chainCreationParams.defaultAAHash,
             evmEmulatorHash: chainCreationParams.evmEmulatorHash,

@@ -39,8 +39,7 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
 
         (contracts, , , directCalldata, ) = GatewayCTMDeployerHelper.calculateAddresses(
             bytes32(uint256(1)),
-            gatewayCTMDeployerConfig,
-            gatewayCTMDeployerConfig.isZKsyncOS
+            gatewayCTMDeployerConfig
         );
     }
 

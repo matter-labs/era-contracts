@@ -11,20 +11,8 @@ import {BytecodePublisher} from "./bytecode/BytecodePublisher.s.sol";
 // Sub-module libraries (internal implementation details)
 import {EraZkosVerifierLifecycle} from "./vm/EraZkosVerifierLifecycle.sol";
 import {EraZkosForceDeployments} from "./vm/EraZkosForceDeployments.sol";
-import {EraZkosGenesisConfig} from "./vm/EraZkosGenesisConfig.sol";
+import {ChainCreationParamsLib} from "../ctm/ChainCreationParamsLib.sol";
 import {ChainCreationParamsConfig} from "./Types.sol";
-
-/// @notice Genesis JSON filenames and absolute paths under `configs/genesis/` (shared by chain-creation params).
-library EraZkosPaths {
-    string internal constant FILENAME_ERA = "era/latest.json";
-    string internal constant FILENAME_ZKOS = "zksync-os/latest.json";
-
-    /// @notice Absolute path to genesis / chain-creation JSON for the given VM mode.
-    function genesisConfigPath(bool _isZKsyncOS) internal returns (string memory) {
-        return
-            string.concat(Utils.vm.projectRoot(), "/../configs/genesis/", _isZKsyncOS ? FILENAME_ZKOS : FILENAME_ERA);
-    }
-}
 
 /// @notice Canonical identifier for contracts that participate in CTM deployment.
 ///         The enum value is VM-neutral; the strategy resolves it to the correct
@@ -73,8 +61,11 @@ struct FactoryDepsResult {
 ///      Delegates to sub-module libraries for specific concerns:
 ///        - EraZkosVerifierLifecycle: verifier creation, initialization, introspection
 ///        - EraZkosForceDeployments: force deployment bytecode hashing
-///        - EraZkosGenesisConfig: genesis config loading
+///        - ChainCreationParamsLib: genesis config loading
 library EraZkosRouter {
+    string private constant GENESIS_FILENAME_ERA = "era/latest.json";
+    string private constant GENESIS_FILENAME_ZKOS = "zksync-os/latest.json";
+
     // ======================== Contract registry ========================
 
     /// @notice Resolve a EraZkosContract to its (fileName, contractName) for the active VM.
@@ -209,8 +200,14 @@ library EraZkosRouter {
 
     // ======================== Genesis config ========================
 
+    /// @notice Absolute path to genesis / chain-creation JSON under `configs/genesis/` for the given VM mode.
     function genesisConfigPath(bool _isZKsyncOS) internal returns (string memory) {
-        return EraZkosPaths.genesisConfigPath(_isZKsyncOS);
+        return
+            string.concat(
+                Utils.vm.projectRoot(),
+                "/../configs/genesis/",
+                _isZKsyncOS ? GENESIS_FILENAME_ZKOS : GENESIS_FILENAME_ERA
+            );
     }
 
     /// @notice Load chain creation params from the genesis config file at the given path.
@@ -218,7 +215,7 @@ library EraZkosRouter {
         bool _isZKsyncOS,
         string memory _configPath
     ) internal returns (ChainCreationParamsConfig memory) {
-        return EraZkosGenesisConfig.getChainCreationParams(_configPath, _isZKsyncOS);
+        return ChainCreationParamsLib.getChainCreationParams(_configPath, _isZKsyncOS);
     }
 
     // ======================== Verifier lifecycle (delegated to EraZkosVerifierLifecycle) ========================

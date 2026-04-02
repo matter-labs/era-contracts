@@ -215,7 +215,7 @@ contract GatewayCTMDeployerTest is Test {
             DeployerAddresses memory expectedDeployers, // DirectCreate2Calldata and create2FactoryAddress not needed for this test
             ,
 
-        ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), deployerConfig, deployerConfig.isZKsyncOS);
+        ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), deployerConfig);
 
         // Publish bytecodes for all deployers using calculated addresses
         _publishDeployerBytecodes(calculatedContracts);

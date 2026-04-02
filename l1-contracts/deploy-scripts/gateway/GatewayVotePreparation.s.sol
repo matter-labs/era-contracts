@@ -154,14 +154,10 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             ,
             DirectCreate2Calldata memory directCalldata,
             address create2FactoryAddress
-        ) = GatewayCTMDeployerHelper.calculateAddresses(
-                bytes32(0),
-                gatewayCTMDeployerConfig,
-                gatewayCTMDeployerConfig.isZKsyncOS
-            );
+        ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
 
         // Deploy all factory dependencies
-        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps(gatewayCTMDeployerConfig.isZKsyncOS);
+        bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps(gatewayCTMDeployerConfig);
         address l1AssetRouter = address(IL1Bridgehub(coreAddresses.bridgehub.proxies.bridgehub).assetRouter());
 
         for (uint i = 0; i < deps.length; i++) {

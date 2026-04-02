@@ -12,7 +12,7 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {EraZkosRouter} from "../../utils/EraZkosRouter.sol";
+import {EraZkosRouter, FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
@@ -24,8 +24,6 @@ import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 abstract contract CTMUpgradeBase is DeployCTMScript {
-    function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual returns (bool);
-
     function getEmptyVerifierParams() internal pure returns (VerifierParams memory) {
         return
             VerifierParams({
@@ -72,12 +70,15 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     /// @notice Build L1 -> L2 upgrade tx
     function composeUpgradeTx(
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments,
-        uint256[] memory factoryDepsHashes,
+        FactoryDepsResult memory _factoryDepsResult,
         uint256 protocolUpgradeNonce
     ) internal view returns (L2CanonicalTransaction memory transaction) {
         // Sanity check
         for (uint256 i; i < forceDeployments.length; i++) {
-            require(isHashInFactoryDepsCheck(forceDeployments[i].bytecodeHash), "Bytecode hash not in factory deps");
+            require(
+                EraZkosRouter.isHashInFactoryDeps(_factoryDepsResult, forceDeployments[i].bytecodeHash),
+                "Bytecode hash not in factory deps"
+            );
         }
 
         (address target, bytes memory data) = getL2UpgradeTargetAndData(forceDeployments);
@@ -99,7 +100,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             data: data,
             signature: new bytes(0),
             // All factory deps should've been published before
-            factoryDeps: factoryDepsHashes,
+            factoryDeps: _factoryDepsResult.factoryDepsHashes,
             paymasterInput: new bytes(0),
             // Reserved dynamic type for the future use-case. Using it should be avoided,
             // But it is still here, just in case we want to enable some additional functionality
@@ -162,7 +163,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         ChainCreationParamsConfig memory chainCreationParams,
         uint256 l1ChainId,
         address ownerAddress,
-        uint256[] memory factoryDepsHashes,
+        FactoryDepsResult memory _factoryDepsResult,
         address registeredChainIdDiamondProxy
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion(registeredChainIdDiamondProxy);
@@ -176,7 +177,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             chainCreationParams,
             l1ChainId,
             ownerAddress,
-            factoryDepsHashes,
+            _factoryDepsResult,
             nonce
         );
 
@@ -198,7 +199,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         ChainCreationParamsConfig memory chainCreationParams,
         uint256 l1ChainId,
         address ownerAddress,
-        uint256[] memory factoryDepsHashes,
+        FactoryDepsResult memory _factoryDepsResult,
         uint256 protocolUpgradeNonce
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments = buildUpgradeForceDeployments(
@@ -207,7 +208,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         );
 
         proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: composeUpgradeTx(forceDeployments, factoryDepsHashes, protocolUpgradeNonce),
+            l2ProtocolUpgradeTx: composeUpgradeTx(forceDeployments, _factoryDepsResult, protocolUpgradeNonce),
             bootloaderHash: chainCreationParams.bootloaderHash,
             defaultAccountHash: chainCreationParams.defaultAAHash,
             evmEmulatorHash: chainCreationParams.evmEmulatorHash,
