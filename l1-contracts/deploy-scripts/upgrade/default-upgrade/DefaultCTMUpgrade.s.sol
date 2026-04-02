@@ -19,14 +19,12 @@ import {
 } from "../../utils/Types.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
@@ -836,24 +834,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         admin = getBridgehubAdmin();
         calls = new Call[](1);
         calls[0] = prepareCreateNewChainCall(555)[0];
-    }
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        if (!isZKBytecode) {
-            if (compareStrings(contractName, "DiamondProxy")) {
-                return type(DiamondProxy).creationCode;
-            } else if (compareStrings(contractName, "DefaultUpgrade")) {
-                return type(DefaultUpgrade).creationCode;
-            } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
-                return type(GovernanceUpgradeTimer).creationCode;
-            } else if (compareStrings(contractName, "UpgradeStageValidator")) {
-                return type(UpgradeStageValidator).creationCode;
-            }
-        }
-        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function deployUpgradeStageValidator() internal {

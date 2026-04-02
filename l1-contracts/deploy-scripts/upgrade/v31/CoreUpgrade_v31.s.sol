@@ -88,13 +88,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
                           Internal functions
     //////////////////////////////////////////////////////////////*/
 
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        return super.getCreationCode(contractName, isZKBytecode);
-    }
-
     function getCreationCalldata(
         string memory contractName,
         bool isZKBytecode

@@ -78,6 +78,8 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         forceDeploymentContracts[0] = EraZkosContract.L2V31Upgrade;
     }
 
+    // FIXME: the logic in this function is only suitable for the dummy upgrade implementation.
+    // Should be rewritten once the full upgrade contract is available.
     function getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
     ) internal view virtual override returns (address, bytes memory) {
@@ -120,6 +122,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         );
     }
 
+    // FIXME: should be rewritten to be more generic once the full upgrade is available.
     function getProposedUpgrade(
         StateTransitionDeployedAddresses memory stateTransition,
         ChainCreationParamsConfig memory chainCreationParams,
