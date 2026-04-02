@@ -32,17 +32,10 @@ event L2UpgradeTxDataConstructed(address indexed bridgehub, uint256 indexed chai
 abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
     using Bytes for bytes;
 
-    /// @dev The address of the Bridgehub proxy on L1.
-    IBridgehubBase public immutable BRIDGEHUB;
-
-    constructor(IBridgehubBase _bridgehub) {
-        BRIDGEHUB = _bridgehub;
-    }
-
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
-        IBridgehubBase bridgehub = BRIDGEHUB;
+        IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
         address assetRouter = address(bridgehub.assetRouter());
         address nativeTokenVaultAddr = address(IL1AssetRouter(assetRouter).nativeTokenVault());
 

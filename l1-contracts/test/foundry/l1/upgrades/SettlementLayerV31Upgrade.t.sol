@@ -27,7 +27,6 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 contract DummySettlementLayerV31Upgrade is EraSettlementLayerV31Upgrade, BaseUpgradeUtils {
-    constructor(IBridgehubBase _bridgehub) EraSettlementLayerV31Upgrade(_bridgehub) {}
     function setTotalBatchesCommitted(uint256 _totalBatchesCommitted) public {
         s.totalBatchesCommitted = _totalBatchesCommitted;
     }
@@ -116,7 +115,8 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
         mockGWChain = makeAddr("gwChain");
         mockChainTypeManager = makeAddr("chainTypeManager");
 
-        upgrade = new DummySettlementLayerV31Upgrade(IBridgehubBase(mockBridgehub));
+        upgrade = new DummySettlementLayerV31Upgrade();
+        upgrade.setBridgehub(mockBridgehub);
         upgrade.setChainId(testChainId);
         upgrade.setChainTypeManager(mockChainTypeManager);
         upgrade.setTotalBatchesCommitted(100);

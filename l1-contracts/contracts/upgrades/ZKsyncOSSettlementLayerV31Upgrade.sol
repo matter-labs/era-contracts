@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {SettlementLayerV31UpgradeBase} from "./SettlementLayerV31UpgradeBase.sol";
-import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {Bytes} from "../vendor/Bytes.sol";
 
@@ -14,8 +13,6 @@ import {Bytes} from "../vendor/Bytes.sol";
 /// @custom:security-contact security@matterlabs.dev
 contract ZKsyncOSSettlementLayerV31Upgrade is SettlementLayerV31UpgradeBase {
     using Bytes for bytes;
-
-    constructor(IBridgehubBase _bridgehub) SettlementLayerV31UpgradeBase(_bridgehub) {}
 
     /// @inheritdoc SettlementLayerV31UpgradeBase
     function getL2UpgradeTxData(

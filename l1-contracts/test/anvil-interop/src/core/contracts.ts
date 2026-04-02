@@ -57,7 +57,6 @@ const ARTIFACTS = {
   Ownable2Step: "Ownable2Step.sol/Ownable2Step.json",
   EraSettlementLayerV31Upgrade: "EraSettlementLayerV31Upgrade.sol/EraSettlementLayerV31Upgrade.json",
   ZKsyncOSSettlementLayerV31Upgrade: "ZKsyncOSSettlementLayerV31Upgrade.sol/ZKsyncOSSettlementLayerV31Upgrade.json",
-  SettlementLayerV31Upgrade: "SettlementLayerV31Upgrade.sol/SettlementLayerV31Upgrade.json",
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
   TestnetERC20Token: "TestnetERC20Token.sol/TestnetERC20Token.json",

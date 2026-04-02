@@ -431,7 +431,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             compareStrings(contractName, "EraSettlementLayerV31Upgrade") ||
             compareStrings(contractName, "ZKsyncOSSettlementLayerV31Upgrade")
         ) {
-            return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
+            return abi.encode();
         } else if (compareStrings(contractName, "Governance")) {
             return
                 abi.encode(
