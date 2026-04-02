@@ -76,3 +76,39 @@ export const NEW_PRIORITY_REQUEST_EVENT_SIG =
   "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])";
 export const L1_MESSAGE_SENT_EVENT_SIG = "L1MessageSent(address,bytes32,bytes)";
 export const FINALIZE_DEPOSIT_SIG = "finalizeDeposit(uint256,bytes32,bytes)";
+
+// Anvil account #2 — used as a secondary distinct recipient
+export const ANVIL_ACCOUNT2_ADDR = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
+// Anvil account #2 private key
+export const ANVIL_ACCOUNT2_PRIVATE_KEY = "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a";
+
+// ── Interop enums (mirror Solidity Messaging.sol) ──────────────
+
+export enum BundleStatus {
+  Unreceived = 0,
+  Verified = 1,
+  FullyExecuted = 2,
+  Unbundled = 3,
+}
+
+export enum CallStatus {
+  Unprocessed = 0,
+  Executed = 1,
+  Cancelled = 2,
+}
+
+// ── Interop attribute selectors (ERC-7786) ─────────────────────
+
+// keccak256("interopCallValue(uint256)")[0:4]
+export const INTEROP_CALL_VALUE_SELECTOR = "0x54b16529";
+// keccak256("indirectCall(uint256)")[0:4]
+export const INDIRECT_CALL_SELECTOR = "0xc8496ea7";
+// keccak256("executionAddress(bytes)")[0:4]
+export const EXECUTION_ADDRESS_SELECTOR = "0x054c031b";
+// keccak256("unbundlerAddress(bytes)")[0:4]
+export const UNBUNDLER_ADDRESS_SELECTOR = "0xb9c86698";
+
+// Address of a non-existent contract used to create failing calls in unbundle tests
+export const FAILING_CALL_CONTRACT = "0x000000000000000000000000000000000000fEEd";
+// Selector for a non-existent function: someVeryUnfortunateCall()
+export const FAILING_CALL_CALLDATA = "0x00056d83";
