@@ -166,7 +166,6 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
-
     /// @notice Full default upgrade preparation flow
     function prepareEcosystemUpgrade() public virtual {
         console.log("Ecosystem contracts are deployed!");

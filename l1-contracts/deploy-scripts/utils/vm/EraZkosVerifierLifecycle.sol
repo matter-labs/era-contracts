@@ -98,6 +98,8 @@ library EraZkosVerifierLifecycle {
 
     /// @notice Retrieve sub-verifier addresses from a deployed dual verifier.
     ///         Era uses immutable getters; ZKsyncOS uses versioned mappings.
+    ///         We query version 0 because on Gateway, verifiers are not registered at the
+    ///         default version — this was never added and will be removed in the future.
     function getSubVerifiers(
         address _verifier,
         bool _isZKsyncOS
@@ -108,8 +110,8 @@ library EraZkosVerifierLifecycle {
 
         if (_isZKsyncOS) {
             IZKsyncOSDualVerifier verifier = IZKsyncOSDualVerifier(_verifier);
-            fflonk = address(verifier.fflonkVerifiers(DEFAULT_ZKSYNC_OS_VERIFIER_VERSION));
-            plonk = address(verifier.plonkVerifiers(DEFAULT_ZKSYNC_OS_VERIFIER_VERSION));
+            fflonk = address(verifier.fflonkVerifiers(0));
+            plonk = address(verifier.plonkVerifiers(0));
         } else {
             IEraDualVerifier verifier = IEraDualVerifier(_verifier);
             fflonk = address(verifier.FFLONK_VERIFIER());

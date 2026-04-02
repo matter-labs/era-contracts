@@ -26,7 +26,6 @@ import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {Utils} from "../../utils/Utils.sol";
 
-// ChainCreationParamsLib is now accessed through EraZkosRouter.getChainCreationParams()
 import {EraZkosRouter} from "../../utils/EraZkosRouter.sol";
 
 /// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.

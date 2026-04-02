@@ -117,8 +117,12 @@ library DeployCTML1OrGateway {
             return CTMContract.EraChainTypeManager;
         } else if (compareStrings(contractName, "BlobsL1DAValidatorZKsyncOS")) {
             return CTMContract.BlobsL1DAValidatorZKsyncOS;
-        } else if (compareStrings(contractName, "EraTestnetVerifier")) {
-            // The EraTestnetVerifier contract maps to the Verifier slot for testnets.
+        } else if (
+            compareStrings(contractName, "EraTestnetVerifier") ||
+            compareStrings(contractName, "ZKsyncOSTestnetVerifier") ||
+            compareStrings(contractName, "EraDualVerifier") ||
+            compareStrings(contractName, "ZKsyncOSDualVerifier")
+        ) {
             return CTMContract.Verifier;
         } else {
             revert(string.concat("Contract ", contractName, " not CTM contract, creation calldata could not be set"));

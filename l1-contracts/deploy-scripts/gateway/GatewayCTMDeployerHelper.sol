@@ -119,10 +119,7 @@ library GatewayCTMDeployerHelper {
         )
     {
         create2FactoryAddress = EraZkosRouter.getDeploymentTarget(config.isZKsyncOS);
-        (contracts, deployerCalldata, deployers, directCalldata) = _calculateAddressesInner(
-            _create2Salt,
-            config
-        );
+        (contracts, deployerCalldata, deployers, directCalldata) = _calculateAddressesInner(_create2Salt, config);
     }
 
     function _calculateAddressesInner(
@@ -139,10 +136,7 @@ library GatewayCTMDeployerHelper {
     {
         CalculateAddressesIntermediate memory im;
 
-        (deployers.daDeployer, deployerCalldata.daCalldata, im.daResult) = _calculateDADeployer(
-            _create2Salt,
-            config
-        );
+        (deployers.daDeployer, deployerCalldata.daCalldata, im.daResult) = _calculateDADeployer(_create2Salt, config);
         (
             deployers.proxyAdminDeployer,
             deployerCalldata.proxyAdminCalldata,

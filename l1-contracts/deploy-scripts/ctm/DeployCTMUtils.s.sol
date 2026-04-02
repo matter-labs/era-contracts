@@ -59,8 +59,6 @@ import {
     BridgehubAddresses,
     CoreDeployedAddresses
 } from "../utils/Types.sol";
-// ChainCreationParamsLib is now accessed through EraZkosRouter.getChainCreationParams()
-
 import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 
 import {CTMDeployedAddresses} from "../utils/Types.sol";
@@ -291,81 +289,9 @@ abstract contract DeployCTMUtils is DeployUtils {
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "L1AssetRouter")) {
-                return type(L1AssetRouter).creationCode;
-            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-                return type(L1ERC20Bridge).creationCode;
-            } else if (compareStrings(contractName, "L1NativeTokenVault")) {
-                return type(L1NativeTokenVault).creationCode;
-            } else if (compareStrings(contractName, "BridgedStandardERC20")) {
-                return type(BridgedStandardERC20).creationCode;
-            } else if (compareStrings(contractName, "Governance")) {
-                return type(Governance).creationCode;
-            } else if (compareStrings(contractName, "ChainAdminOwnable")) {
-                return type(ChainAdminOwnable).creationCode;
-            } else if (compareStrings(contractName, "ChainAdmin")) {
-                return type(ChainAdmin).creationCode;
-            } else if (compareStrings(contractName, "ProxyAdmin")) {
-                return type(ProxyAdmin).creationCode;
-            } else if (compareStrings(contractName, "RollupDAManager")) {
-                return type(RollupDAManager).creationCode;
-            } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
-                return type(ValidiumL1DAValidator).creationCode;
-            } else if (compareStrings(contractName, "Verifier")) {
-                return EraZkosRouter.getVerifierCreationCode(config.isZKsyncOS, config.testnetVerifier);
-            } else if (compareStrings(contractName, "VerifierFflonk")) {
-                return EraZkosRouter.getVerifierFflonkCreationCode(config.isZKsyncOS);
-            } else if (compareStrings(contractName, "VerifierPlonk")) {
-                return EraZkosRouter.getVerifierPlonkCreationCode(config.isZKsyncOS);
-            } else if (compareStrings(contractName, "DefaultUpgrade")) {
-                return type(DefaultUpgrade).creationCode;
-            } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
-                return type(L1GenesisUpgrade).creationCode;
-            } else if (compareStrings(contractName, "ValidatorTimelock")) {
-                return type(ValidatorTimelock).creationCode;
-            } else if (compareStrings(contractName, "PermissionlessValidator")) {
-                return type(PermissionlessValidator).creationCode;
-            } else if (compareStrings(contractName, "EraChainTypeManager")) {
-                return type(EraChainTypeManager).creationCode;
-            } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
-                return type(ZKsyncOSChainTypeManager).creationCode;
-            } else if (compareStrings(contractName, "BytecodesSupplier")) {
-                return type(BytecodesSupplier).creationCode;
-            } else if (compareStrings(contractName, "ExecutorFacet")) {
-                return type(ExecutorFacet).creationCode;
-            } else if (compareStrings(contractName, "AdminFacet")) {
-                return type(AdminFacet).creationCode;
-            } else if (compareStrings(contractName, "MailboxFacet")) {
-                return type(MailboxFacet).creationCode;
-            } else if (compareStrings(contractName, "GettersFacet")) {
-                return type(GettersFacet).creationCode;
-            } else if (compareStrings(contractName, "MigratorFacet")) {
-                return type(MigratorFacet).creationCode;
-            } else if (compareStrings(contractName, "CommitterFacet")) {
-                return type(CommitterFacet).creationCode;
-            } else if (compareStrings(contractName, "DiamondInit")) {
-                return type(DiamondInit).creationCode;
-            } else if (compareStrings(contractName, "ServerNotifier")) {
-                return type(ServerNotifier).creationCode;
-            } else if (compareStrings(contractName, "SettlementLayerV31Upgrade")) {
-                return type(SettlementLayerV31Upgrade).creationCode;
-            }
-        } else {
-            if (compareStrings(contractName, "Verifier")) {
-                if (config.testnetVerifier) {
-                    return getCreationCode("TestnetVerifier", true);
-                } else {
-                    return getCreationCode("DualVerifier", true);
-                }
-            } else if (compareStrings(contractName, "VerifierFflonk")) {
-                (, string memory resolved) = EraZkosRouter.resolve(config.isZKsyncOS, EraZkosContract.VerifierFflonk);
-                return ContractsBytecodesLib.getCreationCode(resolved);
-            } else if (compareStrings(contractName, "VerifierPlonk")) {
-                (, string memory resolved) = EraZkosRouter.resolve(config.isZKsyncOS, EraZkosContract.VerifierPlonk);
-                return ContractsBytecodesLib.getCreationCode(resolved);
-            }
+            return ContractsBytecodesLib.getCreationCodeEVM(contractName);
         }
-        return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
+        return ContractsBytecodesLib.getL2Bytecode(contractName, config.isZKsyncOS);
     }
 
     function getRollupL2DACommitmentScheme() internal returns (L2DACommitmentScheme) {
@@ -390,9 +316,15 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode(ctmAddresses.daAddresses.availBridge);
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "VerifierFflonk")) {
+        } else if (
+            compareStrings(contractName, "EraVerifierFflonk") ||
+            compareStrings(contractName, "ZKsyncOSVerifierFflonk")
+        ) {
             return abi.encode();
-        } else if (compareStrings(contractName, "VerifierPlonk")) {
+        } else if (
+            compareStrings(contractName, "EraVerifierPlonk") ||
+            compareStrings(contractName, "ZKsyncOSVerifierPlonk")
+        ) {
             return abi.encode();
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();

@@ -14,19 +14,27 @@ library ContractsBytecodesLib {
     /// @dev Reverts if the contractIdentifier is unknown or unsupported.
 
     function getCreationCode(string memory contractIdentifier) internal view returns (bytes memory) {
-        return getCreationCodeZK(contractIdentifier);
+        return getCreationCodeEra(contractIdentifier);
     }
 
     function getCreationCode(string memory contractIdentifier, bool isZKBytecode) internal view returns (bytes memory) {
         if (isZKBytecode) {
-            return getCreationCodeZK(contractIdentifier);
+            return getCreationCodeEra(contractIdentifier);
         } else {
             return getCreationCodeEVM(contractIdentifier);
         }
     }
 
+    /// @notice Reads L2 bytecode: ZKsyncOS chains use EVM bytecodes, Era chains use zkEVM bytecodes.
+    function getL2Bytecode(string memory contractIdentifier, bool isZKsyncOS) internal view returns (bytes memory) {
+        if (isZKsyncOS) {
+            return getCreationCodeEVM(contractIdentifier);
+        }
+        return getCreationCodeEra(contractIdentifier);
+    }
+
     function getCreationCodeEVM(string memory contractIdentifier) internal view returns (bytes memory) {
-        string[5] memory EVM_CONTRACT_IDENTIFIERS = [
+        string[5] memory DA_CONTRACT_IDENTIFIERS = [
             "RollupL1DAValidator",
             "BlobsL1DAValidatorZKsyncOS",
             "AvailL1DAValidator",
@@ -34,19 +42,35 @@ library ContractsBytecodesLib {
             "EIP7702Checker"
         ];
 
-        uint256 EVM_CONTRACT_IDENTIFIERS_LENGTH = EVM_CONTRACT_IDENTIFIERS.length;
-        for (uint i = 0; i < EVM_CONTRACT_IDENTIFIERS_LENGTH; i++) {
-            if (Utils.compareStrings(EVM_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
+        uint256 DA_CONTRACT_IDENTIFIERS_LENGTH = DA_CONTRACT_IDENTIFIERS.length;
+        for (uint i = 0; i < DA_CONTRACT_IDENTIFIERS_LENGTH; i++) {
+            if (Utils.compareStrings(DA_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
                 return Utils.readDAContractBytecode(contractIdentifier);
             }
         }
 
-        revert(
-            string.concat("ContractsBytecodesLib: Unknown or unsupported EVM contract identifier: ", contractIdentifier)
-        );
+        // Special cases: contracts where filename differs from contract name
+        if (Utils.compareStrings(contractIdentifier, "AdminFacet")) {
+            return Utils.readFoundryBytecodeL1("Admin.sol", "AdminFacet");
+        } else if (Utils.compareStrings(contractIdentifier, "MailboxFacet")) {
+            return Utils.readFoundryBytecodeL1("Mailbox.sol", "MailboxFacet");
+        } else if (Utils.compareStrings(contractIdentifier, "ExecutorFacet")) {
+            return Utils.readFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
+        } else if (Utils.compareStrings(contractIdentifier, "GettersFacet")) {
+            return Utils.readFoundryBytecodeL1("Getters.sol", "GettersFacet");
+        } else if (Utils.compareStrings(contractIdentifier, "MigratorFacet")) {
+            return Utils.readFoundryBytecodeL1("Migrator.sol", "MigratorFacet");
+        } else if (Utils.compareStrings(contractIdentifier, "CommitterFacet")) {
+            return Utils.readFoundryBytecodeL1("Committer.sol", "CommitterFacet");
+        } else if (Utils.compareStrings(contractIdentifier, "BridgedTokenBeacon")) {
+            return Utils.readFoundryBytecodeL1("UpgradeableBeacon.sol", "UpgradeableBeacon");
+        }
+
+        // Default: read from l1-contracts/out/ using standard naming
+        return Utils.readFoundryBytecodeL1(string.concat(contractIdentifier, ".sol"), contractIdentifier);
     }
 
-    function getCreationCodeZK(string memory contractIdentifier) internal view returns (bytes memory) {
+    function getCreationCodeEra(string memory contractIdentifier) internal view returns (bytes memory) {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.

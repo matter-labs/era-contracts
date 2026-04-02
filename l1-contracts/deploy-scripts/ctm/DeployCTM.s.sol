@@ -210,9 +210,13 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function deployVerifiers() internal {
-        ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract("VerifierFflonk", false);
-        ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract("VerifierPlonk", false);
-        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract("Verifier", false);
+        (, string memory fflonkName) = EraZkosRouter.resolve(config.isZKsyncOS, EraZkosContract.VerifierFflonk);
+        (, string memory plonkName) = EraZkosRouter.resolve(config.isZKsyncOS, EraZkosContract.VerifierPlonk);
+        (, string memory verifierName) = EraZkosRouter.resolveMainVerifier(config.isZKsyncOS, config.testnetVerifier);
+
+        ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
+        ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
+        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, false);
 
         // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
         vm.startBroadcast(getDeployerAddress());

@@ -1128,6 +1128,7 @@ library Utils {
         return bytecode;
     }
 
+    // TODO: restore blake2s hash caching to avoid repeated ffi calls for the same bytecode.
     function blakeHashBytecode(bytes memory bytecode) internal returns (bytes32 hashedBytecode) {
         string[] memory input = new string[](5);
         input[0] = "yarn";
