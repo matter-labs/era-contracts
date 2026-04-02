@@ -42,6 +42,7 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {UpgradeUtils} from "../default-upgrade/UpgradeUtils.sol";
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
+import {EraZkosContract} from "../../utils/EraZkosRouter.sol";
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
@@ -143,10 +144,10 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
         );
     }
 
-    function getForceDeploymentNames() internal pure override returns (string[] memory) {
-        string[] memory forceDeploymentNames = new string[](1);
-        forceDeploymentNames[0] = "L2V29Upgrade";
-        return forceDeploymentNames;
+    function getForceDeploymentContracts() internal pure override returns (EraZkosContract[] memory) {
+        EraZkosContract[] memory forceDeploymentContracts = new EraZkosContract[](1);
+        forceDeploymentContracts[0] = EraZkosContract.L2V29Upgrade;
+        return forceDeploymentContracts;
     }
 
     function getExpectedL2Address(string memory contractName) public override returns (address) {

@@ -398,10 +398,6 @@ abstract contract DeployCTMUtils is DeployUtils {
             });
     }
 
-    function calculateExpectedL2Address(string memory contractName) internal returns (address) {
-        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
-    }
-
     function getL2BytecodeHash(string memory contractName) public view virtual returns (bytes32) {
         return L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, true));
     }

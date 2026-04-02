@@ -5,12 +5,12 @@ import {Utils} from "./Utils.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {BytecodePublisher} from "./bytecode/BytecodePublisher.s.sol";
 
 // Sub-module libraries (internal implementation details)
 import {EraZkosVerifierLifecycle} from "./vm/EraZkosVerifierLifecycle.sol";
-import {EraZkosForceDeployments} from "./vm/EraZkosForceDeployments.sol";
 import {ChainCreationParamsLib} from "../ctm/ChainCreationParamsLib.sol";
 import {ChainCreationParamsConfig} from "./Types.sol";
 
@@ -30,6 +30,8 @@ enum EraZkosContract {
     InteropHandler,
     L2AssetTracker,
     BeaconProxy,
+    L2V29Upgrade,
+    L2V31Upgrade,
     // ---- CTM / state-transition contracts ----
     ChainTypeManager,
     VerifierFflonk,
@@ -60,7 +62,6 @@ struct FactoryDepsResult {
 /// @dev Use as a library: pass `_isZKsyncOS` as the first argument to every function.
 ///      Delegates to sub-module libraries for specific concerns:
 ///        - EraZkosVerifierLifecycle: verifier creation, initialization, introspection
-///        - EraZkosForceDeployments: force deployment bytecode hashing
 ///        - ChainCreationParamsLib: genesis config loading
 library EraZkosRouter {
     string private constant GENESIS_FILENAME_ERA = "era/latest.json";
@@ -122,10 +123,11 @@ library EraZkosRouter {
         return abi.encode(L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1(fileName, contractName)));
     }
 
-    /// @notice Get a bytecode hash suitable for force deployments / upgrades.
+    /// @notice Get a bytecode hash of the deployed bytecode.
     ///         Era:      L2ContractHelper.hashL2Bytecode (ZK bytecode hash).
     ///         ZKsyncOS: keccak256 of deployed EVM bytecode.
-    function getBytecodeHash(bool _isZKsyncOS, EraZkosContract _c) internal view returns (bytes32) {
+    /// @dev Note, that for zksync os it is NOT suitable for force deployments as these require bytecode info. 
+    function getDeployedBytecodeHash(bool _isZKsyncOS, EraZkosContract _c) internal view returns (bytes32) {
         (string memory fileName, string memory contractName) = resolve(_isZKsyncOS, _c);
         if (_isZKsyncOS) {
             return keccak256(Utils.readFoundryDeployedBytecodeL1(fileName, contractName));
@@ -269,16 +271,28 @@ library EraZkosRouter {
         return EraZkosVerifierLifecycle.getSubVerifiers(_verifier, _isZKsyncOS);
     }
 
-    // ======================== Force deployments (delegated to EraZkosForceDeployments) ========================
+    // ======================== Force deployments ========================
 
-    /// @notice Compute the bytecode hash for a force deployment entry.
-    ///         Era:      L2ContractHelper.hashL2Bytecode of ZK creation code.
-    ///         ZKsyncOS: keccak256 of EVM deployed bytecode.
-    function getForceDeploymentBytecodeHash(
+    function getCreate2DerivedForceDeploymentAddr(bool _isZKsyncOS, EraZkosContract _c) internal view returns (address) {
+        // FIXME: add support for additional force deployments on ZKsyncOS in scripts.
+        require(!_isZKsyncOS, "Additional force deployments are not supported for ZKsyncOS scripts");
+        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getDeployedBytecodeHash(false, _c), hex"");
+    }
+
+    /// @notice Build a force deployment entry for scripts that use additional Era force deployments.
+    function getForceDeployment(
         bool _isZKsyncOS,
-        string memory _contractName
-    ) internal view returns (bytes32) {
-        return EraZkosForceDeployments.getForceDeploymentBytecodeHash(_contractName, _isZKsyncOS);
+        EraZkosContract _c
+    ) internal view returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
+        // FIXME: add support for additional force deployments on ZKsyncOS in scripts.
+        require(!_isZKsyncOS, "Additional force deployments are not supported for ZKsyncOS scripts");
+        forceDeployment = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: getDeployedBytecodeHash(false, _c),
+            newAddress: getCreate2DerivedForceDeploymentAddr(_isZKsyncOS, _c),
+            callConstructor: false,
+            value: 0,
+            input: ""
+        });
     }
 
     // ======================== L2 deployment target ========================
@@ -421,6 +435,8 @@ library EraZkosRouter {
         if (_c == EraZkosContract.InteropHandler) return "InteropHandler";
         if (_c == EraZkosContract.L2AssetTracker) return "L2AssetTracker";
         if (_c == EraZkosContract.BeaconProxy) return "BeaconProxy";
+        if (_c == EraZkosContract.L2V29Upgrade) return "L2V29Upgrade";
+        if (_c == EraZkosContract.L2V31Upgrade) return "L2V31Upgrade";
 
         revert("EraZkosRouter: unknown EraZkosContract");
     }

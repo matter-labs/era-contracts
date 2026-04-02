@@ -405,7 +405,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
 
-        string[] memory additionalForceDeployments = getAdditionalDependenciesNames();
+        EraZkosContract[] memory additionalForceDeployments = getAdditionalDependencyContracts();
 
         bytes[] memory additionalDependencies = new bytes[](4 + additionalForceDeployments.length); // Deps after Gateway upgrade
         additionalDependencies[0] = ContractsBytecodesLib.getCreationCodeEra("L2SharedBridgeLegacy");
@@ -414,7 +414,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         additionalDependencies[3] = ContractsBytecodesLib.getCreationCodeEra("ProxyAdmin");
 
         for (uint256 i; i < additionalForceDeployments.length; i++) {
-            additionalDependencies[4 + i] = ContractsBytecodesLib.getCreationCodeEra(additionalForceDeployments[i]);
+            (, string memory contractName) = EraZkosRouter.resolve(config.isZKsyncOS, additionalForceDeployments[i]);
+            additionalDependencies[4 + i] = ContractsBytecodesLib.getCreationCodeEra(contractName);
         }
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, additionalDependencies);
@@ -429,7 +430,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             eraChainId: config.eraChainId,
             gatewayChainId: config.gatewayChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: EraZkosRouter.getBytecodeHash(config.isZKsyncOS, EraZkosContract.BeaconProxy),
+            l2TokenProxyBytecodeHash: EraZkosRouter.getDeployedBytecodeHash(
+                config.isZKsyncOS,
+                EraZkosContract.BeaconProxy
+            ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2Bridgehub),
@@ -849,20 +853,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         admin = getBridgehubAdmin();
         calls = new Call[](1);
         calls[0] = prepareCreateNewChainCall(555)[0];
-    }
-
-    function getForceDeployment(
-        string memory contractName
-    ) public virtual override returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
-        bytes32 bytecodeHash = EraZkosRouter.getForceDeploymentBytecodeHash(config.isZKsyncOS, contractName);
-        return
-            IL2ContractDeployer.ForceDeployment({
-                bytecodeHash: bytecodeHash,
-                newAddress: getExpectedL2Address(contractName),
-                callConstructor: false,
-                value: 0,
-                input: ""
-            });
     }
 
     function getCreationCode(

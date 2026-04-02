@@ -74,9 +74,9 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         return deploySimpleContract("SettlementLayerV31Upgrade", false);
     }
 
-    function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
-        forceDeploymentNames = new string[](1);
-        forceDeploymentNames[0] = "L2V31Upgrade";
+    function getForceDeploymentContracts() internal override returns (EraZkosContract[] memory forceDeploymentContracts) {
+        forceDeploymentContracts = new EraZkosContract[](1);
+        forceDeploymentContracts[0] = EraZkosContract.L2V31Upgrade;
     }
 
     function getExpectedL2Address(string memory contractName) public override returns (address) {
