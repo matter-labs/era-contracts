@@ -30,7 +30,6 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {IComplexUpgraderZKsyncOSV29} from "contracts/state-transition/l2-deps/IComplexUpgraderZKsyncOSV29.sol";
 
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 import {Utils} from "../../utils/Utils.sol";
@@ -89,10 +88,14 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         deployStateTransitionDiamondFacets();
     }
 
-    /// @notice Override to deploy v31-specific upgrade contract
+    /// @notice Override to deploy the correct v31 upgrade contract based on chain type.
     function deployUsedUpgradeContract() internal virtual override returns (address) {
-        console.log("Deploying SettlementLayerV31Upgrade as the chain upgrade contract");
-        return deploySimpleContract("SettlementLayerV31Upgrade", false);
+        if (config.isZKsyncOS) {
+            console.log("Deploying ZKsyncOSSettlementLayerV31Upgrade");
+            return deploySimpleContract("ZKsyncOSSettlementLayerV31Upgrade", false);
+        }
+        console.log("Deploying EraSettlementLayerV31Upgrade");
+        return deploySimpleContract("EraSettlementLayerV31Upgrade", false);
     }
 
     function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
@@ -113,36 +116,14 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     ) internal virtual override returns (address, bytes memory) {
         // The fixedForceDeploymentsData is ecosystem-wide (same for all chains).
         // The additionalForceDeploymentsData placeholder is rewritten per-chain by
-        // SettlementLayerV31Upgrade.getL2V31UpgradeCalldata at upgrade time.
+        // SettlementLayerV31UpgradeBase._buildL2V31UpgradeCalldata at upgrade time.
         bytes memory l2UpgradeCalldata = abi.encodeCall(
             IL2V31Upgrade.upgrade,
             (config.isZKsyncOS, address(0), newlyGeneratedData.fixedForceDeploymentsData, "")
         );
 
         if (config.isZKsyncOS) {
-            if (newConfig.useV29IntrospectionOverride) {
-                // v29 ZKsyncOS ComplexUpgrader uses the v29 ABI variant.
-                IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[]
-                    memory v29ForceDeployments = new IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[](1);
-                v29ForceDeployments[0] = IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo({
-                    isZKsyncOS: true,
-                    deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade"),
-                    newAddress: L2_VERSION_SPECIFIC_UPGRADER_ADDR
-                });
-
-                return (
-                    address(L2_COMPLEX_UPGRADER_ADDR),
-                    abi.encodeCall(
-                        IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal,
-                        (v29ForceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
-                    )
-                );
-            }
-
-            // v30+ ZKsyncOS ComplexUpgrader uses the current ABI.
-            // Include all system contracts in the outer force deployment list so
-            // that the test harness (which reads addresses from this list) can
-            // pre-deploy EVM bytecodes at every address the upgrade touches.
+            // ZKsyncOS: include all system contracts in the outer force deployment list.
             IComplexUpgrader.UniversalContractUpgradeInfo[]
                 memory universalForceDeployments = _buildZKsyncOSForceDeployments();
 

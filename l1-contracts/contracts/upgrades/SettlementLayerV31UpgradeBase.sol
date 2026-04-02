@@ -15,28 +15,21 @@ import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {TokenBridgingData, TokenMetadata} from "../common/Messaging.sol";
-import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
-import {IComplexUpgraderZKsyncOSV29} from "../state-transition/l2-deps/IComplexUpgraderZKsyncOSV29.sol";
-import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {Bytes} from "../vendor/Bytes.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {NotAllBatchesExecuted, PriorityQueueNotReady} from "../common/L1ContractErrors.sol";
 
-error PriorityQueueNotReady();
-error V31UpgradeGatewayBlockNumberNotSet();
-error NotAllBatchesExecuted();
-error UnsupportedL2UpgradeSelector(bytes4 selector);
-error UnexpectedUpgradeTarget(address target);
-
-event L2V31UpgradeCalldataConstructed(address indexed bridgehub, uint256 indexed chainId, bytes data);
 event L2UpgradeTxDataConstructed(address indexed bridgehub, uint256 indexed chainId, bytes data);
 
 /// @author Matter Labs
-/// @title This contract will only be used on L1, since for V31 there will be no active GW, due the deprecation of EraGW, and the ZKSync OS GW launch will only happen after V31.
+/// @title SettlementLayerV31UpgradeBase
+/// @dev Base contract for v31 per-chain upgrades. Handles L1 state updates and
+/// delegates L2 tx construction to subclasses (Era vs ZKsyncOS).
 /// @custom:security-contact security@matterlabs.dev
-contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
+abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
     using Bytes for bytes;
 
     /// @dev The address of the Bridgehub proxy on L1.
@@ -96,11 +89,21 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
-    function getL2V31UpgradeCalldata(
+    /// @notice Construct the final L2 upgrade tx data. Implemented by subclasses.
+    function getL2UpgradeTxData(
+        address _bridgehub,
+        uint256 _chainId,
+        bytes memory _existingTxData
+    ) public view virtual returns (bytes memory);
+
+    /// @notice Replace the placeholder inner calldata with real per-chain data.
+    /// @dev The inner calldata is IL2V31Upgrade.upgrade() — we decode the placeholder to
+    /// extract ecosystem-wide fields, then re-encode with per-chain additionalForceDeploymentsData.
+    function _buildL2V31UpgradeCalldata(
         address _bridgehub,
         uint256 _chainId,
         bytes memory _existingUpgradeCalldata
-    ) public view returns (bytes memory) {
+    ) internal view returns (bytes memory) {
         // Decode the placeholder to extract isZKsyncOS, ctmDeployer, and fixedForceDeploymentsData
         // (these are ecosystem-wide and don't change per chain).
         (bool isZKsyncOS, address ctmDeployer, bytes memory fixedForceDeploymentsData, ) = abi.decode(
@@ -119,6 +122,7 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
             );
     }
 
+    /// @notice Build per-chain ZKChainSpecificForceDeploymentsData from L1 state.
     function _buildChainSpecificForceDeploymentsData(
         address _bridgehub,
         uint256 _chainId
@@ -164,91 +168,16 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
             );
     }
 
-    function getL2UpgradeTxData(
-        address _bridgehub,
-        uint256 _chainId,
-        bytes memory _existingTxData
-    ) public view returns (bytes memory) {
-        bytes4 selector = bytes4(_existingTxData);
-
-        if (selector == IComplexUpgrader.forceDeployAndUpgrade.selector) {
-            (
-                IL2ContractDeployer.ForceDeployment[] memory forceDeployments,
-                address delegateTo,
-                bytes memory existingUpgradeCalldata
-            ) = abi.decode(_existingTxData.slice(4), (IL2ContractDeployer.ForceDeployment[], address, bytes));
-
-            _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
-            bytes memory l2V31UpgradeCalldata = getL2V31UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);
-
-            return
-                abi.encodeCall(
-                    IComplexUpgrader.forceDeployAndUpgrade,
-                    (forceDeployments, delegateTo, l2V31UpgradeCalldata)
-                );
-        }
-
-        if (selector == IComplexUpgrader.forceDeployAndUpgradeUniversal.selector) {
-            (
-                IComplexUpgrader.UniversalContractUpgradeInfo[] memory forceDeployments,
-                address delegateTo,
-                bytes memory existingUpgradeCalldata
-            ) = abi.decode(_existingTxData.slice(4), (IComplexUpgrader.UniversalContractUpgradeInfo[], address, bytes));
-
-            _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
-            bytes memory l2V31UpgradeCalldata = getL2V31UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);
-
-            return
-                abi.encodeCall(
-                    IComplexUpgrader.forceDeployAndUpgradeUniversal,
-                    (forceDeployments, delegateTo, l2V31UpgradeCalldata)
-                );
-        }
-
-        if (selector == IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal.selector) {
-            (
-                IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[] memory forceDeployments,
-                address delegateTo,
-                bytes memory existingUpgradeCalldata
-            ) = abi.decode(
-                    _existingTxData.slice(4),
-                    (IComplexUpgraderZKsyncOSV29.UniversalForceDeploymentInfo[], address, bytes)
-                );
-
-            _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
-            bytes memory l2V31UpgradeCalldata = getL2V31UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);
-
-            return
-                abi.encodeCall(
-                    IComplexUpgraderZKsyncOSV29.forceDeployAndUpgradeUniversal,
-                    (forceDeployments, delegateTo, l2V31UpgradeCalldata)
-                );
-        }
-
-        if (selector == IComplexUpgrader.upgrade.selector) {
-            (address delegateTo, bytes memory existingUpgradeCalldata) = abi.decode(
-                _existingTxData.slice(4),
-                (address, bytes)
-            );
-
-            _validateWrappedUpgrade(delegateTo, existingUpgradeCalldata);
-            bytes memory l2V31UpgradeCalldata = getL2V31UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);
-
-            return abi.encodeCall(IComplexUpgrader.upgrade, (delegateTo, l2V31UpgradeCalldata));
-        }
-
-        revert UnsupportedL2UpgradeSelector(selector);
+    /// @notice Validate that the inner calldata targets L2V31Upgrade at the expected address.
+    function _validateWrappedUpgrade(address _delegateTo, bytes memory _existingUpgradeCalldata) internal pure {
+        require(
+            bytes4(_existingUpgradeCalldata) == IL2V31Upgrade.upgrade.selector,
+            "Unexpected inner upgrade selector"
+        );
+        require(_delegateTo == L2_VERSION_SPECIFIC_UPGRADER_ADDR, "Unexpected upgrade target");
     }
 
-    function emitL2V31UpgradeCalldata(
-        address _bridgehub,
-        uint256 _chainId,
-        bytes calldata _existingUpgradeCalldata
-    ) external returns (bytes memory data) {
-        data = getL2V31UpgradeCalldata(_bridgehub, _chainId, _existingUpgradeCalldata);
-        emit L2V31UpgradeCalldataConstructed(_bridgehub, _chainId, data);
-    }
-
+    /// @notice Emit the constructed L2 upgrade tx data for monitoring/debugging.
     function emitL2UpgradeTxData(
         address _bridgehub,
         uint256 _chainId,
@@ -256,14 +185,5 @@ contract SettlementLayerV31Upgrade is BaseZkSyncUpgrade {
     ) external returns (bytes memory data) {
         data = getL2UpgradeTxData(_bridgehub, _chainId, _existingTxData);
         emit L2UpgradeTxDataConstructed(_bridgehub, _chainId, data);
-    }
-
-    function _validateWrappedUpgrade(address _delegateTo, bytes memory _existingUpgradeCalldata) internal pure {
-        if (bytes4(_existingUpgradeCalldata) != IL2V31Upgrade.upgrade.selector) {
-            revert UnsupportedL2UpgradeSelector(bytes4(_existingUpgradeCalldata));
-        }
-        if (_delegateTo != L2_VERSION_SPECIFIC_UPGRADER_ADDR) {
-            revert UnexpectedUpgradeTarget(_delegateTo);
-        }
     }
 }

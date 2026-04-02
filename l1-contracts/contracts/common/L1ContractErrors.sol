@@ -266,6 +266,8 @@ error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 error MsgValueTooLow(uint256 required, uint256 provided);
 // 0xedd74330
 error MustBeEraChain();
+// 0xf9ba09d6
+error NotAllBatchesExecuted();
 // 0x8b7e144a
 error NewDeadlineExceedsMaxDeadline();
 // 0x6eef58d1
@@ -344,6 +346,8 @@ error PriorityModeActivationTooEarly(uint256 earliestActivationTimestamp, uint25
 error PriorityModeIsNotAllowed();
 // 0x2b9d9c4c
 error PriorityModeRequiresPermanentRollup();
+// 0xa840274f
+error PriorityQueueNotReady();
 // 0xd5a99014
 error PriorityOperationsRollingHashMismatch();
 // 0xbeda0935
@@ -453,6 +457,8 @@ error UpgradeBatchNumberIsNotZero();
 // 0x04d91f9d
 error UpgradeTimestampNotReached(uint256 upgradeTimestamp, uint256 currentTimestamp);
 // 0x47b3b145
+error V31UpgradeGatewayBlockNumberNotSet();
+// 0x6c901535
 error ValidateTxnNotEnoughGas();
 // 0x626ade30
 error ValueMismatch(uint256 expected, uint256 actual);

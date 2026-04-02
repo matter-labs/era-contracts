@@ -12,6 +12,8 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -281,5 +283,51 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
 
     function getExpectedL2Address(string memory contractName) public virtual returns (address) {
         return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
+    }
+
+    /// @notice Build the base ZKsyncOS force deployment array from FixedForceDeploymentsData.
+    /// @dev Uses the same address list as getOtherBuiltinForceDeployments (Era) from
+    /// SystemContractsProcessing. Maps each address to its ZKsyncOS bytecodeInfo from
+    /// FixedForceDeploymentsData. Version-specific entries (e.g. L2V31Upgrade) should be
+    /// appended by the concrete upgrade.
+    /// @param _fixedForceDeploymentsData The ABI-encoded FixedForceDeploymentsData.
+    function getBaseZKsyncOSForceDeployments(
+        bytes memory _fixedForceDeploymentsData
+    ) internal view returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments) {
+        FixedForceDeploymentsData memory data = abi.decode(
+            _fixedForceDeploymentsData,
+            (FixedForceDeploymentsData)
+        );
+
+        // Get the canonical address list (same order as Era force deployments).
+        BuiltinContractDeployInfo[] memory contracts = SystemContractsProcessing.getOtherBuiltinContracts();
+
+        // Build a parallel bytecodeInfo array. Contracts with ZKsyncOS proxy bytecodeInfo in
+        // FixedForceDeploymentsData get ZKsyncOSSystemProxyUpgrade. Others get UnsafeForceDeployment.
+        bytes[] memory bytecodeInfos = new bytes[](contracts.length);
+        bytecodeInfos[0] = data.bridgehubBytecodeInfo;
+        bytecodeInfos[1] = data.l2AssetRouterBytecodeInfo;
+        bytecodeInfos[2] = data.l2NtvBytecodeInfo;
+        bytecodeInfos[3] = data.messageRootBytecodeInfo;
+        // [4] L2WrappedBaseToken — no bytecodeInfo in FixedForceDeploymentsData
+        // [5] L2MessageVerification — no bytecodeInfo
+        bytecodeInfos[6] = data.chainAssetHandlerBytecodeInfo;
+        // [7] L2InteropRootStorage — no bytecodeInfo
+        bytecodeInfos[8] = data.baseTokenHolderBytecodeInfo;
+        bytecodeInfos[9] = data.assetTrackerBytecodeInfo;
+        bytecodeInfos[10] = data.interopCenterBytecodeInfo;
+        bytecodeInfos[11] = data.interopHandlerBytecodeInfo;
+        // [12] GWAssetTracker — no bytecodeInfo
+
+        _deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](contracts.length);
+        for (uint256 i = 0; i < contracts.length; i++) {
+            _deployments[i] = IComplexUpgrader.UniversalContractUpgradeInfo({
+                upgradeType: bytecodeInfos[i].length > 0
+                    ? IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade
+                    : IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+                deployedBytecodeInfo: bytecodeInfos[i],
+                newAddress: contracts[i].addr
+            });
+        }
     }
 }

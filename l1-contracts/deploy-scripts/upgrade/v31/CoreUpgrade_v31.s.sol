@@ -119,9 +119,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
         return super.getCreationCalldata(contractName, isZKBytecode);
     }
 
-    function deployUsedUpgradeContract() internal returns (address) {
-        return deploySimpleContract("SettlementLayerV31Upgrade", false);
-    }
 
     /// @notice Override to properly set deployerAddress in upgrade context
     /// @dev In upgrade scripts, msg.sender is the script address, not the broadcast address

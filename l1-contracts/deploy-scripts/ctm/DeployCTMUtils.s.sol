@@ -70,7 +70,8 @@ import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./Depl
 
 import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
 import {CTMDeployedAddresses} from "../utils/Types.sol";
-import {SettlementLayerV31Upgrade} from "contracts/upgrades/SettlementLayerV31Upgrade.sol";
+import {EraSettlementLayerV31Upgrade} from "contracts/upgrades/EraSettlementLayerV31Upgrade.sol";
+import {ZKsyncOSSettlementLayerV31Upgrade} from "contracts/upgrades/ZKsyncOSSettlementLayerV31Upgrade.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -375,8 +376,10 @@ abstract contract DeployCTMUtils is DeployUtils {
                 return type(DiamondInit).creationCode;
             } else if (compareStrings(contractName, "ServerNotifier")) {
                 return type(ServerNotifier).creationCode;
-            } else if (compareStrings(contractName, "SettlementLayerV31Upgrade")) {
-                return type(SettlementLayerV31Upgrade).creationCode;
+            } else if (compareStrings(contractName, "EraSettlementLayerV31Upgrade")) {
+                return type(EraSettlementLayerV31Upgrade).creationCode;
+            } else if (compareStrings(contractName, "ZKsyncOSSettlementLayerV31Upgrade")) {
+                return type(ZKsyncOSSettlementLayerV31Upgrade).creationCode;
             }
         } else {
             if (compareStrings(contractName, "Verifier")) {
@@ -424,7 +427,10 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "SettlementLayerV31Upgrade")) {
+        } else if (
+            compareStrings(contractName, "EraSettlementLayerV31Upgrade") ||
+            compareStrings(contractName, "ZKsyncOSSettlementLayerV31Upgrade")
+        ) {
             return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
         } else if (compareStrings(contractName, "Governance")) {
             return

@@ -40,16 +40,13 @@ const l1ContractsDir = path.resolve(anvilInteropDir, "../..");
 const ECOSYSTEM_UPGRADE_TEST_SCRIPT =
   "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:EcosystemUpgradeV31ForTests";
 
-// Function selectors for the various ComplexUpgrader entry points.
-// All three variants share the same (forceDeployments[], address delegateTo, bytes calldata) shape;
-// only the ForceDeployment tuple layout differs.
+// Function selectors for the ComplexUpgrader entry points.
+// Used to decode the final L2 upgrade tx data (output of getL2UpgradeTxData).
 const SELECTORS = {
   // forceDeployAndUpgrade((bytes32,address,bool,uint256,bytes)[],address,bytes) — Era
   eraForceDeployAndUpgrade: "0x480d1185",
-  // forceDeployAndUpgradeUniversal((bool,bytes,address)[],address,bytes) — ZKsyncOS v29
-  universalV29: "0x05a33414",
-  // forceDeployAndUpgradeUniversal((uint8,bytes,address)[],address,bytes) — ZKsyncOS v31
-  universalV31: "0xd8cfca80",
+  // forceDeployAndUpgradeUniversal((uint8,bytes,address)[],address,bytes) — ZKsyncOS
+  zkosForceDeployAndUpgradeUniversal: "0xd8cfca80",
 } as const;
 
 // ── Public types ─────────────────────────────────────────────────────
@@ -284,7 +281,7 @@ async function runChainUpgradesAndRelayL2(params: {
 
   const settlementLayerUpgrade = new ethers.Contract(
     settlementLayerUpgradeAddr,
-    getAbi("SettlementLayerV31Upgrade"),
+    getAbi(isZKsyncOS ? "ZKsyncOSSettlementLayerV31Upgrade" : "EraSettlementLayerV31Upgrade"),
     l1Provider
   );
   const l1Chain = anvilManager.getL1Chain()!;
@@ -451,8 +448,7 @@ function decodeUpgradeTxData(upgradeTxData: string): {
     };
   }
 
-  if (selector === SELECTORS.universalV29 || selector === SELECTORS.universalV31) {
-    // v29 (bool,bytes,address) and v31 (uint8,bytes,address) have identical ABI encoding
+  if (selector === SELECTORS.zkosForceDeployAndUpgradeUniversal) {
     const [deployments, delegateTo, innerCalldata] = abiCoder.decode(
       ["tuple(uint8,bytes,address)[]", "address", "bytes"],
       payload
@@ -490,7 +486,7 @@ function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
   const legacyAdminIface = new ethers.utils.Interface([
     "function upgradeChainFromVersion(uint256, tuple(tuple(address,uint8,bool,bytes4[])[],address,bytes))",
   ]);
-  const settlementLayerIface = new ethers.utils.Interface(getAbi("SettlementLayerV31Upgrade"));
+  const settlementLayerIface = new ethers.utils.Interface(getAbi("EraSettlementLayerV31Upgrade"));
 
   const errors: string[] = [];
 

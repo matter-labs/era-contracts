@@ -44,6 +44,12 @@ uint256 constant SYSTEM_CONTRACTS_COUNT = 30;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
 uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 13;
 
+/// @notice A built-in contract's L2 address paired with its EVM bytecode.
+struct BuiltinContractDeployInfo {
+    address addr;
+    bytes bytecode;
+}
+
 library SystemContractsProcessing {
     /// @notice Retrieves the entire list of system contracts as a memory array
     /// @dev Note that it does not include all built-in contracts. Rather all those
@@ -351,131 +357,57 @@ library SystemContractsProcessing {
         }
     }
 
-    function getOtherContractsBytecodes() internal view returns (bytes[] memory result) {
-        result = new bytes[](OTHER_BUILT_IN_CONTRACTS_COUNT);
-
-        result[0] = ContractsBytecodesLib.getCreationCode("L2Bridgehub");
-        result[1] = ContractsBytecodesLib.getCreationCode("L2AssetRouter");
-        result[2] = ContractsBytecodesLib.getCreationCode("L2NativeTokenVault");
-        result[3] = ContractsBytecodesLib.getCreationCode("L2MessageRoot");
-        result[4] = ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken");
-        result[5] = ContractsBytecodesLib.getCreationCode("L2MessageVerification");
-        result[6] = ContractsBytecodesLib.getCreationCode("L2ChainAssetHandler");
-        result[7] = ContractsBytecodesLib.getCreationCode("L2InteropRootStorage");
-        result[8] = ContractsBytecodesLib.getCreationCode("BaseTokenHolder");
-        result[9] = ContractsBytecodesLib.getCreationCode("L2AssetTracker");
-        result[10] = ContractsBytecodesLib.getCreationCode("InteropCenter");
-        result[11] = ContractsBytecodesLib.getCreationCode("InteropHandler");
-        result[12] = ContractsBytecodesLib.getCreationCode("GWAssetTracker");
+    /// @notice Returns address+bytecode pairs for all "other built-in" contracts.
+    /// @dev Single source of truth for both Era and ZKsyncOS force deployment builders.
+    function getOtherBuiltinContracts()
+        internal
+        view
+        returns (BuiltinContractDeployInfo[] memory contracts)
+    {
+        contracts = new BuiltinContractDeployInfo[](OTHER_BUILT_IN_CONTRACTS_COUNT);
+        contracts[0] = BuiltinContractDeployInfo(L2_BRIDGEHUB_ADDR, ContractsBytecodesLib.getCreationCode("L2Bridgehub"));
+        contracts[1] = BuiltinContractDeployInfo(L2_ASSET_ROUTER_ADDR, ContractsBytecodesLib.getCreationCode("L2AssetRouter"));
+        contracts[2] = BuiltinContractDeployInfo(L2_NATIVE_TOKEN_VAULT_ADDR, ContractsBytecodesLib.getCreationCode("L2NativeTokenVault"));
+        contracts[3] = BuiltinContractDeployInfo(L2_MESSAGE_ROOT_ADDR, ContractsBytecodesLib.getCreationCode("L2MessageRoot"));
+        contracts[4] = BuiltinContractDeployInfo(L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken"));
+        contracts[5] = BuiltinContractDeployInfo(address(L2_MESSAGE_VERIFICATION), ContractsBytecodesLib.getCreationCode("L2MessageVerification"));
+        contracts[6] = BuiltinContractDeployInfo(L2_CHAIN_ASSET_HANDLER_ADDR, ContractsBytecodesLib.getCreationCode("L2ChainAssetHandler"));
+        contracts[7] = BuiltinContractDeployInfo(address(L2_INTEROP_ROOT_STORAGE), ContractsBytecodesLib.getCreationCode("L2InteropRootStorage"));
+        contracts[8] = BuiltinContractDeployInfo(L2_BASE_TOKEN_HOLDER_ADDR, ContractsBytecodesLib.getCreationCode("BaseTokenHolder"));
+        contracts[9] = BuiltinContractDeployInfo(L2_ASSET_TRACKER_ADDR, ContractsBytecodesLib.getCreationCode("L2AssetTracker"));
+        contracts[10] = BuiltinContractDeployInfo(L2_INTEROP_CENTER_ADDR, ContractsBytecodesLib.getCreationCode("InteropCenter"));
+        contracts[11] = BuiltinContractDeployInfo(L2_INTEROP_HANDLER_ADDR, ContractsBytecodesLib.getCreationCode("InteropHandler"));
+        contracts[12] = BuiltinContractDeployInfo(GW_ASSET_TRACKER_ADDR, ContractsBytecodesLib.getCreationCode("GWAssetTracker"));
     }
 
-    /// Note, that while proper initialization may require multiple steps,
-    /// those will be conducted inside a specialized upgrade. We still provide
-    /// these force deployments here for the sake of consistency
+    /// @notice Build Era-style ForceDeployment[] from the built-in contracts list.
     function getOtherBuiltinForceDeployments(
         uint256 l1ChainId,
         address owner
     ) internal view returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
-        forceDeployments = new IL2ContractDeployer.ForceDeployment[](OTHER_BUILT_IN_CONTRACTS_COUNT);
-        bytes[] memory bytecodes = getOtherContractsBytecodes();
+        BuiltinContractDeployInfo[] memory contracts = getOtherBuiltinContracts();
+        forceDeployments = new IL2ContractDeployer.ForceDeployment[](contracts.length);
 
-        forceDeployments[0] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[0]),
-            newAddress: L2_BRIDGEHUB_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[1] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[1]),
-            newAddress: L2_ASSET_ROUTER_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[2] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[2]),
-            newAddress: L2_NATIVE_TOKEN_VAULT_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[3] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[3]),
-            newAddress: L2_MESSAGE_ROOT_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[4] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[4]),
-            newAddress: L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[5] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[5]),
-            newAddress: address(L2_MESSAGE_VERIFICATION),
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[6] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[6]),
-            newAddress: L2_CHAIN_ASSET_HANDLER_ADDR,
-            callConstructor: true,
-            value: 0,
-            input: abi.encode(
-                l1ChainId,
-                AddressAliasHelper.applyL1ToL2Alias(owner),
-                L2_BRIDGEHUB_ADDR,
-                L2_ASSET_ROUTER_ADDR,
-                L2_MESSAGE_ROOT_ADDR
-            )
-        });
-        forceDeployments[7] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[7]),
-            newAddress: address(L2_INTEROP_ROOT_STORAGE),
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[8] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[8]),
-            newAddress: L2_BASE_TOKEN_HOLDER_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[9] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[9]),
-            newAddress: L2_ASSET_TRACKER_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[10] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[10]),
-            newAddress: L2_INTEROP_CENTER_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[11] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[11]),
-            newAddress: L2_INTEROP_HANDLER_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[12] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[12]),
-            newAddress: GW_ASSET_TRACKER_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
+        for (uint256 i = 0; i < contracts.length; i++) {
+            forceDeployments[i] = IL2ContractDeployer.ForceDeployment({
+                bytecodeHash: L2ContractHelper.hashL2Bytecode(contracts[i].bytecode),
+                newAddress: contracts[i].addr,
+                callConstructor: false,
+                value: 0,
+                input: ""
+            });
+        }
+
+        // Special case: L2ChainAssetHandler needs constructor call
+        forceDeployments[6].callConstructor = true;
+        // solhint-disable-next-line func-named-parameters
+        forceDeployments[6].input = abi.encode(
+            l1ChainId,
+            AddressAliasHelper.applyL1ToL2Alias(owner),
+            L2_BRIDGEHUB_ADDR,
+            L2_ASSET_ROUTER_ADDR,
+            L2_MESSAGE_ROOT_ADDR
+        );
     }
 
     function forceDeploymentsToHashes(
@@ -543,7 +475,11 @@ library SystemContractsProcessing {
         basicBytecodes[2] = Utils.getEvmEmulatorBytecodeHash();
 
         bytes[] memory systemBytecodes = getSystemContractsBytecodes();
-        bytes[] memory otherBytecodes = getOtherContractsBytecodes();
+        BuiltinContractDeployInfo[] memory otherContracts = getOtherBuiltinContracts();
+        bytes[] memory otherBytecodes = new bytes[](otherContracts.length);
+        for (uint256 i = 0; i < otherContracts.length; i++) {
+            otherBytecodes[i] = otherContracts[i].bytecode;
+        }
 
         factoryDeps = mergeBytesArrays(mergeBytesArrays(basicBytecodes, systemBytecodes), otherBytecodes);
     }

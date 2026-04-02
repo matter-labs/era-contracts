@@ -2,13 +2,8 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {
-    SettlementLayerV31Upgrade,
-    PriorityQueueNotReady,
-    NotAllBatchesExecuted,
-    UnsupportedL2UpgradeSelector,
-    UnexpectedUpgradeTarget
-} from "contracts/upgrades/SettlementLayerV31Upgrade.sol";
+import {EraSettlementLayerV31Upgrade} from "contracts/upgrades/EraSettlementLayerV31Upgrade.sol";
+import {NotAllBatchesExecuted, PriorityQueueNotReady} from "contracts/common/L1ContractErrors.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
@@ -31,8 +26,8 @@ import {
     L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-contract DummySettlementLayerV31Upgrade is SettlementLayerV31Upgrade, BaseUpgradeUtils {
-    constructor(IBridgehubBase _bridgehub) SettlementLayerV31Upgrade(_bridgehub) {}
+contract DummySettlementLayerV31Upgrade is EraSettlementLayerV31Upgrade, BaseUpgradeUtils {
+    constructor(IBridgehubBase _bridgehub) EraSettlementLayerV31Upgrade(_bridgehub) {}
     function setTotalBatchesCommitted(uint256 _totalBatchesCommitted) public {
         s.totalBatchesCommitted = _totalBatchesCommitted;
     }
@@ -70,7 +65,7 @@ contract DummySettlementLayerV31Upgrade is SettlementLayerV31Upgrade, BaseUpgrad
         uint256 _chainId,
         bytes memory _existingUpgradeCalldata
     ) public view returns (bytes memory) {
-        return getL2V31UpgradeCalldata(_bridgehub, _chainId, _existingUpgradeCalldata);
+        return _buildL2V31UpgradeCalldata(_bridgehub, _chainId, _existingUpgradeCalldata);
     }
 
     function exposeBuildChainSpecificForceDeploymentsData(
@@ -351,35 +346,6 @@ contract SettlementLayerV31UpgradeSharedTest is SettlementLayerV31UpgradeTestBas
         bytes memory data = upgrade.getConstructedCalldata(mockBridgehub, testChainId, _placeholderV31Calldata());
 
         assertEq(data, _expectedV31Calldata());
-    }
-
-    function test_RevertWhen_UpgradeTargetIsUnexpected() public {
-        _setupMocks();
-        _prepareV31ProposedUpgrade();
-
-        address wrongTarget = makeAddr("wrongTarget");
-        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
-            IComplexUpgrader.upgrade,
-            (wrongTarget, _placeholderV31Calldata())
-        );
-
-        vm.expectRevert(abi.encodeWithSelector(UnexpectedUpgradeTarget.selector, wrongTarget));
-        upgrade.upgrade(proposedUpgrade);
-    }
-
-    function test_RevertWhen_L2UpgradePayloadHasUnexpectedSelector() public {
-        _setupMocks();
-        _prepareProposedUpgrade();
-
-        proposedUpgrade.l2ProtocolUpgradeTx.data = abi.encodeCall(
-            IComplexUpgrader.upgrade,
-            (L2_VERSION_SPECIFIC_UPGRADER_ADDR, abi.encodeWithSignature("wrongSelector()"))
-        );
-
-        vm.expectRevert(
-            abi.encodeWithSelector(UnsupportedL2UpgradeSelector.selector, bytes4(keccak256("wrongSelector()")))
-        );
-        upgrade.upgrade(proposedUpgrade);
     }
 
     function testFuzz_RevertWhen_BatchesMismatch(uint256 committed, uint256 executed) public {
