@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use clap::ValueEnum;
-use ethers::types::{Address, H256};
+use ethers::types::H256;
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
 
@@ -40,18 +40,7 @@ impl L1Network {
         }
     }
 
-    /// Look up the Avail L1 DA validator address for this network from configs/da.yaml.
-    pub fn avail_l1_da_validator_addr(&self) -> Option<Address> {
-        match self {
-            L1Network::Localhost => None,
-            L1Network::Sepolia => None,
-            L1Network::Holesky => {
-                Some(Address::from_str("0x73d59fe232fce421d1365d6a5beec49acde3d0d9").unwrap())
-            }
-            L1Network::Mainnet => None,
-        }
-    }
-
+    /// TODO: remove, define these in a separate ecosystems/chains registry
     pub fn zk_token_asset_id(&self) -> H256 {
         match self {
             L1Network::Localhost => {

@@ -22,7 +22,7 @@ impl DeployCTMConfig {
         owner_address: Address,
         initial_deployment_config: &InitialDeploymentConfig,
         testnet_verifier: bool,
-        l1_network: L1Network,
+        zk_token_asset_id: H256,
         support_l2_legacy_shared_bridge_test: bool,
         vm_option: VMOption,
     ) -> Self {
@@ -31,7 +31,7 @@ impl DeployCTMConfig {
             testnet_verifier,
             owner_address,
             support_l2_legacy_shared_bridge_test,
-            zk_token_asset_id: l1_network.zk_token_asset_id(),
+            zk_token_asset_id,
             contracts: ContractsDeployCTMConfig {
                 create2_factory_addr: initial_deployment_config.create2_factory_addr,
                 create2_factory_salt: initial_deployment_config.create2_factory_salt,
@@ -39,7 +39,6 @@ impl DeployCTMConfig {
                 governance_min_delay: initial_deployment_config.governance_min_delay,
                 validator_timelock_execution_delay: initial_deployment_config
                     .validator_timelock_execution_delay,
-                avail_l1_da_validator_addr: l1_network.avail_l1_da_validator_addr(),
             },
         }
     }
@@ -53,6 +52,4 @@ pub struct ContractsDeployCTMConfig {
     pub governance_security_council_address: Address,
     pub governance_min_delay: u64,
     pub validator_timelock_execution_delay: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub avail_l1_da_validator_addr: Option<Address>,
 }

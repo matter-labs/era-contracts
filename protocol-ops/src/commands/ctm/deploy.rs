@@ -31,6 +31,7 @@ pub struct CtmDeployInput {
     pub reuse_gov_and_admin: bool,
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
+    pub zk_token_asset_id: Option<H256>,
     pub create2_factory_addr: Option<Address>,
     pub create2_factory_salt: Option<H256>,
 }
@@ -50,12 +51,15 @@ pub fn deploy(
     if let Some(salt) = input.create2_factory_salt {
         initial_deployment_config.create2_factory_salt = salt;
     }
+    let zk_token_asset_id = input
+        .zk_token_asset_id
+        .unwrap_or(l1_network.zk_token_asset_id());
 
     let deploy_config = DeployCTMConfig::new(
         input.owner,
         &initial_deployment_config,
         input.with_testnet_verifier,
-        l1_network,
+        zk_token_asset_id,
         input.with_legacy_bridge,
         input.vm_type,
     );

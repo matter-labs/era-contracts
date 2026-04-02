@@ -44,6 +44,9 @@ pub struct EcosystemInitArgs {
     /// Enable support for legacy bridge testing (default: false)
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_legacy_bridge: bool,
+    /// ZK token asset ID
+    #[clap(long, help_heading = "Advanced input")]
+    pub zk_token_asset_id: Option<H256>,
     /// CREATE2 factory address (if already deployed)
     #[clap(long, help_heading = "Advanced input")]
     pub create2_factory_addr: Option<Address>,
@@ -71,6 +74,7 @@ pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
         vm_type: args.vm_type,
         with_testnet_verifier: args.with_testnet_verifier,
         with_legacy_bridge: args.with_legacy_bridge,
+        zk_token_asset_id: args.zk_token_asset_id,
         create2_factory_addr: args.create2_factory_addr,
         create2_factory_salt: args.create2_factory_salt,
     };
@@ -130,6 +134,7 @@ pub async fn ecosystem_init(
         reuse_gov_and_admin: true,
         with_testnet_verifier: input.with_testnet_verifier,
         with_legacy_bridge: input.with_legacy_bridge,
+        zk_token_asset_id: input.zk_token_asset_id,
         create2_factory_addr: Some(create2_factory_addr),
         create2_factory_salt: input.create2_factory_salt,
     };
@@ -151,6 +156,7 @@ pub struct EcosystemInitInput {
     pub vm_type: VMOption,
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
+    pub zk_token_asset_id: Option<H256>,
     pub create2_factory_addr: Option<Address>,
     pub create2_factory_salt: Option<H256>,
 }
