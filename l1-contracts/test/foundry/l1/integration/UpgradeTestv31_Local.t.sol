@@ -9,6 +9,7 @@ import {EcosystemUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/Ecosy
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
 import {Call} from "contracts/governance/Common.sol";
+import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {Test} from "forge-std/Test.sol";
 import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
@@ -34,6 +35,14 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
     function publishBytecodes() public override {
         console.log("Test mode: Skipping bytecode publishing to avoid MemoryOOG");
         upgradeConfig.factoryDepsPublished = true;
+    }
+
+    /// @notice Override to skip reading all system contract bytecodes which causes MemoryOOG.
+    function buildUpgradeForceDeployments(
+        uint256,
+        address
+    ) internal override returns (IL2ContractDeployer.ForceDeployment[] memory) {
+        return new IL2ContractDeployer.ForceDeployment[](0);
     }
 }
 

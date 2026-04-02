@@ -228,7 +228,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     function buildUpgradeForceDeployments(
         uint256 _l1ChainId,
         address _ownerAddress
-    ) internal returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
+    ) internal virtual returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
         if (config.isZKsyncOS) {
             return new IL2ContractDeployer.ForceDeployment[](0);
         }
