@@ -132,7 +132,7 @@ library EraZkosRouter {
     /// @notice Get a bytecode hash of the deployed bytecode.
     ///         Era:      L2ContractHelper.hashL2Bytecode (ZK bytecode hash).
     ///         ZKsyncOS: keccak256 of deployed EVM bytecode.
-    /// @dev Note, that for zksync os it is NOT suitable for force deployments as these require bytecode info. 
+    /// @dev Note, that for zksync os it is NOT suitable for force deployments as these require bytecode info.
     function getDeployedBytecodeHash(bool _isZKsyncOS, EraZkosContract _c) internal view returns (bytes32) {
         (string memory fileName, string memory contractName) = resolve(_isZKsyncOS, _c);
         if (_isZKsyncOS) {
@@ -201,7 +201,10 @@ library EraZkosRouter {
             _isZKsyncOS,
             _getSharedFactoryDependencyContracts(_isZKsyncOS)
         );
-        bytes[] memory additionalDependencies = _getFactoryDependencyBytecodes(_isZKsyncOS, _additionalDependencyContracts);
+        bytes[] memory additionalDependencies = _getFactoryDependencyBytecodes(
+            _isZKsyncOS,
+            _additionalDependencyContracts
+        );
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, sharedDependencies);
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(factoryDeps, additionalDependencies);
@@ -295,7 +298,10 @@ library EraZkosRouter {
 
     // ======================== Force deployments ========================
 
-    function getCreate2DerivedForceDeploymentAddr(bool _isZKsyncOS, EraZkosContract _c) internal view returns (address) {
+    function getCreate2DerivedForceDeploymentAddr(
+        bool _isZKsyncOS,
+        EraZkosContract _c
+    ) internal view returns (address) {
         // FIXME: add support for additional force deployments on ZKsyncOS in scripts.
         require(!_isZKsyncOS, "Additional force deployments are not supported for ZKsyncOS scripts");
         return Utils.getL2AddressViaCreate2Factory(bytes32(0), getDeployedBytecodeHash(false, _c), hex"");

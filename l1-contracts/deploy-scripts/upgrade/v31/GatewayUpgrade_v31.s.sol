@@ -38,7 +38,11 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
     /// @dev Prepared in getProposedUpgrade, consumed in getL2UpgradeTargetAndData (which must be view).
     bytes internal l2V29UpgradeBytecodeInfo;
 
-    function getForceDeploymentContracts() internal override returns (EraZkosContract[] memory forceDeploymentContracts) {
+    function getForceDeploymentContracts()
+        internal
+        override
+        returns (EraZkosContract[] memory forceDeploymentContracts)
+    {
         if (config.isZKsyncOS) {
             return new EraZkosContract[](0);
         }

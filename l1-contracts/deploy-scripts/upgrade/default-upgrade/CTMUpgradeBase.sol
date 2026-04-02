@@ -250,12 +250,19 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         EraZkosContract[] memory forceDeploymentContracts = getForceDeploymentContracts();
         additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](forceDeploymentContracts.length);
         for (uint256 i; i < forceDeploymentContracts.length; i++) {
-            additionalForceDeployments[i] = EraZkosRouter.getForceDeployment(config.isZKsyncOS, forceDeploymentContracts[i]);
+            additionalForceDeployments[i] = EraZkosRouter.getForceDeployment(
+                config.isZKsyncOS,
+                forceDeploymentContracts[i]
+            );
         }
         return additionalForceDeployments;
     }
 
-    function getAdditionalDependencyContracts() internal virtual returns (EraZkosContract[] memory forceDeploymentContracts) {
+    function getAdditionalDependencyContracts()
+        internal
+        virtual
+        returns (EraZkosContract[] memory forceDeploymentContracts)
+    {
         EraZkosContract[] memory additionalForceDeploymentContracts = getForceDeploymentContracts();
         forceDeploymentContracts = new EraZkosContract[](additionalForceDeploymentContracts.length);
         for (uint256 i; i < additionalForceDeploymentContracts.length; i++) {
@@ -264,7 +271,11 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         return forceDeploymentContracts;
     }
 
-    function getForceDeploymentContracts() internal virtual returns (EraZkosContract[] memory forceDeploymentContracts) {
+    function getForceDeploymentContracts()
+        internal
+        virtual
+        returns (EraZkosContract[] memory forceDeploymentContracts)
+    {
         return new EraZkosContract[](0);
     }
 
@@ -275,5 +286,4 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     ) internal virtual returns (bytes memory) {
         return new bytes(0);
     }
-
 }
