@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::traits::FileConfigTrait;
 use crate::config::forge_interface::deploy_ecosystem::input::InitialDeploymentConfig;
-use crate::types::{L1Network, VMOption};
+use crate::types::VMOption;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DeployCTMConfig {
