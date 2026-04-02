@@ -22,6 +22,7 @@ import {DummyInteropRecipient} from "contracts/dev-contracts/test/DummyInteropRe
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
+import {EraZkosRouter} from "deploy-scripts/utils/EraZkosRouter.sol";
 
 contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegrationScript {
     using stdToml for string;
@@ -66,7 +67,8 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         ctmAddresses.admin.governance = makeAddr("governance");
         ctmAddresses.chainAdmin = makeAddr("chainAdmin");
         ctmAddresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
-        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract("Verifier", true);
+        (, string memory verifierName) = EraZkosRouter.resolveMainVerifier(config.isZKsyncOS, config.testnetVerifier);
+        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, true);
         ctmAddresses.stateTransition.proxies.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
         (
             ctmAddresses.stateTransition.implementations.serverNotifier,
