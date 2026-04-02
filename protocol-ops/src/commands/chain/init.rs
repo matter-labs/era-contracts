@@ -277,57 +277,6 @@ pub async fn chain_init(
         }
     }
 
-    // Set DA validator pair (as owner)
-    logger::step("Setting DA validator pair...");
-    let commitment_scheme =
-        input
-            .l2_da_commitment_scheme
-            .unwrap_or_else(|| match input.chain_params.da_mode {
-                DAValidatorType::Rollup => match input.vm_type {
-                    VMOption::EraVM => L2DACommitmentScheme::BlobsAndPubdataKeccak256,
-                    VMOption::ZKSyncOsVM => L2DACommitmentScheme::BlobsZKSyncOS,
-                },
-                DAValidatorType::Avail | DAValidatorType::Eigen => {
-                    L2DACommitmentScheme::PubdataKeccak256
-                }
-                DAValidatorType::NoDA => L2DACommitmentScheme::EmptyNoDA,
-            });
-    set_da_validator_pair(
-        runner,
-        AdminScriptMode::Broadcast(owner.clone()),
-        input.chain_params.chain_id.as_u64(),
-        input.bridgehub,
-        input.l1_da_validator,
-        commitment_scheme,
-    )
-    .await?;
-
-    // TODO: remove (pass as constructor parameter for chain admin)
-    // Set token multiplier setter (only needed for non-ETH base tokens)
-    let eth_base_token = Address::from_low_u64_be(1);
-    if input.chain_params.base_token_addr != eth_base_token {
-        if let Some(setter) = input.chain_params.token_multiplier_setter {
-            if !setter.is_zero() {
-                logger::step("Setting token multiplier setter...");
-                set_token_multiplier_setter(
-                    runner,
-                    owner,
-                    register_output.chain_admin_addr,
-                    register_output.access_control_restriction_addr,
-                    diamond_proxy,
-                    setter,
-                )
-                .await?;
-            }
-        }
-    }
-
-    // Enable EVM emulator (if requested, as owner)
-    if input.evm_emulator {
-        logger::step("Enabling EVM emulator...");
-        enable_evm_emulator_step(runner, owner, chain_admin, diamond_proxy)?;
-    }
-
     // TODO: for now, just replicating logic from `zkstack`, but not all of these are
     // priority txs, so we need to fix this + skip steps irrelevant for ZKSync OS.
     if !input.skip_priority_txs {
