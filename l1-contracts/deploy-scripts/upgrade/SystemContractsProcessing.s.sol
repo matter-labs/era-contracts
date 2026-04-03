@@ -54,9 +54,13 @@ enum ZKsyncOSUpgradeType {
 }
 
 /// @notice A built-in contract's L2 address, code name, bytecode, and ZKsyncOS upgrade type.
+/// @dev `zksyncOsSuffix` is appended to `codeName` for ZKsyncOS bytecodeInfo lookup when the
+/// ZKsyncOS implementation differs from Era (e.g. suffix "ZKOS" turns "L2NativeTokenVault"
+/// into "L2NativeTokenVaultZKOS"). Empty string means same name for both.
 struct BuiltinContractDeployInfo {
     address addr;
     string codeName;
+    string zksyncOsSuffix;
     bytes bytecode;
     ZKsyncOSUpgradeType zkosUpgradeType;
 }
@@ -375,78 +379,91 @@ library SystemContractsProcessing {
         contracts[0] = BuiltinContractDeployInfo(
             L2_BRIDGEHUB_ADDR,
             "L2Bridgehub",
+            "",
             ContractsBytecodesLib.getCreationCode("L2Bridgehub"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[1] = BuiltinContractDeployInfo(
             L2_ASSET_ROUTER_ADDR,
             "L2AssetRouter",
+            "",
             ContractsBytecodesLib.getCreationCode("L2AssetRouter"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[2] = BuiltinContractDeployInfo(
             L2_NATIVE_TOKEN_VAULT_ADDR,
             "L2NativeTokenVault",
+            "ZKOS",
             ContractsBytecodesLib.getCreationCode("L2NativeTokenVault"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[3] = BuiltinContractDeployInfo(
             L2_MESSAGE_ROOT_ADDR,
             "L2MessageRoot",
+            "",
             ContractsBytecodesLib.getCreationCode("L2MessageRoot"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[4] = BuiltinContractDeployInfo(
             L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
             "L2WrappedBaseToken",
+            "",
             ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken"),
             ZKsyncOSUpgradeType.Unsafe
         );
         contracts[5] = BuiltinContractDeployInfo(
             address(L2_MESSAGE_VERIFICATION),
             "L2MessageVerification",
+            "",
             ContractsBytecodesLib.getCreationCode("L2MessageVerification"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[6] = BuiltinContractDeployInfo(
             L2_CHAIN_ASSET_HANDLER_ADDR,
             "L2ChainAssetHandler",
+            "",
             ContractsBytecodesLib.getCreationCode("L2ChainAssetHandler"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[7] = BuiltinContractDeployInfo(
             address(L2_INTEROP_ROOT_STORAGE),
             "L2InteropRootStorage",
+            "",
             ContractsBytecodesLib.getCreationCode("L2InteropRootStorage"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[8] = BuiltinContractDeployInfo(
             L2_BASE_TOKEN_HOLDER_ADDR,
             "BaseTokenHolder",
+            "",
             ContractsBytecodesLib.getCreationCode("BaseTokenHolder"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[9] = BuiltinContractDeployInfo(
             L2_ASSET_TRACKER_ADDR,
             "L2AssetTracker",
+            "",
             ContractsBytecodesLib.getCreationCode("L2AssetTracker"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[10] = BuiltinContractDeployInfo(
             L2_INTEROP_CENTER_ADDR,
             "InteropCenter",
+            "",
             ContractsBytecodesLib.getCreationCode("InteropCenter"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[11] = BuiltinContractDeployInfo(
             L2_INTEROP_HANDLER_ADDR,
             "InteropHandler",
+            "",
             ContractsBytecodesLib.getCreationCode("InteropHandler"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[12] = BuiltinContractDeployInfo(
             GW_ASSET_TRACKER_ADDR,
             "GWAssetTracker",
+            "",
             ContractsBytecodesLib.getCreationCode("GWAssetTracker"),
             ZKsyncOSUpgradeType.Unsafe
         );
@@ -571,8 +588,16 @@ library SystemContractsProcessing {
         );
 
         for (uint256 i = 0; i < contracts.length; i++) {
-            string memory fileName = string(abi.encodePacked(contracts[i].codeName, ".sol"));
-            bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract(fileName, contracts[i].codeName);
+            string memory contractName = string(
+                abi.encodePacked(contracts[i].codeName, contracts[i].zksyncOsSuffix)
+            );
+            string memory fileName = string(abi.encodePacked(contractName, ".sol"));
+            bytes memory bytecodeInfo;
+            if (contracts[i].zkosUpgradeType == ZKsyncOSUpgradeType.SystemProxy) {
+                bytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
+            } else {
+                bytecodeInfo = Utils.getZKOSBytecodeInfoForContract(fileName, contractName);
+            }
 
             IComplexUpgrader.ContractUpgradeType upgradeType = contracts[i].zkosUpgradeType ==
                 ZKsyncOSUpgradeType.SystemProxy
