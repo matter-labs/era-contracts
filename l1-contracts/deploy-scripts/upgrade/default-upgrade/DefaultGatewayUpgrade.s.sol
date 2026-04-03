@@ -44,7 +44,8 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
-import {EraZkosContract, EraZkosRouter, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {EraZkosRouter, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {CTMContract} from "../../ctm/DeployCTML1OrGateway.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
 // FIXME: consider deleting this file it is not used.
@@ -371,7 +372,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
         (, string memory gwCtmContractName) = EraZkosRouter.resolve(
             config.isZKsyncOS,
-            EraZkosContract.ChainTypeManager
+            CTMContract.ChainTypeManager
         );
         gatewayConfig.gatewayStateTransition.implementations.chainTypeManager = deployGWContract(gwCtmContractName);
 

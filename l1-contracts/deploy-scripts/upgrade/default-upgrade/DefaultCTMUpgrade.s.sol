@@ -29,7 +29,8 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
-import {EraZkosRouter, EraZkosContract, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {EraZkosRouter, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -404,32 +405,32 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
             l2TokenProxyBytecodeHash: EraZkosRouter.getDeployedBytecodeHash(
                 config.isZKsyncOS,
-                EraZkosContract.BeaconProxy
+                CoreContract.BeaconProxy
             ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2Bridgehub),
-            l2AssetRouterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2AssetRouter),
-            l2NtvBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2NativeTokenVault),
-            messageRootBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2MessageRoot),
+            bridgehubBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2Bridgehub),
+            l2AssetRouterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2AssetRouter),
+            l2NtvBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2NativeTokenVault),
+            messageRootBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2MessageRoot),
             chainAssetHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(
                 config.isZKsyncOS,
-                EraZkosContract.L2ChainAssetHandler
+                CoreContract.L2ChainAssetHandler
             ),
             beaconDeployerInfo: EraZkosRouter.getBytecodeInfo(
                 config.isZKsyncOS,
-                EraZkosContract.UpgradeableBeaconDeployer
+                CoreContract.UpgradeableBeaconDeployer
             ),
             baseTokenHolderBytecodeInfo: EraZkosRouter.getBytecodeInfo(
                 config.isZKsyncOS,
-                EraZkosContract.BaseTokenHolder
+                CoreContract.BaseTokenHolder
             ),
-            interopCenterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.InteropCenter),
+            interopCenterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.InteropCenter),
             interopHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(
                 config.isZKsyncOS,
-                EraZkosContract.InteropHandler
+                CoreContract.InteropHandler
             ),
-            assetTrackerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2AssetTracker),
+            assetTrackerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(

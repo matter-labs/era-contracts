@@ -21,115 +21,126 @@ struct CTMCoreDeploymentConfig {
     address permissionlessValidator;
 }
 
+/// @notice Canonical identifier for CTM / state-transition contracts.
+///         The enum value is VM-neutral; `EraZkosRouter.resolve` maps it to
+///         the correct Era or ZKsyncOS contract / artifact name.
 enum CTMContract {
+    // ---- Diamond facets ----
     AdminFacet,
     MailboxFacet,
     ExecutorFacet,
     MigratorFacet,
     CommitterFacet,
     DiamondInit,
+    // ---- Infrastructure ----
     ValidatorTimelock,
-    Verifier,
-    ZKsyncOSChainTypeManager,
-    EraChainTypeManager,
+    ChainTypeManager,
+    // ---- Verifiers ----
+    VerifierFflonk,
+    VerifierPlonk,
+    DualVerifier,
+    TestnetVerifier,
+    // ---- Gateway CTM deployers ----
+    GatewayCTMDeployerCTM,
+    GatewayCTMDeployerVerifiers,
+    // ---- DA ----
     BlobsL1DAValidatorZKsyncOS
 }
 
 library DeployCTML1OrGateway {
+    // solhint-disable-next-line code-complexity
     function getCreationCalldata(
-        CTMCoreDeploymentConfig memory config,
+        CTMCoreDeploymentConfig memory _config,
         bool _isZKsyncOS,
-        CTMContract contractName,
-        bool isZKBytecode
+        CTMContract _contractName,
+        bool /* _isZKBytecode */
     ) internal view returns (bytes memory) {
-        if (contractName == CTMContract.AdminFacet) {
-            return abi.encode(config.l1ChainId, config.rollupDAManager);
-        } else if (contractName == CTMContract.MailboxFacet) {
+        if (_contractName == CTMContract.AdminFacet) {
+            return abi.encode(_config.l1ChainId, _config.rollupDAManager);
+        } else if (_contractName == CTMContract.MailboxFacet) {
             return
                 abi.encode(
-                    config.eraChainId,
-                    config.l1ChainId,
-                    config.chainAssetHandler,
-                    config.eip7702Checker,
-                    config.testnetVerifier
+                    _config.eraChainId,
+                    _config.l1ChainId,
+                    _config.chainAssetHandler,
+                    _config.eip7702Checker,
+                    _config.testnetVerifier
                 );
-        } else if (contractName == CTMContract.ValidatorTimelock) {
-            return abi.encode(config.bridgehubProxy);
-        } else if (contractName == CTMContract.ExecutorFacet) {
-            return abi.encode(config.l1ChainId);
-        } else if (contractName == CTMContract.MigratorFacet) {
-            return abi.encode(config.l1ChainId, config.testnetVerifier);
-        } else if (contractName == CTMContract.CommitterFacet) {
-            return abi.encode(config.l1ChainId);
-        } else if (contractName == CTMContract.DiamondInit) {
+        } else if (_contractName == CTMContract.ValidatorTimelock) {
+            return abi.encode(_config.bridgehubProxy);
+        } else if (_contractName == CTMContract.ExecutorFacet) {
+            return abi.encode(_config.l1ChainId);
+        } else if (_contractName == CTMContract.MigratorFacet) {
+            return abi.encode(_config.l1ChainId, _config.testnetVerifier);
+        } else if (_contractName == CTMContract.CommitterFacet) {
+            return abi.encode(_config.l1ChainId);
+        } else if (_contractName == CTMContract.DiamondInit) {
             return abi.encode(_isZKsyncOS);
-        } else if (contractName == CTMContract.Verifier) {
+        } else if (_contractName == CTMContract.DualVerifier || _contractName == CTMContract.TestnetVerifier) {
             return
                 EraZkosRouter.verifierCreationArgs(
                     _isZKsyncOS,
-                    config.verifierFflonk,
-                    config.verifierPlonk,
-                    config.verifierOwner
+                    _config.verifierFflonk,
+                    _config.verifierPlonk,
+                    _config.verifierOwner
                 );
-        } else if (contractName == CTMContract.ZKsyncOSChainTypeManager) {
+        } else if (_contractName == CTMContract.ChainTypeManager) {
             return
                 abi.encode(
-                    config.bridgehubProxy,
-                    config.interopCenterProxy,
-                    config.l1BytecodesSupplier,
-                    config.permissionlessValidator
+                    _config.bridgehubProxy,
+                    _config.interopCenterProxy,
+                    _config.l1BytecodesSupplier,
+                    _config.permissionlessValidator
                 );
-        } else if (contractName == CTMContract.EraChainTypeManager) {
-            return
-                abi.encode(
-                    config.bridgehubProxy,
-                    config.interopCenterProxy,
-                    config.l1BytecodesSupplier,
-                    config.permissionlessValidator
-                );
-        } else if (contractName == CTMContract.BlobsL1DAValidatorZKsyncOS) {
+        } else if (_contractName == CTMContract.BlobsL1DAValidatorZKsyncOS) {
             return abi.encode();
         } else {
             revert("getCreationCalldata: Unknown CTM contract");
         }
     }
 
-    function getCTMContractFromName(string memory contractName) internal view returns (CTMContract) {
-        if (compareStrings(contractName, "AdminFacet")) {
+    /// @notice Convert a resolved contract name string to the corresponding CTMContract enum value.
+    // solhint-disable-next-line code-complexity
+    function getCTMContractFromName(string memory _contractName) internal view returns (CTMContract) {
+        if (compareStrings(_contractName, "AdminFacet")) {
             return CTMContract.AdminFacet;
-        } else if (compareStrings(contractName, "ExecutorFacet")) {
+        } else if (compareStrings(_contractName, "ExecutorFacet")) {
             return CTMContract.ExecutorFacet;
-        } else if (compareStrings(contractName, "MailboxFacet")) {
+        } else if (compareStrings(_contractName, "MailboxFacet")) {
             return CTMContract.MailboxFacet;
-        } else if (compareStrings(contractName, "DiamondInit")) {
+        } else if (compareStrings(_contractName, "DiamondInit")) {
             return CTMContract.DiamondInit;
-        } else if (compareStrings(contractName, "MigratorFacet")) {
+        } else if (compareStrings(_contractName, "MigratorFacet")) {
             return CTMContract.MigratorFacet;
-        } else if (compareStrings(contractName, "CommitterFacet")) {
+        } else if (compareStrings(_contractName, "CommitterFacet")) {
             return CTMContract.CommitterFacet;
-        } else if (compareStrings(contractName, "ValidatorTimelock")) {
+        } else if (compareStrings(_contractName, "ValidatorTimelock")) {
             return CTMContract.ValidatorTimelock;
-        } else if (compareStrings(contractName, "Verifier")) {
-            return CTMContract.Verifier;
-        } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
-            return CTMContract.ZKsyncOSChainTypeManager;
-        } else if (compareStrings(contractName, "EraChainTypeManager")) {
-            return CTMContract.EraChainTypeManager;
-        } else if (compareStrings(contractName, "BlobsL1DAValidatorZKsyncOS")) {
+        } else if (
+            compareStrings(_contractName, "ZKsyncOSChainTypeManager") ||
+            compareStrings(_contractName, "EraChainTypeManager")
+        ) {
+            return CTMContract.ChainTypeManager;
+        } else if (compareStrings(_contractName, "BlobsL1DAValidatorZKsyncOS")) {
             return CTMContract.BlobsL1DAValidatorZKsyncOS;
         } else if (
-            compareStrings(contractName, "EraTestnetVerifier") ||
-            compareStrings(contractName, "ZKsyncOSTestnetVerifier") ||
-            compareStrings(contractName, "EraDualVerifier") ||
-            compareStrings(contractName, "ZKsyncOSDualVerifier")
+            compareStrings(_contractName, "EraTestnetVerifier") ||
+            compareStrings(_contractName, "ZKsyncOSTestnetVerifier")
         ) {
-            return CTMContract.Verifier;
+            return CTMContract.TestnetVerifier;
+        } else if (
+            compareStrings(_contractName, "EraDualVerifier") ||
+            compareStrings(_contractName, "ZKsyncOSDualVerifier")
+        ) {
+            return CTMContract.DualVerifier;
         } else {
-            revert(string.concat("Contract ", contractName, " not CTM contract, creation calldata could not be set"));
+            revert(
+                string.concat("Contract ", _contractName, " not CTM contract, creation calldata could not be set")
+            );
         }
     }
 
-    function compareStrings(string memory a, string memory b) private view returns (bool) {
-        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
+    function compareStrings(string memory _a, string memory _b) private view returns (bool) {
+        return keccak256(abi.encodePacked(_a)) == keccak256(abi.encodePacked(_b));
     }
 }

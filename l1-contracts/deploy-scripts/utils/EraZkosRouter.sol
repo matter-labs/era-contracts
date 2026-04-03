@@ -16,38 +16,8 @@ import {ChainCreationParamsLib} from "../ctm/ChainCreationParamsLib.sol";
 import {ChainCreationParamsConfig} from "./Types.sol";
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 
-/// @notice Canonical identifier for contracts that participate in CTM deployment.
-///         The enum value is VM-neutral; the strategy resolves it to the correct
-///         Era or ZKsyncOS contract name.
-enum EraZkosContract {
-    // ---- Force-deployment contracts (used in FixedForceDeploymentsData) ----
-    L2Bridgehub,
-    L2AssetRouter,
-    L2NativeTokenVault,
-    L2MessageRoot,
-    UpgradeableBeaconDeployer,
-    BaseTokenHolder,
-    L2ChainAssetHandler,
-    InteropCenter,
-    InteropHandler,
-    L2AssetTracker,
-    BeaconProxy,
-    L2V29Upgrade,
-    L2V31Upgrade,
-    L2SharedBridgeLegacy,
-    BridgedStandardERC20,
-    DiamondProxy,
-    ProxyAdmin,
-    // ---- CTM / state-transition contracts ----
-    ChainTypeManager,
-    VerifierFflonk,
-    VerifierPlonk,
-    DualVerifier,
-    TestnetVerifier,
-    L2BaseToken,
-    GatewayCTMDeployerCTM,
-    GatewayCTMDeployerVerifiers
-}
+import {CoreContract} from "../ecosystem/CoreContract.sol";
+import {CTMContract} from "../ctm/DeployCTML1OrGateway.sol";
 
 /// @notice Result of preparing an L1->L2 deployment (CREATE2 via Era or ZKsyncOS factory).
 struct L1L2DeployPrepareResult {
@@ -75,13 +45,21 @@ library EraZkosRouter {
 
     // ======================== Contract registry ========================
 
-    /// @notice Resolve a EraZkosContract to its (fileName, contractName) for the active VM.
-    // solhint-disable-next-line code-complexity
+    /// @notice Resolve a CoreContract to its (fileName, contractName) for the active VM.
     function resolve(
         bool _isZKsyncOS,
-        EraZkosContract _c
+        CoreContract _c
     ) internal view returns (string memory fileName, string memory contractName) {
-        contractName = _resolveContractName(_isZKsyncOS, _c);
+        contractName = _resolveCoreContractName(_isZKsyncOS, _c);
+        fileName = string.concat(contractName, ".sol");
+    }
+
+    /// @notice Resolve a CTMContract to its (fileName, contractName) for the active VM.
+    function resolve(
+        bool _isZKsyncOS,
+        CTMContract _c
+    ) internal view returns (string memory fileName, string memory contractName) {
+        contractName = _resolveCTMContractName(_isZKsyncOS, _c);
         fileName = string.concat(contractName, ".sol");
     }
 
@@ -90,14 +68,14 @@ library EraZkosRouter {
         bool _isZKsyncOS,
         bool _testnet
     ) internal view returns (string memory fileName, string memory contractName) {
-        return resolve(_isZKsyncOS, _testnet ? EraZkosContract.TestnetVerifier : EraZkosContract.DualVerifier);
+        return resolve(_isZKsyncOS, _testnet ? CTMContract.TestnetVerifier : CTMContract.DualVerifier);
     }
 
     // ======================== Bytecode reading ========================
 
     /// @notice Read L1 contract bytecode from the correct artifact directory.
     ///         ZKsyncOS -> out/ (EVM artifacts), Era -> zkout/ (ZK artifacts).
-    function readBytecodeL1(bool _isZKsyncOS, EraZkosContract _c) internal returns (bytes memory) {
+    function readBytecodeL1(bool _isZKsyncOS, CTMContract _c) internal returns (bytes memory) {
         (string memory fileName, string memory contractName) = resolve(_isZKsyncOS, _c);
         return _readBytecodeL1(_isZKsyncOS, fileName, contractName);
     }
@@ -121,7 +99,7 @@ library EraZkosRouter {
     /// @notice Get bytecode info for force deployments / upgrades.
     ///         Era:      abi.encode(L2BytecodeHash).
     ///         ZKsyncOS: proxy-upgrade bytecode info (impl + SystemContractProxy blake2s).
-    function getBytecodeInfo(bool _isZKsyncOS, EraZkosContract _c) internal returns (bytes memory) {
+    function getBytecodeInfo(bool _isZKsyncOS, CoreContract _c) internal returns (bytes memory) {
         (string memory fileName, string memory contractName) = resolve(_isZKsyncOS, _c);
         if (_isZKsyncOS) {
             return Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
@@ -133,7 +111,7 @@ library EraZkosRouter {
     ///         Era:      L2ContractHelper.hashL2Bytecode (ZK bytecode hash).
     ///         ZKsyncOS: keccak256 of deployed EVM bytecode.
     /// @dev Note, that for zksync os it is NOT suitable for force deployments as these require bytecode info.
-    function getDeployedBytecodeHash(bool _isZKsyncOS, EraZkosContract _c) internal view returns (bytes32) {
+    function getDeployedBytecodeHash(bool _isZKsyncOS, CoreContract _c) internal view returns (bytes32) {
         (string memory fileName, string memory contractName) = resolve(_isZKsyncOS, _c);
         if (_isZKsyncOS) {
             return keccak256(Utils.readFoundryDeployedBytecodeL1(fileName, contractName));
@@ -194,7 +172,7 @@ library EraZkosRouter {
 
     function getFullListOfFactoryDependencies(
         bool _isZKsyncOS,
-        EraZkosContract[] memory _additionalDependencyContracts
+        CoreContract[] memory _additionalDependencyContracts
     ) internal returns (bytes[] memory factoryDeps) {
         bytes[] memory basicDependencies = _getBaseFactoryDependencies(_isZKsyncOS);
         bytes[] memory sharedDependencies = _getFactoryDependencyBytecodes(
@@ -300,7 +278,7 @@ library EraZkosRouter {
 
     function getCreate2DerivedForceDeploymentAddr(
         bool _isZKsyncOS,
-        EraZkosContract _c
+        CoreContract _c
     ) internal view returns (address) {
         // FIXME: add support for additional force deployments on ZKsyncOS in scripts.
         require(!_isZKsyncOS, "Additional force deployments are not supported for ZKsyncOS scripts");
@@ -310,7 +288,7 @@ library EraZkosRouter {
     /// @notice Build a force deployment entry for scripts that use additional Era force deployments.
     function getForceDeployment(
         bool _isZKsyncOS,
-        EraZkosContract _c
+        CoreContract _c
     ) internal view returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
         // FIXME: add support for additional force deployments on ZKsyncOS in scripts.
         require(!_isZKsyncOS, "Additional force deployments are not supported for ZKsyncOS scripts");
@@ -430,21 +408,21 @@ library EraZkosRouter {
 
     function _getSharedFactoryDependencyContracts(
         bool _isZKsyncOS
-    ) private pure returns (EraZkosContract[] memory dependencyContracts) {
+    ) private pure returns (CoreContract[] memory dependencyContracts) {
         if (_isZKsyncOS) {
-            return new EraZkosContract[](0);
+            return new CoreContract[](0);
         }
 
-        dependencyContracts = new EraZkosContract[](4);
-        dependencyContracts[0] = EraZkosContract.L2SharedBridgeLegacy;
-        dependencyContracts[1] = EraZkosContract.BridgedStandardERC20;
-        dependencyContracts[2] = EraZkosContract.DiamondProxy;
-        dependencyContracts[3] = EraZkosContract.ProxyAdmin;
+        dependencyContracts = new CoreContract[](4);
+        dependencyContracts[0] = CoreContract.L2SharedBridgeLegacy;
+        dependencyContracts[1] = CoreContract.BridgedStandardERC20;
+        dependencyContracts[2] = CoreContract.DiamondProxy;
+        dependencyContracts[3] = CoreContract.ProxyAdmin;
     }
 
     function _getFactoryDependencyBytecodes(
         bool _isZKsyncOS,
-        EraZkosContract[] memory _dependencyContracts
+        CoreContract[] memory _dependencyContracts
     ) private returns (bytes[] memory dependencyBytecodes) {
         dependencyBytecodes = new bytes[](_dependencyContracts.length);
 
@@ -470,45 +448,62 @@ library EraZkosRouter {
                 : Utils.readZKFoundryBytecodeL1(_fileName, _contractName);
     }
 
-    /// @notice Resolve a EraZkosContract enum to its contract name for the active VM.
-    // solhint-disable-next-line code-complexity
-    function _resolveContractName(bool _isZKsyncOS, EraZkosContract _c) private view returns (string memory) {
+    /// @notice Resolve a CoreContract enum to its contract name for the active VM.
+    function _resolveCoreContractName(bool _isZKsyncOS, CoreContract _c) private view returns (string memory) {
         // Contracts with different names per VM
-        if (_c == EraZkosContract.L2NativeTokenVault)
+        if (_c == CoreContract.L2NativeTokenVault)
             return _isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault";
-        if (_c == EraZkosContract.ChainTypeManager)
+        if (_c == CoreContract.L2BaseToken) return _isZKsyncOS ? "L2BaseTokenZKOS" : "L2BaseTokenEra";
+
+        // Contracts with the same name across both VMs
+        if (_c == CoreContract.L2Bridgehub) return "L2Bridgehub";
+        if (_c == CoreContract.L2AssetRouter) return "L2AssetRouter";
+        if (_c == CoreContract.L2MessageRoot) return "L2MessageRoot";
+        if (_c == CoreContract.UpgradeableBeaconDeployer) return "UpgradeableBeaconDeployer";
+        if (_c == CoreContract.BaseTokenHolder) return "BaseTokenHolder";
+        if (_c == CoreContract.L2ChainAssetHandler) return "L2ChainAssetHandler";
+        if (_c == CoreContract.InteropCenter) return "InteropCenter";
+        if (_c == CoreContract.InteropHandler) return "InteropHandler";
+        if (_c == CoreContract.L2AssetTracker) return "L2AssetTracker";
+        if (_c == CoreContract.BeaconProxy) return "BeaconProxy";
+        if (_c == CoreContract.L2V29Upgrade) return "L2V29Upgrade";
+        if (_c == CoreContract.L2V31Upgrade) return "L2V31Upgrade";
+        if (_c == CoreContract.L2SharedBridgeLegacy) return "L2SharedBridgeLegacy";
+        if (_c == CoreContract.BridgedStandardERC20) return "BridgedStandardERC20";
+        if (_c == CoreContract.DiamondProxy) return "DiamondProxy";
+        if (_c == CoreContract.ProxyAdmin) return "ProxyAdmin";
+
+        revert("EraZkosRouter: unknown CoreContract");
+    }
+
+    /// @notice Resolve a CTMContract enum to its contract name for the active VM.
+    // solhint-disable-next-line code-complexity
+    function _resolveCTMContractName(bool _isZKsyncOS, CTMContract _c) private view returns (string memory) {
+        // Contracts with different names per VM
+        if (_c == CTMContract.ChainTypeManager)
             return _isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
-        if (_c == EraZkosContract.VerifierFflonk) return _isZKsyncOS ? "ZKsyncOSVerifierFflonk" : "EraVerifierFflonk";
-        if (_c == EraZkosContract.VerifierPlonk) return _isZKsyncOS ? "ZKsyncOSVerifierPlonk" : "EraVerifierPlonk";
-        if (_c == EraZkosContract.DualVerifier) return _isZKsyncOS ? "ZKsyncOSDualVerifier" : "EraDualVerifier";
-        if (_c == EraZkosContract.TestnetVerifier)
+        if (_c == CTMContract.VerifierFflonk) return _isZKsyncOS ? "ZKsyncOSVerifierFflonk" : "EraVerifierFflonk";
+        if (_c == CTMContract.VerifierPlonk) return _isZKsyncOS ? "ZKsyncOSVerifierPlonk" : "EraVerifierPlonk";
+        if (_c == CTMContract.DualVerifier) return _isZKsyncOS ? "ZKsyncOSDualVerifier" : "EraDualVerifier";
+        if (_c == CTMContract.TestnetVerifier)
             return _isZKsyncOS ? "ZKsyncOSTestnetVerifier" : "EraTestnetVerifier";
-        if (_c == EraZkosContract.L2BaseToken) return _isZKsyncOS ? "L2BaseTokenZKOS" : "L2BaseTokenEra";
-        if (_c == EraZkosContract.GatewayCTMDeployerCTM) {
+        if (_c == CTMContract.GatewayCTMDeployerCTM) {
             return _isZKsyncOS ? "GatewayCTMDeployerCTMZKsyncOS" : "GatewayCTMDeployerCTM";
         }
-        if (_c == EraZkosContract.GatewayCTMDeployerVerifiers) {
+        if (_c == CTMContract.GatewayCTMDeployerVerifiers) {
             return _isZKsyncOS ? "GatewayCTMDeployerVerifiersZKsyncOS" : "GatewayCTMDeployerVerifiers";
         }
 
         // Contracts with the same name across both VMs
-        if (_c == EraZkosContract.L2Bridgehub) return "L2Bridgehub";
-        if (_c == EraZkosContract.L2AssetRouter) return "L2AssetRouter";
-        if (_c == EraZkosContract.L2MessageRoot) return "L2MessageRoot";
-        if (_c == EraZkosContract.UpgradeableBeaconDeployer) return "UpgradeableBeaconDeployer";
-        if (_c == EraZkosContract.BaseTokenHolder) return "BaseTokenHolder";
-        if (_c == EraZkosContract.L2ChainAssetHandler) return "L2ChainAssetHandler";
-        if (_c == EraZkosContract.InteropCenter) return "InteropCenter";
-        if (_c == EraZkosContract.InteropHandler) return "InteropHandler";
-        if (_c == EraZkosContract.L2AssetTracker) return "L2AssetTracker";
-        if (_c == EraZkosContract.BeaconProxy) return "BeaconProxy";
-        if (_c == EraZkosContract.L2V29Upgrade) return "L2V29Upgrade";
-        if (_c == EraZkosContract.L2V31Upgrade) return "L2V31Upgrade";
-        if (_c == EraZkosContract.L2SharedBridgeLegacy) return "L2SharedBridgeLegacy";
-        if (_c == EraZkosContract.BridgedStandardERC20) return "BridgedStandardERC20";
-        if (_c == EraZkosContract.DiamondProxy) return "DiamondProxy";
-        if (_c == EraZkosContract.ProxyAdmin) return "ProxyAdmin";
+        if (_c == CTMContract.AdminFacet) return "AdminFacet";
+        if (_c == CTMContract.MailboxFacet) return "MailboxFacet";
+        if (_c == CTMContract.ExecutorFacet) return "ExecutorFacet";
+        if (_c == CTMContract.MigratorFacet) return "MigratorFacet";
+        if (_c == CTMContract.CommitterFacet) return "CommitterFacet";
+        if (_c == CTMContract.DiamondInit) return "DiamondInit";
+        if (_c == CTMContract.ValidatorTimelock) return "ValidatorTimelock";
+        if (_c == CTMContract.BlobsL1DAValidatorZKsyncOS) return "BlobsL1DAValidatorZKsyncOS";
 
-        revert("EraZkosRouter: unknown EraZkosContract");
+        revert("EraZkosRouter: unknown CTMContract");
     }
 }

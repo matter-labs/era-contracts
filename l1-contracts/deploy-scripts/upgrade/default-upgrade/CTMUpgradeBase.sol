@@ -12,7 +12,8 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {EraZkosContract, EraZkosRouter, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {EraZkosRouter, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ChainCreationParamsConfig, CTMDeployedAddresses, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
@@ -247,7 +248,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         internal
         returns (IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments)
     {
-        EraZkosContract[] memory forceDeploymentContracts = getForceDeploymentContracts();
+        CoreContract[] memory forceDeploymentContracts = getForceDeploymentContracts();
         additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](forceDeploymentContracts.length);
         for (uint256 i; i < forceDeploymentContracts.length; i++) {
             additionalForceDeployments[i] = EraZkosRouter.getForceDeployment(
@@ -261,10 +262,10 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     function getAdditionalDependencyContracts()
         internal
         virtual
-        returns (EraZkosContract[] memory forceDeploymentContracts)
+        returns (CoreContract[] memory forceDeploymentContracts)
     {
-        EraZkosContract[] memory additionalForceDeploymentContracts = getForceDeploymentContracts();
-        forceDeploymentContracts = new EraZkosContract[](additionalForceDeploymentContracts.length);
+        CoreContract[] memory additionalForceDeploymentContracts = getForceDeploymentContracts();
+        forceDeploymentContracts = new CoreContract[](additionalForceDeploymentContracts.length);
         for (uint256 i; i < additionalForceDeploymentContracts.length; i++) {
             forceDeploymentContracts[i] = additionalForceDeploymentContracts[i];
         }
@@ -274,9 +275,9 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     function getForceDeploymentContracts()
         internal
         virtual
-        returns (EraZkosContract[] memory forceDeploymentContracts)
+        returns (CoreContract[] memory forceDeploymentContracts)
     {
-        return new EraZkosContract[](0);
+        return new CoreContract[](0);
     }
 
     /// @notice Encode calldata that will be passed to `_postUpgrade`

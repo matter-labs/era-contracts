@@ -23,7 +23,8 @@ import {
     IChainTypeManager
 } from "contracts/state-transition/IChainTypeManager.sol";
 
-import {L1L2DeployPrepareResult, EraZkosContract, EraZkosRouter} from "../utils/EraZkosRouter.sol";
+import {L1L2DeployPrepareResult, EraZkosRouter} from "../utils/EraZkosRouter.sol";
+import {CTMContract} from "../ctm/DeployCTML1OrGateway.sol";
 
 import {Facets, Verifiers} from "contracts/common/StateTransitionTypes.sol";
 
@@ -280,7 +281,7 @@ library GatewayCTMDeployerHelper {
 
         (string memory vdFile, string memory vdName) = EraZkosRouter.resolve(
             config.isZKsyncOS,
-            EraZkosContract.GatewayCTMDeployerVerifiers
+            CTMContract.GatewayCTMDeployerVerifiers
         );
         bytes memory bytecode = EraZkosRouter.readBytecodeL1Raw(config.isZKsyncOS, vdFile, vdName);
         bytes memory constructorArgs = abi.encode(verifiersConfig);
@@ -417,7 +418,7 @@ library GatewayCTMDeployerHelper {
 
     function _calculateCreate2AddressAndCalldata(
         bytes32 _create2Salt,
-        EraZkosContract vmContract,
+        CTMContract vmContract,
         bytes memory constructorArgs,
         bool _isZKsyncOS
     ) internal returns (address addr, bytes memory data) {
@@ -444,7 +445,7 @@ library GatewayCTMDeployerHelper {
         );
         (deployer, data) = _calculateCreate2AddressAndCalldata(
             _create2Salt,
-            EraZkosContract.GatewayCTMDeployerCTM,
+            CTMContract.GatewayCTMDeployerCTM,
             abi.encode(ctmConfig),
             config.isZKsyncOS
         );
@@ -550,14 +551,14 @@ library GatewayCTMDeployerHelper {
         {
             (string memory fflonkFile, string memory fflonkName) = EraZkosRouter.resolve(
                 _isZKsyncOS,
-                EraZkosContract.VerifierFflonk
+                CTMContract.VerifierFflonk
             );
             result.verifierFflonk = _deployInternalEmptyParams(fflonkName, fflonkFile, innerConfig, _isZKsyncOS);
         }
         {
             (string memory plonkFile, string memory plonkName) = EraZkosRouter.resolve(
                 _isZKsyncOS,
-                EraZkosContract.VerifierPlonk
+                CTMContract.VerifierPlonk
             );
             result.verifierPlonk = _deployInternalEmptyParams(plonkName, plonkFile, innerConfig, _isZKsyncOS);
         }
@@ -613,7 +614,7 @@ library GatewayCTMDeployerHelper {
         // CTM Implementation
         (string memory ctmFile, string memory ctmName) = EraZkosRouter.resolve(
             isZKsyncOS,
-            EraZkosContract.ChainTypeManager
+            CTMContract.ChainTypeManager
         );
         result.chainTypeManagerImplementation = _deployInternalWithParams(
             ctmName,

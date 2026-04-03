@@ -50,7 +50,8 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
-import {EraZkosRouter, EraZkosContract} from "../utils/EraZkosRouter.sol";
+import {EraZkosRouter} from "../utils/EraZkosRouter.sol";
+import {CTMContract} from "./DeployCTML1OrGateway.sol";
 
 import {
     StateTransitionDeployedAddresses,
