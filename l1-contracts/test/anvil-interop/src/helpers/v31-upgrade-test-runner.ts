@@ -419,6 +419,37 @@ async function deployL2Contracts(
   // MINT_BASE_TOKEN_HOOK — a ZK-VM precompile that doesn't exist on Anvil.
   // L2BaseTokenEra uses storage-based balance tracking and works on both Era and ZKsyncOS.
   await l2Provider.send("anvil_setCode", [L2_BASE_TOKEN_ADDR, getBytecode("L2BaseTokenEra")]);
+
+  // Seed critical storage values on L2 contracts that were deployed via anvil_setCode
+  // but never initialized. performForceDeployedContractsInit reads these before calling
+  // updateL2, which reverts if WETH_TOKEN is zero.
+  // Storage slots found via forge: NTV.WETH_TOKEN=251, NTV.L2_TOKEN_PROXY_BYTECODE_HASH=255,
+  // NTV.L2_LEGACY_SHARED_BRIDGE=254, NTV.L1_CHAIN_ID=253, AR.L2_LEGACY_SHARED_BRIDGE=255.
+  const NTV_WETH_TOKEN_SLOT = 251;
+  const NTV_L1_CHAIN_ID_SLOT = 253;
+  const NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT = 255;
+  const toSlot = (n: number) => ethers.utils.hexZeroPad(ethers.utils.hexlify(n), 32);
+  const toAddr = (a: string) => ethers.utils.hexZeroPad(a, 32);
+
+  // NTV: set WETH_TOKEN to the wrapped base token impl address (non-zero placeholder)
+  await l2Provider.send("anvil_setStorageAt", [
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    toSlot(NTV_WETH_TOKEN_SLOT),
+    toAddr(L2_WRAPPED_BASE_TOKEN_IMPL_ADDR),
+  ]);
+  // NTV: set L1_CHAIN_ID
+  await l2Provider.send("anvil_setStorageAt", [
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    toSlot(NTV_L1_CHAIN_ID_SLOT),
+    ethers.utils.hexZeroPad(ethers.utils.hexlify(L1_CHAIN_ID), 32),
+  ]);
+  // NTV: set L2_TOKEN_PROXY_BYTECODE_HASH to a non-zero placeholder
+  await l2Provider.send("anvil_setStorageAt", [
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    toSlot(NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT),
+    ethers.utils.hexZeroPad("0x01", 32),
+  ]);
+  // AR: L2_LEGACY_SHARED_BRIDGE is zero (no legacy bridge) — no need to set
 }
 
 // ── Calldata decoding ────────────────────────────────────────────────
