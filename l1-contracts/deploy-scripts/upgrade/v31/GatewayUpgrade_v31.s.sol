@@ -29,7 +29,7 @@ import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 
 import {Utils} from "../../utils/Utils.sol";
 import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
-import {EraZkosContract, FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {EraZkosContract, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
 import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.sol";
 
 // FIXME: consider deleting this script, it is not used.
@@ -55,7 +55,7 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
         ChainCreationParamsConfig memory chainCreationParams,
         uint256,
         address,
-        FactoryDepsResult memory _factoryDepsResult,
+        PublishFactoryDepsResult memory _factoryDepsResult,
         uint256 protocolUpgradeNonce
     ) public virtual override returns (ProposedUpgrade memory proposedUpgrade) {
         if (!config.isZKsyncOS) {

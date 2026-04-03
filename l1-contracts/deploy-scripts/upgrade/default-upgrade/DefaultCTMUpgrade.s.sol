@@ -10,13 +10,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "../../utils/Utils.sol";
-import {
-    StateTransitionDeployedAddresses,
-    ChainCreationParamsConfig,
-    StateTransitionDeployedAddresses,
-    StateTransitionDeployedAddresses,
-    ZkChainAddresses
-} from "../../utils/Types.sol";
+import {StateTransitionDeployedAddresses, ChainCreationParamsConfig, ZkChainAddresses} from "../../utils/Types.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
@@ -35,7 +29,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
-import {EraZkosRouter, EraZkosContract, FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {EraZkosRouter, EraZkosContract, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -113,7 +107,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     ZkChainAddresses internal upToDateZkChain;
     L1Bridgehub internal bridgehub;
 
-    FactoryDepsResult internal factoryDepsResult;
+    PublishFactoryDepsResult internal factoryDepsResult;
 
     function initializeWithArgs(
         address ctmProxy,
@@ -467,7 +461,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         );
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
-        FactoryDepsResult memory result = EraZkosRouter.publishAndProcessFactoryDeps(
+        PublishFactoryDepsResult memory result = EraZkosRouter.publishAndProcessFactoryDeps(
             config.isZKsyncOS,
             supplier,
             allDeps

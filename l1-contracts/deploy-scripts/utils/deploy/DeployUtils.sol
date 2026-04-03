@@ -5,7 +5,7 @@ import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 abstract contract DeployUtils is Create2FactoryUtils {
-    // FIXME: isZKBytecode is never true except for tests where it ends up being ignored anyway. 
+    // FIXME: isZKBytecode is never true except for tests where it ends up being ignored anyway.
     function deployTuppWithContract(
         string memory contractName,
         bool isZKBytecode

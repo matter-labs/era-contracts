@@ -33,7 +33,7 @@ import {Utils} from "../../utils/Utils.sol";
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
-import {EraZkosContract, EraZkosRouter, FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {EraZkosContract, EraZkosRouter, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
 
 /// @notice Script used for v31 upgrade flow
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
@@ -60,6 +60,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // Deploy new ChainTypeManager implementation
         // The constructor will receive the new BytecodesSupplier proxy address
         // Select the correct ChainTypeManager based on chain type (Era vs ZKsyncOS)
+        // FIXME we never actually use deploySimpleContract or deploy TUPP with anything else than false. We need to clean this code.
         (, string memory ctmContractName) = EraZkosRouter.resolve(config.isZKsyncOS, EraZkosContract.ChainTypeManager);
         console.log("Deploying ChainTypeManager:", ctmContractName);
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
@@ -132,7 +133,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         ChainCreationParamsConfig memory chainCreationParams,
         uint256,
         address,
-        FactoryDepsResult memory _factoryDepsResult,
+        PublishFactoryDepsResult memory _factoryDepsResult,
         uint256 protocolUpgradeNonce
     ) public virtual override returns (ProposedUpgrade memory proposedUpgrade) {
         if (!config.isZKsyncOS) {

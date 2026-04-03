@@ -30,6 +30,7 @@ import {
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 
+/// FIXME currently we accept ownership as part of stage1, but in fact we should do it as part of stage0.
 /// @notice Script used for v31 upgrade flow
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
     function deployNewEcosystemContractsL1() public virtual override {

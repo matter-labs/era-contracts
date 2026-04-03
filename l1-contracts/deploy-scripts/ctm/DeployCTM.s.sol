@@ -23,9 +23,6 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
 import {L2LegacySharedBridgeTestHelper} from "../dev/L2LegacySharedBridgeTestHelper.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-// EraZkosVerifierLifecycle is used directly (not through EraZkosRouter) for
-// msg.sender-sensitive operations like initializeVerifier and transferVerifierOwnership,
-// because routing through the EraZkosRouter contract would change msg.sender.
 import {EraZkosVerifierLifecycle} from "../utils/vm/EraZkosVerifierLifecycle.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";

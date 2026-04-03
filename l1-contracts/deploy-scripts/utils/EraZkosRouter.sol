@@ -57,7 +57,7 @@ struct L1L2DeployPrepareResult {
 }
 
 /// @notice Result of publishing and processing factory dependencies.
-struct FactoryDepsResult {
+struct PublishFactoryDepsResult {
     /// @dev Factory dep hashes for the upgrade transaction.
     ///      Era: L2 bytecode hashes as uint256. ZKsyncOS: empty array.
     uint256[] factoryDepsHashes;
@@ -175,7 +175,7 @@ library EraZkosRouter {
         bool _isZKsyncOS,
         BytecodesSupplier _supplier,
         bytes[] memory _allDeps
-    ) internal returns (FactoryDepsResult memory result) {
+    ) internal returns (PublishFactoryDepsResult memory result) {
         _publishBytecodes(_isZKsyncOS, _supplier, _allDeps);
 
         if (_isZKsyncOS) {
@@ -213,7 +213,7 @@ library EraZkosRouter {
 
     /// @notice Check if a bytecode hash is present in the factory deps result.
     ///         For ZKsyncOS (empty result), always returns true since factory deps are not used.
-    function isHashInFactoryDeps(FactoryDepsResult memory _result, bytes32 _hash) internal pure returns (bool) {
+    function isHashInFactoryDeps(PublishFactoryDepsResult memory _result, bytes32 _hash) internal pure returns (bool) {
         if (_result.factoryDepsHashes.length == 0) {
             return true;
         }

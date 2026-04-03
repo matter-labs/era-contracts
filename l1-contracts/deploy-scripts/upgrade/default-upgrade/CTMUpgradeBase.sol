@@ -12,7 +12,7 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {EraZkosContract, EraZkosRouter, FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {EraZkosContract, EraZkosRouter, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
@@ -70,7 +70,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     /// @notice Build L1 -> L2 upgrade tx
     function composeUpgradeTx(
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments,
-        FactoryDepsResult memory _factoryDepsResult,
+        PublishFactoryDepsResult memory _factoryDepsResult,
         uint256 protocolUpgradeNonce
     ) internal view returns (L2CanonicalTransaction memory transaction) {
         // Sanity check
@@ -163,7 +163,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         ChainCreationParamsConfig memory chainCreationParams,
         uint256 l1ChainId,
         address ownerAddress,
-        FactoryDepsResult memory _factoryDepsResult,
+        PublishFactoryDepsResult memory _factoryDepsResult,
         address registeredChainIdDiamondProxy
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion(registeredChainIdDiamondProxy);
@@ -199,7 +199,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         ChainCreationParamsConfig memory chainCreationParams,
         uint256 l1ChainId,
         address ownerAddress,
-        FactoryDepsResult memory _factoryDepsResult,
+        PublishFactoryDepsResult memory _factoryDepsResult,
         uint256 protocolUpgradeNonce
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments = buildUpgradeForceDeployments(

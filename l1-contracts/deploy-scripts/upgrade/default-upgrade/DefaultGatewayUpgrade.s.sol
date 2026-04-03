@@ -42,7 +42,7 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
-import {EraZkosContract, EraZkosRouter, FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {EraZkosContract, EraZkosRouter, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
 // FIXME: consider deleting this file it is not used.
@@ -92,7 +92,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     CTMDeployedAddresses internal ctmDeployedAddresses;
 
     // TODO We need for composing upgrade transaction. but seems we don't need an upgrade transaction on gateway
-    FactoryDepsResult internal factoryDepsResult;
+    PublishFactoryDepsResult internal factoryDepsResult;
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
