@@ -84,23 +84,8 @@ export class DeploymentRunner {
     this.saveState({});
   }
 
-  private toChainConfigMap(chainConfigs: AnvilConfig["chains"]): Map<number, AnvilConfig["chains"][number]> {
-    return new Map(chainConfigs.map((chainConfig) => [chainConfig.chainId, chainConfig]));
-  }
-
   private toRpcUrlMap(l2Chains: L2ChainInfo[]): Map<number, string> {
     return new Map(l2Chains.map((chain) => [chain.chainId, chain.rpcUrl]));
-  }
-
-  private getChainConfigOrThrow(
-    chainConfigsById: Map<number, AnvilConfig["chains"][number]>,
-    chainId: number
-  ): AnvilChainConfig {
-    const chainConfig = chainConfigsById.get(chainId);
-    if (!chainConfig) {
-      throw new Error(`Chain config not found for chain ${chainId}`);
-    }
-    return chainConfig;
   }
 
   private computeInteropChainIds(chainId: number, chainConfigs: AnvilChainConfig[]): number[] {
@@ -127,17 +112,13 @@ export class DeploymentRunner {
     );
   }
 
-  private buildRegistrationConfigs(
-    l2Chains: L2ChainInfo[],
-    chainConfigsById: Map<number, AnvilConfig["chains"][number]>
-  ) {
+  private buildRegistrationConfigs(l2Chains: L2ChainInfo[]) {
     return l2Chains.map((l2Chain) => {
-      this.getChainConfigOrThrow(chainConfigsById, l2Chain.chainId);
       return {
         chainId: l2Chain.chainId,
         rpcUrl: l2Chain.rpcUrl,
-        baseToken: ETH_TOKEN_ADDRESS, // TODO: support non-ETH base tokens EVM-1297
-        validiumMode: false, // TODO: support validium mode (requires batch settlement) EVM-1297
+        baseToken: ETH_TOKEN_ADDRESS, // TODO(EVM-1297): support non-ETH base tokens
+        validiumMode: false, // TODO(EVM-1297): support validium mode (requires batch settlement)
       };
     });
   }
@@ -282,7 +263,6 @@ export class DeploymentRunner {
   async step3And4RegisterAndInitChains(
     l1RpcUrl: string,
     l2Chains: L2ChainInfo[],
-    chainConfigs: AnvilConfig["chains"],
     l1Addresses: CoreDeployedAddresses,
     ctmAddresses: CTMDeployedAddresses
   ): Promise<{
@@ -292,11 +272,10 @@ export class DeploymentRunner {
 
     const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
     const registry = new ChainRegistry(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
-    const chainConfigsById = this.toChainConfigMap(chainConfigs);
     const l2RpcUrlsByChainId = this.toRpcUrlMap(l2Chains);
 
     // Batch-register all chains in a single forge call (avoids nonce conflicts)
-    const configs = this.buildRegistrationConfigs(l2Chains, chainConfigsById);
+    const configs = this.buildRegistrationConfigs(l2Chains);
 
     const regDone = timeIt(`registerChains batch [${configs.map((c) => c.chainId).join(",")}]`);
     const { chainAddresses, genesisPriorityTxs } = await registry.registerChainBatch(configs);
@@ -527,7 +506,6 @@ export class DeploymentRunner {
     const { chainAddresses } = await this.step3And4RegisterAndInitChains(
       chains.l1.rpcUrl,
       chains.l2,
-      chains.config,
       l1Addresses,
       ctmAddresses
     );

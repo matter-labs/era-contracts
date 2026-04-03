@@ -1,13 +1,11 @@
 import type { BigNumber } from "ethers";
 import { Contract, providers, Wallet, ethers } from "ethers";
 import { buildWithdrawalMerkleProof, getSettlementLayerChainId } from "../core/utils";
-import { encodeBridgeBurnData } from "../core/data-encoding";
 import { getAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   ETH_TOKEN_ADDRESS,
   L2_ASSET_ROUTER_ADDR,
-  L2_NATIVE_TOKEN_VAULT_ADDR,
   L2_BASE_TOKEN_ADDR,
   FINALIZE_DEPOSIT_SIG,
 } from "../core/const";
@@ -26,24 +24,6 @@ export interface WithdrawETHResult {
   l2TxHash: string;
   l1TxHash: string | null;
   amount: BigNumber;
-}
-
-export interface WithdrawERC20Params {
-  l1RpcUrl: string;
-  l2RpcUrl: string;
-  chainId: number;
-  l1Addresses: CoreDeployedAddresses;
-  l2TokenAddress: string;
-  assetId: string;
-  amount: BigNumber;
-  l1Recipient?: string;
-}
-
-export interface WithdrawERC20Result {
-  l2TxHash: string;
-  l1TxHash: string | null;
-  amount: BigNumber;
-  assetId: string;
 }
 
 /**
@@ -92,58 +72,6 @@ export async function withdrawETHFromL2(params: WithdrawETHParams): Promise<With
     l2TxHash: l2Tx.hash,
     l1TxHash,
     amount,
-  };
-}
-
-/**
- * Initiate an ERC20 withdrawal from L2 to L1 via L2AssetRouter.withdraw.
- */
-export async function withdrawERC20FromL2(params: WithdrawERC20Params): Promise<WithdrawERC20Result> {
-  const { l1RpcUrl, l2RpcUrl, chainId, l1Addresses, l2TokenAddress, assetId, amount } = params;
-  const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
-
-  const l2Provider = new providers.JsonRpcProvider(l2RpcUrl);
-  const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
-  const l2Wallet = new Wallet(privateKey, l2Provider);
-  const l1Recipient = params.l1Recipient || l2Wallet.address;
-
-  // Approve L2NativeTokenVault to spend tokens
-  const l2Token = new Contract(l2TokenAddress, getAbi("TestnetERC20Token"), l2Wallet);
-
-  console.log("   Approving L2NativeTokenVault for withdrawal...");
-  const approveTx = await l2Token.approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount);
-  await approveTx.wait();
-
-  // Encode withdrawal data: (amount, l1Recipient, l2TokenAddress)
-  const withdrawalData = encodeBridgeBurnData(amount, l1Recipient, l2TokenAddress);
-
-  // Use IL2AssetRouter interface (no overloaded withdraw) for cleaner call syntax
-  const l2AssetRouter = new Contract(L2_ASSET_ROUTER_ADDR, getAbi("IL2AssetRouter"), l2Wallet);
-
-  console.log(`   Initiating ERC20 withdrawal from chain ${chainId}...`);
-  const l2Tx = await l2AssetRouter.withdraw(assetId, withdrawalData, {
-    gasLimit: 5_000_000,
-  });
-  await l2Tx.wait();
-  console.log(`   L2 withdrawal tx: cast run ${l2Tx.hash} -r ${l2RpcUrl}`);
-
-  // Finalize on L1
-  const l1TxHash = await finalizeWithdrawalOnL1(
-    l1Provider,
-    chainId,
-    l1Addresses,
-    assetId,
-    amount,
-    l1Recipient,
-    l2TokenAddress,
-    l2Wallet.address
-  );
-
-  return {
-    l2TxHash: l2Tx.hash,
-    l1TxHash,
-    amount,
-    assetId,
   };
 }
 

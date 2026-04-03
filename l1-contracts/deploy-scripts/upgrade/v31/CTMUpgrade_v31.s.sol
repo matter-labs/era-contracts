@@ -14,21 +14,9 @@ import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeploy
 import {Call} from "contracts/governance/Common.sol";
 
 import {
-    GW_ASSET_TRACKER_ADDR,
-    L2_ASSET_ROUTER_ADDR,
-    L2_ASSET_TRACKER_ADDR,
-    L2_BASE_TOKEN_HOLDER_ADDR,
-    L2_BRIDGEHUB_ADDR,
-    L2_CHAIN_ASSET_HANDLER_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
-    L2_INTEROP_CENTER_ADDR,
-    L2_INTEROP_HANDLER_ADDR,
-    L2_MESSAGE_ROOT_ADDR,
-    L2_NATIVE_TOKEN_VAULT_ADDR,
-    L2_VERSION_SPECIFIC_UPGRADER_ADDR,
-    L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
+    L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
@@ -90,12 +78,11 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
     /// @notice Override to deploy the correct v31 upgrade contract based on chain type.
     function deployUsedUpgradeContract() internal virtual override returns (address) {
-        if (config.isZKsyncOS) {
-            console.log("Deploying ZKsyncOSSettlementLayerV31Upgrade");
-            return deploySimpleContract("ZKsyncOSSettlementLayerV31Upgrade", false);
-        }
-        console.log("Deploying EraSettlementLayerV31Upgrade");
-        return deploySimpleContract("EraSettlementLayerV31Upgrade", false);
+        string memory contractName = config.isZKsyncOS
+            ? "ZKsyncOSSettlementLayerV31Upgrade"
+            : "EraSettlementLayerV31Upgrade";
+        console.log("Deploying", contractName);
+        return deploySimpleContract(contractName, false);
     }
 
     function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
@@ -112,7 +99,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     }
 
     function getL2UpgradeTargetAndData(
-        IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual override returns (address, bytes memory) {
         // The fixedForceDeploymentsData is ecosystem-wide (same for all chains).
         // The additionalForceDeploymentsData placeholder is rewritten per-chain by
@@ -122,87 +109,33 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             (config.isZKsyncOS, address(0), newlyGeneratedData.fixedForceDeploymentsData, "")
         );
 
+        bytes memory complexUpgraderCalldata;
         if (config.isZKsyncOS) {
-            // ZKsyncOS: include all system contracts in the outer force deployment list.
-            IComplexUpgrader.UniversalContractUpgradeInfo[]
-                memory universalForceDeployments = _buildZKsyncOSForceDeployments();
-
-            return (
-                address(L2_COMPLEX_UPGRADER_ADDR),
-                abi.encodeCall(
-                    IComplexUpgrader.forceDeployAndUpgradeUniversal,
-                    (universalForceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
-                )
+            complexUpgraderCalldata = abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (_deployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
+            );
+        } else {
+            complexUpgraderCalldata = abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgrade,
+                (unwrapEraDeployments(_deployments), L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
             );
         }
 
-        return (
-            address(L2_COMPLEX_UPGRADER_ADDR),
-            abi.encodeCall(
-                IComplexUpgrader.forceDeployAndUpgrade,
-                (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
-            )
-        );
+        return (address(L2_COMPLEX_UPGRADER_ADDR), complexUpgraderCalldata);
     }
 
-    /// @dev Build the full ZKsyncOS force deployment array from FixedForceDeploymentsData.
-    /// Maps each bytecodeInfo field to its well-known L2 address and includes L2V31Upgrade.
-    /// TODO: The base system contract entries could be moved to CTMUpgradeBase for reuse
-    /// by future version upgrades. Kept here for now since it references v31-specific data.
-    function _buildZKsyncOSForceDeployments()
+    /// @notice V31-specific: include L2V31Upgrade as an additional ZKsyncOS force deployment.
+    function getAdditionalZKsyncOSForceDeployments()
         internal
-        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
+        override
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
     {
-        FixedForceDeploymentsData memory data = abi.decode(
-            newlyGeneratedData.fixedForceDeploymentsData,
-            (FixedForceDeploymentsData)
-        );
-
-        // All system contracts that performForceDeployedContractsInit deploys via
-        // conductContractUpgrade, plus contracts called during the upgrade (GWAssetTracker,
-        // WrappedBaseToken), plus the L2V31Upgrade delegateTo target.
-        uint256 count = 12;
-        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](count);
-
-        uint256 i = 0;
-        deployments[i++] = _zkosEntry(data.messageRootBytecodeInfo, address(L2_MESSAGE_ROOT_ADDR));
-        deployments[i++] = _zkosEntry(data.bridgehubBytecodeInfo, address(L2_BRIDGEHUB_ADDR));
-        deployments[i++] = _zkosEntry(data.l2AssetRouterBytecodeInfo, address(L2_ASSET_ROUTER_ADDR));
-        deployments[i++] = _zkosEntry(data.l2NtvBytecodeInfo, L2_NATIVE_TOKEN_VAULT_ADDR);
-        deployments[i++] = _zkosEntry(data.chainAssetHandlerBytecodeInfo, address(L2_CHAIN_ASSET_HANDLER_ADDR));
-        deployments[i++] = _zkosEntry(data.assetTrackerBytecodeInfo, L2_ASSET_TRACKER_ADDR);
-        deployments[i++] = _zkosEntry(data.interopCenterBytecodeInfo, address(L2_INTEROP_CENTER_ADDR));
-        deployments[i++] = _zkosEntry(data.interopHandlerBytecodeInfo, address(L2_INTEROP_HANDLER_ADDR));
-        deployments[i++] = _zkosEntry(data.baseTokenHolderBytecodeInfo, L2_BASE_TOKEN_HOLDER_ADDR);
-        // GWAssetTracker and WrappedBaseToken: called during upgrade (initL2, _ensureWethToken)
-        // but not deployed via conductContractUpgrade — include as unsafe force deployments.
-        deployments[i++] = IComplexUpgrader.UniversalContractUpgradeInfo({
-            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
-            deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("GWAssetTracker.sol", "GWAssetTracker"),
-            newAddress: GW_ASSET_TRACKER_ADDR
-        });
-        deployments[i++] = IComplexUpgrader.UniversalContractUpgradeInfo({
-            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
-            deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2WrappedBaseToken.sol", "L2WrappedBaseToken"),
-            newAddress: L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
-        });
-        // L2V31Upgrade: the delegateTo target
-        deployments[i++] = IComplexUpgrader.UniversalContractUpgradeInfo({
+        additional = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
+        additional[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
             upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
             deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade"),
             newAddress: L2_VERSION_SPECIFIC_UPGRADER_ADDR
         });
-    }
-
-    function _zkosEntry(
-        bytes memory _bytecodeInfo,
-        address _addr
-    ) private pure returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
-        return
-            IComplexUpgrader.UniversalContractUpgradeInfo({
-                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
-                deployedBytecodeInfo: _bytecodeInfo,
-                newAddress: _addr
-            });
     }
 }

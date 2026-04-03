@@ -44,19 +44,27 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
     }
 
     function getL2UpgradeTargetAndData(
-        IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal view override returns (address, bytes memory) {
         bytes32 ethAssetId = IL1AssetRouter(address(bridgehub.assetRouter())).ETH_TOKEN_ASSET_ID();
         bytes memory v29UpgradeCalldata = abi.encodeCall(
             IL2V29Upgrade.upgrade,
             (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), ethAssetId)
         );
-        return (
-            address(L2_COMPLEX_UPGRADER_ADDR),
-            abi.encodeCall(
+
+        bytes memory complexUpgraderCalldata;
+        if (config.isZKsyncOS) {
+            complexUpgraderCalldata = abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (_deployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, v29UpgradeCalldata)
+            );
+        } else {
+            complexUpgraderCalldata = abi.encodeCall(
                 IComplexUpgrader.forceDeployAndUpgrade,
-                (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, v29UpgradeCalldata)
-            )
-        );
+                (unwrapEraDeployments(_deployments), L2_VERSION_SPECIFIC_UPGRADER_ADDR, v29UpgradeCalldata)
+            );
+        }
+
+        return (address(L2_COMPLEX_UPGRADER_ADDR), complexUpgraderCalldata);
     }
 }

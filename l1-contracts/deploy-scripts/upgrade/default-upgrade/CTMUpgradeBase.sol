@@ -9,11 +9,11 @@ import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeploy
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {
+    L2_COMPLEX_UPGRADER_ADDR,
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
@@ -54,27 +54,42 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
 
     /// @notice Get L2 upgrade target and data
     function getL2UpgradeTargetAndData(
-        IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual returns (address, bytes memory) {
+        if (config.isZKsyncOS) {
+            return (
+                address(L2_COMPLEX_UPGRADER_ADDR),
+                abi.encodeCall(
+                    IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                    (_deployments, address(0), "")
+                )
+            );
+        }
         return (
             address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR),
-            abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (_forceDeployments))
+            abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (unwrapEraDeployments(_deployments)))
         );
     }
 
     /// @notice Build L1 -> L2 upgrade tx
     function composeUpgradeTx(
-        IL2ContractDeployer.ForceDeployment[] memory forceDeployments,
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments,
         uint256[] memory factoryDepsHashes,
         uint256 protocolUpgradeNonce,
         bool isZKsyncOS
     ) internal returns (L2CanonicalTransaction memory transaction) {
-        // Sanity check
-        for (uint256 i; i < forceDeployments.length; i++) {
-            require(isHashInFactoryDepsCheck(forceDeployments[i].bytecodeHash), "Bytecode hash not in factory deps");
+        // Sanity check: verify Era bytecodeHashes are in factory deps
+        for (uint256 i; i < _deployments.length; i++) {
+            if (_deployments[i].upgradeType == IComplexUpgrader.ContractUpgradeType.EraForceDeployment) {
+                IL2ContractDeployer.ForceDeployment memory fd = abi.decode(
+                    _deployments[i].deployedBytecodeInfo,
+                    (IL2ContractDeployer.ForceDeployment)
+                );
+                require(isHashInFactoryDepsCheck(fd.bytecodeHash), "Bytecode hash not in factory deps");
+            }
         }
 
-        (address target, bytes memory data) = getL2UpgradeTargetAndData(forceDeployments);
+        (address target, bytes memory data) = getL2UpgradeTargetAndData(_deployments);
 
         uint256 txType = isZKsyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
         transaction = L2CanonicalTransaction({
@@ -198,26 +213,22 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         uint256 protocolUpgradeNonce,
         bool isZKsyncOS
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
-        IL2ContractDeployer.ForceDeployment[] memory forceDeployments;
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments;
 
         if (isZKsyncOS) {
-            // ZKsyncOS uses FixedForceDeploymentsData (built in DeployCTM) instead of
-            // Era-style ForceDeployment[] arrays. Return empty — the upgrade tx for
-            // ZKsyncOS chains carries data through a different path.
-            forceDeployments = new IL2ContractDeployer.ForceDeployment[](0);
+            deployments = buildZKsyncOSForceDeployments();
         } else {
             IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
                 .getBaseForceDeployments(l1ChainId, ownerAddress);
             IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalForceDeployments();
-            forceDeployments = SystemContractsProcessing.mergeForceDeployments(
-                baseForceDeployments,
-                additionalForceDeployments
+            deployments = wrapEraDeployments(
+                SystemContractsProcessing.mergeForceDeployments(baseForceDeployments, additionalForceDeployments)
             );
         }
 
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: composeUpgradeTx(
-                forceDeployments,
+                deployments,
                 factoryDepsHashes,
                 protocolUpgradeNonce,
                 isZKsyncOS
@@ -285,46 +296,55 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
     }
 
-    /// @notice Build the base ZKsyncOS force deployment array from FixedForceDeploymentsData.
-    /// @dev Uses the same address list as getOtherBuiltinForceDeployments (Era) from
-    /// SystemContractsProcessing. Maps each address to its ZKsyncOS bytecodeInfo from
-    /// FixedForceDeploymentsData. Version-specific entries (e.g. L2V31Upgrade) should be
-    /// appended by the concrete upgrade.
-    /// @param _fixedForceDeploymentsData The ABI-encoded FixedForceDeploymentsData.
-    function getBaseZKsyncOSForceDeployments(
-        bytes memory _fixedForceDeploymentsData
-    ) internal view returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments) {
-        FixedForceDeploymentsData memory data = abi.decode(_fixedForceDeploymentsData, (FixedForceDeploymentsData));
+    /// @notice Build the full ZKsyncOS force deployment array: base builtins + version-specific entries.
+    function buildZKsyncOSForceDeployments()
+        internal
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory)
+    {
+        return SystemContractsProcessing.buildZKsyncOSForceDeployments(getAdditionalZKsyncOSForceDeployments());
+    }
 
-        // Get the canonical address list (same order as Era force deployments).
-        BuiltinContractDeployInfo[] memory contracts = SystemContractsProcessing.getOtherBuiltinContracts();
+    /// @notice Override to provide version-specific ZKsyncOS force deployment entries.
+    function getAdditionalZKsyncOSForceDeployments()
+        internal
+        virtual
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory)
+    {
+        return new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
+    }
 
-        // Build a parallel bytecodeInfo array. Contracts with ZKsyncOS proxy bytecodeInfo in
-        // FixedForceDeploymentsData get ZKsyncOSSystemProxyUpgrade. Others get UnsafeForceDeployment.
-        bytes[] memory bytecodeInfos = new bytes[](contracts.length);
-        bytecodeInfos[0] = data.bridgehubBytecodeInfo;
-        bytecodeInfos[1] = data.l2AssetRouterBytecodeInfo;
-        bytecodeInfos[2] = data.l2NtvBytecodeInfo;
-        bytecodeInfos[3] = data.messageRootBytecodeInfo;
-        // [4] L2WrappedBaseToken — no bytecodeInfo in FixedForceDeploymentsData
-        // [5] L2MessageVerification — no bytecodeInfo
-        bytecodeInfos[6] = data.chainAssetHandlerBytecodeInfo;
-        // [7] L2InteropRootStorage — no bytecodeInfo
-        bytecodeInfos[8] = data.baseTokenHolderBytecodeInfo;
-        bytecodeInfos[9] = data.assetTrackerBytecodeInfo;
-        bytecodeInfos[10] = data.interopCenterBytecodeInfo;
-        bytecodeInfos[11] = data.interopHandlerBytecodeInfo;
-        // [12] GWAssetTracker — no bytecodeInfo
-
-        _deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](contracts.length);
-        for (uint256 i = 0; i < contracts.length; i++) {
-            _deployments[i] = IComplexUpgrader.UniversalContractUpgradeInfo({
-                upgradeType: bytecodeInfos[i].length > 0
-                    ? IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade
-                    : IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
-                deployedBytecodeInfo: bytecodeInfos[i],
-                newAddress: contracts[i].addr
+    /// @notice Wrap Era ForceDeployment[] into UniversalContractUpgradeInfo[].
+    /// Each ForceDeployment is abi-encoded into deployedBytecodeInfo so it can be
+    /// unwrapped back losslessly when encoding the L2 calldata.
+    function wrapEraDeployments(
+        IL2ContractDeployer.ForceDeployment[] memory _fds
+    ) internal pure returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory _result) {
+        _result = new IComplexUpgrader.UniversalContractUpgradeInfo[](_fds.length);
+        for (uint256 i = 0; i < _fds.length; i++) {
+            _result[i] = IComplexUpgrader.UniversalContractUpgradeInfo({
+                upgradeType: IComplexUpgrader.ContractUpgradeType.EraForceDeployment,
+                deployedBytecodeInfo: abi.encode(_fds[i]),
+                newAddress: _fds[i].newAddress
             });
+        }
+    }
+
+    /// @notice Unwrap Era entries from UniversalContractUpgradeInfo[] back to ForceDeployment[].
+    function unwrapEraDeployments(
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _infos
+    ) internal pure returns (IL2ContractDeployer.ForceDeployment[] memory _result) {
+        uint256 count = 0;
+        for (uint256 i = 0; i < _infos.length; i++) {
+            if (_infos[i].upgradeType == IComplexUpgrader.ContractUpgradeType.EraForceDeployment) {
+                count++;
+            }
+        }
+        _result = new IL2ContractDeployer.ForceDeployment[](count);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < _infos.length; i++) {
+            if (_infos[i].upgradeType == IComplexUpgrader.ContractUpgradeType.EraForceDeployment) {
+                _result[idx++] = abi.decode(_infos[i].deployedBytecodeInfo, (IL2ContractDeployer.ForceDeployment));
+            }
         }
     }
 }

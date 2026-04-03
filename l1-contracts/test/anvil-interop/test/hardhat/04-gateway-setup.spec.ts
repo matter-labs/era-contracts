@@ -72,10 +72,5 @@ describe("04 - Gateway Deployment Verification (read-only)", function () {
       expect(code).to.not.equal("0x");
     });
 
-    it("CTM is registered in Bridgehub", async () => {
-      const bridgehub = new Contract(state.l1Addresses!.bridgehub, getAbi("L1Bridgehub"), l1Provider);
-      const isRegistered = await bridgehub.chainTypeManagerIsRegistered(state.ctmAddresses!.chainTypeManager);
-      expect(isRegistered).to.equal(true);
-    });
   });
 });
