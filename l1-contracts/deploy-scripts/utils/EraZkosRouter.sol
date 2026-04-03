@@ -276,10 +276,7 @@ library EraZkosRouter {
 
     // ======================== Force deployments ========================
 
-    function getCreate2DerivedForceDeploymentAddr(
-        bool _isZKsyncOS,
-        CoreContract _c
-    ) internal view returns (address) {
+    function getCreate2DerivedForceDeploymentAddr(bool _isZKsyncOS, CoreContract _c) internal view returns (address) {
         // FIXME: add support for additional force deployments on ZKsyncOS in scripts.
         require(!_isZKsyncOS, "Additional force deployments are not supported for ZKsyncOS scripts");
         return Utils.getL2AddressViaCreate2Factory(bytes32(0), getDeployedBytecodeHash(false, _c), hex"");
@@ -451,8 +448,7 @@ library EraZkosRouter {
     /// @notice Resolve a CoreContract enum to its contract name for the active VM.
     function _resolveCoreContractName(bool _isZKsyncOS, CoreContract _c) private view returns (string memory) {
         // Contracts with different names per VM
-        if (_c == CoreContract.L2NativeTokenVault)
-            return _isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault";
+        if (_c == CoreContract.L2NativeTokenVault) return _isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault";
         if (_c == CoreContract.L2BaseToken) return _isZKsyncOS ? "L2BaseTokenZKOS" : "L2BaseTokenEra";
 
         // Contracts with the same name across both VMs
@@ -480,13 +476,11 @@ library EraZkosRouter {
     // solhint-disable-next-line code-complexity
     function _resolveCTMContractName(bool _isZKsyncOS, CTMContract _c) private view returns (string memory) {
         // Contracts with different names per VM
-        if (_c == CTMContract.ChainTypeManager)
-            return _isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        if (_c == CTMContract.ChainTypeManager) return _isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         if (_c == CTMContract.VerifierFflonk) return _isZKsyncOS ? "ZKsyncOSVerifierFflonk" : "EraVerifierFflonk";
         if (_c == CTMContract.VerifierPlonk) return _isZKsyncOS ? "ZKsyncOSVerifierPlonk" : "EraVerifierPlonk";
         if (_c == CTMContract.DualVerifier) return _isZKsyncOS ? "ZKsyncOSDualVerifier" : "EraDualVerifier";
-        if (_c == CTMContract.TestnetVerifier)
-            return _isZKsyncOS ? "ZKsyncOSTestnetVerifier" : "EraTestnetVerifier";
+        if (_c == CTMContract.TestnetVerifier) return _isZKsyncOS ? "ZKsyncOSTestnetVerifier" : "EraTestnetVerifier";
         if (_c == CTMContract.GatewayCTMDeployerCTM) {
             return _isZKsyncOS ? "GatewayCTMDeployerCTMZKsyncOS" : "GatewayCTMDeployerCTM";
         }

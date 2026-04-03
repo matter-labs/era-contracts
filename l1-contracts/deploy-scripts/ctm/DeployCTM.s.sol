@@ -503,19 +503,13 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
                 config.isZKsyncOS,
                 CoreContract.UpgradeableBeaconDeployer
             ),
-            baseTokenHolderBytecodeInfo: EraZkosRouter.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.BaseTokenHolder
-            ),
+            baseTokenHolderBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.BaseTokenHolder),
             chainAssetHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(
                 config.isZKsyncOS,
                 CoreContract.L2ChainAssetHandler
             ),
             interopCenterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.InteropCenter),
-            interopHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.InteropHandler
-            ),
+            interopHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.InteropHandler),
             assetTrackerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),

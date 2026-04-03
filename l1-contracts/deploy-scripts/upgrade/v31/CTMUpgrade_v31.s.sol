@@ -76,11 +76,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         return deploySimpleContract("SettlementLayerV31Upgrade", false);
     }
 
-    function getForceDeploymentContracts()
-        internal
-        override
-        returns (CoreContract[] memory forceDeploymentContracts)
-    {
+    function getForceDeploymentContracts() internal override returns (CoreContract[] memory forceDeploymentContracts) {
         forceDeploymentContracts = new CoreContract[](1);
         forceDeploymentContracts[0] = CoreContract.L2V31Upgrade;
     }

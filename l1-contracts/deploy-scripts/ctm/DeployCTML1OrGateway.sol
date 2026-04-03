@@ -129,14 +129,11 @@ library DeployCTML1OrGateway {
         ) {
             return CTMContract.TestnetVerifier;
         } else if (
-            compareStrings(_contractName, "EraDualVerifier") ||
-            compareStrings(_contractName, "ZKsyncOSDualVerifier")
+            compareStrings(_contractName, "EraDualVerifier") || compareStrings(_contractName, "ZKsyncOSDualVerifier")
         ) {
             return CTMContract.DualVerifier;
         } else {
-            revert(
-                string.concat("Contract ", _contractName, " not CTM contract, creation calldata could not be set")
-            );
+            revert(string.concat("Contract ", _contractName, " not CTM contract, creation calldata could not be set"));
         }
     }
 

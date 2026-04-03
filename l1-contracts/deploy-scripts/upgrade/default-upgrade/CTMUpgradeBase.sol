@@ -272,11 +272,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         return forceDeploymentContracts;
     }
 
-    function getForceDeploymentContracts()
-        internal
-        virtual
-        returns (CoreContract[] memory forceDeploymentContracts)
-    {
+    function getForceDeploymentContracts() internal virtual returns (CoreContract[] memory forceDeploymentContracts) {
         return new CoreContract[](0);
     }
 
