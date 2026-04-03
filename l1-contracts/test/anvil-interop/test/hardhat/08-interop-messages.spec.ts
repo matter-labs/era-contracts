@@ -4,7 +4,13 @@ import { ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { getChainIdsByRole, getL2Chain } from "../../src/core/utils";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
-import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_RECIPIENT_ADDR, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
+import {
+  ANVIL_DEFAULT_ACCOUNT_ADDR,
+  ANVIL_RECIPIENT_ADDR,
+  ETH_TOKEN_ADDRESS,
+  L1_CHAIN_ID,
+  L2_ASSET_ROUTER_ADDR,
+} from "../../src/core/const";
 import {
   sendInteropMessage,
   executeBundle,
@@ -62,6 +68,12 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
   let nativeErc20SourceChainId: number;
   let bridgedErc20BundleData: string;
   let bridgedErc20SourceChainId: number;
+  let crossBaseTokenBundleData: string;
+  let crossBaseTokenSourceChainId: number;
+
+  // Chain with a custom (non-ETH) base token for cross-base-token tests
+  let customBaseTokenChainId: number | undefined;
+  let customBaseTokenProvider: ethers.providers.JsonRpcProvider | undefined;
 
   // DummyInteropRecipient on dest chain for base token (direct call) messages
   let dummyRecipient: string;
@@ -95,6 +107,17 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     console.log(`   DummyInteropRecipient: ${dummyRecipient}`);
     console.log(`   Source test token: ${sourceTestToken} (chain ${sourceChainId})`);
     console.log(`   Source test token assetId: ${sourceTestTokenAssetId}`);
+
+    // Find a GW-settled chain with a custom (non-ETH) base token for cross-base-token tests
+    const customBaseTokenConfig = state.chains!.config.find(
+      (c) => c.role === "gwSettled" && c.baseToken && c.baseToken !== ETH_TOKEN_ADDRESS
+    );
+    if (customBaseTokenConfig) {
+      customBaseTokenChainId = customBaseTokenConfig.chainId;
+      const customChain = getL2Chain(state.chains!, customBaseTokenChainId);
+      customBaseTokenProvider = new ethers.providers.JsonRpcProvider(customChain.rpcUrl);
+      console.log(`   Custom base token chain: ${customBaseTokenChainId}`);
+    }
   });
 
   // ── Sending messages ──────────────────────────────────────────
@@ -171,11 +194,46 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       console.log(`   Native ERC20 message sent: ${result.txHash}`);
     });
 
-    it.skip("sends base token from a chain with a different base token (skipped: Anvil chains share ETH base token)", function () {
-      // All Anvil test chains use ETH as the base token, so the
-      // isSameBaseToken path is always true. This scenario requires a
-      // chain with a non-ETH base token, which is not configured in the
-      // current Anvil harness.
+    it("sends base token to a chain with a different base token (indirect via AssetRouter)", async function () {
+      // Send ETH (source chain's base token) to a chain with a custom ERC20 base token.
+      // When the destination has a different base token, the sender's base token goes through
+      // the AssetRouter bridging path (indirect call), not as a direct value transfer.
+      // On the receiving chain, ETH arrives as a bridged ERC20.
+      if (!customBaseTokenChainId) {
+        this.skip();
+        return;
+      }
+
+      const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+      const recipient = encodeEvmChainAddress(L2_ASSET_ROUTER_ADDR, customBaseTokenChainId);
+      const payload = getTokenTransferData(ethAssetId, BASE_TOKEN_AMOUNT, ANVIL_RECIPIENT_ADDR);
+      // callValue = BASE_TOKEN_AMOUNT because ETH is the sender's base token (native),
+      // so the AssetRouter receives it via msg.value rather than ERC20 transferFrom.
+      const attributes = [indirectCallAttr(BASE_TOKEN_AMOUNT)];
+      const msgValue = interopFee.add(BASE_TOKEN_AMOUNT);
+
+      const balBefore = await captureSourceBalance(sourceProvider);
+
+      const result = await sendInteropMessage({
+        sourceProvider,
+        recipient,
+        payload,
+        attributes,
+        value: msgValue,
+      });
+
+      expect(result.txHash).to.be.a("string").and.not.equal("");
+      expect(result.interopBundle).to.not.be.null;
+
+      const balAfter = await captureSourceBalance(sourceProvider);
+      const nativeDelta = balBefore.native.sub(balAfter.native);
+      expect(nativeDelta.gte(msgValue), `native balance should decrease by at least ${msgValue}, got ${nativeDelta}`).to
+        .be.true;
+
+      crossBaseTokenBundleData = result.bundleData;
+      crossBaseTokenSourceChainId = sourceChainId;
+
+      console.log(`   Cross-base-token message sent: ${result.txHash}`);
     });
 
     it("sends a bridged ERC20 token message (indirect call via AssetRouter)", async function () {
@@ -303,11 +361,39 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       );
     });
 
-    it.skip("receives a message sending the base token from the sending chain (skipped: Anvil chains share ETH base token)", function () {
-      // Corresponds to the "interop1 base token" send test above.
-      // All Anvil chains share ETH as the base token, so the
-      // isSameBaseToken path is always true and this scenario cannot be
-      // exercised.
+    it("receives base token from sending chain as bridged ERC20 (different base token)", async function () {
+      // On the custom-base-token chain, ETH (the sender's base token) arrives as a
+      // bridged ERC20 via the AssetRouter, not as native balance. The NTV deploys a
+      // wrapped representation and the recipient's ERC20 balance increases by the sent amount.
+      if (!crossBaseTokenBundleData || !customBaseTokenProvider) {
+        this.skip();
+        return;
+      }
+
+      // ETH's assetId — used to look up the bridged token address on the destination chain
+      const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+
+      const receipt = await executeBundle(
+        customBaseTokenProvider,
+        crossBaseTokenBundleData,
+        crossBaseTokenSourceChainId
+      );
+      expect(receipt.status).to.equal(1);
+
+      // After execution, resolve the bridged ETH token address on the custom-base-token chain
+      const bridgedEthAddr = await getTokenAddressForAsset(customBaseTokenProvider, ethAssetId);
+      expect(bridgedEthAddr).to.not.equal(ethers.constants.AddressZero, "bridged ETH token should be deployed");
+
+      // The recipient (ANVIL_RECIPIENT_ADDR) should have received BASE_TOKEN_AMOUNT as an ERC20 balance
+      const recipientBal = await getTokenBalance(customBaseTokenProvider, bridgedEthAddr, ANVIL_RECIPIENT_ADDR);
+      expect(
+        recipientBal.eq(BASE_TOKEN_AMOUNT),
+        `recipient ERC20 balance should equal ${BASE_TOKEN_AMOUNT}, got ${recipientBal}`
+      ).to.be.true;
+
+      console.log(
+        `   Cross-base-token received: +${ethers.utils.formatEther(recipientBal)} bridged ETH at ${bridgedEthAddr}`
+      );
     });
 
     it("receives a message sending a bridged token", async function () {

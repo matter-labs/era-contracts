@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as zlib from "zlib";
-import { Contract, Wallet, providers } from "ethers";
+import { Contract, ContractFactory, Wallet, providers } from "ethers";
 import type { AnvilManager } from "./daemons/anvil-manager";
 import { ForgeDeployer } from "./deployers/deployer";
 import { ChainRegistry } from "./deployers/chain-registry";
@@ -18,7 +18,7 @@ import type {
   PriorityRequestData,
 } from "./core/types";
 import { getChainIdsByRole, timeIt } from "./core/utils";
-import { getAbi } from "./core/contracts";
+import { getAbi, getCreationBytecode } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./core/const";
 import { deployTestTokens } from "./helpers/deploy-test-token";
 import { registerAndMigrateTestTokens } from "./helpers/token-balance-migration-helper";
@@ -41,6 +41,8 @@ export class DeploymentRunner {
   private stateDir: string;
   private configDir: string;
   private configPath: string;
+  /** Maps chainId → deployed L1 base token address for chains with custom base tokens. */
+  private customBaseTokens: Map<number, string> = new Map();
 
   constructor(baseDir: string = __dirname + "/..") {
     const runSuffix = process.env.ANVIL_INTEROP_RUN_SUFFIX || "";
@@ -133,13 +135,43 @@ export class DeploymentRunner {
   ) {
     return l2Chains.map((l2Chain) => {
       const chainConfig = this.getChainConfigOrThrow(chainConfigsById, l2Chain.chainId);
+      const baseToken = this.customBaseTokens.get(chainConfig.chainId) ?? ETH_TOKEN_ADDRESS;
       return {
         chainId: chainConfig.chainId,
         rpcUrl: l2Chain.rpcUrl,
-        baseToken: ETH_TOKEN_ADDRESS, // TODO(EVM-1297): support non-ETH base tokens
-        validiumMode: false, // TODO(EVM-1297): support validium mode (requires batch settlement)
+        baseToken,
+        validiumMode: false,
       };
     });
+  }
+
+  /**
+   * Deploy custom ERC20 base tokens on L1 for chains that specify `baseToken: "custom"`.
+   * Must be called before chain registration, since the Forge registration script validates
+   * that the base token address is a deployed contract.
+   */
+  private async deployCustomBaseTokens(l1RpcUrl: string, chainConfigs: AnvilChainConfig[]): Promise<void> {
+    const chainsNeedingCustomToken = chainConfigs.filter((c) => c.baseToken === "custom");
+    if (chainsNeedingCustomToken.length === 0) return;
+
+    console.log(`\nDeploying custom base tokens for ${chainsNeedingCustomToken.length} chain(s)...`);
+
+    const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, new providers.JsonRpcProvider(l1RpcUrl));
+    const abi = getAbi("TestnetERC20Token");
+    const bytecode = getCreationBytecode("TestnetERC20Token");
+
+    for (const chainConfig of chainsNeedingCustomToken) {
+      const factory = new ContractFactory(abi, bytecode, wallet);
+      const token = await factory.deploy(`BaseToken${chainConfig.chainId}`, `BT${chainConfig.chainId}`, 18);
+      await token.deployed();
+      this.customBaseTokens.set(chainConfig.chainId, token.address);
+      console.log(`  Chain ${chainConfig.chainId} base token deployed at ${token.address}`);
+    }
+
+    // Persist to state so tests can look up custom base token addresses
+    const state = this.loadState();
+    state.customBaseTokens = Object.fromEntries(this.customBaseTokens);
+    this.saveState(state);
   }
 
   private getGatewayChainOrThrow(gatewayChainId: number, l2Chains: L2ChainInfo[]): L2ChainInfo {
@@ -388,7 +420,7 @@ export class DeploymentRunner {
       throw new Error(`addresses.json not found in ${stateDir}`);
     }
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
-    const { l1Addresses, ctmAddresses, chainAddresses, testTokens } = addresses;
+    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, customBaseTokens } = addresses;
 
     // Decompress hex-gzip state files to native JSON for --load-state CLI.
     // This is more portable than anvil_loadState RPC across anvil versions.
@@ -442,6 +474,9 @@ export class DeploymentRunner {
     state.chainAddresses = chainAddresses;
     if (testTokens) {
       state.testTokens = testTokens;
+    }
+    if (customBaseTokens) {
+      state.customBaseTokens = customBaseTokens;
     }
     this.saveState(state);
 
@@ -522,6 +557,9 @@ export class DeploymentRunner {
 
     // Step 2: Deploy L1 contracts
     const { l1Addresses, ctmAddresses } = await this.step2DeployL1(chains.l1.rpcUrl);
+
+    // Deploy custom ERC20 base tokens on L1 (before chain registration needs them)
+    await this.deployCustomBaseTokens(chains.l1.rpcUrl, config.chains);
 
     // Step 3+4: Register & initialize all L2 chains
     const { chainAddresses } = await this.step3And4RegisterAndInitChains(
