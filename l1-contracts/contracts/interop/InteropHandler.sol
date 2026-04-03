@@ -11,7 +11,8 @@ import {
     L2_NATIVE_TOKEN_VAULT,
     L2_MESSAGE_VERIFICATION,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
-    L2_COMPLEX_UPGRADER_ADDR
+    L2_COMPLEX_UPGRADER_ADDR,
+    L2_SHADOW_ACCOUNT_FACTORY
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {
@@ -295,12 +296,23 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
                 // Transfer base tokens from the BaseTokenHolder instead of minting.
                 L2_BASE_TOKEN_HOLDER.give(address(this), interopCall.value, _sourceChainId);
             }
+            // Determine the actual recipient of the receiveMessage call.
+            // When shadowAccount is true, route through the sender's ShadowAccount
+            // (deploying it if it doesn't exist yet) instead of calling interopCall.to directly.
+            bytes memory senderAddress = InteroperableAddress.formatEvmV1(_sourceChainId, interopCall.from);
+            address recipient;
+            if (interopCall.shadowAccount) {
+                recipient = L2_SHADOW_ACCOUNT_FACTORY.getOrDeployShadowAccount(senderAddress);
+            } else {
+                recipient = interopCall.to;
+            }
+
             // slither-disable-next-line arbitrary-send-eth
-            bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({
+            bytes4 selector = IERC7786Recipient(recipient).receiveMessage{value: interopCall.value}({
                 receiveId: keccak256(abi.encodePacked(_bundleHash, i)),
-                sender: InteroperableAddress.formatEvmV1(_sourceChainId, interopCall.from),
+                sender: senderAddress,
                 payload: interopCall.data
-            }); // attributes are not supported yet
+            });
             require(selector == IERC7786Recipient.receiveMessage.selector, InvalidSelector(selector));
 
             // Notify GWAssetTracker of this successfully executed call so it can move the call's balances

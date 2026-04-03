@@ -51,3 +51,11 @@ error WrongDestinationChainId(bytes32 bundleHash, uint256 expected, uint256 actu
 error WrongSourceChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
 // 0x92196069
 error ZKTokenNotAvailable();
+
+/// Shadow Account errors
+error ShadowAccountAlreadyInitialized();
+error ShadowAccountOnlyFactory();
+error ShadowAccountOnlyInteropHandler();
+error ShadowAccountOnlyOwner();
+error ShadowAccountCallFailed(uint256 callIndex);
+error ShadowAccountWithIndirectCall();

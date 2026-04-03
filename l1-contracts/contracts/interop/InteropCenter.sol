@@ -47,6 +47,7 @@ import {
     InteroperableAddressChainReferenceNotEmpty,
     InteroperableAddressNotEmpty,
     FeeWithdrawalFailed,
+    ShadowAccountWithIndirectCall,
     ZKTokenNotAvailable
 } from "./InteropErrors.sol";
 
@@ -550,7 +551,7 @@ contract InteropCenter is
         } else {
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
-                shadowAccount: false,
+                shadowAccount: _callStarter.callAttributes.shadowAccount,
                 to: recipientAddress,
                 data: _callStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
@@ -655,10 +656,22 @@ contract InteropCenter is
                 // Decode the boolean parameter using AttributesDecoder
                 bool useFixed = AttributesDecoder.decodeBool(_attributes[i]);
                 bundleAttributes.useFixedFee = useFixed;
+            } else if (selector == IERC7786Attributes.shadowAccount.selector) {
+                require(!attributeUsed[5], AttributeAlreadySet(selector));
+                require(
+                    _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
+                );
+                attributeUsed[5] = true;
+                callAttributes.shadowAccount = AttributesDecoder.decodeBool(_attributes[i]);
             } else {
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
         }
+
+        // shadowAccount and indirectCall are mutually exclusive.
+        require(!(callAttributes.shadowAccount && callAttributes.indirectCall), ShadowAccountWithIndirectCall());
     }
 
     /// @notice Checks if the attribute selector is supported by the InteropCenter.
@@ -684,7 +697,8 @@ contract InteropCenter is
                 IERC7786Attributes.indirectCall.selector,
                 IERC7786Attributes.executionAddress.selector,
                 IERC7786Attributes.unbundlerAddress.selector,
-                IERC7786Attributes.useFixedFee.selector
+                IERC7786Attributes.useFixedFee.selector,
+                IERC7786Attributes.shadowAccount.selector
             ];
     }
 
