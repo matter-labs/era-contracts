@@ -56,8 +56,20 @@ impl CommandEnvelope {
     }
 
     pub fn write_to_file(&self, path: &std::path::Path) -> anyhow::Result<()> {
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                std::fs::create_dir_all(parent).map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to create output directory '{}': {e}",
+                        parent.display()
+                    )
+                })?;
+            }
+        }
         let json = serde_json::to_string_pretty(self)?;
-        std::fs::write(path, json)?;
+        std::fs::write(path, &json).map_err(|e| {
+            anyhow::anyhow!("Failed to write output file '{}': {e}", path.display())
+        })?;
         Ok(())
     }
 }

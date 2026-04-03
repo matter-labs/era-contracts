@@ -149,8 +149,8 @@ fn run_pause_deposits(
 // ─── Step 2: Migrate ─────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
-struct VotePreparationOutput {
-    diamond_cut_data: String,
+pub struct VotePreparationOutput {
+    pub diamond_cut_data: String,
 }
 
 fn run_migrate(
