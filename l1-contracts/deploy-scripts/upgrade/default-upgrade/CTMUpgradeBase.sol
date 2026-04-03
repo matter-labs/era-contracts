@@ -52,7 +52,11 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         return ProposedUpgradeLib.emptyL2CanonicalTransaction();
     }
 
-    /// @notice Get L2 upgrade target and data
+    /// @notice Get L2 upgrade target and data.
+    /// @dev From V32 onwards, both Era and ZKsyncOS should use forceDeployAndUpgradeUniversal
+    /// (via L2_COMPLEX_UPGRADER_ADDR) since it supports both chain types via ContractUpgradeType.
+    /// The Era branch below uses forceDeployOnAddresses only because V31 Era chains do not yet
+    /// have forceDeployAndUpgradeUniversal deployed.
     function getL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual returns (address, bytes memory) {
