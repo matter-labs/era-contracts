@@ -27,12 +27,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
-import {
-    CTMDeployedAddresses,
-    StateTransitionContracts,
-    StateTransitionDeployedAddresses,
-    Verifiers
-} from "../utils/Types.sol";
+import {CTMDeployedAddresses, StateTransitionDeployedAddresses} from "../utils/Types.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 
 import {
@@ -241,30 +236,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
     function _saveExpectedGatewayContractsToOutput(DeployedContracts memory expectedGatewayContracts) internal {
         output = GatewayCTMOutput({
-            gatewayStateTransition: StateTransitionDeployedAddresses({
-                proxies: StateTransitionContracts({
-                    chainTypeManager: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
-                    serverNotifier: expectedGatewayContracts.stateTransition.serverNotifierProxy,
-                    validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockProxy,
-                    bytecodesSupplier: address(0),
-                    permissionlessValidator: address(0)
-                }),
-                implementations: StateTransitionContracts({
-                    chainTypeManager: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
-                    serverNotifier: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
-                    validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelockImplementation,
-                    bytecodesSupplier: address(0),
-                    permissionlessValidator: address(0)
-                }),
-                verifiers: expectedGatewayContracts.stateTransition.verifiers,
-                facets: expectedGatewayContracts.stateTransition.facets,
-                genesisUpgrade: expectedGatewayContracts.stateTransition.genesisUpgrade,
-                defaultUpgrade: address(0),
-                legacyValidatorTimelock: address(0),
-                eraDiamondProxy: address(0),
-                rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager,
-                rollupSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator
-            }),
+            gatewayStateTransition: expectedGatewayContracts.stateTransition,
             multicall3: expectedGatewayContracts.multicall3,
             diamondCutData: expectedGatewayContracts.diamondCutData,
             relayedSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator,

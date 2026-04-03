@@ -14,8 +14,10 @@ import {
     StateTransitionDeployedAddresses,
     ChainCreationParamsConfig,
     StateTransitionDeployedAddresses,
-    ZkChainAddresses
+    ZkChainAddresses,
+    L1SpecificStateTransitionAddresses
 } from "../../utils/Types.sol";
+import {DAContracts} from "contracts/common/StateTransitionTypes.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -72,6 +74,8 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     // solhint-disable-next-line gas-struct-packing
     struct Gateway {
         StateTransitionDeployedAddresses gatewayStateTransition;
+        L1SpecificStateTransitionAddresses gatewayL1Specific;
+        DAContracts gatewayDA;
         address gatewayTransparentProxyAdmin;
         bytes facetCutsData;
         uint256 chainId;
@@ -550,14 +554,14 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
             RollupDAManager.updateDAPair,
-            (gatewayConfig.gatewayStateTransition.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
+            (gatewayConfig.gatewayDA.relayedSLDAValidator, getRollupL2DACommitmentScheme(), true)
         );
 
         calls = _prepareL1ToGatewayCall(
             l2Calldata,
             l2GasLimit,
             l1GasPrice,
-            gatewayConfig.gatewayStateTransition.rollupDAManager
+            gatewayConfig.gatewayDA.rollupDAManager
         );
     }
 
@@ -606,12 +610,12 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         vm.serializeAddress(
             "gateway_state_transition",
             "rollup_da_manager",
-            gatewayConfig.gatewayStateTransition.rollupDAManager
+            gatewayConfig.gatewayDA.rollupDAManager
         );
         vm.serializeAddress(
             "gateway_state_transition",
             "rollup_l2_da_validator",
-            gatewayConfig.gatewayStateTransition.rollupSLDAValidator
+            gatewayConfig.gatewayDA.relayedSLDAValidator
         );
         vm.serializeAddress(
             "gateway_state_transition",

@@ -15,7 +15,7 @@ import {
 import {EraZkosContract, EraZkosRouter, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
+import {ChainCreationParamsConfig, CTMDeployedAddresses, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -157,33 +157,33 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         }
     }
 
-    /// @notice Generate upgrade cut data
+    /// @notice Generate upgrade cut data.
     function generateUpgradeCutData(
-        StateTransitionDeployedAddresses memory stateTransition,
-        ChainCreationParamsConfig memory chainCreationParams,
-        uint256 l1ChainId,
-        address ownerAddress,
+        StateTransitionDeployedAddresses memory _stateTransition,
+        ChainCreationParamsConfig memory _chainCreationParams,
+        uint256 _l1ChainId,
+        address _ownerAddress,
         PublishFactoryDepsResult memory _factoryDepsResult,
-        address registeredChainIdDiamondProxy
+        address _registeredChainIdDiamondProxy
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
-        Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion(registeredChainIdDiamondProxy);
+        Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion(_registeredChainIdDiamondProxy);
 
         Diamond.FacetCut[] memory facetCuts;
-        facetCuts = getChainCreationFacetCuts(stateTransition);
+        facetCuts = getChainCreationFacetCuts(_stateTransition);
         facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
-        uint256 nonce = getProtocolUpgradeNonce(chainCreationParams.latestProtocolVersion);
+        uint256 nonce = getProtocolUpgradeNonce(_chainCreationParams.latestProtocolVersion);
         ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(
-            stateTransition,
-            chainCreationParams,
-            l1ChainId,
-            ownerAddress,
+            _stateTransition,
+            _chainCreationParams,
+            _l1ChainId,
+            _ownerAddress,
             _factoryDepsResult,
             nonce
         );
 
         upgradeCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: stateTransition.defaultUpgrade,
+            initAddress: _stateTransition.defaultUpgrade,
             initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
         });
     }

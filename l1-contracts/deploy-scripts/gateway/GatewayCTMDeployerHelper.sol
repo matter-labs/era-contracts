@@ -25,10 +25,11 @@ import {
 
 import {L1L2DeployPrepareResult, EraZkosContract, EraZkosRouter} from "../utils/EraZkosRouter.sol";
 
+import {Facets, Verifiers} from "contracts/common/StateTransitionTypes.sol";
+
+import {DAContracts} from "contracts/common/StateTransitionTypes.sol";
 import {
     DeployedContracts,
-    DAContracts,
-    Facets,
     GatewayCTMDeployerConfig,
     GatewayDADeployerConfig,
     GatewayProxyAdminDeployerConfig,
@@ -36,7 +37,6 @@ import {
     GatewayValidatorTimelockDeployerConfig,
     GatewayValidatorTimelockDeployerResult,
     GatewayVerifiersDeployerConfig,
-    Verifiers,
     GatewayCTMFinalConfig,
     GatewayCTMFinalResult
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
@@ -744,9 +744,9 @@ library GatewayCTMDeployerHelper {
         contracts.stateTransition.chainTypeManagerProxyAdmin = proxyAdminResult.chainTypeManagerProxyAdmin;
 
         // From ValidatorTimelock deployer
-        contracts.stateTransition.validatorTimelockImplementation = validatorTimelockResult
+        contracts.stateTransition.implementations.validatorTimelock = validatorTimelockResult
             .validatorTimelockImplementation;
-        contracts.stateTransition.validatorTimelockProxy = validatorTimelockResult.validatorTimelockProxy;
+        contracts.stateTransition.proxies.validatorTimelock = validatorTimelockResult.validatorTimelockProxy;
 
         // From Verifiers deployer
         contracts.stateTransition.verifiers = verifiersResult;
@@ -757,10 +757,10 @@ library GatewayCTMDeployerHelper {
         contracts.multicall3 = directAddresses.multicall3;
 
         // From CTM deployer
-        contracts.stateTransition.serverNotifierImplementation = ctmResult.serverNotifierImplementation;
-        contracts.stateTransition.serverNotifierProxy = ctmResult.serverNotifierProxy;
-        contracts.stateTransition.chainTypeManagerImplementation = ctmResult.chainTypeManagerImplementation;
-        contracts.stateTransition.chainTypeManagerProxy = ctmResult.chainTypeManagerProxy;
+        contracts.stateTransition.implementations.serverNotifier = ctmResult.serverNotifierImplementation;
+        contracts.stateTransition.proxies.serverNotifier = ctmResult.serverNotifierProxy;
+        contracts.stateTransition.implementations.chainTypeManager = ctmResult.chainTypeManagerImplementation;
+        contracts.stateTransition.proxies.chainTypeManager = ctmResult.chainTypeManagerProxy;
         contracts.diamondCutData = ctmResult.diamondCutData;
     }
 

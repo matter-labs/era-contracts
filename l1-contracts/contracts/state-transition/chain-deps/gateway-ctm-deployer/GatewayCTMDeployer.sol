@@ -2,28 +2,16 @@
 
 pragma solidity 0.8.28;
 
+import {
+    Facets,
+    Verifiers,
+    DAContracts,
+    StateTransitionDeployedAddresses
+} from "contracts/common/StateTransitionTypes.sol";
+
 // This file contains the structs used by the Gateway CTM Deployer contracts.
 // The deployment uses a mix of deployer contracts (for contracts requiring owner initialization)
 // and direct deployments in scripts (for contracts without owner initialization).
-
-/// @notice Diamond facet contract addresses.
-// solhint-disable-next-line gas-struct-packing
-struct Facets {
-    /// @notice Address of the Admin facet contract.
-    address adminFacet;
-    /// @notice Address of the Mailbox facet contract.
-    address mailboxFacet;
-    /// @notice Address of the Executor facet contract.
-    address executorFacet;
-    /// @notice Address of the Getters facet contract.
-    address gettersFacet;
-    /// @notice Address of the Migrator facet contract.
-    address migratorFacet;
-    /// @notice Address of the Committer facet contract.
-    address committerFacet;
-    /// @notice Address of the DiamondInit contract.
-    address diamondInit;
-}
 
 /// @notice Configuration parameters for deploying Gateway CTM.
 /// @dev This is the full config used to derive configs for each deployer.
@@ -71,48 +59,12 @@ struct GatewayCTMDeployerConfig {
     uint256 protocolVersion;
 }
 
-/// @notice Addresses of state transition related contracts.
-// solhint-disable-next-line gas-struct-packing
-struct StateTransitionContracts {
-    /// @notice Address of the ChainTypeManager proxy contract.
-    address chainTypeManagerProxy;
-    /// @notice Address of the ChainTypeManager implementation contract.
-    address chainTypeManagerImplementation;
-    /// @notice Verifier contracts (Verifier, VerifierPlonk, VerifierFflonk).
-    Verifiers verifiers;
-    /// @notice Diamond facet contract addresses.
-    Facets facets;
-    /// @notice Address of the GenesisUpgrade contract.
-    address genesisUpgrade;
-    /// @notice Address of the implementation of the ValidatorTimelock contract.
-    address validatorTimelockImplementation;
-    /// @notice Address of the ValidatorTimelock proxy contract.
-    address validatorTimelockProxy;
-    /// @notice Address of the ProxyAdmin for ChainTypeManager.
-    address chainTypeManagerProxyAdmin;
-    /// @notice Address of the ServerNotifier proxy contract.
-    address serverNotifierProxy;
-    /// @notice Address of the ServerNotifier implementation contract.
-    address serverNotifierImplementation;
-}
-
-/// @notice Addresses of Data Availability (DA) related contracts.
-// solhint-disable-next-line gas-struct-packing
-struct DAContracts {
-    /// @notice Address of the RollupDAManager contract.
-    address rollupDAManager;
-    /// @notice Address of the RelayedSLDAValidator contract.
-    address relayedSLDAValidator;
-    /// @notice Address of the ValidiumL1DAValidator contract.
-    address validiumDAValidator;
-}
-
 /// @notice Collection of all deployed contracts by the Gateway CTM Deployers.
 struct DeployedContracts {
     /// @notice Address of the Multicall3 contract.
     address multicall3;
     /// @notice Struct containing state transition related contracts.
-    StateTransitionContracts stateTransition;
+    StateTransitionDeployedAddresses stateTransition;
     /// @notice Struct containing Data Availability related contracts.
     DAContracts daContracts;
     /// @notice Encoded data for the diamond cut operation.
@@ -183,17 +135,6 @@ struct GatewayVerifiersDeployerConfig {
     bool testnetVerifier;
     /// @notice Flag indicating whether to use ZKsync OS mode.
     bool isZKsyncOS;
-}
-
-/// @notice Result from Verifiers deployer.
-// solhint-disable-next-line gas-struct-packing
-struct Verifiers {
-    /// @notice Address of the VerifierFflonk contract.
-    address verifierFflonk;
-    /// @notice Address of the VerifierPlonk contract.
-    address verifierPlonk;
-    /// @notice Address of the main Verifier contract.
-    address verifier;
 }
 
 // ============ CTM Deployer ============

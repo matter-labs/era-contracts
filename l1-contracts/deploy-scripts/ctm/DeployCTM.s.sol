@@ -240,7 +240,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function deployDAValidators() internal {
-        ctmAddresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner(
+        ctmAddresses.daAddresses.daContracts.rollupDAManager = deployWithCreate2AndOwner(
             "RollupDAManager",
             getDeployerAddress(),
             false
@@ -256,7 +256,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             );
         }
 
-        ctmAddresses.daAddresses.noDAValidiumL1DAValidator = deploySimpleContract("ValidiumL1DAValidator", false);
+        ctmAddresses.daAddresses.daContracts.validiumDAValidator = deploySimpleContract("ValidiumL1DAValidator", false);
 
         if (config.contracts.availL1DAValidator == address(0)) {
             ctmAddresses.daAddresses.availBridge = deploySimpleContract("DummyAvailBridge", false);
@@ -265,7 +265,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
         vm.startBroadcast(getDeployerAddress());
-        IRollupDAManager rollupDAManager = IRollupDAManager(ctmAddresses.daAddresses.rollupDAManager);
+        IRollupDAManager rollupDAManager = IRollupDAManager(ctmAddresses.daAddresses.daContracts.rollupDAManager);
         rollupDAManager.updateDAPair(
             ctmAddresses.daAddresses.l1RollupDAValidator,
             getRollupL2DACommitmentScheme(),
@@ -282,7 +282,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function updateRollupDAManager() internal virtual {
-        IOwnable rollupDAManager = IOwnable(ctmAddresses.daAddresses.rollupDAManager);
+        IOwnable rollupDAManager = IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager);
         address deployer = getDeployerAddress();
         if (rollupDAManager.owner() != deployer) {
             if (rollupDAManager.pendingOwner() == deployer) {
@@ -305,7 +305,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ctm.setPendingAdmin(ctmAddresses.chainAdmin);
 
         IOwnable(ctmAddresses.stateTransition.proxies.serverNotifier).transferOwnership(ctmAddresses.chainAdmin);
-        IOwnable(ctmAddresses.daAddresses.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
+        IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
 
         // Called as library (not through vms) to preserve msg.sender
         EraZkosVerifierLifecycle.transferVerifierOwnership(
@@ -314,7 +314,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             config.isZKsyncOS
         );
 
-        IOwnable(ctmAddresses.daAddresses.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
+        IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
         vm.stopBroadcast();
         console.log("Owners updated");
     }
@@ -382,7 +382,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "validator_timelock_addr",
             ctmAddresses.stateTransition.proxies.validatorTimelock
         );
-        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", ctmAddresses.daAddresses.rollupDAManager);
+        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", ctmAddresses.daAddresses.daContracts.rollupDAManager);
         vm.serializeAddress(
             "deployed_addresses",
             "rollup_l1_da_validator_addr",
@@ -391,7 +391,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.serializeAddress(
             "deployed_addresses",
             "no_da_validium_l1_validator_addr",
-            ctmAddresses.daAddresses.noDAValidiumL1DAValidator
+            ctmAddresses.daAddresses.daContracts.validiumDAValidator
         );
         if (config.isZKsyncOS) {
             vm.serializeAddress(

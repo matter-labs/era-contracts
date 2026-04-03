@@ -47,7 +47,8 @@ import {
     BridgeContracts,
     CTMDeployedAddresses,
     CTMAdminAddresses,
-    DataAvailabilityDeployedAddresses
+    DataAvailabilityDeployedAddresses,
+    L1SpecificStateTransitionAddresses
 } from "./Types.sol";
 import {EraZkosVerifierLifecycle} from "./vm/EraZkosVerifierLifecycle.sol";
 
@@ -269,11 +270,11 @@ library AddressIntrospector {
             verifiers: Verifiers({verifier: verifier, verifierFflonk: verifierFflonk, verifierPlonk: verifierPlonk}),
             facets: facets,
             genesisUpgrade: ctm.l1GenesisUpgrade(),
-            defaultUpgrade: address(0),
+            chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr)
+        });
+        info.l1Specific = L1SpecificStateTransitionAddresses({
             legacyValidatorTimelock: ctm.validatorTimelock(),
-            eraDiamondProxy: address(0),
-            rollupDAManager: address(0),
-            rollupSLDAValidator: address(0)
+            eraDiamondProxy: address(0)
         });
         info.admin = CTMAdminAddresses({
             transparentProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr),

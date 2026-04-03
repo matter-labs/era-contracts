@@ -12,7 +12,8 @@ import {IVerifierV2} from "../../chain-interfaces/IVerifierV2.sol";
 
 import {WrongCTMDeployerVariant} from "../../../common/L1ContractErrors.sol";
 
-import {GatewayVerifiersDeployerConfig, Verifiers} from "./GatewayCTMDeployer.sol";
+import {Verifiers} from "contracts/common/StateTransitionTypes.sol";
+import {GatewayVerifiersDeployerConfig} from "./GatewayCTMDeployer.sol";
 
 /// @title GatewayCTMDeployerVerifiersZKsyncOS
 /// @author Matter Labs

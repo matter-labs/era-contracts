@@ -384,7 +384,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 l1ChainId: _config.l1ChainId,
                 bridgehubProxy: coreAddresses.bridgehub.proxies.bridgehub,
                 interopCenterProxy: L2_INTEROP_CENTER_ADDR,
-                rollupDAManager: ctmAddresses.daAddresses.rollupDAManager,
+                rollupDAManager: ctmAddresses.daAddresses.daContracts.rollupDAManager,
                 chainAssetHandler: coreAddresses.bridgehub.proxies.chainAssetHandler,
                 l1BytecodesSupplier: ctmAddresses.stateTransition.proxies.bytecodesSupplier,
                 eip7702Checker: ctmAddresses.admin.eip7702Checker,
