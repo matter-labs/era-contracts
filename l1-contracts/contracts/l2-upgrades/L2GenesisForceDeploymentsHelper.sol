@@ -312,9 +312,11 @@ library L2GenesisForceDeploymentsHelper {
             );
         }
 
-        // For new chains, there is no legacy shared bridge. For existing chains,
-        // use the L1-provided value instead of reading circularly from the L2 AssetRouter.
-        address l2LegacySharedBridge = _additionalForceDeploymentsData.l2LegacySharedBridge;
+        // For new chains, there is no legacy shared bridge, but for already existing ones
+        // we can query it from the current AssetRouter deployment.
+        address l2LegacySharedBridge = _isGenesisUpgrade
+            ? address(0)
+            : address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
 
         if (!_isGenesisUpgrade) {
             conductContractUpgrade(
@@ -352,14 +354,14 @@ library L2GenesisForceDeploymentsHelper {
         bool _isGenesisUpgrade
     ) private {
         // For genesis, these values are zero (will be set during initL2).
-        // For non-genesis upgrades, use the L1-provided values from the deployment data
-        // instead of reading circularly from the L2 NTV contract.
+        // For non-genesis upgrades, read from the already-deployed L2 contracts
+        // since these values are already set on L2.
         address predeployedL2WethAddress = _isGenesisUpgrade
             ? address(0)
-            : _additionalForceDeploymentsData.predeployedL2WethAddress;
+            : L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN();
         bytes32 previousL2TokenProxyBytecodeHash = _isGenesisUpgrade
             ? bytes32(0)
-            : _fixedForceDeploymentsData.l2TokenProxyBytecodeHash;
+            : L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).L2_TOKEN_PROXY_BYTECODE_HASH();
 
         address wrappedBaseTokenAddress = _ensureWethToken({
             _predeployedWethToken: predeployedL2WethAddress,
@@ -403,11 +405,12 @@ library L2GenesisForceDeploymentsHelper {
                 _additionalForceDeploymentsData.baseTokenMetadata
             );
         } else {
+            address l2LegacySharedBridge = address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
             // solhint-disable-next-line func-named-parameters
             L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateL2(
                 _fixedForceDeploymentsData.l1ChainId,
                 previousL2TokenProxyBytecodeHash,
-                _additionalForceDeploymentsData.l2LegacySharedBridge,
+                l2LegacySharedBridge,
                 wrappedBaseTokenAddress,
                 _additionalForceDeploymentsData.baseTokenBridgingData,
                 _additionalForceDeploymentsData.baseTokenMetadata
