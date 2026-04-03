@@ -22,7 +22,9 @@ import {
   L2_CONTRACT_DEPLOYER_ADDR,
   L2_FORCE_DEPLOYER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
+  L2_INTEROP_ROOT_STORAGE_ADDR,
   L2_MESSAGE_ROOT_ADDR,
+  L2_MESSAGE_VERIFICATION_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
   L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
   L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
@@ -806,6 +808,8 @@ const ADDRESS_TO_CONTRACT: ReadonlyMap<string, ContractName> = new Map<string, C
   [L2_BASE_TOKEN_HOLDER_ADDR.toLowerCase(), "BaseTokenHolder"],
   [L2_WRAPPED_BASE_TOKEN_IMPL_ADDR.toLowerCase(), "L2WrappedBaseToken"],
   [GW_ASSET_TRACKER_ADDR.toLowerCase(), "GWAssetTracker"],
+  [L2_MESSAGE_VERIFICATION_ADDR.toLowerCase(), "L2MessageVerification"],
+  [L2_INTEROP_ROOT_STORAGE_ADDR.toLowerCase(), "L2InteropRootStorage"],
 ]);
 
 function selectUpgradeChains(

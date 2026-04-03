@@ -60,6 +60,8 @@ const ARTIFACTS = {
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
   TestnetERC20Token: "TestnetERC20Token.sol/TestnetERC20Token.json",
+  L2MessageVerification: "L2MessageVerification.sol/L2MessageVerification.json",
+  L2InteropRootStorage: "L2InteropRootStorage.sol/L2InteropRootStorage.json",
   L2V31Upgrade: "L2V31Upgrade.sol/L2V31Upgrade.json",
   UpgradeableBeaconDeployer: "UpgradeableBeaconDeployer.sol/UpgradeableBeaconDeployer.json",
 } as const;
