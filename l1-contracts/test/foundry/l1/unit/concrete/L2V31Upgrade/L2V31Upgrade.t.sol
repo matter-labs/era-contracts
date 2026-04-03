@@ -30,9 +30,15 @@ import {
     ZKChainSpecificForceDeploymentsData
 } from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
-/// @dev A mock that accepts any call (used for contracts where we don't verify behavior).
+/// @dev A mock that accepts any call and returns 32 zero bytes (used for contracts where
+/// we don't verify behavior but callers decode return data).
 contract MockAcceptAll {
-    fallback() external payable {}
+    fallback() external payable {
+        assembly {
+            mstore(0x00, 0)
+            return(0x00, 0x20)
+        }
+    }
 }
 
 /// @dev Mock NTV that records updateL2 calls for verification.
