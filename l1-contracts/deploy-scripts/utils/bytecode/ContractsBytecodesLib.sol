@@ -5,7 +5,19 @@ import {BytecodeUtils as Utils} from "./BytecodeUtils.s.sol";
 
 /// @title ContractsBytecodesLib
 /// @notice Library providing functions to read bytecodes of L2 contracts individually.
+///         Handles special-case filename/contract-name mismatches (e.g. Admin.sol → AdminFacet).
 library ContractsBytecodesLib {
+    /// @notice Get L2 deployed bytecode for factory deps.
+    ///         ZKsyncOS: EVM deployed bytecode from out/.
+    ///         Era: ZK creation code from zkout/.
+    function getL2DeployedBytecode(
+        string memory _contractName,
+        bool _isZKsyncOS
+    ) internal view returns (bytes memory) {
+        string memory fileName = string.concat(_contractName, ".sol");
+        return Utils.readDeployedBytecodeL1(_isZKsyncOS, fileName, _contractName);
+    }
+
     /// @notice Reads the bytecode of the specified contract using a unique identifier.
     /// @param contractIdentifier A unique string identifying the contract and its source.
     /// Examples: "Bridgehub" (L1 generic), "SystemTransparentUpgradeableProxy" (System contract),
@@ -47,23 +59,23 @@ library ContractsBytecodesLib {
 
         // Special cases: contracts where filename differs from contract name
         if (Utils.compareStrings(contractIdentifier, "AdminFacet")) {
-            return Utils.readFoundryBytecodeL1("Admin.sol", "AdminFacet");
+            return Utils.readBytecodeL1(true, "Admin.sol", "AdminFacet");
         } else if (Utils.compareStrings(contractIdentifier, "MailboxFacet")) {
-            return Utils.readFoundryBytecodeL1("Mailbox.sol", "MailboxFacet");
+            return Utils.readBytecodeL1(true, "Mailbox.sol", "MailboxFacet");
         } else if (Utils.compareStrings(contractIdentifier, "ExecutorFacet")) {
-            return Utils.readFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
+            return Utils.readBytecodeL1(true, "Executor.sol", "ExecutorFacet");
         } else if (Utils.compareStrings(contractIdentifier, "GettersFacet")) {
-            return Utils.readFoundryBytecodeL1("Getters.sol", "GettersFacet");
+            return Utils.readBytecodeL1(true, "Getters.sol", "GettersFacet");
         } else if (Utils.compareStrings(contractIdentifier, "MigratorFacet")) {
-            return Utils.readFoundryBytecodeL1("Migrator.sol", "MigratorFacet");
+            return Utils.readBytecodeL1(true, "Migrator.sol", "MigratorFacet");
         } else if (Utils.compareStrings(contractIdentifier, "CommitterFacet")) {
-            return Utils.readFoundryBytecodeL1("Committer.sol", "CommitterFacet");
+            return Utils.readBytecodeL1(true, "Committer.sol", "CommitterFacet");
         } else if (Utils.compareStrings(contractIdentifier, "BridgedTokenBeacon")) {
-            return Utils.readFoundryBytecodeL1("UpgradeableBeacon.sol", "UpgradeableBeacon");
+            return Utils.readBytecodeL1(true, "UpgradeableBeacon.sol", "UpgradeableBeacon");
         }
 
         // Default: read from l1-contracts/out/ using standard naming
-        return Utils.readFoundryBytecodeL1(string.concat(contractIdentifier, ".sol"), contractIdentifier);
+        return Utils.readBytecodeL1(true, string.concat(contractIdentifier, ".sol"), contractIdentifier);
     }
 
     function getCreationCodeEra(string memory contractIdentifier) internal view returns (bytes memory) {
@@ -148,24 +160,24 @@ library ContractsBytecodesLib {
         // These L1 contracts do not follow the direct ContractIdentifier.sol mapping.
         if (Utils.compareStrings(contractIdentifier, "AdminFacet")) {
             // Original: Admin.sol
-            return Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
+            return Utils.readBytecodeL1(false, "Admin.sol", "AdminFacet");
         } else if (Utils.compareStrings(contractIdentifier, "MailboxFacet")) {
             // Original: Mailbox.sol
-            return Utils.readZKFoundryBytecodeL1("Mailbox.sol", "MailboxFacet");
+            return Utils.readBytecodeL1(false, "Mailbox.sol", "MailboxFacet");
         } else if (Utils.compareStrings(contractIdentifier, "ExecutorFacet")) {
             // Original: Executor.sol
-            return Utils.readZKFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
+            return Utils.readBytecodeL1(false, "Executor.sol", "ExecutorFacet");
         } else if (Utils.compareStrings(contractIdentifier, "GettersFacet")) {
             // Original: Getters.sol
-            return Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
+            return Utils.readBytecodeL1(false, "Getters.sol", "GettersFacet");
         } else if (Utils.compareStrings(contractIdentifier, "EraVerifierFflonk")) {
-            return Utils.readZKFoundryBytecodeL1("EraVerifierFflonk.sol", "EraVerifierFflonk");
+            return Utils.readBytecodeL1(false, "EraVerifierFflonk.sol", "EraVerifierFflonk");
         } else if (Utils.compareStrings(contractIdentifier, "EraVerifierPlonk")) {
-            return Utils.readZKFoundryBytecodeL1("EraVerifierPlonk.sol", "EraVerifierPlonk");
+            return Utils.readBytecodeL1(false, "EraVerifierPlonk.sol", "EraVerifierPlonk");
         } else if (Utils.compareStrings(contractIdentifier, "ZKsyncOSVerifierFflonk")) {
-            return Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierFflonk.sol", "ZKsyncOSVerifierFflonk");
+            return Utils.readBytecodeL1(false, "ZKsyncOSVerifierFflonk.sol", "ZKsyncOSVerifierFflonk");
         } else if (Utils.compareStrings(contractIdentifier, "ZKsyncOSVerifierPlonk")) {
-            return Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierPlonk.sol", "ZKsyncOSVerifierPlonk");
+            return Utils.readBytecodeL1(false, "ZKsyncOSVerifierPlonk.sol", "ZKsyncOSVerifierPlonk");
         }
 
         // --- General Cases ---
@@ -194,7 +206,7 @@ library ContractsBytecodesLib {
         for (uint i = 0; i < L1_GENERIC_CONTRACT_IDENTIFIERS_LENGTH; i++) {
             if (Utils.compareStrings(L1_GENERIC_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
                 // The contractIdentifier itself is used for both filename and contract name.
-                return Utils.readZKFoundryBytecodeL1(string.concat(contractIdentifier, ".sol"), contractIdentifier);
+                return Utils.readBytecodeL1(false, string.concat(contractIdentifier, ".sol"), contractIdentifier);
             }
         }
 

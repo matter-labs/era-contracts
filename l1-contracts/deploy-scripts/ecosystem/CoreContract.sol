@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 /// @notice Canonical identifier for core L2 contracts that participate in
 ///         force-deployments and factory-dependency publishing.
-///         The enum value is VM-neutral; `EraZkosRouter.resolve` maps it to
+///         The enum value is VM-neutral; `CoreOnGatewayHelper.resolve` maps it to
 ///         the correct Era or ZKsyncOS contract / artifact name.
 enum CoreContract {
     L2Bridgehub,

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Utils} from "../utils/Utils.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
@@ -12,6 +12,7 @@ import {CoreContract} from "./CoreContract.sol";
 /// @title CoreOnGatewayHelper
 /// @notice Resolves CoreContract enum values to VM-specific artifact names
 ///         and provides bytecode / force-deployment helpers for core L2 contracts.
+///         Delegates bytecode reading to ContractsBytecodesLib / BytecodeUtils.
 library CoreOnGatewayHelper {
     // ======================== Name resolution ========================
 
@@ -34,7 +35,7 @@ library CoreOnGatewayHelper {
         if (_isZKsyncOS) {
             return Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
         }
-        return abi.encode(L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1(fileName, contractName)));
+        return abi.encode(BytecodeUtils.hashBytecode(false, ContractsBytecodesLib.getL2Bytecode(contractName, false)));
     }
 
     /// @notice Get a bytecode hash of the deployed bytecode.
@@ -43,10 +44,7 @@ library CoreOnGatewayHelper {
     /// @dev Note, that for ZKsyncOS it is NOT suitable for force deployments as these require bytecode info.
     function getDeployedBytecodeHash(bool _isZKsyncOS, CoreContract _c) internal view returns (bytes32) {
         (string memory fileName, string memory contractName) = resolve(_isZKsyncOS, _c);
-        if (_isZKsyncOS) {
-            return keccak256(Utils.readFoundryDeployedBytecodeL1(fileName, contractName));
-        }
-        return L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1(fileName, contractName));
+        return BytecodeUtils.getDeployedBytecodeHash(_isZKsyncOS, fileName, contractName);
     }
 
     // ======================== Force deployments ========================
@@ -125,11 +123,10 @@ library CoreOnGatewayHelper {
         dependencyBytecodes = new bytes[](_dependencyContracts.length);
 
         for (uint256 i; i < _dependencyContracts.length; i++) {
+            (, string memory contractName) = resolve(_isZKsyncOS, _dependencyContracts[i]);
             if (_isZKsyncOS) {
-                (string memory fileName, string memory contractName) = resolve(_isZKsyncOS, _dependencyContracts[i]);
-                dependencyBytecodes[i] = Utils.readFoundryDeployedBytecodeL1(fileName, contractName);
+                dependencyBytecodes[i] = ContractsBytecodesLib.getL2DeployedBytecode(contractName, true);
             } else {
-                (, string memory contractName) = resolve(false, _dependencyContracts[i]);
                 dependencyBytecodes[i] = ContractsBytecodesLib.getCreationCodeEra(contractName);
             }
         }

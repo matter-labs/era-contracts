@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
+import {BytecodeUtils} from "./bytecode/BytecodeUtils.s.sol";
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
@@ -1017,11 +1018,9 @@ library Utils {
         });
     }
 
-    /**
-     * @dev Returns the bytecode of a given system contract.
-     */
+    /// @dev Returns the bytecode of a given system contract. Delegates to BytecodeUtils.
     function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
-        return readZKFoundryBytecodeSystemContracts(string.concat(filename, ".sol"), filename);
+        return BytecodeUtils.readSystemContractsBytecode(filename);
     }
 
     /**
@@ -1044,56 +1043,24 @@ library Utils {
     /**
      * @dev Returns the bytecode of a given DA contract.
      */
-    function readDAContractBytecode(string memory contractIdentifier) internal view returns (bytes memory) {
-        return
-            readFoundryBytecode(
-                string.concat("/../da-contracts/out/", contractIdentifier, ".sol/", contractIdentifier, ".json")
-            );
+    // ======================== Bytecode reading (delegates to BytecodeUtils) ========================
+
+    function readDAContractBytecode(string memory _contractIdentifier) internal view returns (bytes memory) {
+        return BytecodeUtils.readDAContractBytecode(_contractIdentifier);
     }
 
-    /**
-     * @dev Read foundry bytecodes
-     */
-    function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
-        return _readFoundryArtifact(artifactPath, ".bytecode.object");
-    }
-
-    function readFoundryDeployedBytecode(string memory artifactPath) internal view returns (bytes memory) {
-        return _readFoundryArtifact(artifactPath, ".deployedBytecode.object");
-    }
-
-    function readFoundryBytecodeL1(
-        string memory fileName,
-        string memory contractName
-    ) internal view returns (bytes memory) {
-        string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
-        return readFoundryBytecode(path);
-    }
-
-    function readZKFoundryBytecodeL1(
-        string memory fileName,
-        string memory contractName
-    ) internal view returns (bytes memory) {
-        string memory path = string.concat("/../l1-contracts/zkout/", fileName, "/", contractName, ".json");
-        return readFoundryBytecode(path);
-    }
-
-    function readFoundryDeployedBytecodeL1(
-        string memory fileName,
-        string memory contractName
-    ) internal view returns (bytes memory) {
-        string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
-        return readFoundryDeployedBytecode(path);
+    function readFoundryBytecode(string memory _artifactPath) internal view returns (bytes memory) {
+        return BytecodeUtils.readFoundryBytecode(_artifactPath);
     }
 
     function readZKFoundryBytecodeL2(
-        string memory fileName,
-        string memory contractName
+        string memory _fileName,
+        string memory _contractName
     ) internal view returns (bytes memory) {
-        string memory path = string.concat("/../l2-contracts/zkout/", fileName, "/", contractName, ".json");
-        return readFoundryBytecode(path);
+        return BytecodeUtils.readZKFoundryBytecodeL2(_fileName, _contractName);
     }
 
+    // TODO: migrate to BytecodeUtils
     function readZKFoundryBytecodeSystemContracts(
         string memory fileName,
         string memory contractName
@@ -1500,37 +1467,26 @@ library Utils {
             );
     }
 
-    // ======================== VM-unified bytecode reading ========================
+    // ======================== VM-unified bytecode reading (delegates to BytecodeUtils) ========================
 
-    /// @notice Read L1 creation bytecode from the correct artifact directory.
-    ///         ZKsyncOS → out/ (EVM artifacts), Era → zkout/ (ZK artifacts).
     function readBytecodeL1(
         bool _isZKsyncOS,
         string memory _fileName,
         string memory _contractName
-    ) internal returns (bytes memory) {
-        return
-            _isZKsyncOS
-                ? readFoundryBytecodeL1(_fileName, _contractName)
-                : readZKFoundryBytecodeL1(_fileName, _contractName);
+    ) internal view returns (bytes memory) {
+        return BytecodeUtils.readBytecodeL1(_isZKsyncOS, _fileName, _contractName);
     }
 
-    /// @notice Convenience overload: derives fileName as contractName + ".sol".
-    function readBytecodeL1(bool _isZKsyncOS, string memory _contractName) internal returns (bytes memory) {
-        return readBytecodeL1(_isZKsyncOS, string.concat(_contractName, ".sol"), _contractName);
+    function readBytecodeL1(bool _isZKsyncOS, string memory _contractName) internal view returns (bytes memory) {
+        return BytecodeUtils.readBytecodeL1(_isZKsyncOS, string.concat(_contractName, ".sol"), _contractName);
     }
 
-    /// @notice Read L1 deployed bytecode from the correct artifact directory.
-    ///         ZKsyncOS → out/ (EVM deployed bytecode), Era → zkout/ (ZK bytecode via hashL2Bytecode).
     function readDeployedBytecodeL1(
         bool _isZKsyncOS,
         string memory _fileName,
         string memory _contractName
     ) internal view returns (bytes memory) {
-        if (_isZKsyncOS) {
-            return readFoundryDeployedBytecodeL1(_fileName, _contractName);
-        }
-        return readZKFoundryBytecodeL1(_fileName, _contractName);
+        return BytecodeUtils.readDeployedBytecodeL1(_isZKsyncOS, _fileName, _contractName);
     }
 
     // add this to be excluded from coverage report

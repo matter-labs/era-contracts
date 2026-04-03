@@ -572,11 +572,11 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     ) internal view virtual override returns (bytes memory) {
         require(isZKBytecode, "Only ZK bytecodes is not supported in Gateway upgrade");
         if (compareStrings(contractName, "DefaultUpgrade")) {
-            return Utils.readZKFoundryBytecodeL1("DefaultUpgrade.sol", "DefaultUpgrade");
+            return Utils.readBytecodeL1(false, "DefaultUpgrade.sol", "DefaultUpgrade");
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
-            return Utils.readZKFoundryBytecodeL1("BytecodesSupplier.sol", "BytecodesSupplier");
+            return Utils.readBytecodeL1(false, "BytecodesSupplier.sol", "BytecodesSupplier");
         } else if (compareStrings(contractName, "TransitionaryOwner")) {
-            return Utils.readZKFoundryBytecodeL1("TransitionaryOwner.sol", "TransitionaryOwner");
+            return Utils.readBytecodeL1(false, "TransitionaryOwner.sol", "TransitionaryOwner");
         } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
             return ContractsBytecodesLib.getCreationCodeEra("L2SharedBridgeLegacy");
         } else if (compareStrings(contractName, "ValidatorTimelock")) {

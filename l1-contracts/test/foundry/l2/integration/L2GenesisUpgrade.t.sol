@@ -135,7 +135,7 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
         L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(L2_GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata);
     }
     function _readL1(ContractName memory c) internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeL1(c.file, c.name);
+        return Utils.readBytecodeL1(false, c.file, c.name);
     }
 
     function _readSC(ContractName memory c) internal view returns (bytes memory) {

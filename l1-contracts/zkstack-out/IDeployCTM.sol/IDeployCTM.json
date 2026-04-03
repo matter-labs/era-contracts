@@ -153,22 +153,24 @@
                 "internalType": "address"
               },
               {
+                "name": "chainTypeManagerProxyAdmin",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
+          },
+          {
+            "name": "l1Specific",
+            "type": "tuple",
+            "internalType": "struct L1SpecificStateTransitionAddresses",
+            "components": [
+              {
                 "name": "legacyValidatorTimelock",
                 "type": "address",
                 "internalType": "address"
               },
               {
                 "name": "eraDiamondProxy",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "rollupDAManager",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "rollupSLDAValidator",
                 "type": "address",
                 "internalType": "address"
               }
@@ -180,17 +182,29 @@
             "internalType": "struct DataAvailabilityDeployedAddresses",
             "components": [
               {
-                "name": "rollupDAManager",
-                "type": "address",
-                "internalType": "address"
+                "name": "daContracts",
+                "type": "tuple",
+                "internalType": "struct DAContracts",
+                "components": [
+                  {
+                    "name": "rollupDAManager",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "relayedSLDAValidator",
+                    "type": "address",
+                    "internalType": "address"
+                  },
+                  {
+                    "name": "validiumDAValidator",
+                    "type": "address",
+                    "internalType": "address"
+                  }
+                ]
               },
               {
                 "name": "l1RollupDAValidator",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "noDAValidiumL1DAValidator",
                 "type": "address",
                 "internalType": "address"
               },

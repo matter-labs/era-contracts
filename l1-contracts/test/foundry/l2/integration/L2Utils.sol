@@ -265,7 +265,7 @@ library L2Utils {
     }
 
     function forceDeployWithoutConstructor(string memory _contractName, address _address) public {
-        bytes memory bytecode = Utils.readZKFoundryBytecodeL1(string.concat(_contractName, ".sol"), _contractName);
+        bytes memory bytecode = Utils.readBytecodeL1(false, string.concat(_contractName, ".sol"), _contractName);
 
         bytes32 bytecodehash = L2ContractHelper.hashL2Bytecode(bytecode);
 
