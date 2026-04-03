@@ -29,9 +29,9 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
-import {PublishFactoryDepsResult} from "./CTMUpgradeBase.sol";
+
 import {Utils} from "../../utils/Utils.sol";
-import {BytecodePublisher} from "../../utils/bytecode/BytecodePublisher.s.sol";
+import {BytecodePublisher, PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
@@ -475,7 +475,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         );
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
-        PublishFactoryDepsResult memory result = _publishAndProcessFactoryDeps(config.isZKsyncOS, supplier, allDeps);
+        PublishFactoryDepsResult memory result = BytecodePublisher.publishAndProcessFactoryDeps(
+            config.isZKsyncOS,
+            supplier,
+            allDeps
+        );
 
         if (result.factoryDepsHashes.length > 0) {
             console.logBytes32(config.contracts.chainCreationParams.bootloaderHash);
@@ -979,29 +983,4 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     // add this to be excluded from coverage report
     function test() internal override {}
-
-    function _publishAndProcessFactoryDeps(
-        bool _isZKsyncOS,
-        BytecodesSupplier _supplier,
-        bytes[] memory _allDeps
-    ) private returns (PublishFactoryDepsResult memory result) {
-        if (_isZKsyncOS) {
-            BytecodePublisher.publishEVMBytecodesInBatches(_supplier, _allDeps);
-        } else {
-            BytecodePublisher.publishEraBytecodesInBatches(_supplier, _allDeps);
-        }
-
-        if (_isZKsyncOS) {
-            result.factoryDepsHashes = new uint256[](0);
-            return result;
-        }
-
-        uint256 depsLen = _allDeps.length;
-        require(depsLen <= 64, "Too many deps");
-
-        result.factoryDepsHashes = new uint256[](depsLen);
-        for (uint256 i = 0; i < depsLen; i++) {
-            result.factoryDepsHashes[i] = uint256(L2ContractHelper.hashL2Bytecode(_allDeps[i]));
-        }
-    }
 }

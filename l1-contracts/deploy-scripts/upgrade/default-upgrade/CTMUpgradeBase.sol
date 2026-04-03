@@ -13,12 +13,7 @@ import {
     L2_FORCE_DEPLOYER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
-/// @notice Result of publishing and processing factory dependencies.
-struct PublishFactoryDepsResult {
-    /// @dev Factory dep hashes for the upgrade transaction.
-    ///      Era: L2 bytecode hashes as uint256. ZKsyncOS: empty array.
-    uint256[] factoryDepsHashes;
-}
+import {PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
