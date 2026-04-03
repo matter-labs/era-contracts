@@ -382,7 +382,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "validator_timelock_addr",
             ctmAddresses.stateTransition.proxies.validatorTimelock
         );
-        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", ctmAddresses.daAddresses.daContracts.rollupDAManager);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "l1_rollup_da_manager",
+            ctmAddresses.daAddresses.daContracts.rollupDAManager
+        );
         vm.serializeAddress(
             "deployed_addresses",
             "rollup_l1_da_validator_addr",

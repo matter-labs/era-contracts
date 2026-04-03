@@ -557,12 +557,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             (gatewayConfig.gatewayDA.relayedSLDAValidator, getRollupL2DACommitmentScheme(), true)
         );
 
-        calls = _prepareL1ToGatewayCall(
-            l2Calldata,
-            l2GasLimit,
-            l1GasPrice,
-            gatewayConfig.gatewayDA.rollupDAManager
-        );
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, gatewayConfig.gatewayDA.rollupDAManager);
     }
 
     function getAddresses() public view virtual override returns (CTMDeployedAddresses memory) {
@@ -607,11 +602,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             "chain_type_manager_proxy_admin",
             gatewayConfig.gatewayTransparentProxyAdmin
         );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "rollup_da_manager",
-            gatewayConfig.gatewayDA.rollupDAManager
-        );
+        vm.serializeAddress("gateway_state_transition", "rollup_da_manager", gatewayConfig.gatewayDA.rollupDAManager);
         vm.serializeAddress(
             "gateway_state_transition",
             "rollup_l2_da_validator",

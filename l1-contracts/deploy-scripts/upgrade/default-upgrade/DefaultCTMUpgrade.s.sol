@@ -264,7 +264,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         config.contracts.diamondCutData = abi.encode(diamondCut);
         newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
         console.log("Prepared diamond cut data");
-        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutDataFromLocalConfig(ctmAddresses.stateTransition);
+        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutDataFromLocalConfig(
+            ctmAddresses.stateTransition
+        );
         newlyGeneratedData.upgradeCutData = abi.encode(upgradeCutData);
         upgradeConfig.upgradeCutPrepared = true;
         console.log("UpgradeCutGenerated");
@@ -804,7 +806,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             upToDateZkChain.chainId
         );
         uint256 oldProtocolVersion = getOldProtocolVersion();
-        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutDataFromLocalConfig(ctmAddresses.stateTransition);
+        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutDataFromLocalConfig(
+            ctmAddresses.stateTransition
+        );
 
         admin = IZKChain(chainDiamondProxyAddress).getAdmin();
 
@@ -911,7 +915,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         );
         vm.serializeAddress("deployed_addresses", "rollup_l1_da_validator_addr", discoveredEraZkChain.l1DAValidator);
         vm.serializeAddress("deployed_addresses", "validium_l1_da_validator_addr", address(0));
-        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", ctmAddresses.daAddresses.daContracts.rollupDAManager);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "l1_rollup_da_manager",
+            ctmAddresses.daAddresses.daContracts.rollupDAManager
+        );
         vm.serializeAddress("deployed_addresses", "upgrade_stage_validator", upgradeAddresses.upgradeStageValidator);
 
         string memory deployedAddresses = vm.serializeAddress(

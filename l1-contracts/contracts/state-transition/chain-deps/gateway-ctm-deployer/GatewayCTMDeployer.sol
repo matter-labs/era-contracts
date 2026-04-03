@@ -2,12 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {
-    Facets,
-    Verifiers,
-    DAContracts,
-    StateTransitionDeployedAddresses
-} from "contracts/common/StateTransitionTypes.sol";
+import {Facets, DAContracts, StateTransitionDeployedAddresses} from "contracts/common/StateTransitionTypes.sol";
 
 // This file contains the structs used by the Gateway CTM Deployer contracts.
 // The deployment uses a mix of deployer contracts (for contracts requiring owner initialization)

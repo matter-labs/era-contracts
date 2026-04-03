@@ -2,11 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import {
-    Facets,
-    Verifiers,
-    StateTransitionDeployedAddresses
-} from "contracts/common/StateTransitionTypes.sol";
+import {Facets, Verifiers, StateTransitionDeployedAddresses} from "contracts/common/StateTransitionTypes.sol";
 
 import {DAContracts} from "contracts/common/StateTransitionTypes.sol";
 import {
