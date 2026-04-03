@@ -486,7 +486,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             gatewayChainId: config.gatewayChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: EraZkosRouter.getBytecodeHash(config.isZKsyncOS, EraZkosContract.BeaconProxy),
+            l2TokenProxyBytecodeHash: EraZkosRouter.getDeployedBytecodeHash(
+                config.isZKsyncOS,
+                EraZkosContract.BeaconProxy
+            ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(ctmAddresses.admin.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2Bridgehub),

@@ -350,15 +350,15 @@ library SystemContractsProcessing {
     function getOtherContractsBytecodes() internal view returns (bytes[] memory result) {
         result = new bytes[](OTHER_BUILT_IN_CONTRACTS_COUNT);
 
-        result[0] = ContractsBytecodesLib.getCreationCode("L2Bridgehub");
-        result[1] = ContractsBytecodesLib.getCreationCode("L2AssetRouter");
-        result[2] = ContractsBytecodesLib.getCreationCode("L2NativeTokenVault");
-        result[3] = ContractsBytecodesLib.getCreationCode("L2MessageRoot");
-        result[4] = ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken");
-        result[5] = ContractsBytecodesLib.getCreationCode("L2MessageVerification");
-        result[6] = ContractsBytecodesLib.getCreationCode("L2ChainAssetHandler");
-        result[7] = ContractsBytecodesLib.getCreationCode("L2InteropRootStorage");
-        result[8] = ContractsBytecodesLib.getCreationCode("BaseTokenHolder");
+        result[0] = ContractsBytecodesLib.getCreationCodeEra("L2Bridgehub");
+        result[1] = ContractsBytecodesLib.getCreationCodeEra("L2AssetRouter");
+        result[2] = ContractsBytecodesLib.getCreationCodeEra("L2NativeTokenVault");
+        result[3] = ContractsBytecodesLib.getCreationCodeEra("L2MessageRoot");
+        result[4] = ContractsBytecodesLib.getCreationCodeEra("L2WrappedBaseToken");
+        result[5] = ContractsBytecodesLib.getCreationCodeEra("L2MessageVerification");
+        result[6] = ContractsBytecodesLib.getCreationCodeEra("L2ChainAssetHandler");
+        result[7] = ContractsBytecodesLib.getCreationCodeEra("L2InteropRootStorage");
+        result[8] = ContractsBytecodesLib.getCreationCodeEra("BaseTokenHolder");
     }
 
     /// Note, that while proper initialization may require multiple steps,

@@ -12,7 +12,7 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {EraZkosRouter, FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {EraZkosContract, EraZkosRouter, FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
@@ -229,6 +229,8 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         uint256 _l1ChainId,
         address _ownerAddress
     ) internal virtual returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
+        // FIXME: this logic is not correct as force deployments are still needed to be done by the complex upgrader.
+        // We did not introduce force deployments yet.
         if (config.isZKsyncOS) {
             return new IL2ContractDeployer.ForceDeployment[](0);
         }
@@ -241,42 +243,40 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         );
     }
 
-    function getForceDeployment(
-        string memory contractName
-    ) public virtual returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
-        return
-            IL2ContractDeployer.ForceDeployment({
-                bytecodeHash: getL2BytecodeHash(contractName),
-                newAddress: getExpectedL2Address(contractName),
-                callConstructor: false,
-                value: 0,
-                input: ""
-            });
-    }
-
     function getAdditionalForceDeployments()
         internal
         returns (IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments)
     {
-        string[] memory forceDeploymentNames = getForceDeploymentNames();
-        additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](forceDeploymentNames.length);
-        for (uint256 i; i < forceDeploymentNames.length; i++) {
-            additionalForceDeployments[i] = getForceDeployment(forceDeploymentNames[i]);
+        EraZkosContract[] memory forceDeploymentContracts = getForceDeploymentContracts();
+        additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](forceDeploymentContracts.length);
+        for (uint256 i; i < forceDeploymentContracts.length; i++) {
+            additionalForceDeployments[i] = EraZkosRouter.getForceDeployment(
+                config.isZKsyncOS,
+                forceDeploymentContracts[i]
+            );
         }
         return additionalForceDeployments;
     }
 
-    function getAdditionalDependenciesNames() internal virtual returns (string[] memory forceDeploymentNames) {
-        string[] memory additionalForceDeploymentNames = getForceDeploymentNames();
-        forceDeploymentNames = new string[](additionalForceDeploymentNames.length);
-        for (uint256 i; i < additionalForceDeploymentNames.length; i++) {
-            forceDeploymentNames[i] = additionalForceDeploymentNames[i];
+    function getAdditionalDependencyContracts()
+        internal
+        virtual
+        returns (EraZkosContract[] memory forceDeploymentContracts)
+    {
+        EraZkosContract[] memory additionalForceDeploymentContracts = getForceDeploymentContracts();
+        forceDeploymentContracts = new EraZkosContract[](additionalForceDeploymentContracts.length);
+        for (uint256 i; i < additionalForceDeploymentContracts.length; i++) {
+            forceDeploymentContracts[i] = additionalForceDeploymentContracts[i];
         }
-        return forceDeploymentNames;
+        return forceDeploymentContracts;
     }
 
-    function getForceDeploymentNames() internal virtual returns (string[] memory forceDeploymentNames) {
-        return new string[](0);
+    function getForceDeploymentContracts()
+        internal
+        virtual
+        returns (EraZkosContract[] memory forceDeploymentContracts)
+    {
+        return new EraZkosContract[](0);
     }
 
     /// @notice Encode calldata that will be passed to `_postUpgrade`
@@ -285,9 +285,5 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         StateTransitionDeployedAddresses memory
     ) internal virtual returns (bytes memory) {
         return new bytes(0);
-    }
-
-    function getExpectedL2Address(string memory contractName) public virtual returns (address) {
-        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
     }
 }

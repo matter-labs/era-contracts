@@ -45,6 +45,8 @@ import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
 import {EraZkosContract, EraZkosRouter, FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
+// FIXME: consider deleting this file it is not used.
+// FIXME: if it is used however, it is not compatible with zksync os as it uses era bytecodes directly.
 /// @notice Script used for default CTM on gateway upgrade flow, should be run after L1 CTM upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
 contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
@@ -575,9 +577,9 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         } else if (compareStrings(contractName, "TransitionaryOwner")) {
             return Utils.readZKFoundryBytecodeL1("TransitionaryOwner.sol", "TransitionaryOwner");
         } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
-            return ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
+            return ContractsBytecodesLib.getCreationCodeEra("L2SharedBridgeLegacy");
         } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            return ContractsBytecodesLib.getCreationCode("ValidatorTimelock");
+            return ContractsBytecodesLib.getCreationCodeEra("ValidatorTimelock");
         }
         return super.getCreationCode(contractName, isZKBytecode);
     }
