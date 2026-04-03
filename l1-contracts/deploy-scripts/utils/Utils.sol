@@ -1055,11 +1055,11 @@ library Utils {
      * @dev Read foundry bytecodes
      */
     function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, artifactPath);
-        string memory json = vm.readFile(path);
-        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode.object");
-        return bytecode;
+        return _readFoundryArtifact(artifactPath, ".bytecode.object");
+    }
+
+    function readFoundryDeployedBytecode(string memory artifactPath) internal view returns (bytes memory) {
+        return _readFoundryArtifact(artifactPath, ".deployedBytecode.object");
     }
 
     function readFoundryBytecodeL1(
@@ -1075,8 +1075,7 @@ library Utils {
         string memory contractName
     ) internal view returns (bytes memory) {
         string memory path = string.concat("/../l1-contracts/zkout/", fileName, "/", contractName, ".json");
-        bytes memory bytecode = readFoundryBytecode(path);
-        return bytecode;
+        return readFoundryBytecode(path);
     }
 
     function readFoundryDeployedBytecodeL1(
@@ -1084,8 +1083,7 @@ library Utils {
         string memory contractName
     ) internal view returns (bytes memory) {
         string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
-        bytes memory bytecode = readFoundryDeployedBytecode(path);
-        return bytecode;
+        return readFoundryDeployedBytecode(path);
     }
 
     function readZKFoundryBytecodeL2(
@@ -1093,8 +1091,7 @@ library Utils {
         string memory contractName
     ) internal view returns (bytes memory) {
         string memory path = string.concat("/../l2-contracts/zkout/", fileName, "/", contractName, ".json");
-        bytes memory bytecode = readFoundryBytecode(path);
-        return bytecode;
+        return readFoundryBytecode(path);
     }
 
     function readZKFoundryBytecodeSystemContracts(
@@ -1113,19 +1110,17 @@ library Utils {
             contractName,
             ".json"
         );
-        bytes memory bytecode = readFoundryBytecode(path);
-        return bytecode;
+        return readFoundryBytecode(path);
     }
 
-    /**
-     * @dev Read hardhat bytecodes
-     */
-    function readFoundryDeployedBytecode(string memory artifactPath) internal view returns (bytes memory) {
+    function _readFoundryArtifact(
+        string memory _artifactPath,
+        string memory _jsonKey
+    ) private view returns (bytes memory) {
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, artifactPath);
+        string memory path = string.concat(root, _artifactPath);
         string memory json = vm.readFile(path);
-        bytes memory bytecode = vm.parseJsonBytes(json, ".deployedBytecode.object");
-        return bytecode;
+        return vm.parseJsonBytes(json, _jsonKey);
     }
 
     // TODO: restore blake2s hash caching to avoid repeated ffi calls for the same bytecode.
@@ -1490,6 +1485,52 @@ library Utils {
     function getProxyAdminAddress(address proxy) internal view returns (address) {
         bytes32 value = vm.load(proxy, ADMIN_SLOT); // Foundry cheatcode
         return address(uint160(uint256(value)));
+    }
+
+    string private constant GENESIS_FILENAME_ERA = "era/latest.json";
+    string private constant GENESIS_FILENAME_ZKOS = "zksync-os/latest.json";
+
+    /// @notice Absolute path to genesis / chain-creation JSON under `configs/genesis/` for the given VM mode.
+    function genesisConfigPath(bool _isZKsyncOS) internal returns (string memory) {
+        return
+            string.concat(
+                vm.projectRoot(),
+                "/../configs/genesis/",
+                _isZKsyncOS ? GENESIS_FILENAME_ZKOS : GENESIS_FILENAME_ERA
+            );
+    }
+
+    // ======================== VM-unified bytecode reading ========================
+
+    /// @notice Read L1 creation bytecode from the correct artifact directory.
+    ///         ZKsyncOS → out/ (EVM artifacts), Era → zkout/ (ZK artifacts).
+    function readBytecodeL1(
+        bool _isZKsyncOS,
+        string memory _fileName,
+        string memory _contractName
+    ) internal returns (bytes memory) {
+        return
+            _isZKsyncOS
+                ? readFoundryBytecodeL1(_fileName, _contractName)
+                : readZKFoundryBytecodeL1(_fileName, _contractName);
+    }
+
+    /// @notice Convenience overload: derives fileName as contractName + ".sol".
+    function readBytecodeL1(bool _isZKsyncOS, string memory _contractName) internal returns (bytes memory) {
+        return readBytecodeL1(_isZKsyncOS, string.concat(_contractName, ".sol"), _contractName);
+    }
+
+    /// @notice Read L1 deployed bytecode from the correct artifact directory.
+    ///         ZKsyncOS → out/ (EVM deployed bytecode), Era → zkout/ (ZK bytecode via hashL2Bytecode).
+    function readDeployedBytecodeL1(
+        bool _isZKsyncOS,
+        string memory _fileName,
+        string memory _contractName
+    ) internal view returns (bytes memory) {
+        if (_isZKsyncOS) {
+            return readFoundryDeployedBytecodeL1(_fileName, _contractName);
+        }
+        return readZKFoundryBytecodeL1(_fileName, _contractName);
     }
 
     // add this to be excluded from coverage report

@@ -44,8 +44,9 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
-import {EraZkosRouter, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
-import {CTMContract} from "../../ctm/DeployCTML1OrGateway.sol";
+import {PublishFactoryDepsResult} from "./CTMUpgradeBase.sol";
+import {Utils} from "../../utils/Utils.sol";
+import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
 // FIXME: consider deleting this file it is not used.
@@ -118,7 +119,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         initializeConfig(
             _create2FactorySalt,
             _isZKsyncOS,
-            getChainCreationParamsConfig(EraZkosRouter.genesisConfigPath(_isZKsyncOS)),
+            getChainCreationParamsConfig(Utils.genesisConfigPath(_isZKsyncOS)),
             _eraChainId,
             _priorityTxsL2GasLimit,
             _maxExpectedL1GasPrice,
@@ -370,7 +371,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
-        (, string memory gwCtmContractName) = EraZkosRouter.resolve(config.isZKsyncOS, CTMContract.ChainTypeManager);
+        (, string memory gwCtmContractName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.ChainTypeManager);
         gatewayConfig.gatewayStateTransition.implementations.chainTypeManager = deployGWContract(gwCtmContractName);
 
         deployUpgradeSpecificContractsGW();

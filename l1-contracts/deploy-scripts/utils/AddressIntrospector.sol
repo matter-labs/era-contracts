@@ -50,7 +50,7 @@ import {
     DataAvailabilityDeployedAddresses,
     L1SpecificStateTransitionAddresses
 } from "./Types.sol";
-import {EraZkosVerifierLifecycle} from "./vm/EraZkosVerifierLifecycle.sol";
+import {DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
 
 library AddressIntrospector {
     error NoUptoDateZkChainFound();
@@ -511,6 +511,6 @@ library AddressIntrospector {
         address _verifier,
         bool _isZKsyncOS
     ) private view returns (address fflonk, address plonk) {
-        return EraZkosVerifierLifecycle.getSubVerifiers(_verifier, _isZKsyncOS);
+        return DeployCTML1OrGateway.getSubVerifiers(_verifier, _isZKsyncOS);
     }
 }

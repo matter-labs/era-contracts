@@ -29,8 +29,12 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
-import {EraZkosRouter, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {PublishFactoryDepsResult} from "./CTMUpgradeBase.sol";
+import {Utils} from "../../utils/Utils.sol";
+import {BytecodePublisher} from "../../utils/bytecode/BytecodePublisher.s.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
+import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -200,7 +204,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         // Set config.isZKsyncOS before getChainCreationParamsConfig.
         config.isZKsyncOS = isZKsyncOS;
         ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
-            EraZkosRouter.genesisConfigPath(isZKsyncOS)
+            Utils.genesisConfigPath(isZKsyncOS)
         );
 
         // Optional override for v29 introspection selection
@@ -403,28 +407,28 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             eraChainId: config.eraChainId,
             gatewayChainId: config.gatewayChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: EraZkosRouter.getDeployedBytecodeHash(
+            l2TokenProxyBytecodeHash: CoreOnGatewayHelper.getDeployedBytecodeHash(
                 config.isZKsyncOS,
                 CoreContract.BeaconProxy
             ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2Bridgehub),
-            l2AssetRouterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2AssetRouter),
-            l2NtvBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2NativeTokenVault),
-            messageRootBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2MessageRoot),
-            chainAssetHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(
+            bridgehubBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2Bridgehub),
+            l2AssetRouterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2AssetRouter),
+            l2NtvBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2NativeTokenVault),
+            messageRootBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2MessageRoot),
+            chainAssetHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
                 config.isZKsyncOS,
                 CoreContract.L2ChainAssetHandler
             ),
-            beaconDeployerInfo: EraZkosRouter.getBytecodeInfo(
+            beaconDeployerInfo: CoreOnGatewayHelper.getBytecodeInfo(
                 config.isZKsyncOS,
                 CoreContract.UpgradeableBeaconDeployer
             ),
-            baseTokenHolderBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.BaseTokenHolder),
-            interopCenterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.InteropCenter),
-            interopHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.InteropHandler),
-            assetTrackerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2AssetTracker),
+            baseTokenHolderBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.BaseTokenHolder),
+            interopCenterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.InteropCenter),
+            interopHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.InteropHandler),
+            assetTrackerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
@@ -450,13 +454,13 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function publishBytecodes() public virtual {
-        bytes[] memory allDeps = EraZkosRouter.getFullListOfFactoryDependencies(
+        bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
             config.isZKsyncOS,
             getAdditionalDependencyContracts()
         );
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
-        PublishFactoryDepsResult memory result = EraZkosRouter.publishAndProcessFactoryDeps(
+        PublishFactoryDepsResult memory result = _publishAndProcessFactoryDeps(
             config.isZKsyncOS,
             supplier,
             allDeps
@@ -964,4 +968,29 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     // add this to be excluded from coverage report
     function test() internal override {}
+
+    function _publishAndProcessFactoryDeps(
+        bool _isZKsyncOS,
+        BytecodesSupplier _supplier,
+        bytes[] memory _allDeps
+    ) private returns (PublishFactoryDepsResult memory result) {
+        if (_isZKsyncOS) {
+            BytecodePublisher.publishEVMBytecodesInBatches(_supplier, _allDeps);
+        } else {
+            BytecodePublisher.publishEraBytecodesInBatches(_supplier, _allDeps);
+        }
+
+        if (_isZKsyncOS) {
+            result.factoryDepsHashes = new uint256[](0);
+            return result;
+        }
+
+        uint256 depsLen = _allDeps.length;
+        require(depsLen <= 64, "Too many deps");
+
+        result.factoryDepsHashes = new uint256[](depsLen);
+        for (uint256 i = 0; i < depsLen; i++) {
+            result.factoryDepsHashes[i] = uint256(L2ContractHelper.hashL2Bytecode(_allDeps[i]));
+        }
+    }
 }

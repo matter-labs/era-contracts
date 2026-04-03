@@ -29,7 +29,7 @@ import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 
 import {Utils} from "../../utils/Utils.sol";
 import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
-import {PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {PublishFactoryDepsResult} from "../default-upgrade/CTMUpgradeBase.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.sol";
 

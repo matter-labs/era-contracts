@@ -12,8 +12,15 @@ import {
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {EraZkosRouter, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+/// @notice Result of publishing and processing factory dependencies.
+struct PublishFactoryDepsResult {
+    /// @dev Factory dep hashes for the upgrade transaction.
+    ///      Era: L2 bytecode hashes as uint256. ZKsyncOS: empty array.
+    uint256[] factoryDepsHashes;
+}
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
+import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ChainCreationParamsConfig, CTMDeployedAddresses, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
@@ -58,6 +65,11 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         return ProposedUpgradeLib.emptyL2CanonicalTransaction();
     }
 
+    /// @notice Returns the L2 upgrade transaction type for the active VM.
+    function _getUpgradeTxType() internal view returns (uint256) {
+        return config.isZKsyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+    }
+
     /// @notice Get L2 upgrade target and data
     function getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
@@ -77,14 +89,14 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         // Sanity check
         for (uint256 i; i < forceDeployments.length; i++) {
             require(
-                EraZkosRouter.isHashInFactoryDeps(_factoryDepsResult, forceDeployments[i].bytecodeHash),
+                _isHashInFactoryDeps(_factoryDepsResult, forceDeployments[i].bytecodeHash),
                 "Bytecode hash not in factory deps"
             );
         }
 
         (address target, bytes memory data) = getL2UpgradeTargetAndData(forceDeployments);
 
-        uint256 txType = EraZkosRouter.upgradeL2TxType(config.isZKsyncOS);
+        uint256 txType = _getUpgradeTxType();
         transaction = L2CanonicalTransaction({
             txType: txType,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
@@ -107,17 +119,6 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             // But it is still here, just in case we want to enable some additional functionality
             reservedDynamic: new bytes(0)
         });
-    }
-
-    /// @notice Merge two Call arrays
-    function mergeCalls(Call[] memory a, Call[] memory b) internal pure returns (Call[] memory result) {
-        result = new Call[](a.length + b.length);
-        for (uint256 i = 0; i < a.length; i++) {
-            result[i] = a[i];
-        }
-        for (uint256 i = 0; i < b.length; i++) {
-            result[a.length + i] = b[i];
-        }
     }
 
     /// @notice Merge two FacetCut arrays
@@ -251,7 +252,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         CoreContract[] memory forceDeploymentContracts = getForceDeploymentContracts();
         additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](forceDeploymentContracts.length);
         for (uint256 i; i < forceDeploymentContracts.length; i++) {
-            additionalForceDeployments[i] = EraZkosRouter.getForceDeployment(
+            additionalForceDeployments[i] = CoreOnGatewayHelper.getForceDeployment(
                 config.isZKsyncOS,
                 forceDeploymentContracts[i]
             );
@@ -282,5 +283,17 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         StateTransitionDeployedAddresses memory
     ) internal virtual returns (bytes memory) {
         return new bytes(0);
+    }
+
+    function _isHashInFactoryDeps(PublishFactoryDepsResult memory _result, bytes32 _hash) private pure returns (bool) {
+        if (_result.factoryDepsHashes.length == 0) {
+            return true;
+        }
+        for (uint256 i = 0; i < _result.factoryDepsHashes.length; i++) {
+            if (bytes32(_result.factoryDepsHashes[i]) == _hash) {
+                return true;
+            }
+        }
+        return false;
     }
 }

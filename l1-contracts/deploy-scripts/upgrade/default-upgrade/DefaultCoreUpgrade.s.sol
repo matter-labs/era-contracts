@@ -26,7 +26,7 @@ import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {Utils} from "../../utils/Utils.sol";
 
-import {EraZkosRouter} from "../../utils/EraZkosRouter.sol";
+import {ChainCreationParamsLib} from "../../ctm/ChainCreationParamsLib.sol";
 
 /// @notice Script used for default ecosystem upgrade flow should be run as a first for the upgrade.
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
@@ -463,8 +463,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice Load protocol version from genesis config
     function loadProtocolVersionFromGenesis() internal virtual returns (uint256) {
-        string memory genesisPath = EraZkosRouter.genesisConfigPath(additionalConfig.isZKsyncOS);
-        return EraZkosRouter.getChainCreationParams(additionalConfig.isZKsyncOS, genesisPath).latestProtocolVersion;
+        string memory genesisPath = Utils.genesisConfigPath(additionalConfig.isZKsyncOS);
+        return ChainCreationParamsLib.getChainCreationParams(genesisPath, additionalConfig.isZKsyncOS).latestProtocolVersion;
     }
 
     function getBroadcasterAddress() internal view virtual returns (address) {
