@@ -385,7 +385,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         string memory gatewayStateTransition = vm.serializeAddress(
             "gateway_state_transition",
             "diamond_proxy_addr",
-            output.gatewayStateTransition.eraDiamondProxy
+            address(0)
         );
         vm.serializeString("root", "gateway_state_transition", gatewayStateTransition);
         vm.serializeAddress("root", "multicall3_addr", output.multicall3);

@@ -270,6 +270,7 @@ library AddressIntrospector {
             verifiers: Verifiers({verifier: verifier, verifierFflonk: verifierFflonk, verifierPlonk: verifierPlonk}),
             facets: facets,
             genesisUpgrade: ctm.l1GenesisUpgrade(),
+            defaultUpgrade: address(0),
             chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr)
         });
         info.l1Specific = L1SpecificStateTransitionAddresses({
