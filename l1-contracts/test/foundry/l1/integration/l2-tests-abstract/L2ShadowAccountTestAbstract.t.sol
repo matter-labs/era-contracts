@@ -80,19 +80,19 @@ abstract contract L2ShadowAccountTestAbstract is Test, L2InteropTestUtils {
         bytes memory data
     ) internal pure returns (bytes memory) {
         ShadowAccountCall[] memory calls = new ShadowAccountCall[](1);
-        calls[0] = ShadowAccountCall({
-            callType: ShadowAccountCallType.Call,
-            target: target,
-            value: value,
-            data: data
-        });
+        calls[0] = ShadowAccountCall({callType: ShadowAccountCallType.Call, target: target, value: value, data: data});
         return abi.encode(calls);
     }
 
     /// @dev Builds a ShadowAccountCall[] payload with a delegatecall.
     function _buildSingleDelegatecallPayload(address target, bytes memory data) internal pure returns (bytes memory) {
         ShadowAccountCall[] memory calls = new ShadowAccountCall[](1);
-        calls[0] = ShadowAccountCall({callType: ShadowAccountCallType.DelegateCall, target: target, value: 0, data: data});
+        calls[0] = ShadowAccountCall({
+            callType: ShadowAccountCallType.DelegateCall,
+            target: target,
+            value: 0,
+            data: data
+        });
         return abi.encode(calls);
     }
 
@@ -269,12 +269,7 @@ abstract contract L2ShadowAccountTestAbstract is Test, L2InteropTestUtils {
 
         // Build a payload with a call to the target
         ShadowAccountCall[] memory calls = new ShadowAccountCall[](1);
-        calls[0] = ShadowAccountCall({
-            callType: ShadowAccountCallType.Call,
-            target: target,
-            value: 0,
-            data: ""
-        });
+        calls[0] = ShadowAccountCall({callType: ShadowAccountCallType.Call, target: target, value: 0, data: ""});
         bytes memory payload = abi.encode(calls);
 
         // Mock the target call to succeed
@@ -299,7 +294,12 @@ abstract contract L2ShadowAccountTestAbstract is Test, L2InteropTestUtils {
         vm.deal(account, 1 ether);
 
         ShadowAccountCall[] memory calls = new ShadowAccountCall[](1);
-        calls[0] = ShadowAccountCall({callType: ShadowAccountCallType.Call, target: recipient, value: 0.5 ether, data: ""});
+        calls[0] = ShadowAccountCall({
+            callType: ShadowAccountCallType.Call,
+            target: recipient,
+            value: 0.5 ether,
+            data: ""
+        });
         bytes memory payload = abi.encode(calls);
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
@@ -385,7 +385,12 @@ abstract contract L2ShadowAccountTestAbstract is Test, L2InteropTestUtils {
         vm.mockCall(target, bytes(""), abi.encode(true));
 
         ShadowAccountCall[] memory calls = new ShadowAccountCall[](1);
-        calls[0] = ShadowAccountCall({callType: ShadowAccountCallType.DelegateCall, target: target, value: 0, data: ""});
+        calls[0] = ShadowAccountCall({
+            callType: ShadowAccountCallType.DelegateCall,
+            target: target,
+            value: 0,
+            data: ""
+        });
         bytes memory payload = abi.encode(calls);
 
         vm.expectEmit(true, false, false, true);

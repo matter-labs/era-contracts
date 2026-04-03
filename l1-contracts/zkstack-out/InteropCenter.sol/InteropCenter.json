@@ -282,14 +282,19 @@
             "internalType": "uint256"
           },
           {
+            "name": "indirectCallMessageValue",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
             "name": "indirectCall",
             "type": "bool",
             "internalType": "bool"
           },
           {
-            "name": "indirectCallMessageValue",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "shadowAccount",
+            "type": "bool",
+            "internalType": "bool"
           }
         ]
       },
@@ -1035,6 +1040,11 @@
   {
     "type": "error",
     "name": "Reentrancy",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ShadowAccountWithIndirectCall",
     "inputs": []
   },
   {

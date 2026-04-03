@@ -5,7 +5,13 @@ pragma solidity 0.8.28;
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
 import {IShadowAccount, ShadowAccountCall, ShadowAccountCallType} from "./IShadowAccount.sol";
 import {L2_INTEROP_HANDLER_ADDR, L2_SHADOW_ACCOUNT_FACTORY_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {ShadowAccountAlreadyInitialized, ShadowAccountCallFailed, ShadowAccountOnlyFactory, ShadowAccountOnlyInteropHandler, ShadowAccountOnlyOwner} from "./InteropErrors.sol";
+import {
+    ShadowAccountAlreadyInitialized,
+    ShadowAccountCallFailed,
+    ShadowAccountOnlyFactory,
+    ShadowAccountOnlyInteropHandler,
+    ShadowAccountOnlyOwner
+} from "./InteropErrors.sol";
 
 /// @title ShadowAccount
 /// @author Matter Labs

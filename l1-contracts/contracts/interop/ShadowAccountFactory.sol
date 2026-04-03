@@ -40,12 +40,6 @@ contract ShadowAccountFactory is IShadowAccountFactory {
     function predictAddress(bytes calldata _owner) external view returns (address predicted) {
         bytes32 salt = keccak256(_owner);
         bytes32 codeHash = keccak256(type(ShadowAccount).creationCode);
-        predicted = address(
-            uint160(
-                uint256(
-                    keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, codeHash))
-                )
-            )
-        );
+        predicted = address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, codeHash)))));
     }
 }
