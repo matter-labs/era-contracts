@@ -111,7 +111,7 @@ uint256 constant L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS = 21000;
 uint256 constant L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS = 16;
 
 /// @dev The static part of the L1->l2 transaction native cost for ZKsync OS.
-/// It includes hasing (126_000) and coinbase/refund mint_base_token intrinsic native worst case costs.
+/// It includes hashing (126_000) and coinbase/refund mint_base_token intrinsic native worst case costs.
 uint256 constant L1_TX_STATIC_NATIVE_ZKSYNC_OS = 2_875_420;
 
 /// @dev The encoding cost per keccak256 round(136 bytes) of the L1->l2 transaction in native resource for ZKsync OS.
@@ -121,7 +121,7 @@ uint256 constant L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS = 17500;
 uint256 constant L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS = 1;
 
 /// @dev The intrinsic cost of the L1->l2 transaction in pubdata for ZKsync OS
-/// It inlcudes tx log, coinbase, treasury, refund recipient and asset tracker pubdata.
+/// It includes tx log, coinbase, treasury, refund recipient and asset tracker pubdata.
 uint256 constant L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS = 351;
 
 /// @dev The native per gas ratio for 0 gas price(service/upgrade/gateway) transactions in ZKsync OS.
