@@ -414,7 +414,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2Bridgehub),
-            l2AssetRouterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2AssetRouter),
+            l2AssetRouterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
+                config.isZKsyncOS,
+                CoreContract.L2AssetRouter
+            ),
             l2NtvBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2NativeTokenVault),
             messageRootBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2MessageRoot),
             chainAssetHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
@@ -425,10 +428,22 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
                 config.isZKsyncOS,
                 CoreContract.UpgradeableBeaconDeployer
             ),
-            baseTokenHolderBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.BaseTokenHolder),
-            interopCenterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.InteropCenter),
-            interopHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.InteropHandler),
-            assetTrackerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2AssetTracker),
+            baseTokenHolderBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
+                config.isZKsyncOS,
+                CoreContract.BaseTokenHolder
+            ),
+            interopCenterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
+                config.isZKsyncOS,
+                CoreContract.InteropCenter
+            ),
+            interopHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
+                config.isZKsyncOS,
+                CoreContract.InteropHandler
+            ),
+            assetTrackerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
+                config.isZKsyncOS,
+                CoreContract.L2AssetTracker
+            ),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
@@ -460,11 +475,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         );
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
-        PublishFactoryDepsResult memory result = _publishAndProcessFactoryDeps(
-            config.isZKsyncOS,
-            supplier,
-            allDeps
-        );
+        PublishFactoryDepsResult memory result = _publishAndProcessFactoryDeps(config.isZKsyncOS, supplier, allDeps);
 
         if (result.factoryDepsHashes.length > 0) {
             console.logBytes32(config.contracts.chainCreationParams.bootloaderHash);

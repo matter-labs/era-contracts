@@ -464,7 +464,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     /// @notice Load protocol version from genesis config
     function loadProtocolVersionFromGenesis() internal virtual returns (uint256) {
         string memory genesisPath = Utils.genesisConfigPath(additionalConfig.isZKsyncOS);
-        return ChainCreationParamsLib.getChainCreationParams(genesisPath, additionalConfig.isZKsyncOS).latestProtocolVersion;
+        return
+            ChainCreationParamsLib
+                .getChainCreationParams(genesisPath, additionalConfig.isZKsyncOS)
+                .latestProtocolVersion;
     }
 
     function getBroadcasterAddress() internal view virtual returns (address) {

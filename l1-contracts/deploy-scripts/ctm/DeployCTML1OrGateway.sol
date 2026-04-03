@@ -103,12 +103,7 @@ library DeployCTML1OrGateway {
             return abi.encode(_isZKsyncOS);
         } else if (_contractName == CTMContract.DualVerifier || _contractName == CTMContract.TestnetVerifier) {
             return
-                verifierCreationArgs(
-                    _isZKsyncOS,
-                    _config.verifierFflonk,
-                    _config.verifierPlonk,
-                    _config.verifierOwner
-                );
+                verifierCreationArgs(_isZKsyncOS, _config.verifierFflonk, _config.verifierPlonk, _config.verifierOwner);
         } else if (_contractName == CTMContract.ChainTypeManager) {
             return
                 abi.encode(
@@ -154,14 +149,11 @@ library DeployCTML1OrGateway {
         ) {
             return CTMContract.TestnetVerifier;
         } else if (
-            _compareStrings(_contractName, "EraDualVerifier") ||
-            _compareStrings(_contractName, "ZKsyncOSDualVerifier")
+            _compareStrings(_contractName, "EraDualVerifier") || _compareStrings(_contractName, "ZKsyncOSDualVerifier")
         ) {
             return CTMContract.DualVerifier;
         } else {
-            revert(
-                string.concat("Contract ", _contractName, " not CTM contract, creation calldata could not be set")
-            );
+            revert(string.concat("Contract ", _contractName, " not CTM contract, creation calldata could not be set"));
         }
     }
 
@@ -241,13 +233,11 @@ library DeployCTML1OrGateway {
     // solhint-disable-next-line code-complexity
     function _resolveCTMContractName(bool _isZKsyncOS, CTMContract _c) private view returns (string memory) {
         // Contracts with different names per VM
-        if (_c == CTMContract.ChainTypeManager)
-            return _isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        if (_c == CTMContract.ChainTypeManager) return _isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         if (_c == CTMContract.VerifierFflonk) return _isZKsyncOS ? "ZKsyncOSVerifierFflonk" : "EraVerifierFflonk";
         if (_c == CTMContract.VerifierPlonk) return _isZKsyncOS ? "ZKsyncOSVerifierPlonk" : "EraVerifierPlonk";
         if (_c == CTMContract.DualVerifier) return _isZKsyncOS ? "ZKsyncOSDualVerifier" : "EraDualVerifier";
-        if (_c == CTMContract.TestnetVerifier)
-            return _isZKsyncOS ? "ZKsyncOSTestnetVerifier" : "EraTestnetVerifier";
+        if (_c == CTMContract.TestnetVerifier) return _isZKsyncOS ? "ZKsyncOSTestnetVerifier" : "EraTestnetVerifier";
         if (_c == CTMContract.GatewayCTMDeployerCTM) {
             return _isZKsyncOS ? "GatewayCTMDeployerCTMZKsyncOS" : "GatewayCTMDeployerCTM";
         }

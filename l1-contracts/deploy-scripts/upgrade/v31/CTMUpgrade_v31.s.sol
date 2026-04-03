@@ -63,7 +63,10 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // The constructor will receive the new BytecodesSupplier proxy address
         // Select the correct ChainTypeManager based on chain type (Era vs ZKsyncOS)
         // FIXME we never actually use deploySimpleContract or deploy TUPP with anything else than false. We need to clean this code.
-        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.ChainTypeManager);
+        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(
+            config.isZKsyncOS,
+            CTMContract.ChainTypeManager
+        );
         console.log("Deploying ChainTypeManager:", ctmContractName);
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
 

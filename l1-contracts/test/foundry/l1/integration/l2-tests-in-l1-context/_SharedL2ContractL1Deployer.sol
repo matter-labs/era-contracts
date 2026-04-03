@@ -67,7 +67,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         ctmAddresses.admin.governance = makeAddr("governance");
         ctmAddresses.chainAdmin = makeAddr("chainAdmin");
         ctmAddresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
-        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.isZKsyncOS, config.testnetVerifier);
+        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
+            config.isZKsyncOS,
+            config.testnetVerifier
+        );
         ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, true);
         ctmAddresses.stateTransition.proxies.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
         (

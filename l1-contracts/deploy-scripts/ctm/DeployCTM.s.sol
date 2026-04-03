@@ -179,7 +179,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         initializeGeneratedData();
 
         deployStateTransitionDiamondFacets();
-        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.ChainTypeManager);
+        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(
+            config.isZKsyncOS,
+            CTMContract.ChainTypeManager
+        );
         (
             ctmAddresses.stateTransition.implementations.chainTypeManager,
             ctmAddresses.stateTransition.proxies.chainTypeManager
@@ -210,7 +213,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function deployVerifiers() internal {
         (, string memory fflonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierFflonk);
         (, string memory plonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierPlonk);
-        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(config.isZKsyncOS, config.testnetVerifier);
+        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
+            config.isZKsyncOS,
+            config.testnetVerifier
+        );
 
         ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
@@ -495,21 +501,36 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(ctmAddresses.admin.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2Bridgehub),
-            l2AssetRouterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2AssetRouter),
+            l2AssetRouterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
+                config.isZKsyncOS,
+                CoreContract.L2AssetRouter
+            ),
             l2NtvBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2NativeTokenVault),
             messageRootBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2MessageRoot),
             beaconDeployerInfo: CoreOnGatewayHelper.getBytecodeInfo(
                 config.isZKsyncOS,
                 CoreContract.UpgradeableBeaconDeployer
             ),
-            baseTokenHolderBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.BaseTokenHolder),
+            baseTokenHolderBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
+                config.isZKsyncOS,
+                CoreContract.BaseTokenHolder
+            ),
             chainAssetHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
                 config.isZKsyncOS,
                 CoreContract.L2ChainAssetHandler
             ),
-            interopCenterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.InteropCenter),
-            interopHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.InteropHandler),
-            assetTrackerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2AssetTracker),
+            interopCenterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
+                config.isZKsyncOS,
+                CoreContract.InteropCenter
+            ),
+            interopHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
+                config.isZKsyncOS,
+                CoreContract.InteropHandler
+            ),
+            assetTrackerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
+                config.isZKsyncOS,
+                CoreContract.L2AssetTracker
+            ),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
