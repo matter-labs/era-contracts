@@ -209,7 +209,7 @@ library Utils {
     function getAllSelectorsForFacet(string memory facetName) internal returns (bytes4[] memory) {
         // TODO(EVM-746): use forge to read the bytecode
         string memory path = string.concat("/../l1-contracts/out/", facetName, ".sol/", facetName, "Facet.json");
-        bytes memory bytecode = readFoundryDeployedBytecode(path);
+        bytes memory bytecode = BytecodeUtils.readFoundryDeployedBytecode(path);
         return getAllSelectors(bytecode);
     }
 
@@ -1396,7 +1396,7 @@ library Utils {
         string memory fileName,
         string memory contractName
     ) internal returns (bytes memory bytecodeInfo) {
-        bytes memory bytecode = readFoundryDeployedBytecodeL1(fileName, contractName);
+        bytes memory bytecode = readDeployedBytecodeL1(true, fileName, contractName);
         bytecodeInfo = getZKOSBytecodeInfo(bytecode);
     }
 
