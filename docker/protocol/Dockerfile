@@ -9,9 +9,23 @@ ARG RUST_TOOLCHAIN=nightly-2025-09-19
 ARG YARN_VERSION=1.22.19
 
 ########################################
-# Base: shared tooling image
+# 1) Planner — prepare cargo-chef recipes
 ########################################
-FROM debian:bookworm-slim AS base
+FROM lukemathwalker/cargo-chef:latest-rust-1 AS planner
+
+COPY protocol-ops /src/protocol-ops
+COPY tools/zksync-os-genesis-gen /src/tools/zksync-os-genesis-gen
+COPY tools/wallets-gen /src/tools/wallets-gen
+
+RUN mkdir -p /recipes && \
+    cd /src/protocol-ops && cargo chef prepare --recipe-path /recipes/protocol-ops.json && \
+    cd /src/tools/zksync-os-genesis-gen && cargo chef prepare --recipe-path /recipes/genesis-gen.json && \
+    cd /src/tools/wallets-gen && cargo chef prepare --recipe-path /recipes/wallets-gen.json
+
+########################################
+# 2) Build
+########################################
+FROM debian:bookworm-slim AS build
 
 ARG FOUNDRY_ARCH
 ARG FOUNDRY_ZKSYNC_TAG
@@ -24,7 +38,8 @@ ARG YARN_VERSION
 ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH \
     RUSTUP_HOME=/usr/local/rustup \
-    CARGO_HOME=/usr/local/cargo
+    CARGO_HOME=/usr/local/cargo \
+    YARN_CACHE_FOLDER=/tmp/yarn-cache
 
 # Build deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -52,94 +67,75 @@ RUN curl -L -o /tmp/foundry-vanilla.tgz https://github.com/foundry-rs/foundry/re
  && chmod +x /usr/local/bin/anvil \
  && rm /tmp/foundry-vanilla.tgz
 
-# Rust + cargo-chef
+# === Install Rust ===
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
     sh -s -- -y --default-toolchain ${RUST_TOOLCHAIN} --no-modify-path
 RUN rustup target add ${RUST_TARGET}
-RUN cargo install cargo-chef --locked
 
-########################################
-# Stage: prepare recipes (fast, only reads manifests)
-########################################
-FROM base AS planner
-
-WORKDIR /src
-COPY . /src
-
-# Each crate has its own workspace — prepare a recipe for each.
-RUN mkdir -p /recipes && \
-    cd protocol-ops && cargo chef prepare --recipe-path /recipes/protocol-ops.json
-RUN cd tools/zksync-os-genesis-gen && cargo chef prepare --recipe-path /recipes/genesis-gen.json
-RUN cd tools/wallets-gen && cargo chef prepare --recipe-path /recipes/wallets-gen.json
-
-########################################
-# Stage: build Rust binaries (cached dep layers via cargo-chef)
-########################################
-FROM base AS rust-builder
-
-ARG RUST_TARGET
-
-# -- Cook dependencies (cached until Cargo.toml/lock change) --
-WORKDIR /build/protocol-ops
+# === Cook Rust dependencies (cached until Cargo.toml/lock change) ===
+WORKDIR /contracts/protocol-ops
 COPY --from=planner /recipes/protocol-ops.json recipe.json
 RUN cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
 
-WORKDIR /build/genesis-gen
+WORKDIR /contracts/tools/zksync-os-genesis-gen
 COPY --from=planner /recipes/genesis-gen.json recipe.json
 COPY tools/zksync-os-genesis-gen/rust-toolchain.toml ./
 RUN cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
 
-WORKDIR /build/wallets-gen
+WORKDIR /contracts/tools/wallets-gen
 COPY --from=planner /recipes/wallets-gen.json recipe.json
 RUN cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
 
-# -- Build actual binaries (only source changes invalidate this) --
-WORKDIR /build/protocol-ops
-COPY protocol-ops/ ./
-RUN cargo build --bin protocol_ops --release --target ${RUST_TARGET}
-
-WORKDIR /build/genesis-gen
-COPY tools/zksync-os-genesis-gen/ ./
-RUN cargo build --release --target ${RUST_TARGET}
-
-WORKDIR /build/wallets-gen
-COPY tools/wallets-gen/ ./
-RUN cargo build --release --target ${RUST_TARGET}
-
-########################################
-# Stage: build Solidity contracts (parallel with rust-builder)
-########################################
-FROM base AS contracts-builder
-
+# === Copy all source code ===
 WORKDIR /contracts
 COPY . /contracts
 
-ENV YARN_CACHE_FOLDER=/tmp/yarn-cache
+# === Build Rust binaries (deps already cached by cook) ===
+WORKDIR /contracts/protocol-ops
+RUN cargo build --bin protocol_ops --release --target ${RUST_TARGET} && \
+    cp target/${RUST_TARGET}/release/protocol_ops /usr/local/bin/ && \
+    rm -rf target
+
+WORKDIR /contracts/tools/zksync-os-genesis-gen
+RUN cargo build --release --target ${RUST_TARGET} && \
+    cp target/${RUST_TARGET}/release/zksync-os-genesis-gen /usr/local/bin/ && \
+    rm -rf target
+
+WORKDIR /contracts/tools/wallets-gen
+RUN cargo build --release --target ${RUST_TARGET} && \
+    cp target/${RUST_TARGET}/release/wallets-gen /usr/local/bin/ && \
+    rm -rf target
+
+# === Install JS dependencies ===
+WORKDIR /contracts
 RUN yarn install --frozen-lockfile
 
-# Clean + compile
-RUN forge clean --root da-contracts && \
-    yarn --cwd l1-contracts clean && forge clean --root l1-contracts && \
-    yarn --cwd l2-contracts clean && forge clean --root l2-contracts && \
-    yarn --cwd system-contracts clean && forge clean --root system-contracts
+# === Clean + compile contracts ===
+RUN forge clean --root da-contracts
+RUN yarn --cwd l1-contracts clean
+RUN forge clean --root l1-contracts
+RUN yarn --cwd l2-contracts clean
+RUN forge clean --root l2-contracts
+RUN yarn --cwd system-contracts clean
+RUN forge clean --root system-contracts
 
-RUN yarn --cwd da-contracts build:foundry && \
-    yarn --cwd l1-contracts build:foundry && \
-    yarn --cwd l2-contracts build:foundry && \
-    yarn --cwd system-contracts build:foundry
+RUN yarn --cwd da-contracts build:foundry
+RUN yarn --cwd l1-contracts build:foundry
+RUN yarn --cwd l2-contracts build:foundry
+RUN yarn --cwd system-contracts build:foundry
 
+# === Calculate hashes ===
 RUN yarn calculate-hashes:check
 
-# Keep full node_modules — forge ffi scripts need devDependencies (ts-node, typescript, etc.)
+# Keep full node_modules — forge ffi scripts need devDependencies (ts-node, etc.)
 
 ########################################
-# Runtime
+# 3) Runtime
 ########################################
 FROM debian:bookworm-slim
 
 ARG NODE_MAJOR
 ARG YARN_VERSION
-ARG RUST_TARGET
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/usr/local/bin:$PATH \
@@ -155,28 +151,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     npm cache clean --force && \
     rm -rf /var/lib/apt/lists/*
 
-# Foundry binaries
-COPY --from=contracts-builder /usr/local/bin/forge /usr/local/bin/forge
-COPY --from=contracts-builder /usr/local/bin/cast  /usr/local/bin/cast
-COPY --from=contracts-builder /usr/local/bin/anvil /usr/local/bin/anvil
+# === Copy foundry binaries from build stage ===
+COPY --from=build /usr/local/bin/forge /usr/local/bin/forge
+COPY --from=build /usr/local/bin/cast  /usr/local/bin/cast
+COPY --from=build /usr/local/bin/anvil /usr/local/bin/anvil
+# === Copy protocol_ops and tools ===
+COPY --from=build /usr/local/bin/protocol_ops /usr/local/bin/protocol_ops
+COPY --from=build /usr/local/bin/zksync-os-genesis-gen /usr/local/bin/zksync-os-genesis-gen
+COPY --from=build /usr/local/bin/wallets-gen /usr/local/bin/wallets-gen
 
-# Rust binaries
-COPY --from=rust-builder /build/protocol-ops/target/${RUST_TARGET}/release/protocol_ops /usr/local/bin/
-COPY --from=rust-builder /build/genesis-gen/target/${RUST_TARGET}/release/zksync-os-genesis-gen /usr/local/bin/
-COPY --from=rust-builder /build/wallets-gen/target/${RUST_TARGET}/release/wallets-gen /usr/local/bin/
-
-# Compiled contracts + configs
+# === Set new WORKDIR and copy artifacts to /contracts/ ===
 WORKDIR /contracts
-COPY --from=contracts-builder /contracts/configs /contracts/configs
-COPY --from=contracts-builder /contracts/l1-contracts /contracts/l1-contracts
-COPY --from=contracts-builder /contracts/l2-contracts /contracts/l2-contracts
-COPY --from=contracts-builder /contracts/system-contracts /contracts/system-contracts
-COPY --from=contracts-builder /contracts/da-contracts /contracts/da-contracts
-COPY --from=contracts-builder /contracts/lib /contracts/lib
-COPY --from=contracts-builder /contracts/node_modules /contracts/node_modules
-COPY --from=contracts-builder /contracts/package.json /contracts/package.json
-COPY --from=contracts-builder /contracts/AllContractsHashes.json /contracts/AllContractsHashes.json
-COPY --from=contracts-builder /contracts/SystemConfig.json /contracts/SystemConfig.json
+COPY --from=build /contracts/configs /contracts/configs
+COPY --from=build /contracts/l1-contracts /contracts/l1-contracts
+COPY --from=build /contracts/l2-contracts /contracts/l2-contracts
+COPY --from=build /contracts/system-contracts /contracts/system-contracts
+COPY --from=build /contracts/da-contracts /contracts/da-contracts
+COPY --from=build /contracts/lib /contracts/lib
+COPY --from=build /contracts/node_modules /contracts/node_modules
+COPY --from=build /contracts/package.json /contracts/package.json
+COPY --from=build /contracts/AllContractsHashes.json /contracts/AllContractsHashes.json
+COPY --from=build /contracts/SystemConfig.json /contracts/SystemConfig.json
 
 # Disable foundry-zksync telemetry
 RUN mkdir -p /etc/xdg/zksync-tooling && \
