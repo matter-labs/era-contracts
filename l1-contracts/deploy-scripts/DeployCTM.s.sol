@@ -57,6 +57,7 @@ import {L2NativeTokenVaultZKOS} from "contracts/bridge/ntv/L2NativeTokenVaultZKO
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
 import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
+import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
@@ -217,18 +218,29 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             (addresses.stateTransition.verifierFflonk) = deploySimpleContract("EraVerifierFflonk", false);
             (addresses.stateTransition.verifierPlonk) = deploySimpleContract("EraVerifierPlonk", false);
         }
-        (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
 
-        if (config.isZKsyncOS) {
-            // We add the verifier to the default execution version
+        if (config.multiProofVerifier) {
+            // Deploy MultiProofVerifier that requires BOTH Airbender and ZiSK proofs.
+            (addresses.stateTransition.ziskVerifier) = deploySimpleContract("ZiskVerifier", false);
+            (addresses.stateTransition.verifier) = deploySimpleContract("MultiProofVerifier", false);
+
             vm.startBroadcast(msg.sender);
-            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).addVerifier(
-                DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
-                IVerifierV2(addresses.stateTransition.verifierFflonk),
-                IVerifier(addresses.stateTransition.verifierPlonk)
-            );
-            ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(config.ownerAddress);
+            MultiProofVerifier(addresses.stateTransition.verifier).transferOwnership(config.ownerAddress);
             vm.stopBroadcast();
+        } else {
+            (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
+
+            if (config.isZKsyncOS) {
+                // We add the verifier to the default execution version
+                vm.startBroadcast(msg.sender);
+                ZKsyncOSDualVerifier(addresses.stateTransition.verifier).addVerifier(
+                    DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
+                    IVerifierV2(addresses.stateTransition.verifierFflonk),
+                    IVerifier(addresses.stateTransition.verifierPlonk)
+                );
+                ZKsyncOSDualVerifier(addresses.stateTransition.verifier).transferOwnership(config.ownerAddress);
+                vm.stopBroadcast();
+            }
         }
     }
 
@@ -362,6 +374,9 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             addresses.stateTransition.chainTypeManagerImplementation
         );
         vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
+        if (addresses.stateTransition.ziskVerifier != address(0)) {
+            vm.serializeAddress("state_transition", "zisk_verifier_addr", addresses.stateTransition.ziskVerifier);
+        }
         vm.serializeAddress("state_transition", "admin_facet_addr", addresses.stateTransition.adminFacet);
         vm.serializeAddress("state_transition", "mailbox_facet_addr", addresses.stateTransition.mailboxFacet);
         vm.serializeAddress("state_transition", "executor_facet_addr", addresses.stateTransition.executorFacet);

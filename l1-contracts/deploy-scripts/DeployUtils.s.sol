@@ -79,6 +79,7 @@ struct Config {
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
     bool isZKsyncOS;
+    bool multiProofVerifier;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
@@ -141,6 +142,11 @@ abstract contract DeployUtils is Create2FactoryUtils {
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
         config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
+        try vm.parseTomlBool(toml, "$.multi_proof_verifier") returns (bool val) {
+            config.multiProofVerifier = val;
+        } catch {
+            config.multiProofVerifier = false;
+        }
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
@@ -423,6 +429,14 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "ZiskVerifier")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "MultiProofVerifier")) {
+            return abi.encode(
+                addresses.stateTransition.verifierPlonk,  // airbender verifier
+                addresses.stateTransition.ziskVerifier,    // zisk verifier
+                msg.sender                                 // initial owner
+            );
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
