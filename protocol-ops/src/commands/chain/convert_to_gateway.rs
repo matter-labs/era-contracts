@@ -84,6 +84,14 @@ pub struct ConvertToGatewayArgs {
     #[clap(long, default_value = "1000000000")]
     pub gateway_settlement_fee: u64,
 
+    /// Whether to use testnet verifier (required for vote-prepare stage).
+    #[clap(long)]
+    pub testnet_verifier: Option<bool>,
+
+    /// Whether to use ZKsync OS (required for vote-prepare stage).
+    #[clap(long)]
+    pub is_zk_sync_os: Option<bool>,
+
     /// Governance address (required for governance-execute stage).
     #[clap(long)]
     pub governance_address: Option<Address>,
@@ -194,41 +202,52 @@ fn run_vote_prepare(
     let refund = args.refund_recipient.ok_or_else(|| {
         anyhow::anyhow!("--refund-recipient is required for vote-prepare stage")
     })?;
+    let testnet_verifier = args.testnet_verifier.ok_or_else(|| {
+        anyhow::anyhow!("--testnet-verifier is required for vote-prepare stage")
+    })?;
+    let is_zk_sync_os = args.is_zk_sync_os.ok_or_else(|| {
+        anyhow::anyhow!("--is-zk-sync-os is required for vote-prepare stage")
+    })?;
 
-    // Read the base template that ships with the image / repo
-    let template_path = contracts_path.join("deploy-script-config-template/config-deploy-ctm.toml");
-    let mut base = if template_path.exists() {
-        std::fs::read_to_string(&template_path)
-            .with_context(|| format!("read {}", template_path.display()))?
-    } else {
-        // Fall back to the generated script-config version (local builds)
-        let sc = contracts_path.join("script-config/config-deploy-ctm.toml");
-        std::fs::read_to_string(&sc)
-            .with_context(|| format!("read {}", sc.display()))?
-    };
+    // Build the vote preparation input TOML from CLI args.
+    // The forge script (GatewayVotePreparation) reads these fields; values
+    // like owner_address are overridden from on-chain state, and contracts.*
+    // fields are not used in the gateway flow but the parent parser requires them.
+    let toml_content = format!(
+        r#"owner_address = "{refund:#x}"
+# Used by the gateway vote preparation forge script
+testnet_verifier = {testnet_verifier}
+is_zk_sync_os = {is_zk_sync_os}
+refund_recipient = "{refund:#x}"
+gateway_chain_id = {gw}
+gateway_settlement_fee = {fee}
+force_deployments_data = "{fd}"
 
-    // Append gateway-specific fields before [contracts] (or at end)
-    let gateway_block = format!(
-        "\nrefund_recipient = \"{refund:#x}\"\n\
-         gateway_chain_id = {gw}\n\
-         gateway_settlement_fee = {fee}\n\
-         force_deployments_data = \"{fd}\"\n",
+# Not used by the gateway flow but required by the parent config parser
+owner_address = "0x0000000000000000000000000000000000000000"
+support_l2_legacy_shared_bridge_test = false
+zk_token_asset_id = "0x0000000000000000000000000000000000000000000000000000000000000001"
+
+[contracts]
+create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
+governance_security_council_address = "0x0000000000000000000000000000000000000000"
+governance_min_delay = 0
+validator_timelock_execution_delay = 0
+"#,
+        refund = refund,
+        testnet_verifier = testnet_verifier,
+        is_zk_sync_os = is_zk_sync_os,
         gw = args.gateway_chain_id,
         fee = args.gateway_settlement_fee,
         fd = force_hex,
     );
-    if let Some(idx) = base.find("\n[contracts]") {
-        base.insert_str(idx, &gateway_block);
-    } else {
-        base.push_str(&gateway_block);
-    }
 
     let script_config = contracts_path.join("script-config");
     std::fs::create_dir_all(&script_config)?;
 
     let generated_path = "/script-config/gateway-vote-preparation-generated.toml";
     let abs_path = contracts_path.join(generated_path.trim_start_matches('/'));
-    std::fs::write(&abs_path, &base)?;
+    std::fs::write(&abs_path, &toml_content)?;
 
     let vote_input_path = generated_path.to_string();
 
