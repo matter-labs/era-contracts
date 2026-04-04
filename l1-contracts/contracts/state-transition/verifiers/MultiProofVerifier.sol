@@ -9,24 +9,20 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Requires BOTH an Airbender proof and a ZiSK proof for each state transition.
-///         Only accepts the combined proof type (MULTI_PROOF_TYPE = 5) or mock proofs (type 3).
-///         Single-system proofs (type 2) are rejected — both proof systems must agree.
+///         Only accepts the combined proof type (MULTI_PROOF_TYPE = 5).
+///         Single-system proofs (type 2) and mock proofs (type 3) are rejected.
 ///
 /// @dev Proof encoding received from the Executor:
 ///      proof[0] = proof_type | (verifier_version << 8)
 ///      proof[1] = previous_hash (used by computeZKsyncOSHash)
 ///
 ///      For type 5 (MULTI_PROOF):
-///      proof[2]           = N  (number of Airbender proof elements)
-///      proof[3 .. 3+N]    = Airbender SNARK proof elements
+///      proof[2]              = N  (number of Airbender proof elements)
+///      proof[3 .. 3+N]       = Airbender SNARK proof elements
 ///      proof[3+N .. 3+N+24]  = ZiSK SNARK proof (24 uint256 = 768 bytes)
 ///      proof[3+N+24 .. 3+N+32] = ZiSK public values (8 uint256 = 256 bytes)
-///
-///      The verifier strips proof[0..2] (type+version, previous_hash) and passes
-///      the remaining data to each inner verifier after splitting.
 contract MultiProofVerifier is Ownable2Step, IVerifier {
     uint256 internal constant MULTI_PROOF_TYPE = 5;
-    uint256 internal constant MOCK_PROOF_TYPE = 3;
 
     /// @notice Inner verifier for Airbender proofs (implements IVerifier).
     IVerifier public airbenderVerifier;
@@ -38,7 +34,6 @@ contract MultiProofVerifier is Ownable2Step, IVerifier {
     error ProofTooShort();
     error AirbenderVerificationFailed();
     error ZiskVerificationFailed();
-    error InvalidMockProof();
 
     constructor(
         IVerifier _airbenderVerifier,
@@ -61,8 +56,6 @@ contract MultiProofVerifier is Ownable2Step, IVerifier {
     }
 
     /// @notice Verify a combined Airbender + ZiSK proof.
-    /// @param _publicInputs Public inputs from the Executor (batch commitment data).
-    /// @param _proof Combined proof array containing both sub-proofs.
     function verify(
         uint256[] calldata _publicInputs,
         uint256[] calldata _proof
@@ -70,10 +63,6 @@ contract MultiProofVerifier is Ownable2Step, IVerifier {
         if (_proof.length == 0) revert EmptyProof();
 
         uint256 proofType = _proof[0] & 255;
-
-        if (proofType == MOCK_PROOF_TYPE) {
-            return _mockVerify(_publicInputs, _proof);
-        }
 
         if (proofType == MULTI_PROOF_TYPE) {
             return _verifyMultiProof(_publicInputs, _proof);
@@ -84,7 +73,6 @@ contract MultiProofVerifier is Ownable2Step, IVerifier {
 
     /// @inheritdoc IVerifier
     function verificationKeyHash() external view override returns (bytes32) {
-        // Return the Airbender VK hash for backward compatibility.
         return airbenderVerifier.verificationKeyHash();
     }
 
@@ -97,15 +85,12 @@ contract MultiProofVerifier is Ownable2Step, IVerifier {
         if (_proof.length < 3) revert ProofTooShort();
 
         uint256 airbenderLen = _proof[2];
-        // Need: 3 + airbenderLen + 24 (ZiSK SNARK) + 8 (ZiSK PV) elements
         if (_proof.length < 3 + airbenderLen + 32) revert ProofTooShort();
 
-        // Compute the public input hash the same way DualVerifier does.
         uint256[] memory args = new uint256[](1);
         args[0] = _computeZKsyncOSHash(_proof[1], _publicInputs);
 
         // --- Airbender verification ---
-        // Extract Airbender proof elements: _proof[3 .. 3+N]
         uint256[] memory airbenderProof = new uint256[](airbenderLen);
         for (uint256 i = 0; i < airbenderLen; i++) {
             airbenderProof[i] = _proof[3 + i];
@@ -115,8 +100,6 @@ contract MultiProofVerifier is Ownable2Step, IVerifier {
         }
 
         // --- ZiSK verification ---
-        // Extract ZiSK data: _proof[3+N .. 3+N+32]
-        // (24 SNARK elements + 8 public value elements)
         uint256 ziskStart = 3 + airbenderLen;
         uint256[] memory ziskProof = new uint256[](32);
         for (uint256 i = 0; i < 32; i++) {
@@ -129,25 +112,7 @@ contract MultiProofVerifier is Ownable2Step, IVerifier {
         return true;
     }
 
-    /// @dev Mock verification: accepts if magic value and public input match.
-    ///      Proof layout for mock: [type, prev_hash, magic(13), public_input]
-    function _mockVerify(
-        uint256[] calldata _publicInputs,
-        uint256[] calldata _proof
-    ) internal pure returns (bool) {
-        if (_proof.length < 4) revert ProofTooShort();
-        uint256[] memory args = new uint256[](1);
-        args[0] = _computeZKsyncOSHash(_proof[1], _publicInputs);
-
-        // Standard mock check: magic value = 13, public input match.
-        if (_proof[2] != 13 || _proof[3] != args[0]) {
-            revert InvalidMockProof();
-        }
-        return true;
-    }
-
     /// @dev Compute the ZKsync OS hash: chain public inputs with keccak256 truncated to 224 bits.
-    ///      Matches DualVerifier.computeZKsyncOSHash.
     function _computeZKsyncOSHash(
         uint256 initialHash,
         uint256[] calldata _publicInputs

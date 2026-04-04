@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import "forge-std/Test.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {MultiProofVerifier} from "contracts/state-transition/verifiers/MultiProofVerifier.sol";
+import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 
 /// @dev Mock verifier that always returns true.
 contract MockPassVerifier is IVerifier {
@@ -27,6 +28,7 @@ contract MockFailVerifier is IVerifier {
 
 contract MultiProofVerifierTest is Test {
     MultiProofVerifier verifier;
+    TestnetVerifier testnetVerifier;
     MockPassVerifier passVerifier;
     MockFailVerifier failVerifier;
 
@@ -38,42 +40,43 @@ contract MultiProofVerifierTest is Test {
             IVerifier(address(passVerifier)),
             address(this)
         );
+        // TestnetVerifier wraps MultiProofVerifier — adds mock proof support.
+        testnetVerifier = new TestnetVerifier(IVerifier(address(verifier)));
     }
+
+    // --- MultiProofVerifier (prod) tests ---
 
     function test_deployment() public view {
         assertEq(address(verifier.airbenderVerifier()), address(passVerifier));
         assertEq(address(verifier.ziskVerifier()), address(passVerifier));
     }
 
-    function test_mockProof_passes() public view {
+    function test_mockProof_rejected_in_prod() public {
         uint256[] memory publicInputs = new uint256[](1);
         publicInputs[0] = 42;
 
-        // Mock proof: [type=3, prevHash=0, magic=13, publicInput]
         uint256[] memory proof = new uint256[](4);
-        proof[0] = 3;  // MOCK_PROOF_TYPE
-        proof[1] = 0;  // previous hash (0 means use publicInputs[0] directly)
-        proof[2] = 13; // magic
-        proof[3] = 42; // must match hash(prevHash, publicInputs)
+        proof[0] = 3;
+        proof[1] = 0;
+        proof[2] = 13;
+        proof[3] = 42;
 
-        assertTrue(verifier.verify(publicInputs, proof));
+        vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, 3));
+        verifier.verify(publicInputs, proof);
     }
 
     function test_multiProof_bothPass() public view {
         uint256[] memory publicInputs = new uint256[](1);
         publicInputs[0] = 42;
 
-        // Multi-proof: [type=5, prevHash=0, N=2, airbender[0], airbender[1], zisk[0..31]]
         uint256 airbenderLen = 2;
         uint256 ziskLen = 32;
         uint256[] memory proof = new uint256[](3 + airbenderLen + ziskLen);
-        proof[0] = 5;  // MULTI_PROOF_TYPE
-        proof[1] = 0;  // previous hash
+        proof[0] = 5;
+        proof[1] = 0;
         proof[2] = airbenderLen;
-        // Airbender proof elements (mock accepts anything)
         proof[3] = 111;
         proof[4] = 222;
-        // ZiSK proof elements (mock accepts anything)
         for (uint256 i = 0; i < ziskLen; i++) {
             proof[5 + i] = i;
         }
@@ -82,7 +85,6 @@ contract MultiProofVerifierTest is Test {
     }
 
     function test_multiProof_airbenderFails_reverts() public {
-        // Set airbender verifier to fail.
         verifier.setAirbenderVerifier(IVerifier(address(failVerifier)));
 
         uint256[] memory publicInputs = new uint256[](1);
@@ -98,7 +100,6 @@ contract MultiProofVerifierTest is Test {
     }
 
     function test_multiProof_ziskFails_reverts() public {
-        // Set zisk verifier to fail (airbender still passes).
         verifier.setZiskVerifier(IVerifier(address(failVerifier)));
 
         uint256[] memory publicInputs = new uint256[](1);
@@ -113,20 +114,10 @@ contract MultiProofVerifierTest is Test {
         verifier.verify(publicInputs, proof);
     }
 
-    function test_unknownProofType_reverts() public {
-        uint256[] memory publicInputs = new uint256[](1);
-        uint256[] memory proof = new uint256[](1);
-        proof[0] = 99; // unknown type
-
-        vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, 99));
-        verifier.verify(publicInputs, proof);
-    }
-
     function test_singleProofType2_rejected() public {
-        // Type 2 (single Airbender proof) should be rejected by MultiProofVerifier.
         uint256[] memory publicInputs = new uint256[](1);
         uint256[] memory proof = new uint256[](44);
-        proof[0] = 2; // OHBENDER type
+        proof[0] = 2;
 
         vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, 2));
         verifier.verify(publicInputs, proof);
@@ -137,5 +128,56 @@ contract MultiProofVerifierTest is Test {
         vm.prank(nonOwner);
         vm.expectRevert("Ownable: caller is not the owner");
         verifier.setAirbenderVerifier(IVerifier(address(failVerifier)));
+    }
+
+    // --- TestnetVerifier(MultiProofVerifier) composition tests ---
+
+    function test_testnet_emptyProof_accepted() public view {
+        uint256[] memory publicInputs = new uint256[](1);
+        publicInputs[0] = 42;
+        uint256[] memory proof = new uint256[](0);
+
+        assertTrue(testnetVerifier.verify(publicInputs, proof));
+    }
+
+    function test_testnet_mockProof_passes() public view {
+        uint256[] memory publicInputs = new uint256[](1);
+        publicInputs[0] = 42;
+
+        uint256[] memory proof = new uint256[](4);
+        proof[0] = 3;
+        proof[1] = 0;
+        proof[2] = 13;
+        proof[3] = 42;
+
+        assertTrue(testnetVerifier.verify(publicInputs, proof));
+    }
+
+    function test_testnet_multiProof_delegated() public view {
+        uint256[] memory publicInputs = new uint256[](1);
+        publicInputs[0] = 42;
+
+        uint256 airbenderLen = 2;
+        uint256 ziskLen = 32;
+        uint256[] memory proof = new uint256[](3 + airbenderLen + ziskLen);
+        proof[0] = 5;
+        proof[1] = 0;
+        proof[2] = airbenderLen;
+        proof[3] = 111;
+        proof[4] = 222;
+        for (uint256 i = 0; i < ziskLen; i++) {
+            proof[5 + i] = i;
+        }
+
+        assertTrue(testnetVerifier.verify(publicInputs, proof));
+    }
+
+    function test_testnet_singleProofType2_rejected() public {
+        uint256[] memory publicInputs = new uint256[](1);
+        uint256[] memory proof = new uint256[](44);
+        proof[0] = 2;
+
+        vm.expectRevert(abi.encodeWithSelector(MultiProofVerifier.UnknownProofType.selector, 2));
+        testnetVerifier.verify(publicInputs, proof);
     }
 }

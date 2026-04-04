@@ -222,11 +222,19 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         if (config.multiProofVerifier) {
             // Deploy MultiProofVerifier that requires BOTH Airbender and ZiSK proofs.
             (addresses.stateTransition.ziskVerifier) = deploySimpleContract("ZiskVerifier", false);
-            (addresses.stateTransition.verifier) = deploySimpleContract("MultiProofVerifier", false);
+            (addresses.stateTransition.multiProofVerifier) = deploySimpleContract("MultiProofVerifier", false);
 
             vm.startBroadcast(msg.sender);
-            MultiProofVerifier(addresses.stateTransition.verifier).transferOwnership(config.ownerAddress);
+            MultiProofVerifier(addresses.stateTransition.multiProofVerifier).transferOwnership(config.ownerAddress);
             vm.stopBroadcast();
+
+            if (config.testnetVerifier) {
+                // Testnet: wrap MultiProofVerifier with TestnetVerifier for mock proof support.
+                (addresses.stateTransition.verifier) = deploySimpleContract("TestnetVerifier", false);
+            } else {
+                // Prod: use MultiProofVerifier directly.
+                addresses.stateTransition.verifier = addresses.stateTransition.multiProofVerifier;
+            }
         } else {
             (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
 

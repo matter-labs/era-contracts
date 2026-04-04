@@ -437,6 +437,8 @@ abstract contract DeployUtils is Create2FactoryUtils {
                 addresses.stateTransition.ziskVerifier,    // zisk verifier
                 msg.sender                                 // initial owner
             );
+        } else if (compareStrings(contractName, "TestnetVerifier")) {
+            return abi.encode(addresses.stateTransition.multiProofVerifier);
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
