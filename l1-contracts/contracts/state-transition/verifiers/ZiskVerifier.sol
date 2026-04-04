@@ -1,0 +1,87 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity 0.8.28;
+
+import {IVerifier} from "../chain-interfaces/IVerifier.sol";
+import {ZiskSnarkPlonkVerifier} from "./ZiskSnarkPlonkVerifier.sol";
+
+/// @title ZiSK Verifier
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @notice Verifies ZiSK SNARK proofs as an inner verifier for ZKsyncOSDualVerifier.
+/// @dev Implements IVerifier so it can be registered via addVerifier(version, ..., ziskVerifier).
+///      The DualVerifier strips the proof header (type+version, previous_hash) before calling
+///      this contract, so _proof starts directly at the ZiSK data:
+///        _proof[0..24]  = ZiSK SNARK proof (24 uint256 = 768 bytes)
+///        _proof[24..32] = ZiSK public values (8 uint256 = 256 bytes)
+///      Remaining elements are padding and ignored.
+contract ZiskVerifier is ZiskSnarkPlonkVerifier, IVerifier {
+    /// @notice ZiSK ELF-specific verification key (programVK).
+    uint64 private constant _PROGRAM_VK_0 = 6940347123582280582;
+    uint64 private constant _PROGRAM_VK_1 = 9814819133568063389;
+    uint64 private constant _PROGRAM_VK_2 = 12093956998655283157;
+    uint64 private constant _PROGRAM_VK_3 = 13916704035449538710;
+
+    /// @notice ZiSK vadcop final root commitment.
+    uint64 private constant _ROOT_CV_ADCOP_FINAL_0 = 9211010158316595036;
+    uint64 private constant _ROOT_CV_ADCOP_FINAL_1 = 7055235338110277438;
+    uint64 private constant _ROOT_CV_ADCOP_FINAL_2 = 2391371252028311145;
+    uint64 private constant _ROOT_CV_ADCOP_FINAL_3 = 10691781997660262077;
+
+    /// @notice BN254 scalar field modulus.
+    uint256 private constant _RFIELD =
+        21888242871839275222246405745257275088548364400416034343698204186575808495617;
+
+    /// @notice Verification key hash (must match server's ProvingVersion VK hash).
+    bytes32 private constant _VK_HASH =
+        0x124ebcd537a1e1c152774dd18f67660e35625bba0b669bf3b4836d636b105337;
+
+    /// @inheritdoc IVerifier
+    function verify(
+        uint256[] calldata _publicInputs,
+        uint256[] calldata _proof
+    ) external view override returns (bool) {
+        // The DualVerifier passes _proof = original_proof[2:].
+        // Layout: [0..24] ZiSK SNARK, [24..32] ZiSK public values, [32..] padding.
+        require(_proof.length >= 32, "ZiskVerifier: proof too short");
+
+        // Extract 24-element ZiSK SNARK proof.
+        uint256[24] memory ziskProof;
+        for (uint256 i = 0; i < 24; i++) {
+            ziskProof[i] = _proof[i];
+        }
+
+        // Extract 256-byte ZiSK public values from 8 uint256 elements.
+        bytes memory publicValues = new bytes(256);
+        for (uint256 i = 0; i < 8; i++) {
+            uint256 val = _proof[24 + i];
+            assembly {
+                mstore(add(add(publicValues, 32), mul(i, 32)), val)
+            }
+        }
+
+        // Compute: sha256(programVK || publicValues || rootCVadcopFinal) % RFIELD
+        uint256 publicValuesDigest = uint256(
+            sha256(
+                abi.encodePacked(
+                    bytes8(_PROGRAM_VK_0),
+                    bytes8(_PROGRAM_VK_1),
+                    bytes8(_PROGRAM_VK_2),
+                    bytes8(_PROGRAM_VK_3),
+                    publicValues,
+                    bytes8(_ROOT_CV_ADCOP_FINAL_0),
+                    bytes8(_ROOT_CV_ADCOP_FINAL_1),
+                    bytes8(_ROOT_CV_ADCOP_FINAL_2),
+                    bytes8(_ROOT_CV_ADCOP_FINAL_3)
+                )
+            )
+        ) % _RFIELD;
+
+        return this.verifyProof(ziskProof, [publicValuesDigest]);
+    }
+
+    /// @inheritdoc IVerifier
+    function verificationKeyHash() external pure override returns (bytes32) {
+        return _VK_HASH;
+    }
+}
