@@ -9,12 +9,13 @@ import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common
 import {MockContract} from "contracts/dev-contracts/MockContract.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
+import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
 
 contract L2ComplexUpgraderTest is Test {
     MockContract public dummyUpgrade;
 
     function setUp() public {
-        bytes memory code = Utils.readBytecodeL1(false, "L2ComplexUpgrader.sol", "L2ComplexUpgrader");
+        bytes memory code = BytecodeUtils.readBytecodeL1(false, "L2ComplexUpgrader.sol", "L2ComplexUpgrader");
         vm.etch(L2_COMPLEX_UPGRADER_ADDR, code);
         dummyUpgrade = new MockContract();
     }

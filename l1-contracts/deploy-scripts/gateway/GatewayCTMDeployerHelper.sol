@@ -24,6 +24,7 @@ import {
 } from "contracts/state-transition/IChainTypeManager.sol";
 
 import {Utils} from "../utils/Utils.sol";
+import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
@@ -195,7 +196,7 @@ library GatewayCTMDeployerHelper {
             aliasedGovernanceAddress: config.aliasedGovernanceAddress
         });
 
-        bytes memory bytecode = Utils.readBytecodeL1(
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1(
             config.isZKsyncOS,
             "GatewayCTMDeployerDA.sol",
             "GatewayCTMDeployerDA"
@@ -224,7 +225,7 @@ library GatewayCTMDeployerHelper {
             aliasedGovernanceAddress: config.aliasedGovernanceAddress
         });
 
-        bytes memory bytecode = Utils.readBytecodeL1(
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1(
             config.isZKsyncOS,
             "GatewayCTMDeployerProxyAdmin.sol",
             "GatewayCTMDeployerProxyAdmin"
@@ -255,7 +256,7 @@ library GatewayCTMDeployerHelper {
             chainTypeManagerProxyAdmin: proxyAdminResult.chainTypeManagerProxyAdmin
         });
 
-        bytes memory bytecode = Utils.readBytecodeL1(
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1(
             config.isZKsyncOS,
             "GatewayCTMDeployerValidatorTimelock.sol",
             "GatewayCTMDeployerValidatorTimelock"
@@ -290,7 +291,7 @@ library GatewayCTMDeployerHelper {
             config.isZKsyncOS,
             CTMContract.GatewayCTMDeployerVerifiers
         );
-        bytes memory bytecode = Utils.readBytecodeL1(config.isZKsyncOS, vdFile, vdName);
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1(config.isZKsyncOS, vdFile, vdName);
         bytes memory constructorArgs = abi.encode(verifiersConfig);
 
         L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(
@@ -412,7 +413,7 @@ library GatewayCTMDeployerHelper {
         bytes memory constructorArgs,
         bool _isZKsyncOS
     ) internal returns (address addr, bytes memory data) {
-        bytes memory bytecode = Utils.readBytecodeL1(_isZKsyncOS, fileName, contractName);
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1(_isZKsyncOS, fileName, contractName);
         L1L2DeployPrepareResult memory result = _prepareL1L2Deployment(
             _isZKsyncOS,
             _create2Salt,
@@ -824,7 +825,7 @@ library GatewayCTMDeployerHelper {
         InnerDeployConfig memory config,
         bool _isZKsyncOS
     ) private returns (address) {
-        bytes memory bytecode = Utils.readBytecodeL1(_isZKsyncOS, fileName, contractName);
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1(_isZKsyncOS, fileName, contractName);
         return _computeCreate2Address(_isZKsyncOS, config.deployerAddr, config.salt, bytecode, params);
     }
 
@@ -849,33 +850,33 @@ library GatewayCTMDeployerHelper {
         dependencies = new bytes[](totalDependencies);
         uint256 idx = 0;
 
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "GatewayCTMDeployerDA");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "GatewayCTMDeployerProxyAdmin");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "GatewayCTMDeployerValidatorTimelock");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "GatewayCTMDeployerVerifiers");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "GatewayCTMDeployerCTM");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "RollupDAManager");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "ValidiumL1DAValidator");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "RelayedSLDAValidator");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "ProxyAdmin");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "ValidatorTimelock");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "TransparentUpgradeableProxy");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "EraVerifierFflonk");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "EraVerifierPlonk");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "EraTestnetVerifier");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "EraDualVerifier");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "ServerNotifier");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "EraChainTypeManager");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "Admin.sol", "AdminFacet");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "Mailbox.sol", "MailboxFacet");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "Executor.sol", "ExecutorFacet");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "Getters.sol", "GettersFacet");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "Migrator.sol", "MigratorFacet");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "Committer.sol", "CommitterFacet");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "DiamondInit");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "L1GenesisUpgrade");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "Multicall3");
-        dependencies[idx++] = Utils.readBytecodeL1(_isZKsyncOS, "DiamondProxy");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "GatewayCTMDeployerDA.sol", "GatewayCTMDeployerDA");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "GatewayCTMDeployerProxyAdmin.sol", "GatewayCTMDeployerProxyAdmin");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "GatewayCTMDeployerValidatorTimelock.sol", "GatewayCTMDeployerValidatorTimelock");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "GatewayCTMDeployerVerifiers.sol", "GatewayCTMDeployerVerifiers");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "GatewayCTMDeployerCTM.sol", "GatewayCTMDeployerCTM");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "RollupDAManager.sol", "RollupDAManager");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "RelayedSLDAValidator.sol", "RelayedSLDAValidator");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "ProxyAdmin.sol", "ProxyAdmin");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "ValidatorTimelock.sol", "ValidatorTimelock");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "TransparentUpgradeableProxy.sol", "TransparentUpgradeableProxy");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "EraVerifierFflonk.sol", "EraVerifierFflonk");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "EraVerifierPlonk.sol", "EraVerifierPlonk");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "EraTestnetVerifier.sol", "EraTestnetVerifier");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "EraDualVerifier.sol", "EraDualVerifier");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "ServerNotifier.sol", "ServerNotifier");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "EraChainTypeManager.sol", "EraChainTypeManager");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Admin.sol", "AdminFacet");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Mailbox.sol", "MailboxFacet");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Executor.sol", "ExecutorFacet");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Getters.sol", "GettersFacet");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Migrator.sol", "MigratorFacet");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Committer.sol", "CommitterFacet");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "DiamondInit.sol", "DiamondInit");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "L1GenesisUpgrade.sol", "L1GenesisUpgrade");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Multicall3.sol", "Multicall3");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "DiamondProxy.sol", "DiamondProxy");
     }
 
     // ======================== VM-branching utilities ========================

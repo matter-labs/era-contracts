@@ -10,6 +10,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Utils} from "../../utils/Utils.sol";
+import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {
     StateTransitionDeployedAddresses,
     ChainCreationParamsConfig,
@@ -572,11 +573,11 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     ) internal view virtual override returns (bytes memory) {
         require(isZKBytecode, "Only ZK bytecodes is not supported in Gateway upgrade");
         if (compareStrings(contractName, "DefaultUpgrade")) {
-            return Utils.readBytecodeL1(false, "DefaultUpgrade.sol", "DefaultUpgrade");
+            return BytecodeUtils.readBytecodeL1(false, "DefaultUpgrade.sol", "DefaultUpgrade");
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
-            return Utils.readBytecodeL1(false, "BytecodesSupplier.sol", "BytecodesSupplier");
+            return BytecodeUtils.readBytecodeL1(false, "BytecodesSupplier.sol", "BytecodesSupplier");
         } else if (compareStrings(contractName, "TransitionaryOwner")) {
-            return Utils.readBytecodeL1(false, "TransitionaryOwner.sol", "TransitionaryOwner");
+            return BytecodeUtils.readBytecodeL1(false, "TransitionaryOwner.sol", "TransitionaryOwner");
         } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
             return ContractsBytecodesLib.getCreationCodeEra("L2SharedBridgeLegacy");
         } else if (compareStrings(contractName, "ValidatorTimelock")) {

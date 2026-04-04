@@ -277,14 +277,14 @@ library Utils {
      * @dev Returns the bytecode hash of the batch bootloader.
      */
     function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
-        return readZKFoundryBytecodeSystemContracts("proved_batch.yul", "Bootloader");
+        return BytecodeUtils.readZKFoundryBytecodeSystemContracts("proved_batch.yul", "Bootloader");
     }
 
     /**
      * @dev Returns the bytecode hash of the EVM emulator.
      */
     function getEvmEmulatorBytecodeHash() internal view returns (bytes memory) {
-        return readZKFoundryBytecodeSystemContracts("EvmEmulator.yul", "EvmEmulator");
+        return BytecodeUtils.readZKFoundryBytecodeSystemContracts("EvmEmulator.yul", "EvmEmulator");
     }
 
     /**
@@ -1018,18 +1018,13 @@ library Utils {
         });
     }
 
-    /// @dev Returns the bytecode of a given system contract. Delegates to BytecodeUtils.
-    function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
-        return BytecodeUtils.readSystemContractsBytecode(filename);
-    }
-
     /**
      * @dev Returns the bytecode of a given system contract in yul.
      */
     function readSystemContractsYulBytecode(string memory filename) internal view returns (bytes memory) {
         string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
 
-        return readFoundryBytecode(path);
+        return BytecodeUtils.readFoundryBytecode(path);
     }
 
     /**
@@ -1038,46 +1033,7 @@ library Utils {
     function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
         string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
 
-        return readFoundryBytecode(path);
-    }
-    /**
-     * @dev Returns the bytecode of a given DA contract.
-     */
-    // ======================== Bytecode reading (delegates to BytecodeUtils) ========================
-
-    function readDAContractBytecode(string memory _contractIdentifier) internal view returns (bytes memory) {
-        return BytecodeUtils.readDAContractBytecode(_contractIdentifier);
-    }
-
-    function readFoundryBytecode(string memory _artifactPath) internal view returns (bytes memory) {
-        return BytecodeUtils.readFoundryBytecode(_artifactPath);
-    }
-
-    function readZKFoundryBytecodeL2(
-        string memory _fileName,
-        string memory _contractName
-    ) internal view returns (bytes memory) {
-        return BytecodeUtils.readZKFoundryBytecodeL2(_fileName, _contractName);
-    }
-
-    // TODO: migrate to BytecodeUtils
-    function readZKFoundryBytecodeSystemContracts(
-        string memory fileName,
-        string memory contractName
-    ) internal view returns (bytes memory) {
-        // kl todo add contracts path here
-        string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
-
-        string memory path = string.concat(
-            "/",
-            CONTRACTS_PATH,
-            "/system-contracts/zkout/",
-            fileName,
-            "/",
-            contractName,
-            ".json"
-        );
-        return readFoundryBytecode(path);
+        return BytecodeUtils.readFoundryBytecode(path);
     }
 
     function _readFoundryArtifact(
@@ -1396,7 +1352,7 @@ library Utils {
         string memory fileName,
         string memory contractName
     ) internal returns (bytes memory bytecodeInfo) {
-        bytes memory bytecode = readDeployedBytecodeL1(true, fileName, contractName);
+        bytes memory bytecode = BytecodeUtils.readDeployedBytecodeL1(true, fileName, contractName);
         bytecodeInfo = getZKOSBytecodeInfo(bytecode);
     }
 
@@ -1465,28 +1421,6 @@ library Utils {
                 "/../configs/genesis/",
                 _isZKsyncOS ? GENESIS_FILENAME_ZKOS : GENESIS_FILENAME_ERA
             );
-    }
-
-    // ======================== VM-unified bytecode reading (delegates to BytecodeUtils) ========================
-
-    function readBytecodeL1(
-        bool _isZKsyncOS,
-        string memory _fileName,
-        string memory _contractName
-    ) internal view returns (bytes memory) {
-        return BytecodeUtils.readBytecodeL1(_isZKsyncOS, _fileName, _contractName);
-    }
-
-    function readBytecodeL1(bool _isZKsyncOS, string memory _contractName) internal view returns (bytes memory) {
-        return BytecodeUtils.readBytecodeL1(_isZKsyncOS, string.concat(_contractName, ".sol"), _contractName);
-    }
-
-    function readDeployedBytecodeL1(
-        bool _isZKsyncOS,
-        string memory _fileName,
-        string memory _contractName
-    ) internal view returns (bytes memory) {
-        return BytecodeUtils.readDeployedBytecodeL1(_isZKsyncOS, _fileName, _contractName);
     }
 
     // add this to be excluded from coverage report

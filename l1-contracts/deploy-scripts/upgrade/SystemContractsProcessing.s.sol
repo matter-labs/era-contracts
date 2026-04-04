@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../utils/Utils.sol";
+import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
@@ -317,9 +318,9 @@ library SystemContractsProcessing {
             } else {
                 // L2BaseToken is now in l1-contracts as L2BaseTokenEra
                 if (Utils.compareStrings(systemContracts[i].codeName, "L2BaseToken")) {
-                    result[i] = Utils.readBytecodeL1(false, "L2BaseTokenEra.sol", "L2BaseTokenEra");
+                    result[i] = BytecodeUtils.readBytecodeL1(false, "L2BaseTokenEra.sol", "L2BaseTokenEra");
                 } else if (systemContracts[i].lang == Language.Solidity) {
-                    result[i] = Utils.readSystemContractsBytecode(systemContracts[i].codeName);
+                    result[i] = BytecodeUtils.readSystemContractsBytecode(systemContracts[i].codeName);
                 } else {
                     result[i] = Utils.readSystemContractsYulBytecode(systemContracts[i].codeName);
                 }
@@ -503,7 +504,7 @@ library SystemContractsProcessing {
         // since the server will rely on it.
         bytes[] memory basicBytecodes = new bytes[](3);
         basicBytecodes[0] = Utils.getBatchBootloaderBytecodeHash();
-        basicBytecodes[1] = Utils.readSystemContractsBytecode("DefaultAccount");
+        basicBytecodes[1] = BytecodeUtils.readSystemContractsBytecode("DefaultAccount");
         basicBytecodes[2] = Utils.getEvmEmulatorBytecodeHash();
 
         bytes[] memory systemBytecodes = getSystemContractsBytecodes();

@@ -57,6 +57,7 @@ import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 import {Utils} from "deploy-scripts/utils/Utils.sol";
+import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 
@@ -74,7 +75,7 @@ library L2Utils {
      * @dev It is a hack needed to make the tests be able to call system contracts directly.
      */
     function initSystemContracts(SystemContractsArgs memory _args) internal {
-        bytes memory contractDeployerBytecode = Utils.readSystemContractsBytecode("ContractDeployer");
+        bytes memory contractDeployerBytecode = BytecodeUtils.readSystemContractsBytecode("ContractDeployer");
         vm.etch(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, contractDeployerBytecode);
         forceDeploySystemContracts(_args);
     }
@@ -265,7 +266,7 @@ library L2Utils {
     }
 
     function forceDeployWithoutConstructor(string memory _contractName, address _address) public {
-        bytes memory bytecode = Utils.readBytecodeL1(false, string.concat(_contractName, ".sol"), _contractName);
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1(false, string.concat(_contractName, ".sol"), _contractName);
 
         bytes32 bytecodehash = L2ContractHelper.hashL2Bytecode(bytecode);
 
