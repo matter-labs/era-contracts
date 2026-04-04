@@ -35,6 +35,18 @@ error InvalidInteropBundleVersion();
 error InvalidInteropCallVersion();
 // 0x32c2e156
 error MessageNotIncluded();
+// 0x73f59c74
+error ShadowAccountAlreadyInitialized();
+// 0xfbb13087
+error ShadowAccountCallFailed(uint256 callIndex);
+// 0x0bdba858
+error ShadowAccountOnlyFactory();
+// 0x57dd2d1c
+error ShadowAccountOnlyInteropHandler();
+// 0xc6febe57
+error ShadowAccountOnlyOwner();
+// 0x40f3e3b2
+error ShadowAccountWithIndirectCall();
 // 0x2f59bd0d
 error SidesLengthNotOne();
 // 0x89fd2c76
@@ -52,10 +64,3 @@ error WrongSourceChainId(bytes32 bundleHash, uint256 expected, uint256 actual);
 // 0x92196069
 error ZKTokenNotAvailable();
 
-/// Shadow Account errors
-error ShadowAccountAlreadyInitialized();
-error ShadowAccountOnlyFactory();
-error ShadowAccountOnlyInteropHandler();
-error ShadowAccountOnlyOwner();
-error ShadowAccountCallFailed(uint256 callIndex);
-error ShadowAccountWithIndirectCall();
