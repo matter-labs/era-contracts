@@ -70,6 +70,18 @@ RUN cargo build --bin protocol_ops --release --target ${RUST_TARGET} && \
     cp target/${RUST_TARGET}/release/protocol_ops /usr/local/bin/ && \
     rm -rf target
 
+# === Build zksync-os-genesis-gen ===
+WORKDIR /contracts/tools/zksync-os-genesis-gen
+RUN cargo build --release --target ${RUST_TARGET} && \
+    cp target/${RUST_TARGET}/release/zksync-os-genesis-gen /usr/local/bin/ && \
+    rm -rf target
+
+# === Build wallets-gen ===
+WORKDIR /contracts/tools/wallets-gen
+RUN cargo build --release --target ${RUST_TARGET} && \
+    cp target/${RUST_TARGET}/release/wallets-gen /usr/local/bin/ && \
+    rm -rf target
+
 # === Install dependencies ===
 WORKDIR /contracts
 RUN yarn install --frozen-lockfile
