@@ -152,7 +152,9 @@ pub async fn run(args: FinalizeMigrationToGatewayArgs) -> anyhow::Result<()> {
         sa.add_arg(ForgeScriptArg::Sig {
             sig: "finishMigrateChainToGateway(address,bytes,uint256,uint256,bytes32,uint256,uint256,uint16,bytes32[],uint8)".to_string(),
         });
-        sa.add_arg(ForgeScriptArg::RpcUrl { url: runner.rpc_url.clone() });
+        sa.add_arg(ForgeScriptArg::RpcUrl {
+            url: runner.rpc_url.clone(),
+        });
         sa.add_arg(ForgeScriptArg::Broadcast);
         sa.add_arg(ForgeScriptArg::Ffi);
         sa.additional_args.extend([
@@ -170,7 +172,9 @@ pub async fn run(args: FinalizeMigrationToGatewayArgs) -> anyhow::Result<()> {
         let script = Forge::new(&contracts_path)
             .script(Path::new("deploy-scripts/gateway/GatewayUtils.s.sol"), sa)
             .with_wallet(&sender, runner.simulate);
-        runner.run(script).context("finishMigrateChainToGateway failed")?;
+        runner
+            .run(script)
+            .context("finishMigrateChainToGateway failed")?;
     }
 
     // Step 6b: Enable each validator on the gateway's ValidatorTimelock.
@@ -185,11 +189,18 @@ pub async fn run(args: FinalizeMigrationToGatewayArgs) -> anyhow::Result<()> {
         .await
         .context("Failed to resolve gateway ValidatorTimelock (pass --gateway-validator-timelock to skip RPC resolution)")?,
     };
-    logger::info(format!("Gateway ValidatorTimelock: {:#x}", gw_validator_timelock));
+    logger::info(format!(
+        "Gateway ValidatorTimelock: {:#x}",
+        gw_validator_timelock
+    ));
 
     logger::step("Enabling validators on gateway");
     let validators: Vec<Address> = {
-        let mut v = vec![args.commit_operator, args.prove_operator, args.execute_operator];
+        let mut v = vec![
+            args.commit_operator,
+            args.prove_operator,
+            args.execute_operator,
+        ];
         v.sort();
         v.dedup();
         v.retain(|a| *a != Address::zero());
@@ -201,23 +212,27 @@ pub async fn run(args: FinalizeMigrationToGatewayArgs) -> anyhow::Result<()> {
         sa.add_arg(ForgeScriptArg::Sig {
             sig: "enableValidatorViaGateway(address,uint256,uint256,uint256,address,address,address,bool)".to_string(),
         });
-        sa.add_arg(ForgeScriptArg::RpcUrl { url: runner.rpc_url.clone() });
+        sa.add_arg(ForgeScriptArg::RpcUrl {
+            url: runner.rpc_url.clone(),
+        });
         sa.add_arg(ForgeScriptArg::Broadcast);
         sa.add_arg(ForgeScriptArg::Ffi);
         sa.additional_args.extend([
-            format!("{:#x}", args.bridgehub_proxy_address),  // bridgehub
-            "1000000000".to_string(),                         // l1GasPrice (1 gwei)
-            args.chain_id.to_string(),                        // l2ChainId
-            args.gateway_chain_id.to_string(),                // gatewayChainId
-            format!("{:#x}", validator),                      // validatorAddress
-            format!("{:#x}", gw_validator_timelock),           // gatewayValidatorTimelock
-            format!("{:#x}", sender.address),                   // refundRecipient
-            "true".to_string(),                               // _shouldSend
+            format!("{:#x}", args.bridgehub_proxy_address), // bridgehub
+            "1000000000".to_string(),                       // l1GasPrice (1 gwei)
+            args.chain_id.to_string(),                      // l2ChainId
+            args.gateway_chain_id.to_string(),              // gatewayChainId
+            format!("{:#x}", validator),                    // validatorAddress
+            format!("{:#x}", gw_validator_timelock),        // gatewayValidatorTimelock
+            format!("{:#x}", sender.address),               // refundRecipient
+            "true".to_string(),                             // _shouldSend
         ]);
         let script = Forge::new(&contracts_path)
             .script(Path::new("deploy-scripts/AdminFunctions.s.sol"), sa)
             .with_wallet(&sender, runner.simulate);
-        runner.run(script).with_context(|| format!("enableValidatorViaGateway for {:#x}", validator))?;
+        runner
+            .run(script)
+            .with_context(|| format!("enableValidatorViaGateway for {:#x}", validator))?;
     }
 
     logger::success("Chain migration finalized (transfer confirmed, validators enabled)");
@@ -295,9 +310,10 @@ async fn find_migration_tx(
         .from_block(0u64)
         .to_block(latest_block);
 
-    let logs = provider.get_logs(&filter).await.context(
-        "Failed to query MigrationStarted events",
-    )?;
+    let logs = provider
+        .get_logs(&filter)
+        .await
+        .context("Failed to query MigrationStarted events")?;
 
     if let Some(log) = logs.last() {
         return log
@@ -407,9 +423,7 @@ async fn get_finalize_params(
         .send()
         .await?;
     let receipt_json: serde_json::Value = resp.json().await?;
-    let receipt = receipt_json
-        .get("result")
-        .context("No receipt result")?;
+    let receipt = receipt_json.get("result").context("No receipt result")?;
 
     // Find the L2→L1 log from bootloader (address 0x8001)
     let l2_to_l1_logs = receipt
@@ -421,10 +435,7 @@ async fn get_finalize_params(
     let mut log_index = None;
     let mut tx_number_in_batch = 0u16;
     for (i, log) in l2_to_l1_logs.iter().enumerate() {
-        let sender = log
-            .get("sender")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let sender = log.get("sender").and_then(|v| v.as_str()).unwrap_or("");
         if sender.to_lowercase() == bootloader {
             log_index = Some(i);
             tx_number_in_batch = log

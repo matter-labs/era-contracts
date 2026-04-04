@@ -5,11 +5,7 @@ use sha2::{Digest as _, Sha256};
 use sha3::Keccak256;
 
 /// Ecosystem-level roles (shared across all chains).
-const ECOSYSTEM_ROLES: &[&str] = &[
-    "deployer",
-    "governor",
-    "token_multiplier_setter",
-];
+const ECOSYSTEM_ROLES: &[&str] = &["deployer", "governor", "token_multiplier_setter"];
 
 /// Per-chain roles (unique to each chain).
 const CHAIN_ROLES: &[&str] = &[
