@@ -80,12 +80,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
             root,
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml"
         );
-        string memory permanentValuesInputPath = string.concat(
-            root,
-            "/test/foundry/l1/integration/deploy-scripts/script-config/permanent-values.toml"
-        );
-
-        initializeConfig(inputPath, permanentValuesInputPath, L2_BRIDGEHUB_ADDR);
+        initializeConfig(inputPath, L2_BRIDGEHUB_ADDR);
         ctmAddresses.admin.transparentProxyAdmin = address(0x1);
         ctmAddresses.admin.governance = address(0x2); // Mock governance for tests
         ctmAddresses.chainAdmin = address(0x3); // Mock chain admin for tests

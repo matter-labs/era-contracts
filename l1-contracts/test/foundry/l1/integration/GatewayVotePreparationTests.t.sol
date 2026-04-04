@@ -33,9 +33,8 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
     ) public returns (DeployedContracts memory contracts, DirectCreate2Calldata memory directCalldata) {
         string memory root = vm.projectRoot();
         string memory configPath = string.concat(root, vm.envString("GATEWAY_VOTE_PREPARATION_INPUT"));
-        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
 
-        initializeConfig(configPath, permanentValuesPath, bridgehubProxy, ctmRepresentativeChainId);
+        initializeConfig(configPath, bridgehubProxy, ctmRepresentativeChainId);
 
         (contracts, , , directCalldata, ) = GatewayCTMDeployerHelper.calculateAddresses(
             bytes32(uint256(1)),

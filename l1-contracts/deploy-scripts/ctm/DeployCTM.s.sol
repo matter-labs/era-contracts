@@ -67,7 +67,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function runWithBridgehub(address bridgehub, bool reuseGovAndAdmin) public {
         console.log("Deploying CTM related contracts");
         runInner(
-            "/script-config/permanent-values.toml",
             "/script-config/config-deploy-ctm.toml",
             "/script-out/output-deploy-ctm.toml",
             bridgehub,
@@ -90,7 +89,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             saveDiamondSelectors();
         }
         runInner(
-            vm.envString("PERMANENT_VALUES_INPUT"),
             vm.envString("CTM_CONFIG"),
             vm.envString("CTM_OUTPUT"),
             bridgehub,
@@ -113,7 +111,6 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function runInner(
-        string memory permanentValuesInputPath,
         string memory inputPath,
         string memory outputPath,
         address bridgehub,
@@ -121,11 +118,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         bool skipL1Deployments
     ) internal {
         string memory root = vm.projectRoot();
-        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
 
-        initializeConfig(inputPath, permanentValuesInputPath, bridgehub);
+        initializeConfig(inputPath, bridgehub);
 
         console.log("Initializing core contracts from BH");
         IL1Bridgehub bridgehubProxy = IL1Bridgehub(bridgehub);

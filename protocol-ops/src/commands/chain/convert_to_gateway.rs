@@ -68,17 +68,21 @@ pub struct ConvertToGatewayArgs {
     #[clap(long)]
     pub ctm_representative_chain_id: Option<u64>,
 
-    /// Path to the gateway vote preparation input TOML, relative to l1-contracts root.
-    #[clap(long, default_value = "/script-config/gateway-vote-preparation.toml")]
-    pub vote_preparation_input_path: String,
-
     /// Path to the gateway vote preparation output TOML, relative to l1-contracts root.
     #[clap(long, default_value = "/script-out/gateway-vote-preparation.toml")]
     pub vote_preparation_output_path: String,
 
-    /// Path to the permanent values TOML, relative to l1-contracts root.
-    #[clap(long, default_value = "/script-config/permanent-values.toml")]
-    pub permanent_values_path: String,
+    /// Hex-encoded force deployments data (required for vote-prepare stage).
+    #[clap(long)]
+    pub force_deployments_data: Option<String>,
+
+    /// Refund recipient address (required for vote-prepare stage).
+    #[clap(long)]
+    pub refund_recipient: Option<Address>,
+
+    /// Gateway settlement fee (default: 1000000000).
+    #[clap(long, default_value = "1000000000")]
+    pub gateway_settlement_fee: u64,
 
     /// Governance address (required for governance-execute stage).
     #[clap(long)]
@@ -183,6 +187,51 @@ fn run_vote_prepare(
     })?;
 
     let contracts_path = resolve_l1_contracts_path()?;
+
+    let force_hex = args.force_deployments_data.as_deref().ok_or_else(|| {
+        anyhow::anyhow!("--force-deployments-data is required for vote-prepare stage")
+    })?;
+    let refund = args.refund_recipient.ok_or_else(|| {
+        anyhow::anyhow!("--refund-recipient is required for vote-prepare stage")
+    })?;
+
+    // Read the base template that ships with the image / repo
+    let template_path = contracts_path.join("deploy-script-config-template/config-deploy-ctm.toml");
+    let mut base = if template_path.exists() {
+        std::fs::read_to_string(&template_path)
+            .with_context(|| format!("read {}", template_path.display()))?
+    } else {
+        // Fall back to the generated script-config version (local builds)
+        let sc = contracts_path.join("script-config/config-deploy-ctm.toml");
+        std::fs::read_to_string(&sc)
+            .with_context(|| format!("read {}", sc.display()))?
+    };
+
+    // Append gateway-specific fields before [contracts] (or at end)
+    let gateway_block = format!(
+        "\nrefund_recipient = \"{refund:#x}\"\n\
+         gateway_chain_id = {gw}\n\
+         gateway_settlement_fee = {fee}\n\
+         force_deployments_data = \"{fd}\"\n",
+        gw = args.gateway_chain_id,
+        fee = args.gateway_settlement_fee,
+        fd = force_hex,
+    );
+    if let Some(idx) = base.find("\n[contracts]") {
+        base.insert_str(idx, &gateway_block);
+    } else {
+        base.push_str(&gateway_block);
+    }
+
+    let script_config = contracts_path.join("script-config");
+    std::fs::create_dir_all(&script_config)?;
+
+    let generated_path = "/script-config/gateway-vote-preparation-generated.toml";
+    let abs_path = contracts_path.join(generated_path.trim_start_matches('/'));
+    std::fs::write(&abs_path, &base)?;
+
+    let vote_input_path = generated_path.to_string();
+
     let script_path = "deploy-scripts/gateway/GatewayVotePreparation.s.sol";
     let script_full_path = contracts_path.join(script_path);
     anyhow::ensure!(
@@ -213,13 +262,12 @@ fn run_vote_prepare(
         .script(Path::new(script_path), script_args)
         .with_env(
             "GATEWAY_VOTE_PREPARATION_INPUT",
-            &args.vote_preparation_input_path,
+            &vote_input_path,
         )
         .with_env(
             "GATEWAY_VOTE_PREPARATION_OUTPUT",
             &args.vote_preparation_output_path,
         )
-        .with_env("PERMANENT_VALUES_INPUT", &args.permanent_values_path)
         .with_wallet(sender, runner.simulate);
 
     logger::step("Running gateway vote preparation");

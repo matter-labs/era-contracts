@@ -124,7 +124,6 @@ abstract contract DeployCTMUtils is DeployUtils {
 
     function initializeConfig(
         string memory configPath,
-        string memory permanentValuesPath,
         address bridgehub
     ) internal virtual {
         string memory toml = vm.readFile(configPath);
