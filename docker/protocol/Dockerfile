@@ -129,8 +129,7 @@ RUN yarn --cwd da-contracts build:foundry && \
 
 RUN yarn calculate-hashes:check
 
-# Prune dev dependencies (keep production deps for ffi scripts)
-RUN yarn install --frozen-lockfile --production
+# Keep full node_modules — forge ffi scripts need devDependencies (ts-node, typescript, etc.)
 
 ########################################
 # Runtime
@@ -151,7 +150,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates bash openssl jq curl gnupg && \
     curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - && \
     apt-get update && apt-get install -y --no-install-recommends nodejs && \
-    npm i -g yarn@${YARN_VERSION} ts-node typescript && \
+    npm i -g yarn@${YARN_VERSION} && \
     npm cache clean --force && \
     rm -rf /var/lib/apt/lists/*
 
