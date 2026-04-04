@@ -104,14 +104,16 @@ RUN yarn --cwd system-contracts build:foundry
 # === Calculate hashes ===
 RUN yarn calculate-hashes:check
 
-# === Remove node_modules ===
-RUN rm -rf node_modules
-RUN yarn cache clean
+# === Prune dev dependencies (keep production deps for ffi scripts) ===
+RUN yarn install --frozen-lockfile --production
 
 ########################################
 # 2) Runtime
 ########################################
 FROM debian:bookworm-slim
+
+ARG NODE_MAJOR
+ARG YARN_VERSION
 
 # === Pass build arg for copying the correct binary ===
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -119,17 +121,23 @@ ENV DEBIAN_FRONTEND=noninteractive \
     FOUNDRY_DISABLE_NIGHTLY_WARNING=1 \
     XDG_CONFIG_HOME=/etc/xdg
 
-# Minimal runtime deps
+# Runtime deps + Node.js (needed for forge ffi scripts like blake2s256.ts)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates bash openssl jq && \
+      ca-certificates bash openssl jq curl gnupg && \
+    curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - && \
+    apt-get update && apt-get install -y --no-install-recommends nodejs && \
+    npm i -g yarn@${YARN_VERSION} ts-node typescript && \
+    npm cache clean --force && \
     rm -rf /var/lib/apt/lists/*
 
 # === Copy foundry binaries from build stage ===
 COPY --from=build /usr/local/bin/forge /usr/local/bin/forge
 COPY --from=build /usr/local/bin/cast  /usr/local/bin/cast
 COPY --from=build /usr/local/bin/anvil /usr/local/bin/anvil
-# === Copy protocol_ops binary ===
+# === Copy protocol_ops and tools ===
 COPY --from=build /usr/local/bin/protocol_ops /usr/local/bin/protocol_ops
+COPY --from=build /usr/local/bin/zksync-os-genesis-gen /usr/local/bin/zksync-os-genesis-gen
+COPY --from=build /usr/local/bin/wallets-gen /usr/local/bin/wallets-gen
 
 # === Set new WORKDIR and copy artifacts to /contracts/ ===
 WORKDIR /contracts
@@ -139,6 +147,8 @@ COPY --from=build /contracts/l2-contracts /contracts/l2-contracts
 COPY --from=build /contracts/system-contracts /contracts/system-contracts
 COPY --from=build /contracts/da-contracts /contracts/da-contracts
 COPY --from=build /contracts/lib /contracts/lib
+COPY --from=build /contracts/node_modules /contracts/node_modules
+COPY --from=build /contracts/package.json /contracts/package.json
 COPY --from=build /contracts/AllContractsHashes.json /contracts/AllContractsHashes.json
 COPY --from=build /contracts/SystemConfig.json /contracts/SystemConfig.json
 
@@ -148,4 +158,5 @@ RUN mkdir -p /etc/xdg/zksync-tooling && \
     > /etc/xdg/zksync-tooling/telemetry.json
 
 # Sanity
-RUN forge --version && cast --version && anvil --version && protocol_ops --help
+RUN forge --version && cast --version && anvil --version && protocol_ops --help && \
+    zksync-os-genesis-gen --help && wallets-gen --help && node --version && yarn --version
