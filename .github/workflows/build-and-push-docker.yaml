@@ -47,6 +47,11 @@ jobs:
           TAGS="${TAGS},ghcr.io/${{ github.repository_owner }}/${IMAGE_NAME}:${BRANCH}"
           echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
 
+      - name: Define whether to save cache
+        if: ${{ github.event_name == 'push' }}
+        id: set-cache-to
+        run: echo "cache-to=type=registry,ref=ghcr.io/${{ github.repository_owner }}/${IMAGE_NAME}:buildcache,mode=max" >> "${GITHUB_OUTPUT}"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
         with:
@@ -55,5 +60,5 @@ jobs:
           platforms: linux/amd64
           file: docker/protocol/Dockerfile
           tags: ${{ steps.tags.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: ${{ steps.set-cache-to.outputs.cache-to }}
