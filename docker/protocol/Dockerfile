@@ -67,7 +67,8 @@ WORKDIR /src
 COPY . /src
 
 # Each crate has its own workspace — prepare a recipe for each.
-RUN cd protocol-ops && cargo chef prepare --recipe-path /recipes/protocol-ops.json
+RUN mkdir -p /recipes && \
+    cd protocol-ops && cargo chef prepare --recipe-path /recipes/protocol-ops.json
 RUN cd tools/zksync-os-genesis-gen && cargo chef prepare --recipe-path /recipes/genesis-gen.json
 RUN cd tools/wallets-gen && cargo chef prepare --recipe-path /recipes/wallets-gen.json
 
