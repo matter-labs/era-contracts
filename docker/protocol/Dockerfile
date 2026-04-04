@@ -71,6 +71,7 @@ RUN curl -L -o /tmp/foundry-vanilla.tgz https://github.com/foundry-rs/foundry/re
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
     sh -s -- -y --default-toolchain ${RUST_TOOLCHAIN} --no-modify-path
 RUN rustup target add ${RUST_TARGET}
+RUN cargo install cargo-chef --locked
 
 # === Cook Rust dependencies (cached until Cargo.toml/lock change) ===
 WORKDIR /contracts/protocol-ops
