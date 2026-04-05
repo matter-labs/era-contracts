@@ -214,8 +214,7 @@ fn run_vote_prepare(
     // like owner_address are overridden from on-chain state, and contracts.*
     // fields are not used in the gateway flow but the parent parser requires them.
     let toml_content = format!(
-        r#"owner_address = "{refund:#x}"
-# Used by the gateway vote preparation forge script
+        r#"# Used by the gateway vote preparation forge script
 testnet_verifier = {testnet_verifier}
 is_zk_sync_os = {is_zk_sync_os}
 refund_recipient = "{refund:#x}"
@@ -223,7 +222,7 @@ gateway_chain_id = {gw}
 gateway_settlement_fee = {fee}
 force_deployments_data = "{fd}"
 
-# Not used by the gateway flow but required by the parent config parser
+# Not used by the gateway flow but required by the parent config parser (overridden from on-chain state)
 owner_address = "0x0000000000000000000000000000000000000000"
 support_l2_legacy_shared_bridge_test = false
 zk_token_asset_id = "0x0000000000000000000000000000000000000000000000000000000000000001"
