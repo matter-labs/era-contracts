@@ -92,19 +92,20 @@ WORKDIR /contracts
 COPY . /contracts
 
 # === Build Rust binaries (deps already cached by cook) ===
+# Keep binaries in their project-relative locations (matches local layout)
 WORKDIR /contracts/protocol-ops
 RUN cargo build --bin protocol_ops --release --target ${RUST_TARGET} && \
-    cp target/${RUST_TARGET}/release/protocol_ops /usr/local/bin/ && \
+    cp target/${RUST_TARGET}/release/protocol_ops ./ && \
     rm -rf target
 
 WORKDIR /contracts/tools/zksync-os-genesis-gen
 RUN cargo build --release --target ${RUST_TARGET} && \
-    cp target/${RUST_TARGET}/release/zksync-os-genesis-gen /usr/local/bin/ && \
+    cp target/${RUST_TARGET}/release/zksync-os-genesis-gen ./ && \
     rm -rf target
 
 WORKDIR /contracts/tools/wallets-gen
 RUN cargo build --release --target ${RUST_TARGET} && \
-    cp target/${RUST_TARGET}/release/wallets-gen /usr/local/bin/ && \
+    cp target/${RUST_TARGET}/release/wallets-gen ./ && \
     rm -rf target
 
 # === Install JS dependencies ===
@@ -139,7 +140,7 @@ ARG NODE_MAJOR
 ARG YARN_VERSION
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    PATH=/usr/local/bin:$PATH \
+    PATH=/contracts/protocol-ops:/contracts/tools/zksync-os-genesis-gen:/contracts/tools/wallets-gen:/usr/local/bin:$PATH \
     FOUNDRY_DISABLE_NIGHTLY_WARNING=1 \
     XDG_CONFIG_HOME=/etc/xdg
 
@@ -156,10 +157,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=build /usr/local/bin/forge /usr/local/bin/forge
 COPY --from=build /usr/local/bin/cast  /usr/local/bin/cast
 COPY --from=build /usr/local/bin/anvil /usr/local/bin/anvil
-# === Copy protocol_ops and tools ===
-COPY --from=build /usr/local/bin/protocol_ops /usr/local/bin/protocol_ops
-COPY --from=build /usr/local/bin/zksync-os-genesis-gen /usr/local/bin/zksync-os-genesis-gen
-COPY --from=build /usr/local/bin/wallets-gen /usr/local/bin/wallets-gen
+# === Copy protocol_ops and tools (project-relative, matches local layout) ===
+COPY --from=build /contracts/protocol-ops/protocol_ops /contracts/protocol-ops/protocol_ops
+COPY --from=build /contracts/tools/zksync-os-genesis-gen/zksync-os-genesis-gen /contracts/tools/zksync-os-genesis-gen/zksync-os-genesis-gen
+COPY --from=build /contracts/tools/wallets-gen/wallets-gen /contracts/tools/wallets-gen/wallets-gen
 
 # === Set new WORKDIR and copy artifacts to /contracts/ ===
 WORKDIR /contracts
