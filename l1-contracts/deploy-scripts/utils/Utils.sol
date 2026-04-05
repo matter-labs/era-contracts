@@ -1018,34 +1018,6 @@ library Utils {
         });
     }
 
-    /**
-     * @dev Returns the bytecode of a given system contract in yul.
-     */
-    function readSystemContractsYulBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
-
-        return BytecodeUtils.readFoundryBytecode(path);
-    }
-
-    /**
-     * @dev Returns the bytecode of a given precompile system contract.
-     */
-    function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
-
-        return BytecodeUtils.readFoundryBytecode(path);
-    }
-
-    function _readFoundryArtifact(
-        string memory _artifactPath,
-        string memory _jsonKey
-    ) private view returns (bytes memory) {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, _artifactPath);
-        string memory json = vm.readFile(path);
-        return vm.parseJsonBytes(json, _jsonKey);
-    }
-
     // TODO: restore blake2s hash caching to avoid repeated ffi calls for the same bytecode.
     function blakeHashBytecode(bytes memory bytecode) internal returns (bytes32 hashedBytecode) {
         string[] memory input = new string[](5);

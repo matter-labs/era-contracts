@@ -314,7 +314,7 @@ library SystemContractsProcessing {
         SystemContract[] memory systemContracts = getSystemContracts();
         for (uint256 i = 0; i < SYSTEM_CONTRACTS_COUNT; i++) {
             if (systemContracts[i].isPrecompile) {
-                result[i] = Utils.readPrecompileBytecode(systemContracts[i].codeName);
+                result[i] = BytecodeUtils.readPrecompileBytecode(systemContracts[i].codeName);
             } else {
                 // L2BaseToken is now in l1-contracts as L2BaseTokenEra
                 if (Utils.compareStrings(systemContracts[i].codeName, "L2BaseToken")) {
@@ -322,7 +322,7 @@ library SystemContractsProcessing {
                 } else if (systemContracts[i].lang == Language.Solidity) {
                     result[i] = BytecodeUtils.readSystemContractsBytecode(systemContracts[i].codeName);
                 } else {
-                    result[i] = Utils.readSystemContractsYulBytecode(systemContracts[i].codeName);
+                    result[i] = BytecodeUtils.readSystemContractsYulBytecode(systemContracts[i].codeName);
                 }
             }
         }
