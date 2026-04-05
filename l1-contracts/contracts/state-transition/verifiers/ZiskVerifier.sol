@@ -17,10 +17,11 @@ import {ZiskSnarkPlonkVerifier} from "./ZiskSnarkPlonkVerifier.sol";
 ///      Remaining elements are padding and ignored.
 contract ZiskVerifier is ZiskSnarkPlonkVerifier, IVerifier {
     /// @notice ZiSK ELF-specific verification key (programVK).
-    uint64 private constant _PROGRAM_VK_0 = 6940347123582280582;
-    uint64 private constant _PROGRAM_VK_1 = 9814819133568063389;
-    uint64 private constant _PROGRAM_VK_2 = 12093956998655283157;
-    uint64 private constant _PROGRAM_VK_3 = 13916704035449538710;
+    /// Derived from the ROM Merkle root of the guest ELF binary.
+    uint64 private constant _PROGRAM_VK_0 = 4838359011762341489;
+    uint64 private constant _PROGRAM_VK_1 = 17537343563151866928;
+    uint64 private constant _PROGRAM_VK_2 = 11949100182324703893;
+    uint64 private constant _PROGRAM_VK_3 = 17106480096882735767;
 
     /// @notice ZiSK vadcop final root commitment.
     uint64 private constant _ROOT_CV_ADCOP_FINAL_0 = 9211010158316595036;
