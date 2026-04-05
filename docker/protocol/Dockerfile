@@ -153,10 +153,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     npm cache clean --force && \
     rm -rf /var/lib/apt/lists/*
 
-# === Copy foundry binaries from build stage ===
+# === Copy foundry binaries and solc cache from build stage ===
 COPY --from=build /usr/local/bin/forge /usr/local/bin/forge
 COPY --from=build /usr/local/bin/cast  /usr/local/bin/cast
 COPY --from=build /usr/local/bin/anvil /usr/local/bin/anvil
+COPY --from=build /root/.svm /root/.svm
 # === Copy protocol_ops and tools (project-relative, matches local layout) ===
 COPY --from=build /contracts/protocol-ops/protocol_ops /contracts/protocol-ops/protocol_ops
 COPY --from=build /contracts/tools/zksync-os-genesis-gen/zksync-os-genesis-gen /contracts/tools/zksync-os-genesis-gen/zksync-os-genesis-gen
