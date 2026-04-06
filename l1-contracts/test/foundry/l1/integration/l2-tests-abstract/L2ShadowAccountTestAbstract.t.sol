@@ -389,6 +389,19 @@ abstract contract L2ShadowAccountTestAbstract is Test, L2InteropTestUtils {
         assertEq(ret, IERC7786Recipient.receiveMessage.selector);
     }
 
+    /// @notice ShadowAccount succeeds with empty payload (zero calls).
+    function test_shadowAccount_emptyPayloadSucceeds() public {
+        bytes memory ownerAddr = _ownerEncoded();
+        address account = factory.getOrDeployShadowAccount(ownerAddr);
+
+        ShadowAccountCall[] memory calls = new ShadowAccountCall[](0);
+        bytes memory payload = abi.encode(calls);
+
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        bytes4 ret = IERC7786Recipient(account).receiveMessage(bytes32(0), ownerAddr, payload);
+        assertEq(ret, IERC7786Recipient.receiveMessage.selector, "Empty payload should succeed");
+    }
+
     /// @notice ShadowAccount can receive ETH via receive().
     function test_shadowAccount_canReceiveEth() public {
         bytes memory ownerAddr = _ownerEncoded();
