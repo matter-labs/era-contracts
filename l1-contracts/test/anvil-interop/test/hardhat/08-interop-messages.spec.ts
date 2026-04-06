@@ -145,7 +145,12 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     expect(receipt.status).to.equal(1);
 
     const recipientBalAfter = await getNativeBalance(destProvider, dummyRecipient);
-    expectBalanceDelta(recipientBalBefore, recipientBalAfter, BASE_TOKEN_AMOUNT, "base token message: recipient native");
+    expectBalanceDelta(
+      recipientBalBefore,
+      recipientBalAfter,
+      BASE_TOKEN_AMOUNT,
+      "base token message: recipient native"
+    );
 
     const balDelta = recipientBalAfter.sub(recipientBalBefore);
     console.log(`   Base token received on destination: +${ethers.utils.formatEther(balDelta)} ETH`);
@@ -176,7 +181,10 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     const balAfter = await captureBalance(sourceProvider, sourceTokenAddress);
 
     // Token balance should decrease by exactly ERC20_AMOUNT
-    expect(balAfter.token!.eq(balBefore.token!.sub(ERC20_AMOUNT)), "ERC20 message: sender token should decrease by ERC20_AMOUNT").to.be.true;
+    expect(
+      balAfter.token!.eq(balBefore.token!.sub(ERC20_AMOUNT)),
+      "ERC20 message: sender token should decrease by ERC20_AMOUNT"
+    ).to.be.true;
 
     expectNativeSpend(balBefore, balAfter, msgValue, result.receipt, "ERC20 message");
 
@@ -238,9 +246,10 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     // ── Execute on destination ──
     // Resolve bridged ETH addr (may be zero if not yet deployed — NTV deploys during execute)
     let bridgedEthAddr = await getTokenAddressForAsset(customBaseTokenProvider!, ethAssetId);
-    const recipientBalBefore = bridgedEthAddr !== ethers.constants.AddressZero
-      ? await getTokenBalance(customBaseTokenProvider!, bridgedEthAddr, ANVIL_RECIPIENT_ADDR)
-      : ethers.BigNumber.from(0);
+    const recipientBalBefore =
+      bridgedEthAddr !== ethers.constants.AddressZero
+        ? await getTokenBalance(customBaseTokenProvider!, bridgedEthAddr, ANVIL_RECIPIENT_ADDR)
+        : ethers.BigNumber.from(0);
 
     const receipt = await executeBundle(customBaseTokenProvider!, result.bundleData, sourceChainId);
     expect(receipt.status).to.equal(1);
@@ -250,7 +259,12 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     expect(bridgedEthAddr).to.not.equal(ethers.constants.AddressZero, "bridged ETH token should be deployed");
 
     const recipientBalAfter = await getTokenBalance(customBaseTokenProvider!, bridgedEthAddr, ANVIL_RECIPIENT_ADDR);
-    expectBalanceDelta(recipientBalBefore, recipientBalAfter, BASE_TOKEN_AMOUNT, "cross-base-token: recipient bridged ETH");
+    expectBalanceDelta(
+      recipientBalBefore,
+      recipientBalAfter,
+      BASE_TOKEN_AMOUNT,
+      "cross-base-token: recipient bridged ETH"
+    );
 
     const balDelta = recipientBalAfter.sub(recipientBalBefore);
     console.log(
@@ -301,9 +315,10 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
 
     // ── Execute on destination (ETH chain) ──
     let bridgedTokenAddr = await getTokenAddressForAsset(destProvider, customBaseTokenAssetId);
-    const recipientBalBefore = bridgedTokenAddr !== ethers.constants.AddressZero
-      ? await getTokenBalance(destProvider, bridgedTokenAddr, ANVIL_RECIPIENT_ADDR)
-      : ethers.BigNumber.from(0);
+    const recipientBalBefore =
+      bridgedTokenAddr !== ethers.constants.AddressZero
+        ? await getTokenBalance(destProvider, bridgedTokenAddr, ANVIL_RECIPIENT_ADDR)
+        : ethers.BigNumber.from(0);
 
     const receipt = await executeBundle(destProvider, result.bundleData, customBaseTokenChainId);
     expect(receipt.status).to.equal(1);
@@ -366,7 +381,10 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     expect(result.interopBundle).to.not.be.null;
 
     const balAfter = await getTokenBalance(sourceProvider, bridgedTokenOnSource, ANVIL_DEFAULT_ACCOUNT_ADDR);
-    expect(balAfter.eq(balBefore.sub(bridgedAmount)), "bridged ERC20 message: sender token should decrease by bridgedAmount").to.be.true;
+    expect(
+      balAfter.eq(balBefore.sub(bridgedAmount)),
+      "bridged ERC20 message: sender token should decrease by bridgedAmount"
+    ).to.be.true;
 
     console.log(`   Bridged ERC20 message sent: ${result.txHash}`);
 

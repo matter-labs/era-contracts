@@ -4,11 +4,7 @@ import type { MultiChainTokenTransferParams, MultiChainTokenTransferResult } fro
 import { getAbi } from "../core/contracts";
 import { encodeEvmAddress } from "./erc7930";
 import { indirectCallAttr, interopCallValueAttr, sendInteropBundle, executeBundle } from "./interop-helpers";
-import {
-  ANVIL_DEFAULT_PRIVATE_KEY,
-  L2_ASSET_ROUTER_ADDR,
-  L2_NATIVE_TOKEN_VAULT_ADDR,
-} from "../core/const";
+import { ANVIL_DEFAULT_PRIVATE_KEY, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
 import { encodeNtvAssetId, encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
 import { createBalanceTrackerFromState } from "./balance-tracker";
 

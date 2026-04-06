@@ -172,7 +172,10 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "single indirect call");
 
     // Token balance should decrease by exactly tokenAmount
-    expect(balAfter.token!.eq(balBefore.token!.sub(tokenAmount)), "single indirect call: sender token should decrease by tokenAmount").to.be.true;
+    expect(
+      balAfter.token!.eq(balBefore.token!.sub(tokenAmount)),
+      "single indirect call: sender token should decrease by tokenAmount"
+    ).to.be.true;
 
     console.log("   [send] Single indirect call bundle sent");
 
@@ -285,7 +288,10 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "two indirect calls");
 
-    expect(balAfter.token!.eq(balBefore.token!.sub(totalTokenAmount)), "two indirect calls: sender token should decrease by 2x tokenAmount").to.be.true;
+    expect(
+      balAfter.token!.eq(balBefore.token!.sub(totalTokenAmount)),
+      "two indirect calls: sender token should decrease by 2x tokenAmount"
+    ).to.be.true;
 
     console.log("   [send] Two indirect calls bundle sent");
 
@@ -302,8 +308,18 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     const recipient1TokenAfter = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
     const recipient2TokenAfter = await getTokenBalance(destProvider, destTokenAddress, ANVIL_ACCOUNT2_ADDR);
 
-    expectBalanceDelta(recipient1TokenBefore, recipient1TokenAfter, tokenAmount, "two indirect calls: recipient1 token");
-    expectBalanceDelta(recipient2TokenBefore, recipient2TokenAfter, tokenAmount, "two indirect calls: recipient2 token");
+    expectBalanceDelta(
+      recipient1TokenBefore,
+      recipient1TokenAfter,
+      tokenAmount,
+      "two indirect calls: recipient1 token"
+    );
+    expectBalanceDelta(
+      recipient2TokenBefore,
+      recipient2TokenAfter,
+      tokenAmount,
+      "two indirect calls: recipient2 token"
+    );
 
     console.log("   [receive] Two indirect calls bundle executed");
   });
@@ -347,7 +363,10 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "mixed bundle");
 
-    expect(balAfter.token!.eq(balBefore.token!.sub(tokenAmount)), "mixed bundle: sender token should decrease by tokenAmount").to.be.true;
+    expect(
+      balAfter.token!.eq(balBefore.token!.sub(tokenAmount)),
+      "mixed bundle: sender token should decrease by tokenAmount"
+    ).to.be.true;
 
     console.log("   [send] Mixed bundle sent");
 
@@ -399,10 +418,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     expect(receipt.status).to.equal(1);
 
     // Second execution with same data should revert
-    await expectRevert(
-      () => executeBundle(destProvider, sendResult.bundleData, sourceChainId),
-      "replay executeBundle"
-    );
+    await expectRevert(() => executeBundle(destProvider, sendResult.bundleData, sourceChainId), "replay executeBundle");
 
     console.log("   [edge] Replay protection verified");
   });
@@ -475,13 +491,14 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
 
     await expectRevert(
-      () => sendInteropBundle({
-        sourceProvider,
-        destinationChainId: destChainId,
-        callStarters,
-        bundleAttributes,
-        value: excessValue,
-      }),
+      () =>
+        sendInteropBundle({
+          sourceProvider,
+          destinationChainId: destChainId,
+          callStarters,
+          bundleAttributes,
+          value: excessValue,
+        }),
       "excess msg.value"
     );
 

@@ -6,8 +6,8 @@
  * ERC-7786 attribute encoding and contract deployment utilities.
  */
 
-import type { providers } from "ethers";
-import { BigNumber, Contract, ethers, Wallet } from "ethers";
+import type { providers, BigNumber } from "ethers";
+import { Contract, ethers, Wallet } from "ethers";
 import { getAbi, getCreationBytecode } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,

@@ -105,12 +105,7 @@ export function expectNativeSpend(
  * Assert that a balance changed by exactly `expectedDelta`.
  * Positive delta = increase, negative delta = decrease.
  */
-export function expectBalanceDelta(
-  before: BigNumber,
-  after: BigNumber,
-  expectedDelta: BigNumber,
-  label: string
-): void {
+export function expectBalanceDelta(before: BigNumber, after: BigNumber, expectedDelta: BigNumber, label: string): void {
   const actualDelta = after.sub(before);
   expect(
     actualDelta.eq(expectedDelta),
@@ -122,11 +117,7 @@ export function expectBalanceDelta(
  * Assert that an async call reverts (throws).
  * Optionally match the error message against `expectedReason` (substring match).
  */
-export async function expectRevert(
-  fn: () => Promise<unknown>,
-  label: string,
-  expectedReason?: string
-): Promise<void> {
+export async function expectRevert(fn: () => Promise<unknown>, label: string, expectedReason?: string): Promise<void> {
   try {
     await fn();
   } catch (err: unknown) {
