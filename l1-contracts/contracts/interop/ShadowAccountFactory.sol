@@ -17,29 +17,29 @@ import {ShadowAccount} from "./ShadowAccount.sol";
 ///      The creation code hash is computed inline when needed.
 contract ShadowAccountFactory is IShadowAccountFactory {
     /// @inheritdoc IShadowAccountFactory
-    function getOrDeployShadowAccount(bytes calldata _owner) external returns (address account) {
-        account = this.predictAddress(_owner);
+    function getOrDeployShadowAccount(bytes calldata _owner) external returns (address) {
+        address predicted = predictAddress(_owner);
 
         // If already deployed, return the existing account.
-        if (account.code.length > 0) {
-            return account;
+        if (predicted.code.length > 0) {
+            return predicted;
         }
 
         // Deploy via CREATE2 with deterministic salt.
         bytes32 salt = keccak256(_owner);
         ShadowAccount newAccount = new ShadowAccount{salt: salt}();
-        assert(address(newAccount) == account);
 
         // Initialize with the owner identity.
         newAccount.initialize(_owner);
 
-        emit ShadowAccountDeployed(account, _owner);
+        emit ShadowAccountDeployed(predicted, _owner);
+        return predicted;
     }
 
     /// @inheritdoc IShadowAccountFactory
-    function predictAddress(bytes calldata _owner) external view returns (address predicted) {
+    function predictAddress(bytes calldata _owner) public view returns (address) {
         bytes32 salt = keccak256(_owner);
         bytes32 codeHash = keccak256(type(ShadowAccount).creationCode);
-        predicted = address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, codeHash)))));
+        return address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), salt, codeHash)))));
     }
 }

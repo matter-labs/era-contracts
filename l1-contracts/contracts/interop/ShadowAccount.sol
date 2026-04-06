@@ -28,6 +28,10 @@ contract ShadowAccount is IShadowAccount {
     /// @notice ERC-7930 encoded address of the owner on the home chain.
     bytes public override owner;
 
+    /// @notice Cached keccak256 hash of the owner, used for O(1) authorization checks in receiveMessage
+    /// instead of re-hashing the variable-length owner bytes on every call.
+    bytes32 private _ownerHash;
+
     /// @notice Whether the account has been initialized.
     bool private _initialized;
 
@@ -37,6 +41,7 @@ contract ShadowAccount is IShadowAccount {
         require(msg.sender == L2_SHADOW_ACCOUNT_FACTORY_ADDR, ShadowAccountOnlyFactory());
         _initialized = true;
         owner = _owner;
+        _ownerHash = keccak256(_owner);
         emit ShadowAccountInitialized(_owner);
     }
 
@@ -51,7 +56,7 @@ contract ShadowAccount is IShadowAccount {
         bytes calldata _payload
     ) external payable override returns (bytes4) {
         require(msg.sender == L2_INTEROP_HANDLER_ADDR, ShadowAccountOnlyInteropHandler());
-        require(keccak256(_sender) == keccak256(owner), ShadowAccountOnlyOwner());
+        require(keccak256(_sender) == _ownerHash, ShadowAccountOnlyOwner());
 
         ShadowAccountCall[] memory calls = abi.decode(_payload, (ShadowAccountCall[]));
         uint256 callsLength = calls.length;
