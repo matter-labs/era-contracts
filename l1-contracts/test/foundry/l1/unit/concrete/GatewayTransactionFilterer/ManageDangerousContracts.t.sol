@@ -22,48 +22,39 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
 
     // ============ Initialization Tests ============
 
-    function test_initialize_marksCreate2FactoryAsDangerous() public view {
-        // The Create2Factory should be in the dangerous contracts list from initialization
-        assertTrue(
-            transactionFiltererProxy.dangerousContracts(ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR),
-            "Create2Factory should be marked as dangerous on initialization"
-        );
-    }
-
-    function test_initialize_emitsDangerousContractAddedForCreate2Factory() public {
+    function test_initialize_registersDangerousCreate2Factory() public {
         GatewayTransactionFilterer impl = new GatewayTransactionFilterer(IBridgehubBase(bridgehub), assetRouter);
 
         vm.expectEmit(true, false, false, false);
         emit DangerousContractAdded(ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR);
 
-        new TransparentUpgradeableProxy(
-            address(impl),
-            admin,
-            abi.encodeCall(GatewayTransactionFilterer.initialize, owner)
+        GatewayTransactionFilterer proxy = GatewayTransactionFilterer(
+            address(
+                new TransparentUpgradeableProxy(
+                    address(impl),
+                    admin,
+                    abi.encodeCall(GatewayTransactionFilterer.initialize, owner)
+                )
+            )
+        );
+
+        assertTrue(
+            proxy.dangerousContracts(ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR),
+            "Create2Factory should be marked as dangerous on initialization"
         );
     }
 
     // ============ addDangerousContract Tests ============
 
-    function test_addDangerousContract_marksContractAsDangerous() public {
-        address dangerousAddr = address(uint160(MIN_ALLOWED_ADDRESS) + 100);
-
-        vm.prank(owner);
-        transactionFiltererProxy.addDangerousContract(dangerousAddr);
-
-        assertTrue(
-            transactionFiltererProxy.dangerousContracts(dangerousAddr),
-            "Contract should be marked as dangerous"
-        );
-    }
-
-    function test_addDangerousContract_emitsEvent() public {
+    function test_addDangerousContract() public {
         address dangerousAddr = address(uint160(MIN_ALLOWED_ADDRESS) + 100);
 
         vm.prank(owner);
         vm.expectEmit(true, false, false, false);
         emit DangerousContractAdded(dangerousAddr);
         transactionFiltererProxy.addDangerousContract(dangerousAddr);
+
+        assertTrue(transactionFiltererProxy.dangerousContracts(dangerousAddr), "Contract should be marked as dangerous");
     }
 
     function test_addDangerousContract_revertsIfNotOwner() public {
@@ -87,21 +78,7 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
 
     // ============ removeDangerousContract Tests ============
 
-    function test_removeDangerousContract_unmarksContract() public {
-        address dangerousAddr = address(uint160(MIN_ALLOWED_ADDRESS) + 100);
-
-        vm.startPrank(owner);
-        transactionFiltererProxy.addDangerousContract(dangerousAddr);
-        transactionFiltererProxy.removeDangerousContract(dangerousAddr);
-        vm.stopPrank();
-
-        assertFalse(
-            transactionFiltererProxy.dangerousContracts(dangerousAddr),
-            "Contract should no longer be marked as dangerous"
-        );
-    }
-
-    function test_removeDangerousContract_emitsEvent() public {
+    function test_removeDangerousContract() public {
         address dangerousAddr = address(uint160(MIN_ALLOWED_ADDRESS) + 100);
 
         vm.startPrank(owner);
@@ -111,6 +88,11 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         emit DangerousContractRemoved(dangerousAddr);
         transactionFiltererProxy.removeDangerousContract(dangerousAddr);
         vm.stopPrank();
+
+        assertFalse(
+            transactionFiltererProxy.dangerousContracts(dangerousAddr),
+            "Contract should no longer be marked as dangerous"
+        );
     }
 
     function test_removeDangerousContract_revertsIfNotOwner() public {
