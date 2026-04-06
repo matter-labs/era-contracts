@@ -62,6 +62,7 @@ const REQUIRED_CONTRACTS = [
   "TestnetERC20Token.sol",
   "L1AssetRouter.sol",
   "InteropHandler.sol",
+  "IERC7786Attributes.sol",
   "L2ComplexUpgrader.sol",
   "L2GenesisUpgrade.sol",
   "L2MessageRoot.sol",
