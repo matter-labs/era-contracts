@@ -78,6 +78,8 @@
     "verify": "hardhat run --network env scripts/verify.ts",
     "verify-on-l2-explorer": "yarn ts-node scripts/verify-on-l2-explorer.ts",
     "verify-contracts": "ts-node scripts/verify-contracts.ts",
+    "check-ctm-parity": "ts-node scripts/check-ctm-parity.ts",
+    "generate-cloned-ctm-config": "ts-node scripts/generate-cloned-ctm-config.ts",
     "read-variable": "ts-node scripts/read-variable.ts",
     "initialize-bridges": "ts-node scripts/initialize-bridges.ts",
     "initialize-validator": "ts-node scripts/initialize-validator.ts",
