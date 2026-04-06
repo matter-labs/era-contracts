@@ -4,8 +4,15 @@ pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
-import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {L2_ASSET_ROUTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    AlreadyDangerousContract,
+    AlreadyWhitelisted,
+    InvalidSelector,
+    NotDangerousContract,
+    NotWhitelisted,
+    ZeroAddress
+} from "../common/L1ContractErrors.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_CREATE2_FACTORY_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {AssetRouterBase} from "../bridge/asset-router/AssetRouterBase.sol";
@@ -27,6 +34,12 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
     /// @notice Event emitted when sender is removed from whitelist
     event WhitelistRevoked(address indexed sender);
 
+    /// @notice Event emitted when a contract is added to the dangerous contracts list
+    event DangerousContractAdded(address indexed contractAddress);
+
+    /// @notice Event emitted when a contract is removed from the dangerous contracts list
+    event DangerousContractRemoved(address indexed contractAddress);
+
     /// @notice The ecosystem's Bridgehub
     IBridgehubBase public immutable BRIDGE_HUB;
 
@@ -35,6 +48,13 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
 
     /// @notice Indicates whether the sender is whitelisted to deposit to Gateway
     mapping(address sender => bool whitelisted) public whitelistedSenders;
+
+    /// @notice Mapping of contracts that can only be called by whitelisted senders.
+    /// @dev This allows restricting specific high-address contracts (above MIN_ALLOWED_ADDRESS)
+    /// that would otherwise be callable by anyone. For example, the built-in Create2Factory
+    /// deployed during ZKsync OS genesis is marked as dangerous to prevent unauthorized
+    /// contract deployments through the Gateway.
+    mapping(address contractAddress => bool isDangerous) public dangerousContracts;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -51,6 +71,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
             revert ZeroAddress();
         }
         _transferOwnership(_owner);
+        _initializeDangerousContracts();
     }
 
     /// @notice Whitelists the sender.
@@ -71,6 +92,27 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
         }
         whitelistedSenders[sender] = false;
         emit WhitelistRevoked(sender);
+    }
+
+    /// @notice Adds a contract to the dangerous contracts list.
+    /// @dev Dangerous contracts can only be called by whitelisted senders, regardless of their address.
+    /// @param contractAddress The L2 address of the contract to mark as dangerous.
+    function addDangerousContract(address contractAddress) external onlyOwner {
+        if (dangerousContracts[contractAddress]) {
+            revert AlreadyDangerousContract(contractAddress);
+        }
+        dangerousContracts[contractAddress] = true;
+        emit DangerousContractAdded(contractAddress);
+    }
+
+    /// @notice Removes a contract from the dangerous contracts list.
+    /// @param contractAddress The L2 address of the contract to unmark as dangerous.
+    function removeDangerousContract(address contractAddress) external onlyOwner {
+        if (!dangerousContracts[contractAddress]) {
+            revert NotDangerousContract(contractAddress);
+        }
+        dangerousContracts[contractAddress] = false;
+        emit DangerousContractRemoved(contractAddress);
     }
 
     /// @notice Checks if the transaction is allowed
@@ -101,6 +143,12 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
             return _checkCTMAssetId(decodedAssetId);
         }
 
+        // Dangerous contracts can only be called by whitelisted senders, even if their address
+        // is above MIN_ALLOWED_ADDRESS.
+        if (dangerousContracts[contractL2]) {
+            return whitelistedSenders[sender];
+        }
+
         // We always allow calls to the L2AssetRouter contract. We expect that it will not
         // cause deploying of any unwhitelisted code, but it is needed to facilitate withdrawals of chains.
         if (contractL2 > MIN_ALLOWED_ADDRESS || contractL2 == L2_ASSET_ROUTER_ADDR) {
@@ -114,5 +162,14 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
     function _checkCTMAssetId(bytes32 assetId) internal view returns (bool) {
         address ctmAddress = BRIDGE_HUB.ctmAssetIdToAddress(assetId);
         return ctmAddress != address(0);
+    }
+
+    /// @dev Populates the initial set of dangerous contracts during initialization.
+    /// The built-in Create2Factory (deployed during ZKsync OS genesis) must be restricted
+    /// because it allows arbitrary contract deployment, which must be gated to whitelisted
+    /// senders on the Gateway.
+    function _initializeDangerousContracts() internal {
+        dangerousContracts[L2_CREATE2_FACTORY_ADDR] = true;
+        emit DangerousContractAdded(L2_CREATE2_FACTORY_ADDR);
     }
 }

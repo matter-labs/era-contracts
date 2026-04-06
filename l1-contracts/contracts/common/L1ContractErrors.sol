@@ -16,6 +16,8 @@ error AddressMismatch(address expected, address supplied);
 // 0x42573d7a
 error AddressNotZero();
 // 0x2a5989a0
+error AlreadyDangerousContract(address);
+// 0x2a5989a0
 error AlreadyPermanentRollup();
 // 0x0bfcef28
 error AlreadyWhitelisted(address);
@@ -314,6 +316,7 @@ error NotInitializedReentrancyGuard();
 error NotL1(uint256 l1ChainId, uint256 blockChainId);
 // 0xc5441a63
 error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
+error NotDangerousContract(address);
 // 0xdf17e316
 error NotWhitelisted(address);
 // 0xf3ed9dfa
