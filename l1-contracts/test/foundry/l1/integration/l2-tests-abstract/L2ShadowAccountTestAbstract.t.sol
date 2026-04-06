@@ -84,18 +84,6 @@ abstract contract L2ShadowAccountTestAbstract is Test, L2InteropTestUtils {
         return abi.encode(calls);
     }
 
-    /// @dev Builds a ShadowAccountCall[] payload with a delegatecall.
-    function _buildSingleDelegatecallPayload(address target, bytes memory data) internal pure returns (bytes memory) {
-        ShadowAccountCall[] memory calls = new ShadowAccountCall[](1);
-        calls[0] = ShadowAccountCall({
-            callType: ShadowAccountCallType.DelegateCall,
-            target: target,
-            value: 0,
-            data: data
-        });
-        return abi.encode(calls);
-    }
-
     /// @dev Creates and executes a bundle with a single shadow account call.
     function _executeShadowAccountBundle(
         bytes memory payload,

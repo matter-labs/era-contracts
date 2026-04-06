@@ -296,16 +296,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
                 // Transfer base tokens from the BaseTokenHolder instead of minting.
                 L2_BASE_TOKEN_HOLDER.give(address(this), interopCall.value, _sourceChainId);
             }
-            // Determine the actual recipient of the receiveMessage call.
             // When shadowAccount is true, route through the sender's ShadowAccount
             // (deploying it if it doesn't exist yet) instead of calling interopCall.to directly.
             bytes memory senderAddress = InteroperableAddress.formatEvmV1(_sourceChainId, interopCall.from);
-            address recipient;
-            if (interopCall.shadowAccount) {
-                recipient = L2_SHADOW_ACCOUNT_FACTORY.getOrDeployShadowAccount(senderAddress);
-            } else {
-                recipient = interopCall.to;
-            }
+            address recipient = interopCall.shadowAccount
+                ? L2_SHADOW_ACCOUNT_FACTORY.getOrDeployShadowAccount(senderAddress)
+                : interopCall.to;
 
             // slither-disable-next-line arbitrary-send-eth
             bytes4 selector = IERC7786Recipient(recipient).receiveMessage{value: interopCall.value}({
