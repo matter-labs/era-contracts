@@ -15,7 +15,7 @@ error AddressHasNoCode(address);
 error AddressMismatch(address expected, address supplied);
 // 0x42573d7a
 error AddressNotZero();
-// 0x2a5989a0
+// 0xb577eb6c
 error AlreadyDangerousContract(address);
 // 0x2a5989a0
 error AlreadyPermanentRollup();
@@ -308,6 +308,8 @@ error NotAZKChain(address addr);
 error NotCompatibleWithPriorityMode();
 // 0x5e67e793
 error NotCurrentSettlementLayer();
+// 0x2b1dc354
+error NotDangerousContract(address);
 // 0x230f9d11
 error NotEnoughSigners(uint256 provided, uint256 expected);
 // 0xdd7e3621
@@ -316,7 +318,6 @@ error NotInitializedReentrancyGuard();
 error NotL1(uint256 l1ChainId, uint256 blockChainId);
 // 0xc5441a63
 error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
-error NotDangerousContract(address);
 // 0xdf17e316
 error NotWhitelisted(address);
 // 0xf3ed9dfa

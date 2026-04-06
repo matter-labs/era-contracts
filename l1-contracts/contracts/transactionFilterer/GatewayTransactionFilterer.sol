@@ -12,18 +12,18 @@ import {
     NotWhitelisted,
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
-import {
-    L2_ASSET_ROUTER_ADDR,
-    ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR
-} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {AssetRouterBase} from "../bridge/asset-router/AssetRouterBase.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 
-/// @dev We want to ensure that only whitelisted contracts can ever be deployed,
-/// while allowing anyone to call any other method. Thus, we disallow calls that can deploy contracts
-/// (i.e. calls to the predeployed Create2Factory or ContractDeployer).
+/// @dev Calls to L2 contracts whose address is below this threshold are only allowed from whitelisted
+/// senders. This covers the Era system-contract space (0x8000–0xffff, e.g. ContractDeployer) and
+/// the Era built-in user-space contracts (0x10000–0x1ffff, e.g. the Era Create2Factory), which can
+/// deploy arbitrary bytecode. Contracts predeployed during ZKsync OS genesis that sit *above* this
+/// threshold (e.g. the Arachnid deterministic-deployment-proxy) are handled separately via the
+/// `dangerousContracts` mapping.
 address constant MIN_ALLOWED_ADDRESS = address(0x20000);
 
 /// @author Matter Labs
@@ -52,12 +52,10 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
     /// @notice Indicates whether the sender is whitelisted to deposit to Gateway
     mapping(address sender => bool whitelisted) public whitelistedSenders;
 
-    /// @notice Mapping of contracts that can only be called by whitelisted senders.
-    /// @dev This allows restricting specific high-address contracts (above MIN_ALLOWED_ADDRESS)
-    /// that would otherwise be callable by anyone. For example, Arachnid's
-    /// deterministic-deployment-proxy (0x4e59b44847b379578588920cA78FbF26c0B4956C), predeployed
-    /// during ZKsync OS genesis, is marked as dangerous to prevent unauthorized contract
-    /// deployments through the Gateway.
+    /// @notice Contracts that may only be called by whitelisted senders, regardless of their address.
+    /// @dev Used to restrict ZKsync OS genesis contracts that sit above MIN_ALLOWED_ADDRESS and
+    /// would otherwise be freely callable. The Arachnid deterministic-deployment-proxy
+    /// (ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR) is registered here during initialization.
     mapping(address contractAddress => bool isDangerous) public dangerousContracts;
 
     /// @dev Contract is expected to be used as proxy implementation.

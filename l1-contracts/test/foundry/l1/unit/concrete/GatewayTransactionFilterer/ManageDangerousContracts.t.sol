@@ -54,7 +54,10 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         emit DangerousContractAdded(dangerousAddr);
         transactionFiltererProxy.addDangerousContract(dangerousAddr);
 
-        assertTrue(transactionFiltererProxy.dangerousContracts(dangerousAddr), "Contract should be marked as dangerous");
+        assertTrue(
+            transactionFiltererProxy.dangerousContracts(dangerousAddr),
+            "Contract should be marked as dangerous"
+        );
     }
 
     function test_addDangerousContract_revertsIfNotOwner() public {
