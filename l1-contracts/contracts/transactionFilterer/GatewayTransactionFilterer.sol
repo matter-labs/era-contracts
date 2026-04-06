@@ -12,7 +12,10 @@ import {
     NotWhitelisted,
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_CREATE2_FACTORY_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR
+} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {AssetRouterBase} from "../bridge/asset-router/AssetRouterBase.sol";
@@ -51,9 +54,10 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
 
     /// @notice Mapping of contracts that can only be called by whitelisted senders.
     /// @dev This allows restricting specific high-address contracts (above MIN_ALLOWED_ADDRESS)
-    /// that would otherwise be callable by anyone. For example, the built-in Create2Factory
-    /// deployed during ZKsync OS genesis is marked as dangerous to prevent unauthorized
-    /// contract deployments through the Gateway.
+    /// that would otherwise be callable by anyone. For example, Arachnid's
+    /// deterministic-deployment-proxy (0x4e59b44847b379578588920cA78FbF26c0B4956C), predeployed
+    /// during ZKsync OS genesis, is marked as dangerous to prevent unauthorized contract
+    /// deployments through the Gateway.
     mapping(address contractAddress => bool isDangerous) public dangerousContracts;
 
     /// @dev Contract is expected to be used as proxy implementation.
@@ -165,11 +169,11 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
     }
 
     /// @dev Populates the initial set of dangerous contracts during initialization.
-    /// The built-in Create2Factory (deployed during ZKsync OS genesis) must be restricted
-    /// because it allows arbitrary contract deployment, which must be gated to whitelisted
-    /// senders on the Gateway.
+    /// Arachnid's deterministic-deployment-proxy (the standard EVM CREATE2 factory predeployed
+    /// during ZKsync OS genesis) must be restricted because it allows arbitrary contract deployment,
+    /// which must be gated to whitelisted senders on the Gateway.
     function _initializeDangerousContracts() internal {
-        dangerousContracts[L2_CREATE2_FACTORY_ADDR] = true;
-        emit DangerousContractAdded(L2_CREATE2_FACTORY_ADDR);
+        dangerousContracts[ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR] = true;
+        emit DangerousContractAdded(ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR);
     }
 }

@@ -8,7 +8,10 @@ import {
     GatewayTransactionFilterer,
     MIN_ALLOWED_ADDRESS
 } from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
-import {L2_CREATE2_FACTORY_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AlreadyDangerousContract, NotDangerousContract} from "contracts/common/L1ContractErrors.sol";
 
 contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
@@ -22,7 +25,7 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
     function test_initialize_marksCreate2FactoryAsDangerous() public view {
         // The Create2Factory should be in the dangerous contracts list from initialization
         assertTrue(
-            transactionFiltererProxy.dangerousContracts(L2_CREATE2_FACTORY_ADDR),
+            transactionFiltererProxy.dangerousContracts(ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR),
             "Create2Factory should be marked as dangerous on initialization"
         );
     }
@@ -31,7 +34,7 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
         GatewayTransactionFilterer impl = new GatewayTransactionFilterer(IBridgehubBase(bridgehub), assetRouter);
 
         vm.expectEmit(true, false, false, false);
-        emit DangerousContractAdded(L2_CREATE2_FACTORY_ADDR);
+        emit DangerousContractAdded(ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR);
 
         new TransparentUpgradeableProxy(
             address(impl),
@@ -113,7 +116,7 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
     function test_removeDangerousContract_revertsIfNotOwner() public {
         vm.prank(randomUser);
         vm.expectRevert("Ownable: caller is not the owner");
-        transactionFiltererProxy.removeDangerousContract(L2_CREATE2_FACTORY_ADDR);
+        transactionFiltererProxy.removeDangerousContract(ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR);
     }
 
     function test_removeDangerousContract_revertsIfNotDangerous() public {
@@ -166,10 +169,10 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
     }
 
     function test_isTransactionAllowed_blocksCreate2FactoryForNonWhitelisted() public view {
-        // Create2Factory is marked dangerous on initialization and is below MIN_ALLOWED_ADDRESS
+        // Deterministic Create2 factory is marked dangerous on initialization and is above MIN_ALLOWED_ADDRESS
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
-            L2_CREATE2_FACTORY_ADDR,
+            ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
             0,
             0,
             hex"12345678",
@@ -185,7 +188,7 @@ contract ManageDangerousContractsTest is GatewayTransactionFiltererTest {
 
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
             randomUser,
-            L2_CREATE2_FACTORY_ADDR,
+            ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
             0,
             0,
             hex"12345678",
