@@ -96,6 +96,50 @@ These versions require `stdarch_x86_avx512` (stabilized in Rust 1.89) and fail o
 
 Known-good versions: `crc-fast 1.3.0`, `zerocopy 0.8.27`
 
+## Testing Guidelines
+
+All PRs that include feature work, bug fixes, or behavioral changes **MUST** follow these testing requirements.
+
+### Test Structure
+
+Every test **MUST** have proper structure:
+
+- Relevant storage changes **MUST** be asserted.
+- Relevant event emissions **MUST** be asserted.
+- Relevant logic asserts **MUST** be in place.
+- Other relevant side effects **MUST** be asserted.
+- Tests **MUST** validate outcomes — not just execute calls.
+- Only **relevant** effects need to be checked; there is no need to check every storage write, event emission, etc.
+
+### Coverage Requirements
+
+- Any feature PR **MUST** include tests for happy, unhappy, and edge-case paths.
+  - Happy and unhappy path coverage should be straightforward for PR owners and reviewers to verify.
+  - Edge-case testing is best effort: PR owners and reviewers should try their best to ensure good coverage, but it is acknowledged that sometimes not all edge cases can be anticipated.
+- Ideally, testing should include fuzz and invariant tests where possible. Different testing approaches lead to flexibility and thorough coverage.
+- Total coverage **MUST NOT** decrease after any PR.
+  - In rare extraordinary cases (e.g., splitting contracts into L1/L2 counterparts) where maintaining coverage would require disproportionate work relative to PR size, this requirement can be discussed on an individual basis. Such cases should be very rare.
+
+### Mocks
+
+- Mocks **MUST** only be used when the intention is to separate concerns or isolate components.
+- Mocks should **not** be used as a convenience shortcut to simplify setup when triggering the full execution flow is feasible.
+- It should be clear from comments in the test why mocks are being used. The test writer should clearly denote that the file or test is expected to be isolated from the part of the flow being mocked.
+
+### Regression Tests
+
+- Every bug found through audits or the bug bounty program **MUST** have a regression test.
+- If the bug is not yet publicly known, consult with the security team before including the regression test to determine appropriate timing.
+
+### Readability
+
+Tests **MUST** be readable for both humans and AI:
+
+- Follow a clear folder structure: separate folders for contracts, separate test files for sections of a contract or logic blocks.
+- Add comments for non-trivial tests, especially edge cases and complex flows. Missing context is easily recovered by a few well-placed comments.
+- Any guideline deviation (use of mocks, missing checks, etc.) should be explicitly explained in the test.
+- Structure tests and the overall codebase to be AI-friendly: keep things clean, avoid complicated structures, and include in-code documentation. AI usage is increasing, and investing effort into clarity pays off.
+
 ## Debugging Strategies
 
 When debugging Solidity compilation or script failures:
@@ -238,6 +282,10 @@ yarn prettier:fix
 2. **Import ordering**: Imports may need to be reordered
 3. **Trailing whitespace**: Will be fixed by prettier
 4. **Missing or extra newlines**: Will be fixed by prettier
+
+## PR Description Maintenance
+
+Whenever an agent makes changes in a PR, it **MUST** update the PR description to reflect the current state of the changes and ensure it is up to date. If the PR already has a description with existing styling or wording, the agent **MUST** follow that same style and tone when updating it.
 
 ## Git Best Practices
 
