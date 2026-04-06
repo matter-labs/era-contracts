@@ -112,6 +112,7 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
     write_output_if_requested(
         "ctm.init",
         args.shared.out_path.as_deref(),
+        args.shared.safe_transactions_out.as_deref(),
         &runner,
         &ctm_input,
         &ctm_output,

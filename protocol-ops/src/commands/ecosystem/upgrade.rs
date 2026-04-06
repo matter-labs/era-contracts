@@ -250,6 +250,7 @@ fn run_no_governance_prepare(
     write_output_if_requested(
         "ecosystem.upgrade",
         args.shared.out_path.as_deref(),
+        args.shared.safe_transactions_out.as_deref(),
         runner,
         &input_env,
         &out_payload,
@@ -377,6 +378,7 @@ fn run_governance_stage(
     write_output_if_requested(
         "ecosystem.upgrade",
         args.shared.out_path.as_deref(),
+        args.shared.safe_transactions_out.as_deref(),
         runner,
         &input_env,
         &out_payload,

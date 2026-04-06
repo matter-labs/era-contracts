@@ -209,6 +209,7 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
     write_output_if_requested(
         "chain.init",
         args.shared.out_path.as_deref(),
+        args.shared.safe_transactions_out.as_deref(),
         &runner,
         &input,
         &ChainInitOutputData::from_full_output(&output),

@@ -324,6 +324,7 @@ validator_timelock_execution_delay = 0
     write_output_if_requested(
         "chain.convert-to-gateway",
         args.shared.out_path.as_deref(),
+        args.shared.safe_transactions_out.as_deref(),
         runner,
         &serde_json::json!({"stage": "vote-prepare"}),
         &VotePrepareOutput {
@@ -466,6 +467,7 @@ fn write_stage_output(
     write_output_if_requested(
         "chain.convert-to-gateway",
         args.shared.out_path.as_deref(),
+        args.shared.safe_transactions_out.as_deref(),
         runner,
         &serde_json::json!({"stage": stage}),
         &StageOutput {

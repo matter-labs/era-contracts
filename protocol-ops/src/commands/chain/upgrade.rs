@@ -103,6 +103,7 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
     write_output_if_requested(
         "chain.upgrade",
         args.shared.out_path.as_deref(),
+        args.shared.safe_transactions_out.as_deref(),
         &runner,
         &empty_input,
         &out_payload,

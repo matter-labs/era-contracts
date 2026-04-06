@@ -64,6 +64,7 @@ pub async fn run(args: HubInitArgs) -> anyhow::Result<()> {
     write_output_if_requested(
         "hub.init",
         args.shared.out_path.as_deref(),
+        args.shared.safe_transactions_out.as_deref(),
         &runner,
         &input,
         &output,

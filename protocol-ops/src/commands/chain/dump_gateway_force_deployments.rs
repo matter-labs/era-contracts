@@ -74,6 +74,7 @@ pub async fn run(args: DumpGatewayForceDeploymentsArgs) -> anyhow::Result<()> {
     write_output_if_requested(
         "chain.dump-gateway-force-deployments",
         args.shared.out_path.as_deref(),
+        args.shared.safe_transactions_out.as_deref(),
         &runner,
         &serde_json::json!({}),
         &serde_json::json!({
