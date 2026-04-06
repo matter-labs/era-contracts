@@ -81,6 +81,8 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// @notice Increase the balance of the receiver by transferring from BaseTokenHolder.
     /// @dev This method is only callable by the bootloader.
     /// @dev The totalSupply is now computed from BaseTokenHolder balance, so we only update balances.
+    /// @dev The corresponding bootloader-side logic is implemented in `mint_base_token` in zksync-os
+    /// https://github.com/matter-labs/zksync-os/blob/6bf0d139b7e9b236b25682e6adb8e59b7a7c4516/basic_bootloader/src/bootloader/transaction_flow/zk/process_l1_transaction.rs#L707
     /// @param _account The address which to mint the funds to.
     /// @param _amount The amount of ETH in wei to be minted.
     function mint(address _account, uint256 _amount) external override onlyBootloader {
