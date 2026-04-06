@@ -289,6 +289,10 @@ Whenever an agent makes changes in a PR, it **MUST** update the PR description t
 
 ## Git Best Practices
 
+### Pushing and Creating PRs
+
+Agents do **not** have push access to the main repository. Always push to a **fork** and create PRs from there. Do not attempt to push directly to `matter-labs/era-contracts`.
+
 ### Never Force Push
 
 **Do NOT use `--force`, `--force-with-lease`, or `git push -f`**
