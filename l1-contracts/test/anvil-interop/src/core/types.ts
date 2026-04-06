@@ -85,7 +85,7 @@ export interface AnvilChainConfig {
   port: number;
   role: ChainRole;
   settlement?: SettlementType;
-  /** L1 base token address. Defaults to ETH_TOKEN_ADDRESS if omitted. */
+  /** L1 base token address, or "custom" to deploy a fresh ERC20. Defaults to ETH_TOKEN_ADDRESS if omitted. */
   baseToken?: string;
 }
 

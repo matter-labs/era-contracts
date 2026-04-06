@@ -14,6 +14,7 @@ import {
   L2_ASSET_ROUTER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
 } from "../../src/core/const";
+import { encodeEvmAddress } from "../../src/helpers/erc7930";
 import {
   sendInteropBundle,
   executeBundle,
@@ -25,17 +26,20 @@ import {
   indirectCallAttr,
   executionAddressAttr,
   unbundlerAddressAttr,
-  encodeEvmAddress,
   getTokenTransferData,
-  getNativeBalance,
-  getTokenBalance,
-  approveAndReturnAmount,
-  getTokenAddressForAsset,
   getInteropProtocolFee,
   deployRevertingContract,
   deployDummyInteropRecipient,
-} from "../../src/helpers/interop-bundle-helper";
-import type { CallStarter } from "../../src/helpers/interop-bundle-helper";
+} from "../../src/helpers/interop-helpers";
+import type { CallStarter } from "../../src/helpers/interop-helpers";
+import {
+  getNativeBalance,
+  getTokenBalance,
+  approveTokenForNtv,
+  getTokenAddressForAsset,
+  expectBalanceDelta,
+  expectRevert,
+} from "../../src/helpers/balance-helpers";
 
 describe("09 - Interop Unbundle (failing calls)", function () {
   this.timeout(0);
@@ -50,25 +54,16 @@ describe("09 - Interop Unbundle (failing calls)", function () {
   let sourceProvider: providers.JsonRpcProvider;
   let destProvider: providers.JsonRpcProvider;
 
-  // Bundle A: explicit unbundlerAddress (destination chain unbundling)
-  let bundleDataA: string;
-  let bundleHashA: string;
-
-  // Bundle B: no explicit unbundlerAddress (source chain unbundling)
-  let bundleDataB: string;
-  let bundleHashB: string;
-
   // Amounts used in calls
   const BASE_AMOUNT = ethers.utils.parseEther("0.01");
   const TOKEN_AMOUNT = ethers.utils.parseUnits("1", 18);
 
   // Token info
   let sourceTokenAddress: string;
-  let assetId: string;
-  let destTokenAddress: string;
+  let sourceAssetId: string;
 
   // Protocol fee
-  let protocolFee: BigNumber;
+  let interopFee: BigNumber;
 
   // DummyInteropRecipient on dest chain for direct calls
   let dummyRecipient: string;
@@ -94,7 +89,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     destProvider = new providers.JsonRpcProvider(destChain.rpcUrl);
 
     sourceTokenAddress = state.testTokens[sourceChainId];
-    assetId = encodeNtvAssetId(sourceChainId, sourceTokenAddress);
+    sourceAssetId = encodeNtvAssetId(sourceChainId, sourceTokenAddress);
 
     // Deploy DummyInteropRecipient on destination chain for direct-call bundles
     dummyRecipient = await deployDummyInteropRecipient(destProvider);
@@ -103,31 +98,31 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     // Deploy a contract that always reverts (for failing call tests)
     failingContract = await deployRevertingContract(destProvider);
     console.log(`   Reverting contract: ${failingContract}`);
+
+    // Get protocol fee
+    interopFee = await getInteropProtocolFee(sourceProvider);
   });
 
   /**
-   * Build the 3 call starters used for both bundle A and bundle B:
+   * Build the 3 call starters used for bundles:
    *   Call 0: direct value transfer to dummyRecipient
-   *   Call 1: call to non-existent contract (WILL FAIL)
+   *   Call 1: call to contract that always reverts (WILL FAIL)
    *   Call 2: indirect ERC20 token transfer via asset router
    */
   function buildCallStarters(): CallStarter[] {
-    // Call 0: direct value transfer
     const call0: CallStarter = {
       to: encodeEvmAddress(dummyRecipient),
       data: "0x",
       callAttributes: [interopCallValueAttr(BASE_AMOUNT)],
     };
 
-    // Call 1: call to contract that always reverts
     const call1: CallStarter = {
       to: encodeEvmAddress(failingContract),
       data: FAILING_CALL_CALLDATA,
       callAttributes: [interopCallValueAttr(BigNumber.from(0))],
     };
 
-    // Call 2: indirect ERC20 token transfer
-    const tokenTransferData = getTokenTransferData(assetId, TOKEN_AMOUNT, ANVIL_RECIPIENT_ADDR);
+    const tokenTransferData = getTokenTransferData(sourceAssetId, TOKEN_AMOUNT, ANVIL_RECIPIENT_ADDR);
     const call2: CallStarter = {
       to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
       data: tokenTransferData,
@@ -137,122 +132,94 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     return [call0, call1, call2];
   }
 
-  it("Can send bundles that need unbundling", async () => {
-    // Approve tokens for the indirect transfer
-    await approveAndReturnAmount(sourceProvider, sourceTokenAddress, TOKEN_AMOUNT.mul(2));
-
-    // Get protocol fee
-    protocolFee = await getInteropProtocolFee(sourceProvider);
+  /**
+   * Send a fresh bundle with the 3 call starters and return its data.
+   * Approves tokens, pays the protocol fee, and sends the bundle.
+   */
+  async function sendAndPrepareBundle(opts: {
+    withUnbundlerAddress?: boolean;
+  }): Promise<{ bundleData: string; bundleHash: string }> {
+    await approveTokenForNtv(sourceProvider, sourceTokenAddress, TOKEN_AMOUNT);
 
     const callStarters = buildCallStarters();
+    const valuePerBundle = BASE_AMOUNT.add(interopFee.mul(callStarters.length));
 
-    // Compute total value: BASE_AMOUNT (for call 0's interopCallValue) + protocol fee per call
-    const valuePerBundle = BASE_AMOUNT.add(protocolFee.mul(callStarters.length));
+    const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
+    if (opts.withUnbundlerAddress) {
+      bundleAttributes.push(unbundlerAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR));
+    }
 
-    // ── Bundle A: explicit unbundlerAddress = ANVIL_DEFAULT_ACCOUNT_ADDR ──
-    const bundleAttributesA = [
-      executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR),
-      unbundlerAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR),
-    ];
-
-    const resultA = await sendInteropBundle({
+    const result = await sendInteropBundle({
       sourceProvider,
       destinationChainId: destChainId,
       callStarters,
-      bundleAttributes: bundleAttributesA,
+      bundleAttributes,
       value: valuePerBundle,
     });
 
-    bundleDataA = resultA.bundleData;
-    bundleHashA = resultA.bundleHash;
-    console.log(`   Bundle A hash: ${bundleHashA}`);
-    console.log(`   Bundle A source tx: ${resultA.txHash}`);
+    expect(result.bundleHash).to.not.equal(ethers.constants.HashZero);
 
-    expect(bundleHashA).to.not.equal(ethers.constants.HashZero);
-
-    // ── Bundle B: no explicit unbundlerAddress (source chain unbundling) ──
-    const bundleAttributesB = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
-
-    const resultB = await sendInteropBundle({
-      sourceProvider,
-      destinationChainId: destChainId,
-      callStarters,
-      bundleAttributes: bundleAttributesB,
-      value: valuePerBundle,
-    });
-
-    bundleDataB = resultB.bundleData;
-    bundleHashB = resultB.bundleHash;
-    console.log(`   Bundle B hash: ${bundleHashB}`);
-    console.log(`   Bundle B source tx: ${resultB.txHash}`);
-
-    expect(bundleHashB).to.not.equal(ethers.constants.HashZero);
-
-    // Look up destination token address for later balance checks
-    destTokenAddress = await getTokenAddressForAsset(destProvider, assetId);
-  });
+    return { bundleData: result.bundleData, bundleHash: result.bundleHash };
+  }
 
   it("Cannot unbundle a non-verified bundle", async () => {
-    // Attempt to unbundle before verifyBundle - should revert
-    const callStatuses = [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed];
+    const { bundleData } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
 
-    let reverted = false;
-    try {
-      await unbundleBundle(destProvider, bundleDataA, callStatuses);
-    } catch {
-      reverted = true;
-    }
-    expect(reverted, "Expected unbundleBundle to revert on non-verified bundle").to.equal(true);
+    const callStatuses = [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed];
+    await expectRevert(() => unbundleBundle(destProvider, bundleData, callStatuses), "unbundle non-verified bundle");
   });
 
   it("Can verify a bundle", async () => {
+    const { bundleData, bundleHash } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
+
     // First, try atomic executeBundle - should revert because call 1 will fail
-    let executeReverted = false;
-    try {
-      await executeBundle(destProvider, bundleDataA, sourceChainId);
-    } catch {
-      executeReverted = true;
-    }
-    expect(executeReverted, "Expected executeBundle to revert due to failing call").to.equal(true);
+    await expectRevert(() => executeBundle(destProvider, bundleData, sourceChainId), "executeBundle with failing call");
 
     // Now call verifyBundle - should succeed
-    const verifyReceipt = await verifyBundle(destProvider, bundleDataA, sourceChainId);
+    const verifyReceipt = await verifyBundle(destProvider, bundleData, sourceChainId);
     console.log(`   verifyBundle tx: ${verifyReceipt.transactionHash}, status: ${verifyReceipt.status}`);
     expect(verifyReceipt.status, "verifyBundle tx should succeed").to.equal(1);
 
     // Check bundleStatus == BundleStatus.Verified (1)
-    const status = await getBundleStatus(destProvider, bundleHashA);
+    const status = await getBundleStatus(destProvider, bundleHash);
     console.log(`   Bundle status after verify: ${status}`);
     expect(status, "Bundle should be in Verified status").to.equal(BundleStatus.Verified);
   });
 
   it("Cannot unbundle from the wrong unbundler address", async () => {
+    const { bundleData } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
+
+    // Verify the bundle first so we can attempt unbundle
+    await verifyBundle(destProvider, bundleData, sourceChainId);
+
     // Use ANVIL_ACCOUNT2_PRIVATE_KEY as the wrong signer
     const callStatuses = [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed];
-
-    let reverted = false;
-    try {
-      await unbundleBundle(destProvider, bundleDataA, callStatuses, ANVIL_ACCOUNT2_PRIVATE_KEY);
-    } catch {
-      reverted = true;
-    }
-    expect(reverted, "Expected unbundleBundle to revert with wrong unbundler").to.equal(true);
+    await expectRevert(
+      () => unbundleBundle(destProvider, bundleData, callStatuses, ANVIL_ACCOUNT2_PRIVATE_KEY),
+      "unbundle from wrong address"
+    );
   });
 
   it("Cannot unbundle a failing call", async () => {
+    const { bundleData } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
+
+    // Verify the bundle first
+    await verifyBundle(destProvider, bundleData, sourceChainId);
+
     // Trying to mark the failing call (index 1) as Executed should revert
     const callStatuses = [CallStatus.Unprocessed, CallStatus.Executed, CallStatus.Unprocessed];
-
-    let reverted = false;
-    try {
-      await unbundleBundle(destProvider, bundleDataA, callStatuses);
-    } catch {
-      reverted = true;
-    }
-    expect(reverted, "Expected unbundleBundle to revert when executing a failing call").to.equal(true);
+    await expectRevert(() => unbundleBundle(destProvider, bundleData, callStatuses), "execute a failing call");
   });
 
   it("Can unbundle from the destination chain", async () => {
+    const { bundleData, bundleHash } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
+
+    // Verify the bundle first
+    await verifyBundle(destProvider, bundleData, sourceChainId);
+
+    // Resolve destination token address
+    let destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
+
     // ── Round 1: [Unprocessed, Cancelled, Executed] ──
     // This executes call 2 (token transfer) and cancels call 1 (failing)
     const round1Statuses = [CallStatus.Unprocessed, CallStatus.Cancelled, CallStatus.Executed];
@@ -260,29 +227,26 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     // Capture token balance before round 1
     const tokenBalanceBefore = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
 
-    await unbundleBundle(destProvider, bundleDataA, round1Statuses);
+    await unbundleBundle(destProvider, bundleData, round1Statuses);
 
     // Re-resolve token address (NTV may have deployed bridged token during unbundle)
-    destTokenAddress = await getTokenAddressForAsset(destProvider, assetId);
+    destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
 
     // Check bundleStatus == BundleStatus.Unbundled (3)
-    const statusAfterRound1 = await getBundleStatus(destProvider, bundleHashA);
+    const statusAfterRound1 = await getBundleStatus(destProvider, bundleHash);
     expect(statusAfterRound1, "Bundle should be in Unbundled status after round 1").to.equal(BundleStatus.Unbundled);
 
     // Check callStatus for all 3 calls after round 1
-    const call0StatusR1 = await getCallStatus(destProvider, bundleHashA, 0);
-    const call1StatusR1 = await getCallStatus(destProvider, bundleHashA, 1);
-    const call2StatusR1 = await getCallStatus(destProvider, bundleHashA, 2);
+    const call0StatusR1 = await getCallStatus(destProvider, bundleHash, 0);
+    const call1StatusR1 = await getCallStatus(destProvider, bundleHash, 1);
+    const call2StatusR1 = await getCallStatus(destProvider, bundleHash, 2);
     expect(call0StatusR1, "Call 0 should be Unprocessed after round 1").to.equal(CallStatus.Unprocessed);
     expect(call1StatusR1, "Call 1 should be Cancelled after round 1").to.equal(CallStatus.Cancelled);
     expect(call2StatusR1, "Call 2 should be Executed after round 1").to.equal(CallStatus.Executed);
 
     // Check token recipient got the token amount
     const tokenBalanceAfter = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
-    const tokenDelta = tokenBalanceAfter.sub(tokenBalanceBefore);
-    expect(tokenDelta.eq(TOKEN_AMOUNT), `Token recipient should receive ${TOKEN_AMOUNT}, got ${tokenDelta}`).to.equal(
-      true
-    );
+    expectBalanceDelta(tokenBalanceBefore, tokenBalanceAfter, TOKEN_AMOUNT, "round 1: recipient token");
 
     // ── Round 2: [Executed, Unprocessed, Unprocessed] ──
     // This executes call 0 (direct value transfer). Already-processed calls are Unprocessed (skip).
@@ -291,68 +255,75 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     // Capture base balance before round 2
     const baseBalanceBefore = await getNativeBalance(destProvider, dummyRecipient);
 
-    await unbundleBundle(destProvider, bundleDataA, round2Statuses);
+    await unbundleBundle(destProvider, bundleData, round2Statuses);
 
     // Check bundleStatus still == Unbundled
-    const statusAfterRound2 = await getBundleStatus(destProvider, bundleHashA);
+    const statusAfterRound2 = await getBundleStatus(destProvider, bundleHash);
     expect(statusAfterRound2, "Bundle should remain in Unbundled status after round 2").to.equal(
       BundleStatus.Unbundled
     );
 
     // Check callStatus matches final: [Executed, Cancelled, Executed]
-    const call0StatusR2 = await getCallStatus(destProvider, bundleHashA, 0);
-    const call1StatusR2 = await getCallStatus(destProvider, bundleHashA, 1);
-    const call2StatusR2 = await getCallStatus(destProvider, bundleHashA, 2);
+    const call0StatusR2 = await getCallStatus(destProvider, bundleHash, 0);
+    const call1StatusR2 = await getCallStatus(destProvider, bundleHash, 1);
+    const call2StatusR2 = await getCallStatus(destProvider, bundleHash, 2);
     expect(call0StatusR2, "Call 0 should be Executed after round 2").to.equal(CallStatus.Executed);
     expect(call1StatusR2, "Call 1 should remain Cancelled after round 2").to.equal(CallStatus.Cancelled);
     expect(call2StatusR2, "Call 2 should remain Executed after round 2").to.equal(CallStatus.Executed);
 
     // Check base recipient got the base amount
     const baseBalanceAfter = await getNativeBalance(destProvider, dummyRecipient);
-    const baseDelta = baseBalanceAfter.sub(baseBalanceBefore);
-    expect(baseDelta.eq(BASE_AMOUNT), `Base recipient should receive ${BASE_AMOUNT}, got ${baseDelta}`).to.equal(true);
+    expectBalanceDelta(baseBalanceBefore, baseBalanceAfter, BASE_AMOUNT, "round 2: recipient native");
   });
 
   it("Cannot unbundle a processed call", async () => {
-    // Trying to re-execute already-processed calls should revert
-    // Call 0 and call 2 are already Executed
-    const callStatuses = [CallStatus.Executed, CallStatus.Unprocessed, CallStatus.Executed];
+    // Send, verify, and fully unbundle a bundle, then try to re-execute
+    const { bundleData, bundleHash } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
 
-    let reverted = false;
-    try {
-      await unbundleBundle(destProvider, bundleDataA, callStatuses);
-    } catch {
-      reverted = true;
-    }
-    expect(reverted, "Expected unbundleBundle to revert when re-executing processed calls").to.equal(true);
+    await verifyBundle(destProvider, bundleData, sourceChainId);
+
+    // Unbundle round 1: execute calls 0 and 2, cancel call 1
+    await unbundleBundle(destProvider, bundleData, [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed]);
+
+    // Verify calls are processed
+    const call0Status = await getCallStatus(destProvider, bundleHash, 0);
+    const call2Status = await getCallStatus(destProvider, bundleHash, 2);
+    expect(call0Status).to.equal(CallStatus.Executed);
+    expect(call2Status).to.equal(CallStatus.Executed);
+
+    // Trying to re-execute already-processed calls should revert
+    const callStatuses = [CallStatus.Executed, CallStatus.Unprocessed, CallStatus.Executed];
+    await expectRevert(() => unbundleBundle(destProvider, bundleData, callStatuses), "re-execute processed calls");
   });
 
   it("Cannot unbundle a cancelled call", async () => {
+    // Send, verify, and partially unbundle (cancel call 1), then try to execute it
+    const { bundleData, bundleHash } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
+
+    await verifyBundle(destProvider, bundleData, sourceChainId);
+
+    // Unbundle: cancel call 1, leave 0 and 2 unprocessed
+    await unbundleBundle(destProvider, bundleData, [
+      CallStatus.Unprocessed,
+      CallStatus.Cancelled,
+      CallStatus.Unprocessed,
+    ]);
+
+    const call1Status = await getCallStatus(destProvider, bundleHash, 1);
+    expect(call1Status).to.equal(CallStatus.Cancelled);
+
     // Trying to execute a cancelled call (index 1) should revert
     const callStatuses = [CallStatus.Unprocessed, CallStatus.Executed, CallStatus.Unprocessed];
-
-    let reverted = false;
-    try {
-      await unbundleBundle(destProvider, bundleDataA, callStatuses);
-    } catch {
-      reverted = true;
-    }
-    expect(reverted, "Expected unbundleBundle to revert when executing a cancelled call").to.equal(true);
+    await expectRevert(() => unbundleBundle(destProvider, bundleData, callStatuses), "execute a cancelled call");
   });
 
   it("Can send an unbundling bundle from the source chain", async () => {
-    // First verify bundle B on the destination chain
-    // Try atomic executeBundle first - should revert (failing call)
-    let executeReverted = false;
-    try {
-      await executeBundle(destProvider, bundleDataB, sourceChainId);
-    } catch {
-      executeReverted = true;
-    }
-    expect(executeReverted, "Expected executeBundle to revert for bundle B due to failing call").to.equal(true);
+    const { bundleData, bundleHash } = await sendAndPrepareBundle({});
 
-    // Build the final call statuses for bundle B
-    // Execute calls 0 and 2, cancel call 1
+    // Try atomic executeBundle first - should revert (failing call)
+    await expectRevert(() => executeBundle(destProvider, bundleData, sourceChainId), "executeBundle with failing call");
+
+    // Build the final call statuses: execute calls 0 and 2, cancel call 1
     const finalCallStatuses = [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed];
 
     // Build mock proof for verification
@@ -362,10 +333,10 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const interopHandlerIface = new ethers.utils.Interface(getAbi("InteropHandler"));
 
     // Call 1: verifyBundle(bundleData, proof)
-    const verifyCalldata = interopHandlerIface.encodeFunctionData("verifyBundle", [bundleDataB, mockProof]);
+    const verifyCalldata = interopHandlerIface.encodeFunctionData("verifyBundle", [bundleData, mockProof]);
 
     // Call 2: unbundleBundle(bundleData, finalCallStatuses)
-    const unbundleCalldata = interopHandlerIface.encodeFunctionData("unbundleBundle", [bundleDataB, finalCallStatuses]);
+    const unbundleCalldata = interopHandlerIface.encodeFunctionData("unbundleBundle", [bundleData, finalCallStatuses]);
 
     const metaCallStarters: CallStarter[] = [
       {
@@ -382,6 +353,9 @@ describe("09 - Interop Unbundle (failing calls)", function () {
 
     const metaBundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
 
+    // Resolve destination token address
+    const destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
+
     // Capture balances before execution
     const baseBalanceBefore = await getNativeBalance(destProvider, dummyRecipient);
     const tokenBalanceBefore = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
@@ -392,7 +366,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
       destinationChainId: destChainId,
       callStarters: metaCallStarters,
       bundleAttributes: metaBundleAttributes,
-      value: protocolFee.mul(2),
+      value: interopFee.mul(2),
     });
 
     console.log(`   Meta-bundle source tx: ${metaResult.txHash}`);
@@ -400,28 +374,23 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     // Execute the meta-bundle on the destination chain
     await executeBundle(destProvider, metaResult.bundleData, sourceChainId);
 
-    // Check bundle B status after meta-bundle execution
-    const statusB = await getBundleStatus(destProvider, bundleHashB);
-    expect(statusB, "Bundle B should be in Unbundled status after meta-bundle").to.equal(BundleStatus.Unbundled);
+    // Check bundle status after meta-bundle execution
+    const statusB = await getBundleStatus(destProvider, bundleHash);
+    expect(statusB, "Bundle should be in Unbundled status after meta-bundle").to.equal(BundleStatus.Unbundled);
 
     // Check balance deltas
     const baseBalanceAfter = await getNativeBalance(destProvider, dummyRecipient);
     const tokenBalanceAfter = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
 
-    const baseDelta = baseBalanceAfter.sub(baseBalanceBefore);
-    const tokenDelta = tokenBalanceAfter.sub(tokenBalanceBefore);
+    expectBalanceDelta(baseBalanceBefore, baseBalanceAfter, BASE_AMOUNT, "meta-bundle: recipient native");
+    expectBalanceDelta(tokenBalanceBefore, tokenBalanceAfter, TOKEN_AMOUNT, "meta-bundle: recipient token");
 
-    expect(baseDelta.eq(BASE_AMOUNT), `Base recipient should receive ${BASE_AMOUNT}, got ${baseDelta}`).to.equal(true);
-    expect(tokenDelta.eq(TOKEN_AMOUNT), `Token recipient should receive ${TOKEN_AMOUNT}, got ${tokenDelta}`).to.equal(
-      true
-    );
-
-    // Check call statuses for bundle B
-    const call0Status = await getCallStatus(destProvider, bundleHashB, 0);
-    const call1Status = await getCallStatus(destProvider, bundleHashB, 1);
-    const call2Status = await getCallStatus(destProvider, bundleHashB, 2);
-    expect(call0Status, "Bundle B call 0 should be Executed").to.equal(CallStatus.Executed);
-    expect(call1Status, "Bundle B call 1 should be Cancelled").to.equal(CallStatus.Cancelled);
-    expect(call2Status, "Bundle B call 2 should be Executed").to.equal(CallStatus.Executed);
+    // Check call statuses for the bundle
+    const call0Status = await getCallStatus(destProvider, bundleHash, 0);
+    const call1Status = await getCallStatus(destProvider, bundleHash, 1);
+    const call2Status = await getCallStatus(destProvider, bundleHash, 2);
+    expect(call0Status, "Call 0 should be Executed").to.equal(CallStatus.Executed);
+    expect(call1Status, "Call 1 should be Cancelled").to.equal(CallStatus.Cancelled);
+    expect(call2Status, "Call 2 should be Executed").to.equal(CallStatus.Executed);
   });
 });

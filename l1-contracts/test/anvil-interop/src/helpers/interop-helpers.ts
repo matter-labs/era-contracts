@@ -1,9 +1,9 @@
 /**
- * Helper functions for interop bundle and message tests.
+ * Interop bundle and message helpers.
  *
- * Provides low-level building blocks for constructing InteropCenter.sendBundle /
- * sendMessage calls and InteropHandler.executeBundle / verifyBundle / unbundleBundle
- * calls, along with ERC-7786 attribute encoding and balance snapshot utilities.
+ * Provides RPC wrappers for InteropCenter.sendBundle / sendMessage and
+ * InteropHandler.executeBundle / verifyBundle / unbundleBundle, along with
+ * ERC-7786 attribute encoding and contract deployment utilities.
  */
 
 import type { providers } from "ethers";
@@ -16,77 +16,38 @@ import {
   INTEROP_CENTER_ADDR,
   INTEROP_SEND_BUNDLE_GAS_LIMIT,
   L2_INTEROP_HANDLER_ADDR,
-  L2_NATIVE_TOKEN_VAULT_ADDR,
-  INTEROP_CALL_VALUE_SELECTOR,
-  INDIRECT_CALL_SELECTOR,
-  EXECUTION_ADDRESS_SELECTOR,
-  UNBUNDLER_ADDRESS_SELECTOR,
 } from "../core/const";
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
 import { buildMockInteropProof } from "../core/utils";
+import { encodeEvmChain, encodeEvmAddress } from "./erc7930";
 
 const abiCoder = ethers.utils.defaultAbiCoder;
 
-// ── ERC-7930 encoding helpers ──────────────────────────────────
-
-/**
- * Encode a chain ID in ERC-7930 format (EVM chain reference without address).
- * Matches the format expected by InteropCenter for destination chain IDs.
- */
-export function encodeEvmChain(chainId: number): string {
-  let chainIdHex = chainId.toString(16);
-  if (chainIdHex.length % 2 !== 0) chainIdHex = `0${chainIdHex}`;
-  const chainRefBytes = ethers.utils.arrayify(`0x${chainIdHex}`);
-  const chainRefLen = chainRefBytes.length;
-  return ethers.utils.hexlify(new Uint8Array([0x00, 0x01, 0x00, 0x00, chainRefLen, ...chainRefBytes, 0x00]));
-}
-
-/**
- * Encode a chain-qualified address in ERC-7930 format (EVM address with chain reference).
- * Used for bundle call starters' `to` field.
- */
-export function encodeEvmChainAddress(address: string, chainId: number): string {
-  let chainIdHex = chainId.toString(16);
-  if (chainIdHex.length % 2 !== 0) chainIdHex = `0${chainIdHex}`;
-  const chainRefBytes = ethers.utils.arrayify(`0x${chainIdHex}`);
-  const chainRefLen = chainRefBytes.length;
-  const addrBytes = ethers.utils.arrayify(address);
-  return ethers.utils.hexlify(
-    new Uint8Array([0x00, 0x01, 0x00, 0x00, chainRefLen, ...chainRefBytes, 0x14, ...addrBytes])
-  );
-}
-
-/**
- * Encode an address in ERC-7930 format (EVM address without chain reference).
- * Used for bundle attributes (executionAddress, unbundlerAddress).
- */
-export function encodeEvmAddress(address: string): string {
-  const addrBytes = ethers.utils.arrayify(address);
-  return ethers.utils.hexlify(new Uint8Array([0x00, 0x01, 0x00, 0x00, 0x00, 0x14, ...addrBytes]));
-}
+/** IERC7786Attributes interface — used for attribute encoding via encodeFunctionData. */
+const erc7786Iface = new ethers.utils.Interface(getAbi("IERC7786Attributes"));
 
 // ── ERC-7786 attribute encoding ────────────────────────────────
+// Uses IERC7786Attributes.encodeFunctionData so selectors and parameter
+// encoding are derived from the Solidity interface — no manual hex.
 
 /** Encode an interopCallValue attribute (direct call: transfers base token value). */
 export function interopCallValueAttr(amount: BigNumber): string {
-  return INTEROP_CALL_VALUE_SELECTOR + abiCoder.encode(["uint256"], [amount]).slice(2);
+  return erc7786Iface.encodeFunctionData("interopCallValue", [amount]);
 }
 
 /** Encode an indirectCall attribute (indirect call: routes through asset router). */
 export function indirectCallAttr(callValue?: BigNumber): string {
-  return INDIRECT_CALL_SELECTOR + abiCoder.encode(["uint256"], [callValue || 0]).slice(2);
+  return erc7786Iface.encodeFunctionData("indirectCall", [callValue || 0]);
 }
 
 /** Encode an executionAddress bundle attribute. */
 export function executionAddressAttr(address: string): string {
-  const encoded = encodeEvmAddress(address);
-  return EXECUTION_ADDRESS_SELECTOR + abiCoder.encode(["bytes"], [encoded]).slice(2);
+  return erc7786Iface.encodeFunctionData("executionAddress", [encodeEvmAddress(address)]);
 }
 
 /** Encode an unbundlerAddress bundle attribute. */
 export function unbundlerAddressAttr(address: string): string {
-  const encoded = encodeEvmAddress(address);
-  return UNBUNDLER_ADDRESS_SELECTOR + abiCoder.encode(["bytes"], [encoded]).slice(2);
+  return erc7786Iface.encodeFunctionData("unbundlerAddress", [encodeEvmAddress(address)]);
 }
 
 // ── Token transfer data encoding ───────────────────────────────
@@ -117,10 +78,12 @@ export interface SendBundleOptions {
   gasLimit?: number;
 }
 
-export interface SendBundleResult {
+export interface InteropSendResult {
   txHash: string;
   receipt: ethers.providers.TransactionReceipt;
+  /** Raw decoded InteropBundle struct from the InteropBundleSent event (ethers tuple). */
   interopBundle: unknown;
+  /** ABI-encoded bundle data, ready for executeBundle / verifyBundle / unbundleBundle. */
   bundleData: string;
   bundleHash: string;
 }
@@ -129,7 +92,7 @@ export interface SendBundleResult {
  * Send an interop bundle via InteropCenter.sendBundle on the source chain.
  * Returns the tx receipt and the extracted InteropBundle struct.
  */
-export async function sendInteropBundle(options: SendBundleOptions): Promise<SendBundleResult> {
+export async function sendInteropBundle(options: SendBundleOptions): Promise<InteropSendResult> {
   const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, options.sourceProvider);
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
@@ -180,19 +143,11 @@ export interface SendMessageOptions {
   gasLimit?: number;
 }
 
-export interface SendMessageResult {
-  txHash: string;
-  receipt: ethers.providers.TransactionReceipt;
-  interopBundle: unknown;
-  bundleData: string;
-  bundleHash: string;
-}
-
 /**
  * Send a single interop message via InteropCenter.sendMessage on the source chain.
  * Returns the tx receipt and the extracted InteropBundle struct (sendMessage wraps into a bundle).
  */
-export async function sendInteropMessage(options: SendMessageOptions): Promise<SendMessageResult> {
+export async function sendInteropMessage(options: SendMessageOptions): Promise<InteropSendResult> {
   const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, options.sourceProvider);
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
@@ -302,91 +257,6 @@ export async function getCallStatus(
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), provider);
   const result = await interopHandler.callStatus(bundleHash, callIndex);
   return typeof result === "number" ? result : result.toNumber();
-}
-
-// ── Balance snapshot utilities ─────────────────────────────────
-
-export interface SourceBalanceSnapshot {
-  native: BigNumber;
-  token?: BigNumber;
-}
-
-/**
- * Capture a balance snapshot for the default sender on a chain.
- * Optionally captures an ERC20 token balance.
- */
-export async function captureSourceBalance(
-  provider: providers.JsonRpcProvider,
-  tokenAddress?: string
-): Promise<SourceBalanceSnapshot> {
-  const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
-  const native = await provider.getBalance(wallet.address);
-
-  let token: BigNumber | undefined;
-  if (tokenAddress) {
-    const erc20 = new Contract(tokenAddress, getAbi("TestnetERC20Token"), provider);
-    token = await erc20.balanceOf(wallet.address);
-  }
-
-  return { native, token };
-}
-
-/**
- * Get the native (ETH) balance of an address on a chain.
- */
-export async function getNativeBalance(provider: providers.JsonRpcProvider, address: string): Promise<BigNumber> {
-  return provider.getBalance(address);
-}
-
-/**
- * Get an ERC20 token balance of an address on a chain.
- * Returns 0 if the token contract doesn't exist yet.
- */
-export async function getTokenBalance(
-  provider: providers.JsonRpcProvider,
-  tokenAddress: string,
-  walletAddress: string
-): Promise<BigNumber> {
-  if (tokenAddress === ethers.constants.AddressZero) return BigNumber.from(0);
-  const code = await provider.getCode(tokenAddress);
-  if (code === "0x") return BigNumber.from(0);
-  const erc20 = new Contract(tokenAddress, getAbi("TestnetERC20Token"), provider);
-  return erc20.balanceOf(walletAddress);
-}
-
-/**
- * Approve L2NativeTokenVault to spend tokens, then return the amount.
- */
-export async function approveAndReturnAmount(
-  provider: providers.JsonRpcProvider,
-  tokenAddress: string,
-  amount: BigNumber
-): Promise<BigNumber> {
-  const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
-  const erc20 = new Contract(tokenAddress, getAbi("TestnetERC20Token"), wallet);
-  const approveTx = await erc20.approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount);
-  await approveTx.wait();
-  return amount;
-}
-
-/**
- * Look up the L2 token address for a given assetId via L2NativeTokenVault.
- */
-export async function getTokenAddressForAsset(provider: providers.JsonRpcProvider, assetId: string): Promise<string> {
-  const vault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), provider);
-  return vault.tokenAddress(assetId);
-}
-
-/**
- * Compute the bundleHash from an InteropBundle struct extracted from an event.
- * The bundleHash is the 4th field (index 3) of the InteropBundle tuple.
- */
-export function extractBundleHash(interopBundle: unknown): string {
-  // InteropBundle tuple: (version, sourceChainId, destinationChainId, bundleHash, ...)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const bundle = interopBundle as any;
-  // ethers returns struct fields both by name and index
-  return bundle.bundleHash || bundle[3];
 }
 
 /**

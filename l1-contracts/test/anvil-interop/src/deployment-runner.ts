@@ -455,7 +455,7 @@ export class DeploymentRunner {
     for (const tmpFile of Object.values(loadStatePaths)) {
       fs.unlinkSync(tmpFile);
     }
-    fs.rmdirSync(tmpDir);
+    fs.rmSync(tmpDir, { recursive: true });
 
     const l1Chain = anvilManager.getL1Chain();
     const l2Chains = anvilManager.getL2Chains();

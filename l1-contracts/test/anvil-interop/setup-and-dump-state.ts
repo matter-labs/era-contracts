@@ -48,14 +48,15 @@ async function main(): Promise<void> {
 
     console.log(`\nDone. All chain states saved to chain-states/${version}/`);
   } finally {
+    await anvilManager.stopAll();
     // Format generated JSON files so CI formatting checks pass.
     // Runs in finally so formatting happens even if deployment fails partway.
-    const l1ContractsDir = path.resolve(__dirname, "../..");
     console.log("\nFormatting generated files...");
     try {
-      execSync("npx prettier --write '**/*.json'", { cwd: l1ContractsDir, stdio: "inherit" });
+      const statesGlob = path.resolve(__dirname, "chain-states/**/*.json");
+      execSync(`npx prettier --write '${statesGlob}'`, { stdio: "inherit" });
     } catch {
-      console.error("Warning: yarn fmt failed");
+      console.error("Warning: prettier failed");
     }
   }
 }

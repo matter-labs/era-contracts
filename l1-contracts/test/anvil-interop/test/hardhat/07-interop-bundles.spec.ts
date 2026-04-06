@@ -9,23 +9,28 @@ import {
   ANVIL_ACCOUNT2_ADDR,
   L2_ASSET_ROUTER_ADDR,
 } from "../../src/core/const";
+import { encodeEvmAddress } from "../../src/helpers/erc7930";
 import {
   sendInteropBundle,
   executeBundle,
-  encodeEvmAddress,
   interopCallValueAttr,
   indirectCallAttr,
   executionAddressAttr,
   getTokenTransferData,
-  captureSourceBalance,
+  getInteropProtocolFee,
+  deployDummyInteropRecipient,
+} from "../../src/helpers/interop-helpers";
+import type { CallStarter } from "../../src/helpers/interop-helpers";
+import {
+  captureBalance,
   getNativeBalance,
   getTokenBalance,
   getTokenAddressForAsset,
-  approveAndReturnAmount,
-  getInteropProtocolFee,
-  deployDummyInteropRecipient,
-} from "../../src/helpers/interop-bundle-helper";
-import type { CallStarter, SendBundleResult } from "../../src/helpers/interop-bundle-helper";
+  approveTokenForNtv,
+  expectNativeSpend,
+  expectBalanceDelta,
+  expectRevert,
+} from "../../src/helpers/balance-helpers";
 
 /** Base token transfer amount (100 gwei — small enough to avoid balance issues, large enough to detect). */
 const BASE_TOKEN_AMOUNT = ethers.utils.parseUnits("100", "gwei");
@@ -49,21 +54,13 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   // Token-related values resolved per-chain
   let sourceTokenAddress: string;
   let sourceAssetId: string;
-  let destTokenAddress: string;
 
   // Interop protocol fee (per call)
-  let interopProtocolFee: BigNumber;
+  let interopFee: BigNumber;
 
   // DummyInteropRecipient contracts on destination chain (required for direct calls)
   let dummyRecipient1: string;
   let dummyRecipient2: string;
-
-  // Stored bundle results from the "send" test, consumed by the "receive" tests
-  let singleDirectBundle: SendBundleResult;
-  let singleIndirectBundle: SendBundleResult;
-  let twoDirectBundle: SendBundleResult;
-  let twoIndirectBundle: SendBundleResult;
-  let mixedBundle: SendBundleResult;
 
   before(async () => {
     state = runner.loadState();
@@ -87,12 +84,9 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     sourceTokenAddress = state.testTokens![sourceChainId];
     sourceAssetId = encodeNtvAssetId(sourceChainId, sourceTokenAddress);
 
-    // Resolve the destination-side L2 token address for this asset
-    destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
-
     // Query the per-call interop protocol fee
-    interopProtocolFee = await getInteropProtocolFee(sourceProvider);
-    console.log(`   Interop protocol fee: ${interopProtocolFee.toString()}`);
+    interopFee = await getInteropProtocolFee(sourceProvider);
+    console.log(`   Interop protocol fee: ${interopFee.toString()}`);
 
     // Deploy DummyInteropRecipient contracts on destination chain for direct-call tests
     dummyRecipient1 = await deployDummyInteropRecipient(destProvider);
@@ -101,264 +95,93 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     console.log(`   DummyInteropRecipient 2: ${dummyRecipient2}`);
   });
 
-  // ─── Sending bundles ──────────────────────────────────────────
-
-  it("can send bundles", async () => {
-    // ── Sub-scenario 1: Single direct call ──
-    {
-      const amount = BASE_TOKEN_AMOUNT;
-      const msgValue = interopProtocolFee.add(amount);
-
-      const callStarters: CallStarter[] = [
-        {
-          to: encodeEvmAddress(dummyRecipient1),
-          data: "0x",
-          callAttributes: [interopCallValueAttr(amount)],
-        },
-      ];
-
-      const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
-
-      const balBefore = await captureSourceBalance(sourceProvider);
-
-      singleDirectBundle = await sendInteropBundle({
-        sourceProvider,
-        destinationChainId: destChainId,
-        callStarters,
-        bundleAttributes,
-        value: msgValue,
-      });
-
-      const balAfter = await captureSourceBalance(sourceProvider);
-
-      expect(singleDirectBundle.txHash, "single direct call: tx hash should exist").to.not.be.null;
-      expect(singleDirectBundle.interopBundle, "single direct call: interopBundle should exist").to.not.be.null;
-
-      // Native balance should decrease by at least msgValue (gas costs make exact match impossible)
-      expect(
-        balAfter.native.lte(balBefore.native.sub(msgValue)),
-        "single direct call: sender native balance should decrease by at least msgValue"
-      ).to.equal(true);
-
-      console.log("   [send] Single direct call bundle sent");
-    }
-
-    // ── Sub-scenario 2: Single indirect call (ERC20 via L2AssetRouter) ──
-    {
-      const tokenAmount = ERC20_TOKEN_AMOUNT;
-      const msgValue = interopProtocolFee;
-
-      await approveAndReturnAmount(sourceProvider, sourceTokenAddress, tokenAmount);
-
-      const callStarters: CallStarter[] = [
-        {
-          to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
-          data: getTokenTransferData(sourceAssetId, tokenAmount, ANVIL_RECIPIENT_ADDR),
-          callAttributes: [indirectCallAttr()],
-        },
-      ];
-
-      const balBefore = await captureSourceBalance(sourceProvider, sourceTokenAddress);
-
-      singleIndirectBundle = await sendInteropBundle({
-        sourceProvider,
-        destinationChainId: destChainId,
-        callStarters,
-        value: msgValue,
-      });
-
-      const balAfter = await captureSourceBalance(sourceProvider, sourceTokenAddress);
-
-      expect(singleIndirectBundle.txHash, "single indirect call: tx hash should exist").to.not.be.null;
-      expect(singleIndirectBundle.interopBundle, "single indirect call: interopBundle should exist").to.not.be.null;
-
-      // Native balance should decrease by at least msgValue
-      expect(
-        balAfter.native.lte(balBefore.native.sub(msgValue)),
-        "single indirect call: sender native balance should decrease by at least msgValue"
-      ).to.equal(true);
-
-      // Token balance should decrease by exactly tokenAmount
-      expect(
-        balAfter.token!.eq(balBefore.token!.sub(tokenAmount)),
-        "single indirect call: sender token balance should decrease by exactly tokenAmount"
-      ).to.equal(true);
-
-      console.log("   [send] Single indirect call bundle sent");
-    }
-
-    // ── Sub-scenario 3: Two direct calls ──
-    {
-      const amount = BASE_TOKEN_AMOUNT;
-      const msgValue = interopProtocolFee.mul(2).add(amount.mul(2));
-
-      const callStarters: CallStarter[] = [
-        {
-          to: encodeEvmAddress(dummyRecipient1),
-          data: "0x",
-          callAttributes: [interopCallValueAttr(amount)],
-        },
-        {
-          to: encodeEvmAddress(dummyRecipient2),
-          data: "0x",
-          callAttributes: [interopCallValueAttr(amount)],
-        },
-      ];
-
-      const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
-
-      const balBefore = await captureSourceBalance(sourceProvider);
-
-      twoDirectBundle = await sendInteropBundle({
-        sourceProvider,
-        destinationChainId: destChainId,
-        callStarters,
-        bundleAttributes,
-        value: msgValue,
-      });
-
-      const balAfter = await captureSourceBalance(sourceProvider);
-
-      expect(twoDirectBundle.txHash, "two direct calls: tx hash should exist").to.not.be.null;
-      expect(twoDirectBundle.interopBundle, "two direct calls: interopBundle should exist").to.not.be.null;
-
-      expect(
-        balAfter.native.lte(balBefore.native.sub(msgValue)),
-        "two direct calls: sender native balance should decrease by at least msgValue"
-      ).to.equal(true);
-
-      console.log("   [send] Two direct calls bundle sent");
-    }
-
-    // ── Sub-scenario 4: Two indirect calls ──
-    {
-      const tokenAmount = ERC20_TOKEN_AMOUNT;
-      const totalTokenAmount = tokenAmount.mul(2);
-      const msgValue = interopProtocolFee.mul(2);
-
-      await approveAndReturnAmount(sourceProvider, sourceTokenAddress, totalTokenAmount);
-
-      const callStarters: CallStarter[] = [
-        {
-          to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
-          data: getTokenTransferData(sourceAssetId, tokenAmount, ANVIL_RECIPIENT_ADDR),
-          callAttributes: [indirectCallAttr()],
-        },
-        {
-          to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
-          data: getTokenTransferData(sourceAssetId, tokenAmount, ANVIL_ACCOUNT2_ADDR),
-          callAttributes: [indirectCallAttr()],
-        },
-      ];
-
-      const balBefore = await captureSourceBalance(sourceProvider, sourceTokenAddress);
-
-      twoIndirectBundle = await sendInteropBundle({
-        sourceProvider,
-        destinationChainId: destChainId,
-        callStarters,
-        value: msgValue,
-      });
-
-      const balAfter = await captureSourceBalance(sourceProvider, sourceTokenAddress);
-
-      expect(twoIndirectBundle.txHash, "two indirect calls: tx hash should exist").to.not.be.null;
-      expect(twoIndirectBundle.interopBundle, "two indirect calls: interopBundle should exist").to.not.be.null;
-
-      expect(
-        balAfter.native.lte(balBefore.native.sub(msgValue)),
-        "two indirect calls: sender native balance should decrease by at least msgValue"
-      ).to.equal(true);
-
-      expect(
-        balAfter.token!.eq(balBefore.token!.sub(totalTokenAmount)),
-        "two indirect calls: sender token balance should decrease by exactly 2x tokenAmount"
-      ).to.equal(true);
-
-      console.log("   [send] Two indirect calls bundle sent");
-    }
-
-    // ── Sub-scenario 5: Mixed bundle (one token transfer + one value transfer) ──
-    {
-      const valueAmount = BASE_TOKEN_AMOUNT;
-      const tokenAmount = ERC20_TOKEN_AMOUNT;
-      const msgValue = interopProtocolFee.mul(2).add(valueAmount);
-
-      await approveAndReturnAmount(sourceProvider, sourceTokenAddress, tokenAmount);
-
-      const callStarters: CallStarter[] = [
-        {
-          to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
-          data: getTokenTransferData(sourceAssetId, tokenAmount, ANVIL_RECIPIENT_ADDR),
-          callAttributes: [indirectCallAttr()],
-        },
-        {
-          to: encodeEvmAddress(dummyRecipient2),
-          data: "0x",
-          callAttributes: [interopCallValueAttr(valueAmount)],
-        },
-      ];
-
-      const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
-
-      const balBefore = await captureSourceBalance(sourceProvider, sourceTokenAddress);
-
-      mixedBundle = await sendInteropBundle({
-        sourceProvider,
-        destinationChainId: destChainId,
-        callStarters,
-        bundleAttributes,
-        value: msgValue,
-      });
-
-      const balAfter = await captureSourceBalance(sourceProvider, sourceTokenAddress);
-
-      expect(mixedBundle.txHash, "mixed bundle: tx hash should exist").to.not.be.null;
-      expect(mixedBundle.interopBundle, "mixed bundle: interopBundle should exist").to.not.be.null;
-
-      expect(
-        balAfter.native.lte(balBefore.native.sub(msgValue)),
-        "mixed bundle: sender native balance should decrease by at least msgValue"
-      ).to.equal(true);
-
-      expect(
-        balAfter.token!.eq(balBefore.token!.sub(tokenAmount)),
-        "mixed bundle: sender token balance should decrease by exactly tokenAmount"
-      ).to.equal(true);
-
-      console.log("   [send] Mixed bundle sent");
-    }
-  });
-
-  // ─── Receiving / executing bundles ────────────────────────────
-
-  it("can receive a single direct call bundle", async () => {
+  it("can send and execute a single direct call bundle", async () => {
     const amount = BASE_TOKEN_AMOUNT;
+    const msgValue = interopFee.add(amount);
 
+    const callStarters: CallStarter[] = [
+      {
+        to: encodeEvmAddress(dummyRecipient1),
+        data: "0x",
+        callAttributes: [interopCallValueAttr(amount)],
+      },
+    ];
+
+    const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
+
+    const balBefore = await captureBalance(sourceProvider);
+
+    const sendResult = await sendInteropBundle({
+      sourceProvider,
+      destinationChainId: destChainId,
+      callStarters,
+      bundleAttributes,
+      value: msgValue,
+    });
+
+    const balAfter = await captureBalance(sourceProvider);
+
+    expect(sendResult.txHash, "single direct call: tx hash should exist").to.not.be.null;
+    expect(sendResult.interopBundle, "single direct call: interopBundle should exist").to.not.be.null;
+
+    expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "single direct call");
+
+    console.log("   [send] Single direct call bundle sent");
+
+    // ── Execute on destination ──
     const recipientBefore = await getNativeBalance(destProvider, dummyRecipient1);
 
-    const receipt = await executeBundle(destProvider, singleDirectBundle.bundleData, sourceChainId);
+    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
 
     expect(receipt.status, "single direct call: executeBundle tx should succeed").to.equal(1);
 
     const recipientAfter = await getNativeBalance(destProvider, dummyRecipient1);
-    const recipientDelta = recipientAfter.sub(recipientBefore);
-
-    expect(
-      recipientDelta.eq(amount),
-      `single direct call: recipient native balance should increase by exactly ${amount.toString()}, got ${recipientDelta.toString()}`
-    ).to.equal(true);
+    expectBalanceDelta(recipientBefore, recipientAfter, amount, "single direct call: recipient native");
 
     console.log("   [receive] Single direct call bundle executed");
   });
 
-  it("can receive a single indirect call bundle", async () => {
+  it("can send and execute a single indirect call bundle", async () => {
     const tokenAmount = ERC20_TOKEN_AMOUNT;
+    const msgValue = interopFee;
 
+    await approveTokenForNtv(sourceProvider, sourceTokenAddress, tokenAmount);
+
+    const callStarters: CallStarter[] = [
+      {
+        to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
+        data: getTokenTransferData(sourceAssetId, tokenAmount, ANVIL_RECIPIENT_ADDR),
+        callAttributes: [indirectCallAttr()],
+      },
+    ];
+
+    const balBefore = await captureBalance(sourceProvider, sourceTokenAddress);
+
+    const sendResult = await sendInteropBundle({
+      sourceProvider,
+      destinationChainId: destChainId,
+      callStarters,
+      value: msgValue,
+    });
+
+    const balAfter = await captureBalance(sourceProvider, sourceTokenAddress);
+
+    expect(sendResult.txHash, "single indirect call: tx hash should exist").to.not.be.null;
+    expect(sendResult.interopBundle, "single indirect call: interopBundle should exist").to.not.be.null;
+
+    expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "single indirect call");
+
+    // Token balance should decrease by exactly tokenAmount
+    expect(balAfter.token!.eq(balBefore.token!.sub(tokenAmount)), "single indirect call: sender token should decrease by tokenAmount").to.be.true;
+
+    console.log("   [send] Single indirect call bundle sent");
+
+    // ── Execute on destination ──
     // Token may not exist on dest chain yet — resolve after execution
+    let destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
     const recipientTokenBefore = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
 
-    const receipt = await executeBundle(destProvider, singleIndirectBundle.bundleData, sourceChainId);
+    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
 
     expect(receipt.status, "single indirect call: executeBundle tx should succeed").to.equal(1);
 
@@ -366,103 +189,302 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
 
     const recipientTokenAfter = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
-    const recipientTokenDelta = recipientTokenAfter.sub(recipientTokenBefore);
-
-    expect(
-      recipientTokenDelta.eq(tokenAmount),
-      `single indirect call: recipient token balance should increase by exactly ${tokenAmount.toString()}, got ${recipientTokenDelta.toString()}`
-    ).to.equal(true);
+    expectBalanceDelta(recipientTokenBefore, recipientTokenAfter, tokenAmount, "single indirect call: recipient token");
 
     console.log("   [receive] Single indirect call bundle executed");
   });
 
-  it("can receive a two direct call bundle", async () => {
+  it("can send and execute a two direct call bundle", async () => {
     const amount = BASE_TOKEN_AMOUNT;
+    const msgValue = interopFee.mul(2).add(amount.mul(2));
 
+    const callStarters: CallStarter[] = [
+      {
+        to: encodeEvmAddress(dummyRecipient1),
+        data: "0x",
+        callAttributes: [interopCallValueAttr(amount)],
+      },
+      {
+        to: encodeEvmAddress(dummyRecipient2),
+        data: "0x",
+        callAttributes: [interopCallValueAttr(amount)],
+      },
+    ];
+
+    const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
+
+    const balBefore = await captureBalance(sourceProvider);
+
+    const sendResult = await sendInteropBundle({
+      sourceProvider,
+      destinationChainId: destChainId,
+      callStarters,
+      bundleAttributes,
+      value: msgValue,
+    });
+
+    const balAfter = await captureBalance(sourceProvider);
+
+    expect(sendResult.txHash, "two direct calls: tx hash should exist").to.not.be.null;
+    expect(sendResult.interopBundle, "two direct calls: interopBundle should exist").to.not.be.null;
+
+    expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "two direct calls");
+
+    console.log("   [send] Two direct calls bundle sent");
+
+    // ── Execute on destination ──
     const recipient1Before = await getNativeBalance(destProvider, dummyRecipient1);
     const recipient2Before = await getNativeBalance(destProvider, dummyRecipient2);
 
-    const receipt = await executeBundle(destProvider, twoDirectBundle.bundleData, sourceChainId);
+    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
 
     expect(receipt.status, "two direct calls: executeBundle tx should succeed").to.equal(1);
 
     const recipient1After = await getNativeBalance(destProvider, dummyRecipient1);
     const recipient2After = await getNativeBalance(destProvider, dummyRecipient2);
 
-    const recipient1Delta = recipient1After.sub(recipient1Before);
-    const recipient2Delta = recipient2After.sub(recipient2Before);
-
-    expect(
-      recipient1Delta.eq(amount),
-      `two direct calls: recipient1 native balance should increase by exactly ${amount.toString()}, got ${recipient1Delta.toString()}`
-    ).to.equal(true);
-
-    expect(
-      recipient2Delta.eq(amount),
-      `two direct calls: recipient2 native balance should increase by exactly ${amount.toString()}, got ${recipient2Delta.toString()}`
-    ).to.equal(true);
+    expectBalanceDelta(recipient1Before, recipient1After, amount, "two direct calls: recipient1 native");
+    expectBalanceDelta(recipient2Before, recipient2After, amount, "two direct calls: recipient2 native");
 
     console.log("   [receive] Two direct calls bundle executed");
   });
 
-  it("can receive a two indirect call bundle", async () => {
+  it("can send and execute a two indirect call bundle", async () => {
     const tokenAmount = ERC20_TOKEN_AMOUNT;
+    const totalTokenAmount = tokenAmount.mul(2);
+    const msgValue = interopFee.mul(2);
 
+    await approveTokenForNtv(sourceProvider, sourceTokenAddress, totalTokenAmount);
+
+    const callStarters: CallStarter[] = [
+      {
+        to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
+        data: getTokenTransferData(sourceAssetId, tokenAmount, ANVIL_RECIPIENT_ADDR),
+        callAttributes: [indirectCallAttr()],
+      },
+      {
+        to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
+        data: getTokenTransferData(sourceAssetId, tokenAmount, ANVIL_ACCOUNT2_ADDR),
+        callAttributes: [indirectCallAttr()],
+      },
+    ];
+
+    const balBefore = await captureBalance(sourceProvider, sourceTokenAddress);
+
+    const sendResult = await sendInteropBundle({
+      sourceProvider,
+      destinationChainId: destChainId,
+      callStarters,
+      value: msgValue,
+    });
+
+    const balAfter = await captureBalance(sourceProvider, sourceTokenAddress);
+
+    expect(sendResult.txHash, "two indirect calls: tx hash should exist").to.not.be.null;
+    expect(sendResult.interopBundle, "two indirect calls: interopBundle should exist").to.not.be.null;
+
+    expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "two indirect calls");
+
+    expect(balAfter.token!.eq(balBefore.token!.sub(totalTokenAmount)), "two indirect calls: sender token should decrease by 2x tokenAmount").to.be.true;
+
+    console.log("   [send] Two indirect calls bundle sent");
+
+    // ── Execute on destination ──
+    let destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
     const recipient1TokenBefore = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
     const recipient2TokenBefore = await getTokenBalance(destProvider, destTokenAddress, ANVIL_ACCOUNT2_ADDR);
 
-    const receipt = await executeBundle(destProvider, twoIndirectBundle.bundleData, sourceChainId);
+    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
 
     expect(receipt.status, "two indirect calls: executeBundle tx should succeed").to.equal(1);
 
+    destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
     const recipient1TokenAfter = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
     const recipient2TokenAfter = await getTokenBalance(destProvider, destTokenAddress, ANVIL_ACCOUNT2_ADDR);
 
-    const recipient1TokenDelta = recipient1TokenAfter.sub(recipient1TokenBefore);
-    const recipient2TokenDelta = recipient2TokenAfter.sub(recipient2TokenBefore);
-
-    expect(
-      recipient1TokenDelta.eq(tokenAmount),
-      `two indirect calls: recipient1 token balance should increase by exactly ${tokenAmount.toString()}, got ${recipient1TokenDelta.toString()}`
-    ).to.equal(true);
-
-    expect(
-      recipient2TokenDelta.eq(tokenAmount),
-      `two indirect calls: recipient2 token balance should increase by exactly ${tokenAmount.toString()}, got ${recipient2TokenDelta.toString()}`
-    ).to.equal(true);
+    expectBalanceDelta(recipient1TokenBefore, recipient1TokenAfter, tokenAmount, "two indirect calls: recipient1 token");
+    expectBalanceDelta(recipient2TokenBefore, recipient2TokenAfter, tokenAmount, "two indirect calls: recipient2 token");
 
     console.log("   [receive] Two indirect calls bundle executed");
   });
 
-  it("can receive a mixed call bundle", async () => {
+  it("can send and execute a mixed call bundle", async () => {
     const valueAmount = BASE_TOKEN_AMOUNT;
     const tokenAmount = ERC20_TOKEN_AMOUNT;
+    const msgValue = interopFee.mul(2).add(valueAmount);
 
-    // The mixed bundle has: call[0] = indirect token transfer to ANVIL_RECIPIENT_ADDR,
-    //                       call[1] = direct value transfer to dummyRecipient2.
+    await approveTokenForNtv(sourceProvider, sourceTokenAddress, tokenAmount);
+
+    const callStarters: CallStarter[] = [
+      {
+        to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
+        data: getTokenTransferData(sourceAssetId, tokenAmount, ANVIL_RECIPIENT_ADDR),
+        callAttributes: [indirectCallAttr()],
+      },
+      {
+        to: encodeEvmAddress(dummyRecipient2),
+        data: "0x",
+        callAttributes: [interopCallValueAttr(valueAmount)],
+      },
+    ];
+
+    const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
+
+    const balBefore = await captureBalance(sourceProvider, sourceTokenAddress);
+
+    const sendResult = await sendInteropBundle({
+      sourceProvider,
+      destinationChainId: destChainId,
+      callStarters,
+      bundleAttributes,
+      value: msgValue,
+    });
+
+    const balAfter = await captureBalance(sourceProvider, sourceTokenAddress);
+
+    expect(sendResult.txHash, "mixed bundle: tx hash should exist").to.not.be.null;
+    expect(sendResult.interopBundle, "mixed bundle: interopBundle should exist").to.not.be.null;
+
+    expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "mixed bundle");
+
+    expect(balAfter.token!.eq(balBefore.token!.sub(tokenAmount)), "mixed bundle: sender token should decrease by tokenAmount").to.be.true;
+
+    console.log("   [send] Mixed bundle sent");
+
+    // ── Execute on destination ──
+    let destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
     const recipientTokenBefore = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
     const recipient2NativeBefore = await getNativeBalance(destProvider, dummyRecipient2);
 
-    const receipt = await executeBundle(destProvider, mixedBundle.bundleData, sourceChainId);
+    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
 
     expect(receipt.status, "mixed bundle: executeBundle tx should succeed").to.equal(1);
 
+    destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
     const recipientTokenAfter = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
     const recipient2NativeAfter = await getNativeBalance(destProvider, dummyRecipient2);
 
-    const recipientTokenDelta = recipientTokenAfter.sub(recipientTokenBefore);
-    const recipient2NativeDelta = recipient2NativeAfter.sub(recipient2NativeBefore);
-
-    expect(
-      recipientTokenDelta.eq(tokenAmount),
-      `mixed bundle: recipient token balance should increase by exactly ${tokenAmount.toString()}, got ${recipientTokenDelta.toString()}`
-    ).to.equal(true);
-
-    expect(
-      recipient2NativeDelta.eq(valueAmount),
-      `mixed bundle: recipient2 native balance should increase by exactly ${valueAmount.toString()}, got ${recipient2NativeDelta.toString()}`
-    ).to.equal(true);
+    expectBalanceDelta(recipientTokenBefore, recipientTokenAfter, tokenAmount, "mixed bundle: recipient token");
+    expectBalanceDelta(recipient2NativeBefore, recipient2NativeAfter, valueAmount, "mixed bundle: recipient2 native");
 
     console.log("   [receive] Mixed bundle executed");
+  });
+
+  // ─── Edge cases ──────────────────────────────────────────────
+
+  it("cannot execute the same bundle twice (replay protection)", async () => {
+    const amount = BASE_TOKEN_AMOUNT;
+    const msgValue = interopFee.add(amount);
+
+    const callStarters: CallStarter[] = [
+      {
+        to: encodeEvmAddress(dummyRecipient1),
+        data: "0x",
+        callAttributes: [interopCallValueAttr(amount)],
+      },
+    ];
+
+    const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
+
+    const sendResult = await sendInteropBundle({
+      sourceProvider,
+      destinationChainId: destChainId,
+      callStarters,
+      bundleAttributes,
+      value: msgValue,
+    });
+
+    // First execution should succeed
+    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
+    expect(receipt.status).to.equal(1);
+
+    // Second execution with same data should revert
+    await expectRevert(
+      () => executeBundle(destProvider, sendResult.bundleData, sourceChainId),
+      "replay executeBundle"
+    );
+
+    console.log("   [edge] Replay protection verified");
+  });
+
+  it("cannot execute a bundle from a non-matching executionAddress", async () => {
+    const amount = BASE_TOKEN_AMOUNT;
+    const msgValue = interopFee.add(amount);
+
+    const callStarters: CallStarter[] = [
+      {
+        to: encodeEvmAddress(dummyRecipient1),
+        data: "0x",
+        callAttributes: [interopCallValueAttr(amount)],
+      },
+    ];
+
+    // Set executionAddress to a specific address (ANVIL_RECIPIENT_ADDR)
+    const bundleAttributes = [executionAddressAttr(ANVIL_RECIPIENT_ADDR)];
+
+    const sendResult = await sendInteropBundle({
+      sourceProvider,
+      destinationChainId: destChainId,
+      callStarters,
+      bundleAttributes,
+      value: msgValue,
+    });
+
+    // Attempt to execute from the default account (which is NOT the executionAddress)
+    await expectRevert(
+      () => executeBundle(destProvider, sendResult.bundleData, sourceChainId),
+      "execute from wrong executionAddress"
+    );
+
+    console.log("   [edge] executionAddress enforcement verified");
+  });
+
+  it("accepts a bundle with zero calls", async () => {
+    // The protocol allows empty bundles — they can be sent, verified, and executed.
+    const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
+
+    const sendResult = await sendInteropBundle({
+      sourceProvider,
+      destinationChainId: destChainId,
+      callStarters: [],
+      bundleAttributes,
+      value: 0,
+    });
+
+    expect(sendResult.txHash).to.not.be.null;
+
+    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
+    expect(receipt.status).to.equal(1);
+
+    console.log("   [edge] Zero-call bundle accepted and executed");
+  });
+
+  it("rejects a bundle with excess msg.value", async () => {
+    const amount = BASE_TOKEN_AMOUNT;
+    const correctValue = interopFee.add(amount);
+    const excessValue = correctValue.add(ethers.utils.parseEther("1"));
+
+    const callStarters: CallStarter[] = [
+      {
+        to: encodeEvmAddress(dummyRecipient1),
+        data: "0x",
+        callAttributes: [interopCallValueAttr(amount)],
+      },
+    ];
+
+    const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
+
+    await expectRevert(
+      () => sendInteropBundle({
+        sourceProvider,
+        destinationChainId: destChainId,
+        callStarters,
+        bundleAttributes,
+        value: excessValue,
+      }),
+      "excess msg.value"
+    );
+
+    console.log("   [edge] Excess msg.value rejected");
   });
 });
