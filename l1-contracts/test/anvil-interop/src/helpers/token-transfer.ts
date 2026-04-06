@@ -5,7 +5,9 @@ import { getAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
   DEFAULT_TX_GAS_LIMIT,
+  INDIRECT_CALL_SELECTOR,
   INTEROP_BUNDLE_TUPLE_TYPE,
+  INTEROP_CALL_VALUE_SELECTOR,
   INTEROP_CENTER_ADDR,
   INTEROP_SEND_BUNDLE_GAS_LIMIT,
   L2_ASSET_ROUTER_ADDR,
@@ -149,12 +151,8 @@ export async function executeTokenTransfer(
 
   const destinationChainIdBytes = encodeEvmChain(targetChainId);
   const targetAddressBytes = encodeEvmAddress(L2_ASSET_ROUTER_ADDR);
-  const indirectCallSelector = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("indirectCall(uint256)")).slice(0, 10);
-  const interopCallValueSelector = ethers.utils
-    .keccak256(ethers.utils.toUtf8Bytes("interopCallValue(uint256)"))
-    .slice(0, 10);
-  const indirectCallAttribute = indirectCallSelector + abiCoder.encode(["uint256"], [0]).slice(2);
-  const interopCallValueAttribute = interopCallValueSelector + abiCoder.encode(["uint256"], [0]).slice(2);
+  const indirectCallAttribute = INDIRECT_CALL_SELECTOR + abiCoder.encode(["uint256"], [0]).slice(2);
+  const interopCallValueAttribute = INTEROP_CALL_VALUE_SELECTOR + abiCoder.encode(["uint256"], [0]).slice(2);
 
   const callStarter = {
     to: targetAddressBytes,

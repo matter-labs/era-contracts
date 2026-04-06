@@ -1,3 +1,6 @@
+import { ethers } from "ethers";
+import { getAbi } from "./contracts";
+
 // Must match the actual Anvil L1 chain ID (31337 = 0x7a69)
 export const L1_CHAIN_ID = 31337;
 
@@ -98,15 +101,13 @@ export enum CallStatus {
 }
 
 // ── Interop attribute selectors (ERC-7786) ─────────────────────
+// Derived from IERC7786Attributes interface — selectors auto-update if the interface changes.
+const erc7786Iface = new ethers.utils.Interface(getAbi("IERC7786Attributes"));
 
-// keccak256("interopCallValue(uint256)")[0:4]
-export const INTEROP_CALL_VALUE_SELECTOR = "0x54b16529";
-// keccak256("indirectCall(uint256)")[0:4]
-export const INDIRECT_CALL_SELECTOR = "0xc8496ea7";
-// keccak256("executionAddress(bytes)")[0:4]
-export const EXECUTION_ADDRESS_SELECTOR = "0x054c031b";
-// keccak256("unbundlerAddress(bytes)")[0:4]
-export const UNBUNDLER_ADDRESS_SELECTOR = "0xb9c86698";
+export const INTEROP_CALL_VALUE_SELECTOR = erc7786Iface.getSighash("interopCallValue");
+export const INDIRECT_CALL_SELECTOR = erc7786Iface.getSighash("indirectCall");
+export const EXECUTION_ADDRESS_SELECTOR = erc7786Iface.getSighash("executionAddress");
+export const UNBUNDLER_ADDRESS_SELECTOR = erc7786Iface.getSighash("unbundlerAddress");
 
 // Address of a non-existent contract used to create failing calls in unbundle tests
 export const FAILING_CALL_CONTRACT = "0x000000000000000000000000000000000000fEEd";

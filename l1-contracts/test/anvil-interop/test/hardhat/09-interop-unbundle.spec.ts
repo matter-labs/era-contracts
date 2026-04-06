@@ -146,8 +146,8 @@ describe("09 - Interop Unbundle (failing calls)", function () {
 
     const callStarters = buildCallStarters();
 
-    // Compute total value: BASE_AMOUNT (for call 0's interopCallValue) + protocol fee * 3 calls
-    const valuePerBundle = BASE_AMOUNT.add(protocolFee.mul(3));
+    // Compute total value: BASE_AMOUNT (for call 0's interopCallValue) + protocol fee per call
+    const valuePerBundle = BASE_AMOUNT.add(protocolFee.mul(callStarters.length));
 
     // ── Bundle A: explicit unbundlerAddress = ANVIL_DEFAULT_ACCOUNT_ADDR ──
     const bundleAttributesA = [
