@@ -76,8 +76,6 @@ error NotEnoughSignatures();
 error NotEraChain();
 // 0xa7050bf6
 error NotHistoricalRoot(bytes32);
-// 0x32ddf9a2
-error NotHyperchain();
 // 0x87470e36
 error NotL1(uint256 blockChainId);
 // 0x1e9f6a9e
