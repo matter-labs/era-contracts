@@ -33,6 +33,8 @@ import {
 } from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
+import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     uint256 public L1_CHAIN_ID;
@@ -443,6 +445,15 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _sendL1ToGatewayMigrationDataToL1(tokenBalanceMigrationData);
 
         emit IL2AssetTracker.L1ToGatewayMigrationInitiated(_assetId, block.chainid);
+    }
+
+    /// @notice Sends L1 -> Gateway migration data to L1 through the L2->L1 messenger.
+    /// @param _data The migration payload.
+    function _sendL1ToGatewayMigrationDataToL1(L1ToGatewayTokenBalanceMigrationData memory _data) internal {
+        // slither-disable-next-line unused-return,reentrancy-no-eth
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            abi.encodeCall(IAssetTrackerDataEncoding.receiveL1ToGatewayMigrationOnL1, _data)
+        );
     }
 
     /// @notice Confirms a migration operation has been completed and updates the asset migration number.
