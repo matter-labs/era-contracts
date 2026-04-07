@@ -109,12 +109,21 @@ export interface ChainInfo {
   config: AnvilChainConfig[];
 }
 
+export interface PrivateInteropAddresses {
+  assetTracker: string;
+  ntv: string;
+  assetRouter: string;
+  interopCenter: string;
+  interopHandler: string;
+}
+
 export interface DeploymentState {
   chains?: ChainInfo;
   l1Addresses?: CoreDeployedAddresses;
   ctmAddresses?: CTMDeployedAddresses;
   chainAddresses?: ChainAddresses[];
   testTokens?: Record<number, string>;
+  privateInteropAddresses?: Record<number, PrivateInteropAddresses>;
 }
 
 export interface MultiChainTokenTransferParams {

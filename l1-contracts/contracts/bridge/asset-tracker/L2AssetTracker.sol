@@ -67,10 +67,15 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     modifier onlyL2NativeTokenVault() {
-        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
+        if (msg.sender != _nativeTokenVaultAddress()) {
             revert Unauthorized(msg.sender);
         }
         _;
+    }
+
+    /// @notice Returns the NTV address for access control. Virtual for private interop override.
+    function _nativeTokenVaultAddress() internal view virtual returns (address) {
+        return L2_NATIVE_TOKEN_VAULT_ADDR;
     }
 
     modifier onlyBaseTokenHolder() {
@@ -144,7 +149,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         return L1_CHAIN_ID;
     }
 
-    function _nativeTokenVault() internal view override returns (INativeTokenVaultBase) {
+    function _nativeTokenVault() internal view virtual override returns (INativeTokenVaultBase) {
         return L2_NATIVE_TOKEN_VAULT;
     }
 
@@ -247,7 +252,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @notice This function is used to check the asset migration number.
     /// @dev This is used to pause outgoing withdrawals and interop transactions after the chain migrates to Gateway.
-    function _checkAssetMigrationNumber(bytes32 _assetId) internal view {
+    function _checkAssetMigrationNumber(bytes32 _assetId) internal view virtual {
         uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
         /// Note we always allow bridging when settling on L1.
@@ -486,12 +491,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @notice Retrieves the token contract address for a given asset ID.
     /// @param _assetId The asset ID to look up.
     /// @return tokenAddress The contract address of the token.
-    function _tryGetTokenAddress(bytes32 _assetId) internal view returns (address tokenAddress) {
+    function _tryGetTokenAddress(bytes32 _assetId) internal view virtual returns (address tokenAddress) {
         tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
         require(tokenAddress != address(0), AssetIdNotRegistered(_assetId));
     }
 
-    function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
+    function _getChainMigrationNumber(uint256 _chainId) internal view virtual override returns (uint256) {
         return L2_CHAIN_ASSET_HANDLER.migrationNumber(_chainId);
     }
 }

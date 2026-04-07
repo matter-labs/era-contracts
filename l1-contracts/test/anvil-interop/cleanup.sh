@@ -6,19 +6,11 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-L1_CONTRACTS_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-
-cd "$SCRIPT_DIR"
-
 echo "🧹 Cleaning up Anvil interop environment..."
 
-# Read chain ports from anvil-config.json (single source of truth)
+# Known ports used by our Anvil instances (offset by ANVIL_INTEROP_PORT_OFFSET if set)
 PORT_OFFSET="${ANVIL_INTEROP_PORT_OFFSET:-0}"
-RUN_SUFFIX="${ANVIL_INTEROP_RUN_SUFFIX:-}"
-PID_FILE="outputs/anvil-pids${RUN_SUFFIX}.json"
-STATE_DIR="outputs/state${RUN_SUFFIX}"
-BASE_PORTS=$(node -e "const c=require('./config/anvil-config.json');console.log(c.chains.map(ch=>ch.port).join(' '))" 2>/dev/null || echo "9545 4050 4051 4052 4053")
+BASE_PORTS="9545 4050 4051 4052 4053 4054"
 ANVIL_PORTS=""
 for BASE in $BASE_PORTS; do
   ANVIL_PORTS="$ANVIL_PORTS $((BASE + PORT_OFFSET))"
@@ -28,10 +20,10 @@ done
 echo "Stopping Anvil instances..."
 
 # Try to use PID file for graceful shutdown
-if [ -f "$PID_FILE" ]; then
+if [ -f "outputs/anvil-pids.json" ]; then
     echo "Found PID file, attempting graceful shutdown..."
     # Extract PIDs and kill them
-    pids=$(cat "$PID_FILE" | grep -o '"[0-9]*":' | grep -o '[0-9]*' || true)
+    pids=$(cat outputs/anvil-pids.json | grep -o '"[0-9]*":' | grep -o '[0-9]*' || true)
     for pid in $pids; do
         if kill -0 "$pid" 2>/dev/null; then
             echo "  Stopping Anvil process $pid..."
@@ -40,7 +32,7 @@ if [ -f "$PID_FILE" ]; then
     done
     sleep 2
     # Remove PID file
-    rm -f "$PID_FILE"
+    rm -f outputs/anvil-pids.json
 fi
 
 # Fallback: Kill processes LISTENING on known Anvil ports only (not system-wide)
@@ -55,6 +47,9 @@ for PORT in $ANVIL_PORTS; do
     fi
 done
 sleep 1
+
+# Clean up step6 log file
+rm -f /tmp/step6-output.log 2>/dev/null || true
 
 # Verify ports are free
 ALL_CLEAR=true
@@ -74,9 +69,8 @@ fi
 
 # Clean up output files
 echo "Cleaning up output files..."
+rm -rf outputs
 mkdir -p outputs
-rm -rf "$STATE_DIR"
-mkdir -p "$STATE_DIR"
 
 # Reset permanent values to initial state
 echo "Resetting permanent values..."
@@ -88,7 +82,7 @@ EOF
 
 # Clean up any broadcast files from forge
 echo "Cleaning up broadcast files..."
-cd "$L1_CONTRACTS_DIR"
+cd ../..
 rm -rf broadcast/DeployL1CoreContracts.s.sol 2>/dev/null || true
 rm -rf broadcast/DeployCTM.s.sol 2>/dev/null || true
 rm -rf broadcast/RegisterCTM.s.sol 2>/dev/null || true
@@ -98,7 +92,7 @@ rm -rf cache-forge/DeployL1CoreContracts.s.sol 2>/dev/null || true
 rm -rf cache-forge/DeployCTM.s.sol 2>/dev/null || true
 rm -rf cache-forge/RegisterCTM.s.sol 2>/dev/null || true
 
-cd "$SCRIPT_DIR"
+cd test/anvil-interop
 
 echo "✅ Broadcast and cache files cleaned"
 

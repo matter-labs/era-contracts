@@ -193,7 +193,11 @@ async function main(): Promise<void> {
       throw new Error("v0.29.0 chain states not found. Generate them first.");
     }
 
-    const { l1Addresses, ctmAddresses, chainAddresses } = await runner.loadChainStates(anvilManager, v29StateDir);
+    // v29 states only have chains 10-13 + 31337 (no chain 14 which was added later)
+    const v29ChainIds = [31337, 10, 11, 12, 13];
+    const { l1Addresses, ctmAddresses, chainAddresses } = await runner.loadChainStates(anvilManager, v29StateDir, {
+      chainIds: v29ChainIds,
+    });
     const l1Chain = anvilManager.getL1Chain();
     if (!l1Chain) throw new Error("L1 chain not started");
 

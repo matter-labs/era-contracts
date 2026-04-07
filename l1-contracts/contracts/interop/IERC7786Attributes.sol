@@ -22,4 +22,10 @@ interface IERC7786Attributes {
     /// @dev This attribute is optional and defaults to `false` (base token fees) when not provided.
     /// @dev Contracts should be able to toggle this flag for Stage1/Stage2 compatibility, this is due to the fact that operator-set base token amount is dependent on operator of the chain, while fixed ZK option is not.
     function useFixedFee(bool _useFixed) external pure;
+
+    /// @notice Routes the call through a ShadowAccount on the destination chain.
+    /// @dev When present, the InteropHandler deploys (if needed) a ShadowAccount for the sender
+    ///      and delivers the call's payload to it via receiveMessage. The payload should contain
+    ///      ABI-encoded ShadowAccountCall[] for the shadow account to execute.
+    function shadowAccount() external pure;
 }

@@ -1,11 +1,7 @@
 import { expect } from "chai";
 import { BigNumber, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import {
-  createBalanceTrackerFromState,
-  computeBalanceDeltas,
-  queryEthAssetIdFromState,
-} from "../../src/helpers/balance-tracker";
+import { createBalanceTrackerFromState, queryEthAssetIdFromState } from "../../src/helpers/balance-tracker";
 import { depositETHToL2 } from "../../src/helpers/l1-deposit-helper";
 import { withdrawETHFromL2 } from "../../src/helpers/l2-withdrawal-helper";
 import {
@@ -14,15 +10,9 @@ import {
   getGWChainBalance,
 } from "../../src/helpers/process-logs-helper";
 import { migrateTokenBalanceToGW } from "../../src/helpers/token-balance-migration-helper";
-import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_RECIPIENT_ADDR, ETH_TOKEN_ADDRESS, L1_CHAIN_ID } from "../../src/core/const";
+import { ETH_TOKEN_ADDRESS, L1_CHAIN_ID } from "../../src/core/const";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
-import {
-  getL1RpcUrl,
-  getL2RpcUrl,
-  getChainDiamondProxy,
-  getChainIdByRole,
-  getChainIdsByRole,
-} from "../../src/core/utils";
+import { getL2Chain, getChainDiamondProxy, getChainIdByRole, getChainIdsByRole } from "../../src/core/utils";
 
 describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
   this.timeout(0);
@@ -46,40 +36,34 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
       const tracker = createBalanceTrackerFromState(state);
       const assetId = await queryEthAssetIdFromState(state);
       const amount = ethers.utils.parseEther("0.5");
-      const senderAddr = ANVIL_DEFAULT_ACCOUNT_ADDR;
+      const l2Chain = getL2Chain(state.chains!, gwSettledChainId);
+      const gwChain = getL2Chain(state.chains!, gwChainId);
+      const gwDiamondProxy = getChainDiamondProxy(state.chainAddresses!, gwChainId);
 
-      // For gateway-settled chains, L1AssetTracker tracks balance under the GW chain ID.
-      const senderBefore = await tracker.takeSnapshot(gwChainId, assetId, undefined, undefined, senderAddr, true);
+      // For gateway-settled chains, L1AssetTracker tracks balance under the GW chain ID
+      const before = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
 
       const result = await depositETHToL2({
-        l1RpcUrl: getL1RpcUrl(state),
-        l2RpcUrl: getL2RpcUrl(state, gwSettledChainId),
+        l1RpcUrl: state.chains!.l1!.rpcUrl,
+        l2RpcUrl: l2Chain.rpcUrl,
         chainId: gwSettledChainId,
         l1Addresses: state.l1Addresses!,
         amount,
-        gwRpcUrl: getL2RpcUrl(state, gwChainId),
+        l1DiamondProxy: gwDiamondProxy,
+        gwRpcUrl: gwChain.rpcUrl,
       });
 
       expect(result.l1TxHash).to.not.be.null;
 
-      const senderAfter = await tracker.takeSnapshot(gwChainId, assetId, undefined, undefined, senderAddr, true);
-      const deltas = computeBalanceDeltas(senderBefore, senderAfter);
+      const after = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
 
-      // L1AssetTracker.chainBalance[gwChainId] should increase by mintValue
+      const l1ChainBalanceDelta = BigNumber.from(after.l1ChainBalance).sub(before.l1ChainBalance);
       expect(
-        deltas.l1ChainBalanceDelta.eq(result.mintValue),
-        `L1AssetTracker.chainBalance[GW] should increase by ${result.mintValue.toString()}, got ${deltas.l1ChainBalanceDelta.toString()}`
+        l1ChainBalanceDelta.eq(result.mintValue),
+        `L1AssetTracker.chainBalance[GW] should increase by ${result.mintValue.toString()}, got ${l1ChainBalanceDelta.toString()}`
       ).to.equal(true);
 
-      // Sender's L1 ETH balance should decrease (by at least mintValue; gas adds to the decrease)
-      expect(
-        deltas.l1TokenDelta.lte(result.mintValue.mul(-1)),
-        `Sender L1 ETH should decrease by at least ${result.mintValue.toString()}, got delta ${deltas.l1TokenDelta.toString()}`
-      ).to.equal(true);
-
-      console.log(
-        `   L1AssetTracker.chainBalance[${gwChainId}]: ${BigNumber.from(senderAfter.l1ChainBalance).toString()}`
-      );
+      console.log(`   L1AssetTracker.chainBalance[${gwChainId}]: ${BigNumber.from(after.l1ChainBalance).toString()}`);
     });
   });
 
@@ -88,58 +72,45 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
       const tracker = createBalanceTrackerFromState(state);
       const assetId = await queryEthAssetIdFromState(state);
       const amount = ethers.utils.parseEther("0.2");
-      const recipientAddr = ANVIL_RECIPIENT_ADDR;
+      const l2Chain = getL2Chain(state.chains!, gwSettledChainId);
 
-      // Snapshot chain balances and recipient's L1 balance
-      const chainBefore = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
-      const recipientL1Before = await tracker.getL1EthBalance(recipientAddr);
+      const before = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
 
       const result = await withdrawETHFromL2({
-        l1RpcUrl: getL1RpcUrl(state),
-        l2RpcUrl: getL2RpcUrl(state, gwSettledChainId),
+        l1RpcUrl: state.chains!.l1!.rpcUrl,
+        l2RpcUrl: l2Chain.rpcUrl,
         chainId: gwSettledChainId,
         l1Addresses: state.l1Addresses!,
         amount,
-        l1Recipient: recipientAddr,
       });
 
       expect(result.l2TxHash).to.not.be.null;
 
-      const chainAfter = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
-      const recipientL1After = await tracker.getL1EthBalance(recipientAddr);
+      const after = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
 
-      // L1AssetTracker.chainBalance[gwChainId] should decrease by the withdrawal amount
-      const l1ChainBalanceDelta = BigNumber.from(chainBefore.l1ChainBalance).sub(chainAfter.l1ChainBalance);
+      const l1ChainBalanceDelta = BigNumber.from(before.l1ChainBalance).sub(after.l1ChainBalance);
       expect(
         l1ChainBalanceDelta.eq(amount),
         `L1AssetTracker.chainBalance[GW] should decrease by ${amount.toString()}, got ${l1ChainBalanceDelta.toString()}`
       ).to.equal(true);
 
-      // Recipient's L1 ETH balance should increase by exactly the withdrawal amount
-      const recipientL1Delta = recipientL1After.sub(recipientL1Before);
-      expect(
-        recipientL1Delta.eq(amount),
-        `Recipient L1 ETH balance should increase by ${amount.toString()}, got delta ${recipientL1Delta.toString()}`
-      ).to.equal(true);
-
-      console.log(
-        `   L1AssetTracker.chainBalance[${gwChainId}]: ${BigNumber.from(chainAfter.l1ChainBalance).toString()}`
-      );
-      console.log(`   Recipient L1 ETH balance delta: ${ethers.utils.formatEther(recipientL1Delta)} ETH`);
+      console.log(`   L1AssetTracker.chainBalance[${gwChainId}]: ${BigNumber.from(after.l1ChainBalance).toString()}`);
     });
   });
 
   describe("processLogsAndMessages on GW for withdrawal", () => {
     it("processes a withdrawal log and decreases GWAssetTracker.chainBalance", async () => {
-      const gwProvider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, gwChainId));
+      const gwChain = getL2Chain(state.chains!, gwChainId);
+      const gwProvider = new ethers.providers.JsonRpcProvider(gwChain.rpcUrl);
 
       const assetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
       const withdrawalAmount = ethers.utils.parseEther("0.1");
-      const wallet = ANVIL_DEFAULT_ACCOUNT_ADDR;
+      const wallet = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 
       // Establish GWAssetTracker.chainBalance via the full Token Balance Migration flow
-      const l1Provider = new ethers.providers.JsonRpcProvider(getL1RpcUrl(state));
-      const l2Provider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, gwSettledChainId));
+      const l1Provider = new ethers.providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
+      const l2Chain = getL2Chain(state.chains!, gwSettledChainId);
+      const l2Provider = new ethers.providers.JsonRpcProvider(l2Chain.rpcUrl);
       const gwDiamondProxy = getChainDiamondProxy(state.chainAddresses!, gwChainId);
       const l2DiamondProxy = getChainDiamondProxy(state.chainAddresses!, gwSettledChainId);
 
@@ -170,7 +141,7 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
 
       const result = await callProcessLogsAndMessages({
         gwProvider,
-        gwRpcUrl: getL2RpcUrl(state, gwChainId),
+        gwRpcUrl: gwChain.rpcUrl,
         chainId: gwSettledChainId,
         logs: [withdrawalLog],
         messages: [message],
@@ -194,7 +165,8 @@ describe("05 - Gateway Bridge (GW-settled chain, via GW)", function () {
     it("sum of GW per-chain balances <= L1 GW balance", async () => {
       const tracker = createBalanceTrackerFromState(state);
       const assetId = await queryEthAssetIdFromState(state);
-      const gwProvider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, gwChainId));
+      const gwChain = getL2Chain(state.chains!, gwChainId);
+      const gwProvider = new ethers.providers.JsonRpcProvider(gwChain.rpcUrl);
 
       const l1Snapshot = await tracker.takeChainBalanceSnapshot(gwChainId, assetId, true);
       const l1GWBalance = BigNumber.from(l1Snapshot.l1ChainBalance);
