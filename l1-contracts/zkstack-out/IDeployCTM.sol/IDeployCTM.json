@@ -192,7 +192,7 @@
                     "internalType": "address"
                   },
                   {
-                    "name": "relayedSLDAValidator",
+                    "name": "rollupSLDAValidator",
                     "type": "address",
                     "internalType": "address"
                   },
@@ -202,11 +202,6 @@
                     "internalType": "address"
                   }
                 ]
-              },
-              {
-                "name": "l1RollupDAValidator",
-                "type": "address",
-                "internalType": "address"
               },
               {
                 "name": "availBridge",
