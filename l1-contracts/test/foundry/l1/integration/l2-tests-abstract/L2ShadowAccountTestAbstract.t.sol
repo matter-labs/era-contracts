@@ -251,17 +251,13 @@ abstract contract L2ShadowAccountTestAbstract is Test, L2InteropTestUtils {
         bytes memory ownerAddr = _ownerEncoded();
         address account = factory.getOrDeployShadowAccount(ownerAddr);
 
-        // Target contract that just accepts calls
+        // Target with a single STOP opcode — a real call to it will halt cleanly with success.
         address target = makeAddr("target");
         vm.etch(target, hex"00");
 
-        // Build a payload with a call to the target
         ShadowAccountCall[] memory calls = new ShadowAccountCall[](1);
         calls[0] = ShadowAccountCall({callType: ShadowAccountCallType.Call, target: target, value: 0, data: ""});
         bytes memory payload = abi.encode(calls);
-
-        // Mock the target call to succeed
-        vm.mockCall(target, bytes(""), abi.encode(true));
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
         bytes4 ret = IERC7786Recipient(account).receiveMessage(bytes32(0), ownerAddr, payload);
@@ -350,12 +346,16 @@ abstract contract L2ShadowAccountTestAbstract is Test, L2InteropTestUtils {
         bytes memory ownerAddr = _ownerEncoded();
         address account = factory.getOrDeployShadowAccount(ownerAddr);
 
-        // Create a target that will revert
-        address reverter = makeAddr("reverter");
-        vm.mockCallRevert(reverter, bytes(""), bytes("revert reason"));
+        // Real contract that always reverts — no mocking needed.
+        AlwaysReverter reverter = new AlwaysReverter();
 
         ShadowAccountCall[] memory calls = new ShadowAccountCall[](1);
-        calls[0] = ShadowAccountCall({callType: ShadowAccountCallType.Call, target: reverter, value: 0, data: ""});
+        calls[0] = ShadowAccountCall({
+            callType: ShadowAccountCallType.Call,
+            target: address(reverter),
+            value: 0,
+            data: ""
+        });
         bytes memory payload = abi.encode(calls);
 
         vm.prank(L2_INTEROP_HANDLER_ADDR);
@@ -367,10 +367,10 @@ abstract contract L2ShadowAccountTestAbstract is Test, L2InteropTestUtils {
     function test_shadowAccount_executesDelegatecall() public {
         bytes memory ownerAddr = _ownerEncoded();
         address account = factory.getOrDeployShadowAccount(ownerAddr);
-        address target = makeAddr("script");
 
-        // Mock the delegatecall to succeed
-        vm.mockCall(target, bytes(""), abi.encode(true));
+        // Real script target with a single STOP opcode — delegatecall to it returns success cleanly.
+        address target = makeAddr("script");
+        vm.etch(target, hex"00");
 
         ShadowAccountCall[] memory calls = new ShadowAccountCall[](1);
         calls[0] = ShadowAccountCall({
@@ -420,6 +420,8 @@ abstract contract L2ShadowAccountTestAbstract is Test, L2InteropTestUtils {
     /// @notice InteropHandler routes shadow account calls through the factory.
     /// @dev This is the core integration test: a bundle with shadowAccount=true
     ///      should deploy a ShadowAccount and execute the payload through it.
+    ///      No mocks on the shadow account itself — the real CREATE2-deployed
+    ///      ShadowAccount executes the payload end-to-end.
     function test_interopHandler_routesThroughShadowAccount() public {
         bytes memory ownerAddr = _ownerEncoded();
         address predicted = factory.predictAddress(ownerAddr);
@@ -427,23 +429,23 @@ abstract contract L2ShadowAccountTestAbstract is Test, L2InteropTestUtils {
         // The shadow account doesn't exist yet.
         assertEq(predicted.code.length, 0, "Shadow account should not exist before bundle execution");
 
-        // Mock the shadow account's receiveMessage to succeed
-        // (since in L1 context tests, the CREATE2 deployed contract may not work perfectly)
-        vm.mockCall(
-            predicted,
-            abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
-            abi.encode(IERC7786Recipient.receiveMessage.selector)
-        );
-        vm.mockCall(
-            predicted,
-            0,
-            abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
-            abi.encode(IERC7786Recipient.receiveMessage.selector)
-        );
+        // Target with a single STOP opcode so the shadow account's downstream call succeeds.
+        address innerTarget = makeAddr("someTarget");
+        vm.etch(innerTarget, hex"00");
 
-        bytes memory payload = _buildSingleCallPayload(makeAddr("someTarget"), 0, "");
+        bytes memory payload = _buildSingleCallPayload(innerTarget, 0, "");
 
         bytes32 bundleHash = _executeShadowAccountBundle(payload, 0);
+
+        // Verify the shadow account was actually deployed by the InteropHandler routing.
+        assertTrue(predicted.code.length > 0, "Shadow account should be deployed after bundle execution");
+
+        // Verify the deployed shadow account is owned by the bundle sender.
+        assertEq(
+            keccak256(ShadowAccount(payable(predicted)).owner()),
+            keccak256(ownerAddr),
+            "Shadow account owner should match bundle sender"
+        );
 
         // Verify the bundle was fully executed.
         assertEq(
@@ -531,5 +533,13 @@ abstract contract L2ShadowAccountTestAbstract is Test, L2InteropTestUtils {
         address predicted = factory.predictAddress(encoded);
         address deployed = factory.getOrDeployShadowAccount(encoded);
         assertEq(predicted, deployed, "Predicted must always match deployed");
+    }
+}
+
+/// @notice Minimal real contract that reverts on every call. Used to test failure-path
+///         coverage in ShadowAccount without resorting to vm.mockCallRevert.
+contract AlwaysReverter {
+    fallback() external payable {
+        revert("AlwaysReverter: always reverts");
     }
 }
