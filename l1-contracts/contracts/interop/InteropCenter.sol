@@ -312,7 +312,7 @@ contract InteropCenter is
     /// @param _interoperableAddress The ERC-7930 address to verify.
     function _ensureEmptyChainReference(bytes calldata _interoperableAddress) internal pure {
         require(
-            _interoperableAddress.length >= 5,
+            _interoperableAddress.length >= 6,
             InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
         );
         uint8 chainReferenceLength = uint8(_interoperableAddress[0x04]);
@@ -325,7 +325,7 @@ contract InteropCenter is
     /// @param _interoperableAddress The ERC-7930 address to verify.
     function _ensureEmptyAddress(bytes calldata _interoperableAddress) internal pure {
         require(
-            _interoperableAddress.length >= 5,
+            _interoperableAddress.length >= 6,
             InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
         );
         uint8 chainReferenceLength = uint8(_interoperableAddress[0x04]);
