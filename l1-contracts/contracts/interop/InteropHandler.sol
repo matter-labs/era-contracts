@@ -52,7 +52,7 @@ import {IAssetTrackerDataEncoding} from "../bridge/asset-tracker/IAssetTrackerDa
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev This contract serves as the entry-point for executing, verifying and unbundling interop bundles.
-contract InteropHandler is IInteropHandler, ReentrancyGuard {
+contract InteropHandler is IInteropHandler, IERC7786Recipient, ReentrancyGuard {
     /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 public L1_CHAIN_ID;
