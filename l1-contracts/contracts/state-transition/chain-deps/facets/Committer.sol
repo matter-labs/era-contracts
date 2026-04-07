@@ -46,6 +46,7 @@ import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {
     BatchNumberMismatch,
+    BatchTimestampGreaterThanLastL2BlockTimestamp,
     CanOnlyProcessOneBatch,
     EmptyPrecommitData,
     HashMismatch,
@@ -583,6 +584,13 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         }
 
         uint256 lastL2BlockTimestamp = _packedBatchAndL2BlockTimestamp & PACKED_L2_BLOCK_TIMESTAMP_MASK;
+
+        // Ensure that batchTimestamp <= lastL2BlockTimestamp, which is required for the
+        // [batchTimestamp, lastL2BlockTimestamp] range to be valid.
+        if (batchTimestamp > lastL2BlockTimestamp) {
+            revert BatchTimestampGreaterThanLastL2BlockTimestamp();
+        }
+
         // All L2 blocks have timestamps within the range of [batchTimestamp, lastL2BlockTimestamp].
         // So here we need to only double check that:
         // - The timestamp of the batch is not too small.
