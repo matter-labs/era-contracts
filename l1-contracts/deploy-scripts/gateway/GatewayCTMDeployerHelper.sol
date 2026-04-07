@@ -850,23 +850,59 @@ library GatewayCTMDeployerHelper {
         dependencies = new bytes[](totalDependencies);
         uint256 idx = 0;
 
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "GatewayCTMDeployerDA.sol", "GatewayCTMDeployerDA");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "GatewayCTMDeployerProxyAdmin.sol", "GatewayCTMDeployerProxyAdmin");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "GatewayCTMDeployerValidatorTimelock.sol", "GatewayCTMDeployerValidatorTimelock");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "GatewayCTMDeployerVerifiers.sol", "GatewayCTMDeployerVerifiers");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "GatewayCTMDeployerCTM.sol", "GatewayCTMDeployerCTM");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
+            _isZKsyncOS,
+            "GatewayCTMDeployerDA.sol",
+            "GatewayCTMDeployerDA"
+        );
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
+            _isZKsyncOS,
+            "GatewayCTMDeployerProxyAdmin.sol",
+            "GatewayCTMDeployerProxyAdmin"
+        );
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
+            _isZKsyncOS,
+            "GatewayCTMDeployerValidatorTimelock.sol",
+            "GatewayCTMDeployerValidatorTimelock"
+        );
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
+            _isZKsyncOS,
+            "GatewayCTMDeployerVerifiers.sol",
+            "GatewayCTMDeployerVerifiers"
+        );
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
+            _isZKsyncOS,
+            "GatewayCTMDeployerCTM.sol",
+            "GatewayCTMDeployerCTM"
+        );
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "RollupDAManager.sol", "RollupDAManager");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "RelayedSLDAValidator.sol", "RelayedSLDAValidator");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
+            _isZKsyncOS,
+            "ValidiumL1DAValidator.sol",
+            "ValidiumL1DAValidator"
+        );
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
+            _isZKsyncOS,
+            "RelayedSLDAValidator.sol",
+            "RelayedSLDAValidator"
+        );
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "ProxyAdmin.sol", "ProxyAdmin");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "ValidatorTimelock.sol", "ValidatorTimelock");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "TransparentUpgradeableProxy.sol", "TransparentUpgradeableProxy");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
+            _isZKsyncOS,
+            "TransparentUpgradeableProxy.sol",
+            "TransparentUpgradeableProxy"
+        );
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "EraVerifierFflonk.sol", "EraVerifierFflonk");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "EraVerifierPlonk.sol", "EraVerifierPlonk");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "EraTestnetVerifier.sol", "EraTestnetVerifier");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "EraDualVerifier.sol", "EraDualVerifier");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "ServerNotifier.sol", "ServerNotifier");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "EraChainTypeManager.sol", "EraChainTypeManager");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
+            _isZKsyncOS,
+            "EraChainTypeManager.sol",
+            "EraChainTypeManager"
+        );
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Admin.sol", "AdminFacet");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Mailbox.sol", "MailboxFacet");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Executor.sol", "ExecutorFacet");

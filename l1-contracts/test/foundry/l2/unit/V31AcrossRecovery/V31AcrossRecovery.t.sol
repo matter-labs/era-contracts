@@ -116,7 +116,11 @@ contract V31AcrossRecoveryUnitTest is Test {
 
         // Read the EVM bytecode of MockUUPSImplementation (from `out/`, not `zkout/`).
         // This is the same contract, but compiled to standard EVM bytecode.
-        bytes memory evmBytecode = BytecodeUtils.readBytecodeL1(true, "MockUUPSImplementation.sol", "MockUUPSImplementation");
+        bytes memory evmBytecode = BytecodeUtils.readBytecodeL1(
+            true,
+            "MockUUPSImplementation.sol",
+            "MockUUPSImplementation"
+        );
 
         // Etch the ContractDeployer system contract (not present by default in zkfoundry unit tests).
         bytes memory contractDeployerBytecode = BytecodeUtils.readSystemContractsBytecode("ContractDeployer");
