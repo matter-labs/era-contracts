@@ -265,7 +265,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    ) public payable virtual override onlyL2InteropCenter {
+    ) public payable virtual override onlyL2InteropCenter whenNotPaused {
         _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
     }
 
