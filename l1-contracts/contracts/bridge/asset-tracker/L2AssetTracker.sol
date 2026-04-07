@@ -391,7 +391,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             _fromChainId: _fromChainId,
             _assetId: baseTokenAssetId,
             _amount: _amount,
-            _tokenOriginChainId: L1_CHAIN_ID,
+            _tokenOriginChainId: L2_NATIVE_TOKEN_VAULT.originChainId(baseTokenAssetId),
             _tokenAddress: address(L2_BASE_TOKEN_SYSTEM_CONTRACT)
         });
     }
