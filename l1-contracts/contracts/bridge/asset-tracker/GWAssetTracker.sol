@@ -40,6 +40,7 @@ import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {
     ChainIdNotRegistered,
+    InvalidBundleIdentifier,
     InvalidInteropCalldata,
     InvalidMessage,
     ReconstructionMismatch,
@@ -496,8 +497,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes calldata _message
     ) internal returns (uint256 chargeableCallCount) {
         if (_message[0] != BUNDLE_IDENTIFIER) {
-            // This should not be possible in V31. In V31 this will be a trigger.
-            return 0;
+            revert InvalidBundleIdentifier();
         }
 
         InteropBundle memory interopBundle = abi.decode(_message[1:], (InteropBundle));

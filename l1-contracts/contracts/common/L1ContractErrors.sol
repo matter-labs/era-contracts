@@ -172,6 +172,7 @@ error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
 error InsufficientFunds(uint256 required, uint256 actual);
 // 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
+error InvalidBundleIdentifier();
 // 0xd438e1fa
 error InvalidBlockRange(uint64 batchNumber, uint64 from, uint64 to);
 // 0xcbd9d2e0
