@@ -53,9 +53,19 @@ import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
+import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
+import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 
 contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
+
+    /// @dev Cache for batched blake2s hashing (keccak256(bytecode) => blake2s(bytecode)).
+    /// ZKsyncOS bytecode info requires blake2s hashes, computed via FFI (`yarn ts-node blake2s256.ts`).
+    /// Without caching, each call to `Utils.getZKOSProxyUpgradeBytecodeInfo` spawns 2 FFI processes
+    /// (one for the impl, one for SystemContractProxy). With ~10 contracts in `_buildForceDeploymentsData`,
+    /// that's ~20 sequential FFI calls. The cache batches all bytecodes into a single FFI call in
+    /// `_precomputeBlakeHashes()`, reducing deployment time significantly.
+    mapping(bytes32 => bytes32) private _blakeCache;
 
     function run() public virtual {
         // Had to leave the function due to scripts that inherit this one, as well as for tests
@@ -486,9 +496,109 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         return beacon;
     }
 
+    /// @dev Precompute blake2s hashes for all unique bytecodes in a single FFI call.
+    function _precomputeBlakeHashes() private {
+        CoreContract[10] memory contracts = [
+            CoreContract.L2Bridgehub,
+            CoreContract.L2AssetRouter,
+            CoreContract.L2NativeTokenVault,
+            CoreContract.L2MessageRoot,
+            CoreContract.UpgradeableBeaconDeployer,
+            CoreContract.L2ChainAssetHandler,
+            CoreContract.InteropCenter,
+            CoreContract.InteropHandler,
+            CoreContract.L2AssetTracker,
+            CoreContract.BaseTokenHolder
+        ];
+
+        string memory tmpFile = string.concat(vm.projectRoot(), "/script-out/tmp-blake-batch.txt");
+        vm.writeFile(tmpFile, "");
+
+        bytes[10] memory bytecodes;
+        for (uint256 i = 0; i < 10; i++) {
+            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, contracts[i]);
+            bytecodes[i] = BytecodeUtils.readDeployedBytecodeL1(true, fileName, contractName);
+            vm.writeLine(tmpFile, vm.toString(bytecodes[i]));
+        }
+        // Also add SystemContractProxy (used for proxy-upgrade bytecode info)
+        bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
+            true,
+            "SystemContractProxy.sol",
+            "SystemContractProxy"
+        );
+        vm.writeLine(tmpFile, vm.toString(proxyBytecode));
+
+        // Single FFI call to batch-hash all bytecodes
+        string[] memory input = new string[](6);
+        input[0] = "yarn";
+        input[1] = "--silent";
+        input[2] = "ts-node";
+        input[3] = "./scripts/blake2s256.ts";
+        input[4] = "--batch";
+        input[5] = tmpFile;
+        bytes memory result = vm.ffi(input);
+
+        uint256 totalBytecodes = 11;
+        require(result.length == totalBytecodes * 32, "Unexpected batch blake2s result length");
+        for (uint256 i = 0; i < 10; i++) {
+            bytes32 hash;
+            assembly {
+                hash := mload(add(result, add(32, mul(i, 32))))
+            }
+            _blakeCache[keccak256(bytecodes[i])] = hash;
+        }
+        {
+            bytes32 proxyHash;
+            assembly {
+                proxyHash := mload(add(result, add(32, mul(10, 32))))
+            }
+            _blakeCache[keccak256(proxyBytecode)] = proxyHash;
+        }
+
+        vm.removeFile(tmpFile);
+    }
+
+    /// @dev Look up a pre-computed blake2s hash and build ZKSyncOSBytecodeInfo.
+    function _cachedZKOSBytecodeInfo(bytes memory _bytecode) private view returns (bytes memory) {
+        bytes32 key = keccak256(_bytecode);
+        bytes32 blakeHash = _blakeCache[key];
+        require(blakeHash != bytes32(0), "Blake hash not cached");
+        return ZKSyncOSBytecodeInfo.encodeZKSyncOSBytecodeInfo(blakeHash, uint32(_bytecode.length), key);
+    }
+
+    /// @dev Returns proxy-upgrade bytecode info, using the blake cache when available.
+    function _getProxyUpgradeBytecodeInfo(
+        string memory _fileName,
+        string memory _contractName
+    ) private returns (bytes memory) {
+        if (config.isZKsyncOS) {
+            bytes memory implBytecode = BytecodeUtils.readDeployedBytecodeL1(true, _fileName, _contractName);
+            bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
+                true,
+                "SystemContractProxy.sol",
+                "SystemContractProxy"
+            );
+            return abi.encode(_cachedZKOSBytecodeInfo(implBytecode), _cachedZKOSBytecodeInfo(proxyBytecode));
+        }
+        return CoreOnGatewayHelper.getBytecodeInfo(false, CoreContract.L2Bridgehub); // unreachable, but keeps compiler happy
+    }
+
+    /// @dev Get bytecode info, using cached blake hashes for ZKsyncOS or CoreOnGatewayHelper for Era.
+    function _getBytecodeInfo(CoreContract _c) private returns (bytes memory) {
+        if (config.isZKsyncOS) {
+            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _c);
+            return _getProxyUpgradeBytecodeInfo(fileName, contractName);
+        }
+        return CoreOnGatewayHelper.getBytecodeInfo(false, _c);
+    }
+
     function _buildForceDeploymentsData(
         address dangerousTestOnlyForcedBeacon
     ) private returns (FixedForceDeploymentsData memory data) {
+        if (config.isZKsyncOS) {
+            _precomputeBlakeHashes();
+        }
+
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             gatewayChainId: config.gatewayChainId,
@@ -500,37 +610,16 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(ctmAddresses.admin.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2Bridgehub),
-            l2AssetRouterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.L2AssetRouter
-            ),
-            l2NtvBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2NativeTokenVault),
-            messageRootBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2MessageRoot),
-            beaconDeployerInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.UpgradeableBeaconDeployer
-            ),
-            baseTokenHolderBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.BaseTokenHolder
-            ),
-            chainAssetHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.L2ChainAssetHandler
-            ),
-            interopCenterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.InteropCenter
-            ),
-            interopHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.InteropHandler
-            ),
-            assetTrackerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.L2AssetTracker
-            ),
+            bridgehubBytecodeInfo: _getBytecodeInfo(CoreContract.L2Bridgehub),
+            l2AssetRouterBytecodeInfo: _getBytecodeInfo(CoreContract.L2AssetRouter),
+            l2NtvBytecodeInfo: _getBytecodeInfo(CoreContract.L2NativeTokenVault),
+            messageRootBytecodeInfo: _getBytecodeInfo(CoreContract.L2MessageRoot),
+            beaconDeployerInfo: _getBytecodeInfo(CoreContract.UpgradeableBeaconDeployer),
+            baseTokenHolderBytecodeInfo: _getBytecodeInfo(CoreContract.BaseTokenHolder),
+            chainAssetHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2ChainAssetHandler),
+            interopCenterBytecodeInfo: _getBytecodeInfo(CoreContract.InteropCenter),
+            interopHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.InteropHandler),
+            assetTrackerBytecodeInfo: _getBytecodeInfo(CoreContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
