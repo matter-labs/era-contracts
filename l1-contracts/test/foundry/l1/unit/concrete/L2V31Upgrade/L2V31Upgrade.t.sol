@@ -17,7 +17,8 @@ import {
     L2_INTEROP_CENTER_ADDR,
     L2_INTEROP_HANDLER_ADDR,
     L2_MESSAGE_ROOT_ADDR,
-    L2_NATIVE_TOKEN_VAULT_ADDR
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ComplexUpgrader} from "contracts/l2-upgrades/L2ComplexUpgrader.sol";
 import {AcrossInfo, LensSpokePoolConstructorParams} from "contracts/l2-upgrades/V31AcrossRecovery.sol";
@@ -78,6 +79,10 @@ contract MockV31UpgradeNativeTokenVault {
             return BASE_TOKEN_ORIGIN_TOKEN;
         }
         return address(0);
+    }
+
+    function registerBaseTokenIfNeeded() external {
+        // No-op for mock
     }
 
     function updateL2(
@@ -204,7 +209,7 @@ contract L2V31UpgradeUnitTest is Test {
 
         // AcceptAll mock for contracts where we don't verify behavior
         MockAcceptAll acceptAll = new MockAcceptAll();
-        address[] memory acceptAllAddresses = new address[](8);
+        address[] memory acceptAllAddresses = new address[](9);
         acceptAllAddresses[0] = L2_DEPLOYER_SYSTEM_CONTRACT_ADDR;
         acceptAllAddresses[1] = L2_MESSAGE_ROOT_ADDR;
         acceptAllAddresses[2] = L2_BRIDGEHUB_ADDR;
@@ -213,6 +218,7 @@ contract L2V31UpgradeUnitTest is Test {
         acceptAllAddresses[5] = L2_INTEROP_CENTER_ADDR;
         acceptAllAddresses[6] = L2_INTEROP_HANDLER_ADDR;
         acceptAllAddresses[7] = GW_ASSET_TRACKER_ADDR;
+        acceptAllAddresses[8] = L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR;
         for (uint256 i = 0; i < acceptAllAddresses.length; i++) {
             vm.etch(acceptAllAddresses[i], address(acceptAll).code);
         }

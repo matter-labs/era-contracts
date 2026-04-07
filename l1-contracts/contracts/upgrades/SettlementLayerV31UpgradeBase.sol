@@ -22,8 +22,6 @@ import {Bytes} from "../vendor/Bytes.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {NotAllBatchesExecuted, PriorityQueueNotReady} from "../common/L1ContractErrors.sol";
 
-event L2UpgradeTxDataConstructed(address indexed bridgehub, uint256 indexed chainId, bytes data);
-
 /// @author Matter Labs
 /// @title SettlementLayerV31UpgradeBase
 /// @dev Base contract for v31 per-chain upgrades. Handles L1 state updates and
@@ -74,7 +72,6 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
         // Era chains automatically have it tracked.
         // ZKsync OS chains haven't been tracking this value until the v31 upgrade.
         // It will have to be backfilled.
-        // FIXME The actual logic for backfilling will be introduced in a separate PR.
         if (!s.zksyncOS) {
             s.baseTokenHasTotalSupply = true;
         }
@@ -170,13 +167,12 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
         require(_delegateTo == L2_VERSION_SPECIFIC_UPGRADER_ADDR, "Unexpected upgrade target");
     }
 
-    /// @notice Emit the constructed L2 upgrade tx data for monitoring/debugging.
+    /// @notice Get the constructed L2 upgrade tx data.
     function emitL2UpgradeTxData(
         address _bridgehub,
         uint256 _chainId,
         bytes calldata _existingTxData
-    ) external returns (bytes memory data) {
+    ) external view returns (bytes memory data) {
         data = getL2UpgradeTxData(_bridgehub, _chainId, _existingTxData);
-        emit L2UpgradeTxDataConstructed(_bridgehub, _chainId, data);
     }
 }

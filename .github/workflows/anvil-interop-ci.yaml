@@ -82,8 +82,9 @@ jobs:
 
       - name: Cleanup
         if: always()
+        working-directory: l1-contracts/test/anvil-interop
         run: |
-          pkill -9 anvil 2>/dev/null || true
+          bash cleanup.sh
 
   # V29 → V31 upgrade test: loads v29 chain states, runs the v31 ecosystem upgrade,
   # executes governance calls, and verifies protocol version is updated.
@@ -135,8 +136,9 @@ jobs:
 
       - name: Cleanup
         if: always()
+        working-directory: l1-contracts/test/anvil-interop
         run: |
-          pkill -9 anvil 2>/dev/null || true
+          bash cleanup.sh
 
   # V30 → V31 upgrade test: loads v30 ZKsync OS chain states, runs the v31 ecosystem upgrade,
   # executes governance calls, and verifies protocol version is updated.
@@ -188,8 +190,9 @@ jobs:
 
       - name: Cleanup
         if: always()
+        working-directory: l1-contracts/test/anvil-interop
         run: |
-          pkill -9 anvil 2>/dev/null || true
+          bash cleanup.sh
 
   # TODO: Re-enable after merging to main. The 'Regenerate Anvil Interop Chain States'
   # workflow_dispatch workflow needs to be on main before it can be triggered from the UI/CLI.
@@ -258,5 +261,6 @@ jobs:
 
       - name: Cleanup
         if: always()
+        working-directory: l1-contracts/test/anvil-interop
         run: |
-          pkill -9 anvil 2>/dev/null || true
+          bash cleanup.sh

@@ -139,6 +139,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         _deployMockContract(L2_NATIVE_TOKEN_VAULT_ADDR);
         _deployMockContract(L2_CHAIN_ASSET_HANDLER_ADDR);
         _deployMockContract(GW_ASSET_TRACKER_ADDR);
+        _deployMockContract(L2_INTEROP_CENTER_ADDR);
 
         vm.mockCall(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, abi.encodeWithSignature("owner()"), abi.encode(address(this)));
 

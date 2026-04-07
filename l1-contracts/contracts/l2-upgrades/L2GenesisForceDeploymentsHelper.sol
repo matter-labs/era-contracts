@@ -7,7 +7,6 @@ import {
     L2_ASSET_TRACKER_ADDR,
     L2_ASSET_ROUTER_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-    L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
@@ -227,9 +226,7 @@ library L2GenesisForceDeploymentsHelper {
             ? IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade
             : IComplexUpgrader.ContractUpgradeType.EraForceDeployment;
 
-        if (_isGenesisUpgrade) {
-            _setupProxyAdmin();
-        }
+        _setupProxyAdmin();
         _deployCoreContracts({
             _expectedUpgradeType: expectedUpgradeType,
             _fixedForceDeploymentsData: fixedForceDeploymentsData,
@@ -527,9 +524,7 @@ library L2GenesisForceDeploymentsHelper {
             IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
         }
 
-        if (_isGenesisUpgrade) {
-            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
-        }
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerBaseTokenIfNeeded();
     }
 
     /// @notice Constructs the initialization calldata for the L2WrappedBaseToken.
