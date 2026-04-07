@@ -138,3 +138,6 @@ address constant GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x1
 
 /// @dev The address of the base token holder contract that holds chain's base token reserves.
 address constant L2_BASE_TOKEN_HOLDER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x11);
+
+/// @dev the address of the L2 shadow account factory
+address constant L2_SHADOW_ACCOUNT_FACTORY_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x12);

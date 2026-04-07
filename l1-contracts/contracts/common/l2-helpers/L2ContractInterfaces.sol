@@ -16,6 +16,7 @@ import {IL2AssetRouter} from "../../bridge/asset-router/IL2AssetRouter.sol";
 import {IL2AssetTracker} from "../../bridge/asset-tracker/IL2AssetTracker.sol";
 import {IGWAssetTracker} from "../../bridge/asset-tracker/IGWAssetTracker.sol";
 import {IBaseTokenHolder} from "../../l2-system/interfaces/IBaseTokenHolder.sol";
+import {IShadowAccountFactory} from "../../interop/IShadowAccountFactory.sol";
 import {ISystemContext} from "../interfaces/ISystemContext.sol";
 import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 
@@ -42,6 +43,7 @@ import {
     L2_ASSET_TRACKER_ADDR,
     GW_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
+    L2_SHADOW_ACCOUNT_FACTORY_ADDR,
     MAX_BUILT_IN_CONTRACT_ADDR,
     L2_BOOTLOADER_ADDRESS
 } from "./L2ContractAddresses.sol";
@@ -95,3 +97,6 @@ IGWAssetTracker constant GW_ASSET_TRACKER = IGWAssetTracker(GW_ASSET_TRACKER_ADD
 
 /// @dev The base token holder contract that holds chain's base token reserves.
 IBaseTokenHolder constant L2_BASE_TOKEN_HOLDER = IBaseTokenHolder(payable(L2_BASE_TOKEN_HOLDER_ADDR));
+
+/// @dev the L2 shadow account factory
+IShadowAccountFactory constant L2_SHADOW_ACCOUNT_FACTORY = IShadowAccountFactory(L2_SHADOW_ACCOUNT_FACTORY_ADDR);

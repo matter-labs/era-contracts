@@ -190,12 +190,14 @@ struct InteropCallStarterInternal {
 }
 
 /// @param interopCallValue Base token value on destination chain to send for interop call.
-/// @param indirectCall An indirect call first calls a contract as specified by the call starter which returns an actual call starter that will be used to form an interop call. In particular, this is used for interop token transfers. In contrast, a direct call uses the call starter to form an interop call.
 /// @param indirectCallMessageValue Base token value on sending chain to send for indirect call.
+/// @param indirectCall An indirect call first calls a contract as specified by the call starter which returns an actual call starter that will be used to form an interop call. In particular, this is used for interop token transfers. In contrast, a direct call uses the call starter to form an interop call.
+/// @param shadowAccount If true, the InteropHandler routes execution through the sender's ShadowAccount on the destination chain. Mutually exclusive with indirectCall.
 struct CallAttributes {
     uint256 interopCallValue;
-    bool indirectCall;
     uint256 indirectCallMessageValue;
+    bool indirectCall;
+    bool shadowAccount;
 }
 
 /// @param executionAddress ERC-7930 Address allowed to execute the bundle on the destination chain. If the byte array is empty then execution is permissionless.
@@ -221,9 +223,9 @@ struct BundleAttributes {
 
 /// @dev A single call.
 /// @param version Version of the InteropCall.
-/// @param shadowAccount If true, execute via a shadow account, otherwise normal. In current release always false, as it's not yet implemented.
-///                      Shadow accounts help with interop when `to` doesn't support 7786. In this case, a "shadow" account could be deployed, allowing
-///                      the user to hold funds securely on the destination chain, and interact with anything on destination chain using this shadow account.
+/// @param shadowAccount If true, the InteropHandler routes execution through the sender's ShadowAccount on the destination chain
+///                      instead of calling `to` directly. The ShadowAccount is deployed deterministically via the ShadowAccountFactory
+///                      and the `data` field is decoded as a ShadowAccountCall[] array by the ShadowAccount.
 /// @param to Destination contract address on the target chain.
 /// @param from Original sender address that initiated the call.
 /// @param value Amount of base token to send with the call.
