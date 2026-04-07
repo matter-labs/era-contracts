@@ -13,6 +13,7 @@ pub mod fflonk;
 pub mod plonk;
 pub mod types;
 pub mod utils;
+pub mod zisk;
 
 use fflonk::insert_residue_elements_and_commitments as fflonk_insert_residue_elements_and_commitments;
 use plonk::insert_residue_elements_and_commitments as plonk_insert_residue_elements_and_commitments;
@@ -24,6 +25,7 @@ use std::str::FromStr;
 enum Variant {
     Era,
     ZKsyncOS,
+    ZiSK,
     Custom,
 }
 
@@ -34,8 +36,9 @@ impl FromStr for Variant {
         match s.to_lowercase().as_str() {
             "era" => Ok(Variant::Era),
             "zksync-os" | "zksyncos" => Ok(Variant::ZKsyncOS),
+            "zisk" => Ok(Variant::ZiSK),
             "custom" => Ok(Variant::Custom),
-            _ => Err(format!("Invalid variant '{}'. Valid options: era, zksync-os, custom", s)),
+            _ => Err(format!("Invalid variant '{}'. Valid options: era, zksync-os, zisk, custom", s)),
         }
     }
 }
@@ -46,7 +49,7 @@ impl FromStr for Variant {
     about = "Tool for generating verifier contract using scheduler json key"
 )]
 struct Opt {
-    /// Variant to use: era, zksync-os, or custom
+    /// Variant to use: era, zksync-os, zisk, or custom
     #[structopt(long = "variant", default_value = "custom")]
     variant: Variant,
 
@@ -72,6 +75,19 @@ struct Opt {
     #[structopt(long = "plonk_output_path", default_value = "data/VerifierPlonk.sol")]
     plonk_output_path: String,
 
+    /// ZiSK VK input JSON (programVK + rootCVadcopFinal).
+    #[structopt(long = "zisk_vk_path", default_value = "data/ZiSK_vk.json")]
+    zisk_vk_path: String,
+
+    /// ZiSK PlonkVerifier.sol input (snarkJS-generated).
+    /// Used with --variant zisk to copy and adapt the inner verifier.
+    #[structopt(long = "zisk_plonk_input_path")]
+    zisk_plonk_input_path: Option<String>,
+
+    /// ZiSK verifier output path.
+    #[structopt(long = "zisk_output_path", default_value = "data/ZiskVerifier.sol")]
+    zisk_output_path: String,
+
 }
 
 fn resolve_paths(opt: &Opt) -> (String, String, String, String) {
@@ -88,6 +104,8 @@ fn resolve_paths(opt: &Opt) -> (String, String, String, String) {
             "data/ZKsyncOSVerifierPlonk.sol".to_string(),
             "data/ZKsyncOSVerifierFflonk.sol".to_string(),
         ),
+        // ZiSK has its own path — handled separately in main()
+        Variant::ZiSK => (String::new(), String::new(), String::new(), String::new()),
         Variant::Custom => (
             opt.plonk_input_path.clone(),
             opt.fflonk_input_path.clone(),
@@ -101,12 +119,18 @@ fn resolve_contract_name(variant: &Variant) -> String {
     match variant {
         Variant::Era => "Era".to_string(),
         Variant::ZKsyncOS => "ZKsyncOS".to_string(),
+        Variant::ZiSK => "Zisk".to_string(),
         Variant::Custom => "".to_string(),
     }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
+
+    // ZiSK variant uses a completely different pipeline
+    if matches!(opt.variant, Variant::ZiSK) {
+        return zisk::generate_zisk_verifier(&opt.zisk_vk_path, &opt.zisk_output_path, opt.zisk_plonk_input_path.as_deref());
+    }
 
     let (plonk_input_path, fflonk_input_path, plonk_output_path, fflonk_output_path) = resolve_paths(&opt);
     let contract_name = resolve_contract_name(&opt.variant);
@@ -136,7 +160,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let plonk_vk_hash =
         hex::encode(calculate_verification_key_hash(plonk_verification_key).to_fixed_bytes());
-    
+
     let fflonk_vk_hash =
         hex::encode(calculate_fflonk_verification_key_hash(fflonk_verification_key).to_fixed_bytes());
 

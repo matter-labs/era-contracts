@@ -289,6 +289,13 @@ jobs:
       - name: Compare ZKsyncOSVerifierFflonk.sol
         run: diff tools/verifier-gen/data/ZKsyncOSVerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol
 
+      - name: Generate ZiSK verifier
+        working-directory: tools/verifier-gen
+        run: cargo run --bin zksync_verifier_contract_generator --release -- --variant zisk
+
+      - name: Compare ZiskVerifier.sol
+        run: diff tools/verifier-gen/data/ZiskVerifier.sol l1-contracts/contracts/state-transition/verifiers/ZiskVerifier.sol
+
   coverage:
     defaults:
       run:
