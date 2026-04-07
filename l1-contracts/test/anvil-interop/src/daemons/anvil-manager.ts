@@ -77,6 +77,12 @@ export class AnvilManager {
       "--auto-impersonate", // Allow impersonating any address without signatures
     ];
 
+    // Enable step-level tracing when running in coverage mode.
+    // This is required for debug_traceTransaction to return non-empty structLogs.
+    if (process.env.ANVIL_COVERAGE_MODE === "1") {
+      args.push("--steps-tracing");
+    }
+
     if (effectiveBlockTime > 0) {
       args.push("--block-time", effectiveBlockTime.toString());
     }
