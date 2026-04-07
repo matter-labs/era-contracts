@@ -252,8 +252,8 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bool _passValue,
         address _nativeTokenVault
     ) internal returns (bytes memory bridgeMintCalldata) {
-        address l1AssetHandler = assetHandlerAddress[_assetId];
-        if (l1AssetHandler == address(0)) {
+        address assetHandler = assetHandlerAddress[_assetId];
+        if (assetHandler == address(0)) {
             // As a UX feature, whenever an asset handler is not present, we always try to register asset within native token vault.
             // The Native Token Vault is trusted to revert in an asset does not belong to it.
             //
@@ -265,11 +265,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             // We do not do any additional transformations here (like setting `assetHandler` in the mapping),
             // because we expect that all those happened inside `tryRegisterTokenFromBurnData`
 
-            l1AssetHandler = _nativeTokenVault;
+            assetHandler = _nativeTokenVault;
         }
 
         uint256 msgValue = _passValue ? msg.value : 0;
-        bridgeMintCalldata = IAssetHandler(l1AssetHandler).bridgeBurn{value: msgValue}({
+        bridgeMintCalldata = IAssetHandler(assetHandler).bridgeBurn{value: msgValue}({
             _chainId: _chainId,
             _msgValue: _nextMsgValue,
             _assetId: _assetId,
