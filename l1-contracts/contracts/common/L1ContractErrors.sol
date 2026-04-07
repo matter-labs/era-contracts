@@ -121,6 +121,7 @@ error EmptyBytes32();
 error EmptyData();
 // 0x95b66fe9
 error EmptyDeposit();
+error ExpirationTimestampMustBeZero();
 // 0x84286507
 error EmptyPrecommitData(uint256 batchNumber);
 // 0x456f8f7a
@@ -348,6 +349,7 @@ error PriorityModeActivationTooEarly(uint256 earliestActivationTimestamp, uint25
 error PriorityModeIsNotAllowed();
 // 0x2b9d9c4c
 error PriorityModeRequiresPermanentRollup();
+error PermanentRollupCannotBeReverted();
 // 0xd5a99014
 error PriorityOperationsRollingHashMismatch();
 // 0xbeda0935

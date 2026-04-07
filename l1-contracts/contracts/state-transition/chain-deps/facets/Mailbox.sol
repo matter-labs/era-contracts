@@ -39,6 +39,7 @@ import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterShared} from "../../../bridge/asset-router/IAssetRouterShared.sol";
 import {
     AddressNotZero,
+    ExpirationTimestampMustBeZero,
     GasPerPubdataMismatch,
     InvalidChainId,
     MsgValueTooLow,
@@ -303,6 +304,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
         uint256 _baseTokenAmount,
         bool _getBalanceChange
     ) public override onlyL1 returns (bytes32 canonicalTxHash) {
+        require(_expirationTimestamp == 0, ExpirationTimestampMustBeZero());
         if (!IBridgehubBase(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
             revert NotSettlementLayer();
         }

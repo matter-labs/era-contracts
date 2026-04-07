@@ -39,7 +39,7 @@ import {
     VerifiedIsNotConsistentWithCommitted,
     MigrationInProgress
 } from "../../L1StateTransitionErrors.sol";
-import {NotAZKChain, NotCompatibleWithPriorityMode} from "../../../common/L1ContractErrors.sol";
+import {NotAZKChain, NotCompatibleWithPriorityMode, PermanentRollupCannotBeReverted} from "../../../common/L1ContractErrors.sol";
 import {OnlyGateway} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 import {TxStatus} from "../../../common/Messaging.sol";
@@ -224,6 +224,9 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         s.totalBatchesCommitted = batchesCommitted;
         s.totalBatchesVerified = batchesVerified;
         s.totalBatchesExecuted = batchesExecuted;
+        if (s.isPermanentRollup) {
+            require(_commitment.isPermanentRollup, PermanentRollupCannotBeReverted());
+        }
         s.isPermanentRollup = _commitment.isPermanentRollup;
         s.precommitmentForTheLatestBatch = _commitment.precommitmentForTheLatestBatch;
 
