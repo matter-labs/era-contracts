@@ -10,7 +10,10 @@ library ContractsBytecodesLib {
     /// @notice Get L2 deployed bytecode for factory deps.
     ///         EVM bytecodes: EVM deployed bytecode from out/.
     ///         ZK bytecodes: ZK creation code from zkout/.
-    function getL2DeployedBytecode(string memory _contractName, bool _isEVMBytecode) internal view returns (bytes memory) {
+    function getL2DeployedBytecode(
+        string memory _contractName,
+        bool _isEVMBytecode
+    ) internal view returns (bytes memory) {
         string memory fileName = string.concat(_contractName, ".sol");
         return Utils.readDeployedBytecodeL1(_isEVMBytecode, fileName, _contractName);
     }

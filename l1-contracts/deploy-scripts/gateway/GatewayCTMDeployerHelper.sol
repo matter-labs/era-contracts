@@ -845,16 +845,11 @@ library GatewayCTMDeployerHelper {
     /// @notice Bytecodes required for Gateway CTM deployers on Era.
     // solhint-disable-next-line code-complexity
     function _gatewayCTMEraFactoryDependencies() private returns (bytes[] memory dependencies) {
-
         uint256 totalDependencies = 27;
         dependencies = new bytes[](totalDependencies);
         uint256 idx = 0;
 
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            false,
-            "GatewayCTMDeployerDA.sol",
-            "GatewayCTMDeployerDA"
-        );
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "GatewayCTMDeployerDA.sol", "GatewayCTMDeployerDA");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(
             false,
             "GatewayCTMDeployerProxyAdmin.sol",
@@ -870,22 +865,10 @@ library GatewayCTMDeployerHelper {
             "GatewayCTMDeployerVerifiers.sol",
             "GatewayCTMDeployerVerifiers"
         );
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            false,
-            "GatewayCTMDeployerCTM.sol",
-            "GatewayCTMDeployerCTM"
-        );
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "GatewayCTMDeployerCTM.sol", "GatewayCTMDeployerCTM");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "RollupDAManager.sol", "RollupDAManager");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            false,
-            "ValidiumL1DAValidator.sol",
-            "ValidiumL1DAValidator"
-        );
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            false,
-            "RelayedSLDAValidator.sol",
-            "RelayedSLDAValidator"
-        );
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "RelayedSLDAValidator.sol", "RelayedSLDAValidator");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "ProxyAdmin.sol", "ProxyAdmin");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "ValidatorTimelock.sol", "ValidatorTimelock");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(
@@ -898,11 +881,7 @@ library GatewayCTMDeployerHelper {
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraTestnetVerifier.sol", "EraTestnetVerifier");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraDualVerifier.sol", "EraDualVerifier");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "ServerNotifier.sol", "ServerNotifier");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            false,
-            "EraChainTypeManager.sol",
-            "EraChainTypeManager"
-        );
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraChainTypeManager.sol", "EraChainTypeManager");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Admin.sol", "AdminFacet");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Mailbox.sol", "MailboxFacet");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Executor.sol", "ExecutorFacet");
