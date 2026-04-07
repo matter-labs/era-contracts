@@ -42,7 +42,7 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {UpgradeUtils} from "../default-upgrade/UpgradeUtils.sol";
 import {DeployL1CoreUtils} from "../../ecosystem/DeployL1CoreUtils.s.sol";
-import {EraZkosContract} from "../../utils/EraZkosRouter.sol";
+import {CoreContract} from "../../ecosystem/CoreContract.sol";
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
@@ -144,9 +144,9 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
         );
     }
 
-    function getForceDeploymentContracts() internal pure override returns (EraZkosContract[] memory) {
-        EraZkosContract[] memory forceDeploymentContracts = new EraZkosContract[](1);
-        forceDeploymentContracts[0] = EraZkosContract.L2V29Upgrade;
+    function getForceDeploymentContracts() internal pure override returns (CoreContract[] memory) {
+        CoreContract[] memory forceDeploymentContracts = new CoreContract[](1);
+        forceDeploymentContracts[0] = CoreContract.L2V29Upgrade;
         return forceDeploymentContracts;
     }
 

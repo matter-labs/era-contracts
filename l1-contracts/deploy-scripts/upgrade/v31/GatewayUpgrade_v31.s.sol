@@ -29,7 +29,8 @@ import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 
 import {Utils} from "../../utils/Utils.sol";
 import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
-import {EraZkosContract, PublishFactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {PublishFactoryDepsResult} from "../default-upgrade/CTMUpgradeBase.sol";
+import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.sol";
 
 // FIXME: consider deleting this script, it is not used.
@@ -38,16 +39,12 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
     /// @dev Prepared in getProposedUpgrade, consumed in getL2UpgradeTargetAndData (which must be view).
     bytes internal l2V29UpgradeBytecodeInfo;
 
-    function getForceDeploymentContracts()
-        internal
-        override
-        returns (EraZkosContract[] memory forceDeploymentContracts)
-    {
+    function getForceDeploymentContracts() internal override returns (CoreContract[] memory forceDeploymentContracts) {
         if (config.isZKsyncOS) {
-            return new EraZkosContract[](0);
+            return new CoreContract[](0);
         }
-        forceDeploymentContracts = new EraZkosContract[](1);
-        forceDeploymentContracts[0] = EraZkosContract.L2V29Upgrade;
+        forceDeploymentContracts = new CoreContract[](1);
+        forceDeploymentContracts[0] = CoreContract.L2V29Upgrade;
     }
 
     function getProposedUpgrade(

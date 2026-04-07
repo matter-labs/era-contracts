@@ -47,9 +47,10 @@ import {
     BridgeContracts,
     CTMDeployedAddresses,
     CTMAdminAddresses,
-    DataAvailabilityDeployedAddresses
+    DataAvailabilityDeployedAddresses,
+    L1SpecificStateTransitionAddresses
 } from "./Types.sol";
-import {EraZkosVerifierLifecycle} from "./vm/EraZkosVerifierLifecycle.sol";
+import {DeployCTML1OrGateway} from "../ctm/DeployCTML1OrGateway.sol";
 
 library AddressIntrospector {
     error NoUptoDateZkChainFound();
@@ -270,10 +271,11 @@ library AddressIntrospector {
             facets: facets,
             genesisUpgrade: ctm.l1GenesisUpgrade(),
             defaultUpgrade: address(0),
+            chainTypeManagerProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr)
+        });
+        info.l1Specific = L1SpecificStateTransitionAddresses({
             legacyValidatorTimelock: ctm.validatorTimelock(),
-            eraDiamondProxy: address(0),
-            rollupDAManager: address(0),
-            rollupSLDAValidator: address(0)
+            eraDiamondProxy: address(0)
         });
         info.admin = CTMAdminAddresses({
             transparentProxyAdmin: Utils.getProxyAdminAddress(_ctmAddr),
@@ -509,6 +511,6 @@ library AddressIntrospector {
         address _verifier,
         bool _isZKsyncOS
     ) private view returns (address fflonk, address plonk) {
-        return EraZkosVerifierLifecycle.getSubVerifiers(_verifier, _isZKsyncOS);
+        return DeployCTML1OrGateway.getSubVerifiers(_verifier, _isZKsyncOS);
     }
 }

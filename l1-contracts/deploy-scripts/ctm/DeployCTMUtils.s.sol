@@ -15,7 +15,6 @@ import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddr
 import {Utils} from "../utils/Utils.sol";
 
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
-// Verifier lifecycle is now handled through EraZkosRouter
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -50,7 +49,8 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
-import {EraZkosRouter, EraZkosContract} from "../utils/EraZkosRouter.sol";
+import {CTMContract} from "./DeployCTML1OrGateway.sol";
+import {ChainCreationParamsLib} from "./ChainCreationParamsLib.sol";
 
 import {
     StateTransitionDeployedAddresses,
@@ -119,7 +119,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     }
 
     function chainCreationParamsPath(bool _isZKsyncOS) internal virtual returns (string memory) {
-        return EraZkosRouter.genesisConfigPath(_isZKsyncOS);
+        return Utils.genesisConfigPath(_isZKsyncOS);
     }
 
     function initializeConfig(
@@ -155,9 +155,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.contracts.validatorTimelockExecutionDelay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
         );
-        config.contracts.chainCreationParams = getChainCreationParamsConfig(
-            EraZkosRouter.genesisConfigPath(config.isZKsyncOS)
-        );
+        config.contracts.chainCreationParams = getChainCreationParamsConfig(Utils.genesisConfigPath(config.isZKsyncOS));
 
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
@@ -167,7 +165,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getChainCreationParamsConfig(
         string memory _config
     ) internal virtual returns (ChainCreationParamsConfig memory chainCreationParams) {
-        return EraZkosRouter.getChainCreationParams(config.isZKsyncOS, _config);
+        return ChainCreationParamsLib.getChainCreationParams(_config, config.isZKsyncOS);
     }
 
     /// @notice Get all six facet cuts
@@ -309,7 +307,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {
-            return abi.encode(ctmAddresses.daAddresses.l1RollupDAValidator);
+            return abi.encode(ctmAddresses.daAddresses.daContracts.rollupSLDAValidator);
         } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
             return abi.encode();
         } else if (compareStrings(contractName, "AvailL1DAValidator")) {
@@ -384,7 +382,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 l1ChainId: _config.l1ChainId,
                 bridgehubProxy: coreAddresses.bridgehub.proxies.bridgehub,
                 interopCenterProxy: L2_INTEROP_CENTER_ADDR,
-                rollupDAManager: ctmAddresses.daAddresses.rollupDAManager,
+                rollupDAManager: ctmAddresses.daAddresses.daContracts.rollupDAManager,
                 chainAssetHandler: coreAddresses.bridgehub.proxies.chainAssetHandler,
                 l1BytecodesSupplier: ctmAddresses.stateTransition.proxies.bytecodesSupplier,
                 eip7702Checker: ctmAddresses.admin.eip7702Checker,
