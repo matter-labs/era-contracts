@@ -255,7 +255,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         updateRollupDAManager();
 
         // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
-        ctmAddresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator", false);
+        ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = deploySimpleContract("RollupL1DAValidator", false);
         if (config.isZKsyncOS) {
             ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS = deploySimpleContract(
                 "BlobsL1DAValidatorZKsyncOS",
@@ -274,7 +274,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.startBroadcast(getDeployerAddress());
         IRollupDAManager rollupDAManager = IRollupDAManager(ctmAddresses.daAddresses.daContracts.rollupDAManager);
         rollupDAManager.updateDAPair(
-            ctmAddresses.daAddresses.l1RollupDAValidator,
+            ctmAddresses.daAddresses.daContracts.rollupSLDAValidator,
             getRollupL2DACommitmentScheme(),
             true
         );
@@ -397,7 +397,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.serializeAddress(
             "deployed_addresses",
             "rollup_l1_da_validator_addr",
-            ctmAddresses.daAddresses.l1RollupDAValidator
+            ctmAddresses.daAddresses.daContracts.rollupSLDAValidator
         );
         vm.serializeAddress(
             "deployed_addresses",

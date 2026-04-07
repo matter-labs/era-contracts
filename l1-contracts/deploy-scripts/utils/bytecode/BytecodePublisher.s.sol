@@ -122,19 +122,21 @@ library BytecodePublisher {
 
     /// @notice Publish bytecodes and compute factory dependency hashes in one call.
     ///         Era: publishes bytecodes, computes L2 bytecode hashes, returns populated result.
-    ///         ZKsyncOS: publishes bytecodes, returns empty array (no factory deps concept).
+    ///         EVM bytecodes: publishes bytecodes, returns empty array (no factory deps concept).
     function publishAndProcessFactoryDeps(
-        bool _isZKsyncOS,
+        bool _isEVMBytecode,
         BytecodesSupplier _supplier,
         bytes[] memory _allDeps
     ) internal returns (PublishFactoryDepsResult memory result) {
-        if (_isZKsyncOS) {
+        if (_isEVMBytecode) {
             publishEVMBytecodesInBatches(_supplier, _allDeps);
         } else {
             publishEraBytecodesInBatches(_supplier, _allDeps);
         }
 
-        if (_isZKsyncOS) {
+        if (_isEVMBytecode) {
+            // EVM bytecodes do not use factory deps in upgrade transactions — bytecodes are
+            // published to BytecodesSupplier above but no hashes are needed in the tx.
             result.factoryDepsHashes = new uint256[](0);
             return result;
         }

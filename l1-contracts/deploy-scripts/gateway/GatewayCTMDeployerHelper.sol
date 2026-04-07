@@ -499,7 +499,7 @@ library GatewayCTMDeployerHelper {
             innerConfig,
             _isZKsyncOS
         );
-        result.relayedSLDAValidator = _deployInternalEmptyParams(
+        result.rollupSLDAValidator = _deployInternalEmptyParams(
             "RelayedSLDAValidator",
             "RelayedSLDAValidator.sol",
             innerConfig,
@@ -747,7 +747,7 @@ library GatewayCTMDeployerHelper {
         // From DA deployer
         contracts.daContracts.rollupDAManager = daResult.rollupDAManager;
         contracts.daContracts.validiumDAValidator = daResult.validiumDAValidator;
-        contracts.daContracts.relayedSLDAValidator = daResult.relayedSLDAValidator;
+        contracts.daContracts.rollupSLDAValidator = daResult.rollupSLDAValidator;
 
         // From ProxyAdmin deployer
         contracts.stateTransition.chainTypeManagerProxyAdmin = proxyAdminResult.chainTypeManagerProxyAdmin;
@@ -836,83 +836,83 @@ library GatewayCTMDeployerHelper {
     function getListOfFactoryDeps(
         GatewayCTMDeployerConfig memory config
     ) external returns (bytes[] memory dependencies) {
-        return _gatewayCTMEraFactoryDependencies(config.isZKsyncOS);
-    }
-
-    /// @notice Bytecodes required for Gateway CTM deployers on Era; empty array on ZKsyncOS.
-    // solhint-disable-next-line code-complexity
-    function _gatewayCTMEraFactoryDependencies(bool _isZKsyncOS) private returns (bytes[] memory dependencies) {
-        if (_isZKsyncOS) {
+        if (config.isZKsyncOS) {
             return dependencies;
         }
+        return _gatewayCTMEraFactoryDependencies();
+    }
+
+    /// @notice Bytecodes required for Gateway CTM deployers on Era.
+    // solhint-disable-next-line code-complexity
+    function _gatewayCTMEraFactoryDependencies() private returns (bytes[] memory dependencies) {
 
         uint256 totalDependencies = 27;
         dependencies = new bytes[](totalDependencies);
         uint256 idx = 0;
 
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            _isZKsyncOS,
+            false,
             "GatewayCTMDeployerDA.sol",
             "GatewayCTMDeployerDA"
         );
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            _isZKsyncOS,
+            false,
             "GatewayCTMDeployerProxyAdmin.sol",
             "GatewayCTMDeployerProxyAdmin"
         );
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            _isZKsyncOS,
+            false,
             "GatewayCTMDeployerValidatorTimelock.sol",
             "GatewayCTMDeployerValidatorTimelock"
         );
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            _isZKsyncOS,
+            false,
             "GatewayCTMDeployerVerifiers.sol",
             "GatewayCTMDeployerVerifiers"
         );
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            _isZKsyncOS,
+            false,
             "GatewayCTMDeployerCTM.sol",
             "GatewayCTMDeployerCTM"
         );
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "RollupDAManager.sol", "RollupDAManager");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "RollupDAManager.sol", "RollupDAManager");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            _isZKsyncOS,
+            false,
             "ValidiumL1DAValidator.sol",
             "ValidiumL1DAValidator"
         );
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            _isZKsyncOS,
+            false,
             "RelayedSLDAValidator.sol",
             "RelayedSLDAValidator"
         );
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "ProxyAdmin.sol", "ProxyAdmin");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "ValidatorTimelock.sol", "ValidatorTimelock");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "ProxyAdmin.sol", "ProxyAdmin");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "ValidatorTimelock.sol", "ValidatorTimelock");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            _isZKsyncOS,
+            false,
             "TransparentUpgradeableProxy.sol",
             "TransparentUpgradeableProxy"
         );
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "EraVerifierFflonk.sol", "EraVerifierFflonk");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "EraVerifierPlonk.sol", "EraVerifierPlonk");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "EraTestnetVerifier.sol", "EraTestnetVerifier");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "EraDualVerifier.sol", "EraDualVerifier");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "ServerNotifier.sol", "ServerNotifier");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraVerifierFflonk.sol", "EraVerifierFflonk");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraVerifierPlonk.sol", "EraVerifierPlonk");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraTestnetVerifier.sol", "EraTestnetVerifier");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "EraDualVerifier.sol", "EraDualVerifier");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "ServerNotifier.sol", "ServerNotifier");
         dependencies[idx++] = BytecodeUtils.readBytecodeL1(
-            _isZKsyncOS,
+            false,
             "EraChainTypeManager.sol",
             "EraChainTypeManager"
         );
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Admin.sol", "AdminFacet");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Mailbox.sol", "MailboxFacet");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Executor.sol", "ExecutorFacet");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Getters.sol", "GettersFacet");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Migrator.sol", "MigratorFacet");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Committer.sol", "CommitterFacet");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "DiamondInit.sol", "DiamondInit");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "L1GenesisUpgrade.sol", "L1GenesisUpgrade");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "Multicall3.sol", "Multicall3");
-        dependencies[idx++] = BytecodeUtils.readBytecodeL1(_isZKsyncOS, "DiamondProxy.sol", "DiamondProxy");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Admin.sol", "AdminFacet");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Mailbox.sol", "MailboxFacet");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Executor.sol", "ExecutorFacet");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Getters.sol", "GettersFacet");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Migrator.sol", "MigratorFacet");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Committer.sol", "CommitterFacet");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondInit.sol", "DiamondInit");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "L1GenesisUpgrade.sol", "L1GenesisUpgrade");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "Multicall3.sol", "Multicall3");
+        dependencies[idx++] = BytecodeUtils.readBytecodeL1(false, "DiamondProxy.sol", "DiamondProxy");
     }
 
     // ======================== VM-branching utilities ========================

@@ -55,14 +55,14 @@ library BytecodeUtils {
     }
 
     /// @notice Read L1 creation bytecode from the correct artifact directory.
-    ///         ZKsyncOS → out/ (EVM artifacts), Era → zkout/ (ZK artifacts).
+    ///         EVM bytecodes → out/, ZK bytecodes → zkout/.
     function readBytecodeL1(
-        bool _isZKsyncOS,
+        bool _isEVMBytecode,
         string memory _fileName,
         string memory _contractName
     ) internal view returns (bytes memory) {
         return
-            _isZKsyncOS
+            _isEVMBytecode
                 ? readFoundryBytecodeL1(_fileName, _contractName)
                 : readZKFoundryBytecodeL1(_fileName, _contractName);
     }
@@ -112,13 +112,13 @@ library BytecodeUtils {
     }
 
     /// @notice Read L1 deployed bytecode from the correct artifact directory.
-    ///         ZKsyncOS → out/ (EVM deployed bytecode), Era → zkout/ (ZK creation bytecode).
+    ///         EVM bytecodes → out/ (EVM deployed bytecode), ZK bytecodes → zkout/ (ZK creation bytecode).
     function readDeployedBytecodeL1(
-        bool _isZKsyncOS,
+        bool _isEVMBytecode,
         string memory _fileName,
         string memory _contractName
     ) internal view returns (bytes memory) {
-        if (_isZKsyncOS) {
+        if (_isEVMBytecode) {
             string memory path = string.concat("/../l1-contracts/out/", _fileName, "/", _contractName, ".json");
             return readFoundryDeployedBytecode(path);
         }
@@ -128,24 +128,24 @@ library BytecodeUtils {
     // ======================== Bytecode hashing ========================
 
     /// @notice Hash bytecode using the VM-appropriate algorithm.
-    ///         Era: L2ContractHelper.hashL2Bytecode (ZK bytecode hash).
-    ///         ZKsyncOS: keccak256 of the bytecode.
-    function hashBytecode(bool _isZKsyncOS, bytes memory _bytecode) internal pure returns (bytes32) {
-        if (_isZKsyncOS) {
+    ///         ZK bytecodes: L2ContractHelper.hashL2Bytecode (ZK bytecode hash).
+    ///         EVM bytecodes: keccak256 of the bytecode.
+    function hashBytecode(bool _isEVMBytecode, bytes memory _bytecode) internal pure returns (bytes32) {
+        if (_isEVMBytecode) {
             return keccak256(_bytecode);
         }
         return L2ContractHelper.hashL2Bytecode(_bytecode);
     }
 
     /// @notice Read and hash deployed bytecode in one call.
-    ///         Era: L2ContractHelper.hashL2Bytecode of ZK creation bytecode.
-    ///         ZKsyncOS: keccak256 of EVM deployed bytecode.
+    ///         ZK bytecodes: L2ContractHelper.hashL2Bytecode of ZK creation bytecode.
+    ///         EVM bytecodes: keccak256 of EVM deployed bytecode.
     function getDeployedBytecodeHash(
-        bool _isZKsyncOS,
+        bool _isEVMBytecode,
         string memory _fileName,
         string memory _contractName
     ) internal view returns (bytes32) {
-        return hashBytecode(_isZKsyncOS, readDeployedBytecodeL1(_isZKsyncOS, _fileName, _contractName));
+        return hashBytecode(_isEVMBytecode, readDeployedBytecodeL1(_isEVMBytecode, _fileName, _contractName));
     }
 
     function compareStrings(string memory a, string memory b) internal pure returns (bool) {

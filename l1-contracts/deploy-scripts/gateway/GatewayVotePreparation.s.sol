@@ -57,7 +57,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         StateTransitionDeployedAddresses gatewayStateTransition;
         address multicall3;
         bytes diamondCutData;
-        address relayedSLDAValidator;
+        address rollupSLDAValidator;
         address validiumDAValidator;
         address rollupDAManager;
     }
@@ -239,7 +239,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             gatewayStateTransition: expectedGatewayContracts.stateTransition,
             multicall3: expectedGatewayContracts.multicall3,
             diamondCutData: expectedGatewayContracts.diamondCutData,
-            relayedSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator,
+            rollupSLDAValidator: expectedGatewayContracts.daContracts.rollupSLDAValidator,
             validiumDAValidator: expectedGatewayContracts.daContracts.validiumDAValidator,
             rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager
         });
@@ -389,7 +389,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         );
         vm.serializeString("root", "gateway_state_transition", gatewayStateTransition);
         vm.serializeAddress("root", "multicall3_addr", output.multicall3);
-        vm.serializeAddress("root", "relayed_sl_da_validator", output.relayedSLDAValidator);
+        vm.serializeAddress("root", "relayed_sl_da_validator", output.rollupSLDAValidator);
         vm.serializeAddress("root", "validium_da_validator", output.validiumDAValidator);
         vm.serializeBytes("root", "governance_calls_to_execute", abi.encode(governanceCallsToExecute));
         vm.serializeBytes("root", "ecosystem_admin_calls_to_execute", abi.encode(ecosystemAdminCallsToExecute));

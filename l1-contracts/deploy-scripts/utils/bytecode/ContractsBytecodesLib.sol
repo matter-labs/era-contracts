@@ -8,11 +8,11 @@ import {BytecodeUtils as Utils} from "./BytecodeUtils.s.sol";
 ///         Handles special-case filename/contract-name mismatches (e.g. Admin.sol → AdminFacet).
 library ContractsBytecodesLib {
     /// @notice Get L2 deployed bytecode for factory deps.
-    ///         ZKsyncOS: EVM deployed bytecode from out/.
-    ///         Era: ZK creation code from zkout/.
-    function getL2DeployedBytecode(string memory _contractName, bool _isZKsyncOS) internal view returns (bytes memory) {
+    ///         EVM bytecodes: EVM deployed bytecode from out/.
+    ///         ZK bytecodes: ZK creation code from zkout/.
+    function getL2DeployedBytecode(string memory _contractName, bool _isEVMBytecode) internal view returns (bytes memory) {
         string memory fileName = string.concat(_contractName, ".sol");
-        return Utils.readDeployedBytecodeL1(_isZKsyncOS, fileName, _contractName);
+        return Utils.readDeployedBytecodeL1(_isEVMBytecode, fileName, _contractName);
     }
 
     /// @notice Reads the bytecode of the specified contract using a unique identifier.
@@ -30,9 +30,9 @@ library ContractsBytecodesLib {
         }
     }
 
-    /// @notice Reads L2 bytecode: ZKsyncOS chains use EVM bytecodes, Era chains use zkEVM bytecodes.
-    function getL2Bytecode(string memory contractIdentifier, bool isZKsyncOS) internal view returns (bytes memory) {
-        if (isZKsyncOS) {
+    /// @notice Reads L2 bytecode: EVM bytecodes from out/, ZK bytecodes from zkout/.
+    function getL2Bytecode(string memory contractIdentifier, bool isEVMBytecode) internal view returns (bytes memory) {
+        if (isEVMBytecode) {
             return getCreationCodeEVM(contractIdentifier);
         }
         return getCreationCodeEra(contractIdentifier);

@@ -85,7 +85,6 @@ struct CoreDeployedAddresses {
 /// @notice L1-specific DA addresses that extend the shared `DAContracts`.
 struct DataAvailabilityDeployedAddresses {
     DAContracts daContracts;
-    address l1RollupDAValidator;
     address availBridge;
     address availL1DAValidator;
     address l1BlobsDAValidatorZKsyncOS;

@@ -307,7 +307,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {
-            return abi.encode(ctmAddresses.daAddresses.l1RollupDAValidator);
+            return abi.encode(ctmAddresses.daAddresses.daContracts.rollupSLDAValidator);
         } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
             return abi.encode();
         } else if (compareStrings(contractName, "AvailL1DAValidator")) {

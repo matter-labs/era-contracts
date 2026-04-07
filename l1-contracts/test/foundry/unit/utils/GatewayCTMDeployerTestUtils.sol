@@ -59,7 +59,7 @@ library DeployedContractsComparator {
 
     function compareDAContracts(DAContracts memory a, DAContracts memory b) internal pure {
         require(a.rollupDAManager == b.rollupDAManager, "rollupDAManager differs");
-        require(a.relayedSLDAValidator == b.relayedSLDAValidator, "relayedSLDAValidator differs");
+        require(a.rollupSLDAValidator == b.rollupSLDAValidator, "rollupSLDAValidator differs");
         require(a.validiumDAValidator == b.validiumDAValidator, "validiumDAValidator differs");
     }
 
@@ -91,7 +91,7 @@ library GatewayCTMDeployerTestUtils {
         // From DA deployer
         contracts.daContracts.rollupDAManager = results.daResult.rollupDAManager;
         contracts.daContracts.validiumDAValidator = results.daResult.validiumDAValidator;
-        contracts.daContracts.relayedSLDAValidator = results.daResult.relayedSLDAValidator;
+        contracts.daContracts.rollupSLDAValidator = results.daResult.rollupSLDAValidator;
 
         // From ProxyAdmin deployer
         contracts.stateTransition.chainTypeManagerProxyAdmin = results.proxyAdminResult.chainTypeManagerProxyAdmin;

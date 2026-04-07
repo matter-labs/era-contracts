@@ -240,7 +240,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             IZKChain(bridgehub.getZKChain(config.eraChainId))
         );
 
-        ctmDeployedAddresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
+        ctmDeployedAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredEraZkChain.l1DAValidator;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         newConfig.oldProtocolVersion = ctmProtocolVersion;
         require(
@@ -557,7 +557,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
             RollupDAManager.updateDAPair,
-            (gatewayConfig.gatewayDA.relayedSLDAValidator, getRollupL2DACommitmentScheme(), true)
+            (gatewayConfig.gatewayDA.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
         );
 
         calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, gatewayConfig.gatewayDA.rollupDAManager);
@@ -609,7 +609,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         vm.serializeAddress(
             "gateway_state_transition",
             "rollup_l2_da_validator",
-            gatewayConfig.gatewayDA.relayedSLDAValidator
+            gatewayConfig.gatewayDA.rollupSLDAValidator
         );
         vm.serializeAddress(
             "gateway_state_transition",

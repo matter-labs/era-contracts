@@ -375,7 +375,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         if (eraChainAddress != address(0)) {
             // ERA chain exists, discover its addresses
             discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(IZKChain(eraChainAddress));
-            ctmAddresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
+            ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredEraZkChain.l1DAValidator;
         } else {
             // ERA chain doesn't exist yet (fresh deployment), use up-to-date addresses
             console.log("ERA chain not found in bridgehub, using up-to-date addresses");
@@ -804,7 +804,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         //     target: nonDisoverable.rollupDAManager,
         //     data: abi.encodeCall(
         //         RollupDAManager.updateDAPair,
-        //         (ctmAddresses.stateTransition.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true)
+        //         (ctmAddresses.stateTransition.daAddresses.daContracts.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
         //     ),
         //     value: 0
         // });
