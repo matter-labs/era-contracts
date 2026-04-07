@@ -236,7 +236,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @dev send the burn message to the asset
     /// @notice Forwards the burn request for specific asset to respective asset handler.
     /// @param _chainId The chain ID of the ZK chain to which to deposit.
-    /// @param _nextMsgValue The L2 `msg.value` from the L1 -> L2 deposit transaction.
+    /// @param _nextMsgValue The L2 `msg.value` from the deposit or interop transaction.
     /// @param _assetId The deposited asset ID.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _transferData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.
