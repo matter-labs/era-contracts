@@ -34,8 +34,7 @@ import {
 /**
  * 08 - Interop Messages (sendMessage / executeBundle)
  *
- * Ports the interop-b-messages tests from zksync-era to the Anvil multichain
- * harness. Tests InteropCenter.sendMessage() for cross-chain value transfers
+ * Tests InteropCenter.sendMessage() for cross-chain value transfers
  * (base token and ERC20) and verifies that executeBundle on the destination
  * chain delivers the correct balances.
  *
