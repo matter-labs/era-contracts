@@ -477,7 +477,6 @@ jobs:
             l1-contracts/coverage/MERGED_UNTESTED_LINES_REPORT.md
           if-no-files-found: warn
 
-
   # FIXME: restore gas report CI
   # gas-report:
   #   needs: [build, lint]

@@ -273,10 +273,7 @@ export function extractFunctions(
  *
  * @returns Map of qualifiedName -> hit (true/false)
  */
-export function resolveFunctionHits(
-  functions: FunctionInfo[],
-  hitLines: Set<number>
-): Map<string, boolean> {
+export function resolveFunctionHits(functions: FunctionInfo[], hitLines: Set<number>): Map<string, boolean> {
   const result = new Map<string, boolean>();
 
   // Sort by line number to determine function boundaries

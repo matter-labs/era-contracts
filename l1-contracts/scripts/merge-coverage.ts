@@ -121,7 +121,7 @@ function toLcovString(data: LcovData): string {
   const sortedFiles = Array.from(data.files.entries()).sort(([a], [b]) => a.localeCompare(b));
 
   for (const [file, record] of sortedFiles) {
-    output.push(`TN:`);
+    output.push("TN:");
     output.push(`SF:${file}`);
 
     // Emit preserved preamble (FN, FNDA, FNF, FNH, BRDA, BRF, BRH, etc.)

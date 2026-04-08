@@ -11,7 +11,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { providers } from "ethers";
 import { collectChainTraces, mergeTraces } from "./trace-collector";
-import { resolveContracts, resolveByBytecode, type ResolvedContract } from "./artifact-resolver";
+import { resolveContracts, resolveByBytecode } from "./artifact-resolver";
 import {
   loadSourceIdMap,
   loadSourceContents,
@@ -19,17 +19,10 @@ import {
   getExecutableLines,
   extractFunctions,
   resolveFunctionHits,
-  loadContractSourceMap,
-  type SourceIdMap,
-  type ContractSourceMap,
 } from "./source-map-decoder";
-import {
-  generateLcov,
-  writeLcov,
-  generateSummary,
-  filterCoverageFiles,
-  type FileCoverage,
-} from "./lcov-generator";
+import type { ContractSourceMap } from "./source-map-decoder";
+import { generateLcov, writeLcov, generateSummary, filterCoverageFiles } from "./lcov-generator";
+import type { FileCoverage } from "./lcov-generator";
 
 export interface CoverageOptions {
   /** Path to the l1-contracts directory */
@@ -261,11 +254,21 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
   // 9. Optionally generate HTML report
   if (options.html) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { spawnSync } = require("child_process");
       const htmlDir = path.join(coverageDir, "html");
       const result = spawnSync(
         "genhtml",
-        [lcovPath, "-o", htmlDir, "--branch-coverage", "--ignore-errors", "category", "--ignore-errors", "inconsistent"],
+        [
+          lcovPath,
+          "-o",
+          htmlDir,
+          "--branch-coverage",
+          "--ignore-errors",
+          "category",
+          "--ignore-errors",
+          "inconsistent",
+        ],
         { stdio: "inherit" }
       );
       if (result.status === 0) {

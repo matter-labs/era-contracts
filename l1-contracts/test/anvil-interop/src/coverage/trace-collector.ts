@@ -143,7 +143,9 @@ export async function collectChainTraces(rpcUrl: string, label: string): Promise
     }
   }
 
-  console.log(`  📊 ${label}: traced ${totalTxs} transactions, ${totalOps} opcodes across ${contractPCs.size} contracts`);
+  console.log(
+    `  📊 ${label}: traced ${totalTxs} transactions, ${totalOps} opcodes across ${contractPCs.size} contracts`
+  );
   return contractPCs;
 }
 

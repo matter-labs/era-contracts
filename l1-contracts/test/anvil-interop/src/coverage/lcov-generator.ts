@@ -12,7 +12,6 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import type { FunctionInfo } from "./source-map-decoder";
 
 export interface FileCoverage {
   /** Source file path (relative to project root) */

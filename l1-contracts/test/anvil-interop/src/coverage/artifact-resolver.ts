@@ -235,7 +235,9 @@ export async function resolveContracts(
         // which shares the same instruction layout as the artifact.
         resolved.push({ address: implAddr, name: sourceMap.name + " (impl)", artifactPath, sourceMap });
         resolvedAddresses.add(implAddr);
-        console.log(`    🔗 ${fieldName}: proxy ${addrLower.slice(0, 10)}... -> impl ${implAddr.slice(0, 10)}... (${sourceMap.name})`);
+        console.log(
+          `    🔗 ${fieldName}: proxy ${addrLower.slice(0, 10)}... -> impl ${implAddr.slice(0, 10)}... (${sourceMap.name})`
+        );
       }
     }
   }

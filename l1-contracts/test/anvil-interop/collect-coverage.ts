@@ -39,6 +39,7 @@ async function main(): Promise<void> {
   };
 
   // Verify prerequisites
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const fs = require("fs");
   if (!fs.existsSync(options.outDir)) {
     console.error("❌ Forge output directory not found. Run 'forge build' first.");
