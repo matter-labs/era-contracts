@@ -23,7 +23,7 @@ contract GettersFacetTest is MigrationTestBase {
     ILegacyGetters internal legacyGettersFacet;
 
     function setUp() public virtual override {
-        super.setUp();
+        _deployIntegrationBase();
         gettersFacet = IGetters(chainAddress);
         gettersFacetWrapper = UtilsFacet(chainAddress);
         legacyGettersFacet = ILegacyGetters(chainAddress);

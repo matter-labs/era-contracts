@@ -14,7 +14,7 @@ contract MigratorTest is MigrationTestBase {
     address internal testnetVerifier;
 
     function setUp() public virtual override {
-        super.setUp();
+        _deployIntegrationBase();
         migratorFacet = IMigrator(chainAddress);
         gettersFacet = IGetters(chainAddress);
         // Point dummyBridgehub to the real bridgehub address so mockCall targets work correctly.

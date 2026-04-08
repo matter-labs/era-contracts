@@ -50,7 +50,7 @@ contract ZKChainBaseTest is MigrationTestBase {
     }
 
     function setUp() public virtual override {
-        super.setUp();
+        _deployIntegrationBase();
         dummyBridgehub = new DummyBridgehub();
 
         // Add TestBaseFacet to the deployed chain for testing modifiers

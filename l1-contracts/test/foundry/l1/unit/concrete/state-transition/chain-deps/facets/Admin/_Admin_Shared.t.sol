@@ -17,7 +17,7 @@ contract AdminTest is MigrationTestBase {
     address internal testnetVerifier;
 
     function setUp() public virtual override {
-        super.setUp();
+        _deployIntegrationBase();
         adminFacet = IAdmin(chainAddress);
         // Create a standalone DummyBridgehub for tests that need to prank as it.
         // It is not wired into the integration deployment; its address is only used for prank targets.

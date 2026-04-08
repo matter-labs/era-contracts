@@ -14,16 +14,29 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
-/// @notice Shared base for migrated unit tests running in integration context.
-/// Deploys full L1 ecosystem + ZK chain + UtilsFacet in setUp().
-/// Child contracts call super.setUp() and add their own bindings.
+/// @notice Shared base for integration-style unit tests.
+///
+/// Provides access to the full integration deployer infrastructure
+/// (L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker)
+/// and helper methods like _addUtilsFacet() and _deployIntegrationBase().
+///
+/// setUp() is intentionally a no-op. Child contracts that need the full
+/// L1 ecosystem call _deployIntegrationBase() in their own setUp().
+/// This avoids deploying ~50 contracts per test contract when most tests
+/// only need lightweight setups, which is critical for forge coverage
+/// performance.
 contract MigrationTestBase is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     UtilsFacet internal utilsFacet;
 
     uint256 internal testChainId;
     address internal chainAddress;
 
-    function setUp() public virtual {
+    /// @dev No-op by default. Child shared bases that need the ecosystem
+    /// call _deployIntegrationBase() explicitly.
+    function setUp() public virtual {}
+
+    /// @dev Deploys the full L1 ecosystem, ZK chains, and adds UtilsFacet.
+    function _deployIntegrationBase() internal {
         _deployL1Contracts();
         _deployTokens();
         _registerNewTokens(tokens);
@@ -33,13 +46,11 @@ contract MigrationTestBase is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         testChainId = zkChainIds[zkChainIds.length - 1];
         chainAddress = getZKChainAddress(testChainId);
 
-        // Add UtilsFacet to the deployed chain so tests can manipulate storage
         _addUtilsFacet(chainAddress);
 
-        // Warp time forward to clear any deployment-induced cooldowns (token multiplier, fee params).
+        // Clear deployment-induced cooldowns (token multiplier, fee params).
         vm.warp(block.timestamp + 2 days);
 
-        // Bind UtilsFacet to the chain's diamond proxy
         utilsFacet = UtilsFacet(chainAddress);
     }
 

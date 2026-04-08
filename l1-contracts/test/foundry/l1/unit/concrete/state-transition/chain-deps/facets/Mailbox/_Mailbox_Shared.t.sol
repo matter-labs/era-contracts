@@ -29,7 +29,7 @@ contract MailboxTest is MigrationTestBase {
     /// @dev MigrationTestBase.setUp() deploys the full ecosystem.
     /// This override adds Mailbox-specific bindings on top.
     function setUp() public virtual override {
-        super.setUp();
+        _deployIntegrationBase();
         setupDiamondProxy();
     }
 
