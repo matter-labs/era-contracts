@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../utils/Utils.sol";
+import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
@@ -313,15 +314,15 @@ library SystemContractsProcessing {
         SystemContract[] memory systemContracts = getSystemContracts();
         for (uint256 i = 0; i < SYSTEM_CONTRACTS_COUNT; i++) {
             if (systemContracts[i].isPrecompile) {
-                result[i] = Utils.readPrecompileBytecode(systemContracts[i].codeName);
+                result[i] = BytecodeUtils.readPrecompileBytecode(systemContracts[i].codeName);
             } else {
                 // L2BaseToken is now in l1-contracts as L2BaseTokenEra
                 if (Utils.compareStrings(systemContracts[i].codeName, "L2BaseToken")) {
-                    result[i] = Utils.readZKFoundryBytecodeL1("L2BaseTokenEra.sol", "L2BaseTokenEra");
+                    result[i] = BytecodeUtils.readBytecodeL1(false, "L2BaseTokenEra.sol", "L2BaseTokenEra");
                 } else if (systemContracts[i].lang == Language.Solidity) {
-                    result[i] = Utils.readSystemContractsBytecode(systemContracts[i].codeName);
+                    result[i] = BytecodeUtils.readSystemContractsBytecode(systemContracts[i].codeName);
                 } else {
-                    result[i] = Utils.readSystemContractsYulBytecode(systemContracts[i].codeName);
+                    result[i] = BytecodeUtils.readSystemContractsYulBytecode(systemContracts[i].codeName);
                 }
             }
         }
@@ -350,15 +351,15 @@ library SystemContractsProcessing {
     function getOtherContractsBytecodes() internal view returns (bytes[] memory result) {
         result = new bytes[](OTHER_BUILT_IN_CONTRACTS_COUNT);
 
-        result[0] = ContractsBytecodesLib.getCreationCode("L2Bridgehub");
-        result[1] = ContractsBytecodesLib.getCreationCode("L2AssetRouter");
-        result[2] = ContractsBytecodesLib.getCreationCode("L2NativeTokenVault");
-        result[3] = ContractsBytecodesLib.getCreationCode("L2MessageRoot");
-        result[4] = ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken");
-        result[5] = ContractsBytecodesLib.getCreationCode("L2MessageVerification");
-        result[6] = ContractsBytecodesLib.getCreationCode("L2ChainAssetHandler");
-        result[7] = ContractsBytecodesLib.getCreationCode("L2InteropRootStorage");
-        result[8] = ContractsBytecodesLib.getCreationCode("BaseTokenHolder");
+        result[0] = ContractsBytecodesLib.getCreationCodeEra("L2Bridgehub");
+        result[1] = ContractsBytecodesLib.getCreationCodeEra("L2AssetRouter");
+        result[2] = ContractsBytecodesLib.getCreationCodeEra("L2NativeTokenVault");
+        result[3] = ContractsBytecodesLib.getCreationCodeEra("L2MessageRoot");
+        result[4] = ContractsBytecodesLib.getCreationCodeEra("L2WrappedBaseToken");
+        result[5] = ContractsBytecodesLib.getCreationCodeEra("L2MessageVerification");
+        result[6] = ContractsBytecodesLib.getCreationCodeEra("L2ChainAssetHandler");
+        result[7] = ContractsBytecodesLib.getCreationCodeEra("L2InteropRootStorage");
+        result[8] = ContractsBytecodesLib.getCreationCodeEra("BaseTokenHolder");
     }
 
     /// Note, that while proper initialization may require multiple steps,
@@ -503,7 +504,7 @@ library SystemContractsProcessing {
         // since the server will rely on it.
         bytes[] memory basicBytecodes = new bytes[](3);
         basicBytecodes[0] = Utils.getBatchBootloaderBytecodeHash();
-        basicBytecodes[1] = Utils.readSystemContractsBytecode("DefaultAccount");
+        basicBytecodes[1] = BytecodeUtils.readSystemContractsBytecode("DefaultAccount");
         basicBytecodes[2] = Utils.getEvmEmulatorBytecodeHash();
 
         bytes[] memory systemBytecodes = getSystemContractsBytecodes();

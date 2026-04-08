@@ -29,28 +29,22 @@ import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 
 import {Utils} from "../../utils/Utils.sol";
 import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
-import {FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {PublishFactoryDepsResult} from "../default-upgrade/CTMUpgradeBase.sol";
+import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.sol";
 
+// FIXME: consider deleting this script, it is not used.
 /// @notice Script used for v31 gateway upgrade flow
 contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
     /// @dev Prepared in getProposedUpgrade, consumed in getL2UpgradeTargetAndData (which must be view).
     bytes internal l2V29UpgradeBytecodeInfo;
 
-    function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
+    function getForceDeploymentContracts() internal override returns (CoreContract[] memory forceDeploymentContracts) {
         if (config.isZKsyncOS) {
-            return new string[](0);
+            return new CoreContract[](0);
         }
-        forceDeploymentNames = new string[](1);
-        forceDeploymentNames[0] = "L2V29Upgrade";
-    }
-
-    function getExpectedL2Address(string memory contractName) public override returns (address) {
-        if (compareStrings(contractName, "L2V29Upgrade")) {
-            return address(L2_VERSION_SPECIFIC_UPGRADER_ADDR);
-        }
-
-        return super.getExpectedL2Address(contractName);
+        forceDeploymentContracts = new CoreContract[](1);
+        forceDeploymentContracts[0] = CoreContract.L2V29Upgrade;
     }
 
     function getProposedUpgrade(
@@ -58,7 +52,7 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
         ChainCreationParamsConfig memory chainCreationParams,
         uint256,
         address,
-        FactoryDepsResult memory _factoryDepsResult,
+        PublishFactoryDepsResult memory _factoryDepsResult,
         uint256 protocolUpgradeNonce
     ) public virtual override returns (ProposedUpgrade memory proposedUpgrade) {
         if (!config.isZKsyncOS) {

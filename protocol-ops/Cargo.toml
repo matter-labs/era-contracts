@@ -44,3 +44,6 @@ toml = "0.8.12"
 url = { version = "2.5.0", features = ["serde"] }
 walkdir = "2.4.0"
 xshell = "0.2.6"
+
+[profile.release]
+strip = true

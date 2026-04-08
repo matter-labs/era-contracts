@@ -2,7 +2,13 @@
 pragma solidity ^0.8.10;
 
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
-import {Facets, Verifiers} from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
+import {
+    Facets,
+    Verifiers,
+    StateTransitionContracts,
+    StateTransitionDeployedAddresses,
+    DAContracts
+} from "contracts/common/StateTransitionTypes.sol";
 
 struct BridgehubContracts {
     address bridgehub;
@@ -76,35 +82,18 @@ struct CoreDeployedAddresses {
     L1CoreAdminAddresses shared;
 }
 
+/// @notice L1-specific DA addresses that extend the shared `DAContracts`.
 struct DataAvailabilityDeployedAddresses {
-    address rollupDAManager;
-    address l1RollupDAValidator;
-    address noDAValidiumL1DAValidator;
+    DAContracts daContracts;
     address availBridge;
     address availL1DAValidator;
     address l1BlobsDAValidatorZKsyncOS;
 }
 
-struct StateTransitionContracts {
-    address chainTypeManager;
-    address serverNotifier;
-    address validatorTimelock;
-    address bytecodesSupplier;
-    address permissionlessValidator;
-}
-
-// solhint-disable-next-line gas-struct-packing
-struct StateTransitionDeployedAddresses {
-    StateTransitionContracts proxies;
-    StateTransitionContracts implementations;
-    Verifiers verifiers;
-    Facets facets;
-    address genesisUpgrade;
-    address defaultUpgrade;
+/// @notice L1-specific state transition addresses that are not used in the Gateway context.
+struct L1SpecificStateTransitionAddresses {
     address legacyValidatorTimelock;
     address eraDiamondProxy;
-    address rollupDAManager;
-    address rollupSLDAValidator;
 }
 
 struct CTMAdminAddresses {
@@ -118,6 +107,7 @@ struct CTMAdminAddresses {
 
 struct CTMDeployedAddresses {
     StateTransitionDeployedAddresses stateTransition;
+    L1SpecificStateTransitionAddresses l1Specific;
     DataAvailabilityDeployedAddresses daAddresses;
     CTMAdminAddresses admin;
     address chainAdmin;

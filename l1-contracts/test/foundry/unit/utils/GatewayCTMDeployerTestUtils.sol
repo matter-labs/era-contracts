@@ -2,15 +2,13 @@
 
 pragma solidity ^0.8.20;
 
+import {Facets, Verifiers, StateTransitionDeployedAddresses} from "contracts/common/StateTransitionTypes.sol";
+
+import {DAContracts} from "contracts/common/StateTransitionTypes.sol";
 import {
-    DAContracts,
     DeployedContracts,
-    Facets,
-    StateTransitionContracts,
-    DAContracts,
     GatewayProxyAdminDeployerResult,
     GatewayValidatorTimelockDeployerResult,
-    Verifiers,
     GatewayCTMFinalResult
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";
 
@@ -27,14 +25,14 @@ struct AllDeployerResults {
 library DeployedContractsComparator {
     function compareDeployedContracts(DeployedContracts memory a, DeployedContracts memory b) internal pure {
         require(a.multicall3 == b.multicall3, "multicall3 differs");
-        compareStateTransitionContracts(a.stateTransition, b.stateTransition);
+        compareStateTransitionDeployedAddresses(a.stateTransition, b.stateTransition);
         compareDAContracts(a.daContracts, b.daContracts);
         compareBytes(a.diamondCutData, b.diamondCutData, "diamondCutData");
     }
 
-    function compareStateTransitionContracts(
-        StateTransitionContracts memory a,
-        StateTransitionContracts memory b
+    function compareStateTransitionDeployedAddresses(
+        StateTransitionDeployedAddresses memory a,
+        StateTransitionDeployedAddresses memory b
     ) internal pure {
         require(a.verifiers.verifier == b.verifiers.verifier, "verifier differs");
         require(a.verifiers.verifierFflonk == b.verifiers.verifierFflonk, "verifierFflonk differs");
@@ -42,26 +40,26 @@ library DeployedContractsComparator {
         compareFacets(a.facets, b.facets);
         require(a.genesisUpgrade == b.genesisUpgrade, "genesisUpgrade differs");
         require(
-            a.validatorTimelockImplementation == b.validatorTimelockImplementation,
+            a.implementations.validatorTimelock == b.implementations.validatorTimelock,
             "validatorTimelockImplementation differs"
         );
-        require(a.validatorTimelockProxy == b.validatorTimelockProxy, "validatorTimelockProxy differs");
+        require(a.proxies.validatorTimelock == b.proxies.validatorTimelock, "validatorTimelockProxy differs");
         require(a.chainTypeManagerProxyAdmin == b.chainTypeManagerProxyAdmin, "chainTypeManagerProxyAdmin differs");
         require(
-            a.serverNotifierImplementation == b.serverNotifierImplementation,
+            a.implementations.serverNotifier == b.implementations.serverNotifier,
             "serverNotifierImplementation differs"
         );
-        require(a.serverNotifierProxy == b.serverNotifierProxy, "serverNotifier proxy differs");
-        require(a.chainTypeManagerProxy == b.chainTypeManagerProxy, "chainTypeManagerProxy differs");
+        require(a.proxies.serverNotifier == b.proxies.serverNotifier, "serverNotifier proxy differs");
+        require(a.proxies.chainTypeManager == b.proxies.chainTypeManager, "chainTypeManagerProxy differs");
         require(
-            a.chainTypeManagerImplementation == b.chainTypeManagerImplementation,
+            a.implementations.chainTypeManager == b.implementations.chainTypeManager,
             "chainTypeManagerImplementation differs"
         );
     }
 
     function compareDAContracts(DAContracts memory a, DAContracts memory b) internal pure {
         require(a.rollupDAManager == b.rollupDAManager, "rollupDAManager differs");
-        require(a.relayedSLDAValidator == b.relayedSLDAValidator, "relayedSLDAValidator differs");
+        require(a.rollupSLDAValidator == b.rollupSLDAValidator, "rollupSLDAValidator differs");
         require(a.validiumDAValidator == b.validiumDAValidator, "validiumDAValidator differs");
     }
 
@@ -93,25 +91,25 @@ library GatewayCTMDeployerTestUtils {
         // From DA deployer
         contracts.daContracts.rollupDAManager = results.daResult.rollupDAManager;
         contracts.daContracts.validiumDAValidator = results.daResult.validiumDAValidator;
-        contracts.daContracts.relayedSLDAValidator = results.daResult.relayedSLDAValidator;
+        contracts.daContracts.rollupSLDAValidator = results.daResult.rollupSLDAValidator;
 
         // From ProxyAdmin deployer
         contracts.stateTransition.chainTypeManagerProxyAdmin = results.proxyAdminResult.chainTypeManagerProxyAdmin;
 
         // From ValidatorTimelock deployer
-        contracts.stateTransition.validatorTimelockImplementation = results
+        contracts.stateTransition.implementations.validatorTimelock = results
             .validatorTimelockResult
             .validatorTimelockImplementation;
-        contracts.stateTransition.validatorTimelockProxy = results.validatorTimelockResult.validatorTimelockProxy;
+        contracts.stateTransition.proxies.validatorTimelock = results.validatorTimelockResult.validatorTimelockProxy;
 
         // From Verifiers deployer
         contracts.stateTransition.verifiers = results.verifiersResult;
 
         // From CTM deployer
-        contracts.stateTransition.serverNotifierImplementation = results.ctmResult.serverNotifierImplementation;
-        contracts.stateTransition.serverNotifierProxy = results.ctmResult.serverNotifierProxy;
-        contracts.stateTransition.chainTypeManagerImplementation = results.ctmResult.chainTypeManagerImplementation;
-        contracts.stateTransition.chainTypeManagerProxy = results.ctmResult.chainTypeManagerProxy;
+        contracts.stateTransition.implementations.serverNotifier = results.ctmResult.serverNotifierImplementation;
+        contracts.stateTransition.proxies.serverNotifier = results.ctmResult.serverNotifierProxy;
+        contracts.stateTransition.implementations.chainTypeManager = results.ctmResult.chainTypeManagerImplementation;
+        contracts.stateTransition.proxies.chainTypeManager = results.ctmResult.chainTypeManagerProxy;
         contracts.diamondCutData = results.ctmResult.diamondCutData;
 
         // Direct deployments - use calculated addresses since they're deployed directly in scripts

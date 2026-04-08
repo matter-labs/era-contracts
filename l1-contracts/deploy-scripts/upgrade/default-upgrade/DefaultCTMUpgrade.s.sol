@@ -10,37 +10,31 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "../../utils/Utils.sol";
-import {
-    StateTransitionDeployedAddresses,
-    ChainCreationParamsConfig,
-    StateTransitionDeployedAddresses,
-    StateTransitionDeployedAddresses,
-    ZkChainAddresses
-} from "../../utils/Types.sol";
+import {StateTransitionDeployedAddresses, ChainCreationParamsConfig, ZkChainAddresses} from "../../utils/Types.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ContractsBytecodesLib} from "../../utils/bytecode/ContractsBytecodesLib.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
-import {EraZkosRouter, EraZkosContract, FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
 
-import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
+import {Utils} from "../../utils/Utils.sol";
+import {BytecodePublisher, PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+import {CoreContract} from "../../ecosystem/CoreContract.sol";
+import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -118,7 +112,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     ZkChainAddresses internal upToDateZkChain;
     L1Bridgehub internal bridgehub;
 
-    FactoryDepsResult internal factoryDepsResult;
+    PublishFactoryDepsResult internal factoryDepsResult;
 
     function initializeWithArgs(
         address ctmProxy,
@@ -178,6 +172,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
             ctmAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
+        // FIXME: need to provide the params as the input for the function, since
+        // on mainnet testnetVerifier must be false. Right now the introspection is not available
+        // due to the previous version being v29.
         // TODO: restore introspection when L1 state is regenerated with ZKsyncOSTestnetVerifier.IS_TESTNET_VERIFIER
         // (bool ok, bytes memory data) = ctmAddresses.stateTransition.verifiers.verifier.staticcall(
         //     abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
@@ -207,7 +204,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         // Set config.isZKsyncOS before getChainCreationParamsConfig.
         config.isZKsyncOS = isZKsyncOS;
         ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
-            EraZkosRouter.genesisConfigPath(isZKsyncOS)
+            Utils.genesisConfigPath(isZKsyncOS)
         );
 
         // Optional override for v29 introspection selection
@@ -224,7 +221,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         }
 
         if (rollupDAManager != address(0)) {
-            ctmAddresses.stateTransition.rollupDAManager = rollupDAManager;
+            ctmAddresses.daAddresses.daContracts.rollupDAManager = rollupDAManager;
         }
     }
 
@@ -282,10 +279,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function generateUpgradeCutDataFromLocalConfig(
-        StateTransitionDeployedAddresses memory stateTransition
+        StateTransitionDeployedAddresses memory _stateTransition
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         upgradeCutData = generateUpgradeCutData(
-            stateTransition,
+            _stateTransition,
             config.contracts.chainCreationParams,
             config.l1ChainId,
             config.ownerAddress,
@@ -378,7 +375,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         if (eraChainAddress != address(0)) {
             // ERA chain exists, discover its addresses
             discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(IZKChain(eraChainAddress));
-            ctmAddresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
+            ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredEraZkChain.l1DAValidator;
         } else {
             // ERA chain doesn't exist yet (fresh deployment), use up-to-date addresses
             console.log("ERA chain not found in bridgehub, using up-to-date addresses");
@@ -402,25 +399,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
 
-    function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
-        bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
-
-        string[] memory additionalForceDeployments = getAdditionalDependenciesNames();
-
-        bytes[] memory additionalDependencies = new bytes[](4 + additionalForceDeployments.length); // Deps after Gateway upgrade
-        additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
-        additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-        additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
-        additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ProxyAdmin");
-
-        for (uint256 i; i < additionalForceDeployments.length; i++) {
-            additionalDependencies[4 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
-        }
-
-        factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, additionalDependencies);
-        factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
-    }
-
     function prepareFixedForceDeploymentsData() public virtual returns (FixedForceDeploymentsData memory data) {
         require(config.ownerAddress != address(0), "owner not set");
 
@@ -429,31 +407,43 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             eraChainId: config.eraChainId,
             gatewayChainId: config.gatewayChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: EraZkosRouter.getBytecodeHash(config.isZKsyncOS, EraZkosContract.BeaconProxy),
+            l2TokenProxyBytecodeHash: CoreOnGatewayHelper.getDeployedBytecodeHash(
+                config.isZKsyncOS,
+                CoreContract.BeaconProxy
+            ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2Bridgehub),
-            l2AssetRouterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2AssetRouter),
-            l2NtvBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2NativeTokenVault),
-            messageRootBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2MessageRoot),
-            chainAssetHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(
+            bridgehubBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2Bridgehub),
+            l2AssetRouterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
                 config.isZKsyncOS,
-                EraZkosContract.L2ChainAssetHandler
+                CoreContract.L2AssetRouter
             ),
-            beaconDeployerInfo: EraZkosRouter.getBytecodeInfo(
+            l2NtvBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2NativeTokenVault),
+            messageRootBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2MessageRoot),
+            chainAssetHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
                 config.isZKsyncOS,
-                EraZkosContract.UpgradeableBeaconDeployer
+                CoreContract.L2ChainAssetHandler
             ),
-            baseTokenHolderBytecodeInfo: EraZkosRouter.getBytecodeInfo(
+            beaconDeployerInfo: CoreOnGatewayHelper.getBytecodeInfo(
                 config.isZKsyncOS,
-                EraZkosContract.BaseTokenHolder
+                CoreContract.UpgradeableBeaconDeployer
             ),
-            interopCenterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.InteropCenter),
-            interopHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(
+            baseTokenHolderBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
                 config.isZKsyncOS,
-                EraZkosContract.InteropHandler
+                CoreContract.BaseTokenHolder
             ),
-            assetTrackerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2AssetTracker),
+            interopCenterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
+                config.isZKsyncOS,
+                CoreContract.InteropCenter
+            ),
+            interopHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
+                config.isZKsyncOS,
+                CoreContract.InteropHandler
+            ),
+            assetTrackerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
+                config.isZKsyncOS,
+                CoreContract.L2AssetTracker
+            ),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
@@ -479,10 +469,13 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function publishBytecodes() public virtual {
-        bytes[] memory allDeps = getFullListOfFactoryDependencies();
+        bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
+            config.isZKsyncOS,
+            getAdditionalDependencyContracts()
+        );
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
-        FactoryDepsResult memory result = EraZkosRouter.publishAndProcessFactoryDeps(
+        PublishFactoryDepsResult memory result = BytecodePublisher.publishAndProcessFactoryDeps(
             config.isZKsyncOS,
             supplier,
             allDeps
@@ -811,7 +804,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         //     target: nonDisoverable.rollupDAManager,
         //     data: abi.encodeCall(
         //         RollupDAManager.updateDAPair,
-        //         (ctmAddresses.stateTransition.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true)
+        //         (ctmAddresses.stateTransition.daAddresses.daContracts.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
         //     ),
         //     value: 0
         // });
@@ -849,38 +842,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         admin = getBridgehubAdmin();
         calls = new Call[](1);
         calls[0] = prepareCreateNewChainCall(555)[0];
-    }
-
-    function getForceDeployment(
-        string memory contractName
-    ) public virtual override returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
-        bytes32 bytecodeHash = EraZkosRouter.getForceDeploymentBytecodeHash(config.isZKsyncOS, contractName);
-        return
-            IL2ContractDeployer.ForceDeployment({
-                bytecodeHash: bytecodeHash,
-                newAddress: getExpectedL2Address(contractName),
-                callConstructor: false,
-                value: 0,
-                input: ""
-            });
-    }
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        if (!isZKBytecode) {
-            if (compareStrings(contractName, "DiamondProxy")) {
-                return type(DiamondProxy).creationCode;
-            } else if (compareStrings(contractName, "DefaultUpgrade")) {
-                return type(DefaultUpgrade).creationCode;
-            } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
-                return type(GovernanceUpgradeTimer).creationCode;
-            } else if (compareStrings(contractName, "UpgradeStageValidator")) {
-                return type(UpgradeStageValidator).creationCode;
-            }
-        }
-        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function deployUpgradeStageValidator() internal {
@@ -968,7 +929,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         );
         vm.serializeAddress("deployed_addresses", "rollup_l1_da_validator_addr", discoveredEraZkChain.l1DAValidator);
         vm.serializeAddress("deployed_addresses", "validium_l1_da_validator_addr", address(0));
-        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", ctmAddresses.stateTransition.rollupDAManager);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "l1_rollup_da_manager",
+            ctmAddresses.daAddresses.daContracts.rollupDAManager
+        );
         vm.serializeAddress("deployed_addresses", "upgrade_stage_validator", upgradeAddresses.upgradeStageValidator);
 
         string memory deployedAddresses = vm.serializeAddress(

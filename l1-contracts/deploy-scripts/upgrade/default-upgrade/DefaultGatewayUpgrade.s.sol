@@ -10,12 +10,15 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Utils} from "../../utils/Utils.sol";
+import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {
     StateTransitionDeployedAddresses,
     ChainCreationParamsConfig,
     StateTransitionDeployedAddresses,
-    ZkChainAddresses
+    ZkChainAddresses,
+    L1SpecificStateTransitionAddresses
 } from "../../utils/Types.sol";
+import {DAContracts} from "contracts/common/StateTransitionTypes.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -42,9 +45,13 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
-import {EraZkosContract, EraZkosRouter, FactoryDepsResult} from "../../utils/EraZkosRouter.sol";
+import {PublishFactoryDepsResult} from "./CTMUpgradeBase.sol";
+import {Utils} from "../../utils/Utils.sol";
+import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
+// FIXME: consider deleting this file it is not used.
+// FIXME: if it is used however, it is not compatible with zksync os as it uses era bytecodes directly.
 /// @notice Script used for default CTM on gateway upgrade flow, should be run after L1 CTM upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
 contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
@@ -70,6 +77,8 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     // solhint-disable-next-line gas-struct-packing
     struct Gateway {
         StateTransitionDeployedAddresses gatewayStateTransition;
+        L1SpecificStateTransitionAddresses gatewayL1Specific;
+        DAContracts gatewayDA;
         address gatewayTransparentProxyAdmin;
         bytes facetCutsData;
         uint256 chainId;
@@ -90,7 +99,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     CTMDeployedAddresses internal ctmDeployedAddresses;
 
     // TODO We need for composing upgrade transaction. but seems we don't need an upgrade transaction on gateway
-    FactoryDepsResult internal factoryDepsResult;
+    PublishFactoryDepsResult internal factoryDepsResult;
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
@@ -111,7 +120,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         initializeConfig(
             _create2FactorySalt,
             _isZKsyncOS,
-            getChainCreationParamsConfig(EraZkosRouter.genesisConfigPath(_isZKsyncOS)),
+            getChainCreationParamsConfig(Utils.genesisConfigPath(_isZKsyncOS)),
             _eraChainId,
             _priorityTxsL2GasLimit,
             _maxExpectedL1GasPrice,
@@ -231,7 +240,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             IZKChain(bridgehub.getZKChain(config.eraChainId))
         );
 
-        ctmDeployedAddresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
+        ctmDeployedAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredEraZkChain.l1DAValidator;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         newConfig.oldProtocolVersion = ctmProtocolVersion;
         require(
@@ -363,9 +372,9 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
-        (, string memory gwCtmContractName) = EraZkosRouter.resolve(
+        (, string memory gwCtmContractName) = DeployCTML1OrGateway.resolve(
             config.isZKsyncOS,
-            EraZkosContract.ChainTypeManager
+            CTMContract.ChainTypeManager
         );
         gatewayConfig.gatewayStateTransition.implementations.chainTypeManager = deployGWContract(gwCtmContractName);
 
@@ -548,15 +557,10 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
             RollupDAManager.updateDAPair,
-            (gatewayConfig.gatewayStateTransition.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
+            (gatewayConfig.gatewayDA.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
         );
 
-        calls = _prepareL1ToGatewayCall(
-            l2Calldata,
-            l2GasLimit,
-            l1GasPrice,
-            gatewayConfig.gatewayStateTransition.rollupDAManager
-        );
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, gatewayConfig.gatewayDA.rollupDAManager);
     }
 
     function getAddresses() public view virtual override returns (CTMDeployedAddresses memory) {
@@ -569,15 +573,15 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     ) internal view virtual override returns (bytes memory) {
         require(isZKBytecode, "Only ZK bytecodes is not supported in Gateway upgrade");
         if (compareStrings(contractName, "DefaultUpgrade")) {
-            return Utils.readZKFoundryBytecodeL1("DefaultUpgrade.sol", "DefaultUpgrade");
+            return BytecodeUtils.readBytecodeL1(false, "DefaultUpgrade.sol", "DefaultUpgrade");
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
-            return Utils.readZKFoundryBytecodeL1("BytecodesSupplier.sol", "BytecodesSupplier");
+            return BytecodeUtils.readBytecodeL1(false, "BytecodesSupplier.sol", "BytecodesSupplier");
         } else if (compareStrings(contractName, "TransitionaryOwner")) {
-            return Utils.readZKFoundryBytecodeL1("TransitionaryOwner.sol", "TransitionaryOwner");
+            return BytecodeUtils.readBytecodeL1(false, "TransitionaryOwner.sol", "TransitionaryOwner");
         } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
-            return ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
+            return ContractsBytecodesLib.getCreationCodeEra("L2SharedBridgeLegacy");
         } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            return ContractsBytecodesLib.getCreationCode("ValidatorTimelock");
+            return ContractsBytecodesLib.getCreationCodeEra("ValidatorTimelock");
         }
         return super.getCreationCode(contractName, isZKBytecode);
     }
@@ -601,15 +605,11 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             "chain_type_manager_proxy_admin",
             gatewayConfig.gatewayTransparentProxyAdmin
         );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "rollup_da_manager",
-            gatewayConfig.gatewayStateTransition.rollupDAManager
-        );
+        vm.serializeAddress("gateway_state_transition", "rollup_da_manager", gatewayConfig.gatewayDA.rollupDAManager);
         vm.serializeAddress(
             "gateway_state_transition",
             "rollup_l2_da_validator",
-            gatewayConfig.gatewayStateTransition.rollupSLDAValidator
+            gatewayConfig.gatewayDA.rollupSLDAValidator
         );
         vm.serializeAddress(
             "gateway_state_transition",

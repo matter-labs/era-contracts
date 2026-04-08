@@ -23,10 +23,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IRollupDAManager} from "../interfaces/IRollupDAManager.sol";
 import {L2LegacySharedBridgeTestHelper} from "../dev/L2LegacySharedBridgeTestHelper.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-// EraZkosVerifierLifecycle is used directly (not through EraZkosRouter) for
-// msg.sender-sensitive operations like initializeVerifier and transferVerifierOwnership,
-// because routing through the EraZkosRouter contract would change msg.sender.
-import {EraZkosVerifierLifecycle} from "../utils/vm/EraZkosVerifierLifecycle.sol";
+import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
@@ -50,14 +47,25 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {CTMDeployedAddresses, Config, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
-import {EraZkosContract, EraZkosRouter} from "../utils/EraZkosRouter.sol";
+import {CoreContract} from "../ecosystem/CoreContract.sol";
+import {CTMContract, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {IDeployCTM} from "contracts/script-interfaces/IDeployCTM.sol";
+import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
+import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 
 contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
+
+    /// @dev Cache for batched blake2s hashing (keccak256(bytecode) => blake2s(bytecode)).
+    /// ZKsyncOS bytecode info requires blake2s hashes, computed via FFI (`yarn ts-node blake2s256.ts`).
+    /// Without caching, each call to `Utils.getZKOSProxyUpgradeBytecodeInfo` spawns 2 FFI processes
+    /// (one for the impl, one for SystemContractProxy). With ~10 contracts in `_buildForceDeploymentsData`,
+    /// that's ~20 sequential FFI calls. The cache batches all bytecodes into a single FFI call in
+    /// `_precomputeBlakeHashes()`, reducing deployment time significantly.
+    mapping(bytes32 => bytes32) private _blakeCache;
 
     function run() public virtual {
         // Had to leave the function due to scripts that inherit this one, as well as for tests
@@ -67,6 +75,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     function runWithBridgehub(address bridgehub, bool reuseGovAndAdmin) public {
         console.log("Deploying CTM related contracts");
         runInner(
+            "/script-config/permanent-values.toml",
             "/script-config/config-deploy-ctm.toml",
             "/script-out/output-deploy-ctm.toml",
             bridgehub,
@@ -89,6 +98,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             saveDiamondSelectors();
         }
         runInner(
+            vm.envString("PERMANENT_VALUES_INPUT"),
             vm.envString("CTM_CONFIG"),
             vm.envString("CTM_OUTPUT"),
             bridgehub,
@@ -111,6 +121,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function runInner(
+        string memory permanentValuesInputPath,
         string memory inputPath,
         string memory outputPath,
         address bridgehub,
@@ -118,10 +129,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         bool skipL1Deployments
     ) internal {
         string memory root = vm.projectRoot();
+        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
 
-        initializeConfig(inputPath, bridgehub);
+        initializeConfig(inputPath, permanentValuesInputPath, bridgehub);
 
         console.log("Initializing core contracts from BH");
         IL1Bridgehub bridgehubProxy = IL1Bridgehub(bridgehub);
@@ -177,7 +189,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         initializeGeneratedData();
 
         deployStateTransitionDiamondFacets();
-        (, string memory ctmContractName) = EraZkosRouter.resolve(config.isZKsyncOS, EraZkosContract.ChainTypeManager);
+        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(
+            config.isZKsyncOS,
+            CTMContract.ChainTypeManager
+        );
         (
             ctmAddresses.stateTransition.implementations.chainTypeManager,
             ctmAddresses.stateTransition.proxies.chainTypeManager
@@ -206,9 +221,12 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function deployVerifiers() internal {
-        (, string memory fflonkName) = EraZkosRouter.resolve(config.isZKsyncOS, EraZkosContract.VerifierFflonk);
-        (, string memory plonkName) = EraZkosRouter.resolve(config.isZKsyncOS, EraZkosContract.VerifierPlonk);
-        (, string memory verifierName) = EraZkosRouter.resolveMainVerifier(config.isZKsyncOS, config.testnetVerifier);
+        (, string memory fflonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierFflonk);
+        (, string memory plonkName) = DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.VerifierPlonk);
+        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
+            config.isZKsyncOS,
+            config.testnetVerifier
+        );
 
         ctmAddresses.stateTransition.verifiers.verifierFflonk = deploySimpleContract(fflonkName, false);
         ctmAddresses.stateTransition.verifiers.verifierPlonk = deploySimpleContract(plonkName, false);
@@ -217,7 +235,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         // Use getDeployerAddress() to ensure the correct sender even when called from nested contracts
         vm.startBroadcast(getDeployerAddress());
         // Called as library (not through vms) to preserve msg.sender
-        EraZkosVerifierLifecycle.initializeVerifier(
+        DeployCTML1OrGateway.initializeVerifier(
             ctmAddresses.stateTransition.verifiers.verifier,
             ctmAddresses.stateTransition.verifiers.verifierFflonk,
             ctmAddresses.stateTransition.verifiers.verifierPlonk,
@@ -239,7 +257,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function deployDAValidators() internal {
-        ctmAddresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner(
+        ctmAddresses.daAddresses.daContracts.rollupDAManager = deployWithCreate2AndOwner(
             "RollupDAManager",
             getDeployerAddress(),
             false
@@ -247,7 +265,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         updateRollupDAManager();
 
         // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
-        ctmAddresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator", false);
+        ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = deploySimpleContract("RollupL1DAValidator", false);
         if (config.isZKsyncOS) {
             ctmAddresses.daAddresses.l1BlobsDAValidatorZKsyncOS = deploySimpleContract(
                 "BlobsL1DAValidatorZKsyncOS",
@@ -255,7 +273,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             );
         }
 
-        ctmAddresses.daAddresses.noDAValidiumL1DAValidator = deploySimpleContract("ValidiumL1DAValidator", false);
+        ctmAddresses.daAddresses.daContracts.validiumDAValidator = deploySimpleContract("ValidiumL1DAValidator", false);
 
         if (config.contracts.availL1DAValidator == address(0)) {
             ctmAddresses.daAddresses.availBridge = deploySimpleContract("DummyAvailBridge", false);
@@ -264,9 +282,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             ctmAddresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
         vm.startBroadcast(getDeployerAddress());
-        IRollupDAManager rollupDAManager = IRollupDAManager(ctmAddresses.daAddresses.rollupDAManager);
+        IRollupDAManager rollupDAManager = IRollupDAManager(ctmAddresses.daAddresses.daContracts.rollupDAManager);
         rollupDAManager.updateDAPair(
-            ctmAddresses.daAddresses.l1RollupDAValidator,
+            ctmAddresses.daAddresses.daContracts.rollupSLDAValidator,
             getRollupL2DACommitmentScheme(),
             true
         );
@@ -281,7 +299,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function updateRollupDAManager() internal virtual {
-        IOwnable rollupDAManager = IOwnable(ctmAddresses.daAddresses.rollupDAManager);
+        IOwnable rollupDAManager = IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager);
         address deployer = getDeployerAddress();
         if (rollupDAManager.owner() != deployer) {
             if (rollupDAManager.pendingOwner() == deployer) {
@@ -304,16 +322,16 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         ctm.setPendingAdmin(ctmAddresses.chainAdmin);
 
         IOwnable(ctmAddresses.stateTransition.proxies.serverNotifier).transferOwnership(ctmAddresses.chainAdmin);
-        IOwnable(ctmAddresses.daAddresses.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
+        IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
 
         // Called as library (not through vms) to preserve msg.sender
-        EraZkosVerifierLifecycle.transferVerifierOwnership(
+        DeployCTML1OrGateway.transferVerifierOwnership(
             ctmAddresses.stateTransition.verifiers.verifier,
             ctmAddresses.admin.governance,
             config.isZKsyncOS
         );
 
-        IOwnable(ctmAddresses.daAddresses.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
+        IOwnable(ctmAddresses.daAddresses.daContracts.rollupDAManager).transferOwnership(ctmAddresses.admin.governance);
         vm.stopBroadcast();
         console.log("Owners updated");
     }
@@ -381,16 +399,20 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             "validator_timelock_addr",
             ctmAddresses.stateTransition.proxies.validatorTimelock
         );
-        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", ctmAddresses.daAddresses.rollupDAManager);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "l1_rollup_da_manager",
+            ctmAddresses.daAddresses.daContracts.rollupDAManager
+        );
         vm.serializeAddress(
             "deployed_addresses",
             "rollup_l1_da_validator_addr",
-            ctmAddresses.daAddresses.l1RollupDAValidator
+            ctmAddresses.daAddresses.daContracts.rollupSLDAValidator
         );
         vm.serializeAddress(
             "deployed_addresses",
             "no_da_validium_l1_validator_addr",
-            ctmAddresses.daAddresses.noDAValidiumL1DAValidator
+            ctmAddresses.daAddresses.daContracts.validiumDAValidator
         );
         if (config.isZKsyncOS) {
             vm.serializeAddress(
@@ -474,39 +496,130 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         return beacon;
     }
 
+    /// @dev Precompute blake2s hashes for all unique bytecodes in a single FFI call.
+    function _precomputeBlakeHashes() private {
+        CoreContract[10] memory contracts = [
+            CoreContract.L2Bridgehub,
+            CoreContract.L2AssetRouter,
+            CoreContract.L2NativeTokenVault,
+            CoreContract.L2MessageRoot,
+            CoreContract.UpgradeableBeaconDeployer,
+            CoreContract.L2ChainAssetHandler,
+            CoreContract.InteropCenter,
+            CoreContract.InteropHandler,
+            CoreContract.L2AssetTracker,
+            CoreContract.BaseTokenHolder
+        ];
+
+        string memory tmpFile = string.concat(vm.projectRoot(), "/script-out/tmp-blake-batch.txt");
+        vm.writeFile(tmpFile, "");
+
+        bytes[10] memory bytecodes;
+        for (uint256 i = 0; i < 10; i++) {
+            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, contracts[i]);
+            bytecodes[i] = BytecodeUtils.readDeployedBytecodeL1(true, fileName, contractName);
+            vm.writeLine(tmpFile, vm.toString(bytecodes[i]));
+        }
+        // Also add SystemContractProxy (used for proxy-upgrade bytecode info)
+        bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
+            true,
+            "SystemContractProxy.sol",
+            "SystemContractProxy"
+        );
+        vm.writeLine(tmpFile, vm.toString(proxyBytecode));
+
+        // Single FFI call to batch-hash all bytecodes
+        string[] memory input = new string[](6);
+        input[0] = "yarn";
+        input[1] = "--silent";
+        input[2] = "ts-node";
+        input[3] = "./scripts/blake2s256.ts";
+        input[4] = "--batch";
+        input[5] = tmpFile;
+        bytes memory result = vm.ffi(input);
+
+        uint256 totalBytecodes = 11;
+        require(result.length == totalBytecodes * 32, "Unexpected batch blake2s result length");
+        for (uint256 i = 0; i < 10; i++) {
+            bytes32 hash;
+            assembly {
+                hash := mload(add(result, add(32, mul(i, 32))))
+            }
+            _blakeCache[keccak256(bytecodes[i])] = hash;
+        }
+        {
+            bytes32 proxyHash;
+            assembly {
+                proxyHash := mload(add(result, add(32, mul(10, 32))))
+            }
+            _blakeCache[keccak256(proxyBytecode)] = proxyHash;
+        }
+
+        vm.removeFile(tmpFile);
+    }
+
+    /// @dev Look up a pre-computed blake2s hash and build ZKSyncOSBytecodeInfo.
+    function _cachedZKOSBytecodeInfo(bytes memory _bytecode) private view returns (bytes memory) {
+        bytes32 key = keccak256(_bytecode);
+        bytes32 blakeHash = _blakeCache[key];
+        require(blakeHash != bytes32(0), "Blake hash not cached");
+        return ZKSyncOSBytecodeInfo.encodeZKSyncOSBytecodeInfo(blakeHash, uint32(_bytecode.length), key);
+    }
+
+    /// @dev Returns proxy-upgrade bytecode info, using the blake cache when available.
+    function _getProxyUpgradeBytecodeInfo(
+        string memory _fileName,
+        string memory _contractName
+    ) private returns (bytes memory) {
+        if (config.isZKsyncOS) {
+            bytes memory implBytecode = BytecodeUtils.readDeployedBytecodeL1(true, _fileName, _contractName);
+            bytes memory proxyBytecode = BytecodeUtils.readDeployedBytecodeL1(
+                true,
+                "SystemContractProxy.sol",
+                "SystemContractProxy"
+            );
+            return abi.encode(_cachedZKOSBytecodeInfo(implBytecode), _cachedZKOSBytecodeInfo(proxyBytecode));
+        }
+        return CoreOnGatewayHelper.getBytecodeInfo(false, CoreContract.L2Bridgehub); // unreachable, but keeps compiler happy
+    }
+
+    /// @dev Get bytecode info, using cached blake hashes for ZKsyncOS or CoreOnGatewayHelper for Era.
+    function _getBytecodeInfo(CoreContract _c) private returns (bytes memory) {
+        if (config.isZKsyncOS) {
+            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _c);
+            return _getProxyUpgradeBytecodeInfo(fileName, contractName);
+        }
+        return CoreOnGatewayHelper.getBytecodeInfo(false, _c);
+    }
+
     function _buildForceDeploymentsData(
         address dangerousTestOnlyForcedBeacon
     ) private returns (FixedForceDeploymentsData memory data) {
+        if (config.isZKsyncOS) {
+            _precomputeBlakeHashes();
+        }
+
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             gatewayChainId: config.gatewayChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: EraZkosRouter.getBytecodeHash(config.isZKsyncOS, EraZkosContract.BeaconProxy),
+            l2TokenProxyBytecodeHash: CoreOnGatewayHelper.getDeployedBytecodeHash(
+                config.isZKsyncOS,
+                CoreContract.BeaconProxy
+            ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(ctmAddresses.admin.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2Bridgehub),
-            l2AssetRouterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2AssetRouter),
-            l2NtvBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2NativeTokenVault),
-            messageRootBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2MessageRoot),
-            beaconDeployerInfo: EraZkosRouter.getBytecodeInfo(
-                config.isZKsyncOS,
-                EraZkosContract.UpgradeableBeaconDeployer
-            ),
-            baseTokenHolderBytecodeInfo: EraZkosRouter.getBytecodeInfo(
-                config.isZKsyncOS,
-                EraZkosContract.BaseTokenHolder
-            ),
-            chainAssetHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(
-                config.isZKsyncOS,
-                EraZkosContract.L2ChainAssetHandler
-            ),
-            interopCenterBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.InteropCenter),
-            interopHandlerBytecodeInfo: EraZkosRouter.getBytecodeInfo(
-                config.isZKsyncOS,
-                EraZkosContract.InteropHandler
-            ),
-            assetTrackerBytecodeInfo: EraZkosRouter.getBytecodeInfo(config.isZKsyncOS, EraZkosContract.L2AssetTracker),
+            bridgehubBytecodeInfo: _getBytecodeInfo(CoreContract.L2Bridgehub),
+            l2AssetRouterBytecodeInfo: _getBytecodeInfo(CoreContract.L2AssetRouter),
+            l2NtvBytecodeInfo: _getBytecodeInfo(CoreContract.L2NativeTokenVault),
+            messageRootBytecodeInfo: _getBytecodeInfo(CoreContract.L2MessageRoot),
+            beaconDeployerInfo: _getBytecodeInfo(CoreContract.UpgradeableBeaconDeployer),
+            baseTokenHolderBytecodeInfo: _getBytecodeInfo(CoreContract.BaseTokenHolder),
+            chainAssetHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.L2ChainAssetHandler),
+            interopCenterBytecodeInfo: _getBytecodeInfo(CoreContract.InteropCenter),
+            interopHandlerBytecodeInfo: _getBytecodeInfo(CoreContract.InteropHandler),
+            assetTrackerBytecodeInfo: _getBytecodeInfo(CoreContract.L2AssetTracker),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(

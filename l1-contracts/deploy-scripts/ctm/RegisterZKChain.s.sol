@@ -160,6 +160,7 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         configureZkSyncStateTransition();
         setPendingAdmin();
 
+        // FIXME: add guards that this functionality is available only for Era chains.
         if (config.initializeLegacyBridge) {
             unpauseDeposits();
             deployLegacySharedBridge();
@@ -524,7 +525,7 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
     function deployLegacySharedBridge() internal {
         bytes[] memory emptyDeps = new bytes[](0);
         address legacyBridgeImplAddr = Utils.deployThroughL1Deterministic({
-            bytecode: ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacyDev"),
+            bytecode: ContractsBytecodesLib.getCreationCodeEra("L2SharedBridgeLegacyDev"),
             constructorargs: hex"",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -535,7 +536,7 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         });
 
         output.l2LegacySharedBridge = Utils.deployThroughL1Deterministic({
-            bytecode: ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
+            bytecode: ContractsBytecodesLib.getCreationCodeEra("TransparentUpgradeableProxy"),
             constructorargs: L2LegacySharedBridgeTestHelper.getLegacySharedBridgeProxyConstructorParams(
                 legacyBridgeImplAddr,
                 config.l1Erc20Bridge,

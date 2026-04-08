@@ -30,10 +30,20 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
     }
 
     /// @notice Override to skip bytecode publishing which reads large JSON files.
-    /// We leave factoryDepsResult.factoryDepsHashes empty so that isHashInFactoryDeps
-    /// bypasses validation (empty array = all hashes accepted).
     function publishBytecodes() public override {
         console.log("Test mode: Skipping bytecode publishing to avoid MemoryOOG");
+
+        factoryDepsResult.factoryDepsHashes = new uint256[](45);
+
+        factoryDepsResult.factoryDepsHashes[0] = uint256(config.contracts.chainCreationParams.bootloaderHash);
+        factoryDepsResult.factoryDepsHashes[1] = uint256(config.contracts.chainCreationParams.defaultAAHash);
+        factoryDepsResult.factoryDepsHashes[2] = uint256(config.contracts.chainCreationParams.evmEmulatorHash);
+
+        bytes32 dummyHash = bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001));
+        for (uint256 i = 3; i < 45; i++) {
+            factoryDepsResult.factoryDepsHashes[i] = uint256(dummyHash);
+        }
+
         upgradeConfig.factoryDepsPublished = true;
     }
 
@@ -46,7 +56,7 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
     }
 }
 
-/// @notice Test-only Core upgrade that skips problematic governance calls
+/// @notice Test-only Core upgrade that skips prlematic governance calls
 contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
     /// @notice Override to skip setAssetTracker call (requires NTV ownership in test)
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
