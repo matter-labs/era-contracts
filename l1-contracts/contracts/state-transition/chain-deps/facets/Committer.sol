@@ -459,6 +459,9 @@ contract CommitterFacet is ZKChainBase, ICommitter {
             revert InvalidTxCountInPriorityMode(_newBatch.numberOfLayer2Txs, _newBatch.numberOfLayer1Txs);
         }
 
+        if (_newBatch.firstBlockTimestamp > _newBatch.lastBlockTimestamp) {
+            revert BatchTimestampGreaterThanLastL2BlockTimestamp();
+        }
         if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > _newBatch.firstBlockTimestamp) {
             revert TimeNotReached(_newBatch.firstBlockTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
         }
