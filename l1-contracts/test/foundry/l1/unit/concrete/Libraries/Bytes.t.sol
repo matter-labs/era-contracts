@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {Bytes} from "contracts/vendor/Bytes.sol";
+import {Bytes} from "@openzeppelin/contracts-v5/utils/Bytes.sol";
 
 /// @notice Unit tests for Bytes library
 contract BytesTest is Test {

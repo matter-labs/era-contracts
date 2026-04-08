@@ -12,7 +12,7 @@ import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandar
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-v5/utils/draft-InteroperableAddress.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,

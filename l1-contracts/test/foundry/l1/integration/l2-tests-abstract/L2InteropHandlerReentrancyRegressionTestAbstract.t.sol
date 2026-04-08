@@ -19,7 +19,7 @@ import {
     INTEROP_BUNDLE_VERSION,
     INTEROP_CALL_VERSION
 } from "contracts/common/Messaging.sol";
-import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-v5/utils/draft-InteroperableAddress.sol";
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";

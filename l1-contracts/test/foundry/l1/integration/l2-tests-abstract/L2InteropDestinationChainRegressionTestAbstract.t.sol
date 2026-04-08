@@ -8,7 +8,7 @@ import "forge-std/console.sol";
 
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
-import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-v5/utils/draft-InteroperableAddress.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {DestinationChainNotRegistered} from "contracts/interop/InteropErrors.sol";
 

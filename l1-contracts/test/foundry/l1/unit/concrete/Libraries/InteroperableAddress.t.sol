@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-v5/utils/draft-InteroperableAddress.sol";
 
 /// @notice Helper contract to test InteroperableAddress library with calldata functions
 contract InteroperableAddressHelper {

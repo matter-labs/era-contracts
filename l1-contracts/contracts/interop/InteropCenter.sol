@@ -54,7 +54,7 @@ import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
 import {AttributesDecoder} from "./AttributesDecoder.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
-import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-v5/utils/draft-InteroperableAddress.sol";
 import {IL2CrossChainSender} from "../bridge/interfaces/IL2CrossChainSender.sol";
 import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
 

@@ -44,7 +44,7 @@ import {
     WrongDestinationBaseTokenAssetId,
     WrongDestinationChainId
 } from "contracts/interop/InteropErrors.sol";
-import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-v5/utils/draft-InteroperableAddress.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {
