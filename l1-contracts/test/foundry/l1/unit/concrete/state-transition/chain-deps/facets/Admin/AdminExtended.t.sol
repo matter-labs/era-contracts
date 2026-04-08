@@ -43,26 +43,23 @@ contract AdminExtendedTest is AdminTest {
     }
 
     function test_SetTokenMultiplier_DenominatorIsZero() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
+        address ctm = utilsFacet.util_getChainTypeManager();
 
-        vm.prank(address(this));
+        vm.prank(ctm);
         vm.expectRevert(DenominatorIsZero.selector);
         adminFacet.setTokenMultiplier(1, 0);
     }
 
     function test_SetPriorityTxMaxGasLimit_TooMuchGas() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
+        address ctm = utilsFacet.util_getChainTypeManager();
 
-        vm.prank(address(this));
+        vm.prank(ctm);
         vm.expectRevert(TooMuchGas.selector);
         adminFacet.setPriorityTxMaxGasLimit(MAX_GAS_PER_TRANSACTION + 1);
     }
 
     function test_ChangeFeeParams_PubdataExceedsMax() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
+        address ctm = utilsFacet.util_getChainTypeManager();
 
         FeeParams memory currentFeeParams = utilsFacet.util_getFeeParams();
         FeeParams memory newFeeParams = FeeParams({
@@ -74,14 +71,13 @@ contract AdminExtendedTest is AdminTest {
             minimalL2GasPrice: 100
         });
 
-        vm.prank(address(this));
+        vm.prank(ctm);
         vm.expectRevert(PriorityTxPubdataExceedsMaxPubDataPerBatch.selector);
         adminFacet.changeFeeParams(newFeeParams);
     }
 
     function test_ChangeFeeParams_InvalidPubdataPricingMode() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
+        address ctm = utilsFacet.util_getChainTypeManager();
 
         // Set initial fee params with Rollup mode
         FeeParams memory currentFeeParams = utilsFacet.util_getFeeParams();
@@ -98,7 +94,7 @@ contract AdminExtendedTest is AdminTest {
             minimalL2GasPrice: 100
         });
 
-        vm.prank(address(this));
+        vm.prank(ctm);
         vm.expectRevert(InvalidPubdataPricingMode.selector);
         adminFacet.changeFeeParams(newFeeParams);
     }
@@ -120,20 +116,18 @@ contract AdminExtendedTest is AdminTest {
     }
 
     function test_UnfreezeDiamond_NotFrozen() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
+        address ctm = utilsFacet.util_getChainTypeManager();
 
         // Try to unfreeze when not frozen
-        vm.prank(address(this));
+        vm.prank(ctm);
         vm.expectRevert(DiamondNotFrozen.selector);
         adminFacet.unfreezeDiamond();
     }
 
     function test_SetTokenMultiplier_Success() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
+        address ctm = utilsFacet.util_getChainTypeManager();
 
-        vm.prank(address(this));
+        vm.prank(ctm);
         adminFacet.setTokenMultiplier(11, 10);
 
         assertEq(utilsFacet.util_getBaseTokenGasPriceMultiplierNominator(), 11);
@@ -165,32 +159,30 @@ contract AdminExtendedTest is AdminTest {
     }
 
     function test_SetValidator() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
+        address ctm = utilsFacet.util_getChainTypeManager();
 
         address validator = makeAddr("validator");
 
-        vm.prank(address(this));
+        vm.prank(ctm);
         adminFacet.setValidator(validator, true);
 
         assertTrue(utilsFacet.util_getValidator(validator));
 
-        vm.prank(address(this));
+        vm.prank(ctm);
         adminFacet.setValidator(validator, false);
 
         assertFalse(utilsFacet.util_getValidator(validator));
     }
 
     function test_SetPorterAvailability() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
+        address ctm = utilsFacet.util_getChainTypeManager();
 
-        vm.prank(address(this));
+        vm.prank(ctm);
         adminFacet.setPorterAvailability(true);
 
         assertTrue(utilsFacet.util_getZkPorterAvailability());
 
-        vm.prank(address(this));
+        vm.prank(ctm);
         adminFacet.setPorterAvailability(false);
 
         assertFalse(utilsFacet.util_getZkPorterAvailability());
@@ -215,8 +207,7 @@ contract AdminExtendedTest is AdminTest {
     }
 
     function test_UpgradeChainFromVersion_HashMismatch() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
+        address ctm = utilsFacet.util_getChainTypeManager();
 
         uint256 oldProtocolVersion = 0;
         utilsFacet.util_setProtocolVersion(oldProtocolVersion);
@@ -229,9 +220,9 @@ contract AdminExtendedTest is AdminTest {
             initCalldata: bytes("")
         });
 
-        // Mock the upgradeCutHash to return a different hash
+        // Mock the upgradeCutHash on the real CTM to return a different hash
         vm.mockCall(
-            address(this),
+            ctm,
             abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector, oldProtocolVersion),
             abi.encode(bytes32(uint256(123)))
         );
@@ -239,14 +230,13 @@ contract AdminExtendedTest is AdminTest {
         bytes32 inputHash = keccak256(abi.encode(diamondCut));
         bytes32 expectedHash = bytes32(uint256(123));
 
-        vm.prank(address(this));
+        vm.prank(ctm);
         vm.expectRevert(abi.encodeWithSelector(HashMismatch.selector, expectedHash, inputHash));
         adminFacet.upgradeChainFromVersion(address(adminFacet), oldProtocolVersion, diamondCut);
     }
 
     function test_UpgradeChainFromVersion_ProtocolIdMismatch() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
+        address ctm = utilsFacet.util_getChainTypeManager();
 
         uint256 currentVersion = 5;
         uint256 wrongOldVersion = 3;
@@ -259,15 +249,15 @@ contract AdminExtendedTest is AdminTest {
             initCalldata: bytes("")
         });
 
-        // Mock the upgradeCutHash to match
+        // Mock the upgradeCutHash on the real CTM to match
         bytes32 cutHash = keccak256(abi.encode(diamondCut));
         vm.mockCall(
-            address(this),
+            ctm,
             abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector, wrongOldVersion),
             abi.encode(cutHash)
         );
 
-        vm.prank(address(this));
+        vm.prank(ctm);
         vm.expectRevert(abi.encodeWithSelector(ProtocolIdMismatch.selector, currentVersion, wrongOldVersion));
         adminFacet.upgradeChainFromVersion(address(adminFacet), wrongOldVersion, diamondCut);
     }
@@ -277,10 +267,9 @@ contract AdminExtendedTest is AdminTest {
         vm.assume(uint256(nominator) * 10 <= uint256(denominator) * 13);
         vm.assume(uint256(nominator) * 13 >= uint256(denominator) * 10);
 
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
+        address ctm = utilsFacet.util_getChainTypeManager();
 
-        vm.prank(address(this));
+        vm.prank(ctm);
         adminFacet.setTokenMultiplier(nominator, denominator);
 
         assertEq(utilsFacet.util_getBaseTokenGasPriceMultiplierNominator(), nominator);
@@ -288,8 +277,7 @@ contract AdminExtendedTest is AdminTest {
     }
 
     function test_ExecuteUpgrade_OnlyChainTypeManager() public {
-        vm.prank(address(dummyBridgehub));
-        utilsFacet.util_setChainTypeManager(address(this));
+        address ctm = utilsFacet.util_getChainTypeManager();
 
         Diamond.FacetCut[] memory emptyFacets = new Diamond.FacetCut[](0);
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
@@ -298,7 +286,7 @@ contract AdminExtendedTest is AdminTest {
             initCalldata: bytes("")
         });
 
-        vm.prank(address(this));
+        vm.prank(ctm);
         adminFacet.executeUpgrade(diamondCut);
     }
 }

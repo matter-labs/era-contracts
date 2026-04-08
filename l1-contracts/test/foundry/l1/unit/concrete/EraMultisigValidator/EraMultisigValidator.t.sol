@@ -12,8 +12,6 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {AddressHasNoCode, RoleAccessDenied} from "contracts/common/L1ContractErrors.sol";
 import {
     AlreadySigned,
@@ -27,8 +25,6 @@ import {
 contract EraMultisigValidatorTest is MigrationTestBase {
     EraMultisigValidator eraMultisig;
     ValidatorTimelock validatorTimelock;
-    DummyBridgehub dummyBridgehub;
-    DummyChainTypeManagerForValidatorTimelock chainTypeManager;
 
     address owner;
     address eraMultisigChainAddress;
@@ -38,7 +34,7 @@ contract EraMultisigValidatorTest is MigrationTestBase {
     address member3;
     address nonMember;
 
-    uint256 chainId;
+    uint256 eraMultisigChainId;
     uint32 executionDelay;
 
     bytes32 precommitterRole;
@@ -48,29 +44,29 @@ contract EraMultisigValidatorTest is MigrationTestBase {
     bytes32 executorRole;
 
     function setUp() public override {
-        super.setUp();
-        owner = makeAddr("owner");
-        eraMultisigChainAddress = makeAddr("eraMultisigChainAddress");
+        // Deploy full integration ecosystem to get real bridgehub and chain
+        _deployIntegrationBase();
+
+        // Use the real chain from the integration deployment
+        eraMultisigChainAddress = chainAddress;
+        eraMultisigChainId = testChainId;
+
+        // Use the real chain's admin as the owner for validators
+        owner = IGetters(eraMultisigChainAddress).getAdmin();
+
         executor = makeAddr("executor");
         member1 = makeAddr("member1");
         member2 = makeAddr("member2");
         member3 = makeAddr("member3");
         nonMember = makeAddr("nonMember");
 
-        chainId = 1;
         executionDelay = 0;
 
-        // Deploy dummy bridgehub and register chain
-        dummyBridgehub = new DummyBridgehub();
-        chainTypeManager = new DummyChainTypeManagerForValidatorTimelock(owner, eraMultisigChainAddress);
-        vm.mockCall(eraMultisigChainAddress, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(owner));
-        vm.mockCall(eraMultisigChainAddress, abi.encodeCall(IGetters.getChainId, ()), abi.encode(chainId));
-        dummyBridgehub.setZKChain(chainId, eraMultisigChainAddress);
-
-        // Deploy the downstream ValidatorTimelock (the one EraMultisig forwards to)
+        // Deploy ValidatorTimelock with the REAL bridgehub (no DummyBridgehub)
         validatorTimelock = ValidatorTimelock(_deployValidatorTimelock(owner, executionDelay));
 
-        // Mock the validator timelock to accept forwarded calls
+        // Mock the validator timelock to accept forwarded calls.
+        // This is valid isolation: we're testing multisig logic, not batch processing.
         vm.mockCall(
             address(validatorTimelock),
             abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector),
@@ -97,7 +93,7 @@ contract EraMultisigValidatorTest is MigrationTestBase {
             ""
         );
 
-        // Deploy EraMultisigValidator via proxy
+        // Deploy EraMultisigValidator via proxy with real bridgehub
         eraMultisig = EraMultisigValidator(_deployEraMultisig(owner, executionDelay, address(validatorTimelock)));
 
         // Cache role identifiers
@@ -109,7 +105,7 @@ contract EraMultisigValidatorTest is MigrationTestBase {
 
         // Grant executor all validator roles on the EraMultisigValidator
         vm.prank(owner);
-        eraMultisig.addValidatorForChainId(chainId, executor);
+        eraMultisig.addValidatorForChainId(eraMultisigChainId, executor);
 
         // Setup default multisig: 3 members, threshold 2
         address[] memory membersToAdd = new address[](3);
@@ -126,7 +122,8 @@ contract EraMultisigValidatorTest is MigrationTestBase {
 
     function _deployValidatorTimelock(address _owner, uint32 _delay) internal returns (address) {
         ProxyAdmin admin = new ProxyAdmin();
-        ValidatorTimelock impl = new ValidatorTimelock(address(dummyBridgehub));
+        // Use real bridgehub from integration deployment
+        ValidatorTimelock impl = new ValidatorTimelock(address(addresses.bridgehub));
         return
             address(
                 new TransparentUpgradeableProxy(
@@ -139,7 +136,8 @@ contract EraMultisigValidatorTest is MigrationTestBase {
 
     function _deployEraMultisig(address _owner, uint32 _delay, address _validatorTimelock) internal returns (address) {
         ProxyAdmin admin = new ProxyAdmin();
-        EraMultisigValidator impl = new EraMultisigValidator(address(dummyBridgehub));
+        // Use real bridgehub from integration deployment
+        EraMultisigValidator impl = new EraMultisigValidator(address(addresses.bridgehub));
         return
             address(
                 new TransparentUpgradeableProxy(
@@ -159,9 +157,9 @@ contract EraMultisigValidatorTest is MigrationTestBase {
         return eraMultisig.calculateHash(eraMultisigChainAddress, from, to, data);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      INITIALIZATION
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_initialize_setsOwner() public view {
         assertEq(eraMultisig.owner(), owner);
@@ -179,7 +177,7 @@ contract EraMultisigValidatorTest is MigrationTestBase {
     function test_initialize_parentTwoParamInitializeReverts() public {
         // The 2-param initialize inherited from ValidatorTimelock is disabled
         ProxyAdmin admin = new ProxyAdmin();
-        EraMultisigValidator impl = new EraMultisigValidator(address(dummyBridgehub));
+        EraMultisigValidator impl = new EraMultisigValidator(address(addresses.bridgehub));
         vm.expectRevert();
         new TransparentUpgradeableProxy(
             address(impl),
@@ -191,7 +189,7 @@ contract EraMultisigValidatorTest is MigrationTestBase {
     function test_initialize_revertsIfTimelockHasNoCode() public {
         address eoa = makeAddr("eoa");
         ProxyAdmin admin = new ProxyAdmin();
-        EraMultisigValidator impl = new EraMultisigValidator(address(dummyBridgehub));
+        EraMultisigValidator impl = new EraMultisigValidator(address(addresses.bridgehub));
         vm.expectRevert(abi.encodeWithSelector(AddressHasNoCode.selector, eoa));
         new TransparentUpgradeableProxy(
             address(impl),
@@ -200,9 +198,9 @@ contract EraMultisigValidatorTest is MigrationTestBase {
         );
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      THRESHOLD MANAGEMENT
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_changeThreshold_setsNewValue() public {
         vm.prank(owner);
@@ -229,9 +227,9 @@ contract EraMultisigValidatorTest is MigrationTestBase {
         assertEq(eraMultisig.threshold(), 0);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      MEMBERSHIP MANAGEMENT
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_changeMembers_addsMembers() public view {
         assertTrue(eraMultisig.executionMultisigMember(member1));
@@ -318,7 +316,7 @@ contract EraMultisigValidatorTest is MigrationTestBase {
     }
 
     function test_changeMembers_removeAndAddSameAddress() public {
-        // Remove and then add the same address in one call — add wins (executed second)
+        // Remove and then add the same address in one call -- add wins (executed second)
         address[] memory toAdd = new address[](1);
         toAdd[0] = member1;
         address[] memory toRemove = new address[](1);
@@ -330,9 +328,9 @@ contract EraMultisigValidatorTest is MigrationTestBase {
         assertTrue(eraMultisig.executionMultisigMember(member1));
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      HASH APPROVAL
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_approveHash_recordsApproval() public {
         bytes32 hash = _sampleHash();
@@ -397,9 +395,9 @@ contract EraMultisigValidatorTest is MigrationTestBase {
         assertEq(eraMultisig.getApprovals(hash2), 1);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      GET APPROVALS
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_getApprovals_returnsZeroForUnapprovedHash() public view {
         bytes32 hash = _sampleHash();
@@ -446,7 +444,7 @@ contract EraMultisigValidatorTest is MigrationTestBase {
 
         assertEq(eraMultisig.getApprovals(hash), 0);
 
-        // Re-add member1 — their old approval should count again
+        // Re-add member1 -- their old approval should count again
         address[] memory reAdd = new address[](1);
         reAdd[0] = member1;
         address[] memory noRemove = new address[](0);
@@ -480,9 +478,9 @@ contract EraMultisigValidatorTest is MigrationTestBase {
         assertEq(eraMultisig.getApprovals(hash), 0);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      EXECUTE BATCHES
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_executeBatches_succeedsWhenThresholdMet() public {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
@@ -539,7 +537,7 @@ contract EraMultisigValidatorTest is MigrationTestBase {
         vm.prank(member2);
         eraMultisig.approveHash(hash);
 
-        // Remove member1 — drops valid approvals to 1
+        // Remove member1 -- drops valid approvals to 1
         address[] memory toAdd = new address[](0);
         address[] memory toRemove = new address[](1);
         toRemove[0] = member1;
@@ -567,7 +565,7 @@ contract EraMultisigValidatorTest is MigrationTestBase {
         vm.prank(owner);
         eraMultisig.changeExecutionMultisigMember(toAdd, toRemove);
 
-        // Re-add member1 — restores to 2 valid approvals
+        // Re-add member1 -- restores to 2 valid approvals
         address[] memory reAdd = new address[](1);
         reAdd[0] = member1;
         address[] memory noRemove = new address[](0);
@@ -589,7 +587,7 @@ contract EraMultisigValidatorTest is MigrationTestBase {
     }
 
     function test_executeBatches_thresholdHigherThanMemberCount() public {
-        // Set threshold to 5 but only 3 members exist — impossible to execute
+        // Set threshold to 5 but only 3 members exist -- impossible to execute
         vm.prank(owner);
         eraMultisig.changeThreshold(5);
 
@@ -608,9 +606,9 @@ contract EraMultisigValidatorTest is MigrationTestBase {
         eraMultisig.executeBatchesSharedBridge(eraMultisigChainAddress, from, to, data);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      PRECOMMIT / COMMIT / PROVE / REVERT FORWARDING
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_precommit_forwardsWithoutApprovalCheck() public {
         vm.prank(executor);
@@ -672,9 +670,9 @@ contract EraMultisigValidatorTest is MigrationTestBase {
         eraMultisig.revertBatchesSharedBridge(eraMultisigChainAddress, 5);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      CALCULATE HASH (EIP-712)
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_calculateHash_deterministic() public view {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();

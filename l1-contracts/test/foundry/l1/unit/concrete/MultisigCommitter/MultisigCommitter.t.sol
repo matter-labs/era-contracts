@@ -11,7 +11,6 @@ import {MultisigCommitter} from "contracts/state-transition/validators/MultisigC
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 
 import {
     Unauthorized,
@@ -22,12 +21,9 @@ import {
     SignerNotAuthorized,
     SignersNotSorted
 } from "contracts/common/L1ContractErrors.sol";
-import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract MultisigCommitterTest is MigrationTestBase {
     MultisigCommitter multisigCommitter;
-    DummyChainTypeManagerForValidatorTimelock chainTypeManager;
-    DummyBridgehub dummyBridgehub;
 
     bytes32 constant DEFAULT_ADMIN_ROLE = bytes32(0);
 
@@ -41,7 +37,7 @@ contract MultisigCommitterTest is MigrationTestBase {
     uint256 validator2SharedKey;
     address validator1Custom;
     uint256 validator1CustomKey;
-    uint256 chainId;
+    uint256 mcChainId;
     uint256 lastBatchNumber;
     uint32 executionDelay;
 
@@ -53,11 +49,16 @@ contract MultisigCommitterTest is MigrationTestBase {
     bytes32 constant EIP712_VERSION_HASH = keccak256("1");
 
     function setUp() public override {
-        super.setUp();
+        // Deploy full integration ecosystem to get real bridgehub and chain
+        _deployIntegrationBase();
+
         ecosystemOwner = makeAddr("ecosystemOwner");
-        chainAdmin = makeAddr("chainAdmin");
-        mcChainAddress = makeAddr("chainAddress");
         sequencer = makeAddr("sequencer");
+
+        // Use real chain from integration deployment
+        mcChainAddress = chainAddress;
+        mcChainId = testChainId;
+        chainAdmin = IGetters(mcChainAddress).getAdmin();
 
         // we want to have the validators sorted
         Vm.Wallet[3] memory validators = [
@@ -83,24 +84,16 @@ contract MultisigCommitterTest is MigrationTestBase {
         validator1Custom = validators[2].addr;
         validator1CustomKey = validators[2].privateKey;
 
-        chainId = 1;
         lastBatchNumber = 123;
         executionDelay = 10;
 
-        dummyBridgehub = new DummyBridgehub();
-
-        chainTypeManager = new DummyChainTypeManagerForValidatorTimelock(chainAdmin, mcChainAddress);
-
-        vm.mockCall(mcChainAddress, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(chainAdmin));
-        vm.mockCall(mcChainAddress, abi.encodeCall(IGetters.getChainId, ()), abi.encode(chainId));
-        dummyBridgehub.setZKChain(chainId, mcChainAddress);
-
+        // Deploy MultisigCommitter with real bridgehub (no DummyBridgehub)
         multisigCommitter = MultisigCommitter(_deployMultisigCommitter(ecosystemOwner, executionDelay));
         committerRole = multisigCommitter.COMMITTER_ROLE();
         validatorRole = multisigCommitter.COMMIT_VALIDATOR_ROLE();
 
         vm.prank(chainAdmin);
-        multisigCommitter.addValidatorForChainId(chainId, sequencer);
+        multisigCommitter.addValidatorForChainId(mcChainId, sequencer);
         vm.prank(chainAdmin);
         multisigCommitter.grantRole(mcChainAddress, validatorRole, validator1Custom);
         vm.prank(ecosystemOwner);
@@ -113,7 +106,8 @@ contract MultisigCommitterTest is MigrationTestBase {
 
     function _deployMultisigCommitter(address _initialOwner, uint32 _initialExecutionDelay) internal returns (address) {
         ProxyAdmin admin = new ProxyAdmin();
-        MultisigCommitter multisigCommitterImplementation = new MultisigCommitter(address(dummyBridgehub));
+        // Use real bridgehub from integration deployment
+        MultisigCommitter multisigCommitterImplementation = new MultisigCommitter(address(addresses.bridgehub));
         return
             address(
                 new TransparentUpgradeableProxy(
@@ -219,10 +213,12 @@ contract MultisigCommitterTest is MigrationTestBase {
     }
 
     function prepareCommit() internal returns (uint256, uint256, bytes memory) {
+        // Mock the chain to accept forwarded commit calls.
+        // This is valid isolation: we're testing multisig logic, not batch processing.
         vm.mockCall(
             mcChainAddress,
             abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector),
-            abi.encode(chainId)
+            abi.encode(mcChainId)
         );
 
         IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();

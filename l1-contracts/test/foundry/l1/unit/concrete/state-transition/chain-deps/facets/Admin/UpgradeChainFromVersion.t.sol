@@ -38,7 +38,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
 
     function test_revertWhen_cutHashMismatch() public {
         address admin = utilsFacet.util_getAdmin();
-        address chainTypeManager = makeAddr("chainTypeManager");
+        address ctm = utilsFacet.util_getChainTypeManager();
 
         uint256 oldProtocolVersion = 1;
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -47,14 +47,10 @@ contract UpgradeChainFromVersionTest is AdminTest {
             initCalldata: new bytes(0)
         });
 
-        utilsFacet.util_setChainTypeManager(chainTypeManager);
+        utilsFacet.util_setProtocolVersion(oldProtocolVersion);
 
         bytes32 cutHashInput = keccak256("random");
-        vm.mockCall(
-            chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector),
-            abi.encode(cutHashInput)
-        );
+        vm.mockCall(ctm, abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector), abi.encode(cutHashInput));
 
         vm.startPrank(admin);
         vm.expectRevert(
@@ -65,7 +61,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
 
     function test_revertWhen_ProtocolVersionMismatchWhenUpgrading() public {
         address admin = utilsFacet.util_getAdmin();
-        address chainTypeManager = makeAddr("chainTypeManager");
+        address ctm = utilsFacet.util_getChainTypeManager();
 
         uint256 oldProtocolVersion = 1;
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -75,14 +71,9 @@ contract UpgradeChainFromVersionTest is AdminTest {
         });
 
         utilsFacet.util_setProtocolVersion(oldProtocolVersion + 1);
-        utilsFacet.util_setChainTypeManager(chainTypeManager);
 
         bytes32 cutHashInput = keccak256(abi.encode(diamondCutData));
-        vm.mockCall(
-            chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector),
-            abi.encode(cutHashInput)
-        );
+        vm.mockCall(ctm, abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector), abi.encode(cutHashInput));
 
         vm.startPrank(admin);
         vm.expectRevert(abi.encodeWithSelector(ProtocolIdMismatch.selector, uint256(2), oldProtocolVersion));
@@ -91,7 +82,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
 
     function test_revertWhen_ProtocolVersionMismatchAfterUpgrading() public {
         address admin = utilsFacet.util_getAdmin();
-        address chainTypeManager = makeAddr("chainTypeManager");
+        address ctm = utilsFacet.util_getChainTypeManager();
 
         uint256 oldProtocolVersion = 1;
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -101,14 +92,9 @@ contract UpgradeChainFromVersionTest is AdminTest {
         });
 
         utilsFacet.util_setProtocolVersion(oldProtocolVersion);
-        utilsFacet.util_setChainTypeManager(chainTypeManager);
 
         bytes32 cutHashInput = keccak256(abi.encode(diamondCutData));
-        vm.mockCall(
-            chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector),
-            abi.encode(cutHashInput)
-        );
+        vm.mockCall(ctm, abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector), abi.encode(cutHashInput));
 
         vm.startPrank(admin);
         vm.expectRevert(ProtocolIdNotGreater.selector);
@@ -119,7 +105,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
 
     function test_revertWhen_validatorCallsBeforeTimestamp() public {
         address admin = utilsFacet.util_getAdmin();
-        address chainTypeManager = makeAddr("chainTypeManager");
+        address ctm = utilsFacet.util_getChainTypeManager();
         address validatorAddr = makeAddr("validator");
 
         uint256 oldProtocolVersion = 1;
@@ -130,15 +116,10 @@ contract UpgradeChainFromVersionTest is AdminTest {
         });
 
         utilsFacet.util_setProtocolVersion(oldProtocolVersion);
-        utilsFacet.util_setChainTypeManager(chainTypeManager);
         utilsFacet.util_setValidator(validatorAddr, true);
 
         bytes32 cutHashInput = keccak256(abi.encode(diamondCutData));
-        vm.mockCall(
-            chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector),
-            abi.encode(cutHashInput)
-        );
+        vm.mockCall(ctm, abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector), abi.encode(cutHashInput));
 
         // Set upgrade timestamp to 1000, current time is 500 (before timestamp)
         uint256 upgradeTimestamp = 1000;
@@ -156,7 +137,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
 
     function test_revertWhen_validatorCallsWithTimestampZero() public {
         address admin = utilsFacet.util_getAdmin();
-        address chainTypeManager = makeAddr("chainTypeManager");
+        address ctm = utilsFacet.util_getChainTypeManager();
         address validatorAddr = makeAddr("validator");
 
         uint256 oldProtocolVersion = 1;
@@ -167,17 +148,12 @@ contract UpgradeChainFromVersionTest is AdminTest {
         });
 
         utilsFacet.util_setProtocolVersion(oldProtocolVersion);
-        utilsFacet.util_setChainTypeManager(chainTypeManager);
         utilsFacet.util_setValidator(validatorAddr, true);
 
         bytes32 cutHashInput = keccak256(abi.encode(diamondCutData));
-        vm.mockCall(
-            chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector),
-            abi.encode(cutHashInput)
-        );
+        vm.mockCall(ctm, abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector), abi.encode(cutHashInput));
 
-        // Timestamp 0 means no timestamp was set — validator should NOT be able to upgrade
+        // Timestamp 0 means no timestamp was set -- validator should NOT be able to upgrade
         vm.warp(1000);
         vm.mockCall(
             admin,
@@ -192,7 +168,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
 
     function test_validatorCallsAfterTimestamp() public {
         address admin = utilsFacet.util_getAdmin();
-        address chainTypeManager = makeAddr("chainTypeManager");
+        address ctm = utilsFacet.util_getChainTypeManager();
         address validatorAddr = makeAddr("validator");
         address mockVerifier = makeAddr("mockVerifier");
 
@@ -210,17 +186,16 @@ contract UpgradeChainFromVersionTest is AdminTest {
         });
 
         utilsFacet.util_setProtocolVersion(oldProtocolVersion);
-        utilsFacet.util_setChainTypeManager(chainTypeManager);
         utilsFacet.util_setValidator(validatorAddr, true);
 
         bytes32 cutHashInput = keccak256(abi.encode(diamondCutData));
         vm.mockCall(
-            chainTypeManager,
+            ctm,
             abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector, oldProtocolVersion),
             abi.encode(cutHashInput)
         );
         vm.mockCall(
-            chainTypeManager,
+            ctm,
             abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, newProtocolVersion),
             abi.encode(mockVerifier)
         );
@@ -243,7 +218,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
 
     function test_adminBypassesTimeGate() public {
         address admin = utilsFacet.util_getAdmin();
-        address chainTypeManager = makeAddr("chainTypeManager");
+        address ctm = utilsFacet.util_getChainTypeManager();
 
         uint256 oldProtocolVersion = 1;
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -253,14 +228,9 @@ contract UpgradeChainFromVersionTest is AdminTest {
         });
 
         utilsFacet.util_setProtocolVersion(oldProtocolVersion);
-        utilsFacet.util_setChainTypeManager(chainTypeManager);
 
         bytes32 cutHashInput = keccak256(abi.encode(diamondCutData));
-        vm.mockCall(
-            chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector),
-            abi.encode(cutHashInput)
-        );
+        vm.mockCall(ctm, abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector), abi.encode(cutHashInput));
 
         // Even though timestamp is not set (0) and block.timestamp is 0,
         // admin should bypass the time-gate entirely.
@@ -274,7 +244,7 @@ contract UpgradeChainFromVersionTest is AdminTest {
     }
 
     function test_chainTypeManagerBypassesTimeGate() public {
-        address chainTypeManager = makeAddr("chainTypeManager");
+        address ctm = utilsFacet.util_getChainTypeManager();
 
         uint256 oldProtocolVersion = 1;
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -284,19 +254,14 @@ contract UpgradeChainFromVersionTest is AdminTest {
         });
 
         utilsFacet.util_setProtocolVersion(oldProtocolVersion);
-        utilsFacet.util_setChainTypeManager(chainTypeManager);
 
         bytes32 cutHashInput = keccak256(abi.encode(diamondCutData));
-        vm.mockCall(
-            chainTypeManager,
-            abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector),
-            abi.encode(cutHashInput)
-        );
+        vm.mockCall(ctm, abi.encodeWithSelector(IChainTypeManager.upgradeCutHash.selector), abi.encode(cutHashInput));
 
         vm.warp(0);
 
         // ChainTypeManager should also bypass the time-gate.
-        vm.startPrank(chainTypeManager);
+        vm.startPrank(ctm);
         vm.expectRevert(ProtocolIdNotGreater.selector);
         adminFacet.upgradeChainFromVersion(address(adminFacet), oldProtocolVersion, diamondCutData);
     }
