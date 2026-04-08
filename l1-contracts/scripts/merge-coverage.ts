@@ -217,9 +217,47 @@ for (const [, data] of anvilData) {
     if (hits > 0) anvilHit++;
   }
 }
-printSummary("Anvil interop", anvilFiles, anvilLines, anvilHit);
+printSummary("Anvil (raw)", anvilFiles, anvilLines, anvilHit);
 
-// Merge: use Foundry as the base, add Anvil hits only for lines/functions already in Foundry
+// --- Build rebased Anvil LCOV: Foundry's structure with only Anvil hits ---
+// Deep-clone Foundry, zero all hits, then overlay Anvil hits.
+const anvilRebased = parseLcov(fs.readFileSync(foundryPath, "utf-8"));
+let anvilRebasedLinesHit = 0;
+
+for (const [file, record] of anvilRebased.files) {
+  const anvilFile = anvilData.get(file);
+
+  // Zero all line hits, then set from Anvil
+  for (const [lineNum] of record.lines) {
+    const anvilLineHits = anvilFile?.lines.get(lineNum) || 0;
+    record.lines.set(lineNum, anvilLineHits);
+    if (anvilLineHits > 0) anvilRebasedLinesHit++;
+  }
+
+  // Zero all FNDA hits, then set from Anvil; recompute FNH
+  let fnHitCount = 0;
+  record.preamble = record.preamble.map((line) => {
+    if (!line.startsWith("FNDA:")) return line;
+    const parts = line.substring(5).split(",");
+    const fnName = parts.slice(1).join(",");
+    const anvilFnHits = anvilFile?.functionHits.get(fnName) || 0;
+    if (anvilFnHits > 0) {
+      fnHitCount++;
+    }
+    return `FNDA:${anvilFnHits},${fnName}`;
+  });
+  record.preamble = record.preamble.map((line) => {
+    if (!line.startsWith("FNH:")) return line;
+    return `FNH:${fnHitCount}`;
+  });
+}
+
+const anvilRebasedStats = countLcov(anvilRebased);
+printSummary("Anvil (rebased)", anvilRebasedStats.files, anvilRebasedStats.lines, anvilRebasedLinesHit);
+
+const anvilRebasedPath = path.join(path.dirname(outputPath), "anvil-rebased-lcov.info");
+
+// --- Build merged LCOV: Foundry hits + Anvil hits ---
 let linesEnhanced = 0;
 let functionsEnhanced = 0;
 
@@ -227,7 +265,6 @@ for (const [file, record] of foundry.files) {
   const anvilFile = anvilData.get(file);
   if (!anvilFile) continue;
 
-  // Merge line hits
   for (const [lineNum, foundryHits] of record.lines) {
     const anvilLineHits = anvilFile.lines.get(lineNum);
     if (anvilLineHits !== undefined && anvilLineHits > foundryHits) {
@@ -236,7 +273,6 @@ for (const [file, record] of foundry.files) {
     }
   }
 
-  // Merge function hits: boost FNDA counts in the preamble
   if (anvilFile.functionHits.size > 0) {
     record.preamble = record.preamble.map((line) => {
       if (!line.startsWith("FNDA:")) return line;
@@ -254,7 +290,6 @@ for (const [file, record] of foundry.files) {
       return line;
     });
 
-    // Update FNH count if we enhanced functions
     if (functionsEnhanced > 0) {
       record.preamble = record.preamble.map((line) => {
         if (!line.startsWith("FNH:")) return line;
@@ -265,16 +300,19 @@ for (const [file, record] of foundry.files) {
   }
 }
 
+const mergedStats = countLcov(foundry);
+printSummary("Merged", mergedStats.files, mergedStats.lines, mergedStats.hit);
+
 console.log(`\n  Anvil added coverage for ${linesEnhanced} previously-uncovered lines`);
 if (functionsEnhanced > 0) {
   console.log(`  Anvil added coverage for ${functionsEnhanced} previously-uncovered functions`);
 }
 
-const mergedStats = countLcov(foundry);
-printSummary("Merged", mergedStats.files, mergedStats.lines, mergedStats.hit);
-
+// Write outputs
 const dir = path.dirname(outputPath);
 if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 fs.writeFileSync(outputPath, toLcovString(foundry));
+fs.writeFileSync(anvilRebasedPath, toLcovString(anvilRebased));
 
 console.log(`\n✅ Merged LCOV written to: ${outputPath}`);
+console.log(`✅ Anvil (rebased) LCOV written to: ${anvilRebasedPath}`);
