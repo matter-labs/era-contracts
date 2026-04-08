@@ -634,6 +634,10 @@ contract InteropCenter is
                 );
                 attributeUsed[2] = true;
                 bundleAttributes.executionAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
+                // Validate ERC-7930 format early to prevent unexecutable bundles that lock funds.
+                if (bundleAttributes.executionAddress.length > 0) {
+                    InteroperableAddress.parseEvmV1(bundleAttributes.executionAddress);
+                }
             } else if (selector == IERC7786Attributes.unbundlerAddress.selector) {
                 require(!attributeUsed[3], AttributeAlreadySet(selector));
                 require(
@@ -643,6 +647,10 @@ contract InteropCenter is
                 );
                 attributeUsed[3] = true;
                 bundleAttributes.unbundlerAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
+                // Validate ERC-7930 format early to prevent unexecutable bundles that lock funds.
+                if (bundleAttributes.unbundlerAddress.length > 0) {
+                    InteroperableAddress.parseEvmV1(bundleAttributes.unbundlerAddress);
+                }
             } else if (selector == IERC7786Attributes.useFixedFee.selector) {
                 require(!attributeUsed[4], AttributeAlreadySet(selector));
                 require(
