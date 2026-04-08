@@ -12,6 +12,7 @@
 
 import * as fs from "fs";
 import * as path from "path";
+import type { FunctionInfo } from "./source-map-decoder";
 
 export interface FileCoverage {
   /** Source file path (relative to project root) */
@@ -20,10 +21,24 @@ export interface FileCoverage {
   lineHits: Map<number, number>;
   /** Set of all executable lines in this file */
   executableLines: Set<number>;
+  /** Function declarations in this file with hit status */
+  functions?: Array<{ qualifiedName: string; line: number; hit: boolean }>;
 }
 
 /**
  * Generates an LCOV tracefile string from coverage data.
+ *
+ * LCOV format:
+ *   TN:test_name
+ *   SF:source_file_path
+ *   FN:line,name          (function declaration)
+ *   FNDA:hit_count,name   (function hit data)
+ *   FNF:count             (functions found)
+ *   FNH:count             (functions hit)
+ *   DA:line,hit_count     (line data)
+ *   LF:count              (lines found)
+ *   LH:count              (lines hit)
+ *   end_of_record
  */
 export function generateLcov(coverageData: FileCoverage[], testName = "anvil_interop"): string {
   const lines: string[] = [];
@@ -31,6 +46,23 @@ export function generateLcov(coverageData: FileCoverage[], testName = "anvil_int
   for (const file of coverageData) {
     lines.push(`TN:${testName}`);
     lines.push(`SF:${file.filePath}`);
+
+    // Emit FN/FNDA records if function data is available
+    if (file.functions && file.functions.length > 0) {
+      // FN records (sorted by line)
+      const sortedFns = [...file.functions].sort((a, b) => a.line - b.line);
+      for (const fn of sortedFns) {
+        lines.push(`FN:${fn.line},${fn.qualifiedName}`);
+      }
+
+      // FNDA records
+      for (const fn of sortedFns) {
+        lines.push(`FNDA:${fn.hit ? 1 : 0},${fn.qualifiedName}`);
+      }
+
+      lines.push(`FNF:${sortedFns.length}`);
+      lines.push(`FNH:${sortedFns.filter((f) => f.hit).length}`);
+    }
 
     // Emit DA records for all executable lines
     const allLines = new Set([...file.executableLines, ...file.lineHits.keys()]);

@@ -73,25 +73,38 @@ function parseLcov(content: string): LcovData {
   return { files };
 }
 
+interface AnvilFileData {
+  lines: Map<number, number>;
+  /** function name -> hit count */
+  functionHits: Map<string, number>;
+}
+
 /**
- * Parses only DA hit counts from an LCOV file (lightweight, for the secondary input).
+ * Parses DA and FNDA records from an LCOV file (for the secondary/Anvil input).
  */
-function parseHitsOnly(content: string): Map<string, Map<number, number>> {
-  const files = new Map<string, Map<number, number>>();
+function parseAnvilData(content: string): Map<string, AnvilFileData> {
+  const files = new Map<string, AnvilFileData>();
   let currentFile: string | null = null;
   let currentLines = new Map<number, number>();
+  let currentFnHits = new Map<string, number>();
 
   for (const line of content.split("\n")) {
     if (line.startsWith("SF:")) {
       currentFile = line.substring(3);
       currentLines = new Map();
+      currentFnHits = new Map();
     } else if (line.startsWith("DA:") && currentFile) {
       const parts = line.substring(3).split(",");
       const lineNum = parseInt(parts[0], 10);
       const hits = parseInt(parts[1], 10);
       currentLines.set(lineNum, Math.max(currentLines.get(lineNum) || 0, hits));
+    } else if (line.startsWith("FNDA:") && currentFile) {
+      const parts = line.substring(5).split(",");
+      const hits = parseInt(parts[0], 10);
+      const name = parts.slice(1).join(","); // function name may not contain commas, but be safe
+      currentFnHits.set(name, Math.max(currentFnHits.get(name) || 0, hits));
     } else if (line === "end_of_record" && currentFile) {
-      files.set(currentFile, currentLines);
+      files.set(currentFile, { lines: currentLines, functionHits: currentFnHits });
       currentFile = null;
     }
   }
@@ -192,36 +205,70 @@ if (!fs.existsSync(anvilPath)) {
   process.exit(0);
 }
 
-// Parse Anvil LCOV (only need hit counts)
-const anvilHits = parseHitsOnly(fs.readFileSync(anvilPath, "utf-8"));
+// Parse Anvil LCOV (DA + FNDA)
+const anvilData = parseAnvilData(fs.readFileSync(anvilPath, "utf-8"));
 let anvilFiles = 0;
 let anvilLines = 0;
 let anvilHit = 0;
-for (const [, lines] of anvilHits) {
+for (const [, data] of anvilData) {
   anvilFiles++;
-  for (const [, hits] of lines) {
+  for (const [, hits] of data.lines) {
     anvilLines++;
     if (hits > 0) anvilHit++;
   }
 }
 printSummary("Anvil interop", anvilFiles, anvilLines, anvilHit);
 
-// Merge: use Foundry as the base, add Anvil hits only for lines already in Foundry
+// Merge: use Foundry as the base, add Anvil hits only for lines/functions already in Foundry
 let linesEnhanced = 0;
-for (const [file, record] of foundry.files) {
-  const anvilFileHits = anvilHits.get(file);
-  if (!anvilFileHits) continue;
+let functionsEnhanced = 0;
 
+for (const [file, record] of foundry.files) {
+  const anvilFile = anvilData.get(file);
+  if (!anvilFile) continue;
+
+  // Merge line hits
   for (const [lineNum, foundryHits] of record.lines) {
-    const anvilLineHits = anvilFileHits.get(lineNum);
+    const anvilLineHits = anvilFile.lines.get(lineNum);
     if (anvilLineHits !== undefined && anvilLineHits > foundryHits) {
       record.lines.set(lineNum, anvilLineHits);
       if (foundryHits === 0) linesEnhanced++;
     }
   }
+
+  // Merge function hits: boost FNDA counts in the preamble
+  if (anvilFile.functionHits.size > 0) {
+    record.preamble = record.preamble.map((line) => {
+      if (!line.startsWith("FNDA:")) return line;
+      const parts = line.substring(5).split(",");
+      const foundryFnHits = parseInt(parts[0], 10);
+      const fnName = parts.slice(1).join(",");
+      const anvilFnHits = anvilFile.functionHits.get(fnName) || 0;
+      if (anvilFnHits > 0 && foundryFnHits === 0) {
+        functionsEnhanced++;
+        return `FNDA:${anvilFnHits},${fnName}`;
+      }
+      if (anvilFnHits > foundryFnHits) {
+        return `FNDA:${anvilFnHits},${fnName}`;
+      }
+      return line;
+    });
+
+    // Update FNH count if we enhanced functions
+    if (functionsEnhanced > 0) {
+      record.preamble = record.preamble.map((line) => {
+        if (!line.startsWith("FNH:")) return line;
+        const currentHit = parseInt(line.substring(4), 10);
+        return `FNH:${currentHit + functionsEnhanced}`;
+      });
+    }
+  }
 }
 
 console.log(`\n  Anvil added coverage for ${linesEnhanced} previously-uncovered lines`);
+if (functionsEnhanced > 0) {
+  console.log(`  Anvil added coverage for ${functionsEnhanced} previously-uncovered functions`);
+}
 
 const mergedStats = countLcov(foundry);
 printSummary("Merged", mergedStats.files, mergedStats.lines, mergedStats.hit);

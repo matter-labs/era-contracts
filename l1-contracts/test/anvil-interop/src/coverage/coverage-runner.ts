@@ -17,6 +17,8 @@ import {
   loadSourceContents,
   resolveSourceLocations,
   getExecutableLines,
+  extractFunctions,
+  resolveFunctionHits,
   loadContractSourceMap,
   type SourceIdMap,
   type ContractSourceMap,
@@ -154,13 +156,44 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
 
   console.log(`  Coverage data for ${fileHitLines.size} source files`);
 
-  // 7. Compute executable lines for all covered files
-  console.log("\n🔍 Step 7: Computing executable line sets...");
+  // 7. Compute executable lines and extract function data
+  console.log("\n🔍 Step 7: Computing executable lines and extracting functions...");
   const allContractMaps: ContractSourceMap[] = resolvedContracts
     .map((c) => c.sourceMap)
     .filter((sm): sm is ContractSourceMap => sm !== null);
 
+  // Build a map of source file -> list of contract names that compile from it
+  // (used for function extraction — we need the contract name for qualified names)
+  const fileToContractNames = new Map<string, Set<string>>();
+  for (const contract of resolvedContracts) {
+    // The artifact's compilationTarget tells us which file this contract comes from.
+    // We can infer the file from the source map: the majority of entries point to the main file.
+    // Simpler: use the contract name and find it in source files via function parsing.
+    const name = contract.name.replace(/ \(impl\)$/, ""); // strip " (impl)" suffix
+    // Get the compilation target file from the artifact metadata
+    try {
+      const artifact = JSON.parse(fs.readFileSync(contract.artifactPath, "utf-8"));
+      const rawMeta = artifact.metadata || artifact.rawMetadata || "{}";
+      const metadata = typeof rawMeta === "string" ? JSON.parse(rawMeta) : rawMeta;
+      const target = metadata.settings?.compilationTarget;
+      if (target) {
+        for (const filePath of Object.keys(target)) {
+          let names = fileToContractNames.get(filePath);
+          if (!names) {
+            names = new Set();
+            fileToContractNames.set(filePath, names);
+          }
+          names.add(name);
+        }
+      }
+    } catch {
+      // Skip if metadata unavailable
+    }
+  }
+
   const coverageData: FileCoverage[] = [];
+  let totalFunctions = 0;
+  let totalFunctionsHit = 0;
 
   // Include all source files that have contract code (not just hit files)
   for (const [, filePath] of Object.entries(sourceIdMap)) {
@@ -178,11 +211,34 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
       lineHits.set(line, hitLines.has(line) ? 1 : 0);
     }
 
+    // Extract function data for contracts compiled from this file
+    const contractNames = fileToContractNames.get(filePath);
+    let functions: Array<{ qualifiedName: string; line: number; hit: boolean }> | undefined;
+
+    if (contractNames) {
+      functions = [];
+      for (const contractName of contractNames) {
+        const fnInfos = extractFunctions(contractName, filePath, sourceContents);
+        const fnHits = resolveFunctionHits(fnInfos, hitLines);
+        for (const fn of fnInfos) {
+          const hit = fnHits.get(fn.qualifiedName) || false;
+          functions.push({ qualifiedName: fn.qualifiedName, line: fn.line, hit });
+          totalFunctions++;
+          if (hit) totalFunctionsHit++;
+        }
+      }
+    }
+
     coverageData.push({
       filePath,
       lineHits,
       executableLines,
+      functions,
     });
+  }
+
+  if (totalFunctions > 0) {
+    console.log(`  Functions: ${totalFunctionsHit}/${totalFunctions} hit`);
   }
 
   // 8. Filter and generate output

@@ -215,6 +215,91 @@ export function loadSourceContents(sourceIdMap: SourceIdMap, projectRoot: string
   return contents;
 }
 
+export interface FunctionInfo {
+  /** Function name as it appears in LCOV: "ContractName.functionName" */
+  qualifiedName: string;
+  /** 1-based line number of the function declaration */
+  line: number;
+  /** The source file path */
+  file: string;
+}
+
+/**
+ * Extracts function declarations from a contract's source file.
+ *
+ * Parses `function <name>(` and `constructor(` patterns from the source,
+ * qualifying names as `ContractName.functionName` to match Forge's LCOV format.
+ */
+export function extractFunctions(
+  contractName: string,
+  filePath: string,
+  sourceContents: Map<string, string>
+): FunctionInfo[] {
+  const content = sourceContents.get(filePath);
+  if (!content) return [];
+
+  const functions: FunctionInfo[] = [];
+  const lines = content.split("\n");
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Match: function <name>(  or  constructor(
+    const funcMatch = line.match(/\bfunction\s+(\w+)\s*\(/);
+    const ctorMatch = line.match(/\bconstructor\s*\(/);
+
+    if (funcMatch) {
+      functions.push({
+        qualifiedName: `${contractName}.${funcMatch[1]}`,
+        line: i + 1,
+        file: filePath,
+      });
+    } else if (ctorMatch) {
+      functions.push({
+        qualifiedName: `${contractName}.constructor`,
+        line: i + 1,
+        file: filePath,
+      });
+    }
+  }
+
+  return functions;
+}
+
+/**
+ * Determines which functions were hit based on line coverage data.
+ *
+ * A function is considered hit if any executable line between its declaration
+ * and the next function declaration (or EOF) was covered.
+ *
+ * @returns Map of qualifiedName -> hit (true/false)
+ */
+export function resolveFunctionHits(
+  functions: FunctionInfo[],
+  hitLines: Set<number>
+): Map<string, boolean> {
+  const result = new Map<string, boolean>();
+
+  // Sort by line number to determine function boundaries
+  const sorted = [...functions].sort((a, b) => a.line - b.line);
+
+  for (let i = 0; i < sorted.length; i++) {
+    const startLine = sorted[i].line;
+    const endLine = i + 1 < sorted.length ? sorted[i + 1].line - 1 : startLine + 200;
+
+    let hit = false;
+    for (let line = startLine; line <= endLine; line++) {
+      if (hitLines.has(line)) {
+        hit = true;
+        break;
+      }
+    }
+
+    result.set(sorted[i].qualifiedName, hit);
+  }
+
+  return result;
+}
+
 /**
  * Counts the total number of executable lines in a source file by checking
  * which lines appear in any contract's source map.
