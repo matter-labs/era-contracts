@@ -1,0 +1,114 @@
+{
+  "abi": [
+    { "type": "receive", "stateMutability": "payable" },
+    { "type": "function", "name": "callSelf", "inputs": [], "outputs": [], "stateMutability": "payable" },
+    {
+      "type": "function",
+      "name": "receiveMessage",
+      "inputs": [
+        { "name": "receiveId", "type": "bytes32", "internalType": "bytes32" },
+        { "name": "sender", "type": "bytes", "internalType": "bytes" },
+        { "name": "payload", "type": "bytes", "internalType": "bytes" }
+      ],
+      "outputs": [{ "name": "", "type": "bytes4", "internalType": "bytes4" }],
+      "stateMutability": "payable"
+    },
+    {
+      "type": "function",
+      "name": "selector",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "bytes4", "internalType": "bytes4" }],
+      "stateMutability": "view"
+    }
+  ],
+  "bytecode": {
+    "object": "0x6080604052348015600e575f5ffd5b5061037d8061001c5f395ff3fe608060405260043610610036575f3560e01c80630adfba60146100415780632432ef261461004b578063ea3d508a146100b8575f5ffd5b3661003d57005b5f5ffd5b6100496100d0565b005b610083610059366004610208565b7f2432ef260000000000000000000000000000000000000000000000000000000095945050505050565b6040517fffffffff00000000000000000000000000000000000000000000000000000000909116815260200160405180910390f35b3480156100c3575f5ffd5b505f546100839060e01b81565b60408051808201825260028082527f307800000000000000000000000000000000000000000000000000000000000060208084018290528451808601865292835282015291517f2432ef260000000000000000000000000000000000000000000000000000000081523092632432ef2692610150925f92906004016102cd565b6020604051808303815f875af115801561016c573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906101909190610301565b5f80547fffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000001660e09290921c919091179055565b5f5f83601f8401126101d3575f5ffd5b50813567ffffffffffffffff8111156101ea575f5ffd5b602083019150836020828501011115610201575f5ffd5b9250929050565b5f5f5f5f5f6060868803121561021c575f5ffd5b85359450602086013567ffffffffffffffff811115610239575f5ffd5b610245888289016101c3565b909550935050604086013567ffffffffffffffff811115610264575f5ffd5b610270888289016101c3565b969995985093965092949392505050565b5f81518084528060208401602086015e5f6020828601015260207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f83011685010191505092915050565b838152606060208201525f6102e56060830185610281565b82810360408401526102f78185610281565b9695505050505050565b5f60208284031215610311575f5ffd5b81517fffffffff0000000000000000000000000000000000000000000000000000000081168114610340575f5ffd5b939250505056fea26469706673582212203dafed18a16123970cc6400b6d113b872e9a1db5d157440e702b5bc387ebb3bd64736f6c634300081c0033",
+    "sourceMap": "131:553:148:-:0;;;;;;;;;;;;;;;;;;;",
+    "linkReferences": {}
+  },
+  "deployedBytecode": {
+    "object": "0x608060405260043610610036575f3560e01c80630adfba60146100415780632432ef261461004b578063ea3d508a146100b8575f5ffd5b3661003d57005b5f5ffd5b6100496100d0565b005b610083610059366004610208565b7f2432ef260000000000000000000000000000000000000000000000000000000095945050505050565b6040517fffffffff00000000000000000000000000000000000000000000000000000000909116815260200160405180910390f35b3480156100c3575f5ffd5b505f546100839060e01b81565b60408051808201825260028082527f307800000000000000000000000000000000000000000000000000000000000060208084018290528451808601865292835282015291517f2432ef260000000000000000000000000000000000000000000000000000000081523092632432ef2692610150925f92906004016102cd565b6020604051808303815f875af115801561016c573d5f5f3e3d5ffd5b505050506040513d601f19601f820116820180604052508101906101909190610301565b5f80547fffffffffffffffffffffffffffffffffffffffffffffffffffffffff000000001660e09290921c919091179055565b5f5f83601f8401126101d3575f5ffd5b50813567ffffffffffffffff8111156101ea575f5ffd5b602083019150836020828501011115610201575f5ffd5b9250929050565b5f5f5f5f5f6060868803121561021c575f5ffd5b85359450602086013567ffffffffffffffff811115610239575f5ffd5b610245888289016101c3565b909550935050604086013567ffffffffffffffff811115610264575f5ffd5b610270888289016101c3565b969995985093965092949392505050565b5f81518084528060208401602086015e5f6020828601015260207fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe0601f83011685010191505092915050565b838152606060208201525f6102e56060830185610281565b82810360408401526102f78185610281565b9695505050505050565b5f60208284031215610311575f5ffd5b81517fffffffff0000000000000000000000000000000000000000000000000000000081168114610340575f5ffd5b939250505056fea26469706673582212203dafed18a16123970cc6400b6d113b872e9a1db5d157440e702b5bc387ebb3bd64736f6c634300081c0033",
+    "sourceMap": "131:553:148:-:0;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;560:122;;;:::i;:::-;;294:260;;;;;;:::i;:::-;506:41;294:260;;;;;;;;;;;1325:66:871;1313:79;;;1295:98;;1283:2;1268:18;294:260:148;;;;;;;189:22;;;;;;;;;;-1:-1:-1;189:22:148;;;;;;;;560:122;650:11;;;;;;;;;;;;;;;;;;;;663;;;;;;;;;;;;;618:57;;;;;:4;;:19;;:57;;646:1;;663:11;618:57;;;:::i;:::-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;:::i;:::-;607:8;:68;;;;;;;;;;;;;;;560:122::o;14:347:871:-;65:8;75:6;129:3;122:4;114:6;110:17;106:27;96:55;;147:1;144;137:12;96:55;-1:-1:-1;170:20:871;;213:18;202:30;;199:50;;;245:1;242;235:12;199:50;282:4;274:6;270:17;258:29;;334:3;327:4;318:6;310;306:19;302:30;299:39;296:59;;;351:1;348;341:12;296:59;14:347;;;;;:::o;366:780::-;465:6;473;481;489;497;550:2;538:9;529:7;525:23;521:32;518:52;;;566:1;563;556:12;518:52;602:9;589:23;579:33;;663:2;652:9;648:18;635:32;690:18;682:6;679:30;676:50;;;722:1;719;712:12;676:50;761:58;811:7;802:6;791:9;787:22;761:58;:::i;:::-;838:8;;-1:-1:-1;735:84:871;-1:-1:-1;;926:2:871;911:18;;898:32;955:18;942:32;;939:52;;;987:1;984;977:12;939:52;1026:60;1078:7;1067:8;1056:9;1052:24;1026:60;:::i;:::-;366:780;;;;-1:-1:-1;366:780:871;;-1:-1:-1;1105:8:871;;1000:86;366:780;-1:-1:-1;;;366:780:871:o;1404:347::-;1445:3;1483:5;1477:12;1510:6;1505:3;1498:19;1566:6;1559:4;1552:5;1548:16;1541:4;1536:3;1532:14;1526:47;1618:1;1611:4;1602:6;1597:3;1593:16;1589:27;1582:38;1740:4;1670:66;1665:2;1657:6;1653:15;1649:88;1644:3;1640:98;1636:109;1629:116;;;1404:347;;;;:::o;1756:448::-;1977:6;1966:9;1959:25;2020:2;2015;2004:9;2000:18;1993:30;1940:4;2046:44;2086:2;2075:9;2071:18;2063:6;2046:44;:::i;:::-;2138:9;2130:6;2126:22;2121:2;2110:9;2106:18;2099:50;2166:32;2191:6;2183;2166:32;:::i;:::-;2158:40;1756:448;-1:-1:-1;;;;;;1756:448:871:o;2209:336::-;2278:6;2331:2;2319:9;2310:7;2306:23;2302:32;2299:52;;;2347:1;2344;2337:12;2299:52;2379:9;2373:16;2429:66;2422:5;2418:78;2411:5;2408:89;2398:117;;2511:1;2508;2501:12;2398:117;2534:5;2209:336;-1:-1:-1;;;2209:336:871:o",
+    "linkReferences": {}
+  },
+  "methodIdentifiers": {
+    "callSelf()": "0adfba60",
+    "receiveMessage(bytes32,bytes,bytes)": "2432ef26",
+    "selector()": "ea3d508a"
+  },
+  "rawMetadata": "{\"compiler\":{\"version\":\"0.8.28+commit.7893614a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[],\"name\":\"callSelf\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"receiveId\",\"type\":\"bytes32\"},{\"internalType\":\"bytes\",\"name\":\"sender\",\"type\":\"bytes\"},{\"internalType\":\"bytes\",\"name\":\"payload\",\"type\":\"bytes\"}],\"name\":\"receiveMessage\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"selector\",\"outputs\":[{\"internalType\":\"bytes4\",\"name\":\"\",\"type\":\"bytes4\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"stateMutability\":\"payable\",\"type\":\"receive\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"contracts/dev-contracts/test/DummyInteropRecipient.sol\":\"DummyInteropRecipient\"},\"evmVersion\":\"prague\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":9999999},\"remappings\":[\":@ensdomains/=node_modules/@ensdomains/\",\":@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/\",\":@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/\",\":ds-test/=lib/forge-std/lib/ds-test/src/\",\":erc4626-tests/=lib/openzeppelin-contracts-upgradeable-v4/lib/erc4626-tests/\",\":eth-gas-reporter/=node_modules/eth-gas-reporter/\",\":forge-std/=lib/forge-std/src/\",\":foundry-test/=test/foundry/\",\":hardhat/=node_modules/hardhat/\",\":l2-contracts/=../l2-contracts/contracts/\",\":murky/=lib/murky/src/\",\":openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/\",\":openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/\",\":openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/\",\":system-contracts/=../system-contracts/\"]},\"sources\":{\"contracts/dev-contracts/test/DummyInteropRecipient.sol\":{\"keccak256\":\"0xf4c73dce3ef639a8a66f9a16763a9f7c3fb0f8d6d2dabd283a38e1e4b55fdee8\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://46292ad00c039ab0a917085cea1b93d3bd37a20121fdf2635314b77c7efcf538\",\"dweb:/ipfs/QmXnUgCm65JarPDWA4VSkKWs6taNooWxAXPVzvJ3fkwYis\"]},\"contracts/interop/IERC7786Recipient.sol\":{\"keccak256\":\"0xa3ab76c78cae80115f5f572f97d10784fe4ac9f776112a22550be0f79fcb89a5\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://442579171b1fb63ea0777380ade6e2641cc59414cc869649940c555dbc8e4faf\",\"dweb:/ipfs/Qme9H4REXeT5UuduFnneeaiV7zMLZNmrTPr56ejGSCLZZi\"]}},\"version\":1}",
+  "metadata": {
+    "compiler": { "version": "0.8.28+commit.7893614a" },
+    "language": "Solidity",
+    "output": {
+      "abi": [
+        { "inputs": [], "stateMutability": "payable", "type": "function", "name": "callSelf" },
+        {
+          "inputs": [
+            { "internalType": "bytes32", "name": "receiveId", "type": "bytes32" },
+            { "internalType": "bytes", "name": "sender", "type": "bytes" },
+            { "internalType": "bytes", "name": "payload", "type": "bytes" }
+          ],
+          "stateMutability": "payable",
+          "type": "function",
+          "name": "receiveMessage",
+          "outputs": [{ "internalType": "bytes4", "name": "", "type": "bytes4" }]
+        },
+        {
+          "inputs": [],
+          "stateMutability": "view",
+          "type": "function",
+          "name": "selector",
+          "outputs": [{ "internalType": "bytes4", "name": "", "type": "bytes4" }]
+        },
+        { "inputs": [], "stateMutability": "payable", "type": "receive" }
+      ],
+      "devdoc": { "kind": "dev", "methods": {}, "version": 1 },
+      "userdoc": { "kind": "user", "methods": {}, "version": 1 }
+    },
+    "settings": {
+      "remappings": [
+        "@ensdomains/=node_modules/@ensdomains/",
+        "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
+        "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
+        "ds-test/=lib/forge-std/lib/ds-test/src/",
+        "erc4626-tests/=lib/openzeppelin-contracts-upgradeable-v4/lib/erc4626-tests/",
+        "eth-gas-reporter/=node_modules/eth-gas-reporter/",
+        "forge-std/=lib/forge-std/src/",
+        "foundry-test/=test/foundry/",
+        "hardhat/=node_modules/hardhat/",
+        "l2-contracts/=../l2-contracts/contracts/",
+        "murky/=lib/murky/src/",
+        "openzeppelin-contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/",
+        "openzeppelin-contracts-v4/=lib/openzeppelin-contracts-v4/",
+        "openzeppelin-contracts/=lib/murky/lib/openzeppelin-contracts/",
+        "system-contracts/=../system-contracts/"
+      ],
+      "optimizer": { "enabled": true, "runs": 9999999 },
+      "metadata": { "bytecodeHash": "ipfs" },
+      "compilationTarget": { "contracts/dev-contracts/test/DummyInteropRecipient.sol": "DummyInteropRecipient" },
+      "evmVersion": "prague",
+      "libraries": {}
+    },
+    "sources": {
+      "contracts/dev-contracts/test/DummyInteropRecipient.sol": {
+        "keccak256": "0xf4c73dce3ef639a8a66f9a16763a9f7c3fb0f8d6d2dabd283a38e1e4b55fdee8",
+        "urls": [
+          "bzz-raw://46292ad00c039ab0a917085cea1b93d3bd37a20121fdf2635314b77c7efcf538",
+          "dweb:/ipfs/QmXnUgCm65JarPDWA4VSkKWs6taNooWxAXPVzvJ3fkwYis"
+        ],
+        "license": "MIT"
+      },
+      "contracts/interop/IERC7786Recipient.sol": {
+        "keccak256": "0xa3ab76c78cae80115f5f572f97d10784fe4ac9f776112a22550be0f79fcb89a5",
+        "urls": [
+          "bzz-raw://442579171b1fb63ea0777380ade6e2641cc59414cc869649940c555dbc8e4faf",
+          "dweb:/ipfs/Qme9H4REXeT5UuduFnneeaiV7zMLZNmrTPr56ejGSCLZZi"
+        ],
+        "license": "MIT"
+      }
+    },
+    "version": 1
+  },
+  "id": 148
+}

@@ -117,13 +117,25 @@ export function expectBalanceDelta(before: BigNumber, after: BigNumber, expected
  * Assert that an async call reverts (throws).
  * Optionally match the error message against `expectedReason` (substring match).
  */
-export async function expectRevert(fn: () => Promise<unknown>, label: string, expectedReason?: string): Promise<void> {
+export async function expectRevert(
+  fn: () => Promise<unknown>,
+  label: string,
+  expectedReason?: string
+): Promise<void> {
   try {
     await fn();
   } catch (err: unknown) {
     if (expectedReason) {
+      // Check both the JS error message and the on-chain revert data
       const msg = err instanceof Error ? err.message : String(err);
-      expect(msg, `${label}: revert reason mismatch`).to.include(expectedReason);
+      const hasReasonInMessage = msg.includes(expectedReason);
+      // ethers v5 embeds the revert data in error.error.data or error.data
+      const errorData = (err as any)?.error?.data || (err as any)?.data || "";
+      const hasReasonInData = typeof errorData === "string" && errorData.includes(expectedReason);
+      expect(
+        hasReasonInMessage || hasReasonInData,
+        `${label}: revert reason mismatch — expected "${expectedReason}" in message or data.\nMessage: ${msg.slice(0, 200)}\nData: ${String(errorData).slice(0, 200)}`
+      ).to.be.true;
     }
     return; // reverted as expected
   }

@@ -48,6 +48,7 @@ const REQUIRED_CONTRACTS = [
   "ISetupLegacyBridge.sol",
   "DefaultUpgrade.sol",
   // Used by anvil-interop test suite (contracts.ts)
+  "DummyInteropRecipient.sol",
   "GWAssetTracker.sol",
   "L2Bridgehub.sol",
   "InteropCenter.sol",
