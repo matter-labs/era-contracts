@@ -440,6 +440,26 @@ jobs:
         if: always()
         run: pkill -9 anvil 2>/dev/null || true
 
+      - name: Filter Anvil coverage directories
+        if: success()
+        run: |
+          lcov --ignore-errors unused --remove coverage/anvil/anvil-lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file coverage/anvil/anvil-lcov.info --rc branch_coverage=1
+
+      - name: Post Anvil interop coverage report
+        if: success()
+        run: |
+          {
+            echo "## Anvil Interop Coverage Report"
+            echo ""
+            echo '```'
+            lcov --summary coverage/anvil/anvil-lcov.info --rc branch_coverage=1 2>&1
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate Anvil untested lines report
+        if: success()
+        run: npx ts-node scripts/generate-untested-lines-report.ts coverage/anvil/anvil-lcov.info coverage/anvil/ANVIL_UNTESTED_LINES_REPORT.md
+
       - name: Merge Foundry + Anvil coverage
         if: success()
         run: yarn coverage:merge
@@ -473,6 +493,7 @@ jobs:
             l1-contracts/lcov.info
             l1-contracts/coverage/anvil/anvil-lcov.info
             l1-contracts/coverage/anvil/anvil-coverage-summary.txt
+            l1-contracts/coverage/anvil/ANVIL_UNTESTED_LINES_REPORT.md
             l1-contracts/coverage/merged-lcov.info
             l1-contracts/coverage/MERGED_UNTESTED_LINES_REPORT.md
           if-no-files-found: warn
