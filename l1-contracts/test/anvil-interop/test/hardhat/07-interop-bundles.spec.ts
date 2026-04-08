@@ -419,7 +419,11 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     expect(receipt.status).to.equal(1);
 
     // Second execution with same data should revert
-    await expectRevert(() => executeBundle(destProvider, sendResult.bundleData, sourceChainId), "replay executeBundle");
+    await expectRevert(
+      () => executeBundle(destProvider, sendResult.bundleData, sourceChainId),
+      "replay executeBundle",
+      "0x5bba5111" // BundleAlreadyProcessed(bytes32)
+    );
 
     console.log("   [edge] Replay protection verified");
   });
@@ -450,7 +454,8 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     // Attempt to execute from the default account (which is NOT the executionAddress)
     await expectRevert(
       () => executeBundle(destProvider, sendResult.bundleData, sourceChainId),
-      "execute from wrong executionAddress"
+      "execute from wrong executionAddress",
+      "0xe845be4c" // ExecutingNotAllowed(bytes32,bytes,bytes)
     );
 
     console.log("   [edge] executionAddress enforcement verified");
@@ -500,7 +505,8 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
           bundleAttributes,
           value: excessValue,
         }),
-      "excess msg.value"
+      "excess msg.value",
+      "0x4a094431" // MsgValueMismatch(uint256,uint256)
     );
 
     console.log("   [edge] Excess msg.value rejected");

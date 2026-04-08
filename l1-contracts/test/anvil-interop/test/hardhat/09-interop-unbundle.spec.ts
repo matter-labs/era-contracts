@@ -174,7 +174,8 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const callStatuses = [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed];
     await expectRevert(
       () => unbundleBundle(destProvider, bundleData, callStatuses, ANVIL_ACCOUNT2_PRIVATE_KEY),
-      "unbundle non-verified bundle"
+      "unbundle non-verified bundle",
+      "0xf729f26d" // CanNotUnbundle(bytes32)
     );
   });
 
@@ -205,7 +206,8 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const callStatuses = [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed];
     await expectRevert(
       () => unbundleBundle(destProvider, bundleData, callStatuses),
-      "unbundle from wrong address"
+      "unbundle from wrong address",
+      "0x0345c281" // UnbundlingNotAllowed(bytes32,bytes,bytes)
     );
   });
 
@@ -312,7 +314,8 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const callStatuses = [CallStatus.Executed, CallStatus.Unprocessed, CallStatus.Executed];
     await expectRevert(
       () => unbundleBundle(destProvider, bundleData, callStatuses, ANVIL_ACCOUNT2_PRIVATE_KEY),
-      "re-execute processed calls"
+      "re-execute processed calls",
+      "0xc087b727" // CallNotExecutable(bytes32,uint256)
     );
   });
 
@@ -337,7 +340,8 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const callStatuses = [CallStatus.Unprocessed, CallStatus.Executed, CallStatus.Unprocessed];
     await expectRevert(
       () => unbundleBundle(destProvider, bundleData, callStatuses, ANVIL_ACCOUNT2_PRIVATE_KEY),
-      "execute a cancelled call"
+      "execute a cancelled call",
+      "0xd5c7a376" // CallAlreadyExecuted(bytes32,uint256)
     );
   });
 
@@ -378,7 +382,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const metaBundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
 
     // Resolve destination token address
-    const destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
+    let destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
 
     // Capture balances before execution
     const baseBalanceBefore = await getNativeBalance(destProvider, dummyRecipient);
@@ -403,6 +407,10 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     expect(statusB, "Bundle should be in Unbundled status after meta-bundle").to.equal(BundleStatus.Unbundled);
 
     // Check balance deltas
+    destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
+    expect(destTokenAddress, "bridged token should be deployed by the meta-bundle").to.not.equal(
+      ethers.constants.AddressZero
+    );
     const baseBalanceAfter = await getNativeBalance(destProvider, dummyRecipient);
     const tokenBalanceAfter = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
 
