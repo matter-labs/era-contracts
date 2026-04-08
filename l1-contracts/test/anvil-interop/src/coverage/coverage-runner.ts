@@ -236,7 +236,14 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
 
   // 8. Filter and generate output
   console.log("\n🔍 Step 8: Generating coverage report...");
-  const filteredCoverage = filterCoverageFiles(coverageData);
+  const filteredCoverage = filterCoverageFiles(coverageData, {
+    excludeInterfaces: true,
+    excludePatterns: [
+      /\/Config\.sol$/, // Pure constants
+      /\/Messaging\.sol$/, // Struct definitions
+      /\/L2ContractAddresses\.sol$/, // Address constants
+    ],
+  });
 
   const lcovContent = generateLcov(filteredCoverage);
   const lcovPath = path.join(coverageDir, "anvil-lcov.info");

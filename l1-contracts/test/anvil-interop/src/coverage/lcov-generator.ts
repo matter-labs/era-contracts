@@ -175,8 +175,8 @@ export function filterCoverageFiles(
   return coverageData.filter((file) => {
     const p = file.filePath;
 
-    // Must be a contracts file
-    if (!p.startsWith("contracts/") && !p.includes("/contracts/")) {
+    // Must start with contracts/ (excludes ../system-contracts/, lib/, etc.)
+    if (!p.startsWith("contracts/")) {
       return false;
     }
 
@@ -190,6 +190,14 @@ export function filterCoverageFiles(
 
     if (opts.excludeLibs && (p.startsWith("lib/") || p.includes("/lib/"))) {
       return false;
+    }
+
+    if (opts.excludeInterfaces) {
+      // Exclude interface files: contracts/*/I*.sol or contracts/*/interfaces/*.sol
+      const basename = path.basename(p, ".sol");
+      if (/^I[A-Z]/.test(basename) || p.includes("/interfaces/")) {
+        return false;
+      }
     }
 
     for (const pattern of opts.excludePatterns!) {
