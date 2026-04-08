@@ -129,3 +129,13 @@ export async function expectRevert(fn: () => Promise<unknown>, label: string, ex
   }
   expect.fail(`${label}: expected revert but call succeeded`);
 }
+
+/**
+ * Generate a random BigNumber between min and max (inclusive).
+ * Useful for randomizing test amounts so tests don't pass only for specific values.
+ */
+export function randomBigNumber(min: BigNumber, max: BigNumber): BigNumber {
+  const range = max.sub(min);
+  const randomHex = ethers.utils.hexlify(ethers.utils.randomBytes(32));
+  return min.add(BigNumber.from(randomHex).mod(range.add(1)));
+}

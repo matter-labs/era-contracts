@@ -30,13 +30,14 @@ import {
   expectNativeSpend,
   expectBalanceDelta,
   expectRevert,
+  randomBigNumber,
 } from "../../src/helpers/balance-helpers";
 
-/** Base token transfer amount (100 gwei — small enough to avoid balance issues, large enough to detect). */
-const BASE_TOKEN_AMOUNT = ethers.utils.parseUnits("100", "gwei");
-
-/** ERC20 token transfer amount (500 smallest units). */
-const ERC20_TOKEN_AMOUNT = BigNumber.from(500);
+// Randomized per-test amount ranges (small enough for balance safety, large enough to detect)
+const BASE_TOKEN_MIN = ethers.utils.parseUnits("10", "gwei");
+const BASE_TOKEN_MAX = ethers.utils.parseUnits("1000", "gwei");
+const ERC20_TOKEN_MIN = BigNumber.from(100);
+const ERC20_TOKEN_MAX = BigNumber.from(10000);
 
 describe("07 - Interop Bundles (GW-settled chains)", function () {
   this.timeout(0);
@@ -96,7 +97,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   });
 
   it("can send and execute a single direct call bundle", async () => {
-    const amount = BASE_TOKEN_AMOUNT;
+    const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
     const msgValue = interopFee.add(amount);
 
     const callStarters: CallStarter[] = [
@@ -142,7 +143,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   });
 
   it("can send and execute a single indirect call bundle", async () => {
-    const tokenAmount = ERC20_TOKEN_AMOUNT;
+    const tokenAmount = randomBigNumber(ERC20_TOKEN_MIN, ERC20_TOKEN_MAX);
     const msgValue = interopFee;
 
     await approveTokenForNtv(sourceProvider, sourceTokenAddress, tokenAmount);
@@ -198,7 +199,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   });
 
   it("can send and execute a two direct call bundle", async () => {
-    const amount = BASE_TOKEN_AMOUNT;
+    const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
     const msgValue = interopFee.mul(2).add(amount.mul(2));
 
     const callStarters: CallStarter[] = [
@@ -253,7 +254,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   });
 
   it("can send and execute a two indirect call bundle", async () => {
-    const tokenAmount = ERC20_TOKEN_AMOUNT;
+    const tokenAmount = randomBigNumber(ERC20_TOKEN_MIN, ERC20_TOKEN_MAX);
     const totalTokenAmount = tokenAmount.mul(2);
     const msgValue = interopFee.mul(2);
 
@@ -325,8 +326,8 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   });
 
   it("can send and execute a mixed call bundle", async () => {
-    const valueAmount = BASE_TOKEN_AMOUNT;
-    const tokenAmount = ERC20_TOKEN_AMOUNT;
+    const valueAmount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
+    const tokenAmount = randomBigNumber(ERC20_TOKEN_MIN, ERC20_TOKEN_MAX);
     const msgValue = interopFee.mul(2).add(valueAmount);
 
     await approveTokenForNtv(sourceProvider, sourceTokenAddress, tokenAmount);
@@ -392,7 +393,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   // ─── Edge cases ──────────────────────────────────────────────
 
   it("cannot execute the same bundle twice (replay protection)", async () => {
-    const amount = BASE_TOKEN_AMOUNT;
+    const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
     const msgValue = interopFee.add(amount);
 
     const callStarters: CallStarter[] = [
@@ -424,7 +425,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   });
 
   it("cannot execute a bundle from a non-matching executionAddress", async () => {
-    const amount = BASE_TOKEN_AMOUNT;
+    const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
     const msgValue = interopFee.add(amount);
 
     const callStarters: CallStarter[] = [
@@ -476,7 +477,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   });
 
   it("rejects a bundle with excess msg.value", async () => {
-    const amount = BASE_TOKEN_AMOUNT;
+    const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
     const correctValue = interopFee.add(amount);
     const excessValue = correctValue.add(ethers.utils.parseEther("1"));
 

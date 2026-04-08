@@ -29,6 +29,7 @@ import {
   approveTokenForNtv,
   expectNativeSpend,
   expectBalanceDelta,
+  randomBigNumber,
 } from "../../src/helpers/balance-helpers";
 
 /**
@@ -60,9 +61,11 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
   let sourceTokenAddress: string;
   let sourceAssetId: string;
 
-  // Amount constants
-  const BASE_TOKEN_AMOUNT = ethers.utils.parseEther("1");
-  const ERC20_AMOUNT = ethers.utils.parseUnits("10", 18);
+  // Randomized per-test amount ranges
+  const BASE_TOKEN_MIN = ethers.utils.parseUnits("100", "gwei");
+  const BASE_TOKEN_MAX = ethers.utils.parseUnits("10000", "gwei");
+  const ERC20_MIN = ethers.utils.parseUnits("1", 18);
+  const ERC20_MAX = ethers.utils.parseUnits("100", 18);
 
   // Chain with a custom (non-ETH) base token for cross-base-token tests
   let customBaseTokenChainId: number | undefined;
@@ -114,10 +117,11 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
   });
 
   it("can send and receive a base token message (direct call with value)", async function () {
+    const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
     const recipient = encodeEvmChainAddress(dummyRecipient, destChainId);
     const payload = "0x";
-    const attributes = [interopCallValueAttr(BASE_TOKEN_AMOUNT)];
-    const msgValue = interopFee.add(BASE_TOKEN_AMOUNT);
+    const attributes = [interopCallValueAttr(amount)];
+    const msgValue = interopFee.add(amount);
 
     const balBefore = await captureBalance(sourceProvider);
 
@@ -147,7 +151,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     expectBalanceDelta(
       recipientBalBefore,
       recipientBalAfter,
-      BASE_TOKEN_AMOUNT,
+      amount,
       "base token message: recipient native"
     );
 
@@ -156,13 +160,14 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
   });
 
   it("can send and receive a native ERC20 token message (indirect call via AssetRouter)", async function () {
+    const erc20Amount = randomBigNumber(ERC20_MIN, ERC20_MAX);
     const recipient = encodeEvmChainAddress(L2_ASSET_ROUTER_ADDR, destChainId);
-    const payload = getTokenTransferData(sourceAssetId, ERC20_AMOUNT, ANVIL_RECIPIENT_ADDR);
+    const payload = getTokenTransferData(sourceAssetId, erc20Amount, ANVIL_RECIPIENT_ADDR);
     const attributes = [indirectCallAttr()];
     const msgValue = interopFee;
 
     // Approve NTV to spend tokens before sending
-    await approveTokenForNtv(sourceProvider, sourceTokenAddress, ERC20_AMOUNT);
+    await approveTokenForNtv(sourceProvider, sourceTokenAddress, erc20Amount);
 
     const balBefore = await captureBalance(sourceProvider, sourceTokenAddress);
 
@@ -179,10 +184,10 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
 
     const balAfter = await captureBalance(sourceProvider, sourceTokenAddress);
 
-    // Token balance should decrease by exactly ERC20_AMOUNT
+    // Token balance should decrease by exactly erc20Amount
     expect(
-      balAfter.token!.eq(balBefore.token!.sub(ERC20_AMOUNT)),
-      "ERC20 message: sender token should decrease by ERC20_AMOUNT"
+      balAfter.token!.eq(balBefore.token!.sub(erc20Amount)),
+      "ERC20 message: sender token should decrease by erc20Amount"
     ).to.be.true;
 
     expectNativeSpend(balBefore, balAfter, msgValue, result.receipt, "ERC20 message");
@@ -202,7 +207,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     destTokenAddr = await getTokenAddressForAsset(destProvider, sourceAssetId);
 
     const recipientBalAfter = await getTokenBalance(destProvider, destTokenAddr, ANVIL_RECIPIENT_ADDR);
-    expectBalanceDelta(recipientBalBefore, recipientBalAfter, ERC20_AMOUNT, "ERC20 message: recipient token");
+    expectBalanceDelta(recipientBalBefore, recipientBalAfter, erc20Amount, "ERC20 message: recipient token");
 
     const balDelta = recipientBalAfter.sub(recipientBalBefore);
     console.log(
@@ -216,13 +221,14 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       return;
     }
 
+    const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
     const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
     const recipient = encodeEvmChainAddress(L2_ASSET_ROUTER_ADDR, customBaseTokenChainId);
-    const payload = getTokenTransferData(ethAssetId, BASE_TOKEN_AMOUNT, ANVIL_RECIPIENT_ADDR);
-    // callValue = BASE_TOKEN_AMOUNT because ETH is the sender's base token (native),
+    const payload = getTokenTransferData(ethAssetId, amount, ANVIL_RECIPIENT_ADDR);
+    // callValue = amount because ETH is the sender's base token (native),
     // so the AssetRouter receives it via msg.value rather than ERC20 transferFrom.
-    const attributes = [indirectCallAttr(BASE_TOKEN_AMOUNT)];
-    const msgValue = interopFee.add(BASE_TOKEN_AMOUNT);
+    const attributes = [indirectCallAttr(amount)];
+    const msgValue = interopFee.add(amount);
 
     const balBefore = await captureBalance(sourceProvider);
 
@@ -261,7 +267,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     expectBalanceDelta(
       recipientBalBefore,
       recipientBalAfter,
-      BASE_TOKEN_AMOUNT,
+      amount,
       "cross-base-token: recipient bridged ETH"
     );
 
@@ -289,7 +295,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     }
 
     const customBaseTokenAssetId = encodeNtvAssetId(L1_CHAIN_ID, customBaseTokenL1Addr);
-    const amount = BASE_TOKEN_AMOUNT;
+    const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
 
     // Send from chain 14 → destChainId (ETH chain). The custom base token is native on
     // chain 14, so the AssetRouter receives it via msg.value (indirectCall with callValue).
