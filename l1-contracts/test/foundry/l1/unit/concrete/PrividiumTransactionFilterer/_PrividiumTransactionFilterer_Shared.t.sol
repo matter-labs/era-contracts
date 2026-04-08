@@ -9,12 +9,20 @@ import {PrividiumTransactionFilterer} from "contracts/transactionFilterer/Privid
 contract PrividiumTransactionFiltererTest is MigrationTestBase {
     PrividiumTransactionFilterer internal transactionFiltererProxy;
     PrividiumTransactionFilterer internal transactionFiltererImplementation;
-    address internal owner = makeAddr("owner");
-    address internal admin = makeAddr("admin");
-    address internal sender = makeAddr("sender");
-    address internal assetRouter = makeAddr("assetRouter");
+    address internal owner;
+    address internal admin;
+    address internal sender;
+    address internal assetRouter;
 
-    constructor() {
+    function setUp() public virtual override {
+        _deployIntegrationBase();
+
+        owner = makeAddr("owner");
+        admin = makeAddr("admin");
+        sender = makeAddr("sender");
+        // Use real assetRouter from integration deployment
+        assetRouter = address(addresses.sharedBridge);
+
         transactionFiltererImplementation = new PrividiumTransactionFilterer(assetRouter);
 
         transactionFiltererProxy = PrividiumTransactionFilterer(
