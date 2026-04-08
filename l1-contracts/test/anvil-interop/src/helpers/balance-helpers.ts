@@ -113,6 +113,54 @@ export function expectBalanceDelta(before: BigNumber, after: BigNumber, expected
   ).to.be.true;
 }
 
+interface EthersLikeError {
+  data?: unknown;
+  error?: { data?: unknown };
+  receipt?: { blockNumber?: number };
+  transaction?: {
+    data?: string;
+    from?: string;
+    gasLimit?: BigNumber;
+    to?: string;
+    value?: BigNumber;
+  };
+}
+
+function extractRevertData(err: unknown): string {
+  if (typeof err !== "object" || err === null) return "";
+
+  const errorWithData = err as EthersLikeError;
+  const nestedData = errorWithData.error?.data;
+  if (typeof nestedData === "string") return nestedData;
+
+  const directData = errorWithData.data;
+  if (typeof directData === "string") return directData;
+
+  return "";
+}
+
+async function extractRevertDataFromCall(provider: providers.JsonRpcProvider, err: EthersLikeError): Promise<string> {
+  const tx = err.transaction;
+  if (!tx?.to || !tx.data) return "";
+
+  try {
+    await provider.call(
+      {
+        to: tx.to,
+        from: tx.from,
+        data: tx.data,
+        value: tx.value,
+        gasLimit: tx.gasLimit,
+      },
+      err.receipt?.blockNumber
+    );
+  } catch (callErr: unknown) {
+    return extractRevertData(callErr);
+  }
+
+  return "";
+}
+
 /**
  * Assert that an async call reverts (throws).
  * Optionally match the error message against `expectedReason` (substring match).
@@ -120,7 +168,8 @@ export function expectBalanceDelta(before: BigNumber, after: BigNumber, expected
 export async function expectRevert(
   fn: () => Promise<unknown>,
   label: string,
-  expectedReason?: string
+  expectedReason?: string,
+  provider?: providers.JsonRpcProvider
 ): Promise<void> {
   try {
     await fn();
@@ -129,9 +178,12 @@ export async function expectRevert(
       // Check both the JS error message and the on-chain revert data
       const msg = err instanceof Error ? err.message : String(err);
       const hasReasonInMessage = msg.includes(expectedReason);
-      // ethers v5 embeds the revert data in error.error.data or error.data
-      const errorData = (err as any)?.error?.data || (err as any)?.data || "";
-      const hasReasonInData = typeof errorData === "string" && errorData.includes(expectedReason);
+      const errorWithData = typeof err === "object" && err !== null ? (err as EthersLikeError) : undefined;
+      let errorData = extractRevertData(err);
+      if (!errorData && provider && errorWithData) {
+        errorData = await extractRevertDataFromCall(provider, errorWithData);
+      }
+      const hasReasonInData = errorData.includes(expectedReason);
       expect(
         hasReasonInMessage || hasReasonInData,
         `${label}: revert reason mismatch — expected "${expectedReason}" in message or data.\nMessage: ${msg.slice(0, 200)}\nData: ${String(errorData).slice(0, 200)}`

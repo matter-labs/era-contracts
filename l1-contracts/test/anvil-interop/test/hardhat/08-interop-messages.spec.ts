@@ -148,12 +148,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     expect(receipt.status).to.equal(1);
 
     const recipientBalAfter = await getNativeBalance(destProvider, dummyRecipient);
-    expectBalanceDelta(
-      recipientBalBefore,
-      recipientBalAfter,
-      amount,
-      "base token message: recipient native"
-    );
+    expectBalanceDelta(recipientBalBefore, recipientBalAfter, amount, "base token message: recipient native");
 
     const balDelta = recipientBalAfter.sub(recipientBalBefore);
     console.log(`   Base token received on destination: +${ethers.utils.formatEther(balDelta)} ETH`);
@@ -264,12 +259,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     expect(bridgedEthAddr).to.not.equal(ethers.constants.AddressZero, "bridged ETH token should be deployed");
 
     const recipientBalAfter = await getTokenBalance(customBaseTokenProvider!, bridgedEthAddr, ANVIL_RECIPIENT_ADDR);
-    expectBalanceDelta(
-      recipientBalBefore,
-      recipientBalAfter,
-      amount,
-      "cross-base-token: recipient bridged ETH"
-    );
+    expectBalanceDelta(recipientBalBefore, recipientBalAfter, amount, "cross-base-token: recipient bridged ETH");
 
     const balDelta = recipientBalAfter.sub(recipientBalBefore);
     console.log(

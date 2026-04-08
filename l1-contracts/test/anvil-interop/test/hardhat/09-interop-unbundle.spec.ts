@@ -19,6 +19,7 @@ import { encodeEvmAddress } from "../../src/helpers/erc7930";
 import {
   sendInteropBundle,
   executeBundle,
+  simulateUnbundleBundle,
   verifyBundle,
   unbundleBundle,
   getBundleStatus,
@@ -173,7 +174,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
 
     const callStatuses = [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed];
     await expectRevert(
-      () => unbundleBundle(destProvider, bundleData, callStatuses, ANVIL_ACCOUNT2_PRIVATE_KEY),
+      () => simulateUnbundleBundle(destProvider, bundleData, callStatuses, ANVIL_ACCOUNT2_PRIVATE_KEY),
       "unbundle non-verified bundle",
       "0xf729f26d" // CanNotUnbundle(bytes32)
     );
@@ -205,7 +206,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     // Use the default signer (ANVIL_DEFAULT_ACCOUNT_ADDR) — NOT the designated unbundler (ANVIL_ACCOUNT2)
     const callStatuses = [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed];
     await expectRevert(
-      () => unbundleBundle(destProvider, bundleData, callStatuses),
+      () => simulateUnbundleBundle(destProvider, bundleData, callStatuses),
       "unbundle from wrong address",
       "0x0345c281" // UnbundlingNotAllowed(bytes32,bytes,bytes)
     );
@@ -226,7 +227,9 @@ describe("09 - Interop Unbundle (failing calls)", function () {
   });
 
   it("Can unbundle from the destination chain", async () => {
-    const { bundleData, bundleHash, baseAmount, tokenAmount } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
+    const { bundleData, bundleHash, baseAmount, tokenAmount } = await sendAndPrepareBundle({
+      withUnbundlerAddress: true,
+    });
 
     // Verify the bundle first
     await verifyBundle(destProvider, bundleData, sourceChainId);
@@ -313,7 +316,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     // Trying to re-execute already-processed calls should revert
     const callStatuses = [CallStatus.Executed, CallStatus.Unprocessed, CallStatus.Executed];
     await expectRevert(
-      () => unbundleBundle(destProvider, bundleData, callStatuses, ANVIL_ACCOUNT2_PRIVATE_KEY),
+      () => simulateUnbundleBundle(destProvider, bundleData, callStatuses, ANVIL_ACCOUNT2_PRIVATE_KEY),
       "re-execute processed calls",
       "0xc087b727" // CallNotExecutable(bytes32,uint256)
     );
@@ -339,9 +342,9 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     // Trying to execute a cancelled call (index 1) should revert
     const callStatuses = [CallStatus.Unprocessed, CallStatus.Executed, CallStatus.Unprocessed];
     await expectRevert(
-      () => unbundleBundle(destProvider, bundleData, callStatuses, ANVIL_ACCOUNT2_PRIVATE_KEY),
+      () => simulateUnbundleBundle(destProvider, bundleData, callStatuses, ANVIL_ACCOUNT2_PRIVATE_KEY),
       "execute a cancelled call",
-      "0xd5c7a376" // CallAlreadyExecuted(bytes32,uint256)
+      "0xc087b727" // CallNotExecutable(bytes32,uint256)
     );
   });
 

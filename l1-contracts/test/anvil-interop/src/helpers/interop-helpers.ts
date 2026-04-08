@@ -132,6 +132,25 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
   return { txHash: tx.hash, receipt, interopBundle, bundleData, bundleHash };
 }
 
+/**
+ * Simulate InteropCenter.sendBundle via callStatic to capture revert data without sending a tx.
+ */
+export async function simulateInteropBundle(options: SendBundleOptions): Promise<void> {
+  const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, options.sourceProvider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
+
+  const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
+  await interopCenter.callStatic.sendBundle(
+    destinationChainIdBytes,
+    options.callStarters,
+    options.bundleAttributes || [],
+    {
+      gasLimit: options.gasLimit || INTEROP_SEND_BUNDLE_GAS_LIMIT,
+      value: options.value || 0,
+    }
+  );
+}
+
 // ── InteropCenter.sendMessage wrapper ──────────────────────────
 
 export interface SendMessageOptions {
@@ -204,6 +223,24 @@ export async function executeBundle(
 }
 
 /**
+ * Simulate InteropHandler.executeBundle via callStatic to capture revert data without sending a tx.
+ */
+export async function simulateExecuteBundle(
+  destProvider: providers.JsonRpcProvider,
+  bundleData: string,
+  sourceChainId: number,
+  gasLimit?: number
+): Promise<void> {
+  const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, destProvider);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+  const mockProof = buildMockInteropProof(sourceChainId);
+
+  await interopHandler.callStatic.executeBundle(bundleData, mockProof, {
+    gasLimit: gasLimit || DEFAULT_TX_GAS_LIMIT,
+  });
+}
+
+/**
  * Verify a bundle on the destination chain via InteropHandler.verifyBundle.
  * Uses a mock proof.
  */
@@ -235,6 +272,21 @@ export async function unbundleBundle(
 
   const tx = await interopHandler.unbundleBundle(bundleData, callStatuses, { gasLimit: DEFAULT_TX_GAS_LIMIT });
   return tx.wait();
+}
+
+/**
+ * Simulate InteropHandler.unbundleBundle via callStatic to capture revert data without sending a tx.
+ */
+export async function simulateUnbundleBundle(
+  destProvider: providers.JsonRpcProvider,
+  bundleData: string,
+  callStatuses: number[],
+  signerKey?: string
+): Promise<void> {
+  const wallet = new Wallet(signerKey || ANVIL_DEFAULT_PRIVATE_KEY, destProvider);
+  const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
+
+  await interopHandler.callStatic.unbundleBundle(bundleData, callStatuses, { gasLimit: DEFAULT_TX_GAS_LIMIT });
 }
 
 /**
