@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 import {DefaultAdminTransferNotAllowed, RoleAccessDenied} from "contracts/common/L1ContractErrors.sol";
 
@@ -12,7 +13,7 @@ contract MockAccessControlEnumerable is AccessControlEnumerablePerChainAddressUp
     }
 }
 
-contract AccessControlEnumerablePerChainAddressUpgradeableTest is Test {
+contract AccessControlEnumerablePerChainAddressUpgradeableTest is MigrationTestBase {
     MockAccessControlEnumerable accessControl;
 
     address chainAddress1;
@@ -33,7 +34,8 @@ contract AccessControlEnumerablePerChainAddressUpgradeableTest is Test {
 
     bytes32 constant DEFAULT_ADMIN_ROLE = bytes32(0);
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         chainAddress1 = makeAddr("chainAddress1");
         chainAddress2 = makeAddr("chainAddress2");
         account1 = makeAddr("account1");

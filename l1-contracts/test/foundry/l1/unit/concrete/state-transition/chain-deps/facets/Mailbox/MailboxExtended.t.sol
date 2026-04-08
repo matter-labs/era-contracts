@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
@@ -14,7 +14,8 @@ import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailbox
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
+import {L1ContractDeployer} from "foundry-test/l1/integration/_SharedL1ContractDeployer.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 
@@ -28,16 +29,17 @@ import {
     NotSettlementLayer
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-contract MailboxOnGatewayTest is UtilsCallMockerTest {
+contract MailboxOnGatewayTest is MigrationTestBase {
     IMailbox internal mailboxFacet;
-    UtilsFacet internal utilsFacet;
+    // utilsFacet inherited from MigrationTestBase
     address bridgehub;
     address chainAssetHandler;
     uint256 constant eraChainId = 9;
     uint256 constant l1ChainId = 1;
     uint256 constant gatewayChainId = 505; // Different from L1
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         // Set up on a non-L1 chain (Gateway)
         vm.chainId(gatewayChainId);
 
@@ -99,7 +101,7 @@ contract MailboxOnGatewayTest is UtilsCallMockerTest {
     }
 }
 
-contract MailboxConstructorTest is Test {
+contract MailboxConstructorTest is MigrationTestBase {
     function test_Constructor_RevertWhen_EIP7702CheckerIsZeroOnL1() public {
         // On L1, EIP7702Checker cannot be zero
         vm.chainId(1); // L1 chain ID

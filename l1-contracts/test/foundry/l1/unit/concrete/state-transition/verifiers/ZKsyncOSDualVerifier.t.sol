@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -46,7 +47,7 @@ contract MockPlonkVerifierOS is IVerifier {
 }
 
 /// @notice Unit tests for ZKsyncOSDualVerifier contract
-contract ZKsyncOSDualVerifierTest is Test {
+contract ZKsyncOSDualVerifierTest is MigrationTestBase {
     ZKsyncOSDualVerifier public verifier;
     MockFflonkVerifierOS public fflonkVerifier;
     MockPlonkVerifierOS public plonkVerifier;
@@ -55,7 +56,8 @@ contract ZKsyncOSDualVerifierTest is Test {
     uint256 internal constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
     uint256 internal constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         owner = makeAddr("owner");
         fflonkVerifier = new MockFflonkVerifierOS();
         plonkVerifier = new MockPlonkVerifierOS();

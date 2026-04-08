@@ -12,7 +12,9 @@ contract InitializeTest is BridgehubTest {
     address internal chainProxyAdmin;
     uint256 internal priorityTxMaxGasLimit;
 
-    function setUp() public {
+    function setUp() public virtual override {
+        super.setUp();
+
         bridgehubDiamondInit = new DiamondInit(false);
 
         governor = GOVERNOR;

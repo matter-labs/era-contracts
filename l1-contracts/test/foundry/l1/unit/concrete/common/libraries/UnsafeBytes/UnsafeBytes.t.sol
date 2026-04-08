@@ -23,7 +23,7 @@ contract UnsafeBytesTestTest is Test {
         bytesData = abi.encodePacked(addr0, addr1, u256, u321, u322, addr2, b32, addr3);
     }
 
-    function test() public {
+    function test_unsafeBytes() public {
         (address a0, uint256 o0) = unsafeBytesTest.readAddress(bytesData, 0);
         assertEq(a0, addr0, "addr0 should be first address");
         assertEq(o0, 20, "offset should be 20");

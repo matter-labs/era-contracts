@@ -10,8 +10,8 @@ import {TransactionFiltererFalse} from "contracts/dev-contracts/test/DummyTransa
 import {TransactionNotAllowed, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
-    function setUp() public virtual {
-        setupDiamondProxy();
+    function setUp() public virtual override {
+        super.setUp();
     }
 
     function test_success_withoutFilterer() public {
@@ -94,17 +94,16 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         bytes32 oldRootHash = gettersFacet.getPriorityTreeRoot();
         assertEq(oldRootHash, bytes32(0), "root hash should be 0");
 
-        address oldBridgehub = address(bridgehub);
-        address bridgehub = makeAddr("bridgehub");
+        address newBridgehub = makeAddr("bridgehub");
 
-        utilsFacet.util_setBridgehub(bridgehub);
+        utilsFacet.util_setBridgehub(newBridgehub);
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setPriorityTxMaxGasLimit(100000000);
 
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
 
         vm.deal(interopCenter, 100 ether);
-        vm.prank(address(oldBridgehub));
+        vm.prank(newBridgehub);
         bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
 

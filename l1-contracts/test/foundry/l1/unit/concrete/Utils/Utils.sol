@@ -444,7 +444,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](72);
+        bytes4[] memory selectors = new bytes4[](92);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -519,6 +519,26 @@ library Utils {
         selectors[i++] = UtilsFacet.util_setPriorityOpsRequestTimestamp.selector;
         selectors[i++] = UtilsFacet.util_setZksyncOS.selector;
         selectors[i++] = UtilsFacet.util_setBaseTokenHasTotalSupply.selector;
+        // Getters compatibility selectors
+        selectors[i++] = UtilsFacet.util_setIsDiamondStorageFrozen.selector;
+        selectors[i++] = UtilsFacet.util_setFacets.selector;
+        selectors[i++] = UtilsFacet.util_setFacetFunctionSelectors.selector;
+        selectors[i++] = UtilsFacet.util_setFacetAddresses.selector;
+        selectors[i++] = UtilsFacet.util_setFacetAddress.selector;
+        selectors[i++] = UtilsFacet.util_setIsFacetFreezable.selector;
+        selectors[i++] = UtilsFacet.util_setIsFunctionFreezable.selector;
+        selectors[i++] = UtilsFacet.util_setIsEthWithdrawalFinalized.selector;
+        selectors[i++] = UtilsFacet.util_setTotalPriorityTxs.selector;
+        selectors[i++] = UtilsFacet.util_setFirstUnprocessedPriorityTx.selector;
+        selectors[i++] = UtilsFacet.util_setPriorityQueueSize.selector;
+        selectors[i++] = UtilsFacet.util_setPriorityTreeStartIndex.selector;
+        selectors[i++] = UtilsFacet.util_setPubdataPricingMode.selector;
+        selectors[i++] = UtilsFacet.util_setL1DAValidator.selector;
+        selectors[i++] = UtilsFacet.util_getL1DAValidator.selector;
+        selectors[i++] = UtilsFacet.util_setL2DACommitmentScheme.selector;
+        selectors[i++] = UtilsFacet.util_setVerifierByAddress.selector;
+        selectors[i++] = UtilsFacet.util_setStoredBatchHash.selector;
+        selectors[i++] = UtilsFacet.utils_setL2EvmEmulatorBytecodeHash.selector;
 
         return selectors;
     }

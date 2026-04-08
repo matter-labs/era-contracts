@@ -5,7 +5,8 @@ import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract AdminManagement is ChainTypeManagerTest {
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         deploy();
     }
 

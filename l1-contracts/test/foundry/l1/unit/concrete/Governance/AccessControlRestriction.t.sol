@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import "forge-std/console.sol";
@@ -13,7 +13,7 @@ import {IAccessControlRestriction} from "contracts/governance/IAccessControlRest
 import {AccessToFallbackDenied, AccessToFunctionDenied, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
 
-contract AccessRestrictionTest is Test {
+contract AccessRestrictionTest is MigrationTestBase {
     AccessControlRestriction internal restriction;
     ChainAdmin internal chainAdmin;
     address owner;
@@ -30,7 +30,8 @@ contract AccessRestrictionTest is Test {
         return selectors;
     }
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         owner = makeAddr("random address");
         randomCaller = makeAddr("random caller");
 

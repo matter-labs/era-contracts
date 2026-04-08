@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -17,7 +18,7 @@ import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 /// @notice Additional unit tests for GatewayTransactionFilterer to improve coverage
-contract GatewayTransactionFiltererAdditionalTest is Test {
+contract GatewayTransactionFiltererAdditionalTest is MigrationTestBase {
     GatewayTransactionFilterer internal transactionFiltererProxy;
     GatewayTransactionFilterer internal transactionFiltererImplementation;
     address internal owner = makeAddr("owner");
@@ -30,7 +31,8 @@ contract GatewayTransactionFiltererAdditionalTest is Test {
     event WhitelistGranted(address indexed sender);
     event WhitelistRevoked(address indexed sender);
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         transactionFiltererImplementation = new GatewayTransactionFilterer(IBridgehubBase(bridgehub), assetRouter);
 
         transactionFiltererProxy = GatewayTransactionFilterer(

@@ -2,11 +2,17 @@
 
 pragma solidity 0.8.28;
 
-import {FeeParams, IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {
+    FeeParams,
+    PubdataPricingMode,
+    IVerifier,
+    VerifierParams
+} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {PriorityTree} from "contracts/state-transition/libraries/PriorityTree.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 contract UtilsFacet is ZKChainBase {
     function util_setChainId(uint256 _chainId) external {
@@ -297,6 +303,131 @@ contract UtilsFacet is ZKChainBase {
 
     function util_setBaseTokenHasTotalSupply(bool _hasTotalSupply) external {
         s.baseTokenHasTotalSupply = _hasTotalSupply;
+    }
+
+    // === Methods added for Getters test compatibility (matching GettersFacetWrapper API) ===
+
+    // Alias: tests call setIsDiamondStorageFrozen, UtilsFacet has setIsFrozen
+    function util_setIsDiamondStorageFrozen(bool _isDiamondStorageFrozen) external {
+        Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
+        ds.isFrozen = _isDiamondStorageFrozen;
+    }
+
+    // Diamond storage: facet list
+    function util_setFacets(IGetters.Facet[] memory _facets) external {
+        Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
+        ds.facets = new address[](_facets.length);
+        for (uint256 i = 0; i < ds.facets.length; i++) {
+            ds.facets[i] = _facets[i].addr;
+            ds.facetToSelectors[_facets[i].addr] = Diamond.FacetToSelectors({
+                selectors: _facets[i].selectors,
+                facetPosition: uint16(i)
+            });
+        }
+    }
+
+    // Diamond storage: facet function selectors
+    function util_setFacetFunctionSelectors(address _facet, bytes4[] memory _selectors) external {
+        Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
+        ds.facetToSelectors[_facet].selectors = _selectors;
+    }
+
+    // Diamond storage: facet addresses array
+    function util_setFacetAddresses(address[] memory _facets) external {
+        Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
+        ds.facets = _facets;
+    }
+
+    // Diamond storage: selector → facet address
+    function util_setFacetAddress(bytes4 _selector, address _facet) external {
+        Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
+        ds.selectorToFacet[_selector].facetAddress = _facet;
+    }
+
+    // Diamond storage: facet freezability
+    function util_setIsFacetFreezable(address _facet, bool _isFacetFreezable) external {
+        Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
+        ds.facetToSelectors[_facet].selectors = new bytes4[](1);
+        ds.facetToSelectors[_facet].selectors[0] = bytes4("1234");
+        bytes4 selector0 = ds.facetToSelectors[_facet].selectors[0];
+        ds.selectorToFacet[selector0] = Diamond.SelectorToFacet({
+            facetAddress: _facet,
+            selectorPosition: 0,
+            isFreezable: _isFacetFreezable
+        });
+    }
+
+    // Diamond storage: function freezability
+    function util_setIsFunctionFreezable(bytes4 _selector, bool _isFreezable) external {
+        Diamond.DiamondStorage storage ds = Diamond.getDiamondStorage();
+        ds.selectorToFacet[_selector].isFreezable = _isFreezable;
+    }
+
+    // Chain storage: ETH withdrawal finalization
+    function util_setIsEthWithdrawalFinalized(
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        bool _isFinalized
+    ) external {
+        s.isEthWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex] = _isFinalized;
+    }
+
+    // Chain storage: total priority txs (sets priority tree leaf index)
+    function util_setTotalPriorityTxs(uint256 _totalPriorityTxs) external {
+        s.priorityTree.startIndex = 0;
+        s.priorityTree.tree._nextLeafIndex = _totalPriorityTxs;
+    }
+
+    // Chain storage: first unprocessed priority tx
+    function util_setFirstUnprocessedPriorityTx(uint256 _firstUnprocessedPriorityTx) external {
+        s.priorityTree.startIndex = 0;
+        s.priorityTree.unprocessedIndex = _firstUnprocessedPriorityTx;
+    }
+
+    // Chain storage: priority queue size
+    function util_setPriorityQueueSize(uint256 _priorityQueueSize) external {
+        s.priorityTree.unprocessedIndex = 1;
+        s.priorityTree.tree._nextLeafIndex = _priorityQueueSize + 1;
+    }
+
+    // Chain storage: priority tree start index
+    function util_setPriorityTreeStartIndex(uint256 _startIndex) external {
+        s.priorityTree.startIndex = _startIndex;
+    }
+
+    // Chain storage: pubdata pricing mode
+    function util_setPubdataPricingMode(uint8 _mode) external {
+        s.feeParams.pubdataPricingMode = PubdataPricingMode(_mode);
+    }
+
+    // Chain storage: L1 DA validator
+    function util_setL1DAValidator(address _validator) external {
+        s.l1DAValidator = _validator;
+    }
+
+    // Getter for L1 DA validator
+    function util_getL1DAValidator() external view returns (address) {
+        return s.l1DAValidator;
+    }
+
+    // Chain storage: L2 DA commitment scheme
+    function util_setL2DACommitmentScheme(uint8 _scheme) external {
+        s.l2DACommitmentScheme = L2DACommitmentScheme(_scheme);
+    }
+
+    // Overload: accept address for verifier (GettersFacetWrapper compatibility)
+    function util_setVerifierByAddress(address _verifier) external {
+        s.verifier = IVerifier(_verifier);
+    }
+
+    // Alias for stored batch hash (singular, matching GettersFacetWrapper API)
+    function util_setStoredBatchHash(uint256 _batchNumber, bytes32 _storedBatchHash) external {
+        s.storedBatchHashes[_batchNumber] = _storedBatchHash;
+    }
+
+    // Alias for L2 EVM emulator bytecode hash (note: GettersFacetWrapper used "utils_" prefix)
+    function utils_setL2EvmEmulatorBytecodeHash(bytes32 _l2EvmEmulatorBytecodeHash) external {
+        s.l2EvmEmulatorBytecodeHash = _l2EvmEmulatorBytecodeHash;
     }
 
     // add this to be excluded from coverage report

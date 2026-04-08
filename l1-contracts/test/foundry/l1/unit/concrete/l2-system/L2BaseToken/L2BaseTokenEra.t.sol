@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {L2BaseTokenEra} from "contracts/l2-system/era/L2BaseTokenEra.sol";
 import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.sol";
@@ -32,7 +33,7 @@ import {DummyL2BaseTokenHolder} from "contracts/dev-contracts/test/DummyL2BaseTo
 
 /// @title L2BaseTokenEraTest
 /// @notice Unit tests for L2BaseTokenEra contract
-contract L2BaseTokenEraTest is Test {
+contract L2BaseTokenEraTest is MigrationTestBase {
     L2BaseTokenEra internal l2BaseToken;
 
     address internal l1Receiver;
@@ -51,7 +52,8 @@ contract L2BaseTokenEraTest is Test {
     event Transfer(address indexed from, address indexed to, uint256 value);
     event Mint(address indexed account, uint256 amount);
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         l2BaseToken = new L2BaseTokenEra();
         l1Receiver = makeAddr("l1Receiver");
         alice = makeAddr("alice");

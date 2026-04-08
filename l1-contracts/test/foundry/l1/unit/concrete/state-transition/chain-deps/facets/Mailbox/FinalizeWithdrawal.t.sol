@@ -17,8 +17,8 @@ contract MailboxFinalizeWithdrawal is MailboxTest {
     DummySharedBridge L1AssetRouter;
     address baseTokenBridgeAddress;
 
-    function setUp() public virtual {
-        setupDiamondProxy();
+    function setUp() public virtual override {
+        super.setUp();
 
         L1AssetRouter = new DummySharedBridge(keccak256("dummyDepositHash"));
         baseTokenBridgeAddress = address(L1AssetRouter);

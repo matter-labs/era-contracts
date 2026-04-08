@@ -66,7 +66,8 @@ contract ExecutingTest is ExecutorTest {
         return keccak256(abi.encodePacked(_chainId, uint256(11)));
     }
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         generatePriorityOps(2);
 
         bytes1 source = bytes1(0x01);

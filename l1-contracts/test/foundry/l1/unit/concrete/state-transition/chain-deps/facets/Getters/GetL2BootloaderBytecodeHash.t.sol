@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 
 contract GetL2BootloaderBytecodeHashTest is GettersFacetTest {
-    function test() public {
+    function test_getter() public {
         bytes32 expected = keccak256("L2 Bootloader Bytecode Hash");
         gettersFacetWrapper.util_setL2BootloaderBytecodeHash(expected);
 

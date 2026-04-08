@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.21;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -10,7 +10,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 
-contract GatewayTransactionFiltererTest is Test {
+contract GatewayTransactionFiltererTest is MigrationTestBase {
     GatewayTransactionFilterer internal transactionFiltererProxy;
     GatewayTransactionFilterer internal transactionFiltererImplementation;
     address internal owner = makeAddr("owner");
@@ -39,5 +39,5 @@ contract GatewayTransactionFiltererTest is Test {
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal virtual override {}
 }

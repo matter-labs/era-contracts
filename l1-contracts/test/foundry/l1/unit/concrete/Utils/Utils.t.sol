@@ -12,11 +12,12 @@ import {
     L2_DA_COMMITMENT_SCHEME
 } from "./Utils.sol";
 
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
+import {L1ContractDeployer} from "foundry-test/l1/integration/_SharedL1ContractDeployer.t.sol";
 
 // solhint-enable max-line-length
 
-contract UtilsTest is UtilsCallMockerTest {
+contract UtilsTest is MigrationTestBase {
     function test_PackBatchTimestampAndBlockTimestamp() public virtual {
         uint64 batchTimestamp = 0x12345678;
         uint64 blockTimestamp = 0x87654321;

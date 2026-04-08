@@ -4,7 +4,8 @@ pragma solidity 0.8.28;
 
 import {console2 as console} from "forge-std/Script.sol";
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
+import {MigrationTestBase} from "test/foundry/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import "forge-std/console.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -73,7 +74,7 @@ import {IL1AssetTracker, L1AssetTracker} from "contracts/bridge/asset-tracker/L1
 
 import {IMessageVerification} from "contracts/common/MessageVerification.sol";
 
-contract ExperimentalBridgeTest is Test {
+contract ExperimentalBridgeTest is MigrationTestBase {
     using stdStorage for StdStorage;
 
     address weth;
@@ -109,8 +110,6 @@ contract ExperimentalBridgeTest is Test {
     TestnetERC20Token testToken8;
     TestnetERC20Token testToken18;
 
-    address mockL2Contract;
-
     uint256 l1ChainId;
     uint256 eraChainId;
     uint256 gatewayChainId;
@@ -139,7 +138,9 @@ contract ExperimentalBridgeTest is Test {
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(testToken));
     }
 
-    function setUp() public {
+    function setUp() public virtual override {
+        super.setUp();
+
         l1ChainId = 1;
         eraChainId = 320;
         gatewayChainId = 506;

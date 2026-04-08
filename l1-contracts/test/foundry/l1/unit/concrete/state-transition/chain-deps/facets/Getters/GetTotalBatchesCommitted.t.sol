@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 
 contract GetTotalBatchesCommittedTest is GettersFacetTest {
-    function test() public {
+    function test_getter() public {
         uint256 expected = 96544567876534567890;
         gettersFacetWrapper.util_setTotalBatchesCommitted(expected);
 

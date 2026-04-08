@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 
 contract GetPendingAdminTest is GettersFacetTest {
-    function test() public {
+    function test_getter() public {
         address expected = makeAddr("pendingAdmin");
         gettersFacetWrapper.util_setPendingAdmin(expected);
 

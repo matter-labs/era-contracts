@@ -3,6 +3,7 @@ pragma solidity ^0.8.18;
 
 // Import Foundry's Test framework
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 // Import the RollupDAManager contract
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -10,7 +11,7 @@ import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 import {InvalidL2DACommitmentScheme, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
-contract RollupDAManagerTest is Test {
+contract RollupDAManagerTest is MigrationTestBase {
     // Instance of the contract under test
     RollupDAManager rollupDAManager;
 
@@ -26,7 +27,8 @@ contract RollupDAManagerTest is Test {
     event DAPairUpdated(address indexed l1DAValidator, L2DACommitmentScheme indexed l2DACommitmentScheme, bool status);
 
     // setUp is run before each test
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         owner = makeAddr("owner");
         newOwner = makeAddr("newOwner");
         nonOwner = makeAddr("nonOwner");

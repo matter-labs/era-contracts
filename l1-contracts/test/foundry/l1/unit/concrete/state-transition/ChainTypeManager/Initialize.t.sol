@@ -16,7 +16,8 @@ import {
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
 contract ChainTypeManagerInitializeTest is ChainTypeManagerTest {
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         deploy();
     }
 

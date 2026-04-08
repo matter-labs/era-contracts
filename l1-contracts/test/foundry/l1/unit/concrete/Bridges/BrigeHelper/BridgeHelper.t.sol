@@ -3,6 +3,7 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import "contracts/bridge/BridgeHelper.sol"; // adjust path
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -109,12 +110,13 @@ interface IDataEncodingBridge {
     ) external pure returns (uint256, bytes memory, bytes memory, bytes memory);
 }
 
-contract BridgeHelperTest is Test {
+contract BridgeHelperTest is MigrationTestBase {
     uint256 constant ORIGIN_CHAIN_ID = 270;
 
     IDataEncodingBridge dec;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         dec = IDataEncodingBridge(address(new DataEncodingWrapper()));
     }
 

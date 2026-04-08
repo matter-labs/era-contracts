@@ -2,11 +2,11 @@
 
 pragma solidity ^0.8.21;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {PrividiumTransactionFilterer} from "contracts/transactionFilterer/PrividiumTransactionFilterer.sol";
 
-contract PrividiumTransactionFiltererTest is Test {
+contract PrividiumTransactionFiltererTest is MigrationTestBase {
     PrividiumTransactionFilterer internal transactionFiltererProxy;
     PrividiumTransactionFilterer internal transactionFiltererImplementation;
     address internal owner = makeAddr("owner");
@@ -32,5 +32,5 @@ contract PrividiumTransactionFiltererTest is Test {
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal virtual override {}
 }

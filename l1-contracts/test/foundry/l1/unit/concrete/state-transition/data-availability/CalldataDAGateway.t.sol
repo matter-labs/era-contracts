@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {
     CalldataDAGateway,
@@ -35,10 +36,11 @@ contract CalldataDAGatewayHarness is CalldataDAGateway {
 }
 
 /// @notice Unit tests for CalldataDAGateway contract
-contract CalldataDAGatewayTest is Test {
+contract CalldataDAGatewayTest is MigrationTestBase {
     CalldataDAGatewayHarness public gateway;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         gateway = new CalldataDAGatewayHarness();
     }
 

@@ -27,6 +27,13 @@ import {MessageHashing, ProofData} from "contracts/common/libraries/MessageHashi
 
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
+import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
+import {Utils as TestUtils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
+import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 
 contract MailboxL2LogsProve is MailboxTest {
     bytes32[] elements;
@@ -37,54 +44,77 @@ contract MailboxL2LogsProve is MailboxTest {
     bool isService;
     uint8 shardId;
     L1MessageRoot messageRoot;
+    address proofBridgehub;
 
     /// @dev Gateway chain ID used for legacy historical migration intervals.
     uint256 constant LEGACY_GW_CHAIN_ID = 1;
 
-    function setUp() public virtual {
-        setupDiamondProxy();
+    function setUp() public virtual override {
+        super.setUp();
 
         // MessageRoot rejects batch zero proofs, so keep tests on a non-zero executed batch.
         // Use batch 2 so that we can set migrateToGWBatchNumber=1 (must be >0).
         utilsFacet.util_setTotalBatchesExecuted(2);
         batchNumber = gettersFacet.getTotalBatchesExecuted();
 
-        // Mock getAllZKChainChainIDs to return the test chain so v31 upgrade sets the placeholder
-        uint256[] memory chainIds = new uint256[](1);
+        // Use a dedicated mock bridgehub for the L1MessageRoot proof verification.
+        // The recursive proof path calls bridgehub.getZKChain() etc. and needs exact mock control.
+        // Using the real bridgehub causes interference with real chain registrations.
+        proofBridgehub = makeAddr("proofBridgehub");
+
+        // Mock getAllZKChainChainIDs to include test chain AND settlement layer chain,
+        // so v31 upgrade sets the placeholder for both. Without this, _noBatchFallback
+        // returns bytes32(0) for the SL instead of querying the chain's l2LogsRootHash.
+        uint256[] memory chainIds = new uint256[](2);
         chainIds[0] = gettersFacet.getChainId();
+        chainIds[1] = LEGACY_GW_CHAIN_ID;
         vm.mockCall(
-            address(bridgehub),
+            proofBridgehub,
             abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
             abi.encode(chainIds)
         );
         vm.mockCall(
-            address(bridgehub),
+            proofBridgehub,
             abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, gettersFacet.getChainId()),
             abi.encode(block.chainid)
         );
+        vm.mockCall(
+            proofBridgehub,
+            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, LEGACY_GW_CHAIN_ID),
+            abi.encode(block.chainid)
+        );
 
-        // Deploy messageRoot as a proxy with v31 upgrade initialization so that
-        // v31UpgradeChainBatchNumber is set to the placeholder value, enabling
-        // _noBatchFallback to query l2LogsRootHash from the chain directly.
+        // Create a test-local ChainAssetHandler
+        L1ChainAssetHandler localChainAssetHandler = new L1ChainAssetHandler(address(this), proofBridgehub);
+
+        // Deploy messageRoot as a proxy with v31 upgrade initialization
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(address(bridgehub), LEGACY_GW_CHAIN_ID, address(realChainAssetHandler))),
+                    address(new L1MessageRoot(proofBridgehub, LEGACY_GW_CHAIN_ID, address(localChainAssetHandler))),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
                 )
             )
         );
 
+        // Mock the proof bridgehub responses
+        vm.mockCall(proofBridgehub, abi.encodeCall(IBridgehubBase.messageRoot, ()), abi.encode(address(messageRoot)));
+        vm.mockCall(proofBridgehub, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(address(0)));
+        localChainAssetHandler.setAddresses();
+
+        // Use localChainAssetHandler for settlement layer setup
+        realChainAssetHandler = localChainAssetHandler;
+
+        // Mock the REAL bridgehub to return this messageRoot (the Mailbox facet uses the real bridgehub)
         vm.mockCall(
             address(bridgehub),
             abi.encodeCall(IBridgehubBase.messageRoot, ()),
             abi.encode(address(messageRoot))
         );
-        vm.mockCall(address(bridgehub), abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(address(0)));
-        realChainAssetHandler.setAddresses();
+        // Also mock getZKChain for the test chain on the proof bridgehub
         vm.mockCall(
-            address(bridgehub),
+            proofBridgehub,
             abi.encodeCall(IBridgehubBase.getZKChain, (gettersFacet.getChainId())),
             abi.encode(address(mailboxFacet))
         );
@@ -94,6 +124,54 @@ contract MailboxL2LogsProve is MailboxTest {
         merkle = new MerkleTest();
         isService = true;
         shardId = 0;
+    }
+
+    /// @dev Override to create bare diamond proxies for recursive proof tests.
+    /// The recursive proof verification requires precise mock control over the
+    /// proof bridgehub. Real ZK chains deployed via _deployZKChain would interfere.
+    function deployDiamondProxy() internal override returns (address proxy) {
+        mockDiamondInitInteropCenterCallsWithAddress(proofBridgehub, address(0), bytes32(0));
+
+        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: address(
+                new MailboxFacet(eraChainId, block.chainid, address(chainAssetHandler), eip7702Checker, false)
+            ),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: TestUtils.getMailboxSelectors()
+        });
+        facetCuts[1] = Diamond.FacetCut({
+            facet: address(new UtilsFacet()),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: TestUtils.getUtilsFacetSelectors()
+        });
+        facetCuts[2] = Diamond.FacetCut({
+            facet: address(new GettersFacet()),
+            action: Diamond.Action.Add,
+            isFreezable: true,
+            selectors: TestUtils.getGettersSelectors()
+        });
+
+        mockDiamondInitInteropCenterCallsWithAddress(proofBridgehub, address(0), bytes32(0));
+        vm.mockCall(
+            proofBridgehub,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(chainAssetHandler)
+        );
+        vm.mockCall(
+            address(chainAssetHandler),
+            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
+            abi.encode(1)
+        );
+        vm.mockCall(
+            address(chainAssetHandler),
+            abi.encodeWithSelector(IL1ChainAssetHandler.isMigrationInProgress.selector),
+            abi.encode(false)
+        );
+        mockChainTypeManagerVerifier(makeAddr("testnetVerifier"));
+        proxy = TestUtils.makeDiamondProxy(facetCuts, proofBridgehub);
     }
 
     function _addHashedLogToMerkleTree(
@@ -365,7 +443,12 @@ contract MailboxL2LogsProve is MailboxTest {
         });
         // setHistoricalMigrationInterval only accepts migration number 0 and the legacy GW chain ID.
         // We use LEGACY_GW_CHAIN_ID as the settlement layer to match this constraint.
-        realChainAssetHandler.setHistoricalMigrationInterval(gettersFacet.getChainId(), 0, interval);
+        // NOTE: getChainId() must be evaluated BEFORE vm.prank, because vm.prank is consumed
+        // by the next external call — including the staticcall to getChainId() if it's inline.
+        uint256 chainIdForInterval = gettersFacet.getChainId();
+        address cahOwner = realChainAssetHandler.owner();
+        vm.prank(cahOwner);
+        realChainAssetHandler.setHistoricalMigrationInterval(chainIdForInterval, 0, interval);
     }
 
     function checkRecursiveLeafProof(
@@ -406,7 +489,7 @@ contract MailboxL2LogsProve is MailboxTest {
         }
 
         vm.mockCall(
-            address(bridgehub),
+            proofBridgehub,
             abi.encodeCall(IBridgehubBase.getZKChain, (proofInfo.settlementLayerChainId)),
             abi.encode(secondDiamondProxy)
         );
@@ -500,7 +583,9 @@ contract MailboxL2LogsProve is MailboxTest {
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });
+        vm.startPrank(realChainAssetHandler.owner());
         realChainAssetHandler.setHistoricalMigrationInterval(gettersFacet.getChainId(), 0, interval);
+        vm.stopPrank();
 
         RecursiveProofInfo memory proofInfo = RecursiveProofInfo({
             leaf: bytes32(0),
@@ -541,7 +626,7 @@ contract MailboxL2LogsProve is MailboxTest {
         secondUtils.util_setL2LogsRootHash(secondBatchNumber, requiredRoot);
 
         vm.mockCall(
-            address(bridgehub),
+            proofBridgehub,
             abi.encodeCall(IBridgehubBase.getZKChain, (proofInfo.settlementLayerChainId)),
             abi.encode(secondDiamondProxy)
         );
@@ -571,7 +656,9 @@ contract MailboxL2LogsProve is MailboxTest {
             settlementLayerChainId: LEGACY_GW_CHAIN_ID,
             isActive: false
         });
+        vm.startPrank(realChainAssetHandler.owner());
         realChainAssetHandler.setHistoricalMigrationInterval(gettersFacet.getChainId(), 0, interval);
+        vm.stopPrank();
 
         RecursiveProofInfo memory proofInfo = RecursiveProofInfo({
             leaf: bytes32(0),
@@ -611,7 +698,7 @@ contract MailboxL2LogsProve is MailboxTest {
         secondUtils.util_setL2LogsRootHash(secondBatchNumber, requiredRoot);
 
         vm.mockCall(
-            address(bridgehub),
+            proofBridgehub,
             abi.encodeCall(IBridgehubBase.getZKChain, (proofInfo.settlementLayerChainId)),
             abi.encode(secondDiamondProxy)
         );

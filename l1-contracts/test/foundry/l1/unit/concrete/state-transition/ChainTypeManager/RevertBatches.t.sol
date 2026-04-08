@@ -56,7 +56,8 @@ contract RevertBatchesTest is ChainTypeManagerTest {
     CommitterFacet internal committerFacet;
     GettersFacet internal gettersFacet;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         deploy();
 
         defaultBlobCommitment = Utils.getDefaultBlobCommitment();

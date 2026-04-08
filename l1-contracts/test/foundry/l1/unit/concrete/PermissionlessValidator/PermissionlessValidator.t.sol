@@ -2,18 +2,20 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 import {Reentrancy} from "contracts/common/L1ContractErrors.sol";
 import {ExecutorMock} from "./ExecutorMock.sol";
 import {ReentrantExecutorMock} from "./ReentrantExecutorMock.sol";
 
-contract PermissionlessValidatorTest is Test {
+contract PermissionlessValidatorTest is MigrationTestBase {
     PermissionlessValidator internal validator;
     ExecutorMock internal executor;
     address internal proxyAdmin = makeAddr("proxyAdmin");
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         PermissionlessValidator implementation = new PermissionlessValidator();
         TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
             address(implementation),

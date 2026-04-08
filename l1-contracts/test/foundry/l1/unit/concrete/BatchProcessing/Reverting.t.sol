@@ -22,7 +22,8 @@ contract RevertingTest is ExecutorTest {
     bytes32[] blobVersionedHashes;
     bytes operatorDAInput;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         setUpCommitBatch();
 
         vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1);

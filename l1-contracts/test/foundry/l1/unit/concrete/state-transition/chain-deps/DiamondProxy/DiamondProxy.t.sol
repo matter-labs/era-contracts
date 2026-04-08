@@ -4,7 +4,8 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
+import {L1ContractDeployer} from "foundry-test/l1/integration/_SharedL1ContractDeployer.t.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -27,7 +28,7 @@ contract TestFacet is ZKChainBase {
     function test() internal virtual {}
 }
 
-contract DiamondProxyTest is UtilsCallMockerTest {
+contract DiamondProxyTest is MigrationTestBase {
     Diamond.FacetCut[] internal facetCuts;
     address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     DummyBridgehub internal dummyBridgehub;
@@ -38,7 +39,8 @@ contract DiamondProxyTest is UtilsCallMockerTest {
         selectors[0] = TestFacet.func.selector;
     }
 
-    function setUp() public virtual {
+    function setUp() public virtual override {
+        super.setUp();
         facetCuts.push(
             Diamond.FacetCut({
                 facet: address(new TestFacet()),

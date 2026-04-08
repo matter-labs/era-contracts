@@ -2,16 +2,18 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {L1DAValidatorOutput} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
 import {ValL1DAWrongInputLength} from "contracts/state-transition/L1StateTransitionErrors.sol";
 
 /// @notice Unit tests for ValidiumL1DAValidator contract
-contract ValidiumL1DAValidatorTest is Test {
+contract ValidiumL1DAValidatorTest is MigrationTestBase {
     ValidiumL1DAValidator public validator;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         validator = new ValidiumL1DAValidator();
     }
 

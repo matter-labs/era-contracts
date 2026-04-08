@@ -21,6 +21,9 @@ import {
 
 // solhint-enable max-line-length
 
+/// @notice Test infrastructure contract providing mock helpers for diamond initialization.
+/// This is NOT a migrated test — it's infrastructure inherited by L1ContractDeployer
+/// and transitively by MigrationTestBase. It must remain on Test, not MigrationTestBase.
 contract UtilsCallMockerTest is Test {
     address private constant DEFAULT_CHAIN_TYPE_MANAGER = address(0x1234567890876543567890);
     uint256 private constant DEFAULT_PROTOCOL_VERSION = 0;
@@ -101,8 +104,6 @@ contract UtilsCallMockerTest is Test {
     }
 
     /// @notice Mocks the CTM's protocolVersionVerifier call for DiamondInit
-    /// @dev The chainTypeManager address (0x1234567890876543567890) and protocolVersion (0)
-    ///      match the values used in Utils.makeInitializeData()
     function mockChainTypeManagerVerifier(address verifier) public {
         vm.mockCall(
             DEFAULT_CHAIN_TYPE_MANAGER,

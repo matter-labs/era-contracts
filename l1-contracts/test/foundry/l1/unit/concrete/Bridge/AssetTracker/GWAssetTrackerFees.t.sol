@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 
@@ -30,7 +31,7 @@ import {InteropBundle, L2Log} from "contracts/common/Messaging.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
-contract GWAssetTrackerFeesTest is Test {
+contract GWAssetTrackerFeesTest is MigrationTestBase {
     GWAssetTrackerTestHelper public gwAssetTracker;
     TestnetERC20Token public wrappedZKToken;
 
@@ -58,7 +59,9 @@ contract GWAssetTrackerFeesTest is Test {
         uint256 interopCallCount
     );
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
+
         // Deploy wrapped ZK token first (before GWAssetTracker setup)
         wrappedZKToken = new TestnetERC20Token("Wrapped ZK", "WZK", 18);
 

@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 
 contract GetL2EvmEmulatorBytecodeHashTest is GettersFacetTest {
-    function test() public {
+    function test_getter() public {
         bytes32 expected = bytes32(uint256(0x1234567890abcdef));
         gettersFacetWrapper.utils_setL2EvmEmulatorBytecodeHash(expected);
 

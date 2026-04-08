@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Vm} from "forge-std/Vm.sol";
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {Utils} from "../Utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
@@ -24,7 +24,7 @@ import {
 } from "contracts/common/L1ContractErrors.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
-contract MultisigCommitterTest is Test {
+contract MultisigCommitterTest is MigrationTestBase {
     MultisigCommitter multisigCommitter;
     DummyChainTypeManagerForValidatorTimelock chainTypeManager;
     DummyBridgehub dummyBridgehub;
@@ -33,7 +33,7 @@ contract MultisigCommitterTest is Test {
 
     address ecosystemOwner;
     address chainAdmin;
-    address chainAddress;
+    address mcChainAddress;
     address sequencer;
     address validator1Shared;
     uint256 validator1SharedKey;
@@ -52,10 +52,11 @@ contract MultisigCommitterTest is Test {
     bytes32 constant EIP712_NAME_HASH = keccak256("MultisigCommitter");
     bytes32 constant EIP712_VERSION_HASH = keccak256("1");
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         ecosystemOwner = makeAddr("ecosystemOwner");
         chainAdmin = makeAddr("chainAdmin");
-        chainAddress = makeAddr("chainAddress");
+        mcChainAddress = makeAddr("chainAddress");
         sequencer = makeAddr("sequencer");
 
         // we want to have the validators sorted
@@ -88,11 +89,11 @@ contract MultisigCommitterTest is Test {
 
         dummyBridgehub = new DummyBridgehub();
 
-        chainTypeManager = new DummyChainTypeManagerForValidatorTimelock(chainAdmin, chainAddress);
+        chainTypeManager = new DummyChainTypeManagerForValidatorTimelock(chainAdmin, mcChainAddress);
 
-        vm.mockCall(chainAddress, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(chainAdmin));
-        vm.mockCall(chainAddress, abi.encodeCall(IGetters.getChainId, ()), abi.encode(chainId));
-        dummyBridgehub.setZKChain(chainId, chainAddress);
+        vm.mockCall(mcChainAddress, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(chainAdmin));
+        vm.mockCall(mcChainAddress, abi.encodeCall(IGetters.getChainId, ()), abi.encode(chainId));
+        dummyBridgehub.setZKChain(chainId, mcChainAddress);
 
         multisigCommitter = MultisigCommitter(_deployMultisigCommitter(ecosystemOwner, executionDelay));
         committerRole = multisigCommitter.COMMITTER_ROLE();
@@ -101,7 +102,7 @@ contract MultisigCommitterTest is Test {
         vm.prank(chainAdmin);
         multisigCommitter.addValidatorForChainId(chainId, sequencer);
         vm.prank(chainAdmin);
-        multisigCommitter.grantRole(chainAddress, validatorRole, validator1Custom);
+        multisigCommitter.grantRole(mcChainAddress, validatorRole, validator1Custom);
         vm.prank(ecosystemOwner);
         multisigCommitter.addSharedValidator(validator1Shared);
         vm.prank(ecosystemOwner);
@@ -134,44 +135,44 @@ contract MultisigCommitterTest is Test {
     function test_customVsDefaultSigningSet() public {
         assertEq(multisigCommitter.sharedSigningThreshold(), 2);
         assertEq(multisigCommitter.sharedValidatorsCount(), 2);
-        assertEq(multisigCommitter.getSigningThreshold(chainAddress), 2);
-        assertEq(multisigCommitter.getValidatorsCount(chainAddress), 2);
-        assertFalse(multisigCommitter.isCustomSigningSetActive(chainAddress));
+        assertEq(multisigCommitter.getSigningThreshold(mcChainAddress), 2);
+        assertEq(multisigCommitter.getValidatorsCount(mcChainAddress), 2);
+        assertFalse(multisigCommitter.isCustomSigningSetActive(mcChainAddress));
 
         vm.prank(chainAdmin);
-        multisigCommitter.setCustomSigningThreshold(chainAddress, 1);
+        multisigCommitter.setCustomSigningThreshold(mcChainAddress, 1);
         // setting the threshold has no effect unless customValidatorSet is enabled
-        assertEq(multisigCommitter.getSigningThreshold(chainAddress), 2);
-        assertEq(multisigCommitter.getValidatorsCount(chainAddress), 2);
-        assertFalse(multisigCommitter.isCustomSigningSetActive(chainAddress));
+        assertEq(multisigCommitter.getSigningThreshold(mcChainAddress), 2);
+        assertEq(multisigCommitter.getValidatorsCount(mcChainAddress), 2);
+        assertFalse(multisigCommitter.isCustomSigningSetActive(mcChainAddress));
 
         vm.prank(ecosystemOwner);
-        multisigCommitter.useCustomSigningSet(chainAddress);
-        assertEq(multisigCommitter.getSigningThreshold(chainAddress), 1);
-        assertEq(multisigCommitter.getValidatorsCount(chainAddress), 1);
-        assertTrue(multisigCommitter.isCustomSigningSetActive(chainAddress));
+        multisigCommitter.useCustomSigningSet(mcChainAddress);
+        assertEq(multisigCommitter.getSigningThreshold(mcChainAddress), 1);
+        assertEq(multisigCommitter.getValidatorsCount(mcChainAddress), 1);
+        assertTrue(multisigCommitter.isCustomSigningSetActive(mcChainAddress));
 
         vm.prank(chainAdmin);
-        multisigCommitter.useSharedSigningSet(chainAddress);
-        assertEq(multisigCommitter.getSigningThreshold(chainAddress), 2);
-        assertEq(multisigCommitter.getValidatorsCount(chainAddress), 2);
-        assertFalse(multisigCommitter.isCustomSigningSetActive(chainAddress));
+        multisigCommitter.useSharedSigningSet(mcChainAddress);
+        assertEq(multisigCommitter.getSigningThreshold(mcChainAddress), 2);
+        assertEq(multisigCommitter.getValidatorsCount(mcChainAddress), 2);
+        assertFalse(multisigCommitter.isCustomSigningSetActive(mcChainAddress));
     }
 
     function test_custom_validator_set_enablemenet_permissions() public {
         vm.prank(chainAdmin);
         vm.expectRevert(); // chain admin cannot enable custom validator set
-        multisigCommitter.useCustomSigningSet(chainAddress);
+        multisigCommitter.useCustomSigningSet(mcChainAddress);
 
         vm.prank(ecosystemOwner);
-        multisigCommitter.useCustomSigningSet(chainAddress);
+        multisigCommitter.useCustomSigningSet(mcChainAddress);
 
         vm.prank(ecosystemOwner);
         vm.expectRevert(); // ecosystem owner cannot revoke custom validator set
-        multisigCommitter.useSharedSigningSet(chainAddress);
+        multisigCommitter.useSharedSigningSet(mcChainAddress);
 
         vm.prank(chainAdmin);
-        multisigCommitter.useSharedSigningSet(chainAddress);
+        multisigCommitter.useSharedSigningSet(mcChainAddress);
     }
 
     function test_addingRemovingSharedValidators() public {
@@ -179,47 +180,47 @@ contract MultisigCommitterTest is Test {
         vm.prank(ecosystemOwner);
         multisigCommitter.addSharedValidator(validator3Shared);
         assertEq(multisigCommitter.sharedValidatorsCount(), 3);
-        assertEq(multisigCommitter.getValidatorsCount(chainAddress), 3);
+        assertEq(multisigCommitter.getValidatorsCount(mcChainAddress), 3);
         assertTrue(multisigCommitter.isSharedValidator(validator3Shared));
-        assertTrue(multisigCommitter.isValidator(chainAddress, validator3Shared));
+        assertTrue(multisigCommitter.isValidator(mcChainAddress, validator3Shared));
 
         vm.prank(ecosystemOwner);
         multisigCommitter.removeSharedValidator(validator1Shared);
         assertEq(multisigCommitter.sharedValidatorsCount(), 2);
-        assertEq(multisigCommitter.getValidatorsCount(chainAddress), 2);
+        assertEq(multisigCommitter.getValidatorsCount(mcChainAddress), 2);
         assertFalse(multisigCommitter.isSharedValidator(validator1Shared));
-        assertFalse(multisigCommitter.isValidator(chainAddress, validator1Shared));
+        assertFalse(multisigCommitter.isValidator(mcChainAddress, validator1Shared));
 
         vm.prank(ecosystemOwner);
         multisigCommitter.removeSharedValidator(validator3Shared);
         assertEq(multisigCommitter.sharedValidatorsCount(), 1);
-        assertEq(multisigCommitter.getValidatorsCount(chainAddress), 1);
+        assertEq(multisigCommitter.getValidatorsCount(mcChainAddress), 1);
         assertFalse(multisigCommitter.isSharedValidator(validator3Shared));
-        assertFalse(multisigCommitter.isValidator(chainAddress, validator3Shared));
+        assertFalse(multisigCommitter.isValidator(mcChainAddress, validator3Shared));
 
         vm.prank(ecosystemOwner);
         multisigCommitter.addSharedValidator(validator1Shared);
         assertEq(multisigCommitter.sharedValidatorsCount(), 2);
-        assertEq(multisigCommitter.getValidatorsCount(chainAddress), 2);
+        assertEq(multisigCommitter.getValidatorsCount(mcChainAddress), 2);
         assertTrue(multisigCommitter.isSharedValidator(validator1Shared));
-        assertTrue(multisigCommitter.isValidator(chainAddress, validator1Shared));
+        assertTrue(multisigCommitter.isValidator(mcChainAddress, validator1Shared));
     }
 
     function test_changeSharedSigningThreshold() public {
         vm.prank(ecosystemOwner);
         multisigCommitter.setSharedSigningThreshold(0);
         assertEq(multisigCommitter.sharedSigningThreshold(), 0);
-        assertEq(multisigCommitter.getSigningThreshold(chainAddress), 0);
+        assertEq(multisigCommitter.getSigningThreshold(mcChainAddress), 0);
 
         vm.prank(ecosystemOwner);
         multisigCommitter.setSharedSigningThreshold(2);
         assertEq(multisigCommitter.sharedSigningThreshold(), 2);
-        assertEq(multisigCommitter.getSigningThreshold(chainAddress), 2);
+        assertEq(multisigCommitter.getSigningThreshold(mcChainAddress), 2);
     }
 
     function prepareCommit() internal returns (uint256, uint256, bytes memory) {
         vm.mockCall(
-            chainAddress,
+            mcChainAddress,
             abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector),
             abi.encode(chainId)
         );
@@ -241,17 +242,17 @@ contract MultisigCommitterTest is Test {
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = prepareCommit();
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(ChainRequiresValidatorsSignaturesForCommit.selector));
-        multisigCommitter.commitBatchesSharedBridge(chainAddress, commitBatchFrom, commitBatchTo, commitData);
+        multisigCommitter.commitBatchesSharedBridge(mcChainAddress, commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_multisig_can_be_disabled() public {
         vm.prank(ecosystemOwner);
         multisigCommitter.setSharedSigningThreshold(0);
-        assertEq(multisigCommitter.getSigningThreshold(chainAddress), 0);
+        assertEq(multisigCommitter.getSigningThreshold(mcChainAddress), 0);
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = prepareCommit();
         vm.prank(sequencer);
-        multisigCommitter.commitBatchesSharedBridge(chainAddress, commitBatchFrom, commitBatchTo, commitData);
+        multisigCommitter.commitBatchesSharedBridge(mcChainAddress, commitBatchFrom, commitBatchTo, commitData);
     }
 
     function hashCommitData(
@@ -264,7 +265,7 @@ contract MultisigCommitterTest is Test {
             "CommitBatchesMultisig(address chainAddress,uint256 processBatchFrom,uint256 processBatchTo,bytes batchData)"
         );
         bytes32 structHash = keccak256(
-            abi.encode(typeHash, chainAddress, commitBatchFrom, commitBatchTo, keccak256(commitData))
+            abi.encode(typeHash, mcChainAddress, commitBatchFrom, commitBatchTo, keccak256(commitData))
         );
         bytes32 domainSeparator = keccak256(
             abi.encode(
@@ -304,7 +305,7 @@ contract MultisigCommitterTest is Test {
 
         vm.prank(sequencer);
         multisigCommitter.commitBatchesMultisig(
-            chainAddress,
+            mcChainAddress,
             commitBatchFrom,
             commitBatchTo,
             commitData,
@@ -329,7 +330,7 @@ contract MultisigCommitterTest is Test {
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(NotEnoughSigners.selector, 1, 2));
         multisigCommitter.commitBatchesMultisig(
-            chainAddress,
+            mcChainAddress,
             commitBatchFrom,
             commitBatchTo,
             commitData,
@@ -352,7 +353,7 @@ contract MultisigCommitterTest is Test {
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(SignerNotAuthorized.selector, validator1Custom));
         multisigCommitter.commitBatchesMultisig(
-            chainAddress,
+            mcChainAddress,
             commitBatchFrom,
             commitBatchTo,
             commitData,
@@ -368,7 +369,7 @@ contract MultisigCommitterTest is Test {
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(SignersNotSorted.selector));
         multisigCommitter.commitBatchesMultisig(
-            chainAddress,
+            mcChainAddress,
             commitBatchFrom,
             commitBatchTo,
             commitData,
@@ -378,8 +379,8 @@ contract MultisigCommitterTest is Test {
     }
 
     function test_getValidatorsMember_Shared() public view {
-        address member0 = multisigCommitter.getValidatorsMember(chainAddress, 0);
-        address member1 = multisigCommitter.getValidatorsMember(chainAddress, 1);
+        address member0 = multisigCommitter.getValidatorsMember(mcChainAddress, 0);
+        address member1 = multisigCommitter.getValidatorsMember(mcChainAddress, 1);
         // members should be in the shared validators set
         assertTrue(multisigCommitter.isSharedValidator(member0));
         assertTrue(multisigCommitter.isSharedValidator(member1));
@@ -388,9 +389,9 @@ contract MultisigCommitterTest is Test {
     function test_getValidatorsMember_Custom() public {
         // Enable custom validator set
         vm.prank(ecosystemOwner);
-        multisigCommitter.useCustomSigningSet(chainAddress);
+        multisigCommitter.useCustomSigningSet(mcChainAddress);
 
-        address member0 = multisigCommitter.getValidatorsMember(chainAddress, 0);
+        address member0 = multisigCommitter.getValidatorsMember(mcChainAddress, 0);
         // should be the custom validator we added
         assertEq(member0, validator1Custom);
     }
@@ -398,18 +399,18 @@ contract MultisigCommitterTest is Test {
     function test_isValidator_Custom() public {
         // Enable custom validator set
         vm.prank(ecosystemOwner);
-        multisigCommitter.useCustomSigningSet(chainAddress);
+        multisigCommitter.useCustomSigningSet(mcChainAddress);
 
-        assertTrue(multisigCommitter.isValidator(chainAddress, validator1Custom));
-        assertFalse(multisigCommitter.isValidator(chainAddress, validator1Shared));
+        assertTrue(multisigCommitter.isValidator(mcChainAddress, validator1Custom));
+        assertFalse(multisigCommitter.isValidator(mcChainAddress, validator1Shared));
     }
 
     function test_commit_with_custom_validators() public {
         // Enable custom validator set and set threshold
         vm.prank(ecosystemOwner);
-        multisigCommitter.useCustomSigningSet(chainAddress);
+        multisigCommitter.useCustomSigningSet(mcChainAddress);
         vm.prank(chainAdmin);
-        multisigCommitter.setCustomSigningThreshold(chainAddress, 1);
+        multisigCommitter.setCustomSigningThreshold(mcChainAddress, 1);
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = prepareCommit();
         bytes32 digest = hashCommitData(commitBatchFrom, commitBatchTo, commitData);
@@ -422,7 +423,7 @@ contract MultisigCommitterTest is Test {
 
         vm.prank(sequencer);
         multisigCommitter.commitBatchesMultisig(
-            chainAddress,
+            mcChainAddress,
             commitBatchFrom,
             commitBatchTo,
             commitData,
@@ -434,9 +435,9 @@ contract MultisigCommitterTest is Test {
     function test_commit_with_custom_validators_unauthorized_shared() public {
         // Enable custom validator set
         vm.prank(ecosystemOwner);
-        multisigCommitter.useCustomSigningSet(chainAddress);
+        multisigCommitter.useCustomSigningSet(mcChainAddress);
         vm.prank(chainAdmin);
-        multisigCommitter.setCustomSigningThreshold(chainAddress, 1);
+        multisigCommitter.setCustomSigningThreshold(mcChainAddress, 1);
 
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = prepareCommit();
         bytes32 digest = hashCommitData(commitBatchFrom, commitBatchTo, commitData);
@@ -451,7 +452,7 @@ contract MultisigCommitterTest is Test {
         vm.prank(sequencer);
         vm.expectRevert(abi.encodeWithSelector(SignerNotAuthorized.selector, validator1Shared));
         multisigCommitter.commitBatchesMultisig(
-            chainAddress,
+            mcChainAddress,
             commitBatchFrom,
             commitBatchTo,
             commitData,

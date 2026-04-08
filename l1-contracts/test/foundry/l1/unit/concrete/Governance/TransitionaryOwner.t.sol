@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
@@ -19,7 +19,7 @@ contract MockOwnable2Step is Ownable2Step {
 }
 
 /// @notice Unit tests for TransitionaryOwner contract
-contract TransitionaryOwnerTest is Test {
+contract TransitionaryOwnerTest is MigrationTestBase {
     TransitionaryOwner internal transitionaryOwner;
     MockOwnable2Step internal mockOwnableContract;
 
@@ -27,7 +27,8 @@ contract TransitionaryOwnerTest is Test {
     address internal initialOwner;
     address internal randomUser;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         governanceAddress = makeAddr("governance");
         initialOwner = makeAddr("initialOwner");
         randomUser = makeAddr("randomUser");

@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 
 import {BalanceChange, MigrationConfirmationData, L2Log, TxStatus} from "contracts/common/Messaging.sol";
@@ -60,7 +61,7 @@ import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/Dynamic
 import {GWAssetTrackerTestHelper} from "./GWAssetTracker.t.sol";
 import {ProcessLogsTestHelper} from "./ProcessLogsTestHelper.sol";
 
-contract GWAssetTrackerExtendedTest is Test {
+contract GWAssetTrackerExtendedTest is MigrationTestBase {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
     GWAssetTrackerTestHelper public gwAssetTracker;
@@ -82,7 +83,9 @@ contract GWAssetTrackerExtendedTest is Test {
     bytes32 public constant BASE_TOKEN_ASSET_ID = keccak256("baseTokenAssetId");
     uint256 public constant BASE_TOKEN_AMOUNT = 500;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
+
         // Deploy GWAssetTrackerTestHelper
         gwAssetTracker = new GWAssetTrackerTestHelper();
 

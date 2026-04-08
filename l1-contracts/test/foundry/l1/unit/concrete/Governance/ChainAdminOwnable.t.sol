@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
@@ -31,7 +31,7 @@ contract MockRevertingContract {
 }
 
 /// @notice Unit tests for ChainAdminOwnable contract
-contract ChainAdminOwnableTest is Test {
+contract ChainAdminOwnableTest is MigrationTestBase {
     ChainAdminOwnable internal chainAdminOwnable;
     MockChainContract internal mockChainContract;
     MockRevertingContract internal mockRevertingContract;
@@ -45,7 +45,8 @@ contract ChainAdminOwnableTest is Test {
     event NewTokenMultiplierSetter(address _oldTokenMultiplierSetter, address _newTokenMultiplierSetter);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         owner = makeAddr("owner");
         tokenMultiplierSetter = makeAddr("tokenMultiplierSetter");
         randomUser = makeAddr("randomUser");

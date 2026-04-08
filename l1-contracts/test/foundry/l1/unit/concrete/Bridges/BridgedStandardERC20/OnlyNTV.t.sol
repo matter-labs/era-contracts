@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -14,14 +15,15 @@ contract MockNTV {
     }
 }
 
-contract BridgedStandardERC20_OnlyNTV_Test is Test {
+contract BridgedStandardERC20_OnlyNTV_Test is MigrationTestBase {
     using stdStorage for StdStorage;
 
     BridgedStandardERC20 implementation;
     address originToken = address(0xBEEF);
     bytes32 assetId = keccak256(abi.encode("assetId"));
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         implementation = new BridgedStandardERC20();
     }
 

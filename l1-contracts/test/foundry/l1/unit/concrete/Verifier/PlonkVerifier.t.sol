@@ -2,11 +2,12 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
 import {PlonkVerifierTest} from "contracts/dev-contracts/test/PlonkVerifierTest.sol";
 
-contract PlonkVerifierTestTest is Test {
+contract PlonkVerifierTestTest is MigrationTestBase {
     uint256 Q_MOD = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
     uint256 R_MOD = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
@@ -16,7 +17,8 @@ contract PlonkVerifierTestTest is Test {
 
     EraVerifierPlonk public verifier;
 
-    function setUp() public virtual {
+    function setUp() public virtual override {
+        super.setUp();
         publicInputs.push(17257057577815541751225964212897374444694342989384539141520877492729);
 
         serializedProof.push(10032255692304426541958487424837706541667730769782503366592797609781788557424);

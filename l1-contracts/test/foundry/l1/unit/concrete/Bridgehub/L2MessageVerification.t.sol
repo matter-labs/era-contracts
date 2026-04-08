@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "test/foundry/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 
 import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
@@ -20,11 +20,13 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
     0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
 );
 
-contract MessageRootTest is Test {
+contract MessageRootTest is MigrationTestBase {
     address bridgeHub;
     L2MessageVerification l2MessageVerification;
 
-    function setUp() public {
+    function setUp() public virtual override {
+        super.setUp();
+
         bridgeHub = makeAddr("bridgeHub");
         l2MessageVerification = new L2MessageVerification();
     }

@@ -68,7 +68,10 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     address internal owner;
     address internal hyperchain;
 
-    function setUp() public {
+    function setUp() public override {
+        // PermanentRestriction calls bridgehub.setAddresses() which requires an isolated ecosystem.
+        // deploy() creates its own CTM + chain setup, but needs the integration base for the
+        // Bridgehub/infra contracts. Skip super.setUp() and call deploy() directly.
         deploy();
 
         createNewChainBridgehub();

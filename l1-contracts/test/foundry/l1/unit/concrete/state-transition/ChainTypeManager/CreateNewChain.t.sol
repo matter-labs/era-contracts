@@ -10,7 +10,8 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract createNewChainTest is ChainTypeManagerTest {
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         deploy();
     }
 

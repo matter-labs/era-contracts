@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -42,7 +43,7 @@ contract TestERC20 is ERC20 {
     }
 }
 
-contract L1NullifierTest is Test {
+contract L1NullifierTest is MigrationTestBase {
     using stdStorage for StdStorage;
 
     L1Nullifier public l1Nullifier;
@@ -62,7 +63,8 @@ contract L1NullifierTest is Test {
 
     TestERC20 public token;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         owner = makeAddr("owner");
         proxyAdmin = makeAddr("proxyAdmin");
         bridgehub = makeAddr("bridgehub");

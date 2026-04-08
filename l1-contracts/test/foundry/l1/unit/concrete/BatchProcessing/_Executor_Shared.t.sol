@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import "forge-std/console.sol";
-import {Test} from "forge-std/Test.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -46,13 +45,14 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
+import {L1ContractDeployer} from "foundry-test/l1/integration/_SharedL1ContractDeployer.t.sol";
 import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
 
-contract ExecutorTest is UtilsCallMockerTest {
+contract ExecutorTest is MigrationTestBase {
     address internal owner;
     address internal validator;
     address internal randomSigner;
@@ -169,8 +169,8 @@ contract ExecutorTest is UtilsCallMockerTest {
         selectors[i++] = mailbox.proveL2MessageInclusion.selector;
         selectors[i++] = mailbox.proveL2LogInclusion.selector;
         selectors[i++] = mailbox.proveL1ToL2TransactionStatus.selector;
-        selectors[i++] = mailbox.finalizeEthWithdrawal.selector; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
-        selectors[i++] = mailbox.requestL2Transaction.selector; // TODO(EVM-1216): remove after the legacy mailbox.finalizeEthWithdrawal and mailbox.requestL2Transaction are deprecated.
+        selectors[i++] = mailbox.finalizeEthWithdrawal.selector;
+        selectors[i++] = mailbox.requestL2Transaction.selector;
         selectors[i++] = mailbox.bridgehubRequestL2Transaction.selector;
         selectors[i++] = mailbox.l2TransactionBaseCost.selector;
         return selectors;
@@ -204,11 +204,22 @@ contract ExecutorTest is UtilsCallMockerTest {
             );
     }
 
-    constructor() {
-        uint256 l1ChainID = 1;
+    function setUp() public virtual override {
+        super.setUp();
+        _deployExecutorTestChain();
+    }
+
+    /// @dev Deploys a custom diamond with TestExecutor/TestCommitter facets for batch processing tests.
+    /// Uses the real Bridgehub from the integration deployment where possible.
+    function _deployExecutorTestChain() internal {
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
+
+        // Use a DummyBridgehub because batch processing tests need fine-grained control
+        // over bridgehub state (setZKChain, setMessageRoot, etc.) that the real Bridgehub
+        // doesn't expose. This is a justified mock: TestExecutor/TestCommitter are test facets
+        // that need a controlled environment.
         dummyBridgehub = new DummyBridgehub();
         vm.mockCall(address(dummyBridgehub), abi.encodeWithSelector(IL1Bridgehub.L1_CHAIN_ID.selector), abi.encode(1));
         uint256[] memory allZKChainChainIDsZero = new uint256[](0);
@@ -250,7 +261,6 @@ contract ExecutorTest is UtilsCallMockerTest {
         address interopCenter = makeAddr("interopCenter");
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
-        // dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
 
         dummyBridgehub.setSharedBridge(address(sharedBridge));
         vm.prank(owner);
@@ -267,7 +277,6 @@ contract ExecutorTest is UtilsCallMockerTest {
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
 
-        // Deploy and configure RollupDAManager with the DA pair
         rollupDAManager = new RollupDAManager();
         rollupDAManager.updateDAPair(rollupL1DAValidator, L2_DA_COMMITMENT_SCHEME, true);
         rollupDAManager.transferOwnership(TEST_ROLLUP_DA_MANAGER_OWNER);
@@ -288,7 +297,6 @@ contract ExecutorTest is UtilsCallMockerTest {
         );
         DiamondInit diamondInit = new DiamondInit(isZKsyncOS());
         EraTestnetVerifier testnetVerifier = new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
-        // Mock the CTM to return a verifier for protocol version 0
         vm.mockCall(
             address(chainTypeManager),
             abi.encodeWithSelector(IChainTypeManager.protocolVersionVerifier.selector, uint256(0)),
@@ -311,7 +319,6 @@ contract ExecutorTest is UtilsCallMockerTest {
         });
 
         InitializeData memory params = InitializeData({
-            // TODO REVIEW
             chainId: l2ChainId,
             bridgehub: address(dummyBridgehub),
             interopCenter: interopCenter,
@@ -321,7 +328,6 @@ contract ExecutorTest is UtilsCallMockerTest {
             validatorTimelock: address(validatorTimelock),
             baseTokenAssetId: baseTokenAssetId,
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
-            // verifier is fetched from CTM
             l2BootloaderBytecodeHash: dummyHash,
             l2DefaultAccountBytecodeHash: dummyHash,
             l2EvmEmulatorBytecodeHash: dummyHash
@@ -384,18 +390,14 @@ contract ExecutorTest is UtilsCallMockerTest {
         admin = AdminFacet(address(diamondProxy));
         chainTypeManager.setZKChain(l2ChainId, address(diamondProxy));
 
-        // Initiate the token multiplier to enable L1 -> L2 transactions.
         vm.prank(address(chainTypeManager));
         admin.setTokenMultiplier(1, 1);
         vm.prank(address(owner));
         admin.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_COMMITMENT_SCHEME);
 
-        // Allow to call executor directly, without going through ValidatorTimelock
         vm.prank(address(chainTypeManager));
         admin.setValidator(address(validator), true);
 
-        // foundry's default value is 1 for the block's timestamp, it is expected
-        // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER + 1
         vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
 
@@ -447,6 +449,6 @@ contract ExecutorTest is UtilsCallMockerTest {
         return false;
     }
 
-    // add this to be excluded from coverage report
-    function test() internal virtual override {}
+    // Resolve test() from L1ContractDeployer
+    function test() internal virtual override(L1ContractDeployer) {}
 }

@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
@@ -45,7 +46,7 @@ contract MockPlonkVerifier is IVerifier {
 }
 
 /// @notice Unit tests for EraDualVerifier contract
-contract EraDualVerifierTest is Test {
+contract EraDualVerifierTest is MigrationTestBase {
     EraDualVerifier public verifier;
     MockFflonkVerifier public fflonkVerifier;
     MockPlonkVerifier public plonkVerifier;
@@ -53,7 +54,8 @@ contract EraDualVerifierTest is Test {
     uint256 internal constant FFLONK_VERIFICATION_TYPE = 0;
     uint256 internal constant PLONK_VERIFICATION_TYPE = 1;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         fflonkVerifier = new MockFflonkVerifier();
         plonkVerifier = new MockPlonkVerifier();
         verifier = new EraDualVerifier(IVerifierV2(address(fflonkVerifier)), IVerifier(address(plonkVerifier)));

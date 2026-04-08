@@ -39,15 +39,9 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
 
     function setUp() public override {
         super.setUp();
-        chainAssetHandler = makeAddr("chainAssetHandler");
+        // Use the real chainAssetHandler from the deployed Bridgehub — no mock needed
+        chainAssetHandler = IBridgehubBase(address(dummyBridgehub)).chainAssetHandler();
         admin = utilsFacet.util_getAdmin();
-
-        // Mock bridgehub to return chainAssetHandler
-        vm.mockCall(
-            address(dummyBridgehub),
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(chainAssetHandler)
-        );
     }
 
     /*//////////////////////////////////////////////////////////////

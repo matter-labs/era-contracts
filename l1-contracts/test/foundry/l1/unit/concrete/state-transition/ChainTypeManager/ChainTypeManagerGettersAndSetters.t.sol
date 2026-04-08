@@ -7,7 +7,8 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract ChainTypeManagerGettersAndSettersTest is ChainTypeManagerTest {
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         deploy();
     }
 

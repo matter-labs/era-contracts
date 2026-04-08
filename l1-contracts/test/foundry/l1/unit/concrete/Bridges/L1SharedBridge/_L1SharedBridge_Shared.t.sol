@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ERC20} from "@openzeppelin/contracts-v4/token/ERC20/ERC20.sol";
@@ -31,7 +32,7 @@ import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
-contract L1AssetRouterTest is Test {
+contract L1AssetRouterTest is MigrationTestBase {
     using stdStorage for StdStorage;
 
     event BridgehubDepositBaseTokenInitiated(
@@ -114,7 +115,8 @@ contract L1AssetRouterTest is Test {
     uint256 isWithdrawalFinalizedStorageLocation = uint256(8 - 1 + (1 + 49) + 0 + (1 + 49) + 50 + 1 + 50);
     bytes32 ETH_TOKEN_ASSET_ID = keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDR, ETH_TOKEN_ADDRESS));
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         owner = makeAddr("owner");
         admin = makeAddr("admin");
         proxyAdmin = makeAddr("proxyAdmin");
@@ -362,7 +364,7 @@ contract L1AssetRouterTest is Test {
             .checked_write(_value);
     }
 
-    function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
+    function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal override {
         stdstore
             .target(address(l1Nullifier))
             .sig(l1Nullifier.chainBalance.selector)

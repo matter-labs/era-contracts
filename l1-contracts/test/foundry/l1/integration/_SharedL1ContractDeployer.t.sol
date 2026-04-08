@@ -146,7 +146,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         }
     }
 
-    function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
+    function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal virtual {
         stdstore
             .target(address(addresses.l1Nullifier))
             .sig(addresses.l1Nullifier.chainBalance.selector)

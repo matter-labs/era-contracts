@@ -145,10 +145,12 @@ contract ExecutorExtendedTest is ExecutorTest {
 
 /// @title Extended tests for ExecutorFacet revert batches functionality
 contract ExecutorRevertBatchesTest is ExecutorTest {
-    UtilsFacet internal utilsFacet;
+    // utilsFacet is inherited from MigrationTestBase
 
-    constructor() {
-        // Add UtilsFacet to the diamond to manipulate state
+    function setUp() public override {
+        super.setUp();
+
+        // Add UtilsFacet to the executor's diamond to manipulate state
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(new UtilsFacet()),
@@ -164,8 +166,8 @@ contract ExecutorRevertBatchesTest is ExecutorTest {
         });
 
         // Execute the upgrade as chainTypeManager
-        address chainTypeManager = getters.getChainTypeManager();
-        vm.prank(chainTypeManager);
+        address chainTypeManagerAddr = getters.getChainTypeManager();
+        vm.prank(chainTypeManagerAddr);
         admin.executeUpgrade(diamondCutData);
 
         utilsFacet = UtilsFacet(address(executor));

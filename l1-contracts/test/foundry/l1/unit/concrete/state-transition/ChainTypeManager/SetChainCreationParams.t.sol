@@ -8,7 +8,8 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "contracts/common/Config.sol";
 
 contract SetChainCreationParamsTest is ChainTypeManagerTest {
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         deploy();
     }
 

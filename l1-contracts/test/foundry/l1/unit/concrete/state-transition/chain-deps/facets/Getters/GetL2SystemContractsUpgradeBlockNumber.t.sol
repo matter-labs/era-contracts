@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 
 contract GetL2SystemContractsUpgradeBlockNumberTest is GettersFacetTest {
-    function test() public {
+    function test_getter() public {
         uint256 expected = 56432;
         gettersFacetWrapper.util_setL2SystemContractsUpgradeBatchNumber(expected);
 

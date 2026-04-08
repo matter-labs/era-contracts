@@ -50,7 +50,8 @@ contract CommittingTest is ExecutorTest {
     bytes16 defaultBlobOpeningPoint = 0x7142c5851421a2dc03dde0aabdb0ffdb;
     bytes32 defaultBlobClaimedValue = 0x1e5eea3bbb85517461c1d1c7b84c7c2cec050662a5e81a71d5d7e2766eaff2f0;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         // the values below are taken from the actual blob used by Era
         bytes1 source = bytes1(0x01);
         defaultBlobCommitment = Utils.getDefaultBlobCommitment();

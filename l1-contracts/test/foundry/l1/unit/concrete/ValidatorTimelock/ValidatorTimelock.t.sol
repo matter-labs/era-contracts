@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -18,7 +19,7 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 
-contract ValidatorTimelockTest is Test {
+contract ValidatorTimelockTest is MigrationTestBase {
     /// @notice A new validator has been added.
     event ValidatorAdded(uint256 indexed _chainId, address _addedValidator);
 
@@ -61,7 +62,8 @@ contract ValidatorTimelockTest is Test {
     bytes32 executorAdminRole;
     bytes32 upgraderAdminRole;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         owner = makeAddr("owner");
         zkSync = makeAddr("zkSync");
         alice = makeAddr("alice");

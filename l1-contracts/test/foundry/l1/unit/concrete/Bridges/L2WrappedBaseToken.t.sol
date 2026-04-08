@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {L2WrappedBaseToken} from "contracts/bridge/L2WrappedBaseToken.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Proxy.sol";
@@ -14,14 +15,15 @@ import {
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @notice Unit tests for L2WrappedBaseToken contract
-contract L2WrappedBaseTokenTest is Test {
+contract L2WrappedBaseTokenTest is MigrationTestBase {
     L2WrappedBaseToken implementation;
     L2WrappedBaseToken token;
     address l2Bridge;
     address l1Address;
     bytes32 baseTokenAssetId;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         implementation = new L2WrappedBaseToken();
         l2Bridge = makeAddr("l2Bridge");
         l1Address = makeAddr("l1Address");

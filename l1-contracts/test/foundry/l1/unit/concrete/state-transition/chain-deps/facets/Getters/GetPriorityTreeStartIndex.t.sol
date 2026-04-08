@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 
 contract GetPriorityTreeStartIndexTest is GettersFacetTest {
-    function test() public {
+    function test_getter() public {
         uint256 expected = 42;
         gettersFacetWrapper.util_setPriorityTreeStartIndex(expected);
 

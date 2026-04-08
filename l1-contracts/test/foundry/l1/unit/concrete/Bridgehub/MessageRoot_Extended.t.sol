@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "test/foundry/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
@@ -32,7 +32,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
-contract MessageRoot_Extended_Test is Test {
+contract MessageRoot_Extended_Test is MigrationTestBase {
     address bridgeHub;
     uint256 L1_CHAIN_ID;
     uint256 gatewayChainId;
@@ -41,7 +41,9 @@ contract MessageRoot_Extended_Test is Test {
     address assetTracker;
     address chainAssetHandler;
 
-    function setUp() public {
+    function setUp() public virtual override {
+        super.setUp();
+
         bridgeHub = address(new L1Bridgehub(makeAddr("owner"), 10));
         chainAssetHandler = makeAddr("chainAssetHandler");
         assetTracker = makeAddr("assetTracker");

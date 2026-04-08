@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {RestrictionValidator} from "contracts/governance/restriction/RestrictionValidator.sol";
 
@@ -23,12 +23,13 @@ contract NotARestrictionContract {
 }
 
 /// @notice Unit tests for RestrictionValidator library
-contract RestrictionValidatorTest is Test {
+contract RestrictionValidatorTest is MigrationTestBase {
     RestrictionValidatorWrapper internal validator;
     DummyRestriction internal validRestriction;
     NotARestrictionContract internal invalidRestriction;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         validator = new RestrictionValidatorWrapper();
         validRestriction = new DummyRestriction(true);
         invalidRestriction = new NotARestrictionContract();

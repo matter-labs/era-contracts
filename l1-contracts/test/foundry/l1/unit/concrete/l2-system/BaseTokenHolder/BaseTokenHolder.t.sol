@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 import {IBaseTokenHolder} from "contracts/l2-system/interfaces/IBaseTokenHolder.sol";
@@ -21,7 +22,7 @@ import {DummyL2AssetTracker} from "contracts/dev-contracts/test/DummyL2AssetTrac
 
 /// @title BaseTokenHolderTest
 /// @notice Unit tests for BaseTokenHolder contract
-contract BaseTokenHolderTest is Test {
+contract BaseTokenHolderTest is MigrationTestBase {
     BaseTokenHolder internal baseTokenHolder;
 
     address internal recipient;
@@ -29,7 +30,8 @@ contract BaseTokenHolderTest is Test {
     uint256 internal constant ERA_CHAIN_ID = 271;
     uint256 internal constant GATEWAY_CHAIN_ID = 505;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         baseTokenHolder = new BaseTokenHolder();
         recipient = makeAddr("recipient");
 

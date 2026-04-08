@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "test/foundry/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
@@ -33,7 +33,7 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
     0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
 );
 
-contract MessageRootTest is Test {
+contract MessageRootTest is MigrationTestBase {
     address bridgeHub;
     L1MessageRoot messageRoot;
     L2MessageRoot l2MessageRoot;
@@ -41,7 +41,9 @@ contract MessageRootTest is Test {
     uint256 gatewayChainId;
     address assetTracker;
 
-    function setUp() public {
+    function setUp() public virtual override {
+        super.setUp();
+
         bridgeHub = makeAddr("bridgeHub");
         uint256[] memory allZKChainChainIDsZero = new uint256[](0);
         vm.mockCall(

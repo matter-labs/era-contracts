@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 
 import {BalanceChange, MigrationConfirmationData, L2Log} from "contracts/common/Messaging.sol";
@@ -68,7 +69,7 @@ contract GWAssetTrackerTestHelper is GWAssetTracker {
     }
 }
 
-contract GWAssetTrackerTest is Test {
+contract GWAssetTrackerTest is MigrationTestBase {
     GWAssetTrackerTestHelper public gwAssetTracker;
     address public mockBridgehub;
     address public mockMessageRoot;
@@ -91,7 +92,9 @@ contract GWAssetTrackerTest is Test {
     bytes32 public constant BASE_TOKEN_ASSET_ID = keccak256("baseTokenAssetId");
     uint256 public constant BASE_TOKEN_AMOUNT = 500;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
+
         // Deploy GWAssetTrackerTestHelper
         gwAssetTracker = new GWAssetTrackerTestHelper();
 

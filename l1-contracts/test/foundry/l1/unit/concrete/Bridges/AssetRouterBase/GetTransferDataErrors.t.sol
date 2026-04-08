@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {BadTransferDataLength, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
@@ -48,10 +49,11 @@ contract TestAssetRouterBase is AssetRouterBase {
     }
 }
 
-contract AssetRouterBase_GetTransferDataErrors_Test is Test {
+contract AssetRouterBase_GetTransferDataErrors_Test is MigrationTestBase {
     TestAssetRouterBase router;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         router = new TestAssetRouterBase();
     }
 
