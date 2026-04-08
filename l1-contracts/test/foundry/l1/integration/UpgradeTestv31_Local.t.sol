@@ -9,6 +9,7 @@ import {EcosystemUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/Ecosy
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
 import {Call} from "contracts/governance/Common.sol";
+import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {Test} from "forge-std/Test.sol";
 import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
@@ -28,43 +29,34 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
         return bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001));
     }
 
-    /// @notice Override to skip bytecode publishing which reads large JSON files
+    /// @notice Override to skip bytecode publishing which reads large JSON files.
     function publishBytecodes() public override {
         console.log("Test mode: Skipping bytecode publishing to avoid MemoryOOG");
 
-        // Initialize factoryDepsHashes with dummy values
-        // The upgrade process expects at least 3 hashes: bootloader, defaultAA, evmEmulator
-        factoryDepsHashes = new uint256[](45); // Same size as real deployment
+        factoryDepsResult.factoryDepsHashes = new uint256[](45);
 
-        // Use the configured chain creation params hashes
-        factoryDepsHashes[0] = uint256(config.contracts.chainCreationParams.bootloaderHash);
-        factoryDepsHashes[1] = uint256(config.contracts.chainCreationParams.defaultAAHash);
-        factoryDepsHashes[2] = uint256(config.contracts.chainCreationParams.evmEmulatorHash);
+        factoryDepsResult.factoryDepsHashes[0] = uint256(config.contracts.chainCreationParams.bootloaderHash);
+        factoryDepsResult.factoryDepsHashes[1] = uint256(config.contracts.chainCreationParams.defaultAAHash);
+        factoryDepsResult.factoryDepsHashes[2] = uint256(config.contracts.chainCreationParams.evmEmulatorHash);
 
-        // Fill rest with dummy valid bytecode hashes and mark them as in factory deps
         bytes32 dummyHash = bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001));
         for (uint256 i = 3; i < 45; i++) {
-            factoryDepsHashes[i] = uint256(dummyHash);
+            factoryDepsResult.factoryDepsHashes[i] = uint256(dummyHash);
         }
 
-        // Mark all hashes as being in factory deps to pass validation
-        isHashInFactoryDeps[config.contracts.chainCreationParams.bootloaderHash] = true;
-        isHashInFactoryDeps[config.contracts.chainCreationParams.defaultAAHash] = true;
-        isHashInFactoryDeps[config.contracts.chainCreationParams.evmEmulatorHash] = true;
-        isHashInFactoryDeps[dummyHash] = true;
-
-        // Set the flag to indicate bytecodes are "published" for test purposes
         upgradeConfig.factoryDepsPublished = true;
     }
 
-    /// @notice Override to skip validation of bytecode hashes in factory deps
-    function isHashInFactoryDepsCheck(bytes32 _hash) internal view override returns (bool) {
-        // In test mode, always return true to skip validation
-        return true;
+    /// @notice Override to skip reading all system contract bytecodes which causes MemoryOOG.
+    function buildUpgradeForceDeployments(
+        uint256,
+        address
+    ) internal override returns (IL2ContractDeployer.ForceDeployment[] memory) {
+        return new IL2ContractDeployer.ForceDeployment[](0);
     }
 }
 
-/// @notice Test-only Core upgrade that skips problematic governance calls
+/// @notice Test-only Core upgrade that skips prlematic governance calls
 contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
     /// @notice Override to skip setAssetTracker call (requires NTV ownership in test)
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
@@ -156,8 +148,6 @@ contract UpgradeIntegrationTest_Local is
         chainId = eraZKChainId;
         acceptPendingAdmin();
         console.log("setUp: Pending admin accepted");
-        PERMANENT_VALUES_INPUT = "/script-out/foundry-upgrade/permanent-ctm.toml";
-
         ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml";
         ECOSYSTEM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
         ECOSYSTEM_OUTPUT = "/script-out/foundry-upgrade/local-core.toml";
@@ -166,8 +156,6 @@ contract UpgradeIntegrationTest_Local is
         CHAIN_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml";
         CHAIN_OUTPUT = "/script-out/foundry-upgrade/local-gateway.toml";
         console.log("setUp: Paths configured");
-        preparePermanentValues();
-        console.log("setUp: Permanent values prepared");
         setupUpgrade(true);
         console.log("setUp: Upgrade setup complete");
         address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().proxies.bridgehub;

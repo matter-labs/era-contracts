@@ -119,7 +119,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
 
         ctmAddresses.stateTransition.facets.executorFacet = address(new ExecutorFacet(config.l1ChainId));
         ctmAddresses.stateTransition.facets.adminFacet = address(
-            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.rollupDAManager))
+            new AdminFacet(config.l1ChainId, RollupDAManager(ctmAddresses.daAddresses.daContracts.rollupDAManager))
         );
         ctmAddresses.stateTransition.facets.mailboxFacet = address(
             new MailboxFacet(
@@ -165,7 +165,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         bytes memory constructorArgs
     ) internal virtual override returns (address) {
         console.log("Deploying via create2 L2");
-        return L2Utils.deployViaCreat2L2(creationCode, constructorArgs, create2FactoryParams.factorySalt);
+        return L2Utils.deployViaCreat2L2(creationCode, constructorArgs, _create2FactorySalt);
     }
 
     // add this to be excluded from coverage report

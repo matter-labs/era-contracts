@@ -30,20 +30,9 @@ import {
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 
+/// FIXME currently we accept ownership as part of stage1, but in fact we should do it as part of stage0.
 /// @notice Script used for v31 upgrade flow
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
-    /// @notice E2e upgrade generation
-    function run() public virtual override {
-        initialize(
-            "/upgrade-envs/permanent-values/local.toml",
-            "/upgrade-envs/v0.31.0-interopB/local.toml",
-            vm.envString("V31_UPGRADE_ECOSYSTEM_OUTPUT")
-        );
-
-        prepareEcosystemUpgrade();
-        prepareDefaultGovernanceCalls();
-    }
-
     function deployNewEcosystemContractsL1() public virtual override {
         coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
         coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
@@ -99,13 +88,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
     /*//////////////////////////////////////////////////////////////
                           Internal functions
     //////////////////////////////////////////////////////////////*/
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        return super.getCreationCode(contractName, isZKBytecode);
-    }
 
     function getCreationCalldata(
         string memory contractName,

@@ -29,28 +29,22 @@ function elapsed(): string {
 }
 
 function prepareUpgradeHarnessInputs(): {
-  envVars: Record<string, string>;
+  upgradeInputPath: string;
   ecosystemOutputPath: string;
   cleanup: () => void;
 } {
   const tempDir = path.join(anvilInteropDir, "outputs", "upgrade-harness-inputs");
   fs.mkdirSync(tempDir, { recursive: true });
 
-  const permanentValuesPath = path.join(tempDir, "v29-permanent-values.toml");
   const upgradeInputPath = path.join(tempDir, "v29-to-v31-upgrade.toml");
   const ecosystemOutputPath = path.join(tempDir, "v31-upgrade-ecosystem.toml");
 
-  fs.copyFileSync(path.join(anvilInteropDir, "config/v29-permanent-values.toml"), permanentValuesPath);
   fs.copyFileSync(path.join(anvilInteropDir, "config/v29-to-v31-upgrade.toml"), upgradeInputPath);
 
   console.log("  Prepared temporary upgrade harness inputs");
 
   return {
-    envVars: {
-      PERMANENT_VALUES_INPUT_OVERRIDE: `/${path.relative(l1ContractsDir, permanentValuesPath)}`,
-      UPGRADE_INPUT_OVERRIDE: `/${path.relative(l1ContractsDir, upgradeInputPath)}`,
-      UPGRADE_ECOSYSTEM_OUTPUT_OVERRIDE: `/${path.relative(l1ContractsDir, ecosystemOutputPath)}`,
-    },
+    upgradeInputPath: `/${path.relative(l1ContractsDir, upgradeInputPath)}`,
     ecosystemOutputPath,
     cleanup: () => {
       fs.rmSync(tempDir, { recursive: true, force: true });
@@ -179,7 +173,7 @@ async function main(): Promise<void> {
   const runner = new DeploymentRunner();
   let cleanupUpgradeHarnessInputs: (() => void) | null = null;
   let upgradeHarnessInputs: {
-    envVars: Record<string, string>;
+    upgradeInputPath: string;
     ecosystemOutputPath: string;
     cleanup: () => void;
   } | null = null;
@@ -273,13 +267,26 @@ async function main(): Promise<void> {
     upgradeHarnessInputs = prepareUpgradeHarnessInputs();
     cleanupUpgradeHarnessInputs = upgradeHarnessInputs.cleanup;
 
+    const ecosystemOutputRelPath = `/${path.relative(l1ContractsDir, upgradeHarnessInputs.ecosystemOutputPath)}`;
+
     await runForgeScript({
       scriptPath: "deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol:EcosystemUpgrade_v31",
-      envVars: upgradeHarnessInputs.envVars,
+      envVars: {},
       rpcUrl: l1Chain.rpcUrl,
       senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
       projectRoot: l1ContractsDir,
-      sig: "run()",
+      sig: "noGovernancePrepare((address,address,address,address,bool,bytes32,string,string,address))",
+      args: `(${[
+        l1Addresses.bridgehub,
+        ctmAddress,
+        ethers.constants.AddressZero,
+        ethers.constants.AddressZero,
+        "true",
+        "0x0000000000000000000000000000000000000000000000000000000000000000",
+        upgradeHarnessInputs.upgradeInputPath,
+        ecosystemOutputRelPath,
+        governanceAddr,
+      ].join(",")})`,
     });
 
     // ── Step 5: Execute governance calls ──────────────────────────
@@ -346,14 +353,14 @@ async function main(): Promise<void> {
     // ── Step 8: Run stage3 post-governance migration ─────────────
     console.log(`\n=== Step 8: Running stage3 migration (${elapsed()}) ===\n`);
 
-    // Swap configs again for stage3 (it reads permanent values)
     await runForgeScript({
       scriptPath: "deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol:EcosystemUpgrade_v31",
-      envVars: upgradeHarnessInputs.envVars,
+      envVars: {},
       rpcUrl: l1Chain.rpcUrl,
       senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
       projectRoot: l1ContractsDir,
-      sig: "stage3()",
+      sig: "stage3(address)",
+      args: l1Addresses.bridgehub,
     });
 
     // ── Step 9: Verify upgrade ───────────────────────────────────

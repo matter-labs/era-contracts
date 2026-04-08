@@ -16,7 +16,7 @@ library ChainCreationParamsLib {
     function getChainCreationParams(
         string memory _config,
         bool isZKsyncOs
-    ) public returns (ChainCreationParamsConfig memory chainCreationParams) {
+    ) internal returns (ChainCreationParamsConfig memory chainCreationParams) {
         string memory json = vm.readFile(_config);
         uint32 major = uint32(json.readUint("$.protocol_semantic_version.major"));
         uint32 minor = uint32(json.readUint("$.protocol_semantic_version.minor"));

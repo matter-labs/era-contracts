@@ -203,7 +203,7 @@ contract DeployL2Script is Script, IDeployL2Contracts {
     function deployForceDeployer() internal {
         bytes[] memory factoryDeps = new bytes[](0);
         deployed.forceDeployUpgraderAddress = Utils.deployThroughL1({
-            bytecode: ContractsBytecodesLib.getCreationCode("ForceDeployUpgrader"),
+            bytecode: ContractsBytecodesLib.getCreationCodeEra("ForceDeployUpgrader"),
             constructorargs: "",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -220,7 +220,7 @@ contract DeployL2Script is Script, IDeployL2Contracts {
         bytes memory constructorData = "";
 
         deployed.consensusRegistryImplementation = Utils.deployThroughL1({
-            bytecode: ContractsBytecodesLib.getCreationCode("ConsensusRegistry"),
+            bytecode: ContractsBytecodesLib.getCreationCodeEra("ConsensusRegistry"),
             constructorargs: constructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -236,7 +236,7 @@ contract DeployL2Script is Script, IDeployL2Contracts {
         bytes memory constructorData = "";
 
         deployed.multicall3 = Utils.deployThroughL1({
-            bytecode: ContractsBytecodesLib.getCreationCode("Multicall3"),
+            bytecode: ContractsBytecodesLib.getCreationCodeEra("Multicall3"),
             constructorargs: constructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -249,7 +249,7 @@ contract DeployL2Script is Script, IDeployL2Contracts {
 
     function deployTimestampAsserter() internal {
         deployed.timestampAsserter = Utils.deployThroughL1({
-            bytecode: ContractsBytecodesLib.getCreationCode("TimestampAsserter"),
+            bytecode: ContractsBytecodesLib.getCreationCodeEra("TimestampAsserter"),
             constructorargs: "",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -280,7 +280,7 @@ contract DeployL2Script is Script, IDeployL2Contracts {
         );
 
         deployed.consensusRegistryProxy = Utils.deployThroughL1({
-            bytecode: ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
+            bytecode: ContractsBytecodesLib.getCreationCodeEra("TransparentUpgradeableProxy"),
             constructorargs: consensusRegistryProxyConstructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
