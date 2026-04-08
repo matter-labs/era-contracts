@@ -40,7 +40,6 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {ChainCreationParams, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -101,7 +100,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     struct ExpectedL2Addresses {
         address expectedRollupL2DAValidator;
         address expectedValidiumL2DAValidator;
-        address l2SharedBridgeLegacyImpl;
+        address l2SharedBridgeLegacyImpl; //TODO deprecate, eventually
         address l2BridgedStandardERC20Impl;
     }
 
@@ -203,7 +202,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         addresses.bridges.l1NullifierImplementation = deploySimpleContract("L1Nullifier", false);
         addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter", false);
         addresses.vaults.l1NativeTokenVaultImplementation = deploySimpleContract("L1NativeTokenVault", false);
-        addresses.bridges.erc20BridgeImplementation = deploySimpleContract("L1ERC20Bridge", false);
         addresses.bridges.bridgedStandardERC20Implementation = deploySimpleContract("BridgedStandardERC20", false);
 
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
@@ -676,9 +674,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         addresses.bridges.l1NullifierProxy = address(
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).L1_NULLIFIER()
         );
-        addresses.bridges.erc20BridgeProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
-        );
 
         addresses.bridgehub.ctmDeploymentTrackerProxy = address(
             L1Bridgehub(addresses.bridgehub.bridgehubProxy).l1CtmDeployer()
@@ -690,9 +685,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             L1Bridgehub(addresses.bridgehub.bridgehubProxy).chainAssetHandler()
         );
 
-        addresses.bridges.erc20BridgeProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
-        );
         newConfig.oldValidatorTimelock = IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
             .validatorTimelock();
         addresses.stateTransition.serverNotifierProxy = IChainTypeManager(
@@ -735,7 +727,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         string[] memory additionalForceDeployments = getAdditionalDependenciesNames();
 
         bytes[] memory additionalDependencies = new bytes[](7 + additionalForceDeployments.length); // Deps after Gateway upgrade
-        additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
+        additionalDependencies[0] = ""; //TODO rm? check impact of index changes 
         additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
         additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
         additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
@@ -1803,8 +1795,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
                 return Utils.readZKFoundryBytecodeL1("TransitionaryOwner.sol", "TransitionaryOwner");
             } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
                 return Utils.readZKFoundryBytecodeL1("GovernanceUpgradeTimer.sol", "GovernanceUpgradeTimer");
-            } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
-                return ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
             } else if (compareStrings(contractName, "L2StandardERC20")) {
                 return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
             } else if (compareStrings(contractName, "RollupL2DAValidator")) {

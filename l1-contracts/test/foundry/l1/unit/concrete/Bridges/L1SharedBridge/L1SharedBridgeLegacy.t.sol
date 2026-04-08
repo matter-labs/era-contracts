@@ -10,46 +10,11 @@ import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {L2Message} from "contracts/common/Messaging.sol";
 import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+import {IL1ERC20BridgeLegacy} from "contracts/bridge/interfaces/IL1ERC20BridgeLegacy.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 contract L1AssetRouterLegacyTest is L1AssetRouterTest {
-    function test_depositLegacyERC20Bridge() public {
-        uint256 l2TxGasLimit = 100000;
-        uint256 l2TxGasPerPubdataByte = 100;
-        address refundRecipient = address(0);
-
-        // solhint-disable-next-line func-named-parameters
-        vm.expectEmit(true, true, true, true, address(sharedBridge));
-        emit LegacyDepositInitiated({
-            chainId: eraChainId,
-            l2DepositTxHash: txHash,
-            from: alice,
-            to: bob,
-            l1Token: address(token),
-            amount: amount
-        });
-
-        vm.mockCall(
-            bridgehubAddress,
-            abi.encodeWithSelector(IL1Bridgehub.requestL2TransactionDirect.selector),
-            abi.encode(txHash)
-        );
-
-        vm.prank(l1ERC20BridgeAddress);
-
-        sharedBridge.depositLegacyErc20Bridge({
-            _originalCaller: alice,
-            _l2Receiver: bob,
-            _l1Token: address(token),
-            _amount: amount,
-            _l2TxGasLimit: l2TxGasLimit,
-            _l2TxGasPerPubdataByte: l2TxGasPerPubdataByte,
-            _refundRecipient: refundRecipient
-        });
-    }
-
     function test_finalizeWithdrawalLegacyErc20Bridge_EthOnEth() public {
         vm.deal(address(sharedBridge), amount);
 
@@ -104,7 +69,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
 
         // solhint-disable-next-line func-named-parameters
         bytes memory message = abi.encodePacked(
-            IL1ERC20Bridge.finalizeWithdrawal.selector,
+            IL1ERC20BridgeLegacy.finalizeWithdrawal.selector,
             alice,
             address(token),
             amount

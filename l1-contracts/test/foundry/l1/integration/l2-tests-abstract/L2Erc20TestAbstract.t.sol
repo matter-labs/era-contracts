@@ -36,7 +36,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
 
     function initializeTokenByDeposit() internal returns (address l2TokenAddress) {
         performDeposit(makeAddr("someDepositor"), makeAddr("someReeiver"), 1);
-
+        
         l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
         if (l2TokenAddress == address(0)) {
             revert("Token not initialized");

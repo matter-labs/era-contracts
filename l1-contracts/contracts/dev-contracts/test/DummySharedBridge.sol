@@ -11,7 +11,6 @@ import {IL1NativeTokenVault} from "../../bridge/ntv/L1NativeTokenVault.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 import {IL2SharedBridgeLegacy} from "../../bridge/interfaces/IL2SharedBridgeLegacy.sol";
-import {IL2SharedBridgeLegacyFunctions} from "../../bridge/interfaces/IL2SharedBridgeLegacyFunctions.sol";
 
 contract DummySharedBridge is PausableUpgradeable {
     using SafeERC20 for IERC20;
@@ -53,21 +52,6 @@ contract DummySharedBridge is PausableUpgradeable {
     }
 
     function receiveEth(uint256 _chainId) external payable {}
-
-    function depositLegacyErc20Bridge(
-        address, //_msgSender,
-        address, //_l2Receiver,
-        address _l1Token,
-        uint256 _amount,
-        uint256, //_l2TxGasLimit,
-        uint256, //_l2TxGasPerPubdataByte,
-        address //_refundRecipient
-    ) external payable returns (bytes32 txHash) {
-        txHash = dummyL2DepositTxHash;
-
-        // Legacy bridge requires this logic to work properly
-        IERC20(_l1Token).transferFrom(msg.sender, address(this), _amount);
-    }
 
     function claimFailedDepositLegacyErc20Bridge(
         address, //_depositSender,
@@ -192,7 +176,7 @@ contract DummySharedBridge is PausableUpgradeable {
         }
 
         bytes memory l2TxCalldata = abi.encodeCall(
-            IL2SharedBridgeLegacyFunctions.finalizeDeposit,
+            IL2SharedBridgeLegacy.finalizeDeposit,
             (_originalCaller, _l2Receiver, _l1Token, amount, new bytes(0))
         );
         bytes32 txDataHash = keccak256(abi.encode(_originalCaller, _l1Token, amount));

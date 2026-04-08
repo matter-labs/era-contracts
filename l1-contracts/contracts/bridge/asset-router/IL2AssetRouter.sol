@@ -19,7 +19,7 @@ interface IL2AssetRouter is IAssetRouterBase {
 
     function L1_ASSET_ROUTER() external view returns (IL1AssetRouter);
 
-    function withdrawLegacyBridge(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) external;
+    function withdrawLegacyBridge(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) external; //TODO remove after SDK changes
 
     function finalizeDepositLegacyBridge(
         address _l1Sender,

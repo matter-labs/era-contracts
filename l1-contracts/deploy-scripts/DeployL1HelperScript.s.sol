@@ -12,7 +12,6 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
@@ -30,7 +29,6 @@ import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
@@ -130,8 +128,6 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 }
             } else if (compareStrings(contractName, "L1AssetRouter")) {
                 return type(L1AssetRouter).creationCode;
-            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-                return type(L1ERC20Bridge).creationCode;
             } else if (compareStrings(contractName, "L1NativeTokenVault")) {
                 return type(L1NativeTokenVault).creationCode;
             } else if (compareStrings(contractName, "BridgedStandardERC20")) {
@@ -216,8 +212,6 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return Utils.readZKFoundryBytecodeL1("ICTMDeploymentTracker.sol", "ICTMDeploymentTracker");
             } else if (compareStrings(contractName, "L2AssetRouter")) {
                 return Utils.readZKFoundryBytecodeL1("L2AssetRouter.sol", "L2AssetRouter");
-            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-                return Utils.readZKFoundryBytecodeL1("L1ERC20Bridge.sol", "L1ERC20Bridge");
             } else if (compareStrings(contractName, "L2NativeTokenVault")) {
                 return Utils.readZKFoundryBytecodeL1("L2NativeTokenVault.sol", "L2NativeTokenVault");
             } else if (compareStrings(contractName, "BridgedStandardERC20")) {
@@ -305,8 +299,6 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
             } else if (compareStrings(contractName, "L1AssetRouter")) {
                 return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-                return abi.encodeCall(L1ERC20Bridge.initialize, ());
             } else if (compareStrings(contractName, "L1NativeTokenVault")) {
                 return
                     abi.encodeCall(
