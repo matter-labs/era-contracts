@@ -13,18 +13,22 @@ import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayT
 contract GatewayTransactionFiltererTest is MigrationTestBase {
     GatewayTransactionFilterer internal transactionFiltererProxy;
     GatewayTransactionFilterer internal transactionFiltererImplementation;
-    address internal owner = makeAddr("owner");
-    address internal admin = makeAddr("admin");
-    address internal sender = makeAddr("sender");
-    address internal bridgehub = makeAddr("bridgehub");
-    address internal assetRouter = makeAddr("assetRouter");
+    address internal owner;
+    address internal admin;
+    address internal sender;
+    address internal bridgehub;
+    address internal assetRouter;
 
-    constructor() {
+    function setUp() public virtual override {
+        _deployIntegrationBase();
+
         owner = makeAddr("owner");
         admin = makeAddr("admin");
         sender = makeAddr("sender");
-        bridgehub = makeAddr("bridgehub");
-        assetRouter = makeAddr("assetRouter");
+        // Use real bridgehub and assetRouter from integration deployment
+        bridgehub = address(addresses.bridgehub);
+        assetRouter = address(addresses.sharedBridge);
+
         transactionFiltererImplementation = new GatewayTransactionFilterer(IBridgehubBase(bridgehub), assetRouter);
 
         transactionFiltererProxy = GatewayTransactionFilterer(

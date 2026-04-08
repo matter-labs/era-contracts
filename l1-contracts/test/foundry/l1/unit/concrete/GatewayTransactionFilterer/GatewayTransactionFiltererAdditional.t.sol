@@ -21,18 +21,28 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 contract GatewayTransactionFiltererAdditionalTest is MigrationTestBase {
     GatewayTransactionFilterer internal transactionFiltererProxy;
     GatewayTransactionFilterer internal transactionFiltererImplementation;
-    address internal owner = makeAddr("owner");
-    address internal admin = makeAddr("admin");
-    address internal sender = makeAddr("sender");
-    address internal bridgehub = makeAddr("bridgehub");
-    address internal assetRouter = makeAddr("assetRouter");
-    address internal randomUser = makeAddr("randomUser");
+    address internal owner;
+    address internal admin;
+    address internal sender;
+    address internal bridgehub;
+    address internal assetRouter;
+    address internal randomUser;
 
     event WhitelistGranted(address indexed sender);
     event WhitelistRevoked(address indexed sender);
 
     function setUp() public override {
-        super.setUp();
+        // Deploy full integration ecosystem
+        _deployIntegrationBase();
+
+        owner = makeAddr("owner");
+        admin = makeAddr("admin");
+        sender = makeAddr("sender");
+        randomUser = makeAddr("randomUser");
+        // Use real bridgehub and assetRouter from integration deployment
+        bridgehub = address(addresses.bridgehub);
+        assetRouter = address(addresses.sharedBridge);
+
         transactionFiltererImplementation = new GatewayTransactionFilterer(IBridgehubBase(bridgehub), assetRouter);
 
         transactionFiltererProxy = GatewayTransactionFilterer(
@@ -189,6 +199,7 @@ contract GatewayTransactionFiltererAdditionalTest is MigrationTestBase {
             (uint256(1), validAssetId, sender)
         );
 
+        // Mock ctmAssetIdToAddress to return a non-zero address (valid CTM)
         vm.mockCall(
             bridgehub,
             abi.encodeWithSelector(IBridgehubBase.ctmAssetIdToAddress.selector),
@@ -215,6 +226,7 @@ contract GatewayTransactionFiltererAdditionalTest is MigrationTestBase {
             (uint256(1), invalidAssetId, sender)
         );
 
+        // Mock ctmAssetIdToAddress to return zero (invalid CTM)
         vm.mockCall(
             bridgehub,
             abi.encodeWithSelector(IBridgehubBase.ctmAssetIdToAddress.selector),
