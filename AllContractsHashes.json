@@ -620,6 +620,106 @@
     "evmDeployedBytecodeLength": null
   },
   {
+    "contractName": "l2-contracts/AddressAliasHelper",
+    "zkBytecodeHash": "0x01000007b2403c553ee340ec6b899a8d78ee0407b6313d3d4a6c0b26c24d07a2",
+    "zkBytecodePath": "/l2-contracts/zkout/AddressAliasHelper.sol/AddressAliasHelper.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null,
+    "evmDeployedBytecodeBlakeHash": null,
+    "evmDeployedBytecodeLength": null
+  },
+  {
+    "contractName": "l2-contracts/AddressUpgradeable",
+    "zkBytecodeHash": "0x0100000703adf732b95e5109ef5921ea394281a7de36f0308fa66bbf83e2a2f4",
+    "zkBytecodePath": "/l2-contracts/zkout/AddressUpgradeable.sol/AddressUpgradeable.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null,
+    "evmDeployedBytecodeBlakeHash": null,
+    "evmDeployedBytecodeLength": null
+  },
+  {
+    "contractName": "l2-contracts/ConsensusRegistry",
+    "zkBytecodeHash": "0x0100046f89e3b75c3e3572cd9b228c950b13c18df1419cad1b7afe7b1adf7e20",
+    "zkBytecodePath": "/l2-contracts/zkout/ConsensusRegistry.sol/ConsensusRegistry.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null,
+    "evmDeployedBytecodeBlakeHash": null,
+    "evmDeployedBytecodeLength": null
+  },
+  {
+    "contractName": "l2-contracts/ForceDeployUpgrader",
+    "zkBytecodeHash": "0x0100005b1f4981e974afa980f3e8c278f8988affe7e06ecf558b92386279faa8",
+    "zkBytecodePath": "/l2-contracts/zkout/ForceDeployUpgrader.sol/ForceDeployUpgrader.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null,
+    "evmDeployedBytecodeBlakeHash": null,
+    "evmDeployedBytecodeLength": null
+  },
+  {
+    "contractName": "l2-contracts/L2ContractHelper",
+    "zkBytecodeHash": "0x010000079e3e4a4d316974c1787814355ded47b4fe58fc22a13a1410638eac52",
+    "zkBytecodePath": "/l2-contracts/zkout/L2ContractHelper.sol/L2ContractHelper.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null,
+    "evmDeployedBytecodeBlakeHash": null,
+    "evmDeployedBytecodeLength": null
+  },
+  {
+    "contractName": "l2-contracts/Multicall3",
+    "zkBytecodeHash": "0x010001f5738337def234b88042dd1430606c9a9880df281d88c18508e4fcd4b5",
+    "zkBytecodePath": "/l2-contracts/zkout/Multicall3.sol/Multicall3.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null,
+    "evmDeployedBytecodeBlakeHash": null,
+    "evmDeployedBytecodeLength": null
+  },
+  {
+    "contractName": "l2-contracts/SystemContractsCaller",
+    "zkBytecodeHash": "0x0100000715a20339978a38b15943f62ac094214452003c0bbaf7333c759bc011",
+    "zkBytecodePath": "/l2-contracts/zkout/SystemContractsCaller.sol/SystemContractsCaller.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null,
+    "evmDeployedBytecodeBlakeHash": null,
+    "evmDeployedBytecodeLength": null
+  },
+  {
+    "contractName": "l2-contracts/Utils",
+    "zkBytecodeHash": "0x010000079ff98ee98ce6369f775af7bf8c83ae2d53e0943e189bb558ed79e9ff",
+    "zkBytecodePath": "/l2-contracts/zkout/SystemContractsCaller.sol/Utils.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null,
+    "evmDeployedBytecodeBlakeHash": null,
+    "evmDeployedBytecodeLength": null
+  },
+  {
+    "contractName": "l2-contracts/TestnetPaymaster",
+    "zkBytecodeHash": "0x010000b71463e63f8fe07f6e9c5da31223a1b5751953bf265c3a6b65d0caf2f7",
+    "zkBytecodePath": "/l2-contracts/zkout/TestnetPaymaster.sol/TestnetPaymaster.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null,
+    "evmDeployedBytecodeBlakeHash": null,
+    "evmDeployedBytecodeLength": null
+  },
+  {
+    "contractName": "l2-contracts/TimestampAsserter",
+    "zkBytecodeHash": "0x0100001b4df332dc3ed3542533f4da1804c01fe86e8e9b6575c5c286404d2229",
+    "zkBytecodePath": "/l2-contracts/zkout/TimestampAsserter.sol/TimestampAsserter.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null,
+    "evmDeployedBytecodeBlakeHash": null,
+    "evmDeployedBytecodeLength": null
+  },
+  {
     "contractName": "l1-contracts/AccessControlRestriction",
     "zkBytecodeHash": "0x01000295dd47212b257f7592fff8599e275f2419dd3e21f50f6a2abdca1a91b6",
     "zkBytecodePath": "/l1-contracts/zkout/AccessControlRestriction.sol/AccessControlRestriction.json",
