@@ -381,7 +381,11 @@ jobs:
             system-contracts/zkout
 
       - name: Run coverage
-        run: yarn test:foundry --no-match-path 'test/foundry/l1/unit/concrete/Executor/*' && yarn coverage:foundry --report summary --report lcov
+        # Unit tests now deploy a full L1 ecosystem via MigrationTestBase, making them
+        # very slow under coverage instrumentation. Since the same production code paths
+        # are covered by integration tests in l1/integration/, we exclude unit tests
+        # from the coverage run to keep CI times manageable.
+        run: yarn test:foundry --no-match-path 'test/foundry/l1/unit/concrete/Executor/*' && yarn coverage:foundry --no-match-path 'test/foundry/l1/unit/*' --report summary --report lcov
 
       # Installing the specific version of `lcov` because of
       # the `genhtml: ERROR: line ... of ... has branchcov but no linecov data` error.
