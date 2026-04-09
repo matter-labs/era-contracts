@@ -7,7 +7,22 @@ import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeploy
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 
-import {CoreContract} from "./CoreContract.sol";
+import {CoreContract, ZKsyncOSUpgradeType} from "./CoreContract.sol";
+import {
+    GW_ASSET_TRACKER_ADDR,
+    L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
+    L2_BASE_TOKEN_HOLDER_ADDR,
+    L2_BRIDGEHUB_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_HANDLER_ADDR,
+    L2_INTEROP_ROOT_STORAGE,
+    L2_MESSAGE_ROOT_ADDR,
+    L2_MESSAGE_VERIFICATION,
+    L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
+} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 
 /// @title CoreOnGatewayHelper
 /// @notice Resolves CoreContract enum values to VM-specific artifact names
@@ -133,7 +148,7 @@ library CoreOnGatewayHelper {
     }
 
     /// @notice Resolve a CoreContract enum to its contract name for the active VM.
-    function _resolveContractName(bool _isZKsyncOS, CoreContract _c) private view returns (string memory) {
+    function _resolveContractName(bool _isZKsyncOS, CoreContract _c) internal pure returns (string memory) {
         // Contracts with different names per VM
         if (_c == CoreContract.L2NativeTokenVault) return _isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault";
         if (_c == CoreContract.L2BaseToken) return _isZKsyncOS ? "L2BaseTokenZKOS" : "L2BaseTokenEra";
@@ -148,6 +163,10 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.InteropCenter) return "InteropCenter";
         if (_c == CoreContract.InteropHandler) return "InteropHandler";
         if (_c == CoreContract.L2AssetTracker) return "L2AssetTracker";
+        if (_c == CoreContract.L2WrappedBaseToken) return "L2WrappedBaseToken";
+        if (_c == CoreContract.L2MessageVerification) return "L2MessageVerification";
+        if (_c == CoreContract.L2InteropRootStorage) return "L2InteropRootStorage";
+        if (_c == CoreContract.GWAssetTracker) return "GWAssetTracker";
         if (_c == CoreContract.BeaconProxy) return "BeaconProxy";
         if (_c == CoreContract.L2V29Upgrade) return "L2V29Upgrade";
         if (_c == CoreContract.L2V31Upgrade) return "L2V31Upgrade";
@@ -157,5 +176,44 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.ProxyAdmin) return "ProxyAdmin";
 
         revert("CoreOnGatewayHelper: unknown CoreContract");
+    }
+
+    /// @notice Resolve a CoreContract enum to its ZKsyncOS upgrade type.
+    /// @dev Explicit per-contract mapping — no default fallback, so adding a new
+    ///      contract forces the developer to decide the upgrade type here.
+    function _resolveUpgradeType(CoreContract _c) internal pure returns (ZKsyncOSUpgradeType) {
+        if (_c == CoreContract.L2Bridgehub) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.L2AssetRouter) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.L2NativeTokenVault) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.L2MessageRoot) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.L2WrappedBaseToken) return ZKsyncOSUpgradeType.Unsafe;
+        if (_c == CoreContract.L2MessageVerification) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.L2ChainAssetHandler) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.L2InteropRootStorage) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.BaseTokenHolder) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.L2AssetTracker) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.InteropCenter) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
+        if (_c == CoreContract.GWAssetTracker) return ZKsyncOSUpgradeType.Unsafe;
+        revert("CoreOnGatewayHelper: no upgrade type for CoreContract");
+    }
+
+    /// @notice Resolve a CoreContract enum to its canonical L2 address.
+    /// @dev Only covers contracts with well-known constant addresses.
+    function _resolveAddress(CoreContract _c) internal pure returns (address) {
+        if (_c == CoreContract.L2Bridgehub) return L2_BRIDGEHUB_ADDR;
+        if (_c == CoreContract.L2AssetRouter) return L2_ASSET_ROUTER_ADDR;
+        if (_c == CoreContract.L2NativeTokenVault) return L2_NATIVE_TOKEN_VAULT_ADDR;
+        if (_c == CoreContract.L2MessageRoot) return L2_MESSAGE_ROOT_ADDR;
+        if (_c == CoreContract.L2WrappedBaseToken) return L2_WRAPPED_BASE_TOKEN_IMPL_ADDR;
+        if (_c == CoreContract.L2MessageVerification) return address(L2_MESSAGE_VERIFICATION);
+        if (_c == CoreContract.L2ChainAssetHandler) return L2_CHAIN_ASSET_HANDLER_ADDR;
+        if (_c == CoreContract.L2InteropRootStorage) return address(L2_INTEROP_ROOT_STORAGE);
+        if (_c == CoreContract.BaseTokenHolder) return L2_BASE_TOKEN_HOLDER_ADDR;
+        if (_c == CoreContract.L2AssetTracker) return L2_ASSET_TRACKER_ADDR;
+        if (_c == CoreContract.InteropCenter) return L2_INTEROP_CENTER_ADDR;
+        if (_c == CoreContract.InteropHandler) return L2_INTEROP_HANDLER_ADDR;
+        if (_c == CoreContract.GWAssetTracker) return GW_ASSET_TRACKER_ADDR;
+        revert("CoreOnGatewayHelper: no address for CoreContract");
     }
 }

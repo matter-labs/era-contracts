@@ -25,6 +25,8 @@ import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeploy
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {CoreContract, ZKsyncOSUpgradeType} from "../ecosystem/CoreContract.sol";
+import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 
 // solhint-disable no-console, gas-custom-errors
 
@@ -47,24 +49,11 @@ uint256 constant SYSTEM_CONTRACTS_COUNT = 30;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
 uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 13;
 
-/// @notice How a built-in contract is deployed in ZKsyncOS upgrades.
-/// SystemProxy: deployed via conductContractUpgrade (behind a system proxy).
-/// Unsafe: force-deployed directly (no proxy upgrade flow).
-enum ZKsyncOSUpgradeType {
-    SystemProxy,
-    Unsafe
-}
-
-/// @notice A built-in contract's L2 address, code name, bytecode, and ZKsyncOS upgrade type.
-/// @dev `zksyncOsSuffix` is appended to `codeName` for ZKsyncOS bytecodeInfo lookup when the
-/// ZKsyncOS implementation differs from Era (e.g. suffix "ZKOS" turns "L2NativeTokenVault"
-/// into "L2NativeTokenVaultZKOS"). Empty string means same name for both.
+/// @notice A built-in contract's identity plus its Era bytecode.
 struct BuiltinContractDeployInfo {
+    CoreContract id;
     address addr;
-    string codeName;
-    string zksyncOsSuffix;
     bytes bytecode;
-    ZKsyncOSUpgradeType zkosUpgradeType;
 }
 
 library SystemContractsProcessing {
@@ -374,109 +363,36 @@ library SystemContractsProcessing {
         }
     }
 
-    /// @notice Returns metadata for all "other built-in" contracts without loading bytecodes.
-    /// @dev Used by ZKsyncOS paths that load their own bytecodes via getZKOSBytecodeInfo.
-    function getOtherBuiltinContractsMeta() internal pure returns (BuiltinContractDeployInfo[] memory contracts) {
-        contracts = new BuiltinContractDeployInfo[](OTHER_BUILT_IN_CONTRACTS_COUNT);
-        contracts[0] = BuiltinContractDeployInfo(
-            L2_BRIDGEHUB_ADDR,
-            "L2Bridgehub",
-            "",
-            "",
-            ZKsyncOSUpgradeType.SystemProxy
-        );
-        contracts[1] = BuiltinContractDeployInfo(
-            L2_ASSET_ROUTER_ADDR,
-            "L2AssetRouter",
-            "",
-            "",
-            ZKsyncOSUpgradeType.SystemProxy
-        );
-        contracts[2] = BuiltinContractDeployInfo(
-            L2_NATIVE_TOKEN_VAULT_ADDR,
-            "L2NativeTokenVault",
-            "ZKOS",
-            "",
-            ZKsyncOSUpgradeType.SystemProxy
-        );
-        contracts[3] = BuiltinContractDeployInfo(
-            L2_MESSAGE_ROOT_ADDR,
-            "L2MessageRoot",
-            "",
-            "",
-            ZKsyncOSUpgradeType.SystemProxy
-        );
-        contracts[4] = BuiltinContractDeployInfo(
-            L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
-            "L2WrappedBaseToken",
-            "",
-            "",
-            ZKsyncOSUpgradeType.Unsafe
-        );
-        contracts[5] = BuiltinContractDeployInfo(
-            address(L2_MESSAGE_VERIFICATION),
-            "L2MessageVerification",
-            "",
-            "",
-            ZKsyncOSUpgradeType.SystemProxy
-        );
-        contracts[6] = BuiltinContractDeployInfo(
-            L2_CHAIN_ASSET_HANDLER_ADDR,
-            "L2ChainAssetHandler",
-            "",
-            "",
-            ZKsyncOSUpgradeType.SystemProxy
-        );
-        contracts[7] = BuiltinContractDeployInfo(
-            address(L2_INTEROP_ROOT_STORAGE),
-            "L2InteropRootStorage",
-            "",
-            "",
-            ZKsyncOSUpgradeType.SystemProxy
-        );
-        contracts[8] = BuiltinContractDeployInfo(
-            L2_BASE_TOKEN_HOLDER_ADDR,
-            "BaseTokenHolder",
-            "",
-            "",
-            ZKsyncOSUpgradeType.SystemProxy
-        );
-        contracts[9] = BuiltinContractDeployInfo(
-            L2_ASSET_TRACKER_ADDR,
-            "L2AssetTracker",
-            "",
-            "",
-            ZKsyncOSUpgradeType.SystemProxy
-        );
-        contracts[10] = BuiltinContractDeployInfo(
-            L2_INTEROP_CENTER_ADDR,
-            "InteropCenter",
-            "",
-            "",
-            ZKsyncOSUpgradeType.SystemProxy
-        );
-        contracts[11] = BuiltinContractDeployInfo(
-            L2_INTEROP_HANDLER_ADDR,
-            "InteropHandler",
-            "",
-            "",
-            ZKsyncOSUpgradeType.SystemProxy
-        );
-        contracts[12] = BuiltinContractDeployInfo(
-            GW_ASSET_TRACKER_ADDR,
-            "GWAssetTracker",
-            "",
-            "",
-            ZKsyncOSUpgradeType.Unsafe
-        );
+    /// @notice The list of CoreContract entries that are "other built-in" contracts.
+    function getOtherBuiltinCoreContracts() internal pure returns (CoreContract[] memory ids) {
+        ids = new CoreContract[](OTHER_BUILT_IN_CONTRACTS_COUNT);
+        ids[0] = CoreContract.L2Bridgehub;
+        ids[1] = CoreContract.L2AssetRouter;
+        ids[2] = CoreContract.L2NativeTokenVault;
+        ids[3] = CoreContract.L2MessageRoot;
+        ids[4] = CoreContract.L2WrappedBaseToken;
+        ids[5] = CoreContract.L2MessageVerification;
+        ids[6] = CoreContract.L2ChainAssetHandler;
+        ids[7] = CoreContract.L2InteropRootStorage;
+        ids[8] = CoreContract.BaseTokenHolder;
+        ids[9] = CoreContract.L2AssetTracker;
+        ids[10] = CoreContract.InteropCenter;
+        ids[11] = CoreContract.InteropHandler;
+        ids[12] = CoreContract.GWAssetTracker;
     }
 
     /// @notice Returns address+bytecode pairs for all "other built-in" contracts.
-    /// @dev Loads Era (zkout) bytecodes. Use getOtherBuiltinContractsMeta() to avoid loading bytecodes.
+    /// @dev Loads Era (zkout) bytecodes.
     function getOtherBuiltinContracts() internal view returns (BuiltinContractDeployInfo[] memory contracts) {
-        contracts = getOtherBuiltinContractsMeta();
-        for (uint256 i = 0; i < contracts.length; i++) {
-            contracts[i].bytecode = ContractsBytecodesLib.getCreationCodeEra(contracts[i].codeName);
+        CoreContract[] memory ids = getOtherBuiltinCoreContracts();
+        contracts = new BuiltinContractDeployInfo[](ids.length);
+        for (uint256 i = 0; i < ids.length; i++) {
+            string memory eraName = CoreOnGatewayHelper._resolveContractName(false, ids[i]);
+            contracts[i] = BuiltinContractDeployInfo({
+                id: ids[i],
+                addr: CoreOnGatewayHelper._resolveAddress(ids[i]),
+                bytecode: ContractsBytecodesLib.getCreationCodeEra(eraName)
+            });
         }
     }
 
@@ -594,44 +510,43 @@ library SystemContractsProcessing {
         FixedForceDeploymentsData memory _fixedData,
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _additionalDeployments
     ) internal returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
-        BuiltinContractDeployInfo[] memory contracts = getOtherBuiltinContractsMeta();
+        CoreContract[] memory ids = getOtherBuiltinCoreContracts();
 
         deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](
-            contracts.length + _additionalDeployments.length
+            ids.length + _additionalDeployments.length
         );
 
-        for (uint256 i = 0; i < contracts.length; i++) {
+        for (uint256 i = 0; i < ids.length; i++) {
+            address addr = CoreOnGatewayHelper._resolveAddress(ids[i]);
             // Try to reuse bytecodeInfo from FixedForceDeploymentsData to avoid double-loading.
-            bytes memory bytecodeInfo = _getFixedBytecodeInfo(_fixedData, contracts[i].addr);
+            bytes memory bytecodeInfo = _getFixedBytecodeInfo(_fixedData, addr);
 
             if (bytecodeInfo.length == 0) {
                 // Not in FixedForceDeploymentsData — load from disk.
-                string memory contractName = string(
-                    abi.encodePacked(contracts[i].codeName, contracts[i].zksyncOsSuffix)
-                );
-                string memory fileName = string(abi.encodePacked(contractName, ".sol"));
-                if (contracts[i].zkosUpgradeType == ZKsyncOSUpgradeType.SystemProxy) {
+                (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, ids[i]);
+                ZKsyncOSUpgradeType zkosType = CoreOnGatewayHelper._resolveUpgradeType(ids[i]);
+                if (zkosType == ZKsyncOSUpgradeType.SystemProxy) {
                     bytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
                 } else {
                     bytecodeInfo = Utils.getZKOSBytecodeInfoForContract(fileName, contractName);
                 }
             }
 
-            IComplexUpgrader.ContractUpgradeType upgradeType = contracts[i].zkosUpgradeType ==
-                ZKsyncOSUpgradeType.SystemProxy
+            ZKsyncOSUpgradeType zkosType = CoreOnGatewayHelper._resolveUpgradeType(ids[i]);
+            IComplexUpgrader.ContractUpgradeType upgradeType = zkosType == ZKsyncOSUpgradeType.SystemProxy
                 ? IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade
                 : IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment;
 
             deployments[i] = IComplexUpgrader.UniversalContractUpgradeInfo({
                 upgradeType: upgradeType,
                 deployedBytecodeInfo: bytecodeInfo,
-                newAddress: contracts[i].addr
+                newAddress: addr
             });
         }
 
         // Append version-specific entries
         for (uint256 i = 0; i < _additionalDeployments.length; i++) {
-            deployments[contracts.length + i] = _additionalDeployments[i];
+            deployments[ids.length + i] = _additionalDeployments[i];
         }
     }
 

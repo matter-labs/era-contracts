@@ -6,6 +6,14 @@ pragma solidity ^0.8.24;
 ///         force-deployments and factory-dependency publishing.
 ///         The enum value is VM-neutral; `CoreOnGatewayHelper.resolve` maps it to
 ///         the correct Era or ZKsyncOS contract / artifact name.
+/// @notice How a built-in contract is deployed in ZKsyncOS upgrades.
+/// SystemProxy: deployed via conductContractUpgrade (behind a system proxy).
+/// Unsafe: force-deployed directly (no proxy upgrade flow).
+enum ZKsyncOSUpgradeType {
+    SystemProxy,
+    Unsafe
+}
+
 enum CoreContract {
     L2Bridgehub,
     L2AssetRouter,
@@ -17,6 +25,10 @@ enum CoreContract {
     InteropCenter,
     InteropHandler,
     L2AssetTracker,
+    L2WrappedBaseToken,
+    L2MessageVerification,
+    L2InteropRootStorage,
+    GWAssetTracker,
     BeaconProxy,
     L2V29Upgrade,
     L2V31Upgrade,
