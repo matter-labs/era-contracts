@@ -7,7 +7,6 @@ use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-
 use crate::commands::output::write_output_if_requested;
 use crate::common::paths;
 use crate::common::SharedRunArgs;
@@ -248,8 +247,14 @@ async fn run_no_governance_prepare(
     let input_env = EcosystemUpgradeOutInput {
         stage: EcosystemUpgradeStage::NoGovernancePrepare.to_string(),
     };
-    write_output_if_requested("ecosystem.upgrade", &args.shared, runner, &input_env, &out_payload)
-        .await?;
+    write_output_if_requested(
+        "ecosystem.upgrade",
+        &args.shared,
+        runner,
+        &input_env,
+        &out_payload,
+    )
+    .await?;
 
     logger::success("No-governance-prepare completed");
     if let Some(ref out_path) = args.shared.out_path {
@@ -370,8 +375,14 @@ async fn run_governance_stage(
         stage,
         governance_address: format!("{:#x}", governance_addr),
     };
-    write_output_if_requested("ecosystem.upgrade", &args.shared, runner, &input_env, &out_payload)
-        .await?;
+    write_output_if_requested(
+        "ecosystem.upgrade",
+        &args.shared,
+        runner,
+        &input_env,
+        &out_payload,
+    )
+    .await?;
 
     logger::success(format!("Governance stage {} completed", stage));
     if let Some(ref out_path) = args.shared.out_path {

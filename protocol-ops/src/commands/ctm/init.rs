@@ -110,8 +110,7 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
         .deployed_addresses
         .state_transition
         .state_transition_proxy_addr;
-    write_output_if_requested("ctm.init", &args.shared, &runner, &ctm_input, &ctm_output)
-        .await?;
+    write_output_if_requested("ctm.init", &args.shared, &runner, &ctm_input, &ctm_output).await?;
 
     logger::info("CTM contracts initialized");
     logger::info(format!("CTM Proxy: {:#x}", ctm_proxy));

@@ -5,7 +5,6 @@ use clap::Parser;
 use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
-
 use crate::commands::output::write_output_if_requested;
 use crate::common::forge::{Forge, ForgeRunner, ForgeScriptArg};
 use crate::common::logger;

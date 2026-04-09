@@ -156,7 +156,11 @@ fn write_safe_transactions(
         }
     }
     let json = serde_json::to_string_pretty(&envelope)?;
-    std::fs::write(path, &json)
-        .map_err(|e| anyhow::anyhow!("Failed to write safe transactions to '{}': {e}", path.display()))?;
+    std::fs::write(path, &json).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to write safe transactions to '{}': {e}",
+            path.display()
+        )
+    })?;
     Ok(())
 }

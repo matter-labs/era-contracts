@@ -5,7 +5,6 @@ use clap::{Args, Parser, Subcommand};
 use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
-
 use crate::commands::output::write_output_if_requested;
 use crate::common::paths;
 use crate::common::SharedRunArgs;
@@ -598,7 +597,8 @@ async fn find_migration_tx(
 
     // Resolve the chainAssetHandler from the bridgehub — that's where
     // MigrationStarted is emitted.
-    let bridgehub = crate::abi::BridgehubAbi::new(bridgehub_address, std::sync::Arc::new(provider.clone()));
+    let bridgehub =
+        crate::abi::BridgehubAbi::new(bridgehub_address, std::sync::Arc::new(provider.clone()));
     let chain_asset_handler: Address = bridgehub
         .chain_asset_handler()
         .call()
@@ -759,10 +759,11 @@ async fn get_finalize_params(
                 .get("transactionIndex")
                 .and_then(|v| v.as_str())
                 .context("Bootloader L2->L1 log missing 'transactionIndex' field")?;
-            tx_number_in_batch =
-                u16::from_str_radix(tx_index_str.trim_start_matches("0x"), 16).context(
-                    format!("Failed to parse transactionIndex '{}' as u16", tx_index_str),
-                )?;
+            tx_number_in_batch = u16::from_str_radix(tx_index_str.trim_start_matches("0x"), 16)
+                .context(format!(
+                    "Failed to parse transactionIndex '{}' as u16",
+                    tx_index_str
+                ))?;
             break;
         }
     }

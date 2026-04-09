@@ -6,7 +6,6 @@ use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-
 use crate::commands::output::write_output_if_requested;
 use crate::common::paths;
 use crate::common::SharedRunArgs;
@@ -304,10 +303,7 @@ async fn run_grant_whitelist(args: GrantWhitelistArgs) -> anyhow::Result<()> {
 
 /// Dump force deployments data by running the read-only forge script.
 /// Returns the hex-encoded force_deployments_data string.
-fn dump_force_deployments(
-    runner: &mut ForgeRunner,
-    ctm_proxy: Address,
-) -> anyhow::Result<String> {
+fn dump_force_deployments(runner: &mut ForgeRunner, ctm_proxy: Address) -> anyhow::Result<String> {
     let contracts_path = paths::path_to_foundry_scripts();
     std::fs::create_dir_all(contracts_path.join("script-out"))
         .context("create l1-contracts/script-out")?;
@@ -334,7 +330,10 @@ fn dump_force_deployments(
         )
         .with_env("FORCE_DEPLOYMENTS_DUMP_TOML_REL_PATH", dump_toml_rel);
 
-    logger::info(format!("Dumping force deployments (CTM proxy: {:#x})", ctm_proxy));
+    logger::info(format!(
+        "Dumping force deployments (CTM proxy: {:#x})",
+        ctm_proxy
+    ));
     runner
         .run(script)
         .context("forge DumpForceDeploymentsForGateway")?;
@@ -372,9 +371,9 @@ async fn run_vote_prepare(args: VotePrepareArgs) -> anyhow::Result<()> {
     let force_deployments_data = match args.force_deployments_data {
         Some(fd) => fd,
         None => {
-            let ctm_proxy = args.ctm_proxy.context(
-                "--ctm-proxy is required when --force-deployments-data is not provided",
-            )?;
+            let ctm_proxy = args
+                .ctm_proxy
+                .context("--ctm-proxy is required when --force-deployments-data is not provided")?;
             dump_force_deployments(&mut runner, ctm_proxy)?
         }
     };

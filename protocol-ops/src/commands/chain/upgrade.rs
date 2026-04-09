@@ -5,7 +5,6 @@ use clap::Parser;
 use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
-
 use crate::commands::output::write_output_if_requested;
 use crate::common::forge::{Forge, ForgeRunner, ForgeScriptArg};
 use crate::common::logger;
@@ -102,8 +101,14 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
         access_control_restriction: args.access_control_restriction,
         skip_broadcast: args.skip_broadcast,
     };
-    write_output_if_requested("chain.upgrade", &args.shared, &runner, &empty_input, &out_payload)
-        .await?;
+    write_output_if_requested(
+        "chain.upgrade",
+        &args.shared,
+        &runner,
+        &empty_input,
+        &out_payload,
+    )
+    .await?;
 
     logger::success("Chain upgrade completed");
     Ok(())
