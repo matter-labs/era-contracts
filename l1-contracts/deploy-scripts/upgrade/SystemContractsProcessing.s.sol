@@ -589,9 +589,7 @@ library SystemContractsProcessing {
         );
 
         for (uint256 i = 0; i < contracts.length; i++) {
-            string memory contractName = string(
-                abi.encodePacked(contracts[i].codeName, contracts[i].zksyncOsSuffix)
-            );
+            string memory contractName = string(abi.encodePacked(contracts[i].codeName, contracts[i].zksyncOsSuffix));
             string memory fileName = string(abi.encodePacked(contractName, ".sol"));
             bytes memory bytecodeInfo;
             if (contracts[i].zkosUpgradeType == ZKsyncOSUpgradeType.SystemProxy) {

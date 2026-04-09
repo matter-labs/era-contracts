@@ -12,6 +12,7 @@ import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
+import {UnexpectedUpgradeSelector} from "../common/L1ContractErrors.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {TokenBridgingData, TokenMetadata} from "../common/Messaging.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
@@ -162,10 +163,9 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
     /// For ZKsyncOS, delegateTo is a derived address (to avoid overwriting existing bytecode).
     /// We only validate the selector since the delegateTo address varies by chain type.
     function _validateWrappedUpgrade(address, bytes memory _existingUpgradeCalldata) internal pure {
-        require(
-            bytes4(_existingUpgradeCalldata) == IL2V31Upgrade.upgrade.selector,
-            "Unexpected upgrade selector"
-        );
+        if (bytes4(_existingUpgradeCalldata) != IL2V31Upgrade.upgrade.selector) {
+            revert UnexpectedUpgradeSelector();
+        }
     }
 
     /// @notice Get the constructed L2 upgrade tx data.

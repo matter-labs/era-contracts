@@ -71,6 +71,5 @@ describe("04 - Gateway Deployment Verification (read-only)", function () {
       const code = await l1Provider.getCode(chainAddr!.diamondProxy);
       expect(code).to.not.equal("0x");
     });
-
   });
 });

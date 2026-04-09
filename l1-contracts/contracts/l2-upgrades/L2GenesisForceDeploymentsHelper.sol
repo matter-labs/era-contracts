@@ -406,7 +406,6 @@ library L2GenesisForceDeploymentsHelper {
                 _fixedForceDeploymentsData.aliasedL1Governance
             );
         }
-
     }
 
     function _finalizeDeployments(

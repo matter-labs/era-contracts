@@ -78,10 +78,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         if (config.isZKsyncOS) {
             return (
                 address(L2_COMPLEX_UPGRADER_ADDR),
-                abi.encodeCall(
-                    IComplexUpgrader.forceDeployAndUpgradeUniversal,
-                    (_deployments, address(0), "")
-                )
+                abi.encodeCall(IComplexUpgrader.forceDeployAndUpgradeUniversal, (_deployments, address(0), ""))
             );
         }
         return (
@@ -231,11 +228,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         }
 
         proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: composeUpgradeTx(
-                deployments,
-                _factoryDepsResult,
-                protocolUpgradeNonce
-            ),
+            l2ProtocolUpgradeTx: composeUpgradeTx(deployments, _factoryDepsResult, protocolUpgradeNonce),
             bootloaderHash: chainCreationParams.bootloaderHash,
             defaultAccountHash: chainCreationParams.defaultAAHash,
             evmEmulatorHash: chainCreationParams.evmEmulatorHash,
@@ -323,10 +316,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     }
 
     /// @notice Build the full ZKsyncOS force deployment array: base builtins + version-specific entries.
-    function buildZKsyncOSForceDeployments()
-        internal
-        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory)
-    {
+    function buildZKsyncOSForceDeployments() internal returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory) {
         return SystemContractsProcessing.buildZKsyncOSForceDeployments(getAdditionalZKsyncOSForceDeployments());
     }
 

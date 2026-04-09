@@ -38,7 +38,10 @@ contract L2V31Upgrade is V31AcrossRecovery, IL2V31Upgrade {
 
         // V31-specific: initialize contracts that are new in v31
         // (AssetTracker, GWAssetTracker, InteropHandler, L2BaseToken, base token registration).
-        FixedForceDeploymentsData memory fixedData = abi.decode(_fixedForceDeploymentsData, (FixedForceDeploymentsData));
+        FixedForceDeploymentsData memory fixedData = abi.decode(
+            _fixedForceDeploymentsData,
+            (FixedForceDeploymentsData)
+        );
         ZKChainSpecificForceDeploymentsData memory additionalData = abi.decode(
             _additionalForceDeploymentsData,
             (ZKChainSpecificForceDeploymentsData)

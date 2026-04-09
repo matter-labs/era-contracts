@@ -268,8 +268,6 @@ error MsgValueMismatch(uint256 expectedMsgValue, uint256 providedMsgValue);
 error MsgValueTooLow(uint256 required, uint256 provided);
 // 0xedd74330
 error MustBeEraChain();
-// 0xf9ba09d6
-error NotAllBatchesExecuted();
 // 0x8b7e144a
 error NewDeadlineExceedsMaxDeadline();
 // 0x6eef58d1
@@ -298,6 +296,8 @@ error NonSequentialBatch();
 error NonSequentialVersion();
 // 0x0e0ff4d9
 error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
+// 0xf9ba09d6
+error NotAllBatchesExecuted();
 // 0xfa5cd00f
 error NotAllowed(address addr);
 // 0x64846fe4
@@ -350,12 +350,12 @@ error PriorityModeActivationTooEarly(uint256 earliestActivationTimestamp, uint25
 error PriorityModeIsNotAllowed();
 // 0x2b9d9c4c
 error PriorityModeRequiresPermanentRollup();
-// 0xa840274f
-error PriorityQueueNotReady();
 // 0xd5a99014
 error PriorityOperationsRollingHashMismatch();
 // 0xbeda0935
 error PriorityOpsRequestTimestampMissing(uint256 requestId);
+// 0xa840274f
+error PriorityQueueNotReady();
 // 0x1a4d284a
 error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 // 0xa461f651
@@ -444,6 +444,8 @@ error Unauthorized(address caller);
 error UndefinedDiamondCutAction();
 // 0x6aa39880
 error UnexpectedSystemLog(uint256 logKey);
+// 0x8124d8ff
+error UnexpectedUpgradeSelector();
 // 0xc352bb73
 error UnknownVerifierType();
 // 0xf3dd1b9c
@@ -460,9 +462,9 @@ error UnsupportedUpgradeType();
 error UpgradeBatchNumberIsNotZero();
 // 0x04d91f9d
 error UpgradeTimestampNotReached(uint256 upgradeTimestamp, uint256 currentTimestamp);
-// 0x47b3b145
+// 0x4583eb49
 error V31UpgradeGatewayBlockNumberNotSet();
-// 0x6c901535
+// 0x47b3b145
 error ValidateTxnNotEnoughGas();
 // 0x626ade30
 error ValueMismatch(uint256 expected, uint256 actual);

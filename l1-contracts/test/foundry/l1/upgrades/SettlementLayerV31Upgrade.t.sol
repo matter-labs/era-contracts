@@ -473,16 +473,56 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
     }
 
     function _setupMocks() internal {
-        vm.mockCall(mockBridgehub, abi.encodeWithSelector(IBridgehubBase.assetRouter.selector), abi.encode(mockAssetRouter));
-        vm.mockCall(mockAssetRouter, abi.encodeWithSelector(IL1AssetRouter.nativeTokenVault.selector), abi.encode(mockNativeTokenVault));
-        vm.mockCall(mockNativeTokenVault, abi.encodeWithSelector(IL1NativeTokenVault.l1AssetTracker.selector), abi.encode(mockAssetTracker));
-        vm.mockCall(mockBridgehub, abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, testChainId), abi.encode(baseTokenAssetId));
-        vm.mockCall(mockNativeTokenVault, abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, baseTokenAssetId), abi.encode(block.chainid));
-        vm.mockCall(mockNativeTokenVault, abi.encodeWithSelector(INativeTokenVaultBase.originToken.selector, baseTokenAssetId), abi.encode(address(1)));
-        vm.mockCall(mockBridgehub, abi.encodeWithSelector(IBridgehubBase.messageRoot.selector), abi.encode(mockMessageRoot));
-        vm.mockCall(mockMessageRoot, abi.encodeWithSelector(IL1MessageRoot.saveV31UpgradeChainBatchNumber.selector, testChainId), abi.encode());
-        vm.mockCall(mockBridgehub, abi.encodeWithSelector(IBridgehubBase.whitelistedSettlementLayers.selector, testChainId), abi.encode(false));
-        vm.mockCall(mockChainTypeManager, abi.encodeWithSelector(IChainTypeManager.PERMISSIONLESS_VALIDATOR.selector), abi.encode(makeAddr("permissionlessValidator")));
+        vm.mockCall(
+            mockBridgehub,
+            abi.encodeWithSelector(IBridgehubBase.assetRouter.selector),
+            abi.encode(mockAssetRouter)
+        );
+        vm.mockCall(
+            mockAssetRouter,
+            abi.encodeWithSelector(IL1AssetRouter.nativeTokenVault.selector),
+            abi.encode(mockNativeTokenVault)
+        );
+        vm.mockCall(
+            mockNativeTokenVault,
+            abi.encodeWithSelector(IL1NativeTokenVault.l1AssetTracker.selector),
+            abi.encode(mockAssetTracker)
+        );
+        vm.mockCall(
+            mockBridgehub,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, testChainId),
+            abi.encode(baseTokenAssetId)
+        );
+        vm.mockCall(
+            mockNativeTokenVault,
+            abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, baseTokenAssetId),
+            abi.encode(block.chainid)
+        );
+        vm.mockCall(
+            mockNativeTokenVault,
+            abi.encodeWithSelector(INativeTokenVaultBase.originToken.selector, baseTokenAssetId),
+            abi.encode(address(1))
+        );
+        vm.mockCall(
+            mockBridgehub,
+            abi.encodeWithSelector(IBridgehubBase.messageRoot.selector),
+            abi.encode(mockMessageRoot)
+        );
+        vm.mockCall(
+            mockMessageRoot,
+            abi.encodeWithSelector(IL1MessageRoot.saveV31UpgradeChainBatchNumber.selector, testChainId),
+            abi.encode()
+        );
+        vm.mockCall(
+            mockBridgehub,
+            abi.encodeWithSelector(IBridgehubBase.whitelistedSettlementLayers.selector, testChainId),
+            abi.encode(false)
+        );
+        vm.mockCall(
+            mockChainTypeManager,
+            abi.encodeWithSelector(IChainTypeManager.PERMISSIONLESS_VALIDATOR.selector),
+            abi.encode(makeAddr("permissionlessValidator"))
+        );
     }
 
     function test_RewritesZKsyncOSV30UniversalUpgradeWithChainSpecificV31Arguments() public {
@@ -502,12 +542,7 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
 
         bytes memory expectedInnerCalldata = abi.encodeCall(
             IL2V31Upgrade.upgrade,
-            (
-                true,
-                address(0),
-                "",
-                zkosUpgrade.exposeBuildChainSpecificForceDeploymentsData(mockBridgehub, testChainId)
-            )
+            (true, address(0), "", zkosUpgrade.exposeBuildChainSpecificForceDeploymentsData(mockBridgehub, testChainId))
         );
         bytes memory expectedUpgradeTxData = abi.encodeCall(
             IComplexUpgrader.forceDeployAndUpgradeUniversal,
