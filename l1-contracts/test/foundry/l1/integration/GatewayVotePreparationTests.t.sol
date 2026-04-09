@@ -36,7 +36,6 @@ contract GatewayVotePreparationForTest is GatewayVotePreparation {
         string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
 
         initializeConfig(configPath, permanentValuesPath, bridgehubProxy, ctmRepresentativeChainId);
-        instantiateCreate2Factory();
 
         (contracts, , , directCalldata, ) = GatewayCTMDeployerHelper.calculateAddresses(
             bytes32(uint256(1)),
@@ -83,13 +82,13 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
         );
 
         // Verify key contract addresses are non-zero
-        assertTrue(contracts.stateTransition.chainTypeManagerProxy != address(0), "CTM proxy should be non-zero");
+        assertTrue(contracts.stateTransition.proxies.chainTypeManager != address(0), "CTM proxy should be non-zero");
         assertTrue(
-            contracts.stateTransition.chainTypeManagerImplementation != address(0),
+            contracts.stateTransition.implementations.chainTypeManager != address(0),
             "CTM impl should be non-zero"
         );
         assertTrue(
-            contracts.stateTransition.validatorTimelockProxy != address(0),
+            contracts.stateTransition.proxies.validatorTimelock != address(0),
             "ValidatorTimelock proxy should be non-zero"
         );
         assertTrue(contracts.stateTransition.verifiers.verifier != address(0), "Verifier should be non-zero");
@@ -110,8 +109,8 @@ contract GatewayVotePreparationTests is ZKChainDeployer {
             eraZKChainId
         );
         assertEq(
-            contracts.stateTransition.chainTypeManagerProxy,
-            contracts2.stateTransition.chainTypeManagerProxy,
+            contracts.stateTransition.proxies.chainTypeManager,
+            contracts2.stateTransition.proxies.chainTypeManager,
             "CTM proxy should be deterministic"
         );
     }

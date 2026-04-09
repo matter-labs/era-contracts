@@ -8,7 +8,8 @@ import {ValidiumL1DAValidator} from "../../data-availability/ValidiumL1DAValidat
 
 import {ROLLUP_L2_DA_COMMITMENT_SCHEME} from "../../../common/Config.sol";
 
-import {DAContracts, GatewayDADeployerConfig} from "./GatewayCTMDeployer.sol";
+import {DAContracts} from "contracts/common/StateTransitionTypes.sol";
+import {GatewayDADeployerConfig} from "./GatewayCTMDeployer.sol";
 
 /// @title GatewayCTMDeployerDA
 /// @author Matter Labs
@@ -32,10 +33,10 @@ contract GatewayCTMDeployerDA {
         // Deploy DA contracts
         RollupDAManager rollupDAManager = new RollupDAManager{salt: salt}();
         result.validiumDAValidator = address(new ValidiumL1DAValidator{salt: salt}());
-        result.relayedSLDAValidator = address(new RelayedSLDAValidator{salt: salt}());
+        result.rollupSLDAValidator = address(new RelayedSLDAValidator{salt: salt}());
 
         // Initialize DA manager
-        rollupDAManager.updateDAPair(result.relayedSLDAValidator, ROLLUP_L2_DA_COMMITMENT_SCHEME, true);
+        rollupDAManager.updateDAPair(result.rollupSLDAValidator, ROLLUP_L2_DA_COMMITMENT_SCHEME, true);
         // Note, that the governance still has to accept it.
         // It will happen in a separate voting after the deployment is done.
         rollupDAManager.transferOwnership(_config.aliasedGovernanceAddress);

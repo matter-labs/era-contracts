@@ -33,6 +33,19 @@ jobs:
 
       - uses: codespell-project/actions-codespell@8f01853be192eb0f849a5c7d721450e7a467c579 # v2.2
 
+  protocol-ops-fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --check
+        working-directory: protocol-ops
+
   typos:
     runs-on: ubuntu-latest
     steps:

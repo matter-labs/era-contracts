@@ -138,3 +138,13 @@ address constant GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x1
 
 /// @dev The address of the base token holder contract that holds chain's base token reserves.
 address constant L2_BASE_TOKEN_HOLDER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x11);
+
+////////////////////////////////////////////////////////////
+// ZKsync OS genesis contracts
+////////////////////////////////////////////////////////////
+
+/// @dev The address of Arachnid's deterministic-deployment-proxy (standard EVM CREATE2 factory),
+/// predeployed during ZKsync OS genesis. This contract allows anyone to deploy contracts to
+/// deterministic addresses and must be restricted on the Gateway to prevent unauthorized deployments.
+/// See: https://github.com/Arachnid/deterministic-deployment-proxy
+address constant ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR = 0x4e59b44847b379578588920cA78FbF26c0B4956C;

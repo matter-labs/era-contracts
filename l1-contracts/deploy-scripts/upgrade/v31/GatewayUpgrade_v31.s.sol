@@ -23,24 +23,69 @@ import {
     L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 
+import {Utils} from "../../utils/Utils.sol";
+import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
+import {PublishFactoryDepsResult} from "../default-upgrade/CTMUpgradeBase.sol";
+import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.sol";
 
-/// @notice Script used for v31 upgrade flow
+// FIXME: consider deleting this script, it is not used.
+/// @notice Script used for v31 gateway upgrade flow
 contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
-    function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
-        forceDeploymentNames = new string[](1);
-        forceDeploymentNames[0] = "L2V29Upgrade";
+    /// @dev Prepared in getProposedUpgrade, consumed in getL2UpgradeTargetAndData (which must be view).
+    bytes internal l2V29UpgradeBytecodeInfo;
+
+    function getForceDeploymentContracts() internal override returns (CoreContract[] memory forceDeploymentContracts) {
+        if (config.isZKsyncOS) {
+            return new CoreContract[](0);
+        }
+        forceDeploymentContracts = new CoreContract[](1);
+        forceDeploymentContracts[0] = CoreContract.L2V29Upgrade;
     }
 
-    function getExpectedL2Address(string memory contractName) public override returns (address) {
-        if (compareStrings(contractName, "L2V29Upgrade")) {
-            return address(L2_VERSION_SPECIFIC_UPGRADER_ADDR);
+    function getProposedUpgrade(
+        StateTransitionDeployedAddresses memory stateTransition,
+        ChainCreationParamsConfig memory chainCreationParams,
+        uint256,
+        address,
+        PublishFactoryDepsResult memory _factoryDepsResult,
+        uint256 protocolUpgradeNonce
+    ) public virtual override returns (ProposedUpgrade memory proposedUpgrade) {
+        if (!config.isZKsyncOS) {
+            return
+                super.getProposedUpgrade(
+                    stateTransition,
+                    chainCreationParams,
+                    config.l1ChainId,
+                    config.ownerAddress,
+                    _factoryDepsResult,
+                    protocolUpgradeNonce
+                );
         }
 
-        return super.getExpectedL2Address(contractName);
+        // For ZKsyncOS, prepare bytecode info before composeUpgradeTx calls getL2UpgradeTargetAndData.
+        l2V29UpgradeBytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo("L2V29Upgrade.sol", "L2V29Upgrade");
+        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = buildUpgradeForceDeployments(
+            config.l1ChainId,
+            config.ownerAddress
+        );
+
+        proposedUpgrade = ProposedUpgrade({
+            l2ProtocolUpgradeTx: composeUpgradeTx(forceDeployments, _factoryDepsResult, protocolUpgradeNonce),
+            bootloaderHash: chainCreationParams.bootloaderHash,
+            defaultAccountHash: chainCreationParams.defaultAAHash,
+            evmEmulatorHash: chainCreationParams.evmEmulatorHash,
+            verifier: address(0),
+            verifierParams: getEmptyVerifierParams(),
+            l1ContractsUpgradeCalldata: new bytes(0),
+            postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
+            upgradeTimestamp: 0,
+            newProtocolVersion: chainCreationParams.latestProtocolVersion
+        });
     }
 
     function getL2UpgradeTargetAndData(

@@ -90,8 +90,6 @@ contract ZKSProvider is Script {
         IGetters getters = IGetters(bridgehub.getZKChain(actualChainId));
         uint256 totalBatchesExecuted;
         uint256 loopCount = 0;
-        // _initCreate2FactoryParams(address(0), bytes32(0));
-        // instantiateCreate2Factory();
 
         // IteratedReader reader = IteratedReader(deployViaCreate2(abi.encodePacked(type(IteratedReader).creationCode)));
         // console.log("Reader deployed at", address(reader));

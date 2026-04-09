@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../utils/Utils.sol";
+import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {
     GW_ASSET_TRACKER_ADDR,
     L2_ASSET_ROUTER_ADDR,
@@ -338,15 +339,15 @@ library SystemContractsProcessing {
         SystemContract[] memory systemContracts = getSystemContracts();
         for (uint256 i = 0; i < SYSTEM_CONTRACTS_COUNT; i++) {
             if (systemContracts[i].isPrecompile) {
-                result[i] = Utils.readPrecompileBytecode(systemContracts[i].codeName);
+                result[i] = BytecodeUtils.readPrecompileBytecode(systemContracts[i].codeName);
             } else {
                 // L2BaseToken is now in l1-contracts as L2BaseTokenEra
                 if (Utils.compareStrings(systemContracts[i].codeName, "L2BaseToken")) {
-                    result[i] = Utils.readZKFoundryBytecodeL1("L2BaseTokenEra.sol", "L2BaseTokenEra");
+                    result[i] = BytecodeUtils.readBytecodeL1(false, "L2BaseTokenEra.sol", "L2BaseTokenEra");
                 } else if (systemContracts[i].lang == Language.Solidity) {
-                    result[i] = Utils.readSystemContractsBytecode(systemContracts[i].codeName);
+                    result[i] = BytecodeUtils.readSystemContractsBytecode(systemContracts[i].codeName);
                 } else {
-                    result[i] = Utils.readSystemContractsYulBytecode(systemContracts[i].codeName);
+                    result[i] = BytecodeUtils.readSystemContractsYulBytecode(systemContracts[i].codeName);
                 }
             }
         }
@@ -380,91 +381,91 @@ library SystemContractsProcessing {
             L2_BRIDGEHUB_ADDR,
             "L2Bridgehub",
             "",
-            ContractsBytecodesLib.getCreationCode("L2Bridgehub"),
+            ContractsBytecodesLib.getCreationCodeEra("L2Bridgehub"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[1] = BuiltinContractDeployInfo(
             L2_ASSET_ROUTER_ADDR,
             "L2AssetRouter",
             "",
-            ContractsBytecodesLib.getCreationCode("L2AssetRouter"),
+            ContractsBytecodesLib.getCreationCodeEra("L2AssetRouter"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[2] = BuiltinContractDeployInfo(
             L2_NATIVE_TOKEN_VAULT_ADDR,
             "L2NativeTokenVault",
             "ZKOS",
-            ContractsBytecodesLib.getCreationCode("L2NativeTokenVault"),
+            ContractsBytecodesLib.getCreationCodeEra("L2NativeTokenVault"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[3] = BuiltinContractDeployInfo(
             L2_MESSAGE_ROOT_ADDR,
             "L2MessageRoot",
             "",
-            ContractsBytecodesLib.getCreationCode("L2MessageRoot"),
+            ContractsBytecodesLib.getCreationCodeEra("L2MessageRoot"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[4] = BuiltinContractDeployInfo(
             L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
             "L2WrappedBaseToken",
             "",
-            ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken"),
+            ContractsBytecodesLib.getCreationCodeEra("L2WrappedBaseToken"),
             ZKsyncOSUpgradeType.Unsafe
         );
         contracts[5] = BuiltinContractDeployInfo(
             address(L2_MESSAGE_VERIFICATION),
             "L2MessageVerification",
             "",
-            ContractsBytecodesLib.getCreationCode("L2MessageVerification"),
+            ContractsBytecodesLib.getCreationCodeEra("L2MessageVerification"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[6] = BuiltinContractDeployInfo(
             L2_CHAIN_ASSET_HANDLER_ADDR,
             "L2ChainAssetHandler",
             "",
-            ContractsBytecodesLib.getCreationCode("L2ChainAssetHandler"),
+            ContractsBytecodesLib.getCreationCodeEra("L2ChainAssetHandler"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[7] = BuiltinContractDeployInfo(
             address(L2_INTEROP_ROOT_STORAGE),
             "L2InteropRootStorage",
             "",
-            ContractsBytecodesLib.getCreationCode("L2InteropRootStorage"),
+            ContractsBytecodesLib.getCreationCodeEra("L2InteropRootStorage"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[8] = BuiltinContractDeployInfo(
             L2_BASE_TOKEN_HOLDER_ADDR,
             "BaseTokenHolder",
             "",
-            ContractsBytecodesLib.getCreationCode("BaseTokenHolder"),
+            ContractsBytecodesLib.getCreationCodeEra("BaseTokenHolder"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[9] = BuiltinContractDeployInfo(
             L2_ASSET_TRACKER_ADDR,
             "L2AssetTracker",
             "",
-            ContractsBytecodesLib.getCreationCode("L2AssetTracker"),
+            ContractsBytecodesLib.getCreationCodeEra("L2AssetTracker"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[10] = BuiltinContractDeployInfo(
             L2_INTEROP_CENTER_ADDR,
             "InteropCenter",
             "",
-            ContractsBytecodesLib.getCreationCode("InteropCenter"),
+            ContractsBytecodesLib.getCreationCodeEra("InteropCenter"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[11] = BuiltinContractDeployInfo(
             L2_INTEROP_HANDLER_ADDR,
             "InteropHandler",
             "",
-            ContractsBytecodesLib.getCreationCode("InteropHandler"),
+            ContractsBytecodesLib.getCreationCodeEra("InteropHandler"),
             ZKsyncOSUpgradeType.SystemProxy
         );
         contracts[12] = BuiltinContractDeployInfo(
             GW_ASSET_TRACKER_ADDR,
             "GWAssetTracker",
             "",
-            ContractsBytecodesLib.getCreationCode("GWAssetTracker"),
+            ContractsBytecodesLib.getCreationCodeEra("GWAssetTracker"),
             ZKsyncOSUpgradeType.Unsafe
         );
     }
@@ -560,7 +561,7 @@ library SystemContractsProcessing {
         // since the server will rely on it.
         bytes[] memory basicBytecodes = new bytes[](3);
         basicBytecodes[0] = Utils.getBatchBootloaderBytecodeHash();
-        basicBytecodes[1] = Utils.readSystemContractsBytecode("DefaultAccount");
+        basicBytecodes[1] = BytecodeUtils.readSystemContractsBytecode("DefaultAccount");
         basicBytecodes[2] = Utils.getEvmEmulatorBytecodeHash();
 
         bytes[] memory systemBytecodes = getSystemContractsBytecodes();

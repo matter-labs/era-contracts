@@ -47,8 +47,6 @@ contract EcosystemUpgrade_v29_2 is Script, DefaultCTMUpgrade {
     function deployNewEcosystemContractsL1() public override {
         require(upgradeConfig.initialized, "Not initialized");
 
-        instantiateCreate2Factory();
-
         deployVerifiers();
         deployUpgradeStageValidator();
 
@@ -71,7 +69,7 @@ contract EcosystemUpgrade_v29_2 is Script, DefaultCTMUpgrade {
 
         gatewayConfig.gatewayStateTransition.adminFacet = deployGWContract("AdminFacet");
         gatewayConfig.gatewayStateTransition.mailboxFacet = deployGWContract("MailboxFacet");
-        gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
+        gatewayConfig.gatewayL1Specific.defaultUpgrade = deployUsedUpgradeContractGW();
     }
 
     /// @notice Get new facet cuts that were added in the upgrade

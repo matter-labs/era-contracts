@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
+import {BytecodeUtils} from "./bytecode/BytecodeUtils.s.sol";
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
@@ -208,7 +209,7 @@ library Utils {
     function getAllSelectorsForFacet(string memory facetName) internal returns (bytes4[] memory) {
         // TODO(EVM-746): use forge to read the bytecode
         string memory path = string.concat("/../l1-contracts/out/", facetName, ".sol/", facetName, "Facet.json");
-        bytes memory bytecode = readFoundryDeployedBytecode(path);
+        bytes memory bytecode = BytecodeUtils.readFoundryDeployedBytecode(path);
         return getAllSelectors(bytecode);
     }
 
@@ -276,14 +277,14 @@ library Utils {
      * @dev Returns the bytecode hash of the batch bootloader.
      */
     function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
-        return readZKFoundryBytecodeSystemContracts("proved_batch.yul", "Bootloader");
+        return BytecodeUtils.readZKFoundryBytecodeSystemContracts("proved_batch.yul", "Bootloader");
     }
 
     /**
      * @dev Returns the bytecode hash of the EVM emulator.
      */
     function getEvmEmulatorBytecodeHash() internal view returns (bytes memory) {
-        return readZKFoundryBytecodeSystemContracts("EvmEmulator.yul", "EvmEmulator");
+        return BytecodeUtils.readZKFoundryBytecodeSystemContracts("EvmEmulator.yul", "EvmEmulator");
     }
 
     /**
@@ -1017,124 +1018,13 @@ library Utils {
         });
     }
 
-    /**
-     * @dev Returns the bytecode of a given system contract.
-     */
-    function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
-        return readZKFoundryBytecodeSystemContracts(string.concat(filename, ".sol"), filename);
-    }
-
-    /**
-     * @dev Returns the bytecode of a given system contract in yul.
-     */
-    function readSystemContractsYulBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
-
-        return readFoundryBytecode(path);
-    }
-
-    /**
-     * @dev Returns the bytecode of a given precompile system contract.
-     */
-    function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
-
-        return readFoundryBytecode(path);
-    }
-    /**
-     * @dev Returns the bytecode of a given DA contract.
-     */
-    function readDAContractBytecode(string memory contractIdentifier) internal view returns (bytes memory) {
-        return
-            readFoundryBytecode(
-                string.concat("/../da-contracts/out/", contractIdentifier, ".sol/", contractIdentifier, ".json")
-            );
-    }
-
-    /**
-     * @dev Read foundry bytecodes
-     */
-    function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, artifactPath);
-        string memory json = vm.readFile(path);
-        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode.object");
-        return bytecode;
-    }
-
-    function readFoundryBytecodeL1(
-        string memory fileName,
-        string memory contractName
-    ) internal view returns (bytes memory) {
-        string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
-        return readFoundryBytecode(path);
-    }
-
-    function readZKFoundryBytecodeL1(
-        string memory fileName,
-        string memory contractName
-    ) internal view returns (bytes memory) {
-        string memory path = string.concat("/../l1-contracts/zkout/", fileName, "/", contractName, ".json");
-        bytes memory bytecode = readFoundryBytecode(path);
-        return bytecode;
-    }
-
-    function readFoundryDeployedBytecodeL1(
-        string memory fileName,
-        string memory contractName
-    ) internal view returns (bytes memory) {
-        string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
-        bytes memory bytecode = readFoundryDeployedBytecode(path);
-        return bytecode;
-    }
-
-    function readZKFoundryBytecodeL2(
-        string memory fileName,
-        string memory contractName
-    ) internal view returns (bytes memory) {
-        string memory path = string.concat("/../l2-contracts/zkout/", fileName, "/", contractName, ".json");
-        bytes memory bytecode = readFoundryBytecode(path);
-        return bytecode;
-    }
-
-    function readZKFoundryBytecodeSystemContracts(
-        string memory fileName,
-        string memory contractName
-    ) internal view returns (bytes memory) {
-        // kl todo add contracts path here
-        string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
-
-        string memory path = string.concat(
-            "/",
-            CONTRACTS_PATH,
-            "/system-contracts/zkout/",
-            fileName,
-            "/",
-            contractName,
-            ".json"
-        );
-        bytes memory bytecode = readFoundryBytecode(path);
-        return bytecode;
-    }
-
-    /**
-     * @dev Read hardhat bytecodes
-     */
-    function readFoundryDeployedBytecode(string memory artifactPath) internal view returns (bytes memory) {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, artifactPath);
-        string memory json = vm.readFile(path);
-        bytes memory bytecode = vm.parseJsonBytes(json, ".deployedBytecode.object");
-        return bytecode;
-    }
-
-    function blakeHashBytecode(bytes memory bytecode) internal returns (bytes32 hashedBytecode) {
+    function blakeHashBytecode(bytes memory _bytecode) internal returns (bytes32 hashedBytecode) {
         string[] memory input = new string[](5);
         input[0] = "yarn";
         input[1] = "--silent";
         input[2] = "ts-node";
         input[3] = "./scripts/blake2s256.ts";
-        input[4] = vm.toString(bytecode);
+        input[4] = vm.toString(_bytecode);
         hashedBytecode = bytes32(vm.ffi(input));
     }
 
@@ -1433,7 +1323,7 @@ library Utils {
         string memory fileName,
         string memory contractName
     ) internal returns (bytes memory bytecodeInfo) {
-        bytes memory bytecode = readFoundryDeployedBytecodeL1(fileName, contractName);
+        bytes memory bytecode = BytecodeUtils.readDeployedBytecodeL1(true, fileName, contractName);
         bytecodeInfo = getZKOSBytecodeInfo(bytecode);
     }
 
@@ -1489,6 +1379,19 @@ library Utils {
     function getProxyAdminAddress(address proxy) internal view returns (address) {
         bytes32 value = vm.load(proxy, ADMIN_SLOT); // Foundry cheatcode
         return address(uint160(uint256(value)));
+    }
+
+    string private constant GENESIS_FILENAME_ERA = "era/latest.json";
+    string private constant GENESIS_FILENAME_ZKOS = "zksync-os/latest.json";
+
+    /// @notice Absolute path to genesis / chain-creation JSON under `configs/genesis/` for the given VM mode.
+    function genesisConfigPath(bool _isZKsyncOS) internal returns (string memory) {
+        return
+            string.concat(
+                vm.projectRoot(),
+                "/../configs/genesis/",
+                _isZKsyncOS ? GENESIS_FILENAME_ZKOS : GENESIS_FILENAME_ERA
+            );
     }
 
     // add this to be excluded from coverage report

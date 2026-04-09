@@ -13,8 +13,6 @@ import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../utils/Utils.sol";
-import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
-import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
@@ -30,11 +28,6 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 
-import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
-import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
-import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
-import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
-import {ZKsyncOSTestnetVerifier} from "contracts/state-transition/verifiers/ZKsyncOSTestnetVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -56,6 +49,8 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {DeployUtils} from "../utils/deploy/DeployUtils.sol";
+import {CTMContract} from "./DeployCTML1OrGateway.sol";
+import {ChainCreationParamsLib} from "./ChainCreationParamsLib.sol";
 
 import {
     StateTransitionDeployedAddresses,
@@ -64,11 +59,8 @@ import {
     BridgehubAddresses,
     CoreDeployedAddresses
 } from "../utils/Types.sol";
-import {ChainCreationParamsLib} from "./ChainCreationParamsLib.sol";
-
 import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 
-import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
 import {CTMDeployedAddresses} from "../utils/Types.sol";
 import {EraSettlementLayerV31Upgrade} from "contracts/upgrades/EraSettlementLayerV31Upgrade.sol";
 import {ZKsyncOSSettlementLayerV31Upgrade} from "contracts/upgrades/ZKsyncOSSettlementLayerV31Upgrade.sol";
@@ -108,8 +100,6 @@ struct GeneratedData {
 abstract contract DeployCTMUtils is DeployUtils {
     using stdToml for string;
 
-    string public constant ERA_CHAIN_CREATION_PARAMS_PATH = "/../configs/genesis/era/latest.json";
-    string public constant ZKSYNC_OS_CHAIN_CREATION_PARAMS_PATH = "/../configs/genesis/zksync-os/latest.json";
     Config public config;
     // Note: This variable is initialized by concrete implementations before use
     GeneratedData internal generatedData; //slither-disable-line uninitialized-state
@@ -129,12 +119,8 @@ abstract contract DeployCTMUtils is DeployUtils {
         ctmAddresses.stateTransition.facets.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
-    function chainCreationParamsPath(bool isZKsyncOs) internal virtual returns (string memory) {
-        if (isZKsyncOs) {
-            return string.concat(vm.projectRoot(), ZKSYNC_OS_CHAIN_CREATION_PARAMS_PATH);
-        } else {
-            return string.concat(vm.projectRoot(), ERA_CHAIN_CREATION_PARAMS_PATH);
-        }
+    function chainCreationParamsPath(bool _isZKsyncOS) internal virtual returns (string memory) {
+        return Utils.genesisConfigPath(_isZKsyncOS);
     }
 
     function initializeConfig(
@@ -162,8 +148,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         }
         require(config.zkTokenAssetId != bytes32(0), "zk_token_asset_id must be non-zero in config");
 
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesPath);
-        _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
         );
@@ -172,7 +156,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.contracts.validatorTimelockExecutionDelay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
         );
-        config.contracts.chainCreationParams = getChainCreationParamsConfig(chainCreationParamsPath(config.isZKsyncOS));
+        config.contracts.chainCreationParams = getChainCreationParamsConfig(Utils.genesisConfigPath(config.isZKsyncOS));
 
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
@@ -304,93 +288,9 @@ abstract contract DeployCTMUtils is DeployUtils {
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "L1AssetRouter")) {
-                return type(L1AssetRouter).creationCode;
-            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-                return type(L1ERC20Bridge).creationCode;
-            } else if (compareStrings(contractName, "L1NativeTokenVault")) {
-                return type(L1NativeTokenVault).creationCode;
-            } else if (compareStrings(contractName, "BridgedStandardERC20")) {
-                return type(BridgedStandardERC20).creationCode;
-            } else if (compareStrings(contractName, "Governance")) {
-                return type(Governance).creationCode;
-            } else if (compareStrings(contractName, "ChainAdminOwnable")) {
-                return type(ChainAdminOwnable).creationCode;
-            } else if (compareStrings(contractName, "ChainAdmin")) {
-                return type(ChainAdmin).creationCode;
-            } else if (compareStrings(contractName, "ProxyAdmin")) {
-                return type(ProxyAdmin).creationCode;
-            } else if (compareStrings(contractName, "RollupDAManager")) {
-                return type(RollupDAManager).creationCode;
-            } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
-                return type(ValidiumL1DAValidator).creationCode;
-            } else if (compareStrings(contractName, "Verifier")) {
-                if (config.testnetVerifier) {
-                    if (config.isZKsyncOS) {
-                        return type(ZKsyncOSTestnetVerifier).creationCode;
-                    } else {
-                        return type(EraTestnetVerifier).creationCode;
-                    }
-                } else {
-                    if (config.isZKsyncOS) {
-                        return type(ZKsyncOSDualVerifier).creationCode;
-                    } else {
-                        return type(EraDualVerifier).creationCode;
-                    }
-                }
-            } else if (compareStrings(contractName, "EraVerifierFflonk")) {
-                return type(EraVerifierFflonk).creationCode;
-            } else if (compareStrings(contractName, "EraVerifierPlonk")) {
-                return type(EraVerifierPlonk).creationCode;
-            } else if (compareStrings(contractName, "ZKsyncOSVerifierFflonk")) {
-                return type(ZKsyncOSVerifierFflonk).creationCode;
-            } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
-                return type(ZKsyncOSVerifierPlonk).creationCode;
-            } else if (compareStrings(contractName, "DefaultUpgrade")) {
-                return type(DefaultUpgrade).creationCode;
-            } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
-                return type(L1GenesisUpgrade).creationCode;
-            } else if (compareStrings(contractName, "ValidatorTimelock")) {
-                return type(ValidatorTimelock).creationCode;
-            } else if (compareStrings(contractName, "PermissionlessValidator")) {
-                return type(PermissionlessValidator).creationCode;
-            } else if (compareStrings(contractName, "EraChainTypeManager")) {
-                return type(EraChainTypeManager).creationCode;
-            } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
-                return type(ZKsyncOSChainTypeManager).creationCode;
-            } else if (compareStrings(contractName, "BytecodesSupplier")) {
-                return type(BytecodesSupplier).creationCode;
-            } else if (compareStrings(contractName, "ExecutorFacet")) {
-                return type(ExecutorFacet).creationCode;
-            } else if (compareStrings(contractName, "AdminFacet")) {
-                return type(AdminFacet).creationCode;
-            } else if (compareStrings(contractName, "MailboxFacet")) {
-                return type(MailboxFacet).creationCode;
-            } else if (compareStrings(contractName, "GettersFacet")) {
-                return type(GettersFacet).creationCode;
-            } else if (compareStrings(contractName, "MigratorFacet")) {
-                return type(MigratorFacet).creationCode;
-            } else if (compareStrings(contractName, "CommitterFacet")) {
-                return type(CommitterFacet).creationCode;
-            } else if (compareStrings(contractName, "DiamondInit")) {
-                return type(DiamondInit).creationCode;
-            } else if (compareStrings(contractName, "ServerNotifier")) {
-                return type(ServerNotifier).creationCode;
-            } else if (compareStrings(contractName, "EraSettlementLayerV31Upgrade")) {
-                return type(EraSettlementLayerV31Upgrade).creationCode;
-            } else if (compareStrings(contractName, "ZKsyncOSSettlementLayerV31Upgrade")) {
-                return type(ZKsyncOSSettlementLayerV31Upgrade).creationCode;
-            }
-        } else {
-            if (compareStrings(contractName, "Verifier")) {
-                if (config.testnetVerifier) {
-                    return getCreationCode("TestnetVerifier", true);
-                } else {
-                    return getCreationCode("DualVerifier", true);
-                }
-            }
+            return ContractsBytecodesLib.getCreationCodeEVM(contractName);
         }
-        return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
+        return ContractsBytecodesLib.getL2Bytecode(contractName, config.isZKsyncOS);
     }
 
     function getRollupL2DACommitmentScheme() internal returns (L2DACommitmentScheme) {
@@ -408,20 +308,20 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {
-            return abi.encode(ctmAddresses.daAddresses.l1RollupDAValidator);
+            return abi.encode(ctmAddresses.daAddresses.daContracts.rollupSLDAValidator);
         } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
             return abi.encode();
         } else if (compareStrings(contractName, "AvailL1DAValidator")) {
             return abi.encode(ctmAddresses.daAddresses.availBridge);
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "EraVerifierFflonk")) {
+        } else if (
+            compareStrings(contractName, "EraVerifierFflonk") || compareStrings(contractName, "ZKsyncOSVerifierFflonk")
+        ) {
             return abi.encode();
-        } else if (compareStrings(contractName, "EraVerifierPlonk")) {
-            return abi.encode();
-        } else if (compareStrings(contractName, "ZKsyncOSVerifierFflonk")) {
-            return abi.encode();
-        } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
+        } else if (
+            compareStrings(contractName, "EraVerifierPlonk") || compareStrings(contractName, "ZKsyncOSVerifierPlonk")
+        ) {
             return abi.encode();
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
@@ -470,6 +370,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             return
                 DeployCTML1OrGateway.getCreationCalldata(
                     getCTMCoreDeploymentConfig(config),
+                    config.isZKsyncOS,
                     DeployCTML1OrGateway.getCTMContractFromName(contractName),
                     isZKBytecode
                 );
@@ -479,13 +380,13 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getCTMCoreDeploymentConfig(Config memory _config) internal view returns (CTMCoreDeploymentConfig memory) {
         return
             CTMCoreDeploymentConfig({
-                isZKsyncOS: _config.isZKsyncOS,
+                isZKsyncOS: config.isZKsyncOS,
                 testnetVerifier: _config.testnetVerifier,
                 eraChainId: _config.eraChainId,
                 l1ChainId: _config.l1ChainId,
                 bridgehubProxy: coreAddresses.bridgehub.proxies.bridgehub,
                 interopCenterProxy: L2_INTEROP_CENTER_ADDR,
-                rollupDAManager: ctmAddresses.daAddresses.rollupDAManager,
+                rollupDAManager: ctmAddresses.daAddresses.daContracts.rollupDAManager,
                 chainAssetHandler: coreAddresses.bridgehub.proxies.chainAssetHandler,
                 l1BytecodesSupplier: ctmAddresses.stateTransition.proxies.bytecodesSupplier,
                 eip7702Checker: ctmAddresses.admin.eip7702Checker,
@@ -497,10 +398,6 @@ abstract contract DeployCTMUtils is DeployUtils {
                 verifierOwner: getBroadcasterAddress(),
                 permissionlessValidator: ctmAddresses.stateTransition.proxies.permissionlessValidator
             });
-    }
-
-    function calculateExpectedL2Address(string memory contractName) internal returns (address) {
-        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
     }
 
     function getL2BytecodeHash(string memory contractName) public view virtual returns (bytes32) {
