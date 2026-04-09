@@ -1,6 +1,7 @@
 
 old_protocol_version = 0x1d00000000
 bridgehub_proxy_address = "0xa8c43993c2895D5c6409D79d7a1E4ac773f708b6"
+owner_address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 
 use_v29_introspection = true
 

@@ -14,6 +14,13 @@ contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
         setSkipFactoryDepsCheck_TestOnly(true);
         super.prepareCTMUpgrade();
     }
+
+    /// @dev Skip loading zkout bytecodes to avoid MemoryOOG in anvil tests.
+    /// Factory deps are not needed since we skip the check and bytecodes are
+    /// already available on L2 via anvil_setCode.
+    function publishBytecodes() public override {
+        // no-op: avoids loading large zkout files into EVM memory
+    }
 }
 
 /// @dev CoreUpgrade that skips updateContractConnections() on re-run.
