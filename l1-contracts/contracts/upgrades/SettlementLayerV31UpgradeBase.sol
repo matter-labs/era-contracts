@@ -12,7 +12,7 @@ import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
-import {UnexpectedUpgradeSelector} from "../common/L1ContractErrors.sol";
+import {UnexpectedUpgradeSelector, PriorityQueueNotReady} from "../common/L1ContractErrors.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {TokenBridgingData, TokenMetadata} from "../common/Messaging.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
@@ -20,7 +20,7 @@ import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {Bytes} from "../vendor/Bytes.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
-import {NotAllBatchesExecuted, PriorityQueueNotReady} from "../common/L1ContractErrors.sol";
+import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
 
 /// @author Matter Labs
 /// @title SettlementLayerV31UpgradeBase

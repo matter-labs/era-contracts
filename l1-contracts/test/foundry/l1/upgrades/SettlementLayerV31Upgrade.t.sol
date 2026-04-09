@@ -3,7 +3,8 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {EraSettlementLayerV31Upgrade} from "contracts/upgrades/EraSettlementLayerV31Upgrade.sol";
-import {NotAllBatchesExecuted, PriorityQueueNotReady} from "contracts/common/L1ContractErrors.sol";
+import {PriorityQueueNotReady} from "contracts/common/L1ContractErrors.sol";
+import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
