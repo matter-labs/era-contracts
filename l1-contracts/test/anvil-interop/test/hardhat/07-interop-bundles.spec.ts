@@ -42,6 +42,16 @@ const BASE_TOKEN_MAX = ethers.utils.parseUnits("1000", "gwei");
 const ERC20_TOKEN_MIN = BigNumber.from(100);
 const ERC20_TOKEN_MAX = BigNumber.from(10000);
 
+/**
+ * 07 - Interop Bundles (sendBundle / executeBundle)
+ *
+ * Tests atomic bundle execution across GW-settled chains for direct base-token
+ * calls, indirect ERC20 transfers, and mixed bundles. Also covers bundle-level
+ * guardrails such as replay protection, executionAddress enforcement, zero-call
+ * bundles, and msg.value validation.
+ *
+ * Topology: gwSettledChainIds[0] = source, gwSettledChainIds[1] = destination
+ */
 describe("07 - Interop Bundles (GW-settled chains)", function () {
   this.timeout(0);
 

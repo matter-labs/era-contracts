@@ -45,6 +45,16 @@ import {
   randomBigNumber,
 } from "../../src/helpers/balance-helpers";
 
+/**
+ * 09 - Interop Unbundle (verifyBundle / unbundleBundle)
+ *
+ * Tests the non-atomic recovery flow for bundles that contain a failing call.
+ * The suite verifies that bundles can be verified, selectively unbundled across
+ * multiple rounds, and enforced by unbundlerAddress / call-status rules while
+ * still delivering successful base-token and ERC20 transfers.
+ *
+ * Topology: gwSettledChainIds[0] = source, gwSettledChainIds[1] = destination
+ */
 describe("09 - Interop Unbundle (failing calls)", function () {
   this.timeout(0);
 
