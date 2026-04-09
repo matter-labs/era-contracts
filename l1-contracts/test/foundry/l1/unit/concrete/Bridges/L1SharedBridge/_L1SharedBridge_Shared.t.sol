@@ -82,7 +82,6 @@ contract L1AssetRouterTest is MigrationTestBase {
     address l1ERC20BridgeAddress;
     address l1WethAddress;
     address l2SharedBridge;
-    address l1NullifierAddress;
     L1AssetTracker l1AssetTracker;
     TestnetERC20Token token;
     bytes32 tokenAssetId;
@@ -116,22 +115,24 @@ contract L1AssetRouterTest is MigrationTestBase {
     bytes32 ETH_TOKEN_ASSET_ID = keccak256(abi.encode(block.chainid, L2_NATIVE_TOKEN_VAULT_ADDR, ETH_TOKEN_ADDRESS));
 
     function setUp() public override {
-        super.setUp();
+        // Deploy real ecosystem — provides real bridgehub, messageRoot, chains, tokens
+        _deployIntegrationBase();
+
         owner = makeAddr("owner");
         admin = makeAddr("admin");
         proxyAdmin = makeAddr("proxyAdmin");
-        // zkSync = makeAddr("zkSync");
-        bridgehubAddress = makeAddr("bridgehub");
-        messageRootAddress = makeAddr("messageRoot");
+        // Use real bridgehub and messageRoot from integration deployment
+        bridgehubAddress = address(addresses.bridgehub);
+        messageRootAddress = address(addresses.bridgehub.messageRoot());
+        chainAssetHandler = addresses.bridgehub.chainAssetHandler();
         interopCenterAddress = makeAddr("interopCenter");
         alice = makeAddr("alice");
-        // bob = makeAddr("bob");
         l1WethAddress = address(new ERC20("Wrapped ETH", "WETH"));
         l1ERC20BridgeAddress = makeAddr("l1ERC20Bridge");
         l2SharedBridge = makeAddr("l2SharedBridge");
 
         txHash = bytes32(uint256(uint160(makeAddr("txHash"))));
-        l2BatchNumber = 3; //uint256(uint160(makeAddr("l2BatchNumber")));
+        l2BatchNumber = 3;
         l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
         l2TxNumberInBatch = uint16(uint160(makeAddr("l2TxNumberInBatch")));
         l2LegacySharedBridgeAddr = makeAddr("l2LegacySharedBridge");
@@ -139,12 +140,14 @@ contract L1AssetRouterTest is MigrationTestBase {
         merkleProof = new bytes32[](1);
         eraPostUpgradeFirstBatch = 1;
 
-        chainId = 1;
-        eraChainId = 9;
+        // Use real chain IDs from integration deployment
+        chainId = testChainId;
+        eraChainId = zkChainIds[0];
         randomChainId = 999;
-        eraDiamondProxy = makeAddr("eraDiamondProxy");
+        eraDiamondProxy = getZKChainAddress(eraChainId);
         eraErc20BridgeAddress = makeAddr("eraErc20BridgeAddress");
 
+        // Deploy fresh contracts-under-test with REAL dependencies (no makeAddr bridgehub)
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
         l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IL1Bridgehub(bridgehubAddress),
@@ -186,16 +189,8 @@ contract L1AssetRouterTest is MigrationTestBase {
             abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner, tokenBeacon)
         );
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
-        vm.mockCall(
-            bridgehubAddress,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(address(chainAssetHandler))
-        );
-        vm.mockCall(
-            chainAssetHandler,
-            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
-            abi.encode(0)
-        );
+
+        // Real bridgehub answers chainAssetHandler() and migrationNumber() — no mocks needed
         l1AssetTracker = new L1AssetTracker(bridgehubAddress, address(nativeTokenVault), messageRootAddress);
         vm.prank(owner);
         nativeTokenVault.setAssetTracker(address(l1AssetTracker));
@@ -229,6 +224,15 @@ contract L1AssetRouterTest is MigrationTestBase {
         vm.store(address(sharedBridge), bytes32(isWithdrawalFinalizedStorageLocation + 2), bytes32(uint256(1)));
         vm.store(address(sharedBridge), bytes32(isWithdrawalFinalizedStorageLocation + 3), bytes32(0));
 
+        // The fresh L1AssetTracker's chainAssetHandler storage is not yet initialized
+        // (setAddresses requires onlyOwner on a proxied deploy). Mock migrationNumber on
+        // the stored handler address (address(0)) to prevent revert during balance updates.
+        vm.mockCall(
+            address(l1AssetTracker.chainAssetHandler()),
+            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
+            abi.encode(0)
+        );
+        // Keep baseTokenAssetId no-arg mock and settlementLayer — legacy deposit path routing.
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
@@ -239,15 +243,28 @@ contract L1AssetRouterTest is MigrationTestBase {
             abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector),
             abi.encode(block.chainid)
         );
-        vm.mockCall(
-            bridgehubAddress,
-            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, chainId),
-            abi.encode(ETH_TOKEN_ASSET_ID)
-        );
+        // Keep requestL2TransactionDirect mock (legacy path needs controlled response).
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IL1Bridgehub.requestL2TransactionDirect.selector),
             abi.encode(txHash)
+        );
+        // Keep messageRoot mocks — real messageRoot's proof data format may differ from test expectations
+        vm.mockCall(
+            messageRootAddress,
+            abi.encodeWithSelector(IMessageRootBase.getProofData.selector),
+            abi.encode(
+                ProofData({
+                    settlementLayerChainId: 0,
+                    settlementLayerBatchNumber: 0,
+                    settlementLayerBatchRootMask: 0,
+                    batchLeafProofLen: 0,
+                    batchSettlementRoot: 0,
+                    chainIdLeaf: 0,
+                    ptr: 0,
+                    finalProofNode: false
+                })
+            )
         );
         bytes32 ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         stdstore
@@ -277,7 +294,6 @@ contract L1AssetRouterTest is MigrationTestBase {
         // Also set balance for block.chainid to handle _getWithdrawalChain scenarios
         _setAssetTrackerChainBalance(block.chainid, address(token), 1000 * amount);
         _setAssetTrackerChainBalance(block.chainid, ETH_TOKEN_ADDRESS, amount);
-        // console.log("chainBalance %s, %s", address(token), nativeTokenVault.chainBalance(chainId, address(token)));
         _setSharedBridgeChainBalance(chainId, address(token), amount);
         _setSharedBridgeChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
 
@@ -300,6 +316,16 @@ contract L1AssetRouterTest is MigrationTestBase {
         _setBaseTokenAssetId(ETH_TOKEN_ASSET_ID);
         _setAssetTrackerChainBalance(chainId, address(token), amount);
 
+        // Real bridgehub handles baseToken() for registered chainIds, but keep mock for specific
+        // chainId query since child tests may use unregistered chain IDs in error-path scenarios.
+        vm.mockCall(
+            bridgehubAddress,
+            // solhint-disable-next-line func-named-parameters
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
+            abi.encode(ETH_TOKEN_ADDRESS)
+        );
+
+        // Keep NTV tokenAddress mocks — fresh NTV may not map asset IDs correctly after registerToken
         vm.mockCall(
             address(nativeTokenVault),
             abi.encodeWithSelector(IBaseTokenAssetHandler.tokenAddress.selector, tokenAssetId),
@@ -310,39 +336,8 @@ contract L1AssetRouterTest is MigrationTestBase {
             abi.encodeWithSelector(IBaseTokenAssetHandler.tokenAddress.selector, ETH_TOKEN_ASSET_ID),
             abi.encode(address(ETH_TOKEN_ADDRESS))
         );
-        vm.mockCall(
-            bridgehubAddress,
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
-            abi.encode(ETH_TOKEN_ADDRESS)
-        );
 
-        vm.mockCall(
-            l1NullifierAddress,
-            abi.encodeWithSelector(IL1Nullifier.getTransientSettlementLayer.selector),
-            abi.encode(0)
-        );
-        vm.mockCall(
-            messageRootAddress,
-            abi.encodeWithSelector(IL1MessageRoot.v31UpgradeChainBatchNumber.selector),
-            abi.encode(10)
-        );
-        vm.mockCall(
-            address(messageRootAddress),
-            abi.encodeWithSelector(IMessageRootBase.getProofData.selector),
-            abi.encode(
-                ProofData({
-                    settlementLayerChainId: 0,
-                    settlementLayerBatchNumber: 0,
-                    settlementLayerBatchRootMask: 0,
-                    batchLeafProofLen: 0,
-                    batchSettlementRoot: 0,
-                    chainIdLeaf: 0,
-                    ptr: 0,
-                    finalProofNode: false
-                })
-            )
-        );
+        // Real messageRoot answers v31UpgradeChainBatchNumber() and getProofData() — no mocks needed.
     }
 
     function _setSharedBridgeDepositHappened(uint256 _chainId, bytes32 _txHash, bytes32 _txDataHash) internal {
@@ -374,7 +369,7 @@ contract L1AssetRouterTest is MigrationTestBase {
     }
 
     function _setBaseTokenAssetId(bytes32 _assetId) internal {
-        // vm.prank(bridgehubAddress);
+        // Mock on real bridgehub for specific chainId — child tests override this for different base tokens
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, chainId),
