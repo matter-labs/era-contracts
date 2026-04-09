@@ -11,8 +11,6 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {Call} from "contracts/governance/Common.sol";
@@ -69,13 +67,10 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
 
         // For ZKsyncOS, prepare bytecode info before composeUpgradeTx calls getL2UpgradeTargetAndData.
         l2V29UpgradeBytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo("L2V29Upgrade.sol", "L2V29Upgrade");
-        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = buildUpgradeForceDeployments(
-            config.l1ChainId,
-            config.ownerAddress
-        );
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = buildZKsyncOSForceDeployments();
 
         proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: composeUpgradeTx(forceDeployments, _factoryDepsResult, protocolUpgradeNonce),
+            l2ProtocolUpgradeTx: composeUpgradeTx(deployments, _factoryDepsResult, protocolUpgradeNonce),
             bootloaderHash: chainCreationParams.bootloaderHash,
             defaultAccountHash: chainCreationParams.defaultAAHash,
             evmEmulatorHash: chainCreationParams.evmEmulatorHash,

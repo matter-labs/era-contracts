@@ -6,6 +6,8 @@ import {CTMUpgrade_v31} from "deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 import {DefaultCTMUpgrade} from "deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {DefaultCoreUpgrade} from "deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
 import {CoreUpgrade_v31} from "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
+import {EcosystemUpgradeParams} from "deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
+import {stdToml} from "forge-std/StdToml.sol";
 
 contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
     function prepareCTMUpgrade() public override {
@@ -25,6 +27,7 @@ contract CoreUpgradeV31Idempotent is CoreUpgrade_v31 {
 }
 
 contract EcosystemUpgradeV31ForTests is EcosystemUpgrade_v31 {
+    using stdToml for string;
     bool private _useIdempotentCore;
 
     function createCTMUpgrade() internal override returns (DefaultCTMUpgrade) {
@@ -38,10 +41,44 @@ contract EcosystemUpgradeV31ForTests is EcosystemUpgrade_v31 {
         return new CoreUpgrade_v31();
     }
 
+    /// @notice Build EcosystemUpgradeParams from env vars and TOML config files.
+    function _buildParams() private returns (EcosystemUpgradeParams memory) {
+        string memory permanentValuesPath = vm.envString("PERMANENT_VALUES_INPUT_OVERRIDE");
+        string memory upgradeInputPath = vm.envString("UPGRADE_INPUT_OVERRIDE");
+        string memory ecosystemOutputPath = vm.envString("UPGRADE_ECOSYSTEM_OUTPUT_OVERRIDE");
+
+        string memory root = vm.projectRoot();
+        string memory pvToml = vm.readFile(string.concat(root, permanentValuesPath));
+
+        address bridgehubProxy = pvToml.readAddress("$.core_contracts.bridgehub_proxy_addr");
+        address ctmProxy = pvToml.readAddress("$.ctm_contracts.ctm_proxy_addr");
+        address bytecodesSupplier = pvToml.readAddress("$.ctm_contracts.l1_bytecodes_supplier_addr");
+        address rollupDAManager = pvToml.readAddress("$.ctm_contracts.rollup_da_manager");
+        bool isZKsyncOS = pvToml.readBool("$.is_zk_sync_os");
+        bytes32 create2FactorySalt = pvToml.readBytes32("$.permanent_contracts.create2_factory_salt");
+
+        // Read the upgrade input TOML to get the owner/governance address
+        string memory upgradeToml = vm.readFile(string.concat(root, upgradeInputPath));
+        address governance = upgradeToml.readAddress("$.owner_address");
+
+        return
+            EcosystemUpgradeParams({
+                bridgehubProxyAddress: bridgehubProxy,
+                ctmProxy: ctmProxy,
+                bytecodesSupplier: bytecodesSupplier,
+                rollupDAManager: rollupDAManager,
+                isZKsyncOS: isZKsyncOS,
+                create2FactorySalt: create2FactorySalt,
+                upgradeInputPath: upgradeInputPath,
+                ecosystemOutputPath: ecosystemOutputPath,
+                governance: governance
+            });
+    }
+
     /// @notice Step 1: Deploy core L1 ecosystem contracts + configure connections.
     /// @dev Produces ~12 transactions. Call step2() afterward.
     function step1() public {
-        initialize(getPermanentValuesInputPath(), getUpgradeInputPath(), getEcosystemOutputPath());
+        initializeWithArgs(_buildParams());
         coreUpgrade.prepareEcosystemUpgrade();
     }
 
@@ -50,7 +87,7 @@ contract EcosystemUpgradeV31ForTests is EcosystemUpgrade_v31 {
     /// Produces ~25 transactions.
     function step2() public {
         _useIdempotentCore = true;
-        initialize(getPermanentValuesInputPath(), getUpgradeInputPath(), getEcosystemOutputPath());
+        initializeWithArgs(_buildParams());
         prepareEcosystemUpgrade();
         prepareDefaultGovernanceCalls();
     }

@@ -11,8 +11,6 @@ import {Governance} from "contracts/governance/Governance.sol";
 
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-
 import {Call} from "contracts/governance/Common.sol";
 
 import {
@@ -161,15 +159,11 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // For ZKsyncOS v31 upgrades, upgrade the version-specific upgrader via proxy upgrade.
         // Prepare bytecode info for getL2UpgradeTargetAndData (used in composeUpgradeTx).
         l2V31UpgradeBytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo("L2V31Upgrade.sol", "L2V31Upgrade");
-        // ZKsyncOS uses UniversalContractUpgradeInfo instead of ForceDeployment[];
-        // buildUpgradeForceDeployments returns empty for ZKsyncOS.
-        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = buildUpgradeForceDeployments(
-            config.l1ChainId,
-            config.ownerAddress
-        );
+        // ZKsyncOS uses UniversalContractUpgradeInfo[] built from buildZKsyncOSForceDeployments().
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = buildZKsyncOSForceDeployments();
 
         proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: composeUpgradeTx(forceDeployments, _factoryDepsResult, protocolUpgradeNonce),
+            l2ProtocolUpgradeTx: composeUpgradeTx(deployments, _factoryDepsResult, protocolUpgradeNonce),
             bootloaderHash: chainCreationParams.bootloaderHash,
             defaultAccountHash: chainCreationParams.defaultAAHash,
             evmEmulatorHash: chainCreationParams.evmEmulatorHash,
