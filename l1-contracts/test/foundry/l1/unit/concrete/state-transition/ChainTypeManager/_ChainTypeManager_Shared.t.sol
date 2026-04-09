@@ -144,7 +144,8 @@ contract ChainTypeManagerTest is MigrationTestBase {
         l1ChainId = block.chainid;
 
         admin = makeAddr("admin");
-        baseToken = makeAddr("baseToken");
+        // Use real ERC20 if integration deployed (eliminates IERC20Metadata mocks), else makeAddr
+        baseToken = tokens.length > 0 ? tokens[0] : makeAddr("baseToken");
         validator = makeAddr("validator");
         serverNotifier = makeAddr("serverNotifier");
         newChainAdmin = makeAddr("chainadmin");
@@ -286,16 +287,13 @@ contract ChainTypeManagerTest is MigrationTestBase {
     }
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
-        // baseToken is a makeAddr — mock bridgehub.baseToken() and ERC20 metadata.
-        // Real bridgehub provides assetRouter/NTV/assetTracker — no mockDiamondInitInteropCenterCalls needed.
+        // baseToken is a real ERC20 from integration — no IERC20Metadata mocks needed.
+        // Keep baseToken(chainId) mock (chainId 112 unregistered in real bridgehub).
         vm.mockCall(
             address(bridgehub),
             abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
             abi.encode(baseToken)
         );
-        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
-        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
-        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
 
         vm.prank(address(bridgehub));
         return
@@ -314,9 +312,6 @@ contract ChainTypeManagerTest is MigrationTestBase {
             abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
             abi.encode(baseToken)
         );
-        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
-        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
-        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
 
         vm.prank(address(bridgehub));
         chainContractAddress.createNewChain({
