@@ -7,7 +7,6 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
-import {L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";

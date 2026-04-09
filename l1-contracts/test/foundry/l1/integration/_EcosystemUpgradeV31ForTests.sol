@@ -98,4 +98,10 @@ contract EcosystemUpgradeV31ForTests is EcosystemUpgrade_v31 {
         prepareEcosystemUpgrade();
         prepareDefaultGovernanceCalls();
     }
+
+    /// @notice Stage 3: Post-governance token migration. Reads bridgehub from env.
+    function stage3() public {
+        EcosystemUpgradeParams memory params = _buildParams();
+        stage3(params.bridgehubProxyAddress);
+    }
 }
