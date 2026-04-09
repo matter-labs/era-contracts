@@ -438,7 +438,8 @@ jobs:
 
       - name: Cleanup Anvil
         if: always()
-        run: pkill -9 anvil 2>/dev/null || true
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn cleanup
 
       # Merge produces two outputs:
       #   coverage/merged-lcov.info        — Foundry hits + Anvil hits

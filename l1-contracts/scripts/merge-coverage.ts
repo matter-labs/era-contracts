@@ -274,6 +274,7 @@ for (const [file, record] of foundry.files) {
   }
 
   if (anvilFile.functionHits.size > 0) {
+    let fileFunctionsEnhanced = 0;
     record.preamble = record.preamble.map((line) => {
       if (!line.startsWith("FNDA:")) return line;
       const parts = line.substring(5).split(",");
@@ -281,7 +282,7 @@ for (const [file, record] of foundry.files) {
       const fnName = parts.slice(1).join(",");
       const anvilFnHits = anvilFile.functionHits.get(fnName) || 0;
       if (anvilFnHits > 0 && foundryFnHits === 0) {
-        functionsEnhanced++;
+        fileFunctionsEnhanced++;
         return `FNDA:${anvilFnHits},${fnName}`;
       }
       if (anvilFnHits > foundryFnHits) {
@@ -290,12 +291,13 @@ for (const [file, record] of foundry.files) {
       return line;
     });
 
-    if (functionsEnhanced > 0) {
+    if (fileFunctionsEnhanced > 0) {
       record.preamble = record.preamble.map((line) => {
         if (!line.startsWith("FNH:")) return line;
         const currentHit = parseInt(line.substring(4), 10);
-        return `FNH:${currentHit + functionsEnhanced}`;
+        return `FNH:${currentHit + fileFunctionsEnhanced}`;
       });
+      functionsEnhanced += fileFunctionsEnhanced;
     }
   }
 }

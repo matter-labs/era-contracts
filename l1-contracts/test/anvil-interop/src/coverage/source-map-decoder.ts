@@ -225,10 +225,12 @@ export interface FunctionInfo {
 }
 
 /**
- * Extracts function declarations from a contract's source file.
+ * Extracts function declarations from a contract's source file,
+ * scoped to the target contract.
  *
- * Parses `function <name>(` and `constructor(` patterns from the source,
- * qualifying names as `ContractName.functionName` to match Forge's LCOV format.
+ * Uses brace counting to track contract/library/interface boundaries so that
+ * functions from other contracts in the same file are not misattributed.
+ * Skips single-line and multi-line comments to avoid false matches.
  */
 export function extractFunctions(
   contractName: string,
@@ -241,9 +243,61 @@ export function extractFunctions(
   const functions: FunctionInfo[] = [];
   const lines = content.split("\n");
 
+  let insideTargetContract = false;
+  let braceDepth = 0;
+  let inMultiLineComment = false;
+
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    // Match: function <name>(  or  constructor(
+    let line = lines[i];
+
+    // Handle multi-line comments
+    if (inMultiLineComment) {
+      const endIdx = line.indexOf("*/");
+      if (endIdx === -1) continue;
+      line = line.substring(endIdx + 2);
+      inMultiLineComment = false;
+    }
+
+    // Strip single-line comments and multi-line comment starts
+    const singleComment = line.indexOf("//");
+    if (singleComment !== -1) {
+      line = line.substring(0, singleComment);
+    }
+    const multiStart = line.indexOf("/*");
+    if (multiStart !== -1) {
+      const multiEnd = line.indexOf("*/", multiStart + 2);
+      if (multiEnd !== -1) {
+        line = line.substring(0, multiStart) + line.substring(multiEnd + 2);
+      } else {
+        line = line.substring(0, multiStart);
+        inMultiLineComment = true;
+      }
+    }
+
+    // Detect contract/library/abstract contract boundaries
+    const contractMatch = line.match(/\b(?:contract|library|abstract\s+contract)\s+(\w+)/);
+    if (contractMatch && !insideTargetContract) {
+      if (contractMatch[1] === contractName) {
+        insideTargetContract = true;
+        braceDepth = 0;
+      }
+    }
+
+    // Count braces to track scope
+    for (const ch of line) {
+      if (ch === "{") braceDepth++;
+      if (ch === "}") braceDepth--;
+    }
+
+    // Check if we've exited the target contract
+    if (insideTargetContract && braceDepth <= 0 && line.includes("}")) {
+      insideTargetContract = false;
+      continue;
+    }
+
+    if (!insideTargetContract) continue;
+
+    // Match function declarations within the target contract
     const funcMatch = line.match(/\bfunction\s+(\w+)\s*\(/);
     const ctorMatch = line.match(/\bconstructor\s*\(/);
 
@@ -273,7 +327,11 @@ export function extractFunctions(
  *
  * @returns Map of qualifiedName -> hit (true/false)
  */
-export function resolveFunctionHits(functions: FunctionInfo[], hitLines: Set<number>): Map<string, boolean> {
+export function resolveFunctionHits(
+  functions: FunctionInfo[],
+  hitLines: Set<number>,
+  fileLineCount?: number
+): Map<string, boolean> {
   const result = new Map<string, boolean>();
 
   // Sort by line number to determine function boundaries
@@ -281,7 +339,7 @@ export function resolveFunctionHits(functions: FunctionInfo[], hitLines: Set<num
 
   for (let i = 0; i < sorted.length; i++) {
     const startLine = sorted[i].line;
-    const endLine = i + 1 < sorted.length ? sorted[i + 1].line - 1 : startLine + 200;
+    const endLine = i + 1 < sorted.length ? sorted[i + 1].line - 1 : (fileLineCount ?? startLine + 200);
 
     let hit = false;
     for (let line = startLine; line <= endLine; line++) {

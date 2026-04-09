@@ -58,8 +58,13 @@ function buildBytecodeIndex(outDir: string): Map<string, { artifactPath: string;
         if (hex.length < PREFIX_LENGTH) continue;
 
         const prefix = hex.slice(0, PREFIX_LENGTH).toLowerCase();
-        if (!index.has(prefix)) {
+        const existing = index.get(prefix);
+        if (!existing) {
           index.set(prefix, { artifactPath, fullBytecode: hex });
+        } else if (existing.fullBytecode !== hex.toLowerCase()) {
+          console.warn(
+            `  ⚠️  Bytecode prefix collision: ${path.basename(artifactPath)} and ${path.basename(existing.artifactPath)} share prefix ${prefix.slice(0, 16)}...`
+          );
         }
       } catch {
         // Skip malformed artifacts

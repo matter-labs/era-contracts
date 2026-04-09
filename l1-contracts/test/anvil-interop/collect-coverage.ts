@@ -7,7 +7,9 @@
  *   ts-node collect-coverage.ts [--html] [--l1-only]
  *
  * Prerequisites:
- *   - Anvil chains must be running with --steps-tracing enabled
+ *   - Anvil chains must be running with --steps-tracing enabled.
+ *     To enable, either set ANVIL_COVERAGE_MODE=1 before starting chains,
+ *     or start Anvil manually with the --steps-tracing flag.
  *   - Interop tests must have been executed against these chains
  *   - Forge compilation artifacts must exist in l1-contracts/out/
  *   - Deployment state must exist in outputs/state/chains.json
@@ -17,6 +19,7 @@
  * an LCOV coverage report.
  */
 
+import * as fs from "fs";
 import * as path from "path";
 import { collectCoverage } from "./src/coverage/coverage-runner";
 
@@ -38,27 +41,24 @@ async function main(): Promise<void> {
     l1Only,
   };
 
-  // Verify prerequisites
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const fs = require("fs");
   if (!fs.existsSync(options.outDir)) {
-    console.error("❌ Forge output directory not found. Run 'forge build' first.");
+    console.error("Forge output directory not found. Run 'forge build' first.");
     process.exit(1);
   }
   if (!fs.existsSync(options.statePath)) {
-    console.error(`❌ Deployment state not found at ${options.statePath}.`);
+    console.error(`Deployment state not found at ${options.statePath}.`);
     console.error("   Run interop tests with --keep-chains first, or use coverage mode.");
     process.exit(1);
   }
 
   const result = await collectCoverage(options);
 
-  console.log("\n✅ Coverage collection complete.");
+  console.log("\nCoverage collection complete.");
   console.log(`   LCOV: ${result.lcovPath}`);
   console.log(`   Summary: ${result.summaryPath}`);
 }
 
 main().catch((err) => {
-  console.error("❌ Coverage collection failed:", err.message || err);
+  console.error("Coverage collection failed:", err.message || err);
   process.exit(1);
 });

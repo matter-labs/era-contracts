@@ -212,7 +212,9 @@ export async function collectCoverage(options: CoverageOptions): Promise<{
       functions = [];
       for (const contractName of contractNames) {
         const fnInfos = extractFunctions(contractName, filePath, sourceContents);
-        const fnHits = resolveFunctionHits(fnInfos, hitLines);
+        const content = sourceContents.get(filePath);
+        const fileLineCount = content ? content.split("\n").length : undefined;
+        const fnHits = resolveFunctionHits(fnInfos, hitLines, fileLineCount);
         for (const fn of fnInfos) {
           const hit = fnHits.get(fn.qualifiedName) || false;
           functions.push({ qualifiedName: fn.qualifiedName, line: fn.line, hit });
