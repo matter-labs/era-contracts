@@ -42,28 +42,21 @@ contract MessageRoot_Extended_Test is MigrationTestBase {
     address chainAssetHandler;
 
     function setUp() public virtual override {
-        super.setUp();
+        // Deploy real ecosystem — real bridgehub answers queries without mocks
+        _deployIntegrationBase();
 
-        bridgeHub = address(new L1Bridgehub(makeAddr("owner"), 10));
-        chainAssetHandler = makeAddr("chainAssetHandler");
+        bridgeHub = address(addresses.bridgehub);
+        chainAssetHandler = addresses.bridgehub.chainAssetHandler();
         assetTracker = makeAddr("assetTracker");
         L1_CHAIN_ID = 1;
         gatewayChainId = 506;
 
-        vm.mockCall(bridgeHub, abi.encodeWithSelector(IL1Bridgehub.L1_CHAIN_ID.selector), abi.encode(L1_CHAIN_ID));
+        // L1MessageRoot rejects construction when bridgehub has registered chains.
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(chainAssetHandler)
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
+            abi.encode(new uint256[](0))
         );
-        vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
-
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector),
-            abi.encode(makeAddr("chainTypeManager"))
-        );
-        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector), abi.encode(0));
 
         messageRoot = L1MessageRoot(
             address(
@@ -76,13 +69,8 @@ contract MessageRoot_Extended_Test is MigrationTestBase {
         );
         l2MessageRoot = new L2MessageRoot();
 
-        uint256[] memory allZKChainChainIDs = new uint256[](1);
-        allZKChainChainIDs[0] = 271;
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
-            abi.encode(allZKChainChainIDs)
-        );
+        // Real bridgehub answers: L1_CHAIN_ID, chainAssetHandler, owner,
+        // chainTypeManager, settlementLayer — no mocks needed
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);

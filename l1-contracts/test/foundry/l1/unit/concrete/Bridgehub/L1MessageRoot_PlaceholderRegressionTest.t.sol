@@ -19,14 +19,10 @@ contract L1MessageRootPlaceholderRegressionTest is MigrationTestBase {
     uint256 constant TOTAL_BATCHES_EXECUTED = 100;
 
     function setUp() public virtual override {
-        super.setUp();
+        // Deploy real ecosystem — real bridgehub answers chainAssetHandler() without mocks
+        _deployIntegrationBase();
 
-        bridgeHub = makeAddr("bridgeHub");
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(makeAddr("chainAssetHandler"))
-        );
+        bridgeHub = address(addresses.bridgehub);
     }
 
     /// @notice Test demonstrating the regression: chains with placeholder value can be updated

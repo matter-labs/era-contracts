@@ -24,27 +24,23 @@ contract L1MessageRootV31UpgradeTest is MigrationTestBase {
     uint256 constant TOTAL_BATCHES_EXECUTED = 100;
 
     function setUp() public virtual override {
-        super.setUp();
+        // Deploy real ecosystem — real bridgehub answers queries without mocks
+        _deployIntegrationBase();
 
-        bridgeHub = makeAddr("bridgeHub");
+        bridgeHub = address(addresses.bridgehub);
+        address chainAssetHandler = addresses.bridgehub.chainAssetHandler();
 
-        // Mock getAllZKChainChainIDs to return empty array for constructor
-        uint256[] memory allZKChainChainIDs = new uint256[](0);
+        // L1MessageRoot rejects construction when bridgehub has registered chains.
         vm.mockCall(
             bridgeHub,
             abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
-            abi.encode(allZKChainChainIDs)
-        );
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(makeAddr("chainAssetHandler"))
+            abi.encode(new uint256[](0))
         );
 
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1, makeAddr("chainAssetHandler"))),
+                    address(new L1MessageRoot(bridgeHub, block.chainid, chainAssetHandler)),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )
@@ -57,7 +53,7 @@ contract L1MessageRootV31UpgradeTest is MigrationTestBase {
     }
 
     function test_ERA_GATEWAY_CHAIN_ID() public view {
-        assertEq(messageRoot.ERA_GATEWAY_CHAIN_ID(), 1);
+        assertEq(messageRoot.ERA_GATEWAY_CHAIN_ID(), block.chainid);
     }
 
     function test_RevertWhen_SaveV31UpgradeChainBatchNumber_NotOnSettlementLayer() public {
