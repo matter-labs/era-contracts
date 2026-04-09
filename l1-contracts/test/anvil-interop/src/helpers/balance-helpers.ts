@@ -8,7 +8,7 @@
 import { expect } from "chai";
 import type { providers } from "ethers";
 import { BigNumber, Contract, ethers, Wallet } from "ethers";
-import { getAbi } from "../core/contracts";
+import { getAbi, type ContractName } from "../core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
 
 // ── Balance snapshot utilities ─────────────────────────────────
@@ -126,6 +126,29 @@ interface EthersLikeError {
   };
 }
 
+export interface CustomErrorExpectation {
+  contract: ContractName;
+  signature: string;
+}
+
+type ExpectedRevert = string | CustomErrorExpectation;
+
+export function customError(contract: ContractName, signature: string): CustomErrorExpectation {
+  return { contract, signature };
+}
+
+function resolveExpectedReason(expectedReason: ExpectedRevert): { matchValue: string; description: string } {
+  if (typeof expectedReason === "string") {
+    return { matchValue: expectedReason, description: expectedReason };
+  }
+
+  const selector = new ethers.utils.Interface(getAbi(expectedReason.contract)).getSighash(expectedReason.signature);
+  return {
+    matchValue: selector,
+    description: `${expectedReason.contract}.${expectedReason.signature} (${selector})`,
+  };
+}
+
 function extractRevertData(err: unknown): string {
   if (typeof err !== "object" || err === null) return "";
 
@@ -163,30 +186,31 @@ async function extractRevertDataFromCall(provider: providers.JsonRpcProvider, er
 
 /**
  * Assert that an async call reverts (throws).
- * Optionally match the error message against `expectedReason` (substring match).
+ * Optionally match the error message / revert data against a selector or ABI-derived custom error.
  */
 export async function expectRevert(
   fn: () => Promise<unknown>,
   label: string,
-  expectedReason?: string,
+  expectedReason?: ExpectedRevert,
   provider?: providers.JsonRpcProvider
 ): Promise<void> {
   try {
     await fn();
   } catch (err: unknown) {
     if (expectedReason) {
+      const { matchValue, description } = resolveExpectedReason(expectedReason);
       // Check both the JS error message and the on-chain revert data
       const msg = err instanceof Error ? err.message : String(err);
-      const hasReasonInMessage = msg.includes(expectedReason);
+      const hasReasonInMessage = msg.includes(matchValue);
       const errorWithData = typeof err === "object" && err !== null ? (err as EthersLikeError) : undefined;
       let errorData = extractRevertData(err);
       if (!errorData && provider && errorWithData) {
         errorData = await extractRevertDataFromCall(provider, errorWithData);
       }
-      const hasReasonInData = errorData.includes(expectedReason);
+      const hasReasonInData = errorData.includes(matchValue);
       expect(
         hasReasonInMessage || hasReasonInData,
-        `${label}: revert reason mismatch — expected "${expectedReason}" in message or data.\nMessage: ${msg.slice(0, 200)}\nData: ${String(errorData).slice(0, 200)}`
+        `${label}: revert reason mismatch — expected ${description} in message or data.\nMessage: ${msg.slice(0, 200)}\nData: ${String(errorData).slice(0, 200)}`
       ).to.be.true;
     }
     return; // reverted as expected

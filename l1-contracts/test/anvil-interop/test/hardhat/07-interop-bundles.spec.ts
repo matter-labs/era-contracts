@@ -32,6 +32,7 @@ import {
   expectNativeSpend,
   expectBalanceDelta,
   expectRevert,
+  customError,
   randomBigNumber,
 } from "../../src/helpers/balance-helpers";
 
@@ -424,7 +425,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     await expectRevert(
       () => simulateExecuteBundle(destProvider, sendResult.bundleData, sourceChainId),
       "replay executeBundle",
-      "0x5bba5111" // BundleAlreadyProcessed(bytes32)
+      customError("InteropHandler", "BundleAlreadyProcessed(bytes32)")
     );
 
     console.log("   [edge] Replay protection verified");
@@ -457,7 +458,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     await expectRevert(
       () => simulateExecuteBundle(destProvider, sendResult.bundleData, sourceChainId),
       "execute from wrong executionAddress",
-      "0xe845be4c" // ExecutingNotAllowed(bytes32,bytes,bytes)
+      customError("InteropHandler", "ExecutingNotAllowed(bytes32,bytes,bytes)")
     );
 
     console.log("   [edge] executionAddress enforcement verified");
@@ -508,7 +509,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
           value: excessValue,
         }),
       "excess msg.value",
-      "0x4a094431" // MsgValueMismatch(uint256,uint256)
+      customError("InteropCenter", "MsgValueMismatch(uint256,uint256)")
     );
 
     console.log("   [edge] Excess msg.value rejected");

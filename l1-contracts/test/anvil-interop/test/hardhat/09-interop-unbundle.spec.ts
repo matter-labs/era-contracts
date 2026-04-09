@@ -41,6 +41,7 @@ import {
   getTokenAddressForAsset,
   expectBalanceDelta,
   expectRevert,
+  customError,
   randomBigNumber,
 } from "../../src/helpers/balance-helpers";
 
@@ -176,7 +177,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses, ANVIL_ACCOUNT2_PRIVATE_KEY),
       "unbundle non-verified bundle",
-      "0xf729f26d" // CanNotUnbundle(bytes32)
+      customError("InteropHandler", "CanNotUnbundle(bytes32)")
     );
   });
 
@@ -208,7 +209,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses),
       "unbundle from wrong address",
-      "0x0345c281" // UnbundlingNotAllowed(bytes32,bytes,bytes)
+      customError("InteropHandler", "UnbundlingNotAllowed(bytes32,bytes,bytes)")
     );
   });
 
@@ -318,7 +319,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses, ANVIL_ACCOUNT2_PRIVATE_KEY),
       "re-execute processed calls",
-      "0xc087b727" // CallNotExecutable(bytes32,uint256)
+      customError("InteropHandler", "CallNotExecutable(bytes32,uint256)")
     );
   });
 
@@ -344,7 +345,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses, ANVIL_ACCOUNT2_PRIVATE_KEY),
       "execute a cancelled call",
-      "0xc087b727" // CallNotExecutable(bytes32,uint256)
+      customError("InteropHandler", "CallNotExecutable(bytes32,uint256)")
     );
   });
 
