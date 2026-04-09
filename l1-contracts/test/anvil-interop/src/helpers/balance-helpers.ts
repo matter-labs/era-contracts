@@ -6,9 +6,10 @@
  */
 
 import { expect } from "chai";
+import type { ContractName } from "../core/contracts";
 import type { providers } from "ethers";
 import { BigNumber, Contract, ethers, Wallet } from "ethers";
-import { getAbi, type ContractName } from "../core/contracts";
+import { getAbi } from "../core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
 
 // ── Balance snapshot utilities ─────────────────────────────────
