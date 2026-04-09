@@ -9,9 +9,17 @@ pragma solidity ^0.8.24;
 /// directly (not SystemContractProxy bytecodes), so the upgrade() call must be
 /// a no-op to preserve the pre-deployed EVM bytecodes at those addresses.
 contract MockSystemContractProxyAdmin {
-    fallback() external payable {
-        // No-op: proxy upgrades are handled via anvil_setCode in the test harness
+    address public owner;
+
+    /// @notice No-op: proxy upgrades are handled via anvil_setCode in the test harness.
+    function upgrade(address, address) external {}
+
+    /// @notice Allow _setupProxyAdmin() to set ownership.
+    function forceSetOwner(address _newOwner) external {
+        owner = _newOwner;
     }
+
+    fallback() external payable {}
 
     receive() external payable {}
 }

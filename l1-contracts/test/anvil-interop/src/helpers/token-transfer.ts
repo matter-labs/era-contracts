@@ -49,8 +49,7 @@ export async function executeTokenTransfer(
   options: ExecuteTokenTransferOptions
 ): Promise<MultiChainTokenTransferResult> {
   const log = options.logger || defaultLogger;
-  const sourceChainId = options.sourceChainId ?? 10;
-  const targetChainId = options.targetChainId ?? 11;
+  const { sourceChainId, targetChainId } = options;
   const amount = options.amount || "10";
 
   const runner = new DeploymentRunner();
