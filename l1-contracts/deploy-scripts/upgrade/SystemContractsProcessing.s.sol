@@ -378,19 +378,97 @@ library SystemContractsProcessing {
     /// @dev Used by ZKsyncOS paths that load their own bytecodes via getZKOSBytecodeInfo.
     function getOtherBuiltinContractsMeta() internal pure returns (BuiltinContractDeployInfo[] memory contracts) {
         contracts = new BuiltinContractDeployInfo[](OTHER_BUILT_IN_CONTRACTS_COUNT);
-        contracts[0] = BuiltinContractDeployInfo(L2_BRIDGEHUB_ADDR, "L2Bridgehub", "", "", ZKsyncOSUpgradeType.SystemProxy);
-        contracts[1] = BuiltinContractDeployInfo(L2_ASSET_ROUTER_ADDR, "L2AssetRouter", "", "", ZKsyncOSUpgradeType.SystemProxy);
-        contracts[2] = BuiltinContractDeployInfo(L2_NATIVE_TOKEN_VAULT_ADDR, "L2NativeTokenVault", "ZKOS", "", ZKsyncOSUpgradeType.SystemProxy);
-        contracts[3] = BuiltinContractDeployInfo(L2_MESSAGE_ROOT_ADDR, "L2MessageRoot", "", "", ZKsyncOSUpgradeType.SystemProxy);
-        contracts[4] = BuiltinContractDeployInfo(L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, "L2WrappedBaseToken", "", "", ZKsyncOSUpgradeType.Unsafe);
-        contracts[5] = BuiltinContractDeployInfo(address(L2_MESSAGE_VERIFICATION), "L2MessageVerification", "", "", ZKsyncOSUpgradeType.SystemProxy);
-        contracts[6] = BuiltinContractDeployInfo(L2_CHAIN_ASSET_HANDLER_ADDR, "L2ChainAssetHandler", "", "", ZKsyncOSUpgradeType.SystemProxy);
-        contracts[7] = BuiltinContractDeployInfo(address(L2_INTEROP_ROOT_STORAGE), "L2InteropRootStorage", "", "", ZKsyncOSUpgradeType.SystemProxy);
-        contracts[8] = BuiltinContractDeployInfo(L2_BASE_TOKEN_HOLDER_ADDR, "BaseTokenHolder", "", "", ZKsyncOSUpgradeType.SystemProxy);
-        contracts[9] = BuiltinContractDeployInfo(L2_ASSET_TRACKER_ADDR, "L2AssetTracker", "", "", ZKsyncOSUpgradeType.SystemProxy);
-        contracts[10] = BuiltinContractDeployInfo(L2_INTEROP_CENTER_ADDR, "InteropCenter", "", "", ZKsyncOSUpgradeType.SystemProxy);
-        contracts[11] = BuiltinContractDeployInfo(L2_INTEROP_HANDLER_ADDR, "InteropHandler", "", "", ZKsyncOSUpgradeType.SystemProxy);
-        contracts[12] = BuiltinContractDeployInfo(GW_ASSET_TRACKER_ADDR, "GWAssetTracker", "", "", ZKsyncOSUpgradeType.Unsafe);
+        contracts[0] = BuiltinContractDeployInfo(
+            L2_BRIDGEHUB_ADDR,
+            "L2Bridgehub",
+            "",
+            "",
+            ZKsyncOSUpgradeType.SystemProxy
+        );
+        contracts[1] = BuiltinContractDeployInfo(
+            L2_ASSET_ROUTER_ADDR,
+            "L2AssetRouter",
+            "",
+            "",
+            ZKsyncOSUpgradeType.SystemProxy
+        );
+        contracts[2] = BuiltinContractDeployInfo(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            "L2NativeTokenVault",
+            "ZKOS",
+            "",
+            ZKsyncOSUpgradeType.SystemProxy
+        );
+        contracts[3] = BuiltinContractDeployInfo(
+            L2_MESSAGE_ROOT_ADDR,
+            "L2MessageRoot",
+            "",
+            "",
+            ZKsyncOSUpgradeType.SystemProxy
+        );
+        contracts[4] = BuiltinContractDeployInfo(
+            L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
+            "L2WrappedBaseToken",
+            "",
+            "",
+            ZKsyncOSUpgradeType.Unsafe
+        );
+        contracts[5] = BuiltinContractDeployInfo(
+            address(L2_MESSAGE_VERIFICATION),
+            "L2MessageVerification",
+            "",
+            "",
+            ZKsyncOSUpgradeType.SystemProxy
+        );
+        contracts[6] = BuiltinContractDeployInfo(
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            "L2ChainAssetHandler",
+            "",
+            "",
+            ZKsyncOSUpgradeType.SystemProxy
+        );
+        contracts[7] = BuiltinContractDeployInfo(
+            address(L2_INTEROP_ROOT_STORAGE),
+            "L2InteropRootStorage",
+            "",
+            "",
+            ZKsyncOSUpgradeType.SystemProxy
+        );
+        contracts[8] = BuiltinContractDeployInfo(
+            L2_BASE_TOKEN_HOLDER_ADDR,
+            "BaseTokenHolder",
+            "",
+            "",
+            ZKsyncOSUpgradeType.SystemProxy
+        );
+        contracts[9] = BuiltinContractDeployInfo(
+            L2_ASSET_TRACKER_ADDR,
+            "L2AssetTracker",
+            "",
+            "",
+            ZKsyncOSUpgradeType.SystemProxy
+        );
+        contracts[10] = BuiltinContractDeployInfo(
+            L2_INTEROP_CENTER_ADDR,
+            "InteropCenter",
+            "",
+            "",
+            ZKsyncOSUpgradeType.SystemProxy
+        );
+        contracts[11] = BuiltinContractDeployInfo(
+            L2_INTEROP_HANDLER_ADDR,
+            "InteropHandler",
+            "",
+            "",
+            ZKsyncOSUpgradeType.SystemProxy
+        );
+        contracts[12] = BuiltinContractDeployInfo(
+            GW_ASSET_TRACKER_ADDR,
+            "GWAssetTracker",
+            "",
+            "",
+            ZKsyncOSUpgradeType.Unsafe
+        );
     }
 
     /// @notice Returns address+bytecode pairs for all "other built-in" contracts.
