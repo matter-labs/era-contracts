@@ -31,6 +31,7 @@ import {BytecodeNames, ContractName, L2GenesisUpgradeTestHelper} from "./L2Genes
 import {ChainCreationParamsConfig} from "deploy-scripts/utils/Types.sol";
 import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
+import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
 
 contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2ContractL2Deployer {
     uint256 constant CHAIN_ID = 270;
@@ -135,11 +136,11 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
         L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(L2_GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata);
     }
     function _readL1(ContractName memory c) internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeL1(c.file, c.name);
+        return BytecodeUtils.readBytecodeL1(false, c.file, c.name);
     }
 
     function _readSC(ContractName memory c) internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeSystemContracts(c.file, c.name);
+        return BytecodeUtils.readZKFoundryBytecodeSystemContracts(c.file, c.name);
     }
 
     function _hashL1(ContractName memory c) internal view returns (bytes memory) {

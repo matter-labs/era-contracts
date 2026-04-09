@@ -12,19 +12,16 @@ import {stdToml} from "forge-std/StdToml.sol";
 // solhint-disable no-unused-import
 import {WETH9} from "contracts/dev-contracts/WETH9.sol";
 
-import {Utils} from "../utils/Utils.sol";
 import {MintFailed} from "../utils/ZkSyncScriptErrors.sol";
-import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
+import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 
-contract DeployErc20Script is Script {
+contract DeployErc20Script is Create2FactoryUtils {
     using stdToml for string;
 
     struct Config {
         TokenDescription[] tokens;
         address deployerAddress;
         address[] additionalAddressesForMinting;
-        address create2FactoryAddr;
-        bytes32 create2FactorySalt;
     }
 
     struct TokenDescription {
@@ -59,11 +56,6 @@ contract DeployErc20Script is Script {
         config.deployerAddress = msg.sender;
 
         string memory root = vm.projectRoot();
-
-        // Read create2 factory values from permanent values file
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(vm);
-        config.create2FactoryAddr = create2FactoryAddr;
-        config.create2FactorySalt = create2FactorySalt;
 
         // Grab config from custom config file
         string memory path = string.concat(root, vm.envString("TOKENS_CONFIG"));
@@ -161,10 +153,6 @@ contract DeployErc20Script is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-erc20.toml");
         vm.writeToml(toml, path);
-    }
-
-    function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
-        return Utils.deployViaCreate2(_bytecode, config.create2FactorySalt, config.create2FactoryAddr);
     }
 
     // add this to be excluded from coverage report

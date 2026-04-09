@@ -13,7 +13,10 @@ import {
     GatewayTransactionFilterer,
     MIN_ALLOWED_ADDRESS
 } from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {
+    L2_ASSET_ROUTER_ADDR,
+    ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
@@ -286,6 +289,7 @@ contract GatewayTransactionFiltererAdditionalTest is MigrationTestBase {
     function testFuzz_isTransactionAllowed_highAddressAlwaysAllowed(address contractL2) public view {
         vm.assume(uint160(contractL2) > uint160(MIN_ALLOWED_ADDRESS));
         vm.assume(contractL2 != L2_ASSET_ROUTER_ADDR); // Skip the special case
+        vm.assume(contractL2 != ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR); // Dangerous contract — restricted
         bytes memory txCalldata = hex"12345678";
 
         bool isAllowed = transactionFiltererProxy.isTransactionAllowed(
