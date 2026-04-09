@@ -43,15 +43,13 @@ export function loadBytecodeFromOut(artifactRelativePath: string): string {
   return artifact.deployedBytecode?.object || artifact.bytecode?.object || "0x";
 }
 
-/** Load creation (init) bytecode — needed for ContractFactory.deploy(). */
+/**
+ * Load creation (init) bytecode — needed for ContractFactory.deploy().
+ *
+ * Deployment bytecode always comes from forge build output in out/.
+ * zkstack-out intentionally stores ABI-oriented artifacts only.
+ */
 export function loadCreationBytecodeFromOut(artifactRelativePath: string): string {
-  const zkstackPath = path.join(ZKSTACK_OUT_ROOT, artifactRelativePath);
-  if (fs.existsSync(zkstackPath)) {
-    const content = JSON.parse(fs.readFileSync(zkstackPath, "utf-8"));
-    if (!Array.isArray(content) && content.bytecode) {
-      return content.bytecode.object || "0x";
-    }
-  }
   const artifact = loadArtifactFromOut(artifactRelativePath);
   return artifact.bytecode?.object || "0x";
 }

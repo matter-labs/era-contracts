@@ -77,10 +77,6 @@ const REQUIRED_CONTRACTS = [
   "BaseTokenHolder.sol",
 ];
 
-// Some Anvil interop tests deploy contracts from committed zkstack-out artifacts,
-// so these entries must keep forge bytecode instead of being reduced to ABI-only JSON.
-const FULL_ARTIFACT_CONTRACTS = new Set(["DummyInteropRecipient.sol"]);
-
 async function copyContractAbi(src: string, dest: string): Promise<void> {
   await fs.mkdir(dest, { recursive: true });
   const entries = await fs.readdir(src, { withFileTypes: true });
@@ -92,13 +88,11 @@ async function copyContractAbi(src: string, dest: string): Promise<void> {
     if (entry.isDirectory()) {
       await copyContractAbi(srcPath, destPath);
     } else if (entry.name.endsWith(".json")) {
-      // Read the JSON file and either keep the full artifact or reduce to ABI-only JSON.
+      // Read the JSON file and reduce it to ABI-only JSON.
       const content = await fs.readFile(srcPath, "utf-8");
       const json = JSON.parse(content);
 
-      if (FULL_ARTIFACT_CONTRACTS.has(path.basename(src))) {
-        await fs.writeFile(destPath, JSON.stringify(json, null, 2));
-      } else if (json.abi) {
+      if (json.abi) {
         await fs.writeFile(destPath, JSON.stringify(json.abi, null, 2));
       } else {
         console.warn(`Warning: No ABI found in ${srcPath}`);
