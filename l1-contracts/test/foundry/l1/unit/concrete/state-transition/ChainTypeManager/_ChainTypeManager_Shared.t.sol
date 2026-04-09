@@ -84,6 +84,10 @@ contract ChainTypeManagerTest is MigrationTestBase {
 
     Diamond.FacetCut[] internal facetCuts;
 
+    function setUp() public virtual override {
+        _deployIntegrationBase();
+    }
+
     function deploy() public {
         // If the integration base was initialized (super.setUp() was called), use real ecosystem.
         // Otherwise fall back to creating a fresh local ecosystem (for tests like PermanentRestriction
@@ -282,7 +286,8 @@ contract ChainTypeManagerTest is MigrationTestBase {
     }
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
-        // No mocks needed for sharedBridge/l1Nullifier — real contracts are deployed
+        // baseToken is a makeAddr — mock bridgehub.baseToken() and ERC20 metadata.
+        // Real bridgehub provides assetRouter/NTV/assetTracker — no mockDiamondInitInteropCenterCalls needed.
         vm.mockCall(
             address(bridgehub),
             abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
@@ -291,8 +296,6 @@ contract ChainTypeManagerTest is MigrationTestBase {
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
-
-        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
 
         vm.prank(address(bridgehub));
         return
@@ -330,13 +333,9 @@ contract ChainTypeManagerTest is MigrationTestBase {
     }
 
     function _mockMigrationPausedFromBridgehub() internal {
-        address mockChainAssetHandler = makeAddr("mockChainAssetHandler");
-        vm.mockCall(
-            address(bridgehub),
-            abi.encodeWithSignature("chainAssetHandler()"),
-            abi.encode(mockChainAssetHandler)
-        );
-        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
+        // Mock migrationPaused() on the real chain asset handler (test-specific: force paused state)
+        address realChainAssetHandler = address(chainAssetHandler);
+        vm.mockCall(realChainAssetHandler, abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
     }
 
     function _getAllZKChainIDs() internal view returns (uint256[] memory chainIDs) {
