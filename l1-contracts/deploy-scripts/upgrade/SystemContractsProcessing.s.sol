@@ -512,9 +512,7 @@ library SystemContractsProcessing {
     ) internal returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
         CoreContract[] memory ids = getOtherBuiltinCoreContracts();
 
-        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](
-            ids.length + _additionalDeployments.length
-        );
+        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](ids.length + _additionalDeployments.length);
 
         for (uint256 i = 0; i < ids.length; i++) {
             address addr = CoreOnGatewayHelper._resolveAddress(ids[i]);
