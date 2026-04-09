@@ -233,13 +233,7 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
     }
 
     function test_forwardedBridgeMint_RevertWhen_ExecutedIsNotConsistentWithVerified() public {
-        address ctm = utilsFacet.util_getChainTypeManager();
         uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
-        vm.mockCall(
-            ctm,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
-            abi.encode(currentProtocolVersion)
-        );
 
         PriorityTreeCommitment memory priorityTreeCommitment = PriorityTreeCommitment({
             nextLeafIndex: 0,
@@ -269,13 +263,7 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
     }
 
     function test_forwardedBridgeMint_RevertWhen_VerifiedIsNotConsistentWithCommitted() public {
-        address ctm = utilsFacet.util_getChainTypeManager();
         uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
-        vm.mockCall(
-            ctm,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
-            abi.encode(currentProtocolVersion)
-        );
 
         PriorityTreeCommitment memory priorityTreeCommitment = PriorityTreeCommitment({
             nextLeafIndex: 0,
@@ -305,13 +293,7 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
     }
 
     function test_forwardedBridgeMint_RevertWhen_InvalidNumberOfBatchHashes() public {
-        address ctm = utilsFacet.util_getChainTypeManager();
         uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
-        vm.mockCall(
-            ctm,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
-            abi.encode(currentProtocolVersion)
-        );
 
         PriorityTreeCommitment memory priorityTreeCommitment = PriorityTreeCommitment({
             nextLeafIndex: 0,
@@ -392,13 +374,7 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
 
     function test_forwardedBridgeMint_RevertWhen_NotHistoricalRoot_OnL1() public {
         // Setup: on L1, check historical root validation
-        address ctm = utilsFacet.util_getChainTypeManager();
         uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
-        vm.mockCall(
-            ctm,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
-            abi.encode(currentProtocolVersion)
-        );
 
         // Create a priority tree commitment with a side that's NOT a historical root
         bytes32[] memory sides = new bytes32[](1);
@@ -434,13 +410,7 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
 
     function test_forwardedBridgeMint_RevertWhen_NotMigrated_OnL1_ContractAlreadyDeployed() public {
         // Setup: on L1, with _contractAlreadyDeployed=true but settlementLayer=address(0)
-        address ctm = utilsFacet.util_getChainTypeManager();
         uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
-        vm.mockCall(
-            ctm,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
-            abi.encode(currentProtocolVersion)
-        );
 
         // Ensure settlement layer is address(0) (default)
         assertEq(utilsFacet.util_getSettlementLayer(), address(0));
@@ -498,13 +468,7 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
         uint256 gatewayChainId = 505;
         vm.chainId(gatewayChainId);
 
-        address ctm = utilsFacet.util_getChainTypeManager();
         uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
-        vm.mockCall(
-            ctm,
-            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
-            abi.encode(currentProtocolVersion)
-        );
 
         // Ensure settlement layer is address(0) (not migrated)
         assertEq(utilsFacet.util_getSettlementLayer(), address(0));
