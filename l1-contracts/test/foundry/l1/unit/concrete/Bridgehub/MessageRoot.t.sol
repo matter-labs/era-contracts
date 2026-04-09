@@ -42,35 +42,28 @@ contract MessageRootTest is MigrationTestBase {
     address assetTracker;
 
     function setUp() public virtual override {
-        super.setUp();
+        // Deploy real ecosystem — real bridgehub answers all queries, no setUp mocks needed
+        _deployIntegrationBase();
 
-        bridgeHub = makeAddr("bridgeHub");
-        uint256[] memory allZKChainChainIDsZero = new uint256[](0);
+        bridgeHub = address(addresses.bridgehub);
+        assetTracker = makeAddr("assetTracker");
+        L1_CHAIN_ID = 5;
+        gatewayChainId = 506;
+        address chainAssetHandler = addresses.bridgehub.chainAssetHandler();
+
+        // L1MessageRoot rejects construction when bridgehub has registered chains.
+        // Mock getAllZKChainChainIDs → empty during construction only.
         vm.mockCall(
             bridgeHub,
             abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
-            abi.encode(allZKChainChainIDsZero)
-        );
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(makeAddr("chainAssetHandler"))
+            abi.encode(new uint256[](0))
         );
 
-        assetTracker = makeAddr("assetTracker");
-        bridgeHub = makeAddr("bridgeHub");
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(makeAddr("chainAssetHandler"))
-        );
-        L1_CHAIN_ID = 5;
-        gatewayChainId = 506;
-        address chainAssetHandler = makeAddr("chainAssetHandler");
+        // Fresh MessageRoot (contract under test) with REAL bridgehub dependency
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1, chainAssetHandler)),
+                    address(new L1MessageRoot(bridgeHub, block.chainid, chainAssetHandler)),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )
@@ -78,23 +71,11 @@ contract MessageRootTest is MigrationTestBase {
         );
         l2MessageRoot = new L2MessageRoot();
 
-        uint256[] memory allZKChainChainIDs = new uint256[](1);
-        allZKChainChainIDs[0] = 271;
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
-            abi.encode(allZKChainChainIDs)
-        );
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector),
-            abi.encode(makeAddr("chainTypeManager"))
-        );
+        // Real bridgehub answers chainAssetHandler(), chainTypeManager(),
+        // settlementLayer(), owner() — no mocks needed for those.
 
-        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector), abi.encode(0));
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);
-        vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
     }
 
     function test_init() public {
@@ -107,19 +88,15 @@ contract MessageRootTest is MigrationTestBase {
 
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 1");
 
-        address chainAssetHandler = makeAddr("chainAssetHandler");
+        // The MessageRoot was constructed with the real chainAssetHandler from integration
+        address realChainAssetHandler = addresses.bridgehub.chainAssetHandler();
         vm.expectRevert(
             abi.encodeWithSelector(
                 OnlyBridgehubOrChainAssetHandler.selector,
                 address(this),
                 bridgeHub,
-                chainAssetHandler
+                realChainAssetHandler
             )
-        );
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(chainAssetHandler)
         );
         messageRoot.addNewChain(alphaChainId, 0);
 
