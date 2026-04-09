@@ -112,8 +112,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(0));
         }
 
-        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
-
+        // Real bridgehub provides assetRouter/NTV/assetTracker — no interop center mocks needed.
         newChainAddress = createNewChain(getDiamondCutData(diamondInit));
         vm.mockCall(
             address(bridgehub),
