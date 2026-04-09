@@ -458,11 +458,6 @@ library L2GenesisForceDeploymentsHelper {
 
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
 
-        // Initialize L2BaseToken: sets L1_CHAIN_ID and initializes the BaseTokenHolder balance.
-        // For Era: reads __DEPRECATED_totalSupply and computes holder balance.
-        // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder.
-        IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
-
         // Register the base token in the AssetTracker.
         // During genesis, NTV.registerBaseTokenIfNeeded() handles it.
         // During upgrades, AssetTracker.registerBaseTokenDuringUpgrade() handles it.
@@ -471,6 +466,11 @@ library L2GenesisForceDeploymentsHelper {
         } else {
             IL2AssetTracker(L2_ASSET_TRACKER_ADDR).registerBaseTokenDuringUpgrade();
         }
+
+        // Initialize L2BaseToken: sets L1_CHAIN_ID and initializes the BaseTokenHolder balance.
+        // For Era: reads __DEPRECATED_totalSupply and computes holder balance.
+        // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder.
+        IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
     }
 
     /// @notice Constructs the initialization calldata for the L2WrappedBaseToken.

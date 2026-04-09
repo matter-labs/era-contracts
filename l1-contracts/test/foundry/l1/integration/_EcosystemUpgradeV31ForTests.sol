@@ -60,7 +60,9 @@ contract EcosystemUpgradeV31ForTests is EcosystemUpgrade_v31 {
         address bridgehubProxy = pvToml.readAddress("$.core_contracts.bridgehub_proxy_addr");
         address ctmProxy = pvToml.readAddress("$.ctm_contracts.ctm_proxy_addr");
         address bytecodesSupplier = pvToml.readAddress("$.ctm_contracts.l1_bytecodes_supplier_addr");
-        address rollupDAManager = pvToml.readAddress("$.ctm_contracts.rollup_da_manager");
+        address rollupDAManager = pvToml.keyExists("$.ctm_contracts.rollup_da_manager")
+            ? pvToml.readAddress("$.ctm_contracts.rollup_da_manager")
+            : address(0);
         bool isZKsyncOS = pvToml.readBool("$.is_zk_sync_os");
         bytes32 create2FactorySalt = pvToml.readBytes32("$.permanent_contracts.create2_factory_salt");
 
