@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {L2AssetTracker} from "../bridge/asset-tracker/L2AssetTracker.sol";
-import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
-import {IL2BaseTokenBase} from "../l2-system/interfaces/IL2BaseTokenBase.sol";
 import {V31AcrossRecovery} from "./V31AcrossRecovery.sol";
 import {IL2V31Upgrade} from "../upgrades/IL2V31Upgrade.sol";
 import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper.sol";
+import {
+    FixedForceDeploymentsData,
+    ZKChainSpecificForceDeploymentsData
+} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
@@ -36,14 +36,19 @@ contract L2V31Upgrade is V31AcrossRecovery, IL2V31Upgrade {
             false // isGenesisUpgrade
         );
 
-        // V31-specific: register base token in the new AssetTracker.
-        IL2AssetTracker(L2_ASSET_TRACKER_ADDR).registerBaseTokenDuringUpgrade();
-
-        // V31-specific: initialize BaseToken (sets L1_CHAIN_ID and BaseTokenHolder balance).
-        // This is normally only called during genesis, but for v31 we need it for existing
-        // chains because L2BaseToken is a new contract.
-        IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(
-            L2AssetTracker(L2_ASSET_TRACKER_ADDR).L1_CHAIN_ID()
+        // V31-specific: initialize contracts that are new in v31
+        // (AssetTracker, GWAssetTracker, InteropHandler, L2BaseToken, base token registration).
+        FixedForceDeploymentsData memory fixedData = abi.decode(_fixedForceDeploymentsData, (FixedForceDeploymentsData));
+        ZKChainSpecificForceDeploymentsData memory additionalData = abi.decode(
+            _additionalForceDeploymentsData,
+            (ZKChainSpecificForceDeploymentsData)
+        );
+        // solhint-disable-next-line func-named-parameters
+        L2GenesisForceDeploymentsHelper.initializeV31Contracts(
+            _isZKsyncOS,
+            false, // isGenesisUpgrade
+            fixedData,
+            additionalData
         );
     }
 }
