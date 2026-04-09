@@ -481,14 +481,14 @@ async fn run_finalize(args: FinalizeArgs) -> anyhow::Result<()> {
         sa.add_arg(ForgeScriptArg::Broadcast);
         sa.add_arg(ForgeScriptArg::Ffi);
         sa.additional_args.extend([
-            format!("{:#x}", args.bridgehub), // bridgehub
-            args.l1_gas_price.to_string(),                  // l1GasPrice
-            args.chain_id.to_string(),                      // l2ChainId
-            args.gateway_chain_id.to_string(),              // gatewayChainId
-            format!("{:#x}", validator),                    // validatorAddress
-            format!("{:#x}", gw_validator_timelock),        // gatewayValidatorTimelock
-            format!("{:#x}", sender.address),               // refundRecipient
-            "true".to_string(),                             // _shouldSend
+            format!("{:#x}", args.bridgehub),        // bridgehub
+            args.l1_gas_price.to_string(),           // l1GasPrice
+            args.chain_id.to_string(),               // l2ChainId
+            args.gateway_chain_id.to_string(),       // gatewayChainId
+            format!("{:#x}", validator),             // validatorAddress
+            format!("{:#x}", gw_validator_timelock), // gatewayValidatorTimelock
+            format!("{:#x}", sender.address),        // refundRecipient
+            "true".to_string(),                      // _shouldSend
         ]);
         let script = Forge::new(&contracts_path)
             .script(Path::new("deploy-scripts/AdminFunctions.s.sol"), sa)

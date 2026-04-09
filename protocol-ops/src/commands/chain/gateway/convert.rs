@@ -449,10 +449,7 @@ validator_timelock_execution_delay = 0
         .with_wallet(&sender, runner.simulate);
 
     logger::step("Running gateway vote preparation");
-    logger::info(format!(
-        "Bridgehub: {:#x}",
-        args.common.bridgehub
-    ));
+    logger::info(format!("Bridgehub: {:#x}", args.common.bridgehub));
     logger::info(format!(
         "CTM representative chain ID: {}",
         args.ctm_representative_chain_id

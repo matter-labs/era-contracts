@@ -140,9 +140,9 @@ async fn run_no_governance_prepare(
         anyhow::bail!("Script not found: {}", script_full_path.display());
     }
 
-    let bridgehub = args.bridgehub.ok_or_else(|| {
-        anyhow::anyhow!("--bridgehub is required for no-governance-prepare")
-    })?;
+    let bridgehub = args
+        .bridgehub
+        .ok_or_else(|| anyhow::anyhow!("--bridgehub is required for no-governance-prepare"))?;
     let ctm = args.ctm_proxy_address.ok_or_else(|| {
         anyhow::anyhow!("--ctm-proxy-address is required for no-governance-prepare")
     })?;
