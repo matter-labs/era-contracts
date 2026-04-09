@@ -24,6 +24,7 @@ import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 // solhint-disable no-console, gas-custom-errors
 
@@ -507,11 +508,12 @@ library SystemContractsProcessing {
 
     /// @notice Build the full ZKsyncOS force deployment array.
     /// Parallel to `getBaseForceDeployments()` for Era — this is the ZKsyncOS equivalent.
-    /// Loops over `getOtherBuiltinContractsMeta()` (same source of truth as Era) and converts
-    /// each entry to a `UniversalContractUpgradeInfo` based on its `zkosUpgradeType`.
-    /// Uses the metadata-only variant to avoid loading Era (zkout) bytecodes.
+    /// Reuses bytecodeInfo from the already-generated FixedForceDeploymentsData where possible
+    /// to avoid loading large bytecodes from disk twice (OOM prevention).
+    /// @param _fixedData The already-encoded FixedForceDeploymentsData containing bytecodeInfo.
     /// @param _additionalDeployments Version-specific entries to append (e.g. L2V31Upgrade).
     function buildZKsyncOSForceDeployments(
+        FixedForceDeploymentsData memory _fixedData,
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _additionalDeployments
     ) internal returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
         BuiltinContractDeployInfo[] memory contracts = getOtherBuiltinContractsMeta();
@@ -521,13 +523,20 @@ library SystemContractsProcessing {
         );
 
         for (uint256 i = 0; i < contracts.length; i++) {
-            string memory contractName = string(abi.encodePacked(contracts[i].codeName, contracts[i].zksyncOsSuffix));
-            string memory fileName = string(abi.encodePacked(contractName, ".sol"));
-            bytes memory bytecodeInfo;
-            if (contracts[i].zkosUpgradeType == ZKsyncOSUpgradeType.SystemProxy) {
-                bytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
-            } else {
-                bytecodeInfo = Utils.getZKOSBytecodeInfoForContract(fileName, contractName);
+            // Try to reuse bytecodeInfo from FixedForceDeploymentsData to avoid double-loading.
+            bytes memory bytecodeInfo = _getFixedBytecodeInfo(_fixedData, contracts[i].addr);
+
+            if (bytecodeInfo.length == 0) {
+                // Not in FixedForceDeploymentsData — load from disk.
+                string memory contractName = string(
+                    abi.encodePacked(contracts[i].codeName, contracts[i].zksyncOsSuffix)
+                );
+                string memory fileName = string(abi.encodePacked(contractName, ".sol"));
+                if (contracts[i].zkosUpgradeType == ZKsyncOSUpgradeType.SystemProxy) {
+                    bytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
+                } else {
+                    bytecodeInfo = Utils.getZKOSBytecodeInfoForContract(fileName, contractName);
+                }
             }
 
             IComplexUpgrader.ContractUpgradeType upgradeType = contracts[i].zkosUpgradeType ==
@@ -546,5 +555,23 @@ library SystemContractsProcessing {
         for (uint256 i = 0; i < _additionalDeployments.length; i++) {
             deployments[contracts.length + i] = _additionalDeployments[i];
         }
+    }
+
+    /// @dev Map a contract address to its bytecodeInfo field in FixedForceDeploymentsData.
+    /// Returns empty bytes if the contract doesn't have a corresponding field.
+    function _getFixedBytecodeInfo(
+        FixedForceDeploymentsData memory _data,
+        address _addr
+    ) private pure returns (bytes memory) {
+        if (_addr == L2_BRIDGEHUB_ADDR) return _data.bridgehubBytecodeInfo;
+        if (_addr == L2_ASSET_ROUTER_ADDR) return _data.l2AssetRouterBytecodeInfo;
+        if (_addr == L2_NATIVE_TOKEN_VAULT_ADDR) return _data.l2NtvBytecodeInfo;
+        if (_addr == L2_MESSAGE_ROOT_ADDR) return _data.messageRootBytecodeInfo;
+        if (_addr == L2_CHAIN_ASSET_HANDLER_ADDR) return _data.chainAssetHandlerBytecodeInfo;
+        if (_addr == L2_INTEROP_CENTER_ADDR) return _data.interopCenterBytecodeInfo;
+        if (_addr == L2_INTEROP_HANDLER_ADDR) return _data.interopHandlerBytecodeInfo;
+        if (_addr == L2_ASSET_TRACKER_ADDR) return _data.assetTrackerBytecodeInfo;
+        if (_addr == L2_BASE_TOKEN_HOLDER_ADDR) return _data.baseTokenHolderBytecodeInfo;
+        return "";
     }
 }

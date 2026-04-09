@@ -399,6 +399,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
 
+    function getFixedForceDeploymentsData() internal override returns (FixedForceDeploymentsData memory) {
+        return abi.decode(newlyGeneratedData.fixedForceDeploymentsData, (FixedForceDeploymentsData));
+    }
+
     function prepareFixedForceDeploymentsData() public virtual returns (FixedForceDeploymentsData memory data) {
         require(config.ownerAddress != address(0), "owner not set");
 

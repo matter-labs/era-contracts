@@ -26,6 +26,7 @@ import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {PublishFactoryDepsResult} from "../default-upgrade/CTMUpgradeBase.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 
@@ -160,7 +161,8 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // Prepare bytecode info for getL2UpgradeTargetAndData (used in composeUpgradeTx).
         l2V31UpgradeBytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo("L2V31Upgrade.sol", "L2V31Upgrade");
         // ZKsyncOS uses UniversalContractUpgradeInfo[] built from buildZKsyncOSForceDeployments().
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = buildZKsyncOSForceDeployments();
+        FixedForceDeploymentsData memory fixedData = getFixedForceDeploymentsData();
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = buildZKsyncOSForceDeployments(fixedData);
 
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: composeUpgradeTx(deployments, _factoryDepsResult, protocolUpgradeNonce),

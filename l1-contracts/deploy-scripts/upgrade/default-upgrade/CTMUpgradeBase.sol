@@ -217,7 +217,8 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments;
 
         if (config.isZKsyncOS) {
-            deployments = buildZKsyncOSForceDeployments();
+            FixedForceDeploymentsData memory fixedData = getFixedForceDeploymentsData();
+            deployments = buildZKsyncOSForceDeployments(fixedData);
         } else {
             IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
                 .getBaseForceDeployments(l1ChainId, ownerAddress);
@@ -316,9 +317,20 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     }
 
     /// @notice Build the full ZKsyncOS force deployment array: base builtins + version-specific entries.
-    function buildZKsyncOSForceDeployments() internal returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory) {
-        return SystemContractsProcessing.buildZKsyncOSForceDeployments(getAdditionalZKsyncOSForceDeployments());
+    /// @param _fixedData Already-loaded FixedForceDeploymentsData to reuse bytecodeInfo (avoids OOM).
+    function buildZKsyncOSForceDeployments(
+        FixedForceDeploymentsData memory _fixedData
+    ) internal returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory) {
+        return
+            SystemContractsProcessing.buildZKsyncOSForceDeployments(
+                _fixedData,
+                getAdditionalZKsyncOSForceDeployments()
+            );
     }
+
+    /// @notice Returns the FixedForceDeploymentsData for bytecodeInfo reuse.
+    /// @dev Override in DefaultCTMUpgrade to return cached data (avoids double-loading).
+    function getFixedForceDeploymentsData() internal virtual returns (FixedForceDeploymentsData memory);
 
     /// @notice Override to provide version-specific ZKsyncOS force deployment entries.
     function getAdditionalZKsyncOSForceDeployments()

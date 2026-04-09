@@ -40,6 +40,7 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 
@@ -100,6 +101,12 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
     // TODO We need for composing upgrade transaction. but seems we don't need an upgrade transaction on gateway
     PublishFactoryDepsResult internal factoryDepsResult;
+
+    /// @dev Gateway upgrades don't cache FixedForceDeploymentsData — returns empty so
+    /// buildZKsyncOSForceDeployments falls through to loading from disk.
+    function getFixedForceDeploymentsData() internal virtual override returns (FixedForceDeploymentsData memory) {
+        // Return empty struct — buildZKsyncOSForceDeployments will load bytecodes from disk.
+    }
 
     EcosystemUpgradeConfig internal upgradeConfig;
 

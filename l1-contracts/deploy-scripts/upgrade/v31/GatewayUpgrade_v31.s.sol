@@ -28,6 +28,7 @@ import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 import {Utils} from "../../utils/Utils.sol";
 import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
 import {PublishFactoryDepsResult} from "../default-upgrade/CTMUpgradeBase.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.sol";
 
@@ -67,7 +68,8 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
 
         // For ZKsyncOS, prepare bytecode info before composeUpgradeTx calls getL2UpgradeTargetAndData.
         l2V29UpgradeBytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo("L2V29Upgrade.sol", "L2V29Upgrade");
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = buildZKsyncOSForceDeployments();
+        FixedForceDeploymentsData memory fixedData = getFixedForceDeploymentsData();
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = buildZKsyncOSForceDeployments(fixedData);
 
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: composeUpgradeTx(deployments, _factoryDepsResult, protocolUpgradeNonce),
