@@ -7,6 +7,7 @@ import {
   ANVIL_DEFAULT_ACCOUNT_ADDR,
   ANVIL_RECIPIENT_ADDR,
   ANVIL_ACCOUNT2_ADDR,
+  INTEROP_CENTER_ADDR,
   L2_ASSET_ROUTER_ADDR,
 } from "../../src/core/const";
 import { encodeEvmAddress } from "../../src/helpers/erc7930";
@@ -18,8 +19,12 @@ import {
   interopCallValueAttr,
   indirectCallAttr,
   executionAddressAttr,
+  useFixedFeeAttr,
   getTokenTransferData,
   getInteropProtocolFee,
+  getAccumulatedZkFees,
+  getZkInteropFee,
+  getZkTokenAddress,
   deployDummyInteropRecipient,
 } from "../../src/helpers/interop-helpers";
 import type { CallStarter } from "../../src/helpers/interop-helpers";
@@ -28,6 +33,7 @@ import {
   getNativeBalance,
   getTokenBalance,
   getTokenAddressForAsset,
+  approveToken,
   approveTokenForNtv,
   expectNativeSpend,
   expectBalanceDelta,
@@ -68,9 +74,11 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   // Token-related values resolved per-chain
   let sourceTokenAddress: string;
   let sourceAssetId: string;
+  let sourceZkTokenAddress: string;
 
   // Interop protocol fee (per call)
   let interopFee: BigNumber;
+  let zkInteropFee: BigNumber;
 
   // DummyInteropRecipient contracts on destination chain (required for direct calls)
   let dummyRecipient1: string;
@@ -78,7 +86,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
   before(async () => {
     state = runner.loadState();
-    if (!state.chains || !state.l1Addresses || !state.chainAddresses || !state.testTokens) {
+    if (!state.chains || !state.l1Addresses || !state.chainAddresses || !state.testTokens || !state.zkToken) {
       throw new Error("Deployment state incomplete. Run setup first.");
     }
 
@@ -100,7 +108,17 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
     // Query the per-call interop protocol fee
     interopFee = await getInteropProtocolFee(sourceProvider);
+    zkInteropFee = await getZkInteropFee(sourceProvider);
     console.log(`   Interop protocol fee: ${interopFee.toString()}`);
+    console.log(`   Fixed ZK interop fee: ${zkInteropFee.toString()}`);
+
+    sourceZkTokenAddress = await getTokenAddressForAsset(sourceProvider, state.zkToken.assetId);
+    expect(sourceZkTokenAddress, "wrapped ZK token should be bridged to the source chain").to.not.equal(
+      ethers.constants.AddressZero
+    );
+    expect(await getZkTokenAddress(sourceProvider), "InteropCenter should resolve the seeded ZK token").to.equal(
+      sourceZkTokenAddress
+    );
 
     // Deploy DummyInteropRecipient contracts on destination chain for direct-call tests
     dummyRecipient1 = await deployDummyInteropRecipient(destProvider);
@@ -153,6 +171,47 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     expectBalanceDelta(recipientBefore, recipientAfter, amount, "single direct call: recipient native");
 
     console.log("   [receive] Single direct call bundle executed");
+  });
+
+  it("can send and execute a single direct call bundle with fixed ZK fees", async () => {
+    const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
+    const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR), useFixedFeeAttr(true)];
+    const callStarters: CallStarter[] = [
+      {
+        to: encodeEvmAddress(dummyRecipient1),
+        data: "0x",
+        callAttributes: [interopCallValueAttr(amount)],
+      },
+    ];
+
+    await approveToken(sourceProvider, sourceZkTokenAddress, INTEROP_CENTER_ADDR, zkInteropFee);
+
+    const balBefore = await captureBalance(sourceProvider, sourceZkTokenAddress);
+    const sendResult = await sendInteropBundle({
+      sourceProvider,
+      destinationChainId: destChainId,
+      callStarters,
+      bundleAttributes,
+      value: amount,
+    });
+    const balAfter = await captureBalance(sourceProvider, sourceZkTokenAddress);
+
+    expectNativeSpend(balBefore, balAfter, amount, sendResult.receipt, "single direct call fixed fee");
+    expect(
+      balAfter.token!.eq(balBefore.token!.sub(zkInteropFee)),
+      "single direct call fixed fee: sender ZK token should decrease by the fixed fee"
+    ).to.be.true;
+
+    const minedBlock = await sourceProvider.getBlock(sendResult.receipt.blockNumber);
+    const accumulatedZkFees = await getAccumulatedZkFees(sourceProvider, minedBlock.miner);
+    expect(accumulatedZkFees.gte(zkInteropFee), "coinbase should accumulate the fixed ZK fee").to.be.true;
+
+    const recipientBefore = await getNativeBalance(destProvider, dummyRecipient1);
+    const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
+    expect(receipt.status, "single direct call fixed fee: executeBundle tx should succeed").to.equal(1);
+
+    const recipientAfter = await getNativeBalance(destProvider, dummyRecipient1);
+    expectBalanceDelta(recipientBefore, recipientAfter, amount, "single direct call fixed fee: recipient native");
   });
 
   it("can send and execute a single indirect call bundle", async () => {

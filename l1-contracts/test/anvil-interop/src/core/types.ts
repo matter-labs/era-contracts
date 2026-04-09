@@ -119,6 +119,10 @@ export interface DeploymentState {
   testTokens?: Record<number, string>;
   /** L1 address of the custom ERC20 base token, keyed by chain ID. */
   customBaseTokens?: Record<number, string>;
+  zkToken?: {
+    l1Address: string;
+    assetId: string;
+  };
 }
 
 export interface MultiChainTokenTransferParams {

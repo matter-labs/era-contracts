@@ -63,6 +63,21 @@ export async function getTokenBalance(
 }
 
 /**
+ * Approve an ERC20 spender.
+ */
+export async function approveToken(
+  provider: providers.JsonRpcProvider,
+  tokenAddress: string,
+  spender: string,
+  amount: BigNumber
+): Promise<void> {
+  const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
+  const erc20 = new Contract(tokenAddress, getAbi("TestnetERC20Token"), wallet);
+  const approveTx = await erc20.approve(spender, amount);
+  await approveTx.wait();
+}
+
+/**
  * Approve L2NativeTokenVault to spend tokens.
  */
 export async function approveTokenForNtv(
@@ -70,10 +85,7 @@ export async function approveTokenForNtv(
   tokenAddress: string,
   amount: BigNumber
 ): Promise<void> {
-  const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
-  const erc20 = new Contract(tokenAddress, getAbi("TestnetERC20Token"), wallet);
-  const approveTx = await erc20.approve(L2_NATIVE_TOKEN_VAULT_ADDR, amount);
-  await approveTx.wait();
+  await approveToken(provider, tokenAddress, L2_NATIVE_TOKEN_VAULT_ADDR, amount);
 }
 
 /**

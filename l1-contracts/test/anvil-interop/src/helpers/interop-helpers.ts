@@ -50,6 +50,11 @@ export function unbundlerAddressAttr(address: string): string {
   return erc7786Iface.encodeFunctionData("unbundlerAddress", [encodeEvmAddress(address)]);
 }
 
+/** Encode a useFixedFee bundle attribute. */
+export function useFixedFeeAttr(useFixedFee: boolean): string {
+  return erc7786Iface.encodeFunctionData("useFixedFee", [useFixedFee]);
+}
+
 // ── Token transfer data encoding ───────────────────────────────
 
 /**
@@ -317,6 +322,30 @@ export async function getCallStatus(
 export async function getInteropProtocolFee(provider: providers.JsonRpcProvider): Promise<BigNumber> {
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
   return interopCenter.interopProtocolFee();
+}
+
+/**
+ * Get the fixed ZK interop fee from InteropCenter.
+ */
+export async function getZkInteropFee(provider: providers.JsonRpcProvider): Promise<BigNumber> {
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  return interopCenter.ZK_INTEROP_FEE();
+}
+
+/**
+ * Get the resolved ZK token address from InteropCenter.
+ */
+export async function getZkTokenAddress(provider: providers.JsonRpcProvider): Promise<string> {
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  return interopCenter.getZKTokenAddress();
+}
+
+/**
+ * Get accumulated ZK fees for a coinbase address.
+ */
+export async function getAccumulatedZkFees(provider: providers.JsonRpcProvider, coinbase: string): Promise<BigNumber> {
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  return interopCenter.accumulatedZKFees(coinbase);
 }
 
 /**
