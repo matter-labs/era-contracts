@@ -164,7 +164,7 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
     function _validateWrappedUpgrade(address, bytes memory _existingUpgradeCalldata) internal pure {
         require(
             bytes4(_existingUpgradeCalldata) == IL2V31Upgrade.upgrade.selector,
-            "Unexpected inner upgrade selector"
+            "Unexpected upgrade selector"
         );
     }
 
