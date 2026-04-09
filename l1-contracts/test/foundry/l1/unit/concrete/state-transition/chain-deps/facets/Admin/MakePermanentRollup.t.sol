@@ -17,8 +17,8 @@ contract MakePermanentRollupTest is AdminTest {
         super.setUp();
 
         // Access the real RollupDAManager from the integration deployment
-        rollupDAManager = RollupDAManager(ctmAddresses.daAddresses.rollupDAManager);
-        l1DAValidator = ctmAddresses.daAddresses.l1RollupDAValidator;
+        rollupDAManager = RollupDAManager(ctmAddresses.daAddresses.daContracts.rollupDAManager);
+        l1DAValidator = ctmAddresses.daAddresses.daContracts.rollupSLDAValidator;
     }
 
     function test_getRollupDAManager() public {
