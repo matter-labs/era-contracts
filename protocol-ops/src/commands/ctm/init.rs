@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::commands::ctm::accept_ownership::{accept_ownership, CtmAcceptOwnershipInput};
 use crate::commands::ctm::deploy::{deploy, CtmDeployInput};
 use crate::commands::hub::register_ctm::{register_ctm, RegisterCtmInput};
+
 use crate::commands::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
@@ -109,14 +110,8 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
         .deployed_addresses
         .state_transition
         .state_transition_proxy_addr;
-    write_output_if_requested(
-        "ctm.init",
-        args.shared.out_path.as_deref(),
-        args.shared.safe_transactions_out.as_deref(),
-        &runner,
-        &ctm_input,
-        &ctm_output,
-    )?;
+    write_output_if_requested("ctm.init", &args.shared, &runner, &ctm_input, &ctm_output)
+        .await?;
 
     logger::info("CTM contracts initialized");
     logger::info(format!("CTM Proxy: {:#x}", ctm_proxy));

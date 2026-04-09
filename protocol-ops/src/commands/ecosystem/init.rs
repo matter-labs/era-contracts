@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::commands::ctm::init::{ctm_init, CtmInitInput};
 use crate::commands::hub::init::{hub_init, HubInitInput};
+
 use crate::commands::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{
@@ -80,14 +81,7 @@ pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
     };
     let output = ecosystem_init(&mut runner, &sender, &owner, &input).await?;
 
-    write_output_if_requested(
-        "ecosystem.init",
-        args.shared.out_path.as_deref(),
-        args.shared.safe_transactions_out.as_deref(),
-        &runner,
-        &input,
-        &output,
-    )?;
+    write_output_if_requested("ecosystem.init", &args.shared, &runner, &input, &output).await?;
 
     logger::info("Ecosystem initialized");
     logger::info(format!(

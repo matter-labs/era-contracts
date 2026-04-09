@@ -7,6 +7,7 @@ use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+
 use crate::commands::output::write_output_if_requested;
 use crate::common::paths;
 use crate::common::SharedRunArgs;
@@ -119,16 +120,16 @@ pub async fn run(args: EcosystemUpgradeArgs) -> anyhow::Result<()> {
 
     match args.ecosystem_upgrade_stage {
         EcosystemUpgradeStage::NoGovernancePrepare => {
-            run_no_governance_prepare(&mut runner, &sender, &args)
+            run_no_governance_prepare(&mut runner, &sender, &args).await
         }
         stage => {
             let idx = stage.governance_stage_index().unwrap();
-            run_governance_stage(&mut runner, &sender, &args, idx)
+            run_governance_stage(&mut runner, &sender, &args, idx).await
         }
     }
 }
 
-fn run_no_governance_prepare(
+async fn run_no_governance_prepare(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     args: &EcosystemUpgradeArgs,
@@ -247,14 +248,8 @@ fn run_no_governance_prepare(
     let input_env = EcosystemUpgradeOutInput {
         stage: EcosystemUpgradeStage::NoGovernancePrepare.to_string(),
     };
-    write_output_if_requested(
-        "ecosystem.upgrade",
-        args.shared.out_path.as_deref(),
-        args.shared.safe_transactions_out.as_deref(),
-        runner,
-        &input_env,
-        &out_payload,
-    )?;
+    write_output_if_requested("ecosystem.upgrade", &args.shared, runner, &input_env, &out_payload)
+        .await?;
 
     logger::success("No-governance-prepare completed");
     if let Some(ref out_path) = args.shared.out_path {
@@ -299,7 +294,7 @@ struct EcosystemUpgradeOutput {
     governance_calls: GovernanceCalls,
 }
 
-fn run_governance_stage(
+async fn run_governance_stage(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     args: &EcosystemUpgradeArgs,
@@ -375,14 +370,8 @@ fn run_governance_stage(
         stage,
         governance_address: format!("{:#x}", governance_addr),
     };
-    write_output_if_requested(
-        "ecosystem.upgrade",
-        args.shared.out_path.as_deref(),
-        args.shared.safe_transactions_out.as_deref(),
-        runner,
-        &input_env,
-        &out_payload,
-    )?;
+    write_output_if_requested("ecosystem.upgrade", &args.shared, runner, &input_env, &out_payload)
+        .await?;
 
     logger::success(format!("Governance stage {} completed", stage));
     if let Some(ref out_path) = args.shared.out_path {

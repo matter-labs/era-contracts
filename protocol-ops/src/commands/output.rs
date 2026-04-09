@@ -76,11 +76,18 @@ impl CommandEnvelope {
     }
 }
 
+/// Fetch the L1 chain ID from the given RPC URL.
+async fn fetch_l1_chain_id(l1_rpc_url: &str) -> anyhow::Result<u64> {
+    use ethers::providers::{Http, Middleware, Provider};
+    let provider = Provider::<Http>::try_from(l1_rpc_url)?;
+    let chain_id = provider.get_chainid().await?;
+    Ok(chain_id.as_u64())
+}
+
 /// Write `--out` JSON file if the user requested it. No-op otherwise.
-pub fn write_output_if_requested<I, O>(
+pub async fn write_output_if_requested<I, O>(
     command: &str,
-    out_path: Option<&std::path::Path>,
-    safe_out_path: Option<&std::path::Path>,
+    shared: &crate::common::SharedRunArgs,
     runner: &ForgeRunner,
     input: &I,
     output: &O,
@@ -89,14 +96,15 @@ where
     I: Serialize,
     O: Serialize,
 {
-    if out_path.is_some() || safe_out_path.is_some() {
+    if shared.out_path.is_some() || shared.safe_transactions_out.is_some() {
         let envelope = CommandEnvelope::new(command, runner, input, output)?;
-        if let Some(out_path) = out_path {
+        if let Some(ref out_path) = shared.out_path {
             envelope.write_to_file(out_path)?;
             logger::info(format!("Full output written to: {}", out_path.display()));
         }
-        if let Some(safe_path) = safe_out_path {
-            write_safe_transactions(command, &envelope.transactions, safe_path)?;
+        if let Some(ref safe_path) = shared.safe_transactions_out {
+            let l1_chain_id = fetch_l1_chain_id(&shared.l1_rpc_url).await?;
+            write_safe_transactions(command, &envelope.transactions, l1_chain_id, safe_path)?;
             logger::info(format!(
                 "Safe transactions written to: {}",
                 safe_path.display()
@@ -110,6 +118,7 @@ where
 fn write_safe_transactions(
     command: &str,
     transactions: &[Value],
+    l1_chain_id: u64,
     path: &std::path::Path,
 ) -> anyhow::Result<()> {
     let created_at = SystemTime::now()
@@ -132,7 +141,7 @@ fn write_safe_transactions(
 
     let envelope = json!({
         "version": "1.0",
-        "chainId": "1",
+        "chainId": l1_chain_id.to_string(),
         "createdAt": created_at,
         "meta": {
             "name": command,

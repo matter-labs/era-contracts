@@ -80,10 +80,11 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
     function initializeConfig(
         string memory configPath,
+        string memory permanentValuesPath,
         address bridgehubProxy,
         uint256 ctmRepresentativeChainId
     ) internal virtual {
-        super.initializeConfig(configPath, bridgehubProxy);
+        super.initializeConfig(configPath, permanentValuesPath, bridgehubProxy);
         string memory toml = vm.readFile(configPath);
 
         refundRecipient = toml.readAddress("$.refund_recipient");
@@ -260,8 +261,9 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
 
         string memory root = vm.projectRoot();
         string memory configPath = string.concat(root, vm.envString("GATEWAY_VOTE_PREPARATION_INPUT"));
+        string memory permanentValuesPath = string.concat(root, vm.envString("PERMANENT_VALUES_INPUT"));
 
-        initializeConfig(configPath, bridgehubProxy, ctmRepresentativeChainId);
+        initializeConfig(configPath, permanentValuesPath, bridgehubProxy, ctmRepresentativeChainId);
         _initializeGatewayGovernanceConfig(
             GatewayGovernanceConfig({
                 bridgehubProxy: coreAddresses.bridgehub.proxies.bridgehub,

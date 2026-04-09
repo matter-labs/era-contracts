@@ -9,6 +9,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use tokio::task::block_in_place;
 
+use crate::commands::output::write_output_if_requested;
 use crate::abi::{
     IDEPLOYL2CONTRACTSABI_ABI, IDEPLOYPAYMASTERABI_ABI, IENABLEEVMEMULATORABI_ABI,
     IREGISTERONALLCHAINSABI_ABI, IREGISTERZKCHAINABI_ABI, ISETUPLEGACYBRIDGEABI_ABI,
@@ -17,7 +18,7 @@ use crate::admin_functions::{
     accept_admin, make_permanent_rollup, set_da_validator_pair, set_token_multiplier_setter,
     unpause_deposits, AdminScriptMode,
 };
-use crate::commands::output::write_output_if_requested;
+
 use crate::common::SharedRunArgs;
 use crate::common::{
     ethereum::get_ethers_provider,
@@ -208,12 +209,12 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
 
     write_output_if_requested(
         "chain.init",
-        args.shared.out_path.as_deref(),
-        args.shared.safe_transactions_out.as_deref(),
+        &args.shared,
         &runner,
         &input,
         &ChainInitOutputData::from_full_output(&output),
-    )?;
+    )
+    .await?;
 
     logger::info("Chain initialized");
     logger::info(format!("Diamond proxy: {:#x}", output.diamond_proxy_addr));
