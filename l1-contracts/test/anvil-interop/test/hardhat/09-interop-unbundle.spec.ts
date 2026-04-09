@@ -180,6 +180,21 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     return { bundleData: result.bundleData, bundleHash: result.bundleHash, baseAmount, tokenAmount };
   }
 
+  async function expectCallStatuses(
+    provider: providers.JsonRpcProvider,
+    bundleHash: string,
+    expectedStatuses: CallStatus[],
+    context: string
+  ): Promise<void> {
+    const actualStatuses = await Promise.all(
+      expectedStatuses.map((_, index) => getCallStatus(provider, bundleHash, index))
+    );
+
+    expectedStatuses.forEach((expectedStatus, index) => {
+      expect(actualStatuses[index], `${context}: call ${index}`).to.equal(expectedStatus);
+    });
+  }
+
   it("Cannot unbundle a non-verified bundle", async () => {
     const { bundleData } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
 
@@ -264,13 +279,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const statusAfterRound1 = await getBundleStatus(destProvider, bundleHash);
     expect(statusAfterRound1, "Bundle should be in Unbundled status after round 1").to.equal(BundleStatus.Unbundled);
 
-    // Check callStatus for all 3 calls after round 1
-    const call0StatusR1 = await getCallStatus(destProvider, bundleHash, 0);
-    const call1StatusR1 = await getCallStatus(destProvider, bundleHash, 1);
-    const call2StatusR1 = await getCallStatus(destProvider, bundleHash, 2);
-    expect(call0StatusR1, "Call 0 should be Unprocessed after round 1").to.equal(CallStatus.Unprocessed);
-    expect(call1StatusR1, "Call 1 should be Cancelled after round 1").to.equal(CallStatus.Cancelled);
-    expect(call2StatusR1, "Call 2 should be Executed after round 1").to.equal(CallStatus.Executed);
+    await expectCallStatuses(destProvider, bundleHash, round1Statuses, "after round 1");
 
     // Check token recipient got the token amount
     const tokenBalanceAfter = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
@@ -291,13 +300,12 @@ describe("09 - Interop Unbundle (failing calls)", function () {
       BundleStatus.Unbundled
     );
 
-    // Check callStatus matches final: [Executed, Cancelled, Executed]
-    const call0StatusR2 = await getCallStatus(destProvider, bundleHash, 0);
-    const call1StatusR2 = await getCallStatus(destProvider, bundleHash, 1);
-    const call2StatusR2 = await getCallStatus(destProvider, bundleHash, 2);
-    expect(call0StatusR2, "Call 0 should be Executed after round 2").to.equal(CallStatus.Executed);
-    expect(call1StatusR2, "Call 1 should remain Cancelled after round 2").to.equal(CallStatus.Cancelled);
-    expect(call2StatusR2, "Call 2 should remain Executed after round 2").to.equal(CallStatus.Executed);
+    await expectCallStatuses(
+      destProvider,
+      bundleHash,
+      [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed],
+      "after round 2"
+    );
 
     // Check base recipient got the base amount
     const baseBalanceAfter = await getNativeBalance(destProvider, dummyRecipient);
@@ -318,11 +326,12 @@ describe("09 - Interop Unbundle (failing calls)", function () {
       ANVIL_ACCOUNT2_PRIVATE_KEY
     );
 
-    // Verify calls are processed
-    const call0Status = await getCallStatus(destProvider, bundleHash, 0);
-    const call2Status = await getCallStatus(destProvider, bundleHash, 2);
-    expect(call0Status).to.equal(CallStatus.Executed);
-    expect(call2Status).to.equal(CallStatus.Executed);
+    await expectCallStatuses(
+      destProvider,
+      bundleHash,
+      [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed],
+      "after full unbundle"
+    );
 
     // Trying to re-execute already-processed calls should revert
     const callStatuses = [CallStatus.Executed, CallStatus.Unprocessed, CallStatus.Executed];
@@ -347,8 +356,12 @@ describe("09 - Interop Unbundle (failing calls)", function () {
       ANVIL_ACCOUNT2_PRIVATE_KEY
     );
 
-    const call1Status = await getCallStatus(destProvider, bundleHash, 1);
-    expect(call1Status).to.equal(CallStatus.Cancelled);
+    await expectCallStatuses(
+      destProvider,
+      bundleHash,
+      [CallStatus.Unprocessed, CallStatus.Cancelled, CallStatus.Unprocessed],
+      "after cancelling call 1"
+    );
 
     // Trying to execute a cancelled call (index 1) should revert
     const callStatuses = [CallStatus.Unprocessed, CallStatus.Executed, CallStatus.Unprocessed];
@@ -431,12 +444,6 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     expectBalanceDelta(baseBalanceBefore, baseBalanceAfter, baseAmount, "meta-bundle: recipient native");
     expectBalanceDelta(tokenBalanceBefore, tokenBalanceAfter, tokenAmount, "meta-bundle: recipient token");
 
-    // Check call statuses for the bundle
-    const call0Status = await getCallStatus(destProvider, bundleHash, 0);
-    const call1Status = await getCallStatus(destProvider, bundleHash, 1);
-    const call2Status = await getCallStatus(destProvider, bundleHash, 2);
-    expect(call0Status, "Call 0 should be Executed").to.equal(CallStatus.Executed);
-    expect(call1Status, "Call 1 should be Cancelled").to.equal(CallStatus.Cancelled);
-    expect(call2Status, "Call 2 should be Executed").to.equal(CallStatus.Executed);
+    await expectCallStatuses(destProvider, bundleHash, finalCallStatuses, "after meta-bundle");
   });
 });
