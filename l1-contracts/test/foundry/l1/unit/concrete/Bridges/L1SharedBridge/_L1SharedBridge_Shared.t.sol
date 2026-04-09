@@ -190,8 +190,20 @@ contract L1AssetRouterTest is MigrationTestBase {
         );
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
 
-        // Real bridgehub answers chainAssetHandler() and migrationNumber() — no mocks needed
-        l1AssetTracker = new L1AssetTracker(bridgehubAddress, address(nativeTokenVault), messageRootAddress);
+        // Deploy L1AssetTracker via proxy so initialize+setAddresses works (sets chainAssetHandler)
+        L1AssetTracker l1AssetTrackerImpl = new L1AssetTracker(
+            bridgehubAddress,
+            address(nativeTokenVault),
+            messageRootAddress
+        );
+        TransparentUpgradeableProxy l1AssetTrackerProxy = new TransparentUpgradeableProxy(
+            address(l1AssetTrackerImpl),
+            proxyAdmin,
+            abi.encodeWithSelector(L1AssetTracker.initialize.selector, owner)
+        );
+        l1AssetTracker = L1AssetTracker(address(l1AssetTrackerProxy));
+        vm.prank(owner);
+        l1AssetTracker.setAddresses(); // sets chainAssetHandler from real bridgehub
         vm.prank(owner);
         nativeTokenVault.setAssetTracker(address(l1AssetTracker));
 
@@ -224,25 +236,10 @@ contract L1AssetRouterTest is MigrationTestBase {
         vm.store(address(sharedBridge), bytes32(isWithdrawalFinalizedStorageLocation + 2), bytes32(uint256(1)));
         vm.store(address(sharedBridge), bytes32(isWithdrawalFinalizedStorageLocation + 3), bytes32(0));
 
-        // The fresh L1AssetTracker's chainAssetHandler storage is not yet initialized
-        // (setAddresses requires onlyOwner on a proxied deploy). Mock migrationNumber on
-        // the stored handler address (address(0)) to prevent revert during balance updates.
-        vm.mockCall(
-            address(l1AssetTracker.chainAssetHandler()),
-            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
-            abi.encode(0)
-        );
-        // Keep baseTokenAssetId no-arg mock and settlementLayer — legacy deposit path routing.
-        vm.mockCall(
-            bridgehubAddress,
-            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
-            abi.encode(ETH_TOKEN_ASSET_ID)
-        );
-        vm.mockCall(
-            bridgehubAddress,
-            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector),
-            abi.encode(block.chainid)
-        );
+        // L1AssetTracker.chainAssetHandler is now real (from setAddresses) — migrationNumber
+        // defaults to 0 (Solidity mapping) — no mock needed.
+        // bridgehub.settlementLayer(chainId) is already set to block.chainid during chain creation.
+        // bridgehub.baseTokenAssetId(chainId) returns real ETH asset ID for testChainId.
         // Keep requestL2TransactionDirect mock (legacy path needs controlled response).
         vm.mockCall(
             bridgehubAddress,
@@ -316,26 +313,9 @@ contract L1AssetRouterTest is MigrationTestBase {
         _setBaseTokenAssetId(ETH_TOKEN_ASSET_ID);
         _setAssetTrackerChainBalance(chainId, address(token), amount);
 
-        // Real bridgehub handles baseToken() for registered chainIds, but keep mock for specific
-        // chainId query since child tests may use unregistered chain IDs in error-path scenarios.
-        vm.mockCall(
-            bridgehubAddress,
-            // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
-            abi.encode(ETH_TOKEN_ADDRESS)
-        );
+        // Real bridgehub handles baseToken(chainId) for registered testChainId — no mock needed.
 
-        // Keep NTV tokenAddress mocks — fresh NTV may not map asset IDs correctly after registerToken
-        vm.mockCall(
-            address(nativeTokenVault),
-            abi.encodeWithSelector(IBaseTokenAssetHandler.tokenAddress.selector, tokenAssetId),
-            abi.encode(address(token))
-        );
-        vm.mockCall(
-            address(nativeTokenVault),
-            abi.encodeWithSelector(IBaseTokenAssetHandler.tokenAddress.selector, ETH_TOKEN_ASSET_ID),
-            abi.encode(address(ETH_TOKEN_ADDRESS))
-        );
+        // registerToken + registerEthToken already set tokenAddress mapping — no mocks needed.
 
         // Real messageRoot answers v31UpgradeChainBatchNumber() and getProofData() — no mocks needed.
     }
