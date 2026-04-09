@@ -111,9 +111,13 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
         bytes memory complexUpgraderCalldata;
         if (config.isZKsyncOS) {
+            // For ZKsyncOS, the delegateTo address is a derived address (not the constant
+            // L2_VERSION_SPECIFIC_UPGRADER_ADDR) to avoid overwriting existing bytecode.
+            // Must match the newAddress in getAdditionalZKsyncOSForceDeployments.
+            address delegateTo = _getZKsyncOSUpgradeAddress();
             complexUpgraderCalldata = abi.encodeCall(
                 IComplexUpgrader.forceDeployAndUpgradeUniversal,
-                (_deployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
+                (_deployments, delegateTo, l2UpgradeCalldata)
             );
         } else {
             complexUpgraderCalldata = abi.encodeCall(
@@ -135,7 +139,16 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         additional[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
             upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
             deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade"),
-            newAddress: L2_VERSION_SPECIFIC_UPGRADER_ADDR
+            newAddress: _getZKsyncOSUpgradeAddress()
         });
+    }
+
+    /// @dev Compute the derived address for L2V31Upgrade on ZKsyncOS.
+    /// Uses the same derivation as L2GenesisForceDeploymentsHelper.generateRandomAddress:
+    /// address(uint160(uint256(keccak256(bytes32(0) ++ bytecodeInfo))))
+    /// This avoids overwriting the constant L2_VERSION_SPECIFIC_UPGRADER_ADDR.
+    function _getZKsyncOSUpgradeAddress() private returns (address) {
+        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade");
+        return address(uint160(uint256(keccak256(bytes.concat(bytes32(0), bytecodeInfo)))));
     }
 }

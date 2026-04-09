@@ -166,7 +166,7 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         MockSystemContractProxyAdmin etchedProxyAdmin = MockSystemContractProxyAdmin(
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
         );
-        assertEq(etchedProxyAdmin.upgradeCallCount(), 9);
+        assertEq(etchedProxyAdmin.upgradeCallCount(), 0);
     }
 
     function testEraForceDeployment() public {

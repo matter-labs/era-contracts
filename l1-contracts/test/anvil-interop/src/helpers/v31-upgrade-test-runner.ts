@@ -404,17 +404,20 @@ async function deployL2Contracts(
   // (SettlementLayerV31Upgrade) constructs calldata compatible with its ABI.
   await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V31Upgrade")]);
 
-  if (isZKsyncOS) {
-    // ZKsyncOS: conductContractUpgrade(ZKsyncOSSystemProxyUpgrade) calls
-    // updateZKsyncOSContract → SystemContractProxyAdmin.upgrade(proxy, impl).
-    // In production, the proxy is a SystemContractProxy and upgrade() calls upgradeTo().
-    // On Anvil, the system addresses hold plain EVM implementations (not proxies), so
-    // we use a no-op MockSystemContractProxyAdmin to prevent upgradeTo() from reverting.
-    await l2Provider.send("anvil_setCode", [
-      L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
-      getBytecode("MockSystemContractProxyAdmin"),
-    ]);
-  }
+  // SystemContractProxyAdmin: _setupProxyAdmin() calls owner() and forceSetOwner().
+  // The outer forceDeployAndUpgradeUniversal loop (ZKsyncOS) also calls upgrade() on it.
+  // For ZKsyncOS: use MockSystemContractProxyAdmin (no-op upgrade) because Anvil proxies
+  //   don't support upgradeTo(). Set owner so _setupProxyAdmin succeeds.
+  // For Era: use real SystemContractProxyAdmin (upgrade() is not called by outer loop).
+  const proxyAdminBytecode = isZKsyncOS
+    ? getBytecode("MockSystemContractProxyAdmin")
+    : getBytecode("SystemContractProxyAdmin");
+  await l2Provider.send("anvil_setCode", [L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, proxyAdminBytecode]);
+  await l2Provider.send("anvil_setStorageAt", [
+    L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
+    ethers.utils.hexZeroPad("0x0", 32), // slot 0: _owner
+    ethers.utils.hexZeroPad(L2_COMPLEX_UPGRADER_ADDR, 32),
+  ]);
 
   // L2BaseTokenEra (storage-based) instead of L2BaseTokenZKOS (MINT precompile).
   // L2V31Upgrade.upgrade() calls BaseToken.initL2() which on ZKsyncOS invokes
