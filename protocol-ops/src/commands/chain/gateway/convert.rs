@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::Context;
 use clap::{Args, Parser, Subcommand};
@@ -24,7 +24,7 @@ pub struct ConvertShared {
 
     /// Bridgehub proxy address.
     #[clap(long)]
-    pub bridgehub_proxy_address: Address,
+    pub bridgehub: Address,
 
     /// Gateway chain ID (the chain being converted to a gateway).
     #[clap(long)]
@@ -63,7 +63,7 @@ pub struct DeployFiltererArgs {
 
     /// Bridgehub proxy address.
     #[clap(long)]
-    pub bridgehub_proxy_address: Address,
+    pub bridgehub: Address,
 
     /// Gateway chain ID (the chain that will host the transaction filterer).
     #[clap(long)]
@@ -169,10 +169,6 @@ pub async fn run(cmd: ConvertCommands) -> anyhow::Result<()> {
     }
 }
 
-fn resolve_l1_contracts_path() -> anyhow::Result<PathBuf> {
-    paths::resolve_l1_contracts_path()
-}
-
 /// Convert a relative TOML path to the form expected by forge env vars (`/`-prefixed).
 fn forge_env_path(rel: &str) -> String {
     format!("/{}", rel.trim_start_matches('/'))
@@ -202,7 +198,7 @@ async fn run_deploy_filterer(args: DeployFiltererArgs) -> anyhow::Result<()> {
     script_args.add_arg(ForgeScriptArg::Broadcast);
     script_args.add_arg(ForgeScriptArg::Ffi);
     script_args.additional_args.extend([
-        format!("{:#x}", args.bridgehub_proxy_address),
+        format!("{:#x}", args.bridgehub),
         args.gateway_chain_id.to_string(),
     ]);
 
@@ -216,7 +212,7 @@ async fn run_deploy_filterer(args: DeployFiltererArgs) -> anyhow::Result<()> {
         .with_wallet(&sender, runner.simulate);
 
     logger::step("Deploying gateway transaction filterer");
-    logger::info(format!("Bridgehub: {:#x}", args.bridgehub_proxy_address));
+    logger::info(format!("Bridgehub: {:#x}", args.bridgehub));
     logger::info(format!("Gateway chain ID: {}", args.gateway_chain_id));
 
     runner
@@ -229,7 +225,7 @@ async fn run_deploy_filterer(args: DeployFiltererArgs) -> anyhow::Result<()> {
         &runner,
         &serde_json::json!({}),
         &serde_json::json!({
-            "bridgehub_proxy_address": format!("{:#x}", args.bridgehub_proxy_address),
+            "bridgehub": format!("{:#x}", args.bridgehub),
             "gateway_chain_id": args.gateway_chain_id,
         }),
     )
@@ -249,7 +245,7 @@ async fn run_grant_whitelist(args: GrantWhitelistArgs) -> anyhow::Result<()> {
         args.common.shared.forge_args.clone(),
     )?;
 
-    let contracts_path = resolve_l1_contracts_path()?;
+    let contracts_path = paths::resolve_l1_contracts_path()?;
     let script_path = "deploy-scripts/AdminFunctions.s.sol";
 
     // Encode grantees as a Solidity address[] literal: [addr1,addr2,...]
@@ -272,7 +268,7 @@ async fn run_grant_whitelist(args: GrantWhitelistArgs) -> anyhow::Result<()> {
     script_args.add_arg(ForgeScriptArg::Broadcast);
     script_args.add_arg(ForgeScriptArg::Ffi);
     script_args.additional_args.extend([
-        format!("{:#x}", args.common.bridgehub_proxy_address),
+        format!("{:#x}", args.common.bridgehub),
         args.common.gateway_chain_id.to_string(),
         grantees_str,
         "true".to_string(),
@@ -365,7 +361,7 @@ async fn run_vote_prepare(args: VotePrepareArgs) -> anyhow::Result<()> {
         args.common.shared.forge_args.clone(),
     )?;
 
-    let contracts_path = resolve_l1_contracts_path()?;
+    let contracts_path = paths::resolve_l1_contracts_path()?;
 
     // Resolve force_deployments_data: use explicit override or dump from chain.
     let force_deployments_data = match args.force_deployments_data {
@@ -436,7 +432,7 @@ validator_timelock_execution_delay = 0
         gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
     });
     script_args.additional_args.extend([
-        format!("{:#x}", args.common.bridgehub_proxy_address),
+        format!("{:#x}", args.common.bridgehub),
         args.ctm_representative_chain_id.to_string(),
     ]);
 
@@ -455,7 +451,7 @@ validator_timelock_execution_delay = 0
     logger::step("Running gateway vote preparation");
     logger::info(format!(
         "Bridgehub: {:#x}",
-        args.common.bridgehub_proxy_address
+        args.common.bridgehub
     ));
     logger::info(format!(
         "CTM representative chain ID: {}",
@@ -528,7 +524,7 @@ async fn run_governance_execute(args: GovernanceExecuteArgs) -> anyhow::Result<(
         args.common.shared.forge_args.clone(),
     )?;
 
-    let contracts_path = resolve_l1_contracts_path()?;
+    let contracts_path = paths::resolve_l1_contracts_path()?;
 
     // Read the vote preparation output to get encoded governance calls
     let output_path = contracts_path.join(args.vote_preparation_toml.trim_start_matches('/'));
@@ -591,7 +587,7 @@ async fn run_revoke_whitelist(args: RevokeWhitelistArgs) -> anyhow::Result<()> {
         args.common.shared.forge_args.clone(),
     )?;
 
-    let contracts_path = resolve_l1_contracts_path()?;
+    let contracts_path = paths::resolve_l1_contracts_path()?;
     let script_path = "deploy-scripts/AdminFunctions.s.sol";
 
     let mut script_args = args.common.shared.forge_args.clone();
@@ -604,7 +600,7 @@ async fn run_revoke_whitelist(args: RevokeWhitelistArgs) -> anyhow::Result<()> {
     script_args.add_arg(ForgeScriptArg::Broadcast);
     script_args.add_arg(ForgeScriptArg::Ffi);
     script_args.additional_args.extend([
-        format!("{:#x}", args.common.bridgehub_proxy_address),
+        format!("{:#x}", args.common.bridgehub),
         args.common.gateway_chain_id.to_string(),
         format!("{:#x}", args.revoke_address),
         "true".to_string(),

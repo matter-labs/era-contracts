@@ -14,6 +14,11 @@ use crate::common::{
     wallets::Wallet,
 };
 
+/// L2 system address of the Bridgehub on the gateway chain.
+const GATEWAY_L2_BRIDGEHUB: &str = "0x0000000000000000000000000000000000010002";
+/// L2 system address of the bootloader.
+const L2_BOOTLOADER: &str = "0x0000000000000000000000000000000000008001";
+
 /// Shared arguments for all migrate stages.
 #[derive(Debug, Clone, Serialize, Deserialize, Args)]
 pub struct MigrateShared {
@@ -23,7 +28,7 @@ pub struct MigrateShared {
 
     /// Bridgehub proxy address.
     #[clap(long)]
-    pub bridgehub_proxy_address: Address,
+    pub bridgehub: Address,
 
     /// Chain ID of the chain being migrated.
     #[clap(long)]
@@ -102,7 +107,7 @@ pub struct FinalizeArgs {
 
     /// Bridgehub proxy address.
     #[clap(long)]
-    pub bridgehub_proxy_address: Address,
+    pub bridgehub: Address,
 
     /// Chain ID of the chain being migrated.
     #[clap(long)]
@@ -208,7 +213,7 @@ async fn run_pause_deposits(args: PauseDepositsArgs) -> anyhow::Result<()> {
         &args.common.shared.forge_args,
         "pauseDepositsBeforeInitiatingMigration(address,uint256,bool)",
         vec![
-            format!("{:#x}", args.common.bridgehub_proxy_address),
+            format!("{:#x}", args.common.bridgehub),
             args.common.chain_id.to_string(),
             "true".to_string(),
         ],
@@ -257,7 +262,7 @@ async fn run_submit(args: SubmitArgs) -> anyhow::Result<()> {
         &args.common.shared.forge_args,
         "migrateChainToGateway(address,uint256,uint256,uint256,bytes,address,bool)",
         vec![
-            format!("{:#x}", args.common.bridgehub_proxy_address),
+            format!("{:#x}", args.common.bridgehub),
             args.l1_gas_price.to_string(),
             args.common.chain_id.to_string(),
             args.gateway_chain_id.to_string(),
@@ -300,7 +305,7 @@ async fn run_notify_server(args: NotifyServerArgs) -> anyhow::Result<()> {
         &args.common.shared.forge_args,
         "notifyServerMigrationToGateway(address,uint256,bool)",
         vec![
-            format!("{:#x}", args.common.bridgehub_proxy_address),
+            format!("{:#x}", args.common.bridgehub),
             args.common.chain_id.to_string(),
             "true".to_string(),
         ],
@@ -348,7 +353,7 @@ async fn run_finalize(args: FinalizeArgs) -> anyhow::Result<()> {
     logger::step("Searching for migration transaction on L1");
     let l1_tx_hash = find_migration_tx(
         &args.shared.l1_rpc_url,
-        args.bridgehub_proxy_address,
+        args.bridgehub,
         args.chain_id,
         args.lookback_blocks,
     )
@@ -417,7 +422,7 @@ async fn run_finalize(args: FinalizeArgs) -> anyhow::Result<()> {
         sa.add_arg(ForgeScriptArg::Broadcast);
         sa.add_arg(ForgeScriptArg::Ffi);
         sa.additional_args.extend([
-            format!("{:#x}", args.bridgehub_proxy_address),
+            format!("{:#x}", args.bridgehub),
             diamond_cut_data_hex.clone(),
             args.chain_id.to_string(),
             args.gateway_chain_id.to_string(),
@@ -476,7 +481,7 @@ async fn run_finalize(args: FinalizeArgs) -> anyhow::Result<()> {
         sa.add_arg(ForgeScriptArg::Broadcast);
         sa.add_arg(ForgeScriptArg::Ffi);
         sa.additional_args.extend([
-            format!("{:#x}", args.bridgehub_proxy_address), // bridgehub
+            format!("{:#x}", args.bridgehub), // bridgehub
             args.l1_gas_price.to_string(),                  // l1GasPrice
             args.chain_id.to_string(),                      // l2ChainId
             args.gateway_chain_id.to_string(),              // gatewayChainId
@@ -550,8 +555,7 @@ async fn resolve_gateway_validator_timelock(
 
     let provider = Provider::<Http>::try_from(gateway_rpc_url)?;
 
-    // Gateway L2 Bridgehub is at system address 0x10002
-    let gw_bridgehub: Address = "0x0000000000000000000000000000000000010002".parse()?;
+    let gw_bridgehub: Address = GATEWAY_L2_BRIDGEHUB.parse()?;
 
     // chainTypeManager(uint256) -> address
     let ctm_call = ethers::abi::encode(&[ethers::abi::Token::Uint(gateway_chain_id.into())]);
@@ -745,7 +749,7 @@ async fn get_finalize_params(
         .and_then(|v| v.as_array())
         .context("No l2ToL1Logs in receipt")?;
 
-    let bootloader = "0x0000000000000000000000000000000000008001";
+    let bootloader = L2_BOOTLOADER;
     let mut log_index = None;
     let mut tx_number_in_batch = 0u16;
     for (i, log) in l2_to_l1_logs.iter().enumerate() {
