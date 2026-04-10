@@ -223,9 +223,15 @@ function generateToml(
   const newVersion = "0x" + newVersionNum.toHexString().replace("0x", "");
   const salt = "0x" + crypto.randomBytes(32).toString("hex");
 
+  // Parse human-readable version: major = bits [47:32], minor = bits [31:0]
+  const major = newVersionNum.shr(32).toNumber() & 0xffff;
+  const minor = newVersionNum.toNumber() & 0xffffffff;
+  const humanVersion = `v${major}.${minor}`;
+
   let toml = `# Auto-generated verifier-only upgrade TOML
 # Generated at: ${new Date().toISOString()}
 # Environment: ${envConfig.testnetVerifier ? "stage" : "mainnet"}
+# Upgrade version: ${humanVersion}
 
 era_chain_id = ${envConfig.eraChainId}
 testnet_verifier = ${envConfig.testnetVerifier}
@@ -365,7 +371,15 @@ async function main() {
 
   const outputPath = path.resolve(opts.output);
   fs.writeFileSync(outputPath, toml);
+
+  // Parse and output human-readable version for the caller script
+  const newVersionNum = onChain.protocolVersionNum.add(1);
+  const major = newVersionNum.shr(32).toNumber() & 0xffff;
+  const minor = newVersionNum.toNumber() & 0xffffffff;
+  const humanVersion = `v${major}.${minor}`;
+
   console.log(`\nTOML written to: ${outputPath}`);
+  console.log(`UPGRADE_VERSION=${humanVersion}`);
 }
 
 main()

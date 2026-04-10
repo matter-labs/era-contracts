@@ -74,10 +74,8 @@ if [ -z "$ENV" ]; then
     usage
 fi
 
-if [ "$CREATE_PRS" = true ] && [ -z "$UPGRADE_VERSION" ]; then
-    echo "Error: --version is required when using --create-prs"
-    usage
-fi
+
+# UPGRADE_VERSION will be auto-detected from chain if not provided
 
 # ---- Set defaults per environment ----
 if [ "$ENV" = "stage" ]; then
@@ -131,11 +129,18 @@ else
     if [ "$DRY_RUN" = true ]; then
         echo "[DRY RUN] Would generate TOML from on-chain state for $ENV"
     else
-        yarn ts-node scripts/generate-verifier-upgrade-toml.ts \
+        TOML_OUTPUT=$(yarn --silent ts-node scripts/generate-verifier-upgrade-toml.ts \
             --env "$ENV" \
             --l1-rpc "$L1_RPC_URL" \
             $GW_ARGS \
-            --output "$UPGRADE_INPUT_TOML"
+            --output "$UPGRADE_INPUT_TOML" 2>&1)
+        echo "$TOML_OUTPUT"
+
+        # Extract auto-detected version if not provided via --version
+        if [ -z "$UPGRADE_VERSION" ]; then
+            UPGRADE_VERSION=$(echo "$TOML_OUTPUT" | grep '^UPGRADE_VERSION=' | cut -d= -f2)
+            echo "  Auto-detected version: $UPGRADE_VERSION"
+        fi
 
         echo ""
         echo "Generated: $UPGRADE_INPUT_TOML"
