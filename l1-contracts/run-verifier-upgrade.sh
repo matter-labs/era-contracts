@@ -201,6 +201,23 @@ if [ "$SKIP_FORGE" = false ] && [ "$DRY_RUN" = false ]; then
     echo ""
 fi
 
+# ---- Step 4: Generate transaction-simulator JSON ----
+TX_SIM_JSON="$OUTPUT_DIR/transactions.json"
+
+if [ "$SKIP_FORGE" = false ] && [ "$DRY_RUN" = false ] && [ -f "$ECOSYSTEM_OUTPUT" ]; then
+    echo "============================================================"
+    echo "  Step 4: Generate transaction-simulator JSON"
+    echo "============================================================"
+
+    yarn ts-node scripts/generate-transaction-simulator-json.ts \
+        --ecosystem-output "$ECOSYSTEM_OUTPUT" \
+        --env "$ENV" \
+        --output "$TX_SIM_JSON" \
+        --upgrade-name "verifier-upgrade" || echo "Warning: transaction-simulator JSON generation failed"
+
+    echo ""
+fi
+
 # ---- Summary ----
 echo "============================================================"
 echo "  Done!"
@@ -213,11 +230,12 @@ echo "    Input TOML:     $UPGRADE_INPUT_TOML"
 if [ "$SKIP_FORGE" = false ] && [ "$DRY_RUN" = false ]; then
 echo "    Ecosystem TOML: $ECOSYSTEM_OUTPUT"
 echo "    YAML:           $YAML_OUTPUT"
+echo "    TX simulator:   $TX_SIM_JSON"
 echo "    Broadcast:      broadcast/VerifierOnlyUpgrade.s.sol/${CHAIN_ID}/run-latest.json"
 fi
 echo ""
 echo "  Next steps:"
-echo "    1. Review the generated calldata"
-echo "    2. Copy to transaction-simulator and create PR"
+echo "    1. Review the generated calldata in $TX_SIM_JSON"
+echo "    2. Copy $TX_SIM_JSON to transaction-simulator/transactions/"
 echo "    3. Run simulation"
 echo "    4. Submit to governance / Security Council"
