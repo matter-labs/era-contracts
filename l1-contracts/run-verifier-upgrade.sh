@@ -6,38 +6,46 @@
 #
 # Generates upgrade calldata for a verifier-only upgrade with minimal input.
 # Reads all required data from on-chain state automatically.
+# Deploys verifier contracts from a specified era-contracts branch/commit.
 #
 # Usage:
-#   PRIVATE_KEY=$PK ./run-verifier-upgrade.sh --env stage
+#   PRIVATE_KEY=$PK ./run-verifier-upgrade.sh \
+#     --env stage \
+#     --contracts-ref vb-new-verifier-keys
 #
-# Required environment variables:
-#   PRIVATE_KEY       - Deployer private key
+# Required:
+#   --env              stage or mainnet
+#   --contracts-ref    Branch or commit in era-contracts with updated Verifier.sol
+#   PRIVATE_KEY        Deployer private key (env var)
 #
-# Optional environment variables:
-#   L1_RPC_URL        - L1 RPC URL (has defaults per environment)
-#   GATEWAY_RPC_URL   - Gateway RPC URL
-#   PUVT_REPO         - Path to protocol-upgrade-verification-tool repo
+# Optional:
+#   L1_RPC_URL         L1 RPC URL (defaults per environment)
+#   GATEWAY_RPC_URL    Gateway RPC URL
+#   --create-prs       Create PRs in transaction-simulator and PUVT
+#   --version          Override auto-detected version (e.g. v29.4)
+#   --contracts-repo   Git remote URL (default: matter-labs/era-contracts)
+#   --skip-forge       Skip forge script (only generate TOML)
+#   --dry-run          Show what would be done without executing
 #
 # Examples:
-#   # Stage (uses default Sepolia RPC):
-#   PRIVATE_KEY=$TEST_PK ./run-verifier-upgrade.sh --env stage
+#   # Full pipeline on stage:
+#   PRIVATE_KEY=$PK ./run-verifier-upgrade.sh \
+#     --env stage \
+#     --contracts-ref vb-new-verifier-keys \
+#     --create-prs
 #
-#   # Mainnet with custom RPC:
-#   PRIVATE_KEY=$DEPLOYER_PK \
-#   L1_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/KEY \
-#   ./run-verifier-upgrade.sh --env mainnet
-#
-#   # Dry run (show what would happen):
-#   PRIVATE_KEY=$PK ./run-verifier-upgrade.sh --env stage --dry-run
+#   # Mainnet from a specific commit:
+#   PRIVATE_KEY=$PK ./run-verifier-upgrade.sh \
+#     --env mainnet \
+#     --contracts-ref a1b2c3d4
 # =============================================================================
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
-
 # ---- Parse arguments ----
 ENV=""
+CONTRACTS_REF=""
+CONTRACTS_REPO="https://github.com/matter-labs/era-contracts.git"
 SKIP_FORGE=false
 DRY_RUN=false
 INPUT_TOML=""
@@ -45,21 +53,27 @@ CREATE_PRS=false
 UPGRADE_VERSION=""
 
 usage() {
-    echo "Usage: $0 --env <stage|mainnet> [options]"
+    echo "Usage: $0 --env <stage|mainnet> --contracts-ref <branch|commit> [options]"
     echo ""
-    echo "Options:"
-    echo "  --env           Environment: stage or mainnet (required)"
-    echo "  --input-toml    Use existing TOML instead of generating from chain"
-    echo "  --skip-forge    Skip forge script (only generate TOML)"
-    echo "  --dry-run       Show what would be done without executing"
-    echo "  --create-prs    Create PRs in transaction-simulator and PUVT"
-    echo "  --version       Upgrade version, e.g. v29.4 (required with --create-prs)"
+    echo "Required:"
+    echo "  --env             Environment: stage or mainnet"
+    echo "  --contracts-ref   Branch or commit with updated Verifier contracts"
+    echo ""
+    echo "Optional:"
+    echo "  --contracts-repo  Git remote URL (default: matter-labs/era-contracts)"
+    echo "  --input-toml      Use existing TOML instead of generating from chain"
+    echo "  --skip-forge      Skip forge script (only generate TOML)"
+    echo "  --dry-run         Show what would be done without executing"
+    echo "  --create-prs      Create PRs in transaction-simulator and PUVT"
+    echo "  --version         Override auto-detected upgrade version (e.g. v29.4)"
     exit 1
 }
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --env) ENV="$2"; shift 2 ;;
+        --contracts-ref) CONTRACTS_REF="$2"; shift 2 ;;
+        --contracts-repo) CONTRACTS_REPO="$2"; shift 2 ;;
         --input-toml) INPUT_TOML="$2"; shift 2 ;;
         --skip-forge) SKIP_FORGE=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
@@ -74,8 +88,16 @@ if [ -z "$ENV" ]; then
     usage
 fi
 
-
-# UPGRADE_VERSION will be auto-detected from chain if not provided
+if [ -z "$CONTRACTS_REF" ]; then
+    echo "Error: --contracts-ref is required"
+    echo ""
+    echo "  This is the branch or commit in era-contracts that contains the"
+    echo "  updated Verifier.sol contracts with new verification keys."
+    echo ""
+    echo "  Example: --contracts-ref vb-new-verifier-keys"
+    echo "  Example: --contracts-ref a1b2c3d4e5f6"
+    usage
+fi
 
 # ---- Set defaults per environment ----
 if [ "$ENV" = "stage" ]; then
@@ -94,25 +116,103 @@ if [ -z "${PRIVATE_KEY:-}" ] && [ "$SKIP_FORGE" = false ] && [ "$DRY_RUN" = fals
     exit 1
 fi
 
-echo "============================================================"
-echo "  Verifier-Only Upgrade Pipeline"
-echo "============================================================"
-echo ""
-echo "  Environment:  $ENV"
-echo "  L1 RPC:       $L1_RPC_URL"
-echo "  L1 Chain ID:  $CHAIN_ID"
-echo ""
-
 # ---- Output directories ----
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 OUTPUT_DIR="script-out/verifier-upgrade-${ENV}-${TIMESTAMP}"
 mkdir -p "$OUTPUT_DIR"
 
+echo "============================================================"
+echo "  Verifier-Only Upgrade Pipeline"
+echo "============================================================"
+echo ""
+echo "  Environment:    $ENV"
+echo "  L1 RPC:         $L1_RPC_URL"
+echo "  L1 Chain ID:    $CHAIN_ID"
+echo "  Contracts ref:  $CONTRACTS_REF"
+echo "  Contracts repo: $CONTRACTS_REPO"
+echo "  Output dir:     $OUTPUT_DIR"
+echo ""
+
+# ---- Step 0: Clone era-contracts at the specified ref ----
+echo "============================================================"
+echo "  Step 0: Checkout era-contracts @ ${CONTRACTS_REF}"
+echo "============================================================"
+
+CONTRACTS_DIR="$OUTPUT_DIR/era-contracts"
+
+if [ "$DRY_RUN" = true ]; then
+    echo "[DRY RUN] Would clone $CONTRACTS_REPO @ $CONTRACTS_REF"
+else
+    git clone "$CONTRACTS_REPO" "$CONTRACTS_DIR" 2>&1 | tail -2
+    cd "$CONTRACTS_DIR"
+    git checkout "$CONTRACTS_REF" 2>&1 | tail -2
+
+    CONTRACTS_COMMIT=$(git rev-parse HEAD)
+    CONTRACTS_SHORT=$(git rev-parse --short HEAD)
+    echo ""
+    echo "  Checked out: $CONTRACTS_COMMIT"
+    echo "  Branch/tag:  $(git describe --all --always 2>/dev/null || echo "$CONTRACTS_REF")"
+
+    # Save commit info for reproducibility
+    echo "$CONTRACTS_COMMIT" > "$OUTPUT_DIR/contracts-commit.txt"
+    echo "  Saved commit hash to $OUTPUT_DIR/contracts-commit.txt"
+
+    # Verify Verifier contracts exist
+    if [ ! -f "l1-contracts/contracts/state-transition/verifiers/L1VerifierFflonk.sol" ]; then
+        echo ""
+        echo "Error: L1VerifierFflonk.sol not found at ref $CONTRACTS_REF"
+        echo "  Make sure this branch has the updated Verifier contracts."
+        exit 1
+    fi
+
+    WORK_DIR="$CONTRACTS_DIR/l1-contracts"
+
+    # Copy our scripts into the cloned repo if they don't exist there
+    SCRIPT_SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    for f in generate-verifier-upgrade-toml.ts generate-transaction-simulator-json.ts fetch-chain-creation-params.ts; do
+        if [ ! -f "$WORK_DIR/scripts/$f" ] && [ -f "$SCRIPT_SRC_DIR/scripts/$f" ]; then
+            cp "$SCRIPT_SRC_DIR/scripts/$f" "$WORK_DIR/scripts/$f"
+            echo "  Copied $f into cloned repo"
+        fi
+    done
+    if [ ! -f "$WORK_DIR/deploy-scripts/upgrade/VerifierOnlyUpgrade.s.sol" ] && [ -f "$SCRIPT_SRC_DIR/deploy-scripts/upgrade/VerifierOnlyUpgrade.s.sol" ]; then
+        cp "$SCRIPT_SRC_DIR/deploy-scripts/upgrade/VerifierOnlyUpgrade.s.sol" "$WORK_DIR/deploy-scripts/upgrade/VerifierOnlyUpgrade.s.sol"
+        echo "  Copied VerifierOnlyUpgrade.s.sol into cloned repo"
+    fi
+    if [ ! -f "$WORK_DIR/scripts/create-upgrade-prs.sh" ] && [ -f "$SCRIPT_SRC_DIR/scripts/create-upgrade-prs.sh" ]; then
+        cp "$SCRIPT_SRC_DIR/scripts/create-upgrade-prs.sh" "$WORK_DIR/scripts/create-upgrade-prs.sh"
+        chmod +x "$WORK_DIR/scripts/create-upgrade-prs.sh"
+    fi
+
+    # Build L2 contracts and system contracts if needed
+
+    if [ ! -d "$CONTRACTS_DIR/l2-contracts/zkout" ]; then
+        echo ""
+        echo "  Building l2-contracts..."
+        cd "$CONTRACTS_DIR/l2-contracts"
+        yarn install --frozen-lockfile 2>&1 | tail -1
+        forge build --zksync 2>&1 | tail -2
+    fi
+
+    if [ ! -d "$CONTRACTS_DIR/system-contracts/zkout" ]; then
+        echo ""
+        echo "  Building system-contracts..."
+        cd "$CONTRACTS_DIR/system-contracts"
+        yarn install --frozen-lockfile 2>&1 | tail -1
+        yarn build:foundry 2>&1 | tail -2
+    fi
+
+    cd "$WORK_DIR"
+    yarn install --frozen-lockfile 2>&1 | tail -1
+fi
+
+echo ""
+
+# ---- Step 1: Generate upgrade TOML from on-chain state ----
 UPGRADE_INPUT_TOML="$OUTPUT_DIR/upgrade-input.toml"
 ECOSYSTEM_OUTPUT="$OUTPUT_DIR/ecosystem-output.toml"
 YAML_OUTPUT="$OUTPUT_DIR/upgrade.yaml"
 
-# ---- Step 1: Generate upgrade TOML from on-chain state ----
 echo "============================================================"
 echo "  Step 1: Generate upgrade TOML from on-chain state"
 echo "============================================================"
@@ -154,6 +254,7 @@ if [ "$SKIP_FORGE" = false ]; then
     echo "============================================================"
     echo "  Step 2: Deploy verifiers & generate calldata"
     echo "============================================================"
+    echo "  Deploying from: $CONTRACTS_REPO @ ${CONTRACTS_SHORT:-$CONTRACTS_REF}"
 
     if [ "$DRY_RUN" = true ]; then
         echo "[DRY RUN] Would run forge script with:"
@@ -194,7 +295,7 @@ fi
 echo ""
 
 # ---- Step 3: Generate YAML output ----
-if [ "$SKIP_FORGE" = false ] && [ "$DRY_RUN" = false ]; then
+if [ "$SKIP_FORGE" = false ] && [ "$DRY_RUN" = false ] && [ -f "$ECOSYSTEM_OUTPUT" ]; then
     echo "============================================================"
     echo "  Step 3: Generate YAML output"
     echo "============================================================"
@@ -209,7 +310,7 @@ if [ "$SKIP_FORGE" = false ] && [ "$DRY_RUN" = false ]; then
     UPGRADE_ECOSYSTEM_OUTPUT="$ECOSYSTEM_OUTPUT" \
     UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS="$BROADCAST_FILE" \
     YAML_OUTPUT_FILE="$YAML_OUTPUT" \
-    UPGRADE_SEMVER="verifier" \
+    UPGRADE_SEMVER="${UPGRADE_VERSION:-verifier}" \
     UPGRADE_NAME="vk-update" \
     UPGRADE_ENV="$ENV" \
     yarn upgrade-yaml-output-generator $PUVT_ARGS || echo "Warning: YAML generation failed"
@@ -254,18 +355,20 @@ echo "  Done!"
 echo "============================================================"
 echo ""
 echo "  Output directory: $OUTPUT_DIR"
+echo "  Contracts:        $CONTRACTS_REPO @ ${CONTRACTS_SHORT:-$CONTRACTS_REF}"
+if [ -n "$UPGRADE_VERSION" ]; then
+echo "  Version:          $UPGRADE_VERSION"
+fi
 echo ""
 echo "  Files:"
 echo "    Input TOML:     $UPGRADE_INPUT_TOML"
-if [ "$SKIP_FORGE" = false ] && [ "$DRY_RUN" = false ]; then
+if [ "$SKIP_FORGE" = false ] && [ "$DRY_RUN" = false ] && [ -f "${ECOSYSTEM_OUTPUT:-}" ]; then
 echo "    Ecosystem TOML: $ECOSYSTEM_OUTPUT"
-echo "    YAML:           $YAML_OUTPUT"
 echo "    TX simulator:   $TX_SIM_JSON"
-echo "    Broadcast:      broadcast/VerifierOnlyUpgrade.s.sol/${CHAIN_ID}/run-latest.json"
+echo "    Contracts ref:  $OUTPUT_DIR/contracts-commit.txt"
 fi
 echo ""
 echo "  Next steps:"
-echo "    1. Review the generated calldata in $TX_SIM_JSON"
-echo "    2. Copy $TX_SIM_JSON to transaction-simulator/transactions/"
-echo "    3. Run simulation"
-echo "    4. Submit to governance / Security Council"
+echo "    1. Review the generated calldata"
+echo "    2. Verify the contracts commit matches the expected Verifier update"
+echo "    3. Submit to governance / Security Council"
