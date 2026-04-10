@@ -20,7 +20,7 @@ const UPGRADE_SEMVER = requireEnv("UPGRADE_SEMVER");
 const UPGRADE_NAME = requireEnv("UPGRADE_NAME");
 const UPGRADE_ENV = requireEnv("UPGRADE_ENV");
 
-async function parseArgs(): Promise<{ puvtRepo: string }> {
+async function parseArgs(): Promise<{ puvtRepo?: string }> {
   const args = process.argv.slice(2);
   let puvtRepo: string | undefined;
 
@@ -31,17 +31,14 @@ async function parseArgs(): Promise<{ puvtRepo: string }> {
     }
   }
 
-  if (!puvtRepo) {
-    console.error("Error: --puvt-repo parameter is required");
-    process.exit(1);
-  }
-
-  const gitDir = path.join(puvtRepo, ".git");
-  try {
-    await fs.access(gitDir);
-  } catch {
-    console.error(`Error: --puvt-repo does not appear to be a git repository (no .git directory found at ${gitDir})`);
-    process.exit(1);
+  if (puvtRepo) {
+    const gitDir = path.join(puvtRepo, ".git");
+    try {
+      await fs.access(gitDir);
+    } catch {
+      console.error(`Error: --puvt-repo does not appear to be a git repository (no .git directory found at ${gitDir})`);
+      process.exit(1);
+    }
   }
 
   return { puvtRepo };
@@ -107,14 +104,16 @@ async function main() {
   console.log(`Copied TOML from ${OUTPUT_FILE_PATH} to ${tomlDestPath}`);
   console.log(`Copied YAML from ${YAML_OUTPUT_FILE} to ${yamlDestPath}`);
 
-  // Copy YAML to protocol-upgrade-verification-tool repo
-  const puvtDestDir = path.join(puvtRepo, "data", `v${UPGRADE_SEMVER}`, UPGRADE_ENV);
-  const puvtDestPath = path.join(puvtDestDir, `v${UPGRADE_SEMVER}-ecosystem.yaml`);
+  // Copy YAML to protocol-upgrade-verification-tool repo if provided
+  if (puvtRepo) {
+    const puvtDestDir = path.join(puvtRepo, "data", `v${UPGRADE_SEMVER}`, UPGRADE_ENV);
+    const puvtDestPath = path.join(puvtDestDir, `v${UPGRADE_SEMVER}-ecosystem.yaml`);
 
-  await fs.mkdir(puvtDestDir, { recursive: true });
-  await fs.copyFile(yamlDestPath, puvtDestPath);
+    await fs.mkdir(puvtDestDir, { recursive: true });
+    await fs.copyFile(yamlDestPath, puvtDestPath);
 
-  console.log(`Copied YAML from ${yamlDestPath} to puvt repo: ${puvtDestPath}`);
+    console.log(`Copied YAML from ${yamlDestPath} to puvt repo: ${puvtDestPath}`);
+  }
 }
 
 main().catch((err) => {

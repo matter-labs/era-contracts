@@ -196,7 +196,7 @@ if [ "$SKIP_FORGE" = false ] && [ "$DRY_RUN" = false ]; then
     UPGRADE_SEMVER="verifier" \
     UPGRADE_NAME="vk-update" \
     UPGRADE_ENV="$ENV" \
-    yarn upgrade-yaml-output-generator $PUVT_ARGS || echo "Warning: YAML generation failed (may need PUVT_REPO)"
+    yarn upgrade-yaml-output-generator $PUVT_ARGS || echo "Warning: YAML generation failed"
 
     echo ""
 fi
