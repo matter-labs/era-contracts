@@ -273,7 +273,7 @@ latest_protocol_version = ${newVersion}
 token_weth_address = "${envConfig.tokenWeth}"
 
 [gateway]
-chain_id = ${envConfig.gatewayChainId}
+chain_id = ${gwParams ? envConfig.gatewayChainId : 0}
 
 [gateway.gateway_state_transition]
 chain_type_manager_proxy_addr = "${envConfig.gateway.ctmProxy}"
