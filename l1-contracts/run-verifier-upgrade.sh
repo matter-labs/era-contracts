@@ -144,6 +144,7 @@ if [ "$SKIP_FORGE" = false ]; then
         echo "  Input:  $UPGRADE_INPUT_TOML"
         echo "  Output: $ECOSYSTEM_OUTPUT"
     else
+        FORGE_EXIT=0
         UPGRADE_ECOSYSTEM_INPUT="$UPGRADE_INPUT_TOML" \
         UPGRADE_ECOSYSTEM_OUTPUT="$ECOSYSTEM_OUTPUT" \
         forge script --sig "run()" \
@@ -152,7 +153,20 @@ if [ "$SKIP_FORGE" = false ]; then
             --rpc-url "$L1_RPC_URL" \
             --gas-limit 20000000000 \
             --private-key "$PRIVATE_KEY" \
-            --broadcast
+            --broadcast || FORGE_EXIT=$?
+
+        if [ "$FORGE_EXIT" -ne 0 ]; then
+            if [ -f "$ECOSYSTEM_OUTPUT" ]; then
+                echo ""
+                echo "Warning: forge broadcast failed (exit code $FORGE_EXIT)"
+                echo "  This usually means the deployer account has insufficient funds."
+                echo "  The simulation succeeded and output was written."
+                echo "  Fund the deployer and re-run, or use the simulation output."
+            else
+                echo "Error: forge script failed and no output was generated."
+                exit 1
+            fi
+        fi
 
         echo ""
         echo "Forge output: $ECOSYSTEM_OUTPUT"

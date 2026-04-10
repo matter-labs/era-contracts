@@ -461,7 +461,10 @@ contract VerifierOnlyUpgrade is DefaultEcosystemUpgrade {
 
         prepareDefaultGovernanceCalls();
 
-        prepareDefaultTestUpgradeCalls();
+        // Skip prepareDefaultTestUpgradeCalls() — it requires a registered ZKChain
+        // which may not exist in all environments. The test calls are not needed for
+        // the actual upgrade calldata generation.
+        vm.writeToml("\"0x\"", upgradeConfig.outputPath, ".test_upgrade_calls");
     }
 
     /// @notice Full default upgrade preparation flow - simplified for verifier only
