@@ -41,15 +41,19 @@ ENV=""
 SKIP_FORGE=false
 DRY_RUN=false
 INPUT_TOML=""
+CREATE_PRS=false
+UPGRADE_VERSION=""
 
 usage() {
-    echo "Usage: $0 --env <stage|mainnet> [--input-toml <path>] [--skip-forge] [--dry-run]"
+    echo "Usage: $0 --env <stage|mainnet> [options]"
     echo ""
     echo "Options:"
     echo "  --env           Environment: stage or mainnet (required)"
     echo "  --input-toml    Use existing TOML instead of generating from chain"
     echo "  --skip-forge    Skip forge script (only generate TOML)"
     echo "  --dry-run       Show what would be done without executing"
+    echo "  --create-prs    Create PRs in transaction-simulator and PUVT"
+    echo "  --version       Upgrade version, e.g. v29.4 (required with --create-prs)"
     exit 1
 }
 
@@ -59,12 +63,19 @@ while [[ $# -gt 0 ]]; do
         --input-toml) INPUT_TOML="$2"; shift 2 ;;
         --skip-forge) SKIP_FORGE=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
+        --create-prs) CREATE_PRS=true; shift ;;
+        --version) UPGRADE_VERSION="$2"; shift 2 ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
 done
 
 if [ -z "$ENV" ]; then
     echo "Error: --env is required"
+    usage
+fi
+
+if [ "$CREATE_PRS" = true ] && [ -z "$UPGRADE_VERSION" ]; then
+    echo "Error: --version is required when using --create-prs"
     usage
 fi
 
@@ -214,6 +225,20 @@ if [ "$SKIP_FORGE" = false ] && [ "$DRY_RUN" = false ] && [ -f "$ECOSYSTEM_OUTPU
         --env "$ENV" \
         --output "$TX_SIM_JSON" \
         --upgrade-name "verifier-upgrade" || echo "Warning: transaction-simulator JSON generation failed"
+
+    echo ""
+fi
+
+# ---- Step 5: Create PRs ----
+if [ "$CREATE_PRS" = true ] && [ "$DRY_RUN" = false ] && [ -f "$TX_SIM_JSON" ]; then
+    echo "============================================================"
+    echo "  Step 5: Create PRs"
+    echo "============================================================"
+
+    ./scripts/create-upgrade-prs.sh \
+        --output-dir "$OUTPUT_DIR" \
+        --env "$ENV" \
+        --version "$UPGRADE_VERSION"
 
     echo ""
 fi
