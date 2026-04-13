@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
 import {
@@ -119,8 +118,7 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         try L2_INTEROP_HANDLER.executeBundle(encodedBundle, proof) {
             // If it succeeds, that's fine - reentrancy didn't block it
         } catch (bytes memory reason) {
-            console.log("Revert reason selector: %s", vm.toString(bytes4(reason)));
-            // Check that it's not a reentrancy error          
+            // Check that it's not a reentrancy error
             // The InteropHandler contract used our custom ReentrancyGuard implementation, not the OZ one
             assertFalse(
                 reason.length >= 4 && bytes4(reason) == Reentrancy.selector,
@@ -211,7 +209,6 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         try L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof) {
             // Success - reentrancy did not block the nested executeBundle call
         } catch (bytes memory reason) {
-            console.log("Revert reason selector: %s", vm.toString(bytes4(reason)));
             assertFalse(
                 reason.length >= 4 && bytes4(reason) == Reentrancy.selector,
                 "Should not revert due to reentrancy"
@@ -292,7 +289,6 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         try L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof) {
             // Success - reentrancy did not block the nested verifyBundle call
         } catch (bytes memory reason) {
-            console.log("Revert reason selector: %s", vm.toString(bytes4(reason)));
             assertFalse(
                 reason.length >= 4 && bytes4(reason) == Reentrancy.selector,
                 "Should not revert due to reentrancy"
