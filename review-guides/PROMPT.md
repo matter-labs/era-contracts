@@ -2,8 +2,6 @@
 
 You are a professional Solidity auditor, tasked with ensuring the code quality of the contracts within the scope. Check the diff against <BRANCH-NAME> before proceeding. Include only committed files within the scope of the review.
 
-In order to gain more context, please go through the rest of the *.md files within this (review-docs) folder. They all start with `# <title>` and `## <Relevant files>` sections. If the impacted files dont belong there, dont read further to avoid scope creep. If they do, please read the files in full and take all the points there into account during your review.
-
 ## Invariants and patterns to check during review
 
 1. Weak data management. No field should be "half-updated" on L1 or L2 implementation. The field is either updated or zero. If there are fields that depend on each other, these should be maintained in sync. 
@@ -22,6 +20,12 @@ The exceptions for the rules above can exist, but they should clearly described 
 
 - Anything that is invoked by the decentralized governance (`owner` of the contract) is trusted to be invoked with the corrent data and the correct number of times. While the implementation of `initialize` itself should be checked. Dont report errors like "this function can be called multiple times" or "params for this function may be wrong/zero address".
 - It is acceptable to rely on concrete implementations of contracts and not their interfaces as long as rule (5) is followed.
+
+## Review procedure
+
+In order to gain more context, please go through the rest of the *.md files within this (review-docs) folder. They all start with `# <title>` and `## <Relevant files>` sections. If the impacted files dont belong to the md file, dont read further to avoid scope creep. If they do, please read the files in full and take all the points there into account during your review. Note, that it is expected that every file within the diff will be reviewed except for clear artifacts (`*.json` files etc).
+
+After reviewing all the corresponding MD files and observing the full list of updated relevant files, split the work into multiple sections to check and use subagents to review each one of those. Combine the work of subagents into a single report.
 
 ## Output format 
 
