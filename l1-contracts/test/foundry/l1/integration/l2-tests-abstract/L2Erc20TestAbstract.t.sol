@@ -6,7 +6,7 @@ pragma solidity ^0.8.20;
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
+import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -72,7 +72,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             ignoreDecimals: false
         });
 
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(NonSequentialVersion.selector));
         vm.prank(ownerWallet);
         BridgedStandardERC20(l2TokenAddress).reinitializeToken(getters, "TestTokenNewName", "TTN", 20);
     }

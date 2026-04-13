@@ -265,6 +265,9 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             abi.encodeWithSignature("L1_CHAIN_ID()"),
             abi.encode(block.chainid)
         );
+
+        vm.expectEmit(true, true, false, true, address(bridgedToken));
+        emit IERC20.Transfer(address(this), address(0), 100);
         vm.broadcast(L2_NATIVE_TOKEN_VAULT_ADDR); // kl todo call ntv, or even assetRouter/bridgehub
         bridgedToken.bridgeBurn(address(this), 100);
     }

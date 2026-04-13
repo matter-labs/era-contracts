@@ -30,8 +30,10 @@ import {
     MigrationNumberMismatch,
     MigrationIntervalNotSet,
     MigrationIntervalInvalid,
-    HistoricalSettlementLayerMismatch
+    HistoricalSettlementLayerMismatch,
+    NotSystemContext
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {NotAssetRouter, MigrationPaused} from "contracts/common/L1ContractErrors.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
@@ -206,7 +208,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     }
 
     function test_bridgeBurn_Failed() public {
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(NotAssetRouter.selector, address(this), address(0)));
         IChainAssetHandlerBase(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
 
         address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
@@ -214,7 +216,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         vm.prank(address(0));
         IChainAssetHandlerBase(address(l2ChainAssetHandler)).pauseMigration();
 
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(MigrationPaused.selector));
         vm.prank(address(0));
         IChainAssetHandlerBase(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
     }
@@ -245,7 +247,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
 
     function test_setSettlementLayerChainId_NotSystemContext() public {
         address notSystemContext = makeAddr("notSystemContext");
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(NotSystemContext.selector, notSystemContext));
         vm.prank(notSystemContext);
         l2ChainAssetHandler.setSettlementLayerChainId(eraZKChainId, eraZKChainId);
     }
