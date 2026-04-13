@@ -135,9 +135,26 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         assertTrue(logs.length > 0, "Withdrawal should emit events when sending message to L1");
 
-        // Verify the withdrawal was for the correct chain and asset
-        assertTrue(data.chainId == mintChainId, "Withdrawal data should reference the correct chain");
-        assertTrue(ctmAssetId != bytes32(0), "CTM asset ID should be valid");
+        // Verify WithdrawalInitiatedAssetRouter event was emitted with correct params
+        // Event sig: WithdrawalInitiatedAssetRouter(uint256 chainId, address indexed l2Sender, bytes32 indexed assetId, bytes assetData)
+        bytes32 withdrawalSig = keccak256("WithdrawalInitiatedAssetRouter(uint256,address,bytes32,bytes)");
+        bool foundWithdrawal = false;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics.length > 2 && logs[i].topics[0] == withdrawalSig) {
+                assertEq(
+                    logs[i].topics[1],
+                    bytes32(uint256(uint160(ownerWallet))),
+                    "WithdrawalInitiatedAssetRouter: l2Sender should be ownerWallet"
+                );
+                assertEq(
+                    logs[i].topics[2],
+                    ctmAssetId,
+                    "WithdrawalInitiatedAssetRouter: assetId should match ctmAssetId"
+                );
+                foundWithdrawal = true;
+            }
+        }
+        assertTrue(foundWithdrawal, "WithdrawalInitiatedAssetRouter event should be emitted");
     }
 
     function test_finalizeDepositWithRealChainData() public {

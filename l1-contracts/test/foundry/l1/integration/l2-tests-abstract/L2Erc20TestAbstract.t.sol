@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 
 import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
@@ -35,7 +36,9 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         address depositor = makeAddr("depositor");
         address receiver = makeAddr("receiver");
 
+        vm.recordLogs();
         performDeposit(depositor, receiver, 100);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
 
         address l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
 
@@ -44,6 +47,33 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         assertEq(BridgedStandardERC20(l2TokenAddress).name(), TOKEN_DEFAULT_NAME);
         assertEq(BridgedStandardERC20(l2TokenAddress).symbol(), TOKEN_DEFAULT_SYMBOL);
         assertEq(BridgedStandardERC20(l2TokenAddress).decimals(), TOKEN_DEFAULT_DECIMALS);
+
+        // Verify Transfer event (mint: from address(0) to receiver)
+        bytes32 transferSig = keccak256("Transfer(address,address,uint256)");
+        bool foundTransfer = false;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (
+                logs[i].topics.length > 2 &&
+                logs[i].topics[0] == transferSig &&
+                logs[i].emitter == l2TokenAddress &&
+                logs[i].topics[1] == bytes32(uint256(0)) &&
+                logs[i].topics[2] == bytes32(uint256(uint160(receiver)))
+            ) {
+                assertEq(abi.decode(logs[i].data, (uint256)), 100, "Transfer amount should be 100");
+                foundTransfer = true;
+            }
+        }
+        assertTrue(foundTransfer, "Transfer event (mint) should be emitted");
+
+        // Verify DepositFinalizedAssetRouter event
+        bytes32 depositFinalizedSig = keccak256("DepositFinalizedAssetRouter(uint256,bytes32,bytes)");
+        bool foundDepositFinalized = false;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics.length > 0 && logs[i].topics[0] == depositFinalizedSig) {
+                foundDepositFinalized = true;
+            }
+        }
+        assertTrue(foundDepositFinalized, "DepositFinalizedAssetRouter event should be emitted");
     }
 
     function test_governanceShouldBeAbleToReinitializeToken() public {
