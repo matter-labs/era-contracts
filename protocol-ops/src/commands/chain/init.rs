@@ -360,10 +360,11 @@ pub fn register_chain(
     auth: &Wallet,
     input: &ChainInitInput,
 ) -> anyhow::Result<RegisterChainOutput> {
+    let salt = input.create2_factory_salt.unwrap_or_else(H256::random);
     let deploy_config = RegisterChainL1Config::new(
         &input.chain_params,
         input.create2_factory_addr.unwrap_or(Address::zero()),
-        input.create2_factory_salt,
+        Some(salt),
         input.with_legacy_bridge,
         input.evm_emulator,
     )?;
@@ -388,7 +389,8 @@ pub fn register_chain(
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
         .with_slow()
-        .with_wallet(auth, runner.simulate);
+        .with_wallet(auth, runner.simulate)
+        .with_env("CREATE2_FACTORY_SALT", format!("{:#x}", salt));
 
     runner.run(forge)?;
 
