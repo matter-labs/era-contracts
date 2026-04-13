@@ -382,7 +382,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             isActive: false
         });
 
-        vm.expectRevert();
+        vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(makeAddr("notOwner"));
         _l1ChainAssetHandler().setHistoricalMigrationInterval(eraZKChainId, 0, interval);
     }

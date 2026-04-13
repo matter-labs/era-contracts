@@ -56,7 +56,7 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         // Verify address(0) is an invalid CTM address
         assertEq(ctm, address(0), "Testing removal of zero address CTM");
 
-        vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector)); //@check
+        vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
         vm.prank(owner);
         addresses.bridgehub.removeChainTypeManager(ctm);
 

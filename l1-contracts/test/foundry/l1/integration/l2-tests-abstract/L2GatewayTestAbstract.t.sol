@@ -51,11 +51,11 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
 
     function test_gatewayShouldFinalizeDeposit() public {
         finalizeDeposit();
-        require(l2Bridgehub.ctmAssetIdFromAddress(address(chainTypeManager)) == ctmAssetId, "ctmAssetId mismatch");
-        require(l2Bridgehub.ctmAssetIdFromChainId(mintChainId) == ctmAssetId, "ctmAssetIdFromChainId mismatch");
+        assertEq(l2Bridgehub.ctmAssetIdFromAddress(address(chainTypeManager)), ctmAssetId, "ctmAssetId mismatch");
+        assertEq(l2Bridgehub.ctmAssetIdFromChainId(mintChainId), ctmAssetId, "ctmAssetIdFromChainId mismatch");
 
         address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
-        require(!GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
+        assertFalse(GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
     }
 
     function test_gatewayNonEmptyPriorityQueueMigration() public {
@@ -69,7 +69,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         finalizeDepositWithCustomCommitment(abi.encode(commitment));
 
         address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
-        require(!GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
+        assertFalse(GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
     }
 
     function test_forwardToL2OnGateway_L2() public {
