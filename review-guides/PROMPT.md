@@ -25,4 +25,4 @@ The exceptions for the rules above can exist, but they should clearly described 
 
 ## Output format 
 
-Your response MUST start with "REVIEW SUMMARY".
+Your response MUST start with "REVIEW SUMMARY". The report should be written to <REVIEW-REPORT> file.

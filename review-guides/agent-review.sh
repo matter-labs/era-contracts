@@ -5,11 +5,13 @@ set -eu
 usage() {
   cat <<'EOF'
 Usage:
-  ./run-agent.sh <claude|codex> <branch> [--yolo]
+  ./run-agent.sh <claude|codex> <branch> [--yolo] [review-report]
 
 Examples:
   ./run-agent.sh claude feature/my-branch
   ./run-agent.sh codex feature/my-branch --yolo
+  ./run-agent.sh claude feature/my-branch review.md
+  ./run-agent.sh codex feature/my-branch --yolo review.md
 EOF
 }
 
@@ -18,18 +20,13 @@ err() {
   exit 1
 }
 
-# Validate args
 [ $# -ge 2 ] || { usage >&2; exit 1; }
-[ $# -le 3 ] || { usage >&2; exit 1; }
+[ $# -le 4 ] || { usage >&2; exit 1; }
 
 TYPE=$1
 BRANCH=$2
 YOLO=0
-
-if [ $# -eq 3 ]; then
-  [ "$3" = "--yolo" ] || err "unknown third argument: $3"
-  YOLO=1
-fi
+REVIEW_REPORT="agent-review.md"
 
 case "$TYPE" in
   claude|codex) ;;
@@ -38,28 +35,41 @@ case "$TYPE" in
     ;;
 esac
 
+case $# in
+  2)
+    ;;
+  3)
+    if [ "$3" = "--yolo" ]; then
+      YOLO=1
+    else
+      REVIEW_REPORT=$3
+    fi
+    ;;
+  4)
+    [ "$3" = "--yolo" ] || err "when 4 arguments are provided, the 3rd must be --yolo"
+    YOLO=1
+    REVIEW_REPORT=$4
+    ;;
+esac
+
 [ -f "./PROMPT.md" ] || err "./PROMPT.md not found"
 
-# Read prompt file and substitute all occurrences of <BRANCH-NAME>
-# Using awk here keeps it POSIX-sh compatible across Linux/macOS.
 PROMPT=$(
-  awk -v branch="$BRANCH" '
+  awk -v branch="$BRANCH" -v report="$REVIEW_REPORT" '
     {
       gsub(/<BRANCH-NAME>/, branch)
+      gsub(/<REVIEW-REPORT>/, report)
       print
     }
   ' ./PROMPT.md
 )
 
-# Make sure required executable exists
 if ! command -v "$TYPE" >/dev/null 2>&1; then
   err "'$TYPE' command not found in PATH"
 fi
 
 case "$TYPE" in
   claude)
-    # Good default: latest strong model alias + high effort.
-    # Non-interactive mode: -p
     if [ "$YOLO" -eq 1 ]; then
       exec claude \
         -p \
@@ -77,8 +87,6 @@ case "$TYPE" in
     ;;
 
   codex)
-    # Good default: latest flagship model + high reasoning.
-    # Non-interactive mode: codex exec
     if [ "$YOLO" -eq 1 ]; then
       exec codex exec \
         --model gpt-5.4 \
