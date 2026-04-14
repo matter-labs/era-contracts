@@ -54,7 +54,7 @@ contract InvariantTesterZKChains is Test {
         tests = new BoundedBridgehubInvariantTests_2();
         // tests.prepare();
     }
-    
+
     // // Check whether the sum of ETH deposits from tests, updated on each deposit and withdrawal,
     // // equals the balance of L1Shared bridge.
     // function invariant_ETHbalanceStaysEqual() public {

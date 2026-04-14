@@ -29,7 +29,7 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
-import {LogFinder} from "./utils/LogFinder.sol";
+import {LogFinder} from "test-utils/LogFinder.sol";
 
 abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;

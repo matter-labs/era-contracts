@@ -88,7 +88,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         }
     }
 
-    function prepare() public { // TODO(EVM-1391): Justify commented code
+    function prepare() public {
+        // TODO(EVM-1391): Justify commented code
         _generateUserAddresses();
 
         _deployL1Contracts();
@@ -107,7 +108,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             l2ContractAddresses.push(contractAddress);
 
             _addL2ChainContract(zkChainIds[i], contractAddress);
-            // _registerL2SharedBridge(zkChainIds[i], contractAddress); 
+            // _registerL2SharedBridge(zkChainIds[i], contractAddress);
         }
 
         _initializeGatewayScript();

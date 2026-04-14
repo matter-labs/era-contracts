@@ -91,10 +91,7 @@ library LogFinder {
         uint256 expectedCount
     ) internal pure returns (Vm.Log[] memory matchedLogs) {
         matchedLogs = findAll(logs, eventSignature);
-        require(
-            matchedLogs.length == expectedCount,
-            string.concat(eventSignature, ": unexpected log count")
-        );
+        require(matchedLogs.length == expectedCount, string.concat(eventSignature, ": unexpected log count"));
     }
 
     /// @notice Asserts that at least `minCount` logs match the given event signature.
@@ -111,10 +108,7 @@ library LogFinder {
         uint256 minCount
     ) internal pure returns (Vm.Log[] memory matchedLogs) {
         matchedLogs = findAll(logs, eventSignature);
-        require(
-            matchedLogs.length >= minCount,
-            string.concat(eventSignature, ": insufficient log count")
-        );
+        require(matchedLogs.length >= minCount, string.concat(eventSignature, ": insufficient log count"));
     }
 
     /// @notice Collects all logs matching the given event signature emitted by a specific contract.

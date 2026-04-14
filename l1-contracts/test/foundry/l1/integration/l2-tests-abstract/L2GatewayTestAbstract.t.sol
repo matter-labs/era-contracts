@@ -40,7 +40,7 @@ import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrack
 import {BalanceChange} from "contracts/common/Messaging.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 
-import {LogFinder} from "./utils/LogFinder.sol";
+import {LogFinder} from "test-utils/LogFinder.sol";
 
 abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
@@ -132,9 +132,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Verify WithdrawalInitiatedAssetRouter event was emitted with correct params
-        Vm.Log memory withdrawalLog = logs.requireOne(
-            "WithdrawalInitiatedAssetRouter(uint256,address,bytes32,bytes)"
-        );
+        Vm.Log memory withdrawalLog = logs.requireOne("WithdrawalInitiatedAssetRouter(uint256,address,bytes32,bytes)");
         assertEq(
             withdrawalLog.topics[1],
             bytes32(uint256(uint160(ownerWallet))),
