@@ -116,4 +116,44 @@ library LogFinder {
             string.concat(eventSignature, ": insufficient log count")
         );
     }
+
+    /// @notice Collects all logs matching the given event signature emitted by a specific contract.
+    /// @param logs The recorded logs array from `vm.getRecordedLogs()`.
+    /// @param eventSignature The canonical event signature string.
+    /// @param emitter The contract address that must have emitted the log.
+    /// @return matchedLogs All matching `Vm.Log` entries from the specified emitter.
+    function findAllFrom(
+        Vm.Log[] memory logs,
+        string memory eventSignature,
+        address emitter
+    ) internal pure returns (Vm.Log[] memory matchedLogs) {
+        Vm.Log[] memory candidates = findAll(logs, eventSignature);
+
+        uint256 count = 0;
+        for (uint256 i = 0; i < candidates.length; i++) {
+            if (candidates[i].emitter == emitter) count++;
+        }
+
+        matchedLogs = new Vm.Log[](count);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < candidates.length; i++) {
+            if (candidates[i].emitter == emitter) matchedLogs[idx++] = candidates[i];
+        }
+    }
+
+    /// @notice Returns the first log matching the given event signature from a specific emitter,
+    ///         reverting if none is found.
+    /// @param logs The recorded logs array from `vm.getRecordedLogs()`.
+    /// @param eventSignature The canonical event signature string.
+    /// @param emitter The contract address that must have emitted the log.
+    /// @return matchedLog The first matching `Vm.Log` entry.
+    function requireOneFrom(
+        Vm.Log[] memory logs,
+        string memory eventSignature,
+        address emitter
+    ) internal pure returns (Vm.Log memory matchedLog) {
+        Vm.Log[] memory candidates = findAllFrom(logs, eventSignature, emitter);
+        require(candidates.length > 0, string.concat(eventSignature, ": event not found from emitter"));
+        return candidates[0];
+    }
 }

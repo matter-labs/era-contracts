@@ -29,8 +29,11 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
+import {LogFinder} from "./utils/LogFinder.sol";
+
 abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
+    using LogFinder for Vm.Log[];
 
     function test_shouldFinalizeERC20Deposit() public {
         address depositor = makeAddr("depositor");
@@ -49,31 +52,13 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         assertEq(BridgedStandardERC20(l2TokenAddress).decimals(), TOKEN_DEFAULT_DECIMALS);
 
         // Verify Transfer event (mint: from address(0) to receiver)
-        bytes32 transferSig = keccak256("Transfer(address,address,uint256)");
-        bool foundTransfer = false;
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (
-                logs[i].topics.length > 2 &&
-                logs[i].topics[0] == transferSig &&
-                logs[i].emitter == l2TokenAddress &&
-                logs[i].topics[1] == bytes32(uint256(0)) &&
-                logs[i].topics[2] == bytes32(uint256(uint160(receiver)))
-            ) {
-                assertEq(abi.decode(logs[i].data, (uint256)), 100, "Transfer amount should be 100");
-                foundTransfer = true;
-            }
-        }
-        assertTrue(foundTransfer, "Transfer event (mint) should be emitted");
+        Vm.Log memory mintLog = logs.requireOneFrom("Transfer(address,address,uint256)", l2TokenAddress);
+        assertEq(mintLog.topics[1], bytes32(uint256(0)), "Transfer should originate from zero address");
+        assertEq(mintLog.topics[2], bytes32(uint256(uint160(receiver))), "Transfer receiver mismatch");
+        assertEq(abi.decode(mintLog.data, (uint256)), 100, "Transfer amount should be 100");
 
         // Verify DepositFinalizedAssetRouter event
-        bytes32 depositFinalizedSig = keccak256("DepositFinalizedAssetRouter(uint256,bytes32,bytes)");
-        bool foundDepositFinalized = false;
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics.length > 0 && logs[i].topics[0] == depositFinalizedSig) {
-                foundDepositFinalized = true;
-            }
-        }
-        assertTrue(foundDepositFinalized, "DepositFinalizedAssetRouter event should be emitted");
+        logs.requireOne("DepositFinalizedAssetRouter(uint256,bytes32,bytes)");
     }
 
     function test_governanceShouldBeAbleToReinitializeToken() public {
