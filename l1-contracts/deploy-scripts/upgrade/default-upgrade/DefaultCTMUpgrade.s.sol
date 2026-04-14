@@ -23,7 +23,6 @@ import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeploy
 
 import {Governance} from "contracts/governance/Governance.sol";
 
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
@@ -406,56 +405,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     function prepareFixedForceDeploymentsData() public virtual returns (FixedForceDeploymentsData memory data) {
         require(config.ownerAddress != address(0), "owner not set");
 
-        data = FixedForceDeploymentsData({
-            l1ChainId: config.l1ChainId,
-            eraChainId: config.eraChainId,
-            gatewayChainId: config.gatewayChainId,
-            l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: CoreOnGatewayHelper.getDeployedBytecodeHash(
-                config.isZKsyncOS,
-                CoreContract.BeaconProxy
-            ),
-            aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
-            maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2Bridgehub),
-            l2AssetRouterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.L2AssetRouter
-            ),
-            l2NtvBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2NativeTokenVault),
-            messageRootBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2MessageRoot),
-            chainAssetHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.L2ChainAssetHandler
-            ),
-            beaconDeployerInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.UpgradeableBeaconDeployer
-            ),
-            baseTokenHolderBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.BaseTokenHolder
-            ),
-            interopCenterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.InteropCenter
-            ),
-            interopHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.InteropHandler
-            ),
-            assetTrackerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.L2AssetTracker
-            ),
-            l2SharedBridgeLegacyImpl: address(0),
-            l2BridgedStandardERC20Impl: address(0),
-            aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
-                coreAddresses.bridgehub.proxies.chainRegistrationSender
-            ),
-            dangerousTestOnlyForcedBeacon: address(0),
-            zkTokenAssetId: config.zkTokenAssetId
-        });
+        data = _buildForceDeploymentsData(config.ownerAddress, address(0));
     }
 
     function getUpgradeAddedFacetCuts(
@@ -983,6 +933,26 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         require(upgradeConfig.upgradeCutPrepared, "upgrade cut data not prepared");
         return newlyGeneratedData.upgradeCutData;
     }
+
+    /// @dev Test-only: inject pre-computed upgrade cut data to avoid recomputing (memory optimization).
+    function setChainUpgradeDiamondCutData_TestOnly(bytes memory _data) public {
+        newlyGeneratedData.upgradeCutData = _data;
+        upgradeConfig.upgradeCutPrepared = true;
+    }
+
+    /// @dev Test-only: inject pre-computed fixed force deployments data.
+    function setFixedForceDeploymentsData_TestOnly(bytes memory _data) public {
+        newlyGeneratedData.fixedForceDeploymentsData = _data;
+        generatedData.forceDeploymentsData = _data;
+        upgradeConfig.fixedForceDeploymentsDataGenerated = true;
+    }
+
+    /// @notice Returns the encoded FixedForceDeploymentsData bytes.
+    function getEncodedFixedForceDeploymentsData() public view returns (bytes memory) {
+        require(upgradeConfig.fixedForceDeploymentsDataGenerated, "force deployments data not generated");
+        return newlyGeneratedData.fixedForceDeploymentsData;
+    }
+
     ////////////////////////////// Misc utils /////////////////////////////////
 
     // add this to be excluded from coverage report

@@ -394,18 +394,6 @@ library L2GenesisForceDeploymentsHelper {
             );
         }
 
-        if (_isGenesisUpgrade) {
-            InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
-                _fixedForceDeploymentsData.l1ChainId,
-                _fixedForceDeploymentsData.aliasedL1Governance,
-                _fixedForceDeploymentsData.zkTokenAssetId
-            );
-        } else {
-            InteropCenter(L2_INTEROP_CENTER_ADDR).updateL2(
-                _fixedForceDeploymentsData.l1ChainId,
-                _fixedForceDeploymentsData.aliasedL1Governance
-            );
-        }
     }
 
     function _finalizeDeployments(
@@ -434,7 +422,7 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     /// @notice Initializes contracts introduced in v31: AssetTracker, GWAssetTracker,
-    /// InteropHandler, L2BaseToken, and base token registration.
+    /// InteropHandler, InteropCenter, L2BaseToken, and base token registration.
     /// @dev Called from `_finalizeDeployments` during genesis and from `L2V31Upgrade` during upgrades.
     /// Keeping this in the library ensures a single source of truth for v31-specific initialization.
     function initializeV31Contracts(
@@ -457,6 +445,19 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
+
+        if (_isGenesisUpgrade) {
+            InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
+                _fixedForceDeploymentsData.l1ChainId,
+                _fixedForceDeploymentsData.aliasedL1Governance,
+                _fixedForceDeploymentsData.zkTokenAssetId
+            );
+        } else {
+            InteropCenter(L2_INTEROP_CENTER_ADDR).updateL2(
+                _fixedForceDeploymentsData.l1ChainId,
+                _fixedForceDeploymentsData.aliasedL1Governance
+            );
+        }
 
         // Register the base token in the AssetTracker.
         // During genesis, NTV.registerBaseTokenIfNeeded() handles it.

@@ -275,16 +275,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils, IDeployL1Core
         );
         vm.serializeAddress(
             "bridgehub",
-            "chain_asset_handler_proxy_addr",
-            coreAddresses.bridgehub.proxies.chainAssetHandler
-        );
-        vm.serializeAddress(
-            "bridgehub",
-            "chain_asset_handler_implementation_addr",
-            coreAddresses.bridgehub.implementations.chainAssetHandler
-        );
-        vm.serializeAddress(
-            "bridgehub",
             "l1_asset_tracker_implementation_addr",
             coreAddresses.bridgehub.implementations.assetTracker
         );

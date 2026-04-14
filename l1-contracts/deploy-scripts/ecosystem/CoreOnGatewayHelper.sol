@@ -7,7 +7,7 @@ import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeploy
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 
-import {CoreContract, ZKsyncOSUpgradeType} from "./CoreContract.sol";
+import {CoreContract, EraVmSystemContract, Language, ZkSyncOsSystemContract, ZKsyncOSUpgradeType} from "./CoreContract.sol";
 import {
     GW_ASSET_TRACKER_ADDR,
     L2_ASSET_ROUTER_ADDR,
@@ -23,6 +23,12 @@ import {
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {
+    L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
+} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title CoreOnGatewayHelper
 /// @notice Resolves CoreContract enum values to VM-specific artifact names
@@ -151,7 +157,6 @@ library CoreOnGatewayHelper {
     function _resolveContractName(bool _isZKsyncOS, CoreContract _c) internal pure returns (string memory) {
         // Contracts with different names per VM
         if (_c == CoreContract.L2NativeTokenVault) return _isZKsyncOS ? "L2NativeTokenVaultZKOS" : "L2NativeTokenVault";
-        if (_c == CoreContract.L2BaseToken) return _isZKsyncOS ? "L2BaseTokenZKOS" : "L2BaseTokenEra";
 
         // Contracts with the same name across both VMs
         if (_c == CoreContract.L2Bridgehub) return "L2Bridgehub";
@@ -215,5 +220,134 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.InteropHandler) return L2_INTEROP_HANDLER_ADDR;
         if (_c == CoreContract.GWAssetTracker) return GW_ASSET_TRACKER_ADDR;
         revert("CoreOnGatewayHelper: no address for CoreContract");
+    }
+
+    // ======================== ZkSyncOsSystemContract resolvers ========================
+
+    /// @notice Resolve a ZkSyncOsSystemContract to its ZKsyncOS contract name.
+    function _resolveZkOsSystemContractName(ZkSyncOsSystemContract _c) internal pure returns (string memory) {
+        if (_c == ZkSyncOsSystemContract.L2BaseToken) return "L2BaseTokenZKOS";
+        if (_c == ZkSyncOsSystemContract.L1Messenger) return "L1MessengerZKOS";
+        if (_c == ZkSyncOsSystemContract.SystemContext) return "SystemContext";
+        if (_c == ZkSyncOsSystemContract.ContractDeployer) return "ZKOSContractDeployer";
+        revert("CoreOnGatewayHelper: unknown ZkSyncOsSystemContract");
+    }
+
+    /// @notice Resolve a ZkSyncOsSystemContract to its canonical L2 address.
+    function _resolveZkOsSystemContractAddress(ZkSyncOsSystemContract _c) internal pure returns (address) {
+        if (_c == ZkSyncOsSystemContract.L2BaseToken) return L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR;
+        if (_c == ZkSyncOsSystemContract.L1Messenger) return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR;
+        if (_c == ZkSyncOsSystemContract.SystemContext) return L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR;
+        if (_c == ZkSyncOsSystemContract.ContractDeployer) return L2_DEPLOYER_SYSTEM_CONTRACT_ADDR;
+        revert("CoreOnGatewayHelper: no address for ZkSyncOsSystemContract");
+    }
+
+    // ======================== EraVmSystemContract resolvers ========================
+
+    /// @notice Maps an EraVmSystemContract to its deployed address.
+    function _resolveAddress(EraVmSystemContract _id) internal pure returns (address) {
+        if (_id == EraVmSystemContract.EmptyContract_0x0000) return address(0x0000);
+        if (_id == EraVmSystemContract.Ecrecover) return address(0x0001);
+        if (_id == EraVmSystemContract.SHA256) return address(0x0002);
+        if (_id == EraVmSystemContract.Identity) return address(0x0004);
+        if (_id == EraVmSystemContract.EcAdd) return address(0x0006);
+        if (_id == EraVmSystemContract.EcMul) return address(0x0007);
+        if (_id == EraVmSystemContract.EcPairing) return address(0x0008);
+        if (_id == EraVmSystemContract.Modexp) return address(0x0005);
+        if (_id == EraVmSystemContract.EmptyContract_0x8001) return address(0x8001);
+        if (_id == EraVmSystemContract.AccountCodeStorage) return address(0x8002);
+        if (_id == EraVmSystemContract.NonceHolder) return address(0x8003);
+        if (_id == EraVmSystemContract.KnownCodesStorage) return address(0x8004);
+        if (_id == EraVmSystemContract.ImmutableSimulator) return address(0x8005);
+        if (_id == EraVmSystemContract.ContractDeployer) return address(0x8006);
+        if (_id == EraVmSystemContract.L1Messenger) return address(0x8008);
+        if (_id == EraVmSystemContract.MsgValueSimulator) return address(0x8009);
+        if (_id == EraVmSystemContract.L2BaseToken) return address(0x800A);
+        if (_id == EraVmSystemContract.SystemContext) return address(0x800B);
+        if (_id == EraVmSystemContract.BootloaderUtilities) return address(0x800C);
+        if (_id == EraVmSystemContract.EventWriter) return address(0x800D);
+        if (_id == EraVmSystemContract.Compressor) return address(0x800E);
+        if (_id == EraVmSystemContract.Keccak256) return address(0x8010);
+        if (_id == EraVmSystemContract.CodeOracle) return address(0x8012);
+        if (_id == EraVmSystemContract.EvmGasManager) return address(0x8013);
+        if (_id == EraVmSystemContract.EvmPredeploysManager) return address(0x8014);
+        if (_id == EraVmSystemContract.EvmHashesStorage) return address(0x8015);
+        if (_id == EraVmSystemContract.P256Verify) return address(0x0100);
+        if (_id == EraVmSystemContract.PubdataChunkPublisher) return address(0x8011);
+        if (_id == EraVmSystemContract.Create2Factory) return address(0x10000);
+        if (_id == EraVmSystemContract.SloadContract) return address(0x10006);
+        revert("CoreOnGatewayHelper: unknown EraVmSystemContract address");
+    }
+
+    /// @notice Maps an EraVmSystemContract to its Era code name.
+    function _resolveContractName(EraVmSystemContract _id) internal pure returns (string memory) {
+        if (_id == EraVmSystemContract.EmptyContract_0x0000) return "EmptyContract";
+        if (_id == EraVmSystemContract.Ecrecover) return "Ecrecover";
+        if (_id == EraVmSystemContract.SHA256) return "SHA256";
+        if (_id == EraVmSystemContract.Identity) return "Identity";
+        if (_id == EraVmSystemContract.EcAdd) return "EcAdd";
+        if (_id == EraVmSystemContract.EcMul) return "EcMul";
+        if (_id == EraVmSystemContract.EcPairing) return "EcPairing";
+        if (_id == EraVmSystemContract.Modexp) return "Modexp";
+        if (_id == EraVmSystemContract.EmptyContract_0x8001) return "EmptyContract";
+        if (_id == EraVmSystemContract.AccountCodeStorage) return "AccountCodeStorage";
+        if (_id == EraVmSystemContract.NonceHolder) return "NonceHolder";
+        if (_id == EraVmSystemContract.KnownCodesStorage) return "KnownCodesStorage";
+        if (_id == EraVmSystemContract.ImmutableSimulator) return "ImmutableSimulator";
+        if (_id == EraVmSystemContract.ContractDeployer) return "ContractDeployer";
+        if (_id == EraVmSystemContract.L1Messenger) return "L1Messenger";
+        if (_id == EraVmSystemContract.MsgValueSimulator) return "MsgValueSimulator";
+        if (_id == EraVmSystemContract.L2BaseToken) return "L2BaseToken";
+        if (_id == EraVmSystemContract.SystemContext) return "SystemContext";
+        if (_id == EraVmSystemContract.BootloaderUtilities) return "BootloaderUtilities";
+        if (_id == EraVmSystemContract.EventWriter) return "EventWriter";
+        if (_id == EraVmSystemContract.Compressor) return "Compressor";
+        if (_id == EraVmSystemContract.Keccak256) return "Keccak256";
+        if (_id == EraVmSystemContract.CodeOracle) return "CodeOracle";
+        if (_id == EraVmSystemContract.EvmGasManager) return "EvmGasManager";
+        if (_id == EraVmSystemContract.EvmPredeploysManager) return "EvmPredeploysManager";
+        if (_id == EraVmSystemContract.EvmHashesStorage) return "EvmHashesStorage";
+        if (_id == EraVmSystemContract.P256Verify) return "P256Verify";
+        if (_id == EraVmSystemContract.PubdataChunkPublisher) return "PubdataChunkPublisher";
+        if (_id == EraVmSystemContract.Create2Factory) return "Create2Factory";
+        if (_id == EraVmSystemContract.SloadContract) return "SloadContract";
+        revert("CoreOnGatewayHelper: unknown EraVmSystemContract name");
+    }
+
+    /// @notice Maps an EraVmSystemContract to its programming language.
+    function _resolveLanguage(EraVmSystemContract _id) internal pure returns (Language) {
+        if (
+            _id == EraVmSystemContract.Ecrecover ||
+            _id == EraVmSystemContract.SHA256 ||
+            _id == EraVmSystemContract.Identity ||
+            _id == EraVmSystemContract.EcAdd ||
+            _id == EraVmSystemContract.EcMul ||
+            _id == EraVmSystemContract.EcPairing ||
+            _id == EraVmSystemContract.Modexp ||
+            _id == EraVmSystemContract.EventWriter ||
+            _id == EraVmSystemContract.Keccak256 ||
+            _id == EraVmSystemContract.CodeOracle ||
+            _id == EraVmSystemContract.EvmGasManager ||
+            _id == EraVmSystemContract.P256Verify
+        ) {
+            return Language.Yul;
+        }
+        return Language.Solidity;
+    }
+
+    /// @notice Maps an EraVmSystemContract to whether it is a precompile.
+    function _resolveIsPrecompile(EraVmSystemContract _id) internal pure returns (bool) {
+        return (
+            _id == EraVmSystemContract.Ecrecover ||
+            _id == EraVmSystemContract.SHA256 ||
+            _id == EraVmSystemContract.Identity ||
+            _id == EraVmSystemContract.EcAdd ||
+            _id == EraVmSystemContract.EcMul ||
+            _id == EraVmSystemContract.EcPairing ||
+            _id == EraVmSystemContract.Modexp ||
+            _id == EraVmSystemContract.Keccak256 ||
+            _id == EraVmSystemContract.CodeOracle ||
+            _id == EraVmSystemContract.P256Verify
+        );
     }
 }

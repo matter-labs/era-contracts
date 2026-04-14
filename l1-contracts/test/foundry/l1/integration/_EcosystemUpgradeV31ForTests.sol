@@ -21,6 +21,20 @@ contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
     function publishBytecodes() public override {
         // no-op: avoids loading large zkout files into EVM memory
     }
+
+    /// @dev Skip serializing deployed_addresses/state_transition/etc. to TOML.
+    /// The accumulated JSON strings from vm.serializeAddress/vm.serializeString blow
+    /// forge's default 128MB EVM memory. The test only needs chain_upgrade_diamond_cut.
+    function saveOutput(string memory) internal override {
+        // no-op: avoids OOM from large TOML serialization
+    }
+
+    /// @dev Deploy only the upgrade-specific contracts (timer, validator) without
+    /// full CTM deployment (which sets addresses that are already set from step1).
+    function deployUpgradeContractsOnly() public {
+        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
+        upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator", false);
+    }
 }
 
 /// @dev CoreUpgrade that skips updateContractConnections() on re-run.
@@ -36,6 +50,15 @@ contract CoreUpgradeV31Idempotent is CoreUpgrade_v31 {
 contract EcosystemUpgradeV31ForTests is EcosystemUpgrade_v31 {
     using stdToml for string;
     bool private _useIdempotentCore;
+
+    /// @dev Skip state_transition/upgrade_addresses TOML serialization to avoid OOM.
+    /// These optional sections accumulate huge JSON strings that blow the default 128MB limit.
+    /// Only the chain_upgrade_diamond_cut section is needed by the test.
+    function saveCombinedOutput() internal override {
+        bytes memory upgradeCutData = ctmUpgrade.getChainUpgradeDiamondCutData();
+        string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", upgradeCutData);
+        vm.writeToml(toml, ecosystemOutputPath);
+    }
 
     function createCTMUpgrade() internal override returns (DefaultCTMUpgrade) {
         return new CTMUpgradeV31ForTests();
@@ -91,13 +114,55 @@ contract EcosystemUpgradeV31ForTests is EcosystemUpgrade_v31 {
         coreUpgrade.prepareEcosystemUpgrade();
     }
 
-    /// @notice Step 2: Re-populate core addresses (idempotent), deploy CTM, generate governance calls.
+    /// @notice Step 2: Re-populate core addresses (idempotent), deploy CTM, generate diamond cut.
     /// @dev Uses CoreUpgradeV31Idempotent to skip setAddresses/transferOwnership side effects.
-    /// Produces ~25 transactions.
+    /// Writes extra CTM state to output TOML for step2b to read (avoids recomputing).
     function step2() public {
         _useIdempotentCore = true;
-        initializeWithArgs(_buildParams());
+        EcosystemUpgradeParams memory params = _buildParams();
+        initializeWithArgs(params);
         prepareEcosystemUpgrade();
+
+        // Save state for step3 (avoids bytecode-heavy recomputation)
+        string memory root = vm.projectRoot();
+        string memory outPath = string.concat(root, params.ecosystemOutputPath);
+        vm.serializeBytes("ctm_state", "fixed_force_deployments_data", ctmUpgrade.getEncodedFixedForceDeploymentsData());
+        string memory ctmState = vm.serializeAddress(
+            "ctm_state",
+            "asset_tracker_proxy",
+            coreUpgrade.getCoreAddresses().bridgehub.proxies.assetTracker
+        );
+        vm.writeToml(ctmState, outPath, ".ctm_state");
+    }
+
+    /// @notice Step 3: Generate governance calls from step2's output (no bytecode loading/deploy).
+    /// @dev Reads pre-computed CTM state from step2's output TOML.
+    /// Re-deploys CTM L1 contracts (create2 idempotent) for upgradeAddresses (timer etc.)
+    /// but does NOT re-deploy core or re-compute L2 data.
+    function step3() public {
+        _useIdempotentCore = true;
+        EcosystemUpgradeParams memory params = _buildParams();
+        initializeWithArgs(params);
+
+        // Re-deploy only the upgrade-specific contracts (timer, validator) to populate addresses.
+        // Cannot call full deployNewCTMContracts() — verifier deployment calls setAddresses
+        // which reverts with AddressAlreadySet since step1 already set them.
+        CTMUpgradeV31ForTests(address(ctmUpgrade)).deployUpgradeContractsOnly();
+
+        // Read pre-computed data from step2 output
+        string memory root = vm.projectRoot();
+        string memory outputToml = vm.readFile(string.concat(root, params.ecosystemOutputPath));
+        bytes memory upgradeCut = outputToml.readBytes("$.chain_upgrade_diamond_cut");
+        bytes memory fixedForceDeployments = outputToml.readBytes("$.ctm_state.fixed_force_deployments_data");
+        address assetTrackerProxy = outputToml.readAddress("$.ctm_state.asset_tracker_proxy");
+
+        // Inject AssetTracker address into core upgrade (v30 introspection returns 0)
+        coreUpgrade.setAssetTrackerProxy_TestOnly(assetTrackerProxy);
+
+        // Inject into CTM upgrade so governance calls can use it without reloading L2 bytecodes
+        ctmUpgrade.setChainUpgradeDiamondCutData_TestOnly(upgradeCut);
+        ctmUpgrade.setFixedForceDeploymentsData_TestOnly(fixedForceDeployments);
+
         prepareDefaultGovernanceCalls();
     }
 

@@ -477,7 +477,10 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         address dangerousTestOnlyForcedBeacon = _getDangerousTestOnlyForcedBeacon();
 
-        FixedForceDeploymentsData memory data = _buildForceDeploymentsData(dangerousTestOnlyForcedBeacon);
+        FixedForceDeploymentsData memory data = _buildForceDeploymentsData(
+            ctmAddresses.admin.governance,
+            dangerousTestOnlyForcedBeacon
+        );
 
         return abi.encode(data);
     }
@@ -584,7 +587,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     /// @dev Get bytecode info, using cached blake hashes for ZKsyncOS or CoreOnGatewayHelper for Era.
-    function _getBytecodeInfo(CoreContract _c) private returns (bytes memory) {
+    function _getBytecodeInfo(CoreContract _c) internal virtual returns (bytes memory) {
         if (config.isZKsyncOS) {
             (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _c);
             return _getProxyUpgradeBytecodeInfo(fileName, contractName);
@@ -593,8 +596,9 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     }
 
     function _buildForceDeploymentsData(
-        address dangerousTestOnlyForcedBeacon
-    ) private returns (FixedForceDeploymentsData memory data) {
+        address _governance,
+        address _dangerousTestOnlyForcedBeacon
+    ) internal virtual returns (FixedForceDeploymentsData memory data) {
         if (config.isZKsyncOS) {
             _precomputeBlakeHashes();
         }
@@ -608,7 +612,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
                 config.isZKsyncOS,
                 CoreContract.BeaconProxy
             ),
-            aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(ctmAddresses.admin.governance),
+            aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(_governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeInfo: _getBytecodeInfo(CoreContract.L2Bridgehub),
             l2AssetRouterBytecodeInfo: _getBytecodeInfo(CoreContract.L2AssetRouter),
@@ -625,7 +629,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
                 coreAddresses.bridgehub.proxies.chainRegistrationSender
             ),
-            dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon,
+            dangerousTestOnlyForcedBeacon: _dangerousTestOnlyForcedBeacon,
             zkTokenAssetId: config.zkTokenAssetId
         });
     }
