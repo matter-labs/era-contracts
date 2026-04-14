@@ -17,6 +17,7 @@ contract EIP7702Checker {
             let ptr := mload(0x40) // load free memory pointer
             extcodecopy(_account, ptr, 0, 3)
             prefix := mload(ptr) // read back into stack
+            mstore(0x40, add(ptr, 0x20)) // advance free memory pointer
         }
 
         return prefix == EIP7702_PREFIX;

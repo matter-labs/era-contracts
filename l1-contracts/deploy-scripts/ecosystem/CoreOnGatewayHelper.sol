@@ -32,6 +32,7 @@ import {
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {
     L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+    L2_NTV_BEACON_DEPLOYER_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
@@ -226,6 +227,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.InteropCenter) return L2_INTEROP_CENTER_ADDR;
         if (_c == CoreContract.InteropHandler) return L2_INTEROP_HANDLER_ADDR;
         if (_c == CoreContract.GWAssetTracker) return GW_ASSET_TRACKER_ADDR;
+        if (_c == CoreContract.UpgradeableBeaconDeployer) return L2_NTV_BEACON_DEPLOYER_ADDR;
         revert UnknownCoreContract();
     }
 
