@@ -126,7 +126,11 @@ contract EcosystemUpgradeV31ForTests is EcosystemUpgrade_v31 {
         // Save state for step3 (avoids bytecode-heavy recomputation)
         string memory root = vm.projectRoot();
         string memory outPath = string.concat(root, params.ecosystemOutputPath);
-        vm.serializeBytes("ctm_state", "fixed_force_deployments_data", ctmUpgrade.getEncodedFixedForceDeploymentsData());
+        vm.serializeBytes(
+            "ctm_state",
+            "fixed_force_deployments_data",
+            ctmUpgrade.getEncodedFixedForceDeploymentsData()
+        );
         string memory ctmState = vm.serializeAddress(
             "ctm_state",
             "asset_tracker_proxy",

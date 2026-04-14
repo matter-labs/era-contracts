@@ -7,7 +7,13 @@ import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeploy
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 
-import {CoreContract, EraVmSystemContract, Language, ZkSyncOsSystemContract, ZKsyncOSUpgradeType} from "./CoreContract.sol";
+import {
+    CoreContract,
+    EraVmSystemContract,
+    Language,
+    ZkSyncOsSystemContract,
+    ZKsyncOSUpgradeType
+} from "./CoreContract.sol";
 import {UnknownCoreContract, UnknownZkSyncOsSystemContract, UnknownEraVmSystemContract} from "./DeployScriptErrors.sol";
 import {
     GW_ASSET_TRACKER_ADDR,
@@ -346,8 +352,7 @@ library CoreOnGatewayHelper {
 
     /// @notice Maps an EraVmSystemContract to whether it is a precompile.
     function _resolveIsPrecompile(EraVmSystemContract _id) internal pure returns (bool) {
-        return (
-            _id == EraVmSystemContract.Ecrecover ||
+        return (_id == EraVmSystemContract.Ecrecover ||
             _id == EraVmSystemContract.SHA256 ||
             _id == EraVmSystemContract.Identity ||
             _id == EraVmSystemContract.EcAdd ||
@@ -356,7 +361,6 @@ library CoreOnGatewayHelper {
             _id == EraVmSystemContract.Modexp ||
             _id == EraVmSystemContract.Keccak256 ||
             _id == EraVmSystemContract.CodeOracle ||
-            _id == EraVmSystemContract.P256Verify
-        );
+            _id == EraVmSystemContract.P256Verify);
     }
 }

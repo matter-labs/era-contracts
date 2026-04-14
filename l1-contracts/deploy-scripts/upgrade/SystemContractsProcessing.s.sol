@@ -25,7 +25,13 @@ import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeploy
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
-import {CoreContract, EraVmSystemContract, Language, ZkSyncOsSystemContract, ZKsyncOSUpgradeType} from "../ecosystem/CoreContract.sol";
+import {
+    CoreContract,
+    EraVmSystemContract,
+    Language,
+    ZkSyncOsSystemContract,
+    ZKsyncOSUpgradeType
+} from "../ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 import {DeduplicateBytecodesCountMismatch} from "../ecosystem/DeployScriptErrors.sol";
 
@@ -74,8 +80,6 @@ library SystemContractsProcessing {
         }
         return systemContracts;
     }
-
-
 
     /// @notice Deduplicates the array of bytecodes.
     function deduplicateBytecodes(bytes[] memory input) internal pure returns (bytes[] memory output) {

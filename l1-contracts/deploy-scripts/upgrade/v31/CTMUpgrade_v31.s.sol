@@ -120,5 +120,4 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             )
         });
     }
-
 }

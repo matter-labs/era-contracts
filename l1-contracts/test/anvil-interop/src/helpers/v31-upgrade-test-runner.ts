@@ -417,7 +417,10 @@ async function deployL2Contracts(
   // SystemContractProxyAdmin: _setupProxyAdmin() calls owner() and forceSetOwner().
   // For ZKsyncOS: use real SystemContractProxyAdmin — proper proxy setup means upgrade() works.
   // For Era: use real SystemContractProxyAdmin (upgrade() is not called by outer loop).
-  await l2Provider.send("anvil_setCode", [L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, getBytecode("SystemContractProxyAdmin")]);
+  await l2Provider.send("anvil_setCode", [
+    L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
+    getBytecode("SystemContractProxyAdmin"),
+  ]);
   await l2Provider.send("anvil_setStorageAt", [
     L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
     ethers.utils.hexZeroPad("0x0", 32), // slot 0: Ownable._owner
@@ -433,7 +436,7 @@ async function deployL2Contracts(
       // For ZKsyncOS, all force-deployed addresses should be in the map.
       // For Era, system contracts + create2-derived addresses may not be mapped.
 
-        throw new Error(`No contract mapping for ZKsyncOS force deploy address ${entry.address}`);
+      throw new Error(`No contract mapping for ZKsyncOS force deploy address ${entry.address}`);
       continue;
     }
 
@@ -511,9 +514,7 @@ async function deployBehindSystemProxy(
   // In the test harness, bytecodeInfo is the raw EVM bytecode (not the ZKsyncOS tuple),
   // so the derived address won't match production, but this is fine — we just need a unique
   // deterministic address for the impl that doesn't collide with system addresses.
-  const implAddressHash = ethers.utils.keccak256(
-    ethers.utils.concat([ethers.constants.HashZero, implBytecode])
-  );
+  const implAddressHash = ethers.utils.keccak256(ethers.utils.concat([ethers.constants.HashZero, implBytecode]));
   const implAddress = ethers.utils.getAddress("0x" + implAddressHash.slice(26));
 
   // 1. Deploy implementation at derived address
