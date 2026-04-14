@@ -20,7 +20,7 @@ The above means that inside the deployment and upgrade preparation scripts whene
 
 ### ZKsync Era
 
-The genesis is defined in the other repo: <link>. The main difference is that we don't use system proxies for Era and use Force deployments instead.
+The genesis is defined in the [other repo](https://github.com/matter-labs/zksync-era/blob/draft-v31/core/lib/types/src/system_contracts.rs). The main difference is that we don't use system proxies for Era and use Force deployments instead.
 
 ### Upgrade process
 

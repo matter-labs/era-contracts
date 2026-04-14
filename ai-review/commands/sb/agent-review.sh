@@ -38,7 +38,8 @@ err() {
 TYPE=$1
 BRANCH=$2
 YOLO=0
-REVIEW_REPORT="agent-review.md"
+TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
+REVIEW_REPORT="agent-review-${TIMESTAMP}.md"
 
 case "$TYPE" in
   claude|codex) ;;
