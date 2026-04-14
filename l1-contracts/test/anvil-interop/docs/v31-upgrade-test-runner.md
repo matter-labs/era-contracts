@@ -67,19 +67,18 @@ L2 relay phase, the test runner:
 
 This replaces any need for a separate `PREDEPLOY_SYSTEM_CONTRACTS` list.
 
-### MockSystemContractProxyAdmin
+### SystemContractProxyAdmin
 
-On ZKsyncOS chains, `performForceDeployedContractsInit` calls
-`SystemContractProxyAdmin.upgrade(proxy, impl)` which requires `owner == ComplexUpgrader`.
-The test runner deploys a `MockSystemContractProxyAdmin` (no-op) at the proxy admin address
-and sets its owner to `L2_COMPLEX_UPGRADER_ADDR` via `anvil_setStorageAt`.
+The real `SystemContractProxyAdmin` is deployed at the proxy admin address for both Era and
+ZKsyncOS chains. Its `_owner` storage slot is set to `L2_COMPLEX_UPGRADER_ADDR` via
+`anvil_setStorageAt` so that `_setupProxyAdmin()` and `upgrade()` calls succeed.
 
-### L2BaseTokenEra for both Era and ZKsyncOS
+### L2BaseToken per VM type
 
-The test uses `L2BaseTokenEra` (storage-based balance tracking) for both Era and ZKsyncOS
-chains. On ZKsyncOS, `L2BaseTokenZKOS.initL2()` would call `MINT_BASE_TOKEN_HOOK` which is
-a ZK-VM precompile that does not exist on Anvil. `L2BaseTokenEra` avoids this by reading
-`__DEPRECATED_totalSupply` from storage instead.
+Era chains use `L2BaseTokenEra` (storage-based balance tracking).
+ZKsyncOS chains use `L2BaseTokenZKOS` deployed behind `SystemContractProxy` at 0x800A.
+On Anvil, `MINT_BASE_TOKEN_HOOK` is an empty address, so the mint call in
+`L2BaseTokenZKOS.initL2()` is a no-op (same effect as `__DEPRECATED_totalSupply` being zero).
 
 ### Force deployment list from calldata
 
@@ -226,27 +225,23 @@ ZKsync VM (bytecode hashing, validation, etc.) and do not work. The test patches
   mapped to EVM contract names via the `ADDRESS_TO_CONTRACT` map. Also:
   - `L2V31Upgrade` bytecode at the delegateTo address
   - `MockContractDeployer` at 0x8006
-  - `MockSystemContractProxyAdmin` at the proxy admin address (ZKsyncOS only)
-  - `L2BaseTokenEra` at the base token address (both Era and ZKsyncOS)
+  - `SystemContractProxyAdmin` at the proxy admin address (owner set to ComplexUpgrader)
+  - `L2BaseTokenEra` (Era) or `L2BaseTokenZKOS` behind SystemContractProxy (ZKsyncOS) at 0x800A
 
-### Patch: L2BaseToken replacement
+### L2BaseToken per VM type
 
 - Production: `L2V31Upgrade.upgrade()` calls `L2BaseToken.initL2(l1ChainId)`.
-  On Era, `L2BaseTokenEra.initL2()` reads `__DEPRECATED_totalSupply` from storage and
-  computes the BaseTokenHolder balance -- pure storage operations, no precompiles.
-  On ZKsyncOS, `L2BaseTokenZKOS.initL2()` calls `MINT_BASE_TOKEN_HOOK` to mint the
-  initial supply -- this is a ZK-VM precompile that doesn't exist on Anvil.
-- Test: For both Era and ZKsyncOS chains, `anvil_setCode` places `L2BaseTokenEra` which
-  does storage-based balance tracking. This avoids the MINT precompile issue.
+  On Era, `L2BaseTokenEra.initL2()` reads `__DEPRECATED_totalSupply` from storage.
+  On ZKsyncOS, `L2BaseTokenZKOS.initL2()` calls `MINT_BASE_TOKEN_HOOK`.
+- Test: Era uses `L2BaseTokenEra` directly. ZKsyncOS uses `L2BaseTokenZKOS` behind
+  `SystemContractProxy` at 0x800A. On Anvil, `MINT_BASE_TOKEN_HOOK` is an empty address
+  so the mint call is a no-op.
 
-### Patch: MockSystemContractProxyAdmin owner (ZKsyncOS chains only)
+### SystemContractProxyAdmin owner
 
-- Production: On ZKsyncOS chains, `performForceDeployedContractsInit(false)` calls
-  `conductContractUpgrade(ZKsyncOSSystemProxyUpgrade, ...)` which calls
-  `SystemContractProxyAdmin(PROXY_ADMIN_ADDR).upgrade(proxy, impl)`. This
-  requires `owner == ComplexUpgrader` (set during genesis).
-- Test: A `MockSystemContractProxyAdmin` (no-op fallback) is deployed via `anvil_setCode` and
-  its `_owner` storage slot is set to `L2_COMPLEX_UPGRADER_ADDR` via `anvil_setStorageAt`.
+- Production: `_setupProxyAdmin()` requires `owner == ComplexUpgrader` (set during genesis).
+- Test: The real `SystemContractProxyAdmin` is deployed and its `_owner` slot is set to
+  `L2_COMPLEX_UPGRADER_ADDR` via `anvil_setStorageAt`.
 
 ### 7. Stage 3: post-governance migration
 
@@ -274,8 +269,8 @@ No patches. Reads on-chain state to assert:
 | 6   | Clear genesis upgrade hash                     | `clearGenesisUpgradeTxHash`        | Server clears after batch processing                                                      | Clear via storage write                                                                                                                                                | `anvil_setStorageAt(proxy, 0x22, 0x0)`                                                |
 | 7   | Seed batch counters                            | `seedBatchCounters`                | Real batches executed                                                                     | Set counters to 1                                                                                                                                                      | `anvil_setStorageAt(proxy, slot11/13, 1)`                                             |
 | 8   | Pre-deploy L2 contracts + MockContractDeployer | `deployL2Contracts`                | ContractDeployer force-deploys ZK bytecodes                                               | `anvil_setCode` places EVM bytecodes at addresses from the force deployment calldata; MockContractDeployer (no-op fallback) at 0x8006 makes force-deploy calls succeed | `anvil_setCode` for each address in calldata                                          |
-| 9   | L2BaseTokenEra (both variants)                 | `deployL2Contracts`                | `L2BaseTokenEra.initL2()` reads storage; `L2BaseTokenZKOS.initL2()` calls MINT precompile | Use `L2BaseTokenEra` (storage-based) for both Era and ZKsyncOS                                                                                                         | `anvil_setCode` -- MINT_BASE_TOKEN_HOOK precompile doesn't exist on Anvil             |
-| 10  | MockSystemContractProxyAdmin (ZKsyncOS)        | `deployL2Contracts`                | Owner = ComplexUpgrader from genesis                                                      | MockSystemContractProxyAdmin (no-op) + set owner via storage write                                                                                                     | `anvil_setStorageAt(proxyAdmin, slot0, upgrader)` -- `upgrade()` requires `onlyOwner` |
+| 9   | L2BaseToken per VM type                        | `deployL2Contracts`                | Era: `L2BaseTokenEra`; ZKsyncOS: `L2BaseTokenZKOS` behind proxy                          | Same as production. On Anvil, MINT_BASE_TOKEN_HOOK is empty (no-op)                                                                                                    | `anvil_setCode` + `deployBehindSystemProxy` for ZKsyncOS                              |
+| 10  | SystemContractProxyAdmin owner                 | `deployL2Contracts`                | Owner = ComplexUpgrader from genesis                                                      | Real SystemContractProxyAdmin + set owner via storage write                                                                                                             | `anvil_setStorageAt(proxyAdmin, slot0, upgrader)`                                     |
 
 ## What IS tested end-to-end (unpatched production code)
 
