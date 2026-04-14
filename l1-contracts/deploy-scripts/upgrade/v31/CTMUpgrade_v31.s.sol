@@ -5,35 +5,21 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-
-import {Governance} from "contracts/governance/Governance.sol";
-
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-
-import {Call} from "contracts/governance/Common.sol";
-
 import {
     L2_COMPLEX_UPGRADER_ADDR,
     L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
-import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
 import {Utils} from "../../utils/Utils.sol";
 
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
-import {PublishFactoryDepsResult} from "../default-upgrade/CTMUpgradeBase.sol";
-import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 
 /// @notice Script used for v31 upgrade flow
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
-    bytes internal l2V31UpgradeBytecodeInfo;
-
     /// @notice Deploy everything that should be deployed
     function deployNewCTMContracts() public virtual override {
         (ctmAddresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
@@ -80,8 +66,6 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         forceDeploymentContracts[0] = CoreContract.L2V31Upgrade;
     }
 
-    // FIXME: the logic in this function is only suitable for the dummy upgrade implementation.
-    // Should be rewritten once the full upgrade contract is available.
     function getL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual override returns (address, bytes memory) {
@@ -90,6 +74,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // SettlementLayerV31UpgradeBase._buildL2V31UpgradeCalldata at upgrade time.
         bytes memory l2UpgradeCalldata = abi.encodeCall(
             IL2V31Upgrade.upgrade,
+            // address(0) = ctmDeployer placeholder; rewritten per-chain by SettlementLayerV31UpgradeBase
             (config.isZKsyncOS, address(0), newlyGeneratedData.fixedForceDeploymentsData, "")
         );
 
@@ -134,47 +119,5 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     function _getZKsyncOSUpgradeAddress() private returns (address) {
         bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade");
         return address(uint160(uint256(keccak256(bytes.concat(bytes32(0), bytecodeInfo)))));
-    }
-
-    // FIXME: should be rewritten to be more generic once the full upgrade is available.
-    function getProposedUpgrade(
-        StateTransitionDeployedAddresses memory stateTransition,
-        ChainCreationParamsConfig memory chainCreationParams,
-        uint256,
-        address,
-        PublishFactoryDepsResult memory _factoryDepsResult,
-        uint256 protocolUpgradeNonce
-    ) public virtual override returns (ProposedUpgrade memory proposedUpgrade) {
-        if (!config.isZKsyncOS) {
-            return
-                super.getProposedUpgrade(
-                    stateTransition,
-                    chainCreationParams,
-                    config.l1ChainId,
-                    config.ownerAddress,
-                    _factoryDepsResult,
-                    protocolUpgradeNonce
-                );
-        }
-
-        // For ZKsyncOS v31 upgrades, upgrade the version-specific upgrader via proxy upgrade.
-        // Prepare bytecode info for getL2UpgradeTargetAndData (used in composeUpgradeTx).
-        l2V31UpgradeBytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo("L2V31Upgrade.sol", "L2V31Upgrade");
-        // ZKsyncOS uses UniversalContractUpgradeInfo[] built from buildZKsyncOSForceDeployments().
-        FixedForceDeploymentsData memory fixedData = getFixedForceDeploymentsData();
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = buildZKsyncOSForceDeployments(fixedData);
-
-        proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: composeUpgradeTx(deployments, _factoryDepsResult, protocolUpgradeNonce),
-            bootloaderHash: chainCreationParams.bootloaderHash,
-            defaultAccountHash: chainCreationParams.defaultAAHash,
-            evmEmulatorHash: chainCreationParams.evmEmulatorHash,
-            verifier: address(0),
-            verifierParams: getEmptyVerifierParams(),
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
-            upgradeTimestamp: 0,
-            newProtocolVersion: chainCreationParams.latestProtocolVersion
-        });
     }
 }

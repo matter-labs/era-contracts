@@ -167,13 +167,4 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
             revert UnexpectedUpgradeSelector();
         }
     }
-
-    /// @notice Get the constructed L2 upgrade tx data.
-    function emitL2UpgradeTxData(
-        address _bridgehub,
-        uint256 _chainId,
-        bytes calldata _existingTxData
-    ) external view returns (bytes memory data) {
-        data = getL2UpgradeTxData(_bridgehub, _chainId, _existingTxData);
-    }
 }

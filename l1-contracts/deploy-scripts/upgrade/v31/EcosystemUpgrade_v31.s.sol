@@ -81,8 +81,10 @@ contract EcosystemUpgrade_v31 is DefaultEcosystemUpgrade {
         require(address(assetTracker) != address(0), "AssetTracker not set");
 
         // Register bridged tokens in NTV and migrate balances to AssetTracker
+        vm.startBroadcast();
         TokenMigrationUtils.registerBridgedTokensInNTV(address(bridgehub));
         TokenMigrationUtils.migrateAllTokenBalances(address(ntv), address(assetTracker), bridgehub);
+        vm.stopBroadcast();
 
         console.log("v31 stage3 migration complete!");
     }

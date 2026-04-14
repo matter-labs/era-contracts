@@ -243,27 +243,6 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         });
     }
 
-    /// @notice Build the full force deployment list for an upgrade.
-    ///         Era: merges base system contract deployments with additional deployments.
-    ///         ZKsyncOS: returns empty array (system contracts use proxy pattern).
-    function buildUpgradeForceDeployments(
-        uint256 _l1ChainId,
-        address _ownerAddress
-    ) internal virtual returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
-        // FIXME: this logic is not correct as force deployments are still needed to be done by the complex upgrader.
-        // We did not introduce force deployments yet.
-        if (config.isZKsyncOS) {
-            return new IL2ContractDeployer.ForceDeployment[](0);
-        }
-        IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
-            .getBaseForceDeployments(_l1ChainId, _ownerAddress);
-        IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalForceDeployments();
-        forceDeployments = SystemContractsProcessing.mergeForceDeployments(
-            baseForceDeployments,
-            additionalForceDeployments
-        );
-    }
-
     function getAdditionalForceDeployments()
         internal
         returns (IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments)

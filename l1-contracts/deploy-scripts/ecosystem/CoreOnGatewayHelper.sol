@@ -186,7 +186,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2AssetRouter) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2NativeTokenVault) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2MessageRoot) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2WrappedBaseToken) return ZKsyncOSUpgradeType.Unsafe;
+        if (_c == CoreContract.L2WrappedBaseToken) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2MessageVerification) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2ChainAssetHandler) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2InteropRootStorage) return ZKsyncOSUpgradeType.SystemProxy;
@@ -194,7 +194,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2AssetTracker) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.InteropCenter) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.GWAssetTracker) return ZKsyncOSUpgradeType.Unsafe;
+        if (_c == CoreContract.GWAssetTracker) return ZKsyncOSUpgradeType.SystemProxy;
         revert("CoreOnGatewayHelper: no upgrade type for CoreContract");
     }
 

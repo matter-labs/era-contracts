@@ -9,7 +9,6 @@ import {EcosystemUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/Ecosy
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../../../deploy-scripts/utils/Types.sol";
@@ -51,17 +50,9 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
         upgradeConfig.factoryDepsPublished = true;
     }
 
-    /// @notice Override to skip reading all system contract bytecodes which causes MemoryOOG.
-    function buildUpgradeForceDeployments(
-        uint256,
-        address
-    ) internal override returns (IL2ContractDeployer.ForceDeployment[] memory) {
-        return new IL2ContractDeployer.ForceDeployment[](0);
-    }
-
     /// @notice Override to skip bytecode-heavy force deployment generation in getProposedUpgrade.
-    /// The base implementation calls getBaseForceDeployments() which reads all zkout bytecodes,
-    /// causing MemoryOOG. We return an empty upgrade instead.
+    /// The base implementation reads all zkout bytecodes, causing MemoryOOG.
+    /// We return an empty upgrade instead.
     function getProposedUpgrade(
         StateTransitionDeployedAddresses memory stateTransition,
         ChainCreationParamsConfig memory chainCreationParams,

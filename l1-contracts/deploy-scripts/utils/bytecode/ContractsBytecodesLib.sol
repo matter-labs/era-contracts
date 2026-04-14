@@ -84,7 +84,6 @@ library ContractsBytecodesLib {
         // These are handled by the generic L1 case in getCreationCodeEra.
         string[54] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction",
-            /// ??
             "BaseTokenHolder",
             "GWAssetTracker",
             "L2AssetTracker",
@@ -95,7 +94,7 @@ library ContractsBytecodesLib {
             "BridgedTokenBeacon",
             "L1Bridgehub",
             "L2Bridgehub",
-            "BytecodesSupplier", // ???
+            "BytecodesSupplier",
             "ChainAdmin",
             "ChainAdminOwnable",
             "L1ChainAssetHandler",
@@ -126,14 +125,14 @@ library ContractsBytecodesLib {
             "L1MessageRoot",
             "L2MessageRoot",
             "PermanentRestriction",
-            "ProxyAdmin", // ??
+            "ProxyAdmin",
             "UpgradeableBeacon",
             "RelayedSLDAValidator",
-            "RollupDAManager", // ???
+            "RollupDAManager",
             "TransparentUpgradeableProxy",
-            "ServerNotifier", // ???
+            "ServerNotifier",
             "ValidatorTimelock",
-            "ValidiumL1DAValidator", // ???
+            "ValidiumL1DAValidator",
             "L2InteropRootStorage",
             "L2MessageVerification",
             "L2V31Upgrade",

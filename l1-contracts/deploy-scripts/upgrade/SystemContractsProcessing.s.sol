@@ -414,7 +414,7 @@ library SystemContractsProcessing {
             });
         }
 
-        // Special case: L2ChainAssetHandler needs constructor call
+        // Special case: L2ChainAssetHandler needs an initializer call after force deployment
         forceDeployments[6].callConstructor = true;
         // solhint-disable-next-line func-named-parameters
         forceDeployments[6].input = abi.encode(
@@ -456,17 +456,6 @@ library SystemContractsProcessing {
         for (uint256 i = 0; i < right.length; i++) {
             result[left.length + i] = right[i];
         }
-    }
-
-    function getBaseForceDeployments()
-        internal
-        view
-        returns (
-            // For purpose of making compilation of earlier upgrade scripts possible.
-            IL2ContractDeployer.ForceDeployment[] memory forceDeployments
-        )
-    {
-        getBaseForceDeployments(0, address(0));
     }
 
     function getBaseForceDeployments(
