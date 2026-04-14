@@ -222,16 +222,22 @@ library SystemContractsProcessing {
             });
         }
 
-        // Special case: L2ChainAssetHandler needs an initializer call after force deployment
-        forceDeployments[6].callConstructor = true;
-        // solhint-disable-next-line func-named-parameters
-        forceDeployments[6].input = abi.encode(
-            l1ChainId,
-            AddressAliasHelper.applyL1ToL2Alias(owner),
-            L2_BRIDGEHUB_ADDR,
-            L2_ASSET_ROUTER_ADDR,
-            L2_MESSAGE_ROOT_ADDR
-        );
+        // Special case: L2ChainAssetHandler needs an initializer call after force deployment.
+        // Find it by address rather than hardcoding an array index.
+        for (uint256 i = 0; i < contracts.length; i++) {
+            if (contracts[i].addr == L2_CHAIN_ASSET_HANDLER_ADDR) {
+                forceDeployments[i].callConstructor = true;
+                // solhint-disable-next-line func-named-parameters
+                forceDeployments[i].input = abi.encode(
+                    l1ChainId,
+                    AddressAliasHelper.applyL1ToL2Alias(owner),
+                    L2_BRIDGEHUB_ADDR,
+                    L2_ASSET_ROUTER_ADDR,
+                    L2_MESSAGE_ROOT_ADDR
+                );
+                break;
+            }
+        }
     }
 
     function forceDeploymentsToHashes(

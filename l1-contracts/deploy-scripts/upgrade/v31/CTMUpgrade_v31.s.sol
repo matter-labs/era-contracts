@@ -111,13 +111,12 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         override
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
     {
+        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade");
         additional = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
         additional[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
             upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
-            deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade"),
-            newAddress: L2GenesisForceDeploymentsHelper.generateRandomAddress(
-                Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade")
-            )
+            deployedBytecodeInfo: bytecodeInfo,
+            newAddress: L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo)
         });
     }
 }
