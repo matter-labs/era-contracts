@@ -106,6 +106,9 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     }
 
     /// @notice V31-specific: include L2V31Upgrade as an additional ZKsyncOS force deployment.
+    /// @dev L2V31Upgrade is deployed as a standalone contract at the derived random address used as
+    /// the delegate target in `forceDeployAndUpgradeUniversal`, so it uses `ZKsyncOSUnsafeForceDeployment`
+    /// rather than `ZKsyncOSSystemProxyUpgrade`.
     function getAdditionalZKsyncOSForceDeployments()
         internal
         override
