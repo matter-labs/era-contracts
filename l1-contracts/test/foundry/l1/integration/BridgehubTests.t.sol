@@ -34,7 +34,11 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
+import {LogFinder} from "test-utils/LogFinder.sol";
+
 contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+    using LogFinder for Vm.Log[];
+
     uint256 constant TEST_USERS_COUNT = 10;
 
     bytes32 constant NEW_PRIORITY_REQUEST_HASH =
@@ -501,7 +505,8 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
         uint256 beforeChainBalance = addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
-        uint256 beforeBalance = currentToken.balanceOf(address(addresses.sharedBridge));
+        uint256 beforeBridgeBalance = currentToken.balanceOf(address(addresses.sharedBridge));
+        uint256 beforeUserBalance = currentToken.balanceOf(currentUser);
 
         if (beforeChainBalance < amountToWithdraw) {
             vm.expectRevert("L1AR: not enough funds 2");
@@ -536,6 +541,7 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             abi.encode(true)
         );
 
+        vm.recordLogs();
         addresses.sharedBridge.finalizeWithdrawal({
             _chainId: currentChainId,
             _l2BatchNumber: l2BatchNumber,
@@ -545,14 +551,42 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             _merkleProof: merkleProof
         });
 
-        // check if the balance was updated correctly
-        if (beforeChainBalance > amountToWithdraw) {
-            assertEq(
-                beforeChainBalance - addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
-                amountToWithdraw
-            );
-            assertEq(beforeBalance - currentToken.balanceOf(address(addresses.sharedBridge)), amountToWithdraw);
-        }
+        // If we reach here, the withdrawal succeeded — assert outcomes unconditionally
+        // Chain balance decreased by withdrawal amount
+        assertEq(
+            beforeChainBalance - addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
+            amountToWithdraw,
+            "Chain balance should decrease by withdrawal amount"
+        );
+
+        // Bridge token balance decreased
+        assertEq(
+            beforeBridgeBalance - currentToken.balanceOf(address(addresses.sharedBridge)),
+            amountToWithdraw,
+            "Bridge token balance should decrease by withdrawal amount"
+        );
+
+        // Recipient received tokens
+        assertEq(
+            currentToken.balanceOf(currentUser) - beforeUserBalance,
+            amountToWithdraw,
+            "User should receive withdrawn tokens"
+        );
+
+        // Withdrawal marked as finalized (replay protection)
+        assertTrue(
+            addresses.l1Nullifier.isWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex),
+            "Withdrawal should be marked as finalized"
+        );
+
+        // Event: DepositFinalizedAssetRouter
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        Vm.Log memory finalizedLog = logs.requireOne("DepositFinalizedAssetRouter(uint256,bytes32,bytes)");
+        assertEq(
+            uint256(finalizedLog.topics[1]),
+            currentChainId,
+            "DepositFinalizedAssetRouter chainId mismatch"
+        );
     }
 
     function withdrawETHToken(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {
@@ -563,7 +597,8 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
         uint256 beforeChainBalance = addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
-        uint256 beforeBalance = address(addresses.sharedBridge).balance;
+        uint256 beforeBridgeBalance = address(addresses.sharedBridge).balance;
+        uint256 beforeUserBalance = currentUser.balance;
 
         if (beforeChainBalance < amountToWithdraw) {
             vm.expectRevert("L1AR: not enough funds 2");
@@ -596,6 +631,7 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             abi.encode(true)
         );
 
+        vm.recordLogs();
         addresses.sharedBridge.finalizeWithdrawal({
             _chainId: currentChainId,
             _l2BatchNumber: l2BatchNumber,
@@ -604,15 +640,36 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             _message: message,
             _merkleProof: merkleProof
         });
+        Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // check if the balance was updated correctly
-        if (beforeChainBalance > amountToWithdraw) {
-            assertEq(
-                beforeChainBalance - addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
-                amountToWithdraw
-            );
-            assertEq(beforeBalance - address(addresses.sharedBridge).balance, amountToWithdraw);
-        }
+        // If we reach here, the withdrawal succeeded — assert outcomes unconditionally
+        assertEq(
+            beforeChainBalance - addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
+            amountToWithdraw,
+            "Chain balance should decrease by withdrawal amount"
+        );
+        assertEq(
+            beforeBridgeBalance - address(addresses.sharedBridge).balance,
+            amountToWithdraw,
+            "Bridge ETH balance should decrease by withdrawal amount"
+        );
+        assertEq(
+            currentUser.balance - beforeUserBalance,
+            amountToWithdraw,
+            "User should receive withdrawn ETH"
+        );
+        assertTrue(
+            addresses.l1Nullifier.isWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex),
+            "Withdrawal should be marked as finalized"
+        );
+
+        // Event: DepositFinalizedAssetRouter
+        Vm.Log memory finalizedLog = logs.requireOne("DepositFinalizedAssetRouter(uint256,bytes32,bytes)");
+        assertEq(
+            uint256(finalizedLog.topics[1]),
+            currentChainId,
+            "DepositFinalizedAssetRouter chainId mismatch"
+        );
     }
 
     function depositEthToBridgeSuccess(

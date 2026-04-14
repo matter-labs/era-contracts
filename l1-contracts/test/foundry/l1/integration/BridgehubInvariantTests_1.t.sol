@@ -32,6 +32,7 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
 contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+     //@check Why is this file practically the same as BridgehubTests.t.sol?Gi
     uint256 constant TEST_USERS_COUNT = 10;
 
     bytes32 constant NEW_PRIORITY_REQUEST_HASH =
