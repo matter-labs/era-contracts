@@ -360,9 +360,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "L1AssetTracker")) {
             return
                 abi.encode(
-                    config.l1ChainId,
                     coreAddresses.bridgehub.proxies.bridgehub,
-                    coreAddresses.bridges.proxies.l1AssetRouter,
                     coreAddresses.bridges.proxies.l1NativeTokenVault,
                     coreAddresses.bridgehub.proxies.messageRoot
                 );

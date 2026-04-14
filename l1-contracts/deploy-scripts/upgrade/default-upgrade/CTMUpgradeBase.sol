@@ -39,14 +39,14 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     }
 
     /// @notice Get protocol upgrade nonce from protocol version
-    function getProtocolUpgradeNonce(uint256 protocolVersion) internal pure returns (uint256) {
-        return (protocolVersion >> 32);
+    function getProtocolUpgradeNonce(uint256 _protocolVersion) internal pure returns (uint256) {
+        return (_protocolVersion >> 32);
     }
 
     /// @notice Check if upgrade is a patch upgrade
-    function isPatchUpgrade(uint256 protocolVersion) internal pure returns (bool) {
-        (uint32 _major, uint32 _minor, uint32 patch) = SemVer.unpackSemVer(SafeCast.toUint96(protocolVersion));
-        return patch != 0;
+    function isPatchUpgrade(uint256 _protocolVersion) internal pure returns (bool) {
+        (uint32 _major, uint32 _minor, uint32 _patch) = SemVer.unpackSemVer(SafeCast.toUint96(_protocolVersion));
+        return _patch != 0;
     }
 
     /// @notice Get old protocol deadline (max uint256 by default)
@@ -91,7 +91,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     function composeUpgradeTx(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments,
         PublishFactoryDepsResult memory _factoryDepsResult,
-        uint256 protocolUpgradeNonce
+        uint256 _protocolUpgradeNonce
     ) internal returns (L2CanonicalTransaction memory transaction) {
         // Sanity check: verify Era bytecodeHashes are in factory deps
         for (uint256 i; i < _deployments.length; i++) {
@@ -117,7 +117,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             maxFeePerGas: 0,
             maxPriorityFeePerGas: 0,
             paymaster: uint256(uint160(address(0))),
-            nonce: protocolUpgradeNonce,
+            nonce: _protocolUpgradeNonce,
             value: 0,
             reserved: [uint256(0), uint256(0), uint256(0), uint256(0)],
             data: data,
@@ -133,15 +133,15 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
 
     /// @notice Merge two FacetCut arrays
     function mergeFacets(
-        Diamond.FacetCut[] memory a,
-        Diamond.FacetCut[] memory b
+        Diamond.FacetCut[] memory _a,
+        Diamond.FacetCut[] memory _b
     ) internal pure returns (Diamond.FacetCut[] memory result) {
-        result = new Diamond.FacetCut[](a.length + b.length);
-        for (uint256 i = 0; i < a.length; i++) {
-            result[i] = a[i];
+        result = new Diamond.FacetCut[](_a.length + _b.length);
+        for (uint256 i = 0; i < _a.length; i++) {
+            result[i] = _a[i];
         }
-        for (uint256 i = 0; i < b.length; i++) {
-            result[a.length + i] = b[i];
+        for (uint256 i = 0; i < _b.length; i++) {
+            result[_a.length + i] = _b[i];
         }
     }
 
@@ -207,12 +207,12 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     }
 
     function getProposedUpgrade(
-        StateTransitionDeployedAddresses memory stateTransition,
-        ChainCreationParamsConfig memory chainCreationParams,
-        uint256 l1ChainId,
-        address ownerAddress,
+        StateTransitionDeployedAddresses memory _stateTransition,
+        ChainCreationParamsConfig memory _chainCreationParams,
+        uint256 _l1ChainId,
+        address _ownerAddress,
         PublishFactoryDepsResult memory _factoryDepsResult,
-        uint256 protocolUpgradeNonce
+        uint256 _protocolUpgradeNonce
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments;
 
@@ -221,7 +221,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             deployments = buildZKsyncOSForceDeployments(fixedData);
         } else {
             IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
-                .getBaseForceDeployments(l1ChainId, ownerAddress);
+                .getBaseForceDeployments(_l1ChainId, _ownerAddress);
             IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalForceDeployments();
             deployments = wrapEraDeployments(
                 SystemContractsProcessing.mergeForceDeployments(baseForceDeployments, additionalForceDeployments)
@@ -229,17 +229,17 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         }
 
         proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: composeUpgradeTx(deployments, _factoryDepsResult, protocolUpgradeNonce),
-            bootloaderHash: chainCreationParams.bootloaderHash,
-            defaultAccountHash: chainCreationParams.defaultAAHash,
-            evmEmulatorHash: chainCreationParams.evmEmulatorHash,
+            l2ProtocolUpgradeTx: composeUpgradeTx(deployments, _factoryDepsResult, _protocolUpgradeNonce),
+            bootloaderHash: _chainCreationParams.bootloaderHash,
+            defaultAccountHash: _chainCreationParams.defaultAAHash,
+            evmEmulatorHash: _chainCreationParams.evmEmulatorHash,
             // Verifier is resolved from CTM; keep zeroed fields for calldata compatibility.
             verifier: address(0),
             verifierParams: ProposedUpgradeLib.emptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
+            postUpgradeCalldata: encodePostUpgradeCalldata(_stateTransition),
             upgradeTimestamp: 0,
-            newProtocolVersion: chainCreationParams.latestProtocolVersion
+            newProtocolVersion: _chainCreationParams.latestProtocolVersion
         });
     }
 

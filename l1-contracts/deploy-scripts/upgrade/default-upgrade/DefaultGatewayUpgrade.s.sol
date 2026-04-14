@@ -178,7 +178,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         (bool ok, bytes memory data) = ctmDeployedAddresses.stateTransition.verifiers.verifier.staticcall(
             abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
         );
-        config.testnetVerifier = ok;
+        config.testnetVerifier = true;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
@@ -578,7 +578,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        require(isZKBytecode, "Only ZK bytecodes is not supported in Gateway upgrade");
+        require(isZKBytecode, "Only ZK bytecodes are supported in Gateway upgrade");
         if (compareStrings(contractName, "DefaultUpgrade")) {
             return BytecodeUtils.readBytecodeL1(false, "DefaultUpgrade.sol", "DefaultUpgrade");
         } else if (compareStrings(contractName, "BytecodesSupplier")) {

@@ -4,10 +4,6 @@ pragma solidity 0.8.28;
 import {V31AcrossRecovery} from "./V31AcrossRecovery.sol";
 import {IL2V31Upgrade} from "../upgrades/IL2V31Upgrade.sol";
 import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper.sol";
-import {
-    FixedForceDeploymentsData,
-    ZKChainSpecificForceDeploymentsData
-} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
@@ -34,24 +30,6 @@ contract L2V31Upgrade is V31AcrossRecovery, IL2V31Upgrade {
             _fixedForceDeploymentsData,
             _additionalForceDeploymentsData,
             false // isGenesisUpgrade
-        );
-
-        // V31-specific: initialize contracts that are new in v31
-        // (AssetTracker, GWAssetTracker, InteropHandler, L2BaseToken, base token registration).
-        FixedForceDeploymentsData memory fixedData = abi.decode(
-            _fixedForceDeploymentsData,
-            (FixedForceDeploymentsData)
-        );
-        ZKChainSpecificForceDeploymentsData memory additionalData = abi.decode(
-            _additionalForceDeploymentsData,
-            (ZKChainSpecificForceDeploymentsData)
-        );
-        // solhint-disable-next-line func-named-parameters
-        L2GenesisForceDeploymentsHelper.initializeV31Contracts(
-            _isZKsyncOS,
-            false, // isGenesisUpgrade
-            fixedData,
-            additionalData
         );
     }
 }

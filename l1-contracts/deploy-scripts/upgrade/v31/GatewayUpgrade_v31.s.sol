@@ -35,9 +35,6 @@ import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.
 // FIXME: consider deleting this script, it is not used.
 /// @notice Script used for v31 gateway upgrade flow
 contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
-    /// @dev Prepared in getProposedUpgrade, consumed in getL2UpgradeTargetAndData (which must be view).
-    bytes internal l2V29UpgradeBytecodeInfo;
-
     function getForceDeploymentContracts() internal override returns (CoreContract[] memory forceDeploymentContracts) {
         if (config.isZKsyncOS) {
             return new CoreContract[](0);
@@ -66,8 +63,6 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
                 );
         }
 
-        // For ZKsyncOS, prepare bytecode info before composeUpgradeTx calls getL2UpgradeTargetAndData.
-        l2V29UpgradeBytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo("L2V29Upgrade.sol", "L2V29Upgrade");
         FixedForceDeploymentsData memory fixedData = getFixedForceDeploymentsData();
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = buildZKsyncOSForceDeployments(fixedData);
 

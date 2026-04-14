@@ -34,7 +34,7 @@ import {
   NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT,
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
-import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
+import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
 import { transferOwnable2Step } from "./harness-shims";
 import { impersonateAndRun } from "../core/utils";
@@ -433,11 +433,8 @@ async function deployL2Contracts(
   for (const entry of forceDeployEntries) {
     const contractName = contractMap.get(entry.address.toLowerCase());
     if (!contractName) {
-      // For ZKsyncOS, all force-deployed addresses should be in the map.
-      // For Era, system contracts + create2-derived addresses may not be mapped.
-
+      // For ZKsyncOS and EraVM, all force-deployed addresses should be in the map. if it is not add an explicit skip.
       throw new Error(`No contract mapping for ZKsyncOS force deploy address ${entry.address}`);
-      continue;
     }
 
     if (isZKsyncOS && entry.upgradeType === UPGRADE_TYPE_ZKOS_SYSTEM_PROXY) {
@@ -614,9 +611,7 @@ function decodeLatestL2UpgradeTxData(broadcastPath: string): string {
   const adminIface = new ethers.utils.Interface(getAbi("AdminFacet"));
   // Legacy ABI: v29/v30 states have upgradeChainFromVersion(uint256, DiamondCutData) (2 params).
   // Current ABI has upgradeChainFromVersion(address, uint256, DiamondCutData) (3 params).
-  const legacyAdminIface = new ethers.utils.Interface([
-    "function upgradeChainFromVersion(uint256, tuple(tuple(address,uint8,bool,bytes4[])[],address,bytes))",
-  ]);
+  const legacyAdminIface = new ethers.utils.Interface(LEGACY_ADMIN_ABI);
   const settlementLayerIface = new ethers.utils.Interface(getAbi("EraSettlementLayerV31Upgrade"));
 
   const errors: string[] = [];

@@ -80,7 +80,7 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
     }
 }
 
-/// @notice Test-only Core upgrade that skips prlematic governance calls
+/// @notice Test-only Core upgrade that skips problematic governance calls
 contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
     /// @notice Override to skip setAssetTracker call (requires NTV ownership in test)
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {

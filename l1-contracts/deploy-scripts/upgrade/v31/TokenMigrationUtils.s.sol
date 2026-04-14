@@ -8,10 +8,12 @@ import {console2 as console} from "forge-std/Script.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
+import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 /// @notice Shared token migration utilities for the v31 upgrade.
 /// @dev Used by both EcosystemUpgrade_v31 (stage3) and ChainUpgrade_v31.
@@ -29,7 +31,10 @@ library TokenMigrationUtils {
         uint256 bridgedTokensCount = ntv.bridgedTokensCount();
         for (uint256 i = 0; i < bridgedTokensCount; ++i) {
             bytes32 assetId = ntv.bridgedTokens(i);
-            l1AssetTracker.registerLegacyToken(assetId);
+            // Skip tokens that are already registered to avoid reverting with AssetAlreadyRegistered.
+            if (!IAssetTrackerBase(address(l1AssetTracker)).isAssetRegistered(assetId)) {
+                l1AssetTracker.registerLegacyToken(assetId);
+            }
         }
     }
 
@@ -53,7 +58,10 @@ library TokenMigrationUtils {
                 console.log("  Migrating token:", tokenAddress);
                 console.log("  Balance:", balance);
 
-                _assetTracker.registerLegacyToken(assetId);
+                // Skip tokens that are already registered to avoid reverting with AssetAlreadyRegistered.
+                if (!IAssetTrackerBase(address(_assetTracker)).isAssetRegistered(assetId)) {
+                    _assetTracker.registerLegacyToken(assetId);
+                }
 
                 console.log("  Migration successful");
             }
@@ -98,8 +106,7 @@ library TokenMigrationUtils {
         );
 
         // For fresh deployments, register the ETH base token
-        // ETH token address is 0x0000000000000000000000000000000000000001
-        address ethTokenAddress = address(0x0000000000000000000000000000000000000001);
+        address ethTokenAddress = ETH_TOKEN_ADDRESS;
 
         bytes32 ethAssetId = ntv.assetId(ethTokenAddress);
         console.log("ETH token address:", ethTokenAddress);

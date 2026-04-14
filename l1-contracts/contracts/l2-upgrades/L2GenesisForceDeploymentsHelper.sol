@@ -224,20 +224,32 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         _setupProxyAdmin();
-        if (_isGenesisUpgrade) {
-            _initCoreContracts(fixedForceDeploymentsData, additionalForceDeploymentsData);
-            _initTokenInfrastructure(fixedForceDeploymentsData, additionalForceDeploymentsData);
-        } else {
-            _updateCoreContracts(fixedForceDeploymentsData, additionalForceDeploymentsData);
-            _updateTokenInfrastructure(fixedForceDeploymentsData, additionalForceDeploymentsData);
-        }
-        _finalizeDeployments({
-            _ctmDeployer: _ctmDeployer,
-            _fixedForceDeploymentsData: fixedForceDeploymentsData,
-            _additionalForceDeploymentsData: additionalForceDeploymentsData,
-            _isZKsyncOS: _isZKsyncOS,
-            _isGenesisUpgrade: _isGenesisUpgrade
+
+        // Ensure WETH token exists. During genesis NTV.WETH_TOKEN() returns address(0)
+        // (uninitialized storage), so _ensureWethToken deploys a new proxy.
+        // During upgrades it returns the existing address and _ensureWethToken is a no-op.
+        address wrappedBaseTokenAddress = _ensureWethToken({
+            _predeployedWethToken: L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN(),
+            _aliasedL1Governance: fixedForceDeploymentsData.aliasedL1Governance,
+            _baseTokenL1Address: additionalForceDeploymentsData.baseTokenL1Address,
+            _baseTokenAssetId: additionalForceDeploymentsData.baseTokenBridgingData.assetId,
+            _baseTokenName: additionalForceDeploymentsData.baseTokenMetadata.name,
+            _baseTokenSymbol: additionalForceDeploymentsData.baseTokenMetadata.symbol
         });
+
+        if (_isGenesisUpgrade) {
+            _initAllContracts(fixedForceDeploymentsData, additionalForceDeploymentsData, wrappedBaseTokenAddress);
+        } else {
+            _updateAllContracts(fixedForceDeploymentsData, additionalForceDeploymentsData, wrappedBaseTokenAddress);
+        }
+        _finalizeDeployments(_ctmDeployer, fixedForceDeploymentsData);
+
+        _initializeV31Contracts(
+            _isZKsyncOS,
+            _isGenesisUpgrade,
+            fixedForceDeploymentsData,
+            additionalForceDeploymentsData
+        );
 
         emit ForceDeployedContractsInitialized(_isZKsyncOS, _isGenesisUpgrade);
     }
@@ -253,9 +265,11 @@ library L2GenesisForceDeploymentsHelper {
         }
     }
 
-    function _initCoreContracts(
+    /// @notice Calls initL2() on ALL contracts. Used during genesis only.
+    function _initAllContracts(
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,
-        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
+        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
+        address _wrappedBaseTokenAddress
     ) private {
         L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(
             _fixedForceDeploymentsData.l1ChainId,
@@ -277,11 +291,49 @@ library L2GenesisForceDeploymentsHelper {
             _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
             _fixedForceDeploymentsData.aliasedL1Governance
         );
+
+        address deployedTokenBeacon;
+        if (_fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon == address(0)) {
+            deployedTokenBeacon = UpgradeableBeaconDeployer(L2_NTV_BEACON_DEPLOYER_ADDR).deployUpgradeableBeacon(
+                _fixedForceDeploymentsData.aliasedL1Governance
+            );
+        } else {
+            deployedTokenBeacon = _fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon;
+        }
+
+        // solhint-disable-next-line func-named-parameters
+        L2NativeTokenVaultZKOS(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.aliasedL1Governance,
+            _fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
+            _additionalForceDeploymentsData.l2LegacySharedBridge,
+            deployedTokenBeacon,
+            _wrappedBaseTokenAddress,
+            _additionalForceDeploymentsData.baseTokenBridgingData,
+            _additionalForceDeploymentsData.baseTokenMetadata
+        );
+
+        // solhint-disable-next-line func-named-parameters
+        L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.aliasedL1Governance,
+            L2_BRIDGEHUB_ADDR,
+            L2_ASSET_ROUTER_ADDR,
+            L2_MESSAGE_ROOT_ADDR
+        );
+
+        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.aliasedL1Governance,
+            _fixedForceDeploymentsData.zkTokenAssetId
+        );
     }
 
-    function _updateCoreContracts(
+    /// @notice Calls updateL2() on ALL contracts. Used during non-genesis upgrades.
+    function _updateAllContracts(
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,
-        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
+        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
+        address _wrappedBaseTokenAddress
     ) private {
         L2MessageRoot(L2_MESSAGE_ROOT_ADDR).updateL2(
             _fixedForceDeploymentsData.l1ChainId,
@@ -301,77 +353,16 @@ library L2GenesisForceDeploymentsHelper {
             IL2SharedBridgeLegacy(_getLegacySharedBridge()),
             _additionalForceDeploymentsData.baseTokenBridgingData.assetId
         );
-    }
 
-    function _initTokenInfrastructure(
-        FixedForceDeploymentsData memory _fixedForceDeploymentsData,
-        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
-    ) private {
-        address wrappedBaseTokenAddress = _ensureWethToken({
-            _predeployedWethToken: address(0),
-            _aliasedL1Governance: _fixedForceDeploymentsData.aliasedL1Governance,
-            _baseTokenL1Address: _additionalForceDeploymentsData.baseTokenL1Address,
-            _baseTokenAssetId: _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
-            _baseTokenName: _additionalForceDeploymentsData.baseTokenMetadata.name,
-            _baseTokenSymbol: _additionalForceDeploymentsData.baseTokenMetadata.symbol
-        });
-
-        address deployedTokenBeacon;
-        // In production, the `_fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon` must always
-        // be equal to 0. It is only for simplifying testing.
-        if (_fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon == address(0)) {
-            deployedTokenBeacon = UpgradeableBeaconDeployer(L2_NTV_BEACON_DEPLOYER_ADDR).deployUpgradeableBeacon(
-                _fixedForceDeploymentsData.aliasedL1Governance
-            );
-        } else {
-            deployedTokenBeacon = _fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon;
-        }
-
-        // solhint-disable-next-line func-named-parameters
-        L2NativeTokenVaultZKOS(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
-            _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.aliasedL1Governance,
-            _fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
-            _additionalForceDeploymentsData.l2LegacySharedBridge,
-            deployedTokenBeacon,
-            wrappedBaseTokenAddress,
-            _additionalForceDeploymentsData.baseTokenBridgingData,
-            _additionalForceDeploymentsData.baseTokenMetadata
-        );
-
-        // solhint-disable-next-line func-named-parameters
-        L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
-            _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.aliasedL1Governance,
-            L2_BRIDGEHUB_ADDR,
-            L2_ASSET_ROUTER_ADDR,
-            L2_MESSAGE_ROOT_ADDR
-        );
-    }
-
-    function _updateTokenInfrastructure(
-        FixedForceDeploymentsData memory _fixedForceDeploymentsData,
-        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
-    ) private {
-        address predeployedL2WethAddress = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN();
         bytes32 previousL2TokenProxyBytecodeHash = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR)
             .L2_TOKEN_PROXY_BYTECODE_HASH();
-
-        address wrappedBaseTokenAddress = _ensureWethToken({
-            _predeployedWethToken: predeployedL2WethAddress,
-            _aliasedL1Governance: _fixedForceDeploymentsData.aliasedL1Governance,
-            _baseTokenL1Address: _additionalForceDeploymentsData.baseTokenL1Address,
-            _baseTokenAssetId: _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
-            _baseTokenName: _additionalForceDeploymentsData.baseTokenMetadata.name,
-            _baseTokenSymbol: _additionalForceDeploymentsData.baseTokenMetadata.symbol
-        });
 
         // solhint-disable-next-line func-named-parameters
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateL2(
             _fixedForceDeploymentsData.l1ChainId,
             previousL2TokenProxyBytecodeHash,
             _getLegacySharedBridge(),
-            wrappedBaseTokenAddress,
+            _wrappedBaseTokenAddress,
             _additionalForceDeploymentsData.baseTokenBridgingData,
             _additionalForceDeploymentsData.baseTokenMetadata
         );
@@ -391,14 +382,8 @@ library L2GenesisForceDeploymentsHelper {
 
     function _finalizeDeployments(
         address _ctmDeployer,
-        FixedForceDeploymentsData memory _fixedForceDeploymentsData,
-        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
-        bool _isZKsyncOS,
-        bool _isGenesisUpgrade
+        FixedForceDeploymentsData memory _fixedForceDeploymentsData
     ) private {
-        // It is expected that either through the force deployments above
-        // or upon initialization, the L2 deployments of Bridgehub, AssetRouter, and MessageRoot are present.
-        // However, there is still some follow-up finalization that needs to be done.
         L2Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses({
             _assetRouter: L2_ASSET_ROUTER_ADDR,
             _l1CtmDeployer: ICTMDeploymentTracker(_ctmDeployer),
@@ -406,24 +391,42 @@ library L2GenesisForceDeploymentsHelper {
             _chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
             _chainRegistrationSender: _fixedForceDeploymentsData.aliasedChainRegistrationSender
         });
+    }
 
-        // V31-specific contracts are initialized via a shared function.
-        // During genesis, it is called here. During upgrades, it is called by L2V31Upgrade.
-        if (_isGenesisUpgrade) {
-            initializeV31Contracts(_isZKsyncOS, true, _fixedForceDeploymentsData, _additionalForceDeploymentsData);
-        }
+    /// @notice Initializes contracts introduced in v31 using ABI-encoded deployment data.
+    function initializeV31Contracts(
+        bool _isZKsyncOS,
+        bool _isGenesisUpgrade,
+        bytes memory _fixedForceDeploymentsData,
+        bytes memory _additionalForceDeploymentsData
+    ) internal {
+        FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
+            _fixedForceDeploymentsData,
+            (FixedForceDeploymentsData)
+        );
+        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData = abi.decode(
+            _additionalForceDeploymentsData,
+            (ZKChainSpecificForceDeploymentsData)
+        );
+
+        _initializeV31Contracts(
+            _isZKsyncOS,
+            _isGenesisUpgrade,
+            fixedForceDeploymentsData,
+            additionalForceDeploymentsData
+        );
     }
 
     /// @notice Initializes contracts introduced in v31: AssetTracker, GWAssetTracker,
-    /// InteropHandler, InteropCenter, L2BaseToken, and base token registration.
-    /// @dev Called from `_finalizeDeployments` during genesis and from `L2V31Upgrade` during upgrades.
+    /// InteropHandler, L2BaseToken, and base token registration.
+    /// @dev Called after `_finalizeDeployments` as part of `performForceDeployedContractsInit()`.
     /// Keeping this in the library ensures a single source of truth for v31-specific initialization.
-    function initializeV31Contracts(
+    function _initializeV31Contracts(
         bool _isZKsyncOS,
         bool _isGenesisUpgrade,
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,
         ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
-    ) internal {
+    ) private {
         L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(
             _fixedForceDeploymentsData.l1ChainId,
             _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
@@ -439,11 +442,6 @@ library L2GenesisForceDeploymentsHelper {
 
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
 
-        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
-            _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.aliasedL1Governance,
-            _fixedForceDeploymentsData.zkTokenAssetId
-        );
 
         // Register the base token in the AssetTracker.
         // During genesis, NTV.registerBaseTokenIfNeeded() handles it.

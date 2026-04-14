@@ -149,8 +149,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
         console.log("Accepting AssetTracker ownership and setting in NativeTokenVault");
         console.log("NTV address:", ntvProxy);
         console.log("AssetTracker address:", assetTrackerProxy);
-        // console.log()
-
         // Note: AssetTracker.setAddresses() was already called during deployment
         // in updateContractConnections(), and ownership was transferred to governance.
         // Now governance needs to accept the ownership transfer.
