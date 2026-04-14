@@ -20,11 +20,11 @@ The above means that inside the deployment and upgrade preparation scripts whene
 
 ### ZKsync Era
 
-The genesis is defined in the other repo: <link>. The main difference is that we dont use system proxies for Era and use Force deployments instead.
+The genesis is defined in the other repo: <link>. The main difference is that we don't use system proxies for Era and use Force deployments instead.
 
 ### Upgrade process
 
-The fixed force deployments data as well as factory dependenecies for the upgrades are defined inside the deployment and upgrade preparations scripts and then the hash of the actual upgrade transaction to execute is read from `DefaultUpgrade`.
+The fixed force deployments data as well as factory dependencies for the upgrades are defined inside the deployment and upgrade preparation scripts and then the hash of the actual upgrade transaction to execute is read from `DefaultUpgrade`.
 
 ### Consistency between genesis and upgrade
 
@@ -35,6 +35,7 @@ Common pitfalls: a contract added to genesis has not been added to the upgrade s
 ### V31 upgrade
 
 The upgrade that is incoming is v31. Thus, for it the settlement layer contracts are:
+
 - ZKsyncOSSettlementLayerV31Upgrade.sol
 - EraSettlementLayerV31Upgrade.sol
 
@@ -43,9 +44,11 @@ And the corresponding L2 upgrade contract that should be used is:
 - L2V31Upgrade.sol
 
 The only assumptions that the upgrade logic can use is that the:
+
 - ComplexUpgrader contract is present and force deployment via a hook (ZKsync OS only) or via a call to the ContractDeployer system contract (EraVM only) works.
 
 Note, that on ZKsync Era, the old version of the ComplexUpgrader is used, which only supports this function:
+
 ```
     function forceDeployAndUpgrade(
         ForceDeployment[] calldata _forceDeployments,
@@ -60,10 +63,11 @@ Note, that on ZKsync Era, the old version of the ComplexUpgrader is used, which 
 
 ## Common pitfalls
 
-- Using Era-like force deployments / hash calulcation for ZKsync OS scripts (without explicit warnings that ZKsyncOS is not supported or script name indicating so).
+- Using Era-like force deployments / hash calculation for ZKsync OS scripts (without explicit warnings that ZKsyncOS is not supported or script name indicating so).
 - Deviations between genesis and upgrades (mentioned above). Please review the code and verify exhaustively that the contracts/state force deployed, upgraded, initialized, or assumed during the upgrade correctly correspond to the genesis gen, and vice versa.
 
 Do a bidirectional inventory check:
+
 1. enumerate everything introduced/predeployed by genesis,
 2. enumerate everything introduced/upgraded/initialized/assumed by the upgrade flow,
 3. classify each item as matched, intentionally assumed pre-existing, missing from upgrade, missing from genesis, or behaviorally inconsistent.
