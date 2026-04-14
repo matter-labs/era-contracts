@@ -224,16 +224,13 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         _setupProxyAdmin();
-        _deployCoreContracts({
-            _fixedForceDeploymentsData: fixedForceDeploymentsData,
-            _additionalForceDeploymentsData: additionalForceDeploymentsData,
-            _isGenesisUpgrade: _isGenesisUpgrade
-        });
-        _deployTokenInfrastructure({
-            _fixedForceDeploymentsData: fixedForceDeploymentsData,
-            _additionalForceDeploymentsData: additionalForceDeploymentsData,
-            _isGenesisUpgrade: _isGenesisUpgrade
-        });
+        if (_isGenesisUpgrade) {
+            _initCoreContracts(fixedForceDeploymentsData, additionalForceDeploymentsData);
+            _initTokenInfrastructure(fixedForceDeploymentsData, additionalForceDeploymentsData);
+        } else {
+            _updateCoreContracts(fixedForceDeploymentsData, additionalForceDeploymentsData);
+            _updateTokenInfrastructure(fixedForceDeploymentsData, additionalForceDeploymentsData);
+        }
         _finalizeDeployments({
             _ctmDeployer: _ctmDeployer,
             _fixedForceDeploymentsData: fixedForceDeploymentsData,
@@ -256,78 +253,110 @@ library L2GenesisForceDeploymentsHelper {
         }
     }
 
-    function _deployCoreContracts(
+    function _initCoreContracts(
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,
-        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
-        bool _isGenesisUpgrade
+        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
     ) private {
-        if (_isGenesisUpgrade) {
-            L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(
-                _fixedForceDeploymentsData.l1ChainId,
-                _fixedForceDeploymentsData.gatewayChainId
-            );
-        } else {
-            L2MessageRoot(L2_MESSAGE_ROOT_ADDR).updateL2(
-                _fixedForceDeploymentsData.l1ChainId,
-                _fixedForceDeploymentsData.gatewayChainId
-            );
-        }
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.gatewayChainId
+        );
 
-        if (_isGenesisUpgrade) {
-            L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(
-                _fixedForceDeploymentsData.l1ChainId,
-                _fixedForceDeploymentsData.aliasedL1Governance,
-                _fixedForceDeploymentsData.maxNumberOfZKChains
-            );
-        } else {
-            L2Bridgehub(L2_BRIDGEHUB_ADDR).updateL2(
-                _fixedForceDeploymentsData.l1ChainId,
-                _fixedForceDeploymentsData.maxNumberOfZKChains
-            );
-        }
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.aliasedL1Governance,
+            _fixedForceDeploymentsData.maxNumberOfZKChains
+        );
 
-        // For new chains, there is no legacy shared bridge, but for already existing ones
-        // we can query it from the current AssetRouter deployment.
-        address l2LegacySharedBridge = _isGenesisUpgrade
-            ? address(0)
-            : address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
+        // solhint-disable-next-line func-named-parameters
+        L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.eraChainId,
+            IL1AssetRouter(_fixedForceDeploymentsData.l1AssetRouter),
+            IL2SharedBridgeLegacy(address(0)), // no legacy bridge for new chains
+            _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
+            _fixedForceDeploymentsData.aliasedL1Governance
+        );
+    }
 
-        if (_isGenesisUpgrade) {
-            // solhint-disable-next-line func-named-parameters
-            L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
-                _fixedForceDeploymentsData.l1ChainId,
-                _fixedForceDeploymentsData.eraChainId,
-                IL1AssetRouter(_fixedForceDeploymentsData.l1AssetRouter),
-                IL2SharedBridgeLegacy(l2LegacySharedBridge),
-                _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
+    function _updateCoreContracts(
+        FixedForceDeploymentsData memory _fixedForceDeploymentsData,
+        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
+    ) private {
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).updateL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.gatewayChainId
+        );
+
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).updateL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.maxNumberOfZKChains
+        );
+
+        address l2LegacySharedBridge = address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
+        // solhint-disable-next-line func-named-parameters
+        L2AssetRouter(L2_ASSET_ROUTER_ADDR).updateL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.eraChainId,
+            IL1AssetRouter(_fixedForceDeploymentsData.l1AssetRouter),
+            IL2SharedBridgeLegacy(l2LegacySharedBridge),
+            _additionalForceDeploymentsData.baseTokenBridgingData.assetId
+        );
+    }
+
+    function _initTokenInfrastructure(
+        FixedForceDeploymentsData memory _fixedForceDeploymentsData,
+        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
+    ) private {
+        address wrappedBaseTokenAddress = _ensureWethToken({
+            _predeployedWethToken: address(0),
+            _aliasedL1Governance: _fixedForceDeploymentsData.aliasedL1Governance,
+            _baseTokenL1Address: _additionalForceDeploymentsData.baseTokenL1Address,
+            _baseTokenAssetId: _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
+            _baseTokenName: _additionalForceDeploymentsData.baseTokenMetadata.name,
+            _baseTokenSymbol: _additionalForceDeploymentsData.baseTokenMetadata.symbol
+        });
+
+        address deployedTokenBeacon;
+        // In production, the `_fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon` must always
+        // be equal to 0. It is only for simplifying testing.
+        if (_fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon == address(0)) {
+            deployedTokenBeacon = UpgradeableBeaconDeployer(L2_NTV_BEACON_DEPLOYER_ADDR).deployUpgradeableBeacon(
                 _fixedForceDeploymentsData.aliasedL1Governance
             );
         } else {
-            // solhint-disable-next-line func-named-parameters
-            L2AssetRouter(L2_ASSET_ROUTER_ADDR).updateL2(
-                _fixedForceDeploymentsData.l1ChainId,
-                _fixedForceDeploymentsData.eraChainId,
-                IL1AssetRouter(_fixedForceDeploymentsData.l1AssetRouter),
-                IL2SharedBridgeLegacy(l2LegacySharedBridge),
-                _additionalForceDeploymentsData.baseTokenBridgingData.assetId
-            );
+            deployedTokenBeacon = _fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon;
         }
+
+        // solhint-disable-next-line func-named-parameters
+        L2NativeTokenVaultZKOS(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.aliasedL1Governance,
+            _fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
+            _additionalForceDeploymentsData.l2LegacySharedBridge,
+            deployedTokenBeacon,
+            wrappedBaseTokenAddress,
+            _additionalForceDeploymentsData.baseTokenBridgingData,
+            _additionalForceDeploymentsData.baseTokenMetadata
+        );
+
+        // solhint-disable-next-line func-named-parameters
+        L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.aliasedL1Governance,
+            L2_BRIDGEHUB_ADDR,
+            L2_ASSET_ROUTER_ADDR,
+            L2_MESSAGE_ROOT_ADDR
+        );
     }
 
-    function _deployTokenInfrastructure(
+    function _updateTokenInfrastructure(
         FixedForceDeploymentsData memory _fixedForceDeploymentsData,
-        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData,
-        bool _isGenesisUpgrade
+        ZKChainSpecificForceDeploymentsData memory _additionalForceDeploymentsData
     ) private {
-        // For genesis, these values are zero (will be set during initL2).
-        // For non-genesis upgrades, read from the already-deployed L2 contracts
-        // since these values are already set on L2.
-        address predeployedL2WethAddress = _isGenesisUpgrade
-            ? address(0)
-            : L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN();
-        bytes32 previousL2TokenProxyBytecodeHash = _isGenesisUpgrade
-            ? bytes32(0)
-            : L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).L2_TOKEN_PROXY_BYTECODE_HASH();
+        address predeployedL2WethAddress = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN();
+        bytes32 previousL2TokenProxyBytecodeHash = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR)
+            .L2_TOKEN_PROXY_BYTECODE_HASH();
 
         address wrappedBaseTokenAddress = _ensureWethToken({
             _predeployedWethToken: predeployedL2WethAddress,
@@ -338,62 +367,28 @@ library L2GenesisForceDeploymentsHelper {
             _baseTokenSymbol: _additionalForceDeploymentsData.baseTokenMetadata.symbol
         });
 
-        if (_isGenesisUpgrade) {
-            address deployedTokenBeacon;
-            // In production, the `_fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon` must always
-            // be equal to 0. It is only for simplifying testing.
-            if (_fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon == address(0)) {
-                // We deploy the beacon through a dedicated helper contract to reduce the code size here.
-                // The UpgradeableBeaconDeployer is predeployed at genesis, so no force deployment needed here.
-                deployedTokenBeacon = UpgradeableBeaconDeployer(L2_NTV_BEACON_DEPLOYER_ADDR).deployUpgradeableBeacon(
-                    _fixedForceDeploymentsData.aliasedL1Governance
-                );
-            } else {
-                deployedTokenBeacon = _fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon;
-            }
+        address l2LegacySharedBridge = address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
+        // solhint-disable-next-line func-named-parameters
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            previousL2TokenProxyBytecodeHash,
+            l2LegacySharedBridge,
+            wrappedBaseTokenAddress,
+            _additionalForceDeploymentsData.baseTokenBridgingData,
+            _additionalForceDeploymentsData.baseTokenMetadata
+        );
 
-            // solhint-disable-next-line func-named-parameters
-            L2NativeTokenVaultZKOS(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
-                _fixedForceDeploymentsData.l1ChainId,
-                _fixedForceDeploymentsData.aliasedL1Governance,
-                _fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
-                _additionalForceDeploymentsData.l2LegacySharedBridge,
-                deployedTokenBeacon,
-                wrappedBaseTokenAddress,
-                _additionalForceDeploymentsData.baseTokenBridgingData,
-                _additionalForceDeploymentsData.baseTokenMetadata
-            );
-        } else {
-            address l2LegacySharedBridge = address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
-            // solhint-disable-next-line func-named-parameters
-            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateL2(
-                _fixedForceDeploymentsData.l1ChainId,
-                previousL2TokenProxyBytecodeHash,
-                l2LegacySharedBridge,
-                wrappedBaseTokenAddress,
-                _additionalForceDeploymentsData.baseTokenBridgingData,
-                _additionalForceDeploymentsData.baseTokenMetadata
-            );
-        }
+        L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).updateL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            L2_BRIDGEHUB_ADDR,
+            L2_ASSET_ROUTER_ADDR,
+            L2_MESSAGE_ROOT_ADDR
+        );
 
-        if (_isGenesisUpgrade) {
-            // solhint-disable-next-line func-named-parameters
-            L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
-                _fixedForceDeploymentsData.l1ChainId,
-                _fixedForceDeploymentsData.aliasedL1Governance,
-                L2_BRIDGEHUB_ADDR,
-                L2_ASSET_ROUTER_ADDR,
-                L2_MESSAGE_ROOT_ADDR
-            );
-        } else {
-            L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).updateL2(
-                _fixedForceDeploymentsData.l1ChainId,
-                L2_BRIDGEHUB_ADDR,
-                L2_ASSET_ROUTER_ADDR,
-                L2_MESSAGE_ROOT_ADDR
-            );
-        }
-
+        InteropCenter(L2_INTEROP_CENTER_ADDR).updateL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.aliasedL1Governance
+        );
     }
 
     function _finalizeDeployments(
@@ -446,18 +441,11 @@ library L2GenesisForceDeploymentsHelper {
 
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
 
-        if (_isGenesisUpgrade) {
-            InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
-                _fixedForceDeploymentsData.l1ChainId,
-                _fixedForceDeploymentsData.aliasedL1Governance,
-                _fixedForceDeploymentsData.zkTokenAssetId
-            );
-        } else {
-            InteropCenter(L2_INTEROP_CENTER_ADDR).updateL2(
-                _fixedForceDeploymentsData.l1ChainId,
-                _fixedForceDeploymentsData.aliasedL1Governance
-            );
-        }
+        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.aliasedL1Governance,
+            _fixedForceDeploymentsData.zkTokenAssetId
+        );
 
         // Register the base token in the AssetTracker.
         // During genesis, NTV.registerBaseTokenIfNeeded() handles it.
