@@ -8,6 +8,7 @@ import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
 
 import {CoreContract, EraVmSystemContract, Language, ZkSyncOsSystemContract, ZKsyncOSUpgradeType} from "./CoreContract.sol";
+import {UnknownCoreContract, UnknownZkSyncOsSystemContract, UnknownEraVmSystemContract} from "./DeployScriptErrors.sol";
 import {
     GW_ASSET_TRACKER_ADDR,
     L2_ASSET_ROUTER_ADDR,
@@ -180,7 +181,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.DiamondProxy) return "DiamondProxy";
         if (_c == CoreContract.ProxyAdmin) return "ProxyAdmin";
 
-        revert("CoreOnGatewayHelper: unknown CoreContract");
+        revert UnknownCoreContract();
     }
 
     /// @notice Resolve a CoreContract enum to its ZKsyncOS upgrade type.
@@ -200,7 +201,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.InteropCenter) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.InteropHandler) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.GWAssetTracker) return ZKsyncOSUpgradeType.SystemProxy;
-        revert("CoreOnGatewayHelper: no upgrade type for CoreContract");
+        revert UnknownCoreContract();
     }
 
     /// @notice Resolve a CoreContract enum to its canonical L2 address.
@@ -219,10 +220,18 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.InteropCenter) return L2_INTEROP_CENTER_ADDR;
         if (_c == CoreContract.InteropHandler) return L2_INTEROP_HANDLER_ADDR;
         if (_c == CoreContract.GWAssetTracker) return GW_ASSET_TRACKER_ADDR;
-        revert("CoreOnGatewayHelper: no address for CoreContract");
+        revert UnknownCoreContract();
     }
 
     // ======================== ZkSyncOsSystemContract resolvers ========================
+
+    /// @notice Resolve a ZkSyncOsSystemContract to its (fileName, contractName) pair.
+    function resolveZkOsSystemContract(
+        ZkSyncOsSystemContract _c
+    ) internal pure returns (string memory fileName, string memory contractName) {
+        contractName = _resolveZkOsSystemContractName(_c);
+        fileName = string.concat(contractName, ".sol");
+    }
 
     /// @notice Resolve a ZkSyncOsSystemContract to its ZKsyncOS contract name.
     function _resolveZkOsSystemContractName(ZkSyncOsSystemContract _c) internal pure returns (string memory) {
@@ -230,7 +239,7 @@ library CoreOnGatewayHelper {
         if (_c == ZkSyncOsSystemContract.L1Messenger) return "L1MessengerZKOS";
         if (_c == ZkSyncOsSystemContract.SystemContext) return "SystemContext";
         if (_c == ZkSyncOsSystemContract.ContractDeployer) return "ZKOSContractDeployer";
-        revert("CoreOnGatewayHelper: unknown ZkSyncOsSystemContract");
+        revert UnknownZkSyncOsSystemContract();
     }
 
     /// @notice Resolve a ZkSyncOsSystemContract to its canonical L2 address.
@@ -239,7 +248,7 @@ library CoreOnGatewayHelper {
         if (_c == ZkSyncOsSystemContract.L1Messenger) return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR;
         if (_c == ZkSyncOsSystemContract.SystemContext) return L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR;
         if (_c == ZkSyncOsSystemContract.ContractDeployer) return L2_DEPLOYER_SYSTEM_CONTRACT_ADDR;
-        revert("CoreOnGatewayHelper: no address for ZkSyncOsSystemContract");
+        revert UnknownZkSyncOsSystemContract();
     }
 
     // ======================== EraVmSystemContract resolvers ========================
@@ -276,7 +285,7 @@ library CoreOnGatewayHelper {
         if (_id == EraVmSystemContract.PubdataChunkPublisher) return address(0x8011);
         if (_id == EraVmSystemContract.Create2Factory) return address(0x10000);
         if (_id == EraVmSystemContract.SloadContract) return address(0x10006);
-        revert("CoreOnGatewayHelper: unknown EraVmSystemContract address");
+        revert UnknownEraVmSystemContract();
     }
 
     /// @notice Maps an EraVmSystemContract to its Era code name.
@@ -311,7 +320,7 @@ library CoreOnGatewayHelper {
         if (_id == EraVmSystemContract.PubdataChunkPublisher) return "PubdataChunkPublisher";
         if (_id == EraVmSystemContract.Create2Factory) return "Create2Factory";
         if (_id == EraVmSystemContract.SloadContract) return "SloadContract";
-        revert("CoreOnGatewayHelper: unknown EraVmSystemContract name");
+        revert UnknownEraVmSystemContract();
     }
 
     /// @notice Maps an EraVmSystemContract to its programming language.

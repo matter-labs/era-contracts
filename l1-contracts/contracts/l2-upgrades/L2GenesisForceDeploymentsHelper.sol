@@ -293,13 +293,12 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.maxNumberOfZKChains
         );
 
-        address l2LegacySharedBridge = address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
         // solhint-disable-next-line func-named-parameters
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).updateL2(
             _fixedForceDeploymentsData.l1ChainId,
             _fixedForceDeploymentsData.eraChainId,
             IL1AssetRouter(_fixedForceDeploymentsData.l1AssetRouter),
-            IL2SharedBridgeLegacy(l2LegacySharedBridge),
+            IL2SharedBridgeLegacy(_getLegacySharedBridge()),
             _additionalForceDeploymentsData.baseTokenBridgingData.assetId
         );
     }
@@ -367,12 +366,11 @@ library L2GenesisForceDeploymentsHelper {
             _baseTokenSymbol: _additionalForceDeploymentsData.baseTokenMetadata.symbol
         });
 
-        address l2LegacySharedBridge = address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
         // solhint-disable-next-line func-named-parameters
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateL2(
             _fixedForceDeploymentsData.l1ChainId,
             previousL2TokenProxyBytecodeHash,
-            l2LegacySharedBridge,
+            _getLegacySharedBridge(),
             wrappedBaseTokenAddress,
             _additionalForceDeploymentsData.baseTokenBridgingData,
             _additionalForceDeploymentsData.baseTokenMetadata
@@ -460,6 +458,11 @@ library L2GenesisForceDeploymentsHelper {
         // For Era: reads __DEPRECATED_totalSupply and computes holder balance.
         // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder.
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
+    }
+
+    /// @notice Returns the address of the legacy shared bridge from the L2 Asset Router.
+    function _getLegacySharedBridge() private view returns (address) {
+        return address(L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE());
     }
 
     /// @notice Constructs the initialization calldata for the L2WrappedBaseToken.

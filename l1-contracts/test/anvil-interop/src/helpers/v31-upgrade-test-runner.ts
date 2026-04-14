@@ -29,6 +29,9 @@ import {
   L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
   L2_TO_L1_MESSENGER_ADDR,
   L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
+  NTV_WETH_TOKEN_SLOT,
+  NTV_L1_CHAIN_ID_SLOT,
+  NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT,
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
 import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
@@ -461,9 +464,6 @@ async function deployL2Contracts(
   // For ZKsyncOS, these contracts live behind SystemContractProxy, so storage writes go to the
   // proxy address (which delegates to the implementation). The storage layout is the same because
   // TransparentUpgradeableProxy uses EIP-1967 slots that don't collide with implementation storage.
-  const NTV_WETH_TOKEN_SLOT = 251;
-  const NTV_L1_CHAIN_ID_SLOT = 253;
-  const NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT = 255;
   const toSlot = (n: number) => ethers.utils.hexZeroPad(ethers.utils.hexlify(n), 32);
   const toAddr = (a: string) => ethers.utils.hexZeroPad(a, 32);
 

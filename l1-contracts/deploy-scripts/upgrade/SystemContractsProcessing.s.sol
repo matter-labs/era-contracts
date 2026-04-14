@@ -27,8 +27,9 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {CoreContract, EraVmSystemContract, Language, ZkSyncOsSystemContract, ZKsyncOSUpgradeType} from "../ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
+import {DeduplicateBytecodesCountMismatch} from "../ecosystem/DeployScriptErrors.sol";
 
-// solhint-disable no-console, gas-custom-errors
+// solhint-disable no-console
 
 /// @notice Struct representing a system contract's details
 struct SystemContract {
@@ -113,7 +114,7 @@ library SystemContractsProcessing {
         }
 
         // Sanity check
-        require(included == toInclude, "Internal error: included != toInclude");
+        require(included == toInclude, DeduplicateBytecodesCountMismatch());
     }
 
     function getSystemContractsBytecodes() internal view returns (bytes[] memory result) {
@@ -314,7 +315,7 @@ library SystemContractsProcessing {
         }
         // System contracts with l1-contracts EVM bytecodes (0x800x)
         for (uint256 i = 0; i < sysContracts.length; i++) {
-            deployments[builtins.length + i] = _buildZKsyncOSEntry(_fixedData, sysContracts[i]);
+            deployments[builtins.length + i] = _buildZKsyncOSEntryForSystemContract(sysContracts[i]);
         }
         // Version-specific entries
         for (uint256 i = 0; i < _additionalDeployments.length; i++) {
@@ -346,13 +347,11 @@ library SystemContractsProcessing {
     }
 
     /// @dev Build a single ZKsyncOS force deployment entry for a ZkSyncOsSystemContract.
-    function _buildZKsyncOSEntry(
-        FixedForceDeploymentsData memory,
+    function _buildZKsyncOSEntryForSystemContract(
         ZkSyncOsSystemContract _id
     ) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
         address addr = CoreOnGatewayHelper._resolveZkOsSystemContractAddress(_id);
-        string memory contractName = CoreOnGatewayHelper._resolveZkOsSystemContractName(_id);
-        string memory fileName = string(abi.encodePacked(contractName, ".sol"));
+        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolveZkOsSystemContract(_id);
         bytes memory bytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
 
         return
