@@ -159,10 +159,7 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
     }
 
     /// @notice Validate that the inner calldata targets L2V31Upgrade.
-    /// @dev For Era, delegateTo is the constant L2_VERSION_SPECIFIC_UPGRADER_ADDR.
-    /// For ZKsyncOS, delegateTo is a derived address (to avoid overwriting existing bytecode).
-    /// We only validate the selector since the delegateTo address varies by chain type.
-    function _validateWrappedUpgrade(address, bytes memory _existingUpgradeCalldata) internal pure {
+    function _validateWrappedUpgrade(bytes memory _existingUpgradeCalldata) internal pure {
         if (bytes4(_existingUpgradeCalldata) != IL2V31Upgrade.upgrade.selector) {
             revert UnexpectedUpgradeSelector();
         }
