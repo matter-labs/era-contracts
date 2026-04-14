@@ -14,6 +14,8 @@ use crate::common::{
     wallets::Wallet,
 };
 
+use crate::types::L2DACommitmentScheme;
+
 use super::build_admin_functions_script;
 
 /// L2 system address of the Bridgehub on the gateway chain.
@@ -41,10 +43,12 @@ pub struct MigrateShared {
 #[derive(Subcommand, Debug)]
 #[command(after_long_help = "\
 Steps (run in order):
-  1. pause-deposits    Pause deposits before migration
-  2. notify-server     Notify the server about the migration
-  3. submit            Submit the migration transaction (L1 -> gateway)
-  4. finalize          Confirm L2 transfer and enable validators on gateway")]
+  1. pause-deposits        Pause deposits before migration
+  2. notify-server         Notify the server about the migration
+  3. submit                Submit the migration transaction (L1 -> gateway)
+  4. finalize              Confirm L2 transfer (deployer key, no owner authority)
+  5. enable-validators     Enable validators on gateway (owner key)
+  6. set-da-validator-pair Set DA validator pair via gateway (owner key)")]
 pub enum MigrateCommands {
     /// Step 1: Pause deposits on the chain before migration
     PauseDeposits(PauseDepositsArgs),
@@ -52,8 +56,12 @@ pub enum MigrateCommands {
     NotifyServer(NotifyServerArgs),
     /// Step 3: Submit the migration transaction (L1 -> gateway L2)
     Submit(SubmitArgs),
-    /// Step 4: Confirm L1->L2 transfer after gateway processes it and enable validators
+    /// Step 4: Confirm L1->L2 transfer (does not require owner authority)
     Finalize(FinalizeArgs),
+    /// Step 5: Enable validators on the gateway's ValidatorTimelock (requires owner key)
+    EnableValidators(EnableValidatorsArgs),
+    /// Step 6: Set DA validator pair for the chain via gateway (requires owner key)
+    SetDaValidatorPair(SetDaValidatorPairArgs),
 }
 
 // ── PauseDeposits args ─────────────────────────────────────────────────────
@@ -131,15 +139,37 @@ pub struct FinalizeArgs {
     #[clap(long, default_value = "script-out/gateway-vote-preparation.toml")]
     pub vote_preparation_toml: String,
 
-    /// Commit operator address (to register on gateway ValidatorTimelock).
+    /// Number of L1 blocks to scan back when searching for the MigrationStarted event.
+    /// Default: ~30 days at 12s/block (216000).
+    #[clap(long, default_value = "216000")]
+    pub lookback_blocks: u64,
+}
+
+// ── EnableValidators args ──────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, Parser)]
+pub struct EnableValidatorsArgs {
+    #[clap(flatten)]
+    #[serde(flatten)]
+    pub common: MigrateShared,
+
+    /// Gateway chain ID.
+    #[clap(long)]
+    pub gateway_chain_id: u64,
+
+    /// Gateway L2 RPC URL (for resolving ValidatorTimelock if not provided).
+    #[clap(long)]
+    pub gateway_rpc_url: String,
+
+    /// Commit operator address.
     #[clap(long)]
     pub commit_operator: Address,
 
-    /// Prove operator address (to register on gateway ValidatorTimelock).
+    /// Prove operator address.
     #[clap(long)]
     pub prove_operator: Address,
 
-    /// Execute operator address (to register on gateway ValidatorTimelock).
+    /// Execute operator address.
     #[clap(long)]
     pub execute_operator: Address,
 
@@ -148,14 +178,38 @@ pub struct FinalizeArgs {
     #[clap(long)]
     pub gateway_validator_timelock: Option<Address>,
 
-    /// L1 gas price in wei for enableValidatorViaGateway calls (default: 1 gwei).
+    /// L1 gas price in wei (default: 1 gwei).
     #[clap(long, default_value = "1000000000")]
     pub l1_gas_price: u64,
+}
 
-    /// Number of L1 blocks to scan back when searching for the MigrationStarted event.
-    /// Default: ~30 days at 12s/block (216000).
-    #[clap(long, default_value = "216000")]
-    pub lookback_blocks: u64,
+// ── SetDaValidatorPair args ────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, Parser)]
+pub struct SetDaValidatorPairArgs {
+    #[clap(flatten)]
+    #[serde(flatten)]
+    pub common: MigrateShared,
+
+    /// Gateway chain ID.
+    #[clap(long)]
+    pub gateway_chain_id: u64,
+
+    /// Gateway L2 RPC URL (for resolving the chain's diamond proxy on the gateway).
+    #[clap(long)]
+    pub gateway_rpc_url: String,
+
+    /// L1 DA validator address (from vote preparation output).
+    #[clap(long)]
+    pub l1_da_validator: Address,
+
+    /// L2 DA commitment scheme.
+    #[clap(long, value_enum)]
+    pub l2_da_commitment_scheme: L2DACommitmentScheme,
+
+    /// L1 gas price in wei (default: 1 gwei).
+    #[clap(long, default_value = "1000000000")]
+    pub l1_gas_price: u64,
 }
 
 // ── Dispatch ───────────────────────────────────────────────────────────────
@@ -166,6 +220,8 @@ pub async fn run(cmd: MigrateCommands) -> anyhow::Result<()> {
         MigrateCommands::NotifyServer(args) => run_notify_server(args).await,
         MigrateCommands::Submit(args) => run_submit(args).await,
         MigrateCommands::Finalize(args) => run_finalize(args).await,
+        MigrateCommands::EnableValidators(args) => run_enable_validators(args).await,
+        MigrateCommands::SetDaValidatorPair(args) => run_set_da_validator_pair(args).await,
     }
 }
 
@@ -318,7 +374,6 @@ async fn run_finalize(args: FinalizeArgs) -> anyhow::Result<()> {
     )?;
 
     let contracts_path = paths::resolve_l1_contracts_path()?;
-    let should_send = (!runner.simulate).to_string();
 
     // Read diamond_cut_data.
     // Strip leading '/' so PathBuf::join treats it as relative to contracts_path.
@@ -425,23 +480,53 @@ async fn run_finalize(args: FinalizeArgs) -> anyhow::Result<()> {
             .context("finishMigrateChainToGateway failed")?;
     }
 
-    // Step 6b: Enable each validator on the gateway's ValidatorTimelock.
+    write_output_if_requested(
+        "chain.gateway.migrate.finalize",
+        &args.shared,
+        &runner,
+        &serde_json::json!({}),
+        &serde_json::json!({
+            "chain_id": args.chain_id,
+            "gateway_chain_id": args.gateway_chain_id,
+        }),
+    )
+    .await?;
+
+    logger::success("Chain migration finalized (transfer confirmed)");
+    Ok(())
+}
+
+// ── enable-validators ─────────────────────────────────────────────────────
+
+async fn run_enable_validators(args: EnableValidatorsArgs) -> anyhow::Result<()> {
+    let sender = Wallet::parse(args.common.shared.private_key, args.common.shared.sender)?;
+
+    let mut runner = ForgeRunner::new(
+        args.common.shared.simulate,
+        &args.common.shared.l1_rpc_url,
+        args.common.shared.forge_args.clone(),
+    )?;
+    let contracts_path = paths::resolve_l1_contracts_path()?;
+
+    let should_send = "true".to_string();
+
+    // Resolve ValidatorTimelock
     logger::step("Resolving gateway ValidatorTimelock");
     let gw_validator_timelock = match args.gateway_validator_timelock {
         Some(addr) => addr,
-        None => resolve_gateway_validator_timelock(
-            &args.gateway_rpc_url,
-            args.gateway_chain_id,
-        )
-        .await
-        .context("Failed to resolve gateway ValidatorTimelock (pass --gateway-validator-timelock to skip RPC resolution)")?,
+        None => resolve_gateway_validator_timelock(&args.gateway_rpc_url, args.gateway_chain_id)
+            .await
+            .context(
+                "Failed to resolve gateway ValidatorTimelock \
+                 (pass --gateway-validator-timelock to skip RPC resolution)",
+            )?,
     };
     logger::info(format!(
         "Gateway ValidatorTimelock: {:#x}",
         gw_validator_timelock
     ));
 
-    logger::step("Enabling validators on gateway");
+    // Deduplicate operators
     let validators: Vec<Address> = {
         let mut v = vec![
             args.commit_operator,
@@ -453,22 +538,24 @@ async fn run_finalize(args: FinalizeArgs) -> anyhow::Result<()> {
         v.retain(|a| *a != Address::zero());
         v
     };
+
+    logger::step("Enabling validators on gateway");
     for validator in &validators {
         logger::info(format!("Enabling validator {:#x}", validator));
         let script = build_admin_functions_script(
             &contracts_path,
             &runner,
-            &args.shared.forge_args,
+            &args.common.shared.forge_args,
             "enableValidatorViaGateway(address,uint256,uint256,uint256,address,address,address,bool)",
             vec![
-                format!("{:#x}", args.bridgehub),        // bridgehub
-                args.l1_gas_price.to_string(),           // l1GasPrice
-                args.chain_id.to_string(),               // l2ChainId
-                args.gateway_chain_id.to_string(),       // gatewayChainId
-                format!("{:#x}", validator),             // validatorAddress
-                format!("{:#x}", gw_validator_timelock), // gatewayValidatorTimelock
-                format!("{:#x}", sender.address),        // refundRecipient
-                should_send.clone(),                     // _shouldSend
+                format!("{:#x}", args.common.bridgehub),
+                args.l1_gas_price.to_string(),
+                args.common.chain_id.to_string(),
+                args.gateway_chain_id.to_string(),
+                format!("{:#x}", validator),
+                format!("{:#x}", gw_validator_timelock),
+                format!("{:#x}", sender.address),
+                should_send.clone(),
             ],
         )?
         .with_wallet(&sender, runner.simulate);
@@ -477,27 +564,117 @@ async fn run_finalize(args: FinalizeArgs) -> anyhow::Result<()> {
             .with_context(|| format!("enableValidatorViaGateway for {:#x}", validator))?;
     }
 
-    #[derive(Serialize)]
-    struct FinalizeOutput {
-        chain_id: u64,
-        gateway_chain_id: u64,
-        validators_enabled: usize,
-    }
     write_output_if_requested(
-        "chain.gateway.migrate.finalize",
-        &args.shared,
+        "chain.gateway.migrate.enable-validators",
+        &args.common.shared,
         &runner,
         &serde_json::json!({}),
-        &FinalizeOutput {
-            chain_id: args.chain_id,
-            gateway_chain_id: args.gateway_chain_id,
-            validators_enabled: validators.len(),
-        },
+        &serde_json::json!({
+            "chain_id": args.common.chain_id,
+            "gateway_chain_id": args.gateway_chain_id,
+            "validators_enabled": validators.len(),
+        }),
     )
     .await?;
 
-    logger::success("Chain migration finalized (transfer confirmed, validators enabled)");
+    logger::success("Validators enabled on gateway");
     Ok(())
+}
+
+// ── set-da-validator-pair ─────────────────────────────────────────────────
+
+async fn run_set_da_validator_pair(args: SetDaValidatorPairArgs) -> anyhow::Result<()> {
+    let sender = Wallet::parse(args.common.shared.private_key, args.common.shared.sender)?;
+
+    let mut runner = ForgeRunner::new(
+        args.common.shared.simulate,
+        &args.common.shared.l1_rpc_url,
+        args.common.shared.forge_args.clone(),
+    )?;
+    let contracts_path = paths::resolve_l1_contracts_path()?;
+
+    // Resolve the chain's diamond proxy on the gateway via L2 RPC.
+    logger::step("Resolving chain diamond proxy on gateway");
+    let chain_diamond_on_gw =
+        resolve_chain_diamond_on_gateway(&args.gateway_rpc_url, args.common.chain_id)
+            .await
+            .context("Failed to resolve chain diamond proxy on gateway")?;
+    logger::info(format!(
+        "Chain {} diamond proxy on gateway: {:#x}",
+        args.common.chain_id, chain_diamond_on_gw
+    ));
+
+    let should_send = "true".to_string();
+    let script = build_admin_functions_script(
+        &contracts_path,
+        &runner,
+        &args.common.shared.forge_args,
+        "setDAValidatorPairWithGateway(address,uint256,uint256,uint256,address,uint8,address,address,bool)",
+        vec![
+            format!("{:#x}", args.common.bridgehub),
+            args.l1_gas_price.to_string(),
+            args.common.chain_id.to_string(),
+            args.gateway_chain_id.to_string(),
+            format!("{:#x}", args.l1_da_validator),
+            (args.l2_da_commitment_scheme as u8).to_string(),
+            format!("{:#x}", chain_diamond_on_gw),
+            format!("{:#x}", sender.address),
+            should_send,
+        ],
+    )?
+    .with_wallet(&sender, runner.simulate);
+
+    runner
+        .run(script)
+        .context("setDAValidatorPairWithGateway failed")?;
+
+    write_output_if_requested(
+        "chain.gateway.migrate.set-da-validator-pair",
+        &args.common.shared,
+        &runner,
+        &serde_json::json!({}),
+        &serde_json::json!({
+            "chain_id": args.common.chain_id,
+            "gateway_chain_id": args.gateway_chain_id,
+            "l1_da_validator": format!("{:#x}", args.l1_da_validator),
+            "chain_diamond_on_gateway": format!("{:#x}", chain_diamond_on_gw),
+        }),
+    )
+    .await?;
+
+    logger::success("DA validator pair set via gateway");
+    Ok(())
+}
+
+/// Resolve a chain's diamond proxy address on the gateway by querying the
+/// gateway's L2 bridgehub.
+async fn resolve_chain_diamond_on_gateway(
+    gateway_rpc_url: &str,
+    chain_id: u64,
+) -> anyhow::Result<Address> {
+    use ethers::providers::{Http, Middleware, Provider};
+
+    let provider = Provider::<Http>::try_from(gateway_rpc_url)?;
+    let gw_bridgehub: Address = GATEWAY_L2_BRIDGEHUB.parse()?;
+
+    let call = ethers::abi::encode(&[ethers::abi::Token::Uint(chain_id.into())]);
+    let mut calldata = ethers::utils::id("getZKChain(uint256)").to_vec();
+    calldata.extend_from_slice(&call);
+    let tx = ethers::types::TransactionRequest::new()
+        .to(gw_bridgehub)
+        .data(calldata);
+    let result = provider
+        .call(&tx.into(), None)
+        .await
+        .context("gateway L2 getZKChain call")?;
+    let addr = Address::from_slice(&result[12..32]);
+
+    anyhow::ensure!(
+        addr != Address::zero(),
+        "getZKChain({chain_id}) returned zero — chain not registered on gateway"
+    );
+
+    Ok(addr)
 }
 
 // ── Helpers ----------------------------------------------------------------
