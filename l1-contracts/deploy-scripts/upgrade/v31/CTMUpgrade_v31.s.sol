@@ -74,8 +74,13 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // SettlementLayerV31UpgradeBase._buildL2V31UpgradeCalldata at upgrade time.
         bytes memory l2UpgradeCalldata = abi.encodeCall(
             IL2V31Upgrade.upgrade,
-            // address(0) = ctmDeployer placeholder; rewritten per-chain by SettlementLayerV31UpgradeBase
-            (config.isZKsyncOS, address(0), newlyGeneratedData.fixedForceDeploymentsData, "")
+            // additionalForceDeploymentsData ("") is rewritten per-chain by SettlementLayerV31UpgradeBase
+            (
+                config.isZKsyncOS,
+                coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
+                newlyGeneratedData.fixedForceDeploymentsData,
+                ""
+            )
         );
 
         bytes memory complexUpgraderCalldata;
