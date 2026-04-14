@@ -25,6 +25,7 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
     using stdStorage for StdStorage;
 
     function prepare() public {
+        // TODO(EVM-1391): Justify commented code
         // _generateUserAddresses();
 
         _deployL1Contracts();

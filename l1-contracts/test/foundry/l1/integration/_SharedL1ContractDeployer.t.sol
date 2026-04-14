@@ -125,7 +125,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         vm.stopPrank();
     }
 
-    function _setEraBatch() private {
+    function _setEraBatch() private { // TODO(EVM-1391): Dead fn in practice
         vm.startPrank(addresses.sharedBridge.owner());
         // sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(1);
         // sharedBridge.setEraPostDiamondUpgradeFirstBatch(1);

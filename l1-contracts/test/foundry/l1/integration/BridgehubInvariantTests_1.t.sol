@@ -684,11 +684,11 @@ contract BridgehubInvariantTests_1 is L1ContractDeployer, ZKChainDeployer, Token
 
         _deployEra();
         _deployZKChain(ETH_TOKEN_ADDRESS);
-        // _deployZKChain(ETH_TOKEN_ADDRESS);
+        // _deployZKChain(ETH_TOKEN_ADDRESS); // TODO(EVM-1391): Justify commented code
         _deployZKChain(tokens[0]);
-        // _deployZKChain(tokens[0]);
+        // _deployZKChain(tokens[0]);// TODO(EVM-1391): Justify commented code
         _deployZKChain(tokens[1]);
-        // _deployZKChain(tokens[1]);
+        // _deployZKChain(tokens[1]);// TODO(EVM-1391): Justify commented code
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
