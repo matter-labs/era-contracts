@@ -17,6 +17,7 @@ import {
     L2_MESSAGE_ROOT_ADDR,
     L2_MESSAGE_VERIFICATION,
     L2_NATIVE_TOKEN_VAULT_ADDR,
+    L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
     L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
@@ -315,7 +316,7 @@ library SystemContractsProcessing {
     ) internal returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
         CoreContract[] memory builtins = getOtherBuiltinCoreContracts();
         ZkSyncOsSystemContract[] memory sysContracts = getZKsyncOSExtraSystemContracts();
-        uint256 totalBase = builtins.length + sysContracts.length;
+        uint256 totalBase = builtins.length + sysContracts.length + 1;
 
         deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](totalBase + _additionalDeployments.length);
 
@@ -327,6 +328,8 @@ library SystemContractsProcessing {
         for (uint256 i = 0; i < sysContracts.length; i++) {
             deployments[builtins.length + i] = _buildZKsyncOSEntryForSystemContract(sysContracts[i]);
         }
+        // ProxyAdmin is direct-deployed on ZKsyncOS genesis and must also be available during upgrades.
+        deployments[totalBase - 1] = _buildZKsyncOSProxyAdminEntry();
         // Version-specific entries
         for (uint256 i = 0; i < _additionalDeployments.length; i++) {
             deployments[totalBase + i] = _additionalDeployments[i];
@@ -369,6 +372,20 @@ library SystemContractsProcessing {
                 upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
                 deployedBytecodeInfo: bytecodeInfo,
                 newAddress: addr
+            });
+    }
+
+    function _buildZKsyncOSProxyAdminEntry() private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
+        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract(
+            "SystemContractProxyAdmin.sol",
+            "SystemContractProxyAdmin"
+        );
+
+        return
+            IComplexUpgrader.UniversalContractUpgradeInfo({
+                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+                deployedBytecodeInfo: bytecodeInfo,
+                newAddress: L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
             });
     }
 

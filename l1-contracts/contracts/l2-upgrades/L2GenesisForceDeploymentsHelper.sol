@@ -442,7 +442,6 @@ library L2GenesisForceDeploymentsHelper {
 
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
 
-
         // Register the base token in the AssetTracker.
         // During genesis, NTV.registerBaseTokenIfNeeded() handles it.
         // During upgrades, AssetTracker.registerBaseTokenDuringUpgrade() handles it.
