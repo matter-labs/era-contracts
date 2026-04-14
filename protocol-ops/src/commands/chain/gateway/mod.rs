@@ -1,4 +1,8 @@
+use std::path::Path;
+
 use clap::Subcommand;
+
+use crate::common::forge::{Forge, ForgeRunner, ForgeScriptArg};
 
 pub(crate) mod convert;
 pub(crate) mod migrate;
@@ -23,4 +27,27 @@ pub(crate) async fn run(args: GatewayCommands) -> anyhow::Result<()> {
         GatewayCommands::Convert(cmd) => convert::run(cmd).await,
         GatewayCommands::Migrate(cmd) => migrate::run(cmd).await,
     }
+}
+
+/// Build a forge script targeting `AdminFunctions.s.sol` with common arguments.
+pub(super) fn build_admin_functions_script(
+    contracts_path: &Path,
+    runner: &ForgeRunner,
+    forge_args: &crate::common::forge::ForgeScriptArgs,
+    sig: &str,
+    additional_args: Vec<String>,
+) -> anyhow::Result<crate::common::forge::ForgeScript> {
+    let script_path = "deploy-scripts/AdminFunctions.s.sol";
+    let mut script_args = forge_args.clone();
+    script_args.add_arg(ForgeScriptArg::Sig {
+        sig: sig.to_string(),
+    });
+    script_args.add_arg(ForgeScriptArg::RpcUrl {
+        url: runner.rpc_url.clone(),
+    });
+    script_args.add_arg(ForgeScriptArg::Broadcast);
+    script_args.add_arg(ForgeScriptArg::Ffi);
+    script_args.additional_args.extend(additional_args);
+
+    Ok(Forge::new(contracts_path).script(Path::new(script_path), script_args))
 }

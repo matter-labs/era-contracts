@@ -15,6 +15,8 @@ use crate::common::{
     wallets::Wallet,
 };
 
+use super::build_admin_functions_script;
+
 /// Shared arguments for all convert stages.
 #[derive(Debug, Clone, Serialize, Deserialize, Args)]
 pub struct ConvertShared {
@@ -246,7 +248,7 @@ async fn run_grant_whitelist(args: GrantWhitelistArgs) -> anyhow::Result<()> {
     )?;
 
     let contracts_path = paths::resolve_l1_contracts_path()?;
-    let script_path = "deploy-scripts/AdminFunctions.s.sol";
+    let should_send = (!runner.simulate).to_string();
 
     // Encode grantees as a Solidity address[] literal: [addr1,addr2,...]
     let grantees_str = format!(
@@ -258,25 +260,19 @@ async fn run_grant_whitelist(args: GrantWhitelistArgs) -> anyhow::Result<()> {
             .join(",")
     );
 
-    let mut script_args = args.common.shared.forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: "grantGatewayWhitelist(address,uint256,address[],bool)".to_string(),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args.add_arg(ForgeScriptArg::Broadcast);
-    script_args.add_arg(ForgeScriptArg::Ffi);
-    script_args.additional_args.extend([
-        format!("{:#x}", args.common.bridgehub),
-        args.common.gateway_chain_id.to_string(),
-        grantees_str,
-        "true".to_string(),
-    ]);
-
-    let script = Forge::new(&contracts_path)
-        .script(Path::new(script_path), script_args)
-        .with_wallet(&sender, runner.simulate);
+    let script = build_admin_functions_script(
+        &contracts_path,
+        &runner,
+        &args.common.shared.forge_args,
+        "grantGatewayWhitelist(address,uint256,address[],bool)",
+        vec![
+            format!("{:#x}", args.common.bridgehub),
+            args.common.gateway_chain_id.to_string(),
+            grantees_str,
+            should_send,
+        ],
+    )?
+    .with_wallet(&sender, runner.simulate);
 
     logger::step("Granting gateway whitelist");
     logger::info(format!(
@@ -585,27 +581,21 @@ async fn run_revoke_whitelist(args: RevokeWhitelistArgs) -> anyhow::Result<()> {
     )?;
 
     let contracts_path = paths::resolve_l1_contracts_path()?;
-    let script_path = "deploy-scripts/AdminFunctions.s.sol";
+    let should_send = (!runner.simulate).to_string();
 
-    let mut script_args = args.common.shared.forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: "revokeGatewayWhitelist(address,uint256,address,bool)".to_string(),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args.add_arg(ForgeScriptArg::Broadcast);
-    script_args.add_arg(ForgeScriptArg::Ffi);
-    script_args.additional_args.extend([
-        format!("{:#x}", args.common.bridgehub),
-        args.common.gateway_chain_id.to_string(),
-        format!("{:#x}", args.revoke_address),
-        "true".to_string(),
-    ]);
-
-    let script = Forge::new(&contracts_path)
-        .script(Path::new(script_path), script_args)
-        .with_wallet(&sender, runner.simulate);
+    let script = build_admin_functions_script(
+        &contracts_path,
+        &runner,
+        &args.common.shared.forge_args,
+        "revokeGatewayWhitelist(address,uint256,address,bool)",
+        vec![
+            format!("{:#x}", args.common.bridgehub),
+            args.common.gateway_chain_id.to_string(),
+            format!("{:#x}", args.revoke_address),
+            should_send,
+        ],
+    )?
+    .with_wallet(&sender, runner.simulate);
 
     logger::step("Revoking gateway whitelist");
     logger::info(format!("Revoking address: {:#x}", args.revoke_address));

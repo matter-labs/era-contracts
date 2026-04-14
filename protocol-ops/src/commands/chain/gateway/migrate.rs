@@ -14,6 +14,8 @@ use crate::common::{
     wallets::Wallet,
 };
 
+use super::build_admin_functions_script;
+
 /// L2 system address of the Bridgehub on the gateway chain.
 const GATEWAY_L2_BRIDGEHUB: &str = "0x0000000000000000000000000000000000010002";
 /// L2 system address of the bootloader.
@@ -40,16 +42,16 @@ pub struct MigrateShared {
 #[command(after_long_help = "\
 Steps (run in order):
   1. pause-deposits    Pause deposits before migration
-  2. submit            Submit the migration transaction (L1 -> gateway)
-  3. notify-server     Notify the server about the migration
+  2. notify-server     Notify the server about the migration
+  3. submit            Submit the migration transaction (L1 -> gateway)
   4. finalize          Confirm L2 transfer and enable validators on gateway")]
 pub enum MigrateCommands {
     /// Step 1: Pause deposits on the chain before migration
     PauseDeposits(PauseDepositsArgs),
-    /// Step 2: Submit the migration transaction (L1 -> gateway L2)
-    Submit(SubmitArgs),
-    /// Step 3: Notify the server about the migration
+    /// Step 2: Notify the server about the migration
     NotifyServer(NotifyServerArgs),
+    /// Step 3: Submit the migration transaction (L1 -> gateway L2)
+    Submit(SubmitArgs),
     /// Step 4: Confirm L1->L2 transfer after gateway processes it and enable validators
     Finalize(FinalizeArgs),
 }
@@ -58,6 +60,15 @@ pub enum MigrateCommands {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct PauseDepositsArgs {
+    #[clap(flatten)]
+    #[serde(flatten)]
+    pub common: MigrateShared,
+}
+
+// ── NotifyServer args ──────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, Parser)]
+pub struct NotifyServerArgs {
     #[clap(flatten)]
     #[serde(flatten)]
     pub common: MigrateShared,
@@ -86,15 +97,6 @@ pub struct SubmitArgs {
     /// Refund recipient address for L1->L2 transactions.
     #[clap(long)]
     pub refund_recipient: Address,
-}
-
-// ── NotifyServer args ──────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize, Parser)]
-pub struct NotifyServerArgs {
-    #[clap(flatten)]
-    #[serde(flatten)]
-    pub common: MigrateShared,
 }
 
 // ── Finalize args ──────────────────────────────────────────────────────────
@@ -161,8 +163,8 @@ pub struct FinalizeArgs {
 pub async fn run(cmd: MigrateCommands) -> anyhow::Result<()> {
     match cmd {
         MigrateCommands::PauseDeposits(args) => run_pause_deposits(args).await,
-        MigrateCommands::Submit(args) => run_submit(args).await,
         MigrateCommands::NotifyServer(args) => run_notify_server(args).await,
+        MigrateCommands::Submit(args) => run_submit(args).await,
         MigrateCommands::Finalize(args) => run_finalize(args).await,
     }
 }
@@ -171,28 +173,6 @@ pub async fn run(cmd: MigrateCommands) -> anyhow::Result<()> {
 #[derive(Debug, Deserialize)]
 struct VotePreparationOutput {
     diamond_cut_data: String,
-}
-
-fn build_admin_functions_script(
-    contracts_path: &Path,
-    runner: &ForgeRunner,
-    forge_args: &crate::common::forge::ForgeScriptArgs,
-    sig: &str,
-    additional_args: Vec<String>,
-) -> anyhow::Result<crate::common::forge::ForgeScript> {
-    let script_path = "deploy-scripts/AdminFunctions.s.sol";
-    let mut script_args = forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: sig.to_string(),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args.add_arg(ForgeScriptArg::Broadcast);
-    script_args.add_arg(ForgeScriptArg::Ffi);
-    script_args.additional_args.extend(additional_args);
-
-    Ok(Forge::new(contracts_path).script(Path::new(script_path), script_args))
 }
 
 // ── Step 1: Pause deposits ------------------------------------------------
@@ -206,6 +186,7 @@ async fn run_pause_deposits(args: PauseDepositsArgs) -> anyhow::Result<()> {
     )?;
 
     let contracts_path = paths::resolve_l1_contracts_path()?;
+    let should_send = (!runner.simulate).to_string();
 
     let script = build_admin_functions_script(
         &contracts_path,
@@ -215,7 +196,7 @@ async fn run_pause_deposits(args: PauseDepositsArgs) -> anyhow::Result<()> {
         vec![
             format!("{:#x}", args.common.bridgehub),
             args.common.chain_id.to_string(),
-            "true".to_string(),
+            should_send,
         ],
     )?
     .with_wallet(&sender, runner.simulate);
@@ -230,7 +211,45 @@ async fn run_pause_deposits(args: PauseDepositsArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-// ── Step 2: Submit ---------------------------------------------------------
+// ── Step 2: Notify server --------------------------------------------------
+
+async fn run_notify_server(args: NotifyServerArgs) -> anyhow::Result<()> {
+    let sender = Wallet::parse(args.common.shared.private_key, args.common.shared.sender)?;
+    let mut runner = ForgeRunner::new(
+        args.common.shared.simulate,
+        &args.common.shared.l1_rpc_url,
+        args.common.shared.forge_args.clone(),
+    )?;
+
+    let contracts_path = paths::resolve_l1_contracts_path()?;
+    let should_send = (!runner.simulate).to_string();
+
+    let script = build_admin_functions_script(
+        &contracts_path,
+        &runner,
+        &args.common.shared.forge_args,
+        "notifyServerMigrationToGateway(address,uint256,bool)",
+        vec![
+            format!("{:#x}", args.common.bridgehub),
+            args.common.chain_id.to_string(),
+            should_send,
+        ],
+    )?
+    .with_wallet(&sender, runner.simulate);
+
+    logger::step("Notifying server about migration");
+    logger::info(format!("Chain ID: {}", args.common.chain_id));
+
+    runner
+        .run(script)
+        .context("Failed to notify server about migration")?;
+
+    write_stage_output(&runner, &args.common, "notify-server").await?;
+    logger::success("Server notified about migration");
+    Ok(())
+}
+
+// ── Step 3: Submit ---------------------------------------------------------
 
 async fn run_submit(args: SubmitArgs) -> anyhow::Result<()> {
     let sender = Wallet::parse(args.common.shared.private_key, args.common.shared.sender)?;
@@ -241,6 +260,7 @@ async fn run_submit(args: SubmitArgs) -> anyhow::Result<()> {
     )?;
 
     let contracts_path = paths::resolve_l1_contracts_path()?;
+    let should_send = (!runner.simulate).to_string();
 
     // Read diamond_cut_data from the gateway vote preparation output.
     // Strip leading '/' so PathBuf::join treats it as relative to contracts_path.
@@ -268,7 +288,7 @@ async fn run_submit(args: SubmitArgs) -> anyhow::Result<()> {
             args.gateway_chain_id.to_string(),
             diamond_cut_data_hex,
             format!("{:#x}", args.refund_recipient),
-            "true".to_string(),
+            should_send,
         ],
     )?
     .with_wallet(&sender, runner.simulate);
@@ -287,43 +307,6 @@ async fn run_submit(args: SubmitArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-// ── Step 3: Notify server --------------------------------------------------
-
-async fn run_notify_server(args: NotifyServerArgs) -> anyhow::Result<()> {
-    let sender = Wallet::parse(args.common.shared.private_key, args.common.shared.sender)?;
-    let mut runner = ForgeRunner::new(
-        args.common.shared.simulate,
-        &args.common.shared.l1_rpc_url,
-        args.common.shared.forge_args.clone(),
-    )?;
-
-    let contracts_path = paths::resolve_l1_contracts_path()?;
-
-    let script = build_admin_functions_script(
-        &contracts_path,
-        &runner,
-        &args.common.shared.forge_args,
-        "notifyServerMigrationToGateway(address,uint256,bool)",
-        vec![
-            format!("{:#x}", args.common.bridgehub),
-            args.common.chain_id.to_string(),
-            "true".to_string(),
-        ],
-    )?
-    .with_wallet(&sender, runner.simulate);
-
-    logger::step("Notifying server about migration");
-    logger::info(format!("Chain ID: {}", args.common.chain_id));
-
-    runner
-        .run(script)
-        .context("Failed to notify server about migration")?;
-
-    write_stage_output(&runner, &args.common, "notify-server").await?;
-    logger::success("Server notified about migration");
-    Ok(())
-}
-
 // ── Step 4: Finalize -------------------------------------------------------
 
 async fn run_finalize(args: FinalizeArgs) -> anyhow::Result<()> {
@@ -335,6 +318,7 @@ async fn run_finalize(args: FinalizeArgs) -> anyhow::Result<()> {
     )?;
 
     let contracts_path = paths::resolve_l1_contracts_path()?;
+    let should_send = (!runner.simulate).to_string();
 
     // Read diamond_cut_data.
     // Strip leading '/' so PathBuf::join treats it as relative to contracts_path.
@@ -471,28 +455,23 @@ async fn run_finalize(args: FinalizeArgs) -> anyhow::Result<()> {
     };
     for validator in &validators {
         logger::info(format!("Enabling validator {:#x}", validator));
-        let mut sa = args.shared.forge_args.clone();
-        sa.add_arg(ForgeScriptArg::Sig {
-            sig: "enableValidatorViaGateway(address,uint256,uint256,uint256,address,address,address,bool)".to_string(),
-        });
-        sa.add_arg(ForgeScriptArg::RpcUrl {
-            url: runner.rpc_url.clone(),
-        });
-        sa.add_arg(ForgeScriptArg::Broadcast);
-        sa.add_arg(ForgeScriptArg::Ffi);
-        sa.additional_args.extend([
-            format!("{:#x}", args.bridgehub),        // bridgehub
-            args.l1_gas_price.to_string(),           // l1GasPrice
-            args.chain_id.to_string(),               // l2ChainId
-            args.gateway_chain_id.to_string(),       // gatewayChainId
-            format!("{:#x}", validator),             // validatorAddress
-            format!("{:#x}", gw_validator_timelock), // gatewayValidatorTimelock
-            format!("{:#x}", sender.address),        // refundRecipient
-            "true".to_string(),                      // _shouldSend
-        ]);
-        let script = Forge::new(&contracts_path)
-            .script(Path::new("deploy-scripts/AdminFunctions.s.sol"), sa)
-            .with_wallet(&sender, runner.simulate);
+        let script = build_admin_functions_script(
+            &contracts_path,
+            &runner,
+            &args.shared.forge_args,
+            "enableValidatorViaGateway(address,uint256,uint256,uint256,address,address,address,bool)",
+            vec![
+                format!("{:#x}", args.bridgehub),        // bridgehub
+                args.l1_gas_price.to_string(),           // l1GasPrice
+                args.chain_id.to_string(),               // l2ChainId
+                args.gateway_chain_id.to_string(),       // gatewayChainId
+                format!("{:#x}", validator),             // validatorAddress
+                format!("{:#x}", gw_validator_timelock), // gatewayValidatorTimelock
+                format!("{:#x}", sender.address),        // refundRecipient
+                should_send.clone(),                     // _shouldSend
+            ],
+        )?
+        .with_wallet(&sender, runner.simulate);
         runner
             .run(script)
             .with_context(|| format!("enableValidatorViaGateway for {:#x}", validator))?;
@@ -684,6 +663,36 @@ async fn extract_priority_op_hash(
     )
 }
 
+// ── RPC response types for typed deserialization ──────────────────────────
+
+#[derive(Debug, Deserialize)]
+struct JsonRpcResponse<T> {
+    result: Option<T>,
+}
+
+#[derive(Debug, Deserialize)]
+struct L2ToL1Log {
+    sender: String,
+    #[serde(rename = "transactionIndex")]
+    transaction_index: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GatewayTransactionReceipt {
+    #[serde(rename = "l2ToL1Logs")]
+    l2_to_l1_logs: Vec<L2ToL1Log>,
+}
+
+#[derive(Debug, Deserialize)]
+struct L2ToL1LogProof {
+    #[serde(rename = "batchNumber")]
+    batch_number: u64,
+    id: u64,
+    proof: Vec<String>,
+}
+
+// ── RPC helpers ───────────────────────────────────────────────────────────
+
 /// Wait for an L2 transaction receipt on the gateway.
 async fn wait_for_l2_tx_receipt(
     gateway_rpc_url: &str,
@@ -704,12 +713,15 @@ async fn wait_for_l2_tx_receipt(
             "method": "eth_getTransactionReceipt",
             "params": [format!("{:#x}", tx_hash)]
         });
-        let resp = client.post(gateway_rpc_url).json(&body).send().await?;
-        let json: serde_json::Value = resp.json().await?;
-        if let Some(result) = json.get("result") {
-            if !result.is_null() {
-                return Ok(());
-            }
+        let resp: JsonRpcResponse<serde_json::Value> = client
+            .post(gateway_rpc_url)
+            .json(&body)
+            .send()
+            .await?
+            .json()
+            .await?;
+        if resp.result.is_some() {
+            return Ok(());
         }
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
     }
@@ -730,39 +742,31 @@ async fn get_finalize_params(
 ) -> anyhow::Result<FinalizeParams> {
     let client = reqwest::Client::new();
 
+    // Fetch the transaction receipt to find the bootloader L2->L1 log.
     let receipt_body = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "eth_getTransactionReceipt",
         "params": [format!("{:#x}", tx_hash)]
     });
-    let resp = client
+    let receipt_resp: JsonRpcResponse<GatewayTransactionReceipt> = client
         .post(gateway_rpc_url)
         .json(&receipt_body)
         .send()
+        .await?
+        .json()
         .await?;
-    let receipt_json: serde_json::Value = resp.json().await?;
-    let receipt = receipt_json.get("result").context("No receipt result")?;
-
-    let l2_to_l1_logs = receipt
-        .get("l2ToL1Logs")
-        .and_then(|v| v.as_array())
-        .context("No l2ToL1Logs in receipt")?;
+    let receipt = receipt_resp
+        .result
+        .context("eth_getTransactionReceipt returned null")?;
 
     let bootloader = L2_BOOTLOADER;
     let mut log_index = None;
     let mut tx_number_in_batch = 0u16;
-    for (i, log) in l2_to_l1_logs.iter().enumerate() {
-        let sender = log
-            .get("sender")
-            .and_then(|v| v.as_str())
-            .context(format!("L2->L1 log at index {} missing 'sender' field", i))?;
-        if sender.to_lowercase() == bootloader {
+    for (i, log) in receipt.l2_to_l1_logs.iter().enumerate() {
+        if log.sender.to_lowercase() == bootloader {
             log_index = Some(i);
-            let tx_index_str = log
-                .get("transactionIndex")
-                .and_then(|v| v.as_str())
-                .context("Bootloader L2->L1 log missing 'transactionIndex' field")?;
+            let tx_index_str = &log.transaction_index;
             tx_number_in_batch = u16::from_str_radix(tx_index_str.trim_start_matches("0x"), 16)
                 .context(format!(
                     "Failed to parse transactionIndex '{}' as u16",
@@ -774,43 +778,28 @@ async fn get_finalize_params(
     let log_index =
         log_index.context("No L2->L1 log from bootloader (0x8001) in migration tx receipt")?;
 
+    // Fetch the L2->L1 log proof.
     let proof_body = serde_json::json!({
         "jsonrpc": "2.0",
         "id": 1,
         "method": "zks_getL2ToL1LogProof",
         "params": [format!("{:#x}", tx_hash), log_index]
     });
-    let resp = client
+    let proof_resp: JsonRpcResponse<L2ToL1LogProof> = client
         .post(gateway_rpc_url)
         .json(&proof_body)
         .send()
+        .await?
+        .json()
         .await?;
-    let proof_json: serde_json::Value = resp.json().await?;
-    let proof = proof_json
-        .get("result")
-        .filter(|v| !v.is_null())
+    let proof = proof_resp
+        .result
         .context("zks_getL2ToL1LogProof returned null")?;
 
-    let batch_number = proof
-        .get("batchNumber")
-        .and_then(|v| v.as_u64())
-        .context("missing batchNumber")?;
-    let l2_message_index = proof
-        .get("id")
-        .and_then(|v| v.as_u64())
-        .context("missing id")?;
-    let merkle_proof: Vec<String> = proof
-        .get("proof")
-        .and_then(|v| v.as_array())
-        .context("missing proof array")?
-        .iter()
-        .filter_map(|v| v.as_str().map(String::from))
-        .collect();
-
     Ok(FinalizeParams {
-        batch_number,
-        l2_message_index,
+        batch_number: proof.batch_number,
+        l2_message_index: proof.id,
         l2_tx_number_in_batch: tx_number_in_batch,
-        merkle_proof,
+        merkle_proof: proof.proof,
     })
 }
