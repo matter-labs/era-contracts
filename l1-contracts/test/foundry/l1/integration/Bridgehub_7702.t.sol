@@ -103,11 +103,7 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
 
         // 7702-specific: sender must NOT be aliased — the EIP-7702 delegation means
         // the EOA itself is the msg.sender, so no L1-to-L2 alias should be applied.
-        assertEq(
-            address(uint160(request.transaction.from)),
-            randomCaller,
-            "7702: sender should not be aliased"
-        );
+        assertEq(address(uint160(request.transaction.from)), randomCaller, "7702: sender should not be aliased");
 
         // L2 target should be the actual chain contract, not just non-zero
         assertEq(
@@ -123,11 +119,7 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
         Vm.Log memory depositLog = logs.requireOne(
             "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
         );
-        assertEq(
-            uint256(depositLog.topics[1]),
-            currentChainId,
-            "Deposit base token event chainId mismatch"
-        );
+        assertEq(uint256(depositLog.topics[1]), currentChainId, "Deposit base token event chainId mismatch");
 
         // --- Simulate L2 side ---
         _handleRequestByMockL2Contract(request, RequestType.DIRECT);

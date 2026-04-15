@@ -55,19 +55,6 @@ interface IPausable {
 contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
 
-    bytes32 constant NEW_PRIORITY_REQUEST_HASH =
-        keccak256(
-            "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])"
-        );
-
-    struct NewPriorityRequest {
-        uint256 txId;
-        bytes32 txHash;
-        uint64 expirationTimestamp;
-        L2CanonicalTransaction transaction;
-        bytes[] factoryDeps;
-    }
-
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
