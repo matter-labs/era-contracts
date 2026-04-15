@@ -268,12 +268,13 @@ async function runEcosystemUpgradeScripts(rpcUrl: string, envVars: Record<string
     senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
     projectRoot: l1ContractsDir,
   };
-  // Split into three calls to reduce peak EVM memory and avoid broadcast deadlocks.
-  // step2 loads all L2 bytecodes for the diamond cut — needs extra EVM memory (256MB).
-  // step3 reads pre-computed data from step2's output TOML to avoid re-loading bytecodes.
+  // Split into two calls to reduce peak EVM memory and avoid broadcast deadlocks.
+  // step2 loads all L2 bytecodes for the diamond cut AND generates governance calls — it
+  // must be a single forge invocation because state-transition facet addresses, diamond-cut
+  // data and other CTM state can't be reliably round-tripped through TOML between invocations.
+  // It needs extra EVM memory (256MB) to hold the L2 bytecodes.
   await runForgeScript({ ...baseParams, sig: "step1()" });
   await runForgeScript({ ...baseParams, sig: "step2()", extraForgeArgs: ["--memory-limit", "268435456"] });
-  await runForgeScript({ ...baseParams, sig: "step3()" });
 }
 
 // ── Per-chain upgrade + L2 relay ─────────────────────────────────────
@@ -433,7 +434,14 @@ async function deployL2Contracts(
   for (const entry of forceDeployEntries) {
     const contractName = contractMap.get(entry.address.toLowerCase());
     if (!contractName) {
-      // For ZKsyncOS and EraVM, all force-deployed addresses should be in the map. if it is not add an explicit skip.
+      // Era force deployments include the EmptyContract placeholder (0x0000), the EraVM
+      // precompiles (0x0001..0x0008), and the system contracts at 0x800x (AccountCodeStorage,
+      // NonceHolder, etc.). These are either not exercised by the anvil harness (precompiles)
+      // or are already present in the loaded v29/v30 chain state, so we do not need to deploy
+      // their bytecode via anvil_setCode. Skip silently for entries we do not know about.
+      if (entry.upgradeType === UPGRADE_TYPE_ERA_FORCE_DEPLOYMENT) {
+        continue;
+      }
       throw new Error(`No contract mapping for ZKsyncOS force deploy address ${entry.address}`);
     }
 
