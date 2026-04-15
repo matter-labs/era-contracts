@@ -148,12 +148,12 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     error NotLatestProtocolVersion();
 
     /// @notice Get facet cuts that should be removed
-    function getFacetCutsForDeletion(address diamond) internal view returns (Diamond.FacetCut[] memory facetCuts) {
-        IZKChain.Facet[] memory facets = IZKChain(diamond).facets();
+    function getFacetCutsForDeletion(address _diamond) internal view returns (Diamond.FacetCut[] memory facetCuts) {
+        IZKChain.Facet[] memory facets = IZKChain(_diamond).facets();
 
         require(
-            IZKChain(diamond).getProtocolVersion() ==
-                IChainTypeManager(IZKChain(diamond).getChainTypeManager()).protocolVersion(),
+            IZKChain(_diamond).getProtocolVersion() ==
+                IChainTypeManager(IZKChain(_diamond).getChainTypeManager()).protocolVersion(),
             NotLatestProtocolVersion()
         );
 

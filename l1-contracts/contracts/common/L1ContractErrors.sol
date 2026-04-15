@@ -301,7 +301,7 @@ error NotAllowed(address addr);
 // 0x64846fe4
 error NotARestriction(address addr);
 // 0xf306a770
-error NotAssetRouter(address _sender, address _assetRouter);
+error NotAssetRouter(address sender, address assetRouter);
 // 0xb49df1f2
 error NotAZKChain(address addr);
 // 0x7fdf8632
