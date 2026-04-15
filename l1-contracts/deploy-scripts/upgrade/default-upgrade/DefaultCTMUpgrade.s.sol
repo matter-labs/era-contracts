@@ -95,7 +95,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         address bytecodesSupplier;
         bool isZKsyncOS;
         /// @dev ZK token asset ID, used by `InteropCenter.initL2` for fixed-fee bundles.
-        ///      May be bytes32(0) for chains that don't yet have a ZK token on L1 at upgrade time.
+        ///      MUST be non-zero — `InteropCenter.initL2` reverts otherwise, which would abort the
+        ///      L2 upgrade transaction.
         bytes32 zkTokenAssetId;
     }
 
@@ -161,6 +162,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         // Pass bytecodesSupplier to introspection - will overwrite incorrect V29 value
         setAddressesBasedOnCTM(permanentConfig.bytecodesSupplier);
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
+        // Must be non-zero: `InteropCenter.initL2` (invoked via `_initializeV31Contracts`) reverts
+        // on a zero asset ID, which would abort the L2 upgrade transaction. Catch the
+        // misconfiguration here so the preparation script fails loudly instead of on L2.
+        require(permanentConfig.zkTokenAssetId != bytes32(0), "zkTokenAssetId must be non-zero");
         config.zkTokenAssetId = permanentConfig.zkTokenAssetId;
         config.contracts.chainCreationParams = chainCreationParams;
 

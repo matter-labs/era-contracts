@@ -96,11 +96,10 @@ contract EcosystemUpgradeV31ForTests is EcosystemUpgrade_v31 {
             : address(0);
         bool isZKsyncOS = pvToml.readBool("$.is_zk_sync_os");
         bytes32 create2FactorySalt = pvToml.readBytes32("$.permanent_contracts.create2_factory_salt");
-        // The ZK token asset ID is passed to `InteropCenter.initL2`. It is optional — chains
-        // upgrading from a pre-v31 version that don't have a ZK token on L1 yet can omit it.
-        bytes32 zkTokenAssetId = pvToml.keyExists("$.zk_token_asset_id")
-            ? pvToml.readBytes32("$.zk_token_asset_id")
-            : bytes32(0);
+        // The ZK token asset ID is passed to `InteropCenter.initL2`, which requires it to be
+        // non-zero. `initializeConfig` enforces this; we read it here and let the assertion fire
+        // at TOML parse time if it's missing.
+        bytes32 zkTokenAssetId = pvToml.readBytes32("$.zk_token_asset_id");
 
         // Read the upgrade input TOML to get the owner/governance address
         string memory upgradeToml = vm.readFile(string.concat(root, upgradeInputPath));

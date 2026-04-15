@@ -15,8 +15,8 @@ struct EcosystemUpgradeParams {
     string ecosystemOutputPath;
     address governance;
     /// @notice Asset ID of the ZK token used by the InteropCenter for fixed-fee bundles.
-    ///         Chains upgrading from a pre-v31 version that do not yet have a ZK token on L1
-    ///         can pass bytes32(0); fixed-ZK-fee bundles will then fail with ZKTokenNotAvailable
-    ///         until a future upgrade sets the asset ID.
+    ///         MUST be non-zero — `InteropCenter.initL2` (called by `_initializeV31Contracts`
+    ///         on every chain being upgraded to v31) enforces this, and a zero value would
+    ///         revert the L2 upgrade transaction.
     bytes32 zkTokenAssetId;
 }
