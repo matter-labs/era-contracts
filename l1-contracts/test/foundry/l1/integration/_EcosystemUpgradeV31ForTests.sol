@@ -25,8 +25,11 @@ contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
     /// @dev Skip serializing deployed_addresses/state_transition/etc. to TOML.
     /// The accumulated JSON strings from vm.serializeAddress/vm.serializeString blow
     /// forge's default 128MB EVM memory. The test only needs chain_upgrade_diamond_cut.
-    function saveOutput(string memory) internal override {
-        // no-op: avoids OOM from large TOML serialization
+    /// We still need to create the file so that later `vm.writeToml(section)` calls from
+    /// `prepareDefaultGovernanceCalls()` (e.g. for `.governance_calls`) succeed — the
+    /// sectioned form requires the target file to already exist.
+    function saveOutput(string memory outputPath) internal override {
+        vm.writeToml("", outputPath);
     }
 }
 

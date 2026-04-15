@@ -458,12 +458,7 @@ async function deployL2Contracts(
       if (!entry.deployedBytecodeInfo) {
         throw new Error(`ZKsyncOSSystemProxyUpgrade entry ${entry.address} missing deployedBytecodeInfo`);
       }
-      await deployBehindSystemProxy(
-        l2Provider,
-        entry.address,
-        getBytecode(contractName),
-        entry.deployedBytecodeInfo
-      );
+      await deployBehindSystemProxy(l2Provider, entry.address, getBytecode(contractName), entry.deployedBytecodeInfo);
     } else {
       await l2Provider.send("anvil_setCode", [entry.address, getBytecode(contractName)]);
     }
