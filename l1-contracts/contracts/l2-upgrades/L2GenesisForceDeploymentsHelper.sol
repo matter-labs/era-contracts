@@ -321,12 +321,6 @@ library L2GenesisForceDeploymentsHelper {
             L2_ASSET_ROUTER_ADDR,
             L2_MESSAGE_ROOT_ADDR
         );
-
-        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
-            _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.aliasedL1Governance,
-            _fixedForceDeploymentsData.zkTokenAssetId
-        );
     }
 
     /// @notice Calls updateL2() on ALL contracts. Used during non-genesis upgrades.
@@ -372,11 +366,6 @@ library L2GenesisForceDeploymentsHelper {
             L2_BRIDGEHUB_ADDR,
             L2_ASSET_ROUTER_ADDR,
             L2_MESSAGE_ROOT_ADDR
-        );
-
-        InteropCenter(L2_INTEROP_CENTER_ADDR).updateL2(
-            _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.aliasedL1Governance
         );
     }
 
@@ -441,6 +430,12 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
+
+        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(
+            _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.aliasedL1Governance,
+            _fixedForceDeploymentsData.zkTokenAssetId
+        );
 
         // Register the base token in the AssetTracker.
         // During genesis, NTV.registerBaseTokenIfNeeded() handles it.

@@ -112,16 +112,23 @@ interface IInteropCenter {
     /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
     function unpause() external;
 
-    /// @notice Initializes the InteropCenter on a fresh genesis deployment.
+    /// @notice One-shot initialization for the InteropCenter.
+    /// @dev InteropCenter is introduced in v31, so this is called for BOTH new chains (genesis)
+    ///      and existing chains being upgraded to v31. In both cases the contract storage is
+    ///      fresh (the SystemProxy is freshly deployed), so the reentrancy guard and
+    ///      `ZK_TOKEN_ASSET_ID` must be set here. After v31, this function MUST NOT be called
+    ///      again — the `reentrancyGuardInitializer` and `_disableInitializers()` guards prevent it.
     /// @param _l1ChainId The chain ID of L1.
     /// @param _owner The owner address.
     /// @param _zkTokenAssetId The ZK token asset ID.
     function initL2(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) external;
 
-    /// @notice Initializes the InteropCenter during a non-genesis upgrade on an existing chain.
-    /// @dev Performs the same initialization as `initL2`. A separate method is provided for
-    ///      consistency with the initL2/updateL2 pattern used by other L2 system contracts
-    ///      and for maintainability, so that future upgrade-specific logic can be added here.
+    /// @notice Reserved for FUTURE protocol upgrades (v32+) on chains that already initialized
+    ///         InteropCenter via `initL2()`.
+    /// @dev NOT used in the v31 upgrade flow (which uses `initL2()` instead) and NOT used in
+    ///      genesis. Currently performs the same parameter refresh as `initL2()` minus the
+    ///      one-shot fields (reentrancy guard, ZK_TOKEN_ASSET_ID). Add upgrade-specific logic
+    ///      here for future protocol versions.
     /// @param _l1ChainId The chain ID of L1.
     /// @param _owner The owner address.
     function updateL2(uint256 _l1ChainId, address _owner) external;
