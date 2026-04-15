@@ -29,7 +29,9 @@ contract CTMUpgradeV31ForTests is CTMUpgrade_v31 {
     /// `prepareDefaultGovernanceCalls()` (e.g. for `.governance_calls`) succeed — the
     /// sectioned form requires the target file to already exist.
     function saveOutput(string memory outputPath) internal override {
-        vm.writeToml("", outputPath);
+        // Write a minimal placeholder TOML so the sectioned writes in
+        // `prepareDefaultGovernanceCalls` find an existing file.
+        vm.writeToml(vm.serializeString("ctm_output_placeholder", "kind", "test"), outputPath);
     }
 }
 
