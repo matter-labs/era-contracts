@@ -94,6 +94,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         address ctmProxy;
         address bytecodesSupplier;
         bool isZKsyncOS;
+        /// @dev ZK token asset ID, used by `InteropCenter.initL2` for fixed-fee bundles.
+        ///      May be bytes32(0) for chains that don't yet have a ZK token on L1 at upgrade time.
+        bytes32 zkTokenAssetId;
     }
 
     // The output of the script
@@ -120,7 +123,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         bytes32 create2FactorySalt,
         string memory newConfigPath,
         string memory _outputPath,
-        address governance
+        address governance,
+        bytes32 zkTokenAssetId
     ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
@@ -131,7 +135,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             rollupDAManager,
             create2FactorySalt,
             newConfigPath,
-            governance
+            governance,
+            zkTokenAssetId
         );
 
         console.log("Initialized config from %s", newConfigPath);
@@ -156,6 +161,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         // Pass bytecodesSupplier to introspection - will overwrite incorrect V29 value
         setAddressesBasedOnCTM(permanentConfig.bytecodesSupplier);
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
+        config.zkTokenAssetId = permanentConfig.zkTokenAssetId;
         config.contracts.chainCreationParams = chainCreationParams;
 
         if (governance != address(0)) {
@@ -189,7 +195,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         address rollupDAManager,
         bytes32 create2FactorySalt,
         string memory newConfigPath,
-        address governance
+        address governance,
+        bytes32 zkTokenAssetId
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
@@ -197,7 +204,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             ctmProxy: ctmProxy,
             bytecodesSupplier: bytecodesSupplier,
             isZKsyncOS: isZKsyncOS,
-            create2FactorySalt: create2FactorySalt
+            create2FactorySalt: create2FactorySalt,
+            zkTokenAssetId: zkTokenAssetId
         });
         // Set config.isZKsyncOS before getChainCreationParamsConfig.
         config.isZKsyncOS = isZKsyncOS;
