@@ -96,13 +96,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         if (shouldSaveSelectors) {
             saveDiamondSelectors();
         }
-        runInner(
-            vm.envString("CTM_CONFIG"),
-            vm.envString("CTM_OUTPUT"),
-            bridgehub,
-            false,
-            skipL1Deployments
-        );
+        runInner(vm.envString("CTM_CONFIG"), vm.envString("CTM_OUTPUT"), bridgehub, false, skipL1Deployments);
     }
 
     function getAddresses() public view virtual returns (CTMDeployedAddresses memory) {

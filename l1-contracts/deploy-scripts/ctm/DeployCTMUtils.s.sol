@@ -122,10 +122,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         return Utils.genesisConfigPath(_isZKsyncOS);
     }
 
-    function initializeConfig(
-        string memory configPath,
-        address bridgehub
-    ) internal virtual {
+    function initializeConfig(string memory configPath, address bridgehub) internal virtual {
         string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;
