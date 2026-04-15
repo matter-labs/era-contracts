@@ -650,13 +650,13 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         l2ValuesSum[currentTokenAddress] += l2Value;
     }
 
-    /// @notice Finalizes an ERC20 token withdrawal from L2 to L1 via the shared bridge.                           
-    /// @dev Constructs an L2-to-L1 message with `IL1ERC20Bridge.finalizeWithdrawal` selector,                     
-    /// mocks the L2 message inclusion proof on the bridgehub, then calls                                          
-    /// `sharedBridge.finalizeWithdrawal`. The `isWithdrawalFinalized` flag is force-set to                        
-    /// false via `stdstore` before the call to allow repeated invocations with the same params.                   
-    /// Mock justification: L2 proof verification is mocked because L2 batch commitments and                       
-    /// merkle trees are unavailable in this L1-only integration test environment. 
+    /// @notice Finalizes an ERC20 token withdrawal from L2 to L1 via the shared bridge.
+    /// @dev Constructs an L2-to-L1 message with `IL1ERC20Bridge.finalizeWithdrawal` selector,
+    /// mocks the L2 message inclusion proof on the bridgehub, then calls
+    /// `sharedBridge.finalizeWithdrawal`. The `isWithdrawalFinalized` flag is force-set to
+    /// false via `stdstore` before the call to allow repeated invocations with the same params.
+    /// Mock justification: L2 proof verification is mocked because L2 batch commitments and
+    /// merkle trees are unavailable in this L1-only integration test environment.
     function withdrawERC20Token(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {
         uint256 l2BatchNumber = uint256(uint160(makeAddr("l2BatchNumber")));
         uint256 l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
@@ -745,10 +745,10 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         assertEq(uint256(finalizedLog.topics[1]), currentChainId, "DepositFinalizedAssetRouter chainId mismatch");
     }
 
-    /// @notice Finalizes an ETH withdrawal from L2 to L1 via the shared bridge.                                   
+    /// @notice Finalizes an ETH withdrawal from L2 to L1 via the shared bridge.
     /// @dev Same flow as `withdrawERC20Token` but uses `IMailboxLegacy.finalizeEthWithdrawal`
-    /// selector and asserts ETH balances instead of ERC20 balances.                                               
-    /// Mock justification: L2 proof verification is mocked because L2 batch commitments and                       
+    /// selector and asserts ETH balances instead of ERC20 balances.
+    /// Mock justification: L2 proof verification is mocked because L2 batch commitments and
     /// merkle trees are unavailable in this L1-only integration test environment.
     function withdrawETHToken(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {
         uint256 l2BatchNumber = uint256(uint160(makeAddr("l2BatchNumber")));
