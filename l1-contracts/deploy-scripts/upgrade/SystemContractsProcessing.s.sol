@@ -17,9 +17,9 @@ import {
     L2_MESSAGE_ROOT_ADDR,
     L2_MESSAGE_VERIFICATION,
     L2_NATIVE_TOKEN_VAULT_ADDR,
-    L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
     L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
