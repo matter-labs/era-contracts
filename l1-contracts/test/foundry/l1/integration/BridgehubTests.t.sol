@@ -478,7 +478,8 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         // --- Tx field validation ---
         assertEq(request.transaction.reserved[0], mintValue, "Mint value should match");
 
-        { // Code block to avoid stack too deep
+        {
+            // Code block to avoid stack too deep
             // --- Event: BridgehubDepositBaseTokenInitiated (ERC20 base) ---
             Vm.Log memory baseTokenLog = logs.requireOne(
                 "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
@@ -489,7 +490,11 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             Vm.Log memory depositInitiatedLog = logs.requireOne(
                 "BridgehubDepositInitiated(uint256,bytes32,address,bytes32,bytes)"
             );
-            assertEq(uint256(depositInitiatedLog.topics[1]), currentChainId, "Deposit initiated event chainId mismatch");
+            assertEq(
+                uint256(depositInitiatedLog.topics[1]),
+                currentChainId,
+                "Deposit initiated event chainId mismatch"
+            );
         }
         _handleRequestByMockL2Contract(request, RequestType.TWO_BRIDGES);
 

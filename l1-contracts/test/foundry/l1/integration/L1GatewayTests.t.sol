@@ -165,9 +165,9 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     //
     function test_registerGateway() public {
         // Verify gateway is not whitelisted before setup
-        assertFalse(                                                                                                                                                                  
+        assertFalse(
             addresses.bridgehub.whitelistedSettlementLayers(gatewayChainId),
-            "Gateway should not be whitelisted before setup"                                                                                                                          
+            "Gateway should not be whitelisted before setup"
         );
 
         // Expect SettlementLayerRegistered event from Bridgehub
@@ -187,13 +187,13 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     }
 
     //@check  SHould other unhappy and edge case tests live here?
-    // Unhappy                                                                                                                                      
-    // - Call setSettlementLayerStatus directly from a random address.                                                                                                                                                                             
-    // - Chain's settlement layer is set to something other than L1                                                                                                                                                                                                                                                                                   
-    // - Attempt to whitelist a chain ID that was never registered in the bridgehub.                                                                                                                                              
-    // Edge cases                                                                                                                                                                        
-    // - Deregister a previously registered chain                                                                                                                                                                                                                                                                                                                                                                                                                         
-    // - Register the same chain twice                                                                                                                                               
+    // Unhappy
+    // - Call setSettlementLayerStatus directly from a random address.
+    // - Chain's settlement layer is set to something other than L1
+    // - Attempt to whitelist a chain ID that was never registered in the bridgehub.
+    // Edge cases
+    // - Deregister a previously registered chain
+    // - Register the same chain twice
 
     //
     function test_moveChainToGateway() public {
@@ -222,18 +222,17 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             IL1ChainAssetHandler(chainAssetHandler).isMigrationInProgress(migratingChainId),
             "Migration should be in progress"
         );
-                                                                                                                                                                                
+
         // Verify migration number is incremented
         assertEq(
             IChainAssetHandlerBase(chainAssetHandler).migrationNumber(migratingChainId),
-            1,                                                                                                                                                                        
+            1,
             "Migration number should be 1 after initiating migration"
-        );                                                                                                                                                                            
-                    
-        // Deposits paused on the migrating chain                                                                                                                                     
-        uint256 pausedDepositsTimestamp = uint256(vm.load(address(migratingChain), pausedDepositsTimestampSlot));
-        assertTrue(pausedDepositsTimestamp != 0, "Deposits should be paused after initiating migration");  
+        );
 
+        // Deposits paused on the migrating chain
+        uint256 pausedDepositsTimestamp = uint256(vm.load(address(migratingChain), pausedDepositsTimestampSlot));
+        assertTrue(pausedDepositsTimestamp != 0, "Deposits should be paused after initiating migration");
     }
 
     function test_l2Registration() public {
@@ -288,9 +287,9 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
             migratingChainId,
             expectedValue,
-            0,        // l2Value
+            0, // l2Value
             72000000, // l2GasLimit
-            800,      // l2GasPerPubdataByteLimit
+            800, // l2GasPerPubdataByteLimit
             "0x"
         );
 
@@ -519,7 +518,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         // After migrating back, the settlement layer should not be gateway
         uint256 settlementLayer = addresses.bridgehub.settlementLayer(migratingChainId);
-        assertTrue(settlementLayer != gatewayChainId, "Settlement layer should not be gateway after migration back"); 
+        assertTrue(settlementLayer != gatewayChainId, "Settlement layer should not be gateway after migration back");
     }
 
     function test_chainMigrationWithUpgrade() public {
@@ -597,7 +596,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         gatewayScript.migrateChainToGateway(migratingChainId);
 
         // TODO(EVM-1332): Comment on what is this blob explicitly
-        bytes memory data = hex"74beea820000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000010f00000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000300000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000002e49c884fd1000000000000000000000000000000000000000000000000000000000000010f93d0008af83c021d815bd4e76d7297c69d7f4cc4cf0b8892f7f74f6e33e11829000000000000000000000000c71d126d294a5d2e4002a62d0017b7109f18ade9000000000000000000000000c71d126d294a5d2e4002a62d0017b7109f18ade90000000000000000000000058dc094d71c4c3740bc1ef43d46b58717fa3595a000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000001c101000000000000000000000000000000000000000000000000000000000000000900000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000457425443000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000045742544300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c0101030000000000000000000000000000000000000000000000000000000000e4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf7594400000000000000000000000000000000000000000000000000000000000000079ba301ae10c10e68bffcc2b466aac46d7c7cd6f87eb055e4d43897f303c7a03a21b22cb4099a976636357d5d1f46deeb36f60ec6557eef0da85abaa8222c8c018dba9883941a824d6545029e626b54bd10404b2b8fff432a39ad36d9a36fe3d60000000000000000000000000000001100000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000001fa0103000100000000000000000000000000000000000000000000000000000000f84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f82823d18b4879c426cf1cb583e1102d9d7f4a5a3a2d01e3f7cc6d042de25409fef1178cf3cbada927540027845a799eab8cf1d788869a9cc11c0f3ebfec198ff347";
+        bytes
+            memory data = hex"74beea820000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000010f00000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000300000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000002e49c884fd1000000000000000000000000000000000000000000000000000000000000010f93d0008af83c021d815bd4e76d7297c69d7f4cc4cf0b8892f7f74f6e33e11829000000000000000000000000c71d126d294a5d2e4002a62d0017b7109f18ade9000000000000000000000000c71d126d294a5d2e4002a62d0017b7109f18ade90000000000000000000000058dc094d71c4c3740bc1ef43d46b58717fa3595a000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000001c101000000000000000000000000000000000000000000000000000000000000000900000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000457425443000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000045742544300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c0101030000000000000000000000000000000000000000000000000000000000e4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf7594400000000000000000000000000000000000000000000000000000000000000079ba301ae10c10e68bffcc2b466aac46d7c7cd6f87eb055e4d43897f303c7a03a21b22cb4099a976636357d5d1f46deeb36f60ec6557eef0da85abaa8222c8c018dba9883941a824d6545029e626b54bd10404b2b8fff432a39ad36d9a36fe3d60000000000000000000000000000001100000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000001fa0103000100000000000000000000000000000000000000000000000000000000f84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f82823d18b4879c426cf1cb583e1102d9d7f4a5a3a2d01e3f7cc6d042de25409fef1178cf3cbada927540027845a799eab8cf1d788869a9cc11c0f3ebfec198ff347";
 
         vm.expectRevert(abi.encodeWithSelector(InvalidProof.selector));
         address(addresses.l1Nullifier).call(data);
