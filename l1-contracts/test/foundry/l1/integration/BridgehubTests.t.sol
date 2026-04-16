@@ -149,7 +149,7 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
     // blocks -> batches -> commits or just mock it.
     function _commitBatchInfo(uint256 _chainId) internal {
         //vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
-        
+
         GettersFacet zkChainGetters = GettersFacet(getZKChainAddress(_chainId));
 
         IExecutor.StoredBatchInfo memory batchZero;
