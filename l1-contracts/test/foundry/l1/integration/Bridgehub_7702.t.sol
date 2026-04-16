@@ -54,7 +54,7 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
         address payable randomCaller = payable(vm.addr(randomCallerPk));
         currentUser = randomCaller;
         uint256 l2Value = 100;
-        uint256 currentChainId = 10;
+        currentChainId = 10;
         currentChainAddress = getZKChainAddress(currentChainId);
         uint256 gasPrice = 10000000;
         vm.txGasPrice(gasPrice);
@@ -124,16 +124,26 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
         // --- Simulate L2 side ---
         _handleRequestByMockL2Contract(request, RequestType.DIRECT);
 
-        // Update tracking variables
+        // Update tracking variables for invariant harness
         depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += mintValue;
         depositsBridge[currentChainAddress][ETH_TOKEN_ADDRESS] += mintValue;
         tokenSumDeposit[ETH_TOKEN_ADDRESS] += mintValue;
         l2ValuesSum[ETH_TOKEN_ADDRESS] += l2Value;
     }
 
+    //@check does it make sense to add here the rest of unhappy and edge scenarios instead of in unit testing>
+    // Unhappy path tests:                                                                                                                                                                                                                                                                                                                                     
+    // - Caller is dealt less ETH than mintValue (mintValue - 1).                                                                                                                                                                                                                                                                                                     
+    // - Caller has ETH but mintValue is set to 1 — far below the L2 base cost.                                                                                                                                                                                                                                        
+    // Edge case tests
+    // - l2Value is 0, mintValue covers only gas. The 7702 delegation mechanics should still                                                                                            
+    //    work: sender should not be aliased, ETH fully consumed, transaction queued.                                                                                                                                                 
+    // - A regular contract (no signAndAttachDelegation) calls the bridgehub,
+    //    the sender in the L2 canonical transaction should be aliased because it !is7702AccountSender                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+
     function depositEthSuccess(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 l2Value) public {
         uint64 MAX = 2 ** 64 - 1;
-        uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
+        l2Value = bound(l2Value, 0.1 ether, MAX);
 
         emit log_string("DEPOSIT ETH");
         super.depositEthToBridgeSuccess(userIndexSeed, chainIndexSeed, l2Value);
@@ -146,7 +156,7 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
         uint256 l2Value
     ) public {
         uint64 MAX = 2 ** 64 - 1;
-        uint256 l2Value = bound(l2Value, 0.1 ether, MAX);
+        l2Value = bound(l2Value, 0.1 ether, MAX);
 
         emit log_string("DEPOSIT ERC20");
         super.depositERC20ToBridgeSuccess(userIndexSeed, chainIndexSeed, tokenIndexSeed, l2Value);
@@ -154,7 +164,7 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
 
     function withdrawERC20Success(uint256 userIndexSeed, uint256 chainIndexSeed, uint256 amountToWithdraw) public {
         uint64 MAX = (2 ** 32 - 1) + 0.1 ether;
-        uint256 amountToWithdraw = bound(amountToWithdraw, 0.1 ether, MAX);
+        amountToWithdraw = bound(amountToWithdraw, 0.1 ether, MAX);
 
         emit log_string("WITHDRAW ERC20");
         super.withdrawSuccess(userIndexSeed, chainIndexSeed, amountToWithdraw);

@@ -31,6 +31,8 @@ import {
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
+import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestsConstants.sol";
+
 contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
     using LogFinder for Vm.Log[];
@@ -107,9 +109,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         );
 
         // Event: NewPriorityRequest from the mailbox (service transaction was queued)
-        logs.requireOne(
-            "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])"
-        );
+        logs.requireOne(NEW_PRIORITY_REQUEST_SIGNATURE);
     }
 
     function test_chainRegistrationSender_revertWhen_alreadyRegistered() public {

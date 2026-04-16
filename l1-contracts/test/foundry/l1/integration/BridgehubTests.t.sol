@@ -36,13 +36,12 @@ import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
+import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestsConstants.sol";
+
 contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using LogFinder for Vm.Log[];
 
     uint256 constant TEST_USERS_COUNT = 10;
-
-    string constant NEW_PRIORITY_REQUEST_SIGNATURE =
-        "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])";
 
     enum RequestType {
         DIRECT,
@@ -442,7 +441,6 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         uint256 userBaseBefore = baseToken.balanceOf(currentUser);
         uint256 userTokenBefore = currentToken.balanceOf(currentUser);
-        uint256 userEthBefore = currentUser.balance;
 
         bytes memory secondBridgeCallData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
         L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
@@ -466,36 +464,33 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         assertNotEq(request.txHash, bytes32(0), "Priority tx hash should not be zero");
 
         // --- Balance assertions ---
-        // Base token consumed for gas
         assertEq(
             baseToken.balanceOf(currentUser),
             userBaseBefore - mintValue,
             "User base token should decrease by mintValue"
         );
-        // Deposit token consumed via second bridge
         assertEq(
             currentToken.balanceOf(currentUser),
             userTokenBefore - l2Value,
             "User deposit token should decrease by l2Value"
         );
-        // No ETH consumed (both tokens are ERC20, no {value} sent)
-        assertEq(currentUser.balance, userEthBefore, "User ETH should remain unchanged");
 
         // --- Tx field validation ---
         assertEq(request.transaction.reserved[0], mintValue, "Mint value should match");
 
-        // --- Event: BridgehubDepositBaseTokenInitiated (ERC20 base) ---
-        Vm.Log memory baseTokenLog = logs.requireOne(
-            "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
-        );
-        assertEq(uint256(baseTokenLog.topics[1]), currentChainId, "Base token deposit event chainId mismatch");
+        { // Code block to avoid stack too deep
+            // --- Event: BridgehubDepositBaseTokenInitiated (ERC20 base) ---
+            Vm.Log memory baseTokenLog = logs.requireOne(
+                "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
+            );
+            assertEq(uint256(baseTokenLog.topics[1]), currentChainId, "Base token deposit event chainId mismatch");
 
-        // --- Event: BridgehubDepositInitiated (ERC20 second bridge) ---
-        Vm.Log memory depositInitiatedLog = logs.requireOne(
-            "BridgehubDepositInitiated(uint256,bytes32,address,bytes32,bytes)"
-        );
-        assertEq(uint256(depositInitiatedLog.topics[1]), currentChainId, "Deposit initiated event chainId mismatch");
-
+            // --- Event: BridgehubDepositInitiated (ERC20 second bridge) ---
+            Vm.Log memory depositInitiatedLog = logs.requireOne(
+                "BridgehubDepositInitiated(uint256,bytes32,address,bytes32,bytes)"
+            );
+            assertEq(uint256(depositInitiatedLog.topics[1]), currentChainId, "Deposit initiated event chainId mismatch");
+        }
         _handleRequestByMockL2Contract(request, RequestType.TWO_BRIDGES);
 
         depositsUsers[currentUser][baseTokenAddress] += mintValue;

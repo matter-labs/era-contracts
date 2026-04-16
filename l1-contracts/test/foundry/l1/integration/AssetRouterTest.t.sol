@@ -42,12 +42,11 @@ import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
+import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestsConstants.sol";
+
 contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
     using LogFinder for Vm.Log[];
-
-    string constant NEW_PRIORITY_REQUEST_SIGNATURE =
-        "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])";
 
     struct NewPriorityRequest {
         uint256 txId;
