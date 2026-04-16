@@ -336,6 +336,7 @@ library L2GenesisForceDeploymentsHelper {
 
         L2Bridgehub(L2_BRIDGEHUB_ADDR).updateL2(
             _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.aliasedL1Governance,
             _fixedForceDeploymentsData.maxNumberOfZKChains
         );
 
@@ -345,7 +346,8 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.eraChainId,
             IL1AssetRouter(_fixedForceDeploymentsData.l1AssetRouter),
             IL2SharedBridgeLegacy(_getLegacySharedBridge()),
-            _additionalForceDeploymentsData.baseTokenBridgingData.assetId
+            _additionalForceDeploymentsData.baseTokenBridgingData.assetId,
+            _fixedForceDeploymentsData.aliasedL1Governance
         );
 
         bytes32 previousL2TokenProxyBytecodeHash = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR)

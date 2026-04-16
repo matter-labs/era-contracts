@@ -62,8 +62,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         uint256 _maxNumberOfZKChains
     ) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
-        updateL2(_l1ChainId, _maxNumberOfZKChains);
-        _transferOwnership(_owner);
+        updateL2(_l1ChainId, _owner, _maxNumberOfZKChains);
         _initializeInner();
     }
 
@@ -71,10 +70,19 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// @dev This function is used to initialize the new implementation of L2Bridgehub on existing chains during
     /// the upgrade.
     /// @param _l1ChainId The chain id of L1.
+    /// @param _owner The expected owner. If the current owner is different (e.g. a temporary
+    ///        multisig on a chain that predates decentralized governance), it will be reset.
     /// @param _maxNumberOfZKChains The maximum number of ZK chains that can be created.
-    function updateL2(uint256 _l1ChainId, uint256 _maxNumberOfZKChains) public onlyUpgrader {
+    function updateL2(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains) public onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
         MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
+
+        // Ensure the owner matches the expected governance. Pre-v31 ZKsync OS testnets ran with a
+        // temporary multisig owner; we reset it here so every chain ends up with the same
+        // (aliased L1 governance) owner after v31.
+        if (owner() != _owner) {
+            _transferOwnership(_owner);
+        }
 
         // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.

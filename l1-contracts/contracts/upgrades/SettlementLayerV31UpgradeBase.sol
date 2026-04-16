@@ -19,7 +19,7 @@ import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {Bytes} from "../vendor/Bytes.sol";
-import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "../common/Config.sol";
 import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
 
 /// @author Matter Labs
@@ -37,13 +37,21 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
         address assetRouter = address(bridgehub.assetRouter());
         address nativeTokenVaultAddr = address(IL1AssetRouter(assetRouter).nativeTokenVault());
 
-        /// We write to storage to avoid reentrancy.
+        // Persist the freshly discovered NativeTokenVault address into diamond storage so that
+        // subsequent facet calls (Mailbox, Executor, Migrator, etc.) see it without re-querying
+        // the bridgehub. DiamondInit does the same on chain creation.
         s.nativeTokenVault = nativeTokenVaultAddr;
 
         // Note that this call will revert if the native token vault has not been upgraded, i.e.
         // if a chain settling on Gateway tries to upgrade before ZK Gateway has done the upgrade.
         s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
         s.__DEPRECATED_l2DAValidator = address(0);
+        // Reset DA validators, mirroring what the v30 upgrade did. ZKsync OS chains already reset
+        // these during their v30 upgrade, so we only need to do it for Era chains here.
+        if (!s.zksyncOS) {
+            s.l1DAValidator = address(0);
+            s.l2DACommitmentScheme = L2DACommitmentScheme.NONE;
+        }
 
         // Set the permissionless validator used in Priority Mode, same as done in DiamondInit.
         s.priorityModeInfo.permissionlessValidator = IChainTypeManager(s.chainTypeManager).PERMISSIONLESS_VALIDATOR();
@@ -133,9 +141,13 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
             baseTokenSymbol = "ETH";
             baseTokenDecimals = 18;
         } else {
-            baseTokenName = IERC20Metadata(originToken).name();
-            baseTokenSymbol = IERC20Metadata(originToken).symbol();
-            baseTokenDecimals = IERC20Metadata(originToken).decimals();
+            // Use `tokenAddress` (the local bridged representation on this settlement layer)
+            // instead of `originToken` (which is the address on the origin chain and may have no
+            // code here if the token was bridged from another chain).
+            address localToken = nativeTokenVault.tokenAddress(baseTokenAssetId);
+            baseTokenName = IERC20Metadata(localToken).name();
+            baseTokenSymbol = IERC20Metadata(localToken).symbol();
+            baseTokenDecimals = IERC20Metadata(localToken).decimals();
         }
 
         return
