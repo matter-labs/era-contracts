@@ -125,6 +125,12 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         // Verify owner is valid
         assertTrue(owner != address(0), "Owner should be a valid address");
 
+        // Verify migration is not paused initially
+        assertFalse(
+            IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
+            "Migration should not be paused initially"
+        );
+
         vm.prank(owner);
         IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).pauseMigration();
 
@@ -133,6 +139,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
             "Migration should be paused after calling pauseMigration"
         );
+
+        //@check Is there a reason for CAH.pauseMigration() and CAH.unpauseMigration() to not emit events
     }
 
     function test_unpauseMigration_byOwner() public {
@@ -194,12 +202,13 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         );
     }
 
-    function test_bridgeBurn_Failed() public {
+    function test_bridgeBurn_revertWhen_notAssetRouter() public {
         vm.expectRevert(abi.encodeWithSelector(NotAssetRouter.selector, address(this), address(0)));
         IChainAssetHandlerBase(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
+    }
 
-        address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
-            .owner();
+    function test_bridgeBurn_revertWhen_migrationPaused() public {
+        // l2ChainAssetHandler owner is address(0) after bare deployment without initialization
         vm.prank(address(0));
         IChainAssetHandlerBase(address(l2ChainAssetHandler)).pauseMigration();
 
@@ -208,19 +217,14 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         IChainAssetHandlerBase(address(l2ChainAssetHandler)).bridgeBurn(eraZKChainId, 0, 0, address(0), "");
     }
 
-    function test_setSettlementLayerChainId_Success() public {
-        address systemContext = L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR;
-
-        // Verify system context address is valid
-        assertTrue(systemContext != address(0), "System context address should be valid");
-
+    function test_setSettlementLayerChainId_sameChainId() public {
         // Get migration number before the call
         uint256 migrationNumBefore = IChainAssetHandlerBase(address(l2ChainAssetHandler)).migrationNumber(
             block.chainid
         );
 
         // Set the settlement layer chain ID (same chain ID = no migration increment)
-        vm.prank(systemContext);
+        vm.prank(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR);
         l2ChainAssetHandler.setSettlementLayerChainId(eraZKChainId, eraZKChainId);
 
         // When previous and current are the same, migration number should not change
@@ -229,6 +233,26 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             migrationNumAfter,
             migrationNumBefore,
             "Migration number should remain unchanged when settlement layer doesn't change"
+        );
+    }
+
+    function test_setSettlementLayerChainId_differentChainId() public {
+        uint256 migrationNumBefore = IChainAssetHandlerBase(address(l2ChainAssetHandler)).migrationNumber(
+            block.chainid
+        );
+
+        // Different previous and current chain IDs triggers migration number increment
+        uint256 previousChainId = 100;
+        uint256 currentChainId = 200;
+
+        vm.prank(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR);
+        l2ChainAssetHandler.setSettlementLayerChainId(previousChainId, currentChainId);
+
+        uint256 migrationNumAfter = IChainAssetHandlerBase(address(l2ChainAssetHandler)).migrationNumber(block.chainid);
+        assertEq(
+            migrationNumAfter,
+            migrationNumBefore + 1,
+            "Migration number should increment when settlement layer changes"
         );
     }
 
@@ -273,6 +297,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         MigrationInterval memory stored = _l1ChainAssetHandler().migrationInterval(eraZKChainId, 0);
         assertEq(stored.migrateToGWBatchNumber, 10, "migrateToGWBatchNumber mismatch");
         assertEq(stored.migrateFromGWBatchNumber, 50, "migrateFromGWBatchNumber mismatch");
+        assertEq(stored.settlementLayerBatchLowerBound, 100, "settlementLayerBatchLowerBound mismatch");
+        assertEq(stored.settlementLayerBatchUpperBound, 200, "settlementLayerBatchUpperBound mismatch");
         assertEq(stored.settlementLayerChainId, gwChainId, "settlementLayerChainId mismatch");
         assertFalse(stored.isActive, "historical interval should not be active");
     }
