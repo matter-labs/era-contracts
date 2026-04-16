@@ -63,7 +63,6 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
     address public tokenL1Address;
     SimpleExecutor simpleExecutor;
 
-    // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
         require(users.length == 0, "Addresses already generated");
 
@@ -88,7 +87,6 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
             l2ContractAddresses.push(contractAddress);
-
             _addL2ChainContract(zkChainIds[i], contractAddress);
         }
     }
@@ -341,8 +339,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // --- Balance assertions ---
-        // ETH consumed for mintValue (base token deposit + gas)
+        // Verify balances
         assertEq(ethBalanceBefore - address(this).balance, 250000000000100, "ETH balance should decrease by mintValue");
         // Direct path only deposits base token (ETH); ERC20 tokens are NOT transferred on L1
         assertEq(
@@ -351,13 +348,13 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             "ERC20 token balance should remain unchanged in direct deposit"
         );
 
-        // --- Event: BridgehubDepositBaseTokenInitiated ---
+        // Verify BridgehubDepositBaseTokenInitiated event emission
         Vm.Log memory depositLog = logs.requireOne(
             "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
         );
         assertEq(uint256(depositLog.topics[1]), eraZKChainId, "Deposit base token event chainId mismatch");
 
-        // --- Event: NewPriorityRequest — decode and validate L2 transaction ---
+        // Verify NewPriorityRequest event and validate L2 transaction
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
         assertTrue(request.txHash != bytes32(0), "Canonical tx hash should be non-zero");
@@ -462,7 +459,6 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
     // add this to be excluded from coverage report
     function test() internal override {}
 
-    // gets event from logs
     function _getNewPriorityQueueFromLogs(
         Vm.Log[] memory logs
     ) internal pure returns (NewPriorityRequest memory request) {

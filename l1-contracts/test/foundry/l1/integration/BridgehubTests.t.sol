@@ -149,7 +149,7 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
     // blocks -> batches -> commits or just mock it.
     function _commitBatchInfo(uint256 _chainId) internal {
         //vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
-
+        
         GettersFacet zkChainGetters = GettersFacet(getZKChainAddress(_chainId));
 
         IExecutor.StoredBatchInfo memory batchZero;
@@ -288,11 +288,11 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
-        // --- Return value and tx hash ---
+        // Verify return value and tx hash
         assertNotEq(resultantHash, bytes32(0), "Resultant hash should not be zero");
         assertNotEq(request.txHash, bytes32(0), "Priority tx hash should not be zero");
 
-        // --- Balance assertions ---
+        // Verify balances
         // ETH consumed for base token gas
         assertEq(currentUser.balance, userEthBefore - mintValue, "User ETH should decrease by mintValue");
         // ERC20 consumed for the second bridge deposit
@@ -302,16 +302,16 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             "User ERC20 should decrease by l2Value"
         );
 
-        // --- Tx field validation ---
+        // Verify tx fields
         assertEq(request.transaction.reserved[0], mintValue, "Mint value should match");
 
-        // --- Event: BridgehubDepositBaseTokenInitiated (ETH base token) ---
+        // Verify BridgehubDepositBaseTokenInitiated event emission (ETH base token)
         Vm.Log memory baseTokenLog = logs.requireOne(
             "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
         );
         assertEq(uint256(baseTokenLog.topics[1]), currentChainId, "Base token deposit event chainId mismatch");
 
-        // --- Event: BridgehubDepositInitiated (ERC20 second bridge) ---
+        // Verify BridgehubDepositInitiated event emission (ERC20 second bridge)
         Vm.Log memory depositInitiatedLog = logs.requireOne(
             "BridgehubDepositInitiated(uint256,bytes32,address,bytes32,bytes)"
         );
@@ -371,11 +371,11 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
-        // --- Return value and tx hash ---
+        // Verify return value and tx hash
         assertNotEq(resultantHash, bytes32(0), "Resultant hash should not be zero");
         assertNotEq(request.txHash, bytes32(0), "Priority tx hash should not be zero");
 
-        // --- Balance assertions ---
+        // Verify balances
         // ETH consumed via secondBridgeValue
         assertEq(currentUser.balance, userEthBefore - l2Value, "User ETH should decrease by l2Value");
         // ERC20 base token consumed for gas (mintValue)
@@ -385,16 +385,16 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             "User ERC20 base token should decrease by mintValue"
         );
 
-        // --- Tx field validation ---
+        // Verify tx fields
         assertEq(request.transaction.reserved[0], mintValue, "Mint value should match");
 
-        // --- Event: BridgehubDepositBaseTokenInitiated (ERC20 base token) ---
+        // Verify BridgehubDepositBaseTokenInitiated event emission (ERC20 base token)
         Vm.Log memory baseTokenLog = logs.requireOne(
             "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
         );
         assertEq(uint256(baseTokenLog.topics[1]), currentChainId, "Base token deposit event chainId mismatch");
 
-        // --- Event: BridgehubDepositInitiated (ETH second bridge) ---
+        // Verify BridgehubDepositInitiated event emission (ETH second bridge)
         Vm.Log memory depositInitiatedLog = logs.requireOne(
             "BridgehubDepositInitiated(uint256,bytes32,address,bytes32,bytes)"
         );
@@ -459,11 +459,11 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
-        // --- Return value and tx hash ---
+        // Verify return value and tx hash
         assertNotEq(resultantHash, bytes32(0), "Resultant hash should not be zero");
         assertNotEq(request.txHash, bytes32(0), "Priority tx hash should not be zero");
 
-        // --- Balance assertions ---
+        // Verify balances
         assertEq(
             baseToken.balanceOf(currentUser),
             userBaseBefore - mintValue,
@@ -475,18 +475,18 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             "User deposit token should decrease by l2Value"
         );
 
-        // --- Tx field validation ---
+        // Verify tx fields
         assertEq(request.transaction.reserved[0], mintValue, "Mint value should match");
 
         {
             // Code block to avoid stack too deep
-            // --- Event: BridgehubDepositBaseTokenInitiated (ERC20 base) ---
+            // Verify BridgehubDepositBaseTokenInitiated event emission (ERC20 base)
             Vm.Log memory baseTokenLog = logs.requireOne(
                 "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
             );
             assertEq(uint256(baseTokenLog.topics[1]), currentChainId, "Base token deposit event chainId mismatch");
 
-            // --- Event: BridgehubDepositInitiated (ERC20 second bridge) ---
+            // Verify BridgehubDepositInitiated event emission (ERC20 second bridge)
             Vm.Log memory depositInitiatedLog = logs.requireOne(
                 "BridgehubDepositInitiated(uint256,bytes32,address,bytes32,bytes)"
             );
@@ -496,6 +496,7 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
                 "Deposit initiated event chainId mismatch"
             );
         }
+
         _handleRequestByMockL2Contract(request, RequestType.TWO_BRIDGES);
 
         depositsUsers[currentUser][baseTokenAddress] += mintValue;
@@ -544,14 +545,14 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
-        // --- Return value and tx hash ---
+        // Verify return value and tx hash
         assertNotEq(resultantHash, bytes32(0), "Resultant hash should not be zero");
         assertNotEq(request.txHash, bytes32(0), "Priority tx hash should not be zero");
 
-        // --- Balance assertions ---
+        // Verify balances
         assertEq(currentUser.balance, userEthBefore - mintValue, "User ETH should decrease by mintValue");
 
-        // --- Tx field validation ---
+        // Verify tx fields
         assertEq(
             address(uint160(request.transaction.to)),
             chainContracts[currentChainId],
@@ -560,7 +561,7 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         assertEq(request.transaction.value, l2Value, "L2 value should match");
         assertEq(request.transaction.reserved[0], mintValue, "Mint value should match");
 
-        // --- Event: BridgehubDepositBaseTokenInitiated ---
+        // Verify BridgehubDepositBaseTokenInitiated event emission
         Vm.Log memory depositLog = logs.requireOne(
             "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
         );
@@ -614,11 +615,11 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
-        // --- Return value and tx hash ---
+        // Verify return value and tx hash
         assertNotEq(resultantHash, bytes32(0), "Resultant hash should not be zero");
         assertNotEq(request.txHash, bytes32(0), "Priority tx hash should not be zero");
 
-        // --- Balance assertions ---
+        // Verify balances
         assertEq(
             currentToken.balanceOf(currentUser),
             userTokenBefore - mintValue,
@@ -627,7 +628,7 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         // No ETH should be consumed (ERC20 base token chain, no {value} sent)
         assertEq(currentUser.balance, userEthBefore, "User ETH balance should remain unchanged");
 
-        // --- Tx field validation ---
+        // Verify tx fields
         assertEq(
             address(uint160(request.transaction.to)),
             chainContracts[currentChainId],
@@ -636,7 +637,7 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         assertEq(request.transaction.value, l2Value, "L2 value should match");
         assertEq(request.transaction.reserved[0], mintValue, "Mint value should match");
 
-        // --- Event: BridgehubDepositBaseTokenInitiated ---
+        // Verify BridgehubDepositBaseTokenInitiated event emission
         Vm.Log memory depositLog = logs.requireOne(
             "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
         );
@@ -739,7 +740,7 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             "Withdrawal should be marked as finalized"
         );
 
-        // Event: DepositFinalizedAssetRouter
+        // Verify DepositFinalizedAssetRouter event emission
         Vm.Log[] memory logs = vm.getRecordedLogs();
         Vm.Log memory finalizedLog = logs.requireOne("DepositFinalizedAssetRouter(uint256,bytes32,bytes)");
         assertEq(uint256(finalizedLog.topics[1]), currentChainId, "DepositFinalizedAssetRouter chainId mismatch");
@@ -820,7 +821,7 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             "Withdrawal should be marked as finalized"
         );
 
-        // Event: DepositFinalizedAssetRouter
+        // Verify DepositFinalizedAssetRouter event emission
         Vm.Log memory finalizedLog = logs.requireOne("DepositFinalizedAssetRouter(uint256,bytes32,bytes)");
         assertEq(uint256(finalizedLog.topics[1]), currentChainId, "DepositFinalizedAssetRouter chainId mismatch");
     }

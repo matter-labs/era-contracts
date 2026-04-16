@@ -44,7 +44,6 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
             l2ContractAddresses.push(contractAddress);
-
             _addL2ChainContract(zkChainIds[i], contractAddress);
         }
     }
@@ -93,11 +92,11 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
         SimpleExecutor(randomCaller).execute(address(addresses.bridgehub), mintValue, calldataForExecutor);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // --- ETH balance assertions ---
+        // Verify ETH balance
         // Caller was dealt exactly mintValue; all of it should be consumed
         assertEq(randomCaller.balance, 0, "Caller ETH balance should be fully consumed");
 
-        // --- Decode and validate NewPriorityRequest ---
+        // Verify NewPriorityRequest event and validate L2 transaction
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
         assertNotEq(request.txHash, bytes32(0), "Transaction hash should not be zero");
 
@@ -115,13 +114,13 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
         assertEq(request.transaction.value, l2Value, "Transaction value should match l2Value");
         assertEq(request.transaction.reserved[0], mintValue, "Mint value should match");
 
-        // --- Event: BridgehubDepositBaseTokenInitiated ---
+        // Verify BridgehubDepositBaseTokenInitiated event emission
         Vm.Log memory depositLog = logs.requireOne(
             "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
         );
         assertEq(uint256(depositLog.topics[1]), currentChainId, "Deposit base token event chainId mismatch");
 
-        // --- Simulate L2 side ---
+        // Simulate L2 side
         _handleRequestByMockL2Contract(request, RequestType.DIRECT);
 
         // Update tracking variables for invariant harness
