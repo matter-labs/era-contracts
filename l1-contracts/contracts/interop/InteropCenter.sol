@@ -519,6 +519,9 @@ contract InteropCenter is
         address recipientAddress = _callStarter.to;
 
         if (_callStarter.callAttributes.indirectCall) {
+            // InteropCenter supports generic indirect calls with both source-chain msg.value and destination-side
+            // interopCallValue. Whether a particular indirect path supports non-zero interopCallValue is defined by
+            // the concrete IL2CrossChainSender implementation (e.g. the current L2AssetRouter/NTV path does not).
             // slither-disable-next-line arbitrary-send-eth
             InteropCallStarter memory actualCallStarter = IL2CrossChainSender(recipientAddress).initiateIndirectCall{
                 value: _callStarter.callAttributes.indirectCallMessageValue
