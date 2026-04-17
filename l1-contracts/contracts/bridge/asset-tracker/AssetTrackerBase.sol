@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
 import {IAssetTrackerBase} from "./IAssetTrackerBase.sol";
@@ -20,6 +21,7 @@ import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 abstract contract AssetTrackerBase is
     IAssetTrackerBase,
     Ownable2StepUpgradeable,
+    PausableUpgradeable,
     AssetHandlerModifiers,
     ReentrancyGuard
 {
@@ -149,5 +151,16 @@ abstract contract AssetTrackerBase is
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Pauses interop-related functionality in trackers that explicitly check `whenNotPaused`.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Unpauses interop-related functionality in trackers that explicitly check `whenNotPaused`.
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
     function _getChainMigrationNumber(uint256 _chainId) internal view virtual returns (uint256);
 }
