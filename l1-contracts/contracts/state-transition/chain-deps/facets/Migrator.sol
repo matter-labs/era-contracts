@@ -9,6 +9,8 @@ import {
     ZKChainCommitment,
     CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET,
     CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET,
+    GATEWAY_CHAIN_MIGRATION_EXTRA_DELAY_TESTNET,
+    GATEWAY_CHAIN_MIGRATION_EXTRA_DELAY_MAINNET,
     PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET,
     PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET
 } from "../../../common/Config.sol";
@@ -65,6 +67,9 @@ contract MigratorFacet is ZKChainBase, IMigrator {
     /// @notice The timestamp when chain migration becomes available.
     uint256 internal immutable CHAIN_MIGRATION_TIME_WINDOW_START;
 
+    /// @notice Additional migration delay applied only on Gateway as a best-effort mitigation for L1 finality lag.
+    uint256 internal immutable GATEWAY_CHAIN_MIGRATION_EXTRA_DELAY;
+
     /// @notice The timestamp when deposits start being paused.
     uint256 internal immutable PAUSE_DEPOSITS_TIME_WINDOW_START;
 
@@ -74,6 +79,9 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         CHAIN_MIGRATION_TIME_WINDOW_START = _isTestnet
             ? CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET
             : CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET;
+        GATEWAY_CHAIN_MIGRATION_EXTRA_DELAY = _isTestnet
+            ? GATEWAY_CHAIN_MIGRATION_EXTRA_DELAY_TESTNET
+            : GATEWAY_CHAIN_MIGRATION_EXTRA_DELAY_MAINNET;
         PAUSE_DEPOSITS_TIME_WINDOW_START = _isTestnet
             ? PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET
             : PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET;
@@ -164,12 +172,15 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
 
         uint256 timestamp = s.pausedDepositsTimestamp;
-        // This delay only prevents new forwardedBridgeBurn flows from starting immediately after deposits are paused.
-        // It does not eliminate the race where an L1->Gateway deposit accepted on L1 just before
-        // timestamp + CHAIN_MIGRATION_TIME_WINDOW_START can still be finalized after migration starts because of the
-        // L1 finality lag required before the transaction is processed on Gateway.
+        uint256 migrationDelay = CHAIN_MIGRATION_TIME_WINDOW_START;
+        if (block.chainid != L1_CHAIN_ID) {
+            // On Gateway we add a best-effort buffer for in-flight L1->Gateway deposits that may still finalize after
+            // deposits were paused on L1 because Gateway processing waits for L1 finality. This reduces, but does not
+            // eliminate, the race window.
+            migrationDelay += GATEWAY_CHAIN_MIGRATION_EXTRA_DELAY;
+        }
         require(
-            timestamp != 0 && timestamp + CHAIN_MIGRATION_TIME_WINDOW_START <= block.timestamp,
+            timestamp != 0 && timestamp + migrationDelay <= block.timestamp,
             DepositsNotPaused()
         );
 

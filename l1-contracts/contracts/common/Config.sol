@@ -233,9 +233,19 @@ uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START_MAINNET = 0;
 /// @dev It is set to 0 in this release, since stage1 is not yet supported for chains that settle on top of ZK Gateway.
 uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START_MAINNET = 0;
 
+/// @dev Extra delay applied only on Gateway before a chain migration may start.
+/// @dev This is a partial mitigation for in-flight L1->Gateway deposits that may still finalize on Gateway after
+/// deposits have been paused on L1 because Gateway processing waits for L1 finality.
+uint256 constant GATEWAY_CHAIN_MIGRATION_EXTRA_DELAY_MAINNET = 1 hours;
+
 uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START_TESTNET = 0;
 
 uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START_TESTNET = 0;
+
+/// @dev Extra delay applied only on Gateway before a chain migration may start.
+/// @dev This is a partial mitigation for in-flight L1->Gateway deposits that may still finalize on Gateway after
+/// deposits have been paused on L1 because Gateway processing waits for L1 finality.
+uint256 constant GATEWAY_CHAIN_MIGRATION_EXTRA_DELAY_TESTNET = 1 hours;
 
 /// @dev Default overhead value in L1 gas for each batch during chain creation.
 uint32 constant DEFAULT_BATCH_OVERHEAD_L1_GAS = 1_000_000;
