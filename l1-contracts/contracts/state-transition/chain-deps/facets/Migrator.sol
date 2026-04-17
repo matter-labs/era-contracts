@@ -164,6 +164,10 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
 
         uint256 timestamp = s.pausedDepositsTimestamp;
+        // This delay only prevents new forwardedBridgeBurn flows from starting immediately after deposits are paused.
+        // It does not eliminate the race where an L1->Gateway deposit accepted on L1 just before
+        // timestamp + CHAIN_MIGRATION_TIME_WINDOW_START can still be finalized after migration starts because of the
+        // L1 finality lag required before the transaction is processed on Gateway.
         require(
             timestamp != 0 && timestamp + CHAIN_MIGRATION_TIME_WINDOW_START <= block.timestamp,
             DepositsNotPaused()
