@@ -12,6 +12,7 @@ import {CallAttributes} from "contracts/common/Messaging.sol";
 import {AttributesDecoder} from "contracts/interop/AttributesDecoder.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
 
 import {L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -123,5 +124,34 @@ abstract contract L2AssetRouterAttributesEncodingRegressionTestAbstract is Test,
         );
 
         assertEq(callAttributes.interopCallValue, testValue, "parseAttributes should decode any value correctly");
+    }
+
+    function test_regression_parseAttributesRevertsOnMalformedExecutionAddress() public {
+        bytes[] memory attributes = new bytes[](1);
+        attributes[0] = abi.encodeCall(IERC7786Attributes.executionAddress, hex"0001");
+
+        vm.expectRevert(
+            abi.encodeWithSelector(InteroperableAddress.InteroperableAddressParsingError.selector, hex"0001")
+        );
+        InteropCenter(L2_INTEROP_CENTER_ADDR).parseAttributes(
+            attributes,
+            IInteropCenter.AttributeParsingRestrictions.OnlyBundleAttributes
+        );
+    }
+
+    function test_regression_parseAttributesRevertsOnMalformedUnbundlerAddress() public {
+        bytes[] memory attributes = new bytes[](1);
+        attributes[0] = abi.encodeCall(IERC7786Attributes.unbundlerAddress, hex"00010000000100");
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                InteroperableAddress.InteroperableAddressParsingError.selector,
+                hex"00010000000100"
+            )
+        );
+        InteropCenter(L2_INTEROP_CENTER_ADDR).parseAttributes(
+            attributes,
+            IInteropCenter.AttributeParsingRestrictions.OnlyBundleAttributes
+        );
     }
 }
