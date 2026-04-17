@@ -173,7 +173,9 @@ library DeployCTML1OrGateway {
         if (_isZKsyncOS) {
             return abi.encode(_fflonk, _plonk, _owner);
         }
-        return abi.encode(_fflonk, _plonk);
+        // The Airbender PLONK verifier slot is left empty (address(0)) by the default deploy flow;
+        // chains that want Airbender support must deploy their own EraDualVerifier.
+        return abi.encode(_fflonk, _plonk, address(0));
     }
 
     /// @notice Perform any post-deploy steps required for the verifier.
