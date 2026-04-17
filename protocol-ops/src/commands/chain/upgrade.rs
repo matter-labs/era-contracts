@@ -2,6 +2,7 @@ use std::path::Path;
 
 use anyhow::Context;
 use clap::Parser;
+use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::output::write_output_if_requested;
@@ -13,13 +14,13 @@ use crate::common::SharedRunArgs;
 pub struct ChainUpgradeArgs {
     /// Chain diamond proxy address
     #[clap(long)]
-    pub chain_address: String,
+    pub chain_address: Address,
     /// Chain admin address
     #[clap(long)]
-    pub admin_address: String,
+    pub admin_address: Address,
     /// AccessControlRestriction contract address
     #[clap(long)]
-    pub access_control_restriction: String,
+    pub access_control_restriction: Address,
     /// Skip broadcasting transactions
     #[clap(long, default_value_t = false)]
     pub skip_broadcast: bool,
@@ -31,9 +32,9 @@ pub struct ChainUpgradeArgs {
 
 #[derive(Serialize)]
 struct ChainUpgradeOutputPayload {
-    chain_address: String,
-    admin_address: String,
-    access_control_restriction: String,
+    chain_address: Address,
+    admin_address: Address,
+    access_control_restriction: Address,
     skip_broadcast: bool,
 }
 
@@ -63,7 +64,7 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
     });
     script_args.add_arg(ForgeScriptArg::Ffi);
     script_args.add_arg(ForgeScriptArg::GasLimit {
-        gas_limit: 1000000000000,
+        gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
     });
     script_args.add_arg(ForgeScriptArg::PrivateKey {
         private_key: format!("{:#x}", private_key),
@@ -72,18 +73,18 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
         script_args.add_arg(ForgeScriptArg::Broadcast);
     }
     script_args.additional_args.extend([
-        args.chain_address.clone(),
-        args.admin_address.clone(),
-        args.access_control_restriction.clone(),
+        format!("{:#x}", args.chain_address),
+        format!("{:#x}", args.admin_address),
+        format!("{:#x}", args.access_control_restriction),
     ]);
 
     let forge = Forge::new(&runner.foundry_scripts_path).script(script_path, script_args);
 
     logger::step("Running chain upgrade via AdminFunctions.s.sol");
-    logger::info(format!("Chain address: {}", args.chain_address));
-    logger::info(format!("Admin address: {}", args.admin_address));
+    logger::info(format!("Chain address: {:#x}", args.chain_address));
+    logger::info(format!("Admin address: {:#x}", args.admin_address));
     logger::info(format!(
-        "Access control restriction: {}",
+        "Access control restriction: {:#x}",
         args.access_control_restriction
     ));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
@@ -95,18 +96,19 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
 
     let empty_input = serde_json::json!({});
     let out_payload = ChainUpgradeOutputPayload {
-        chain_address: args.chain_address.clone(),
-        admin_address: args.admin_address.clone(),
-        access_control_restriction: args.access_control_restriction.clone(),
+        chain_address: args.chain_address,
+        admin_address: args.admin_address,
+        access_control_restriction: args.access_control_restriction,
         skip_broadcast: args.skip_broadcast,
     };
     write_output_if_requested(
         "chain.upgrade",
-        args.shared.out_path.as_deref(),
+        &args.shared,
         &runner,
         &empty_input,
         &out_payload,
-    )?;
+    )
+    .await?;
 
     logger::success("Chain upgrade completed");
     Ok(())

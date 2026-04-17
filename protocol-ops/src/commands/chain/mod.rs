@@ -1,11 +1,12 @@
 use clap::Subcommand;
 
 use crate::commands::chain::{
-    init::ChainInitArgs, set_upgrade_timestamp::ChainSetUpgradeTimestampArgs,
-    upgrade::ChainUpgradeArgs,
+    gateway::GatewayCommands, init::ChainInitArgs,
+    set_upgrade_timestamp::ChainSetUpgradeTimestampArgs, upgrade::ChainUpgradeArgs,
 };
 
 pub(crate) mod admin_call_builder;
+pub(crate) mod gateway;
 pub(crate) mod init;
 pub(crate) mod set_upgrade_timestamp;
 pub(crate) mod upgrade;
@@ -19,6 +20,9 @@ pub enum ChainCommands {
     Upgrade(ChainUpgradeArgs),
     /// Set upgrade timestamp so server can detect pending upgrade
     SetUpgradeTimestamp(ChainSetUpgradeTimestampArgs),
+    /// Gateway operations: converting a chain into a gateway or migrating to one
+    #[command(subcommand)]
+    Gateway(GatewayCommands),
 }
 
 pub(crate) async fn run(args: ChainCommands) -> anyhow::Result<()> {
@@ -26,5 +30,6 @@ pub(crate) async fn run(args: ChainCommands) -> anyhow::Result<()> {
         ChainCommands::Init(args) => init::run(args).await,
         ChainCommands::Upgrade(args) => upgrade::run(args).await,
         ChainCommands::SetUpgradeTimestamp(args) => set_upgrade_timestamp::run(args).await,
+        ChainCommands::Gateway(cmd) => gateway::run(cmd).await,
     }
 }

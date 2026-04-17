@@ -51,11 +51,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
             "/l1-contracts",
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml"
         );
-        string memory permanentValuesInputPath = string.concat(
-            root,
-            "/test/foundry/l1/integration/deploy-scripts/script-config/permanent-values.toml"
-        );
-        initializeConfig(inputPath, permanentValuesInputPath, L2_BRIDGEHUB_ADDR);
+        initializeConfig(inputPath, L2_BRIDGEHUB_ADDR);
         coreAddresses.bridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
         coreAddresses.bridges.proxies.l1AssetRouter = L2_ASSET_ROUTER_ADDR;
         coreAddresses.bridges.proxies.l1NativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;

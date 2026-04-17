@@ -84,7 +84,11 @@ pub fn deploy(
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
         .with_slow()
-        .with_wallet(auth, runner.simulate);
+        .with_wallet(auth, runner.simulate)
+        .with_env(
+            "CREATE2_FACTORY_SALT",
+            format!("{:#x}", initial_deployment_config.create2_factory_salt),
+        );
 
     runner.run(forge)?;
 

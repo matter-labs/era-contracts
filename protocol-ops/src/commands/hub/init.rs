@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::commands::hub::accept_ownership::{accept_ownership, AcceptOwnershipInput};
 use crate::commands::hub::deploy::{deploy, DeployInput};
 use crate::commands::output::write_output_if_requested;
+
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet, SharedRunArgs};
 use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
 
@@ -61,13 +62,7 @@ pub async fn run(args: HubInitArgs) -> anyhow::Result<()> {
     let output = hub_init(&mut runner, &sender, &owner, &input).await?;
     let bridgehub_addr = output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
 
-    write_output_if_requested(
-        "hub.init",
-        args.shared.out_path.as_deref(),
-        &runner,
-        &input,
-        &output,
-    )?;
+    write_output_if_requested("hub.init", &args.shared, &runner, &input, &output).await?;
 
     logger::info("Bridgehub contracts initialized");
     logger::info(format!("Bridgehub Proxy: {:#x}", bridgehub_addr));

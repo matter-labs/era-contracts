@@ -79,7 +79,7 @@ pub struct EcosystemUpgradeArgs {
     pub governance_address: Option<Address>,
     /// Bridgehub proxy address (required for no-governance-prepare)
     #[clap(long)]
-    pub bridgehub_proxy_address: Option<Address>,
+    pub bridgehub: Option<Address>,
     /// CTM proxy address (required for no-governance-prepare)
     #[clap(long)]
     pub ctm_proxy_address: Option<Address>,
@@ -92,12 +92,9 @@ pub struct EcosystemUpgradeArgs {
     /// Whether target chain is ZKsync OS (required for no-governance-prepare)
     #[clap(long)]
     pub is_zk_sync_os: Option<bool>,
-    /// Explicit CREATE2 salt (hex-encoded bytes32). Mutually exclusive with --random-salt.
-    #[clap(long, conflicts_with = "random_salt")]
-    pub create2_salt: Option<H256>,
-    /// Use a random CREATE2 salt. Mutually exclusive with --create2-salt.
-    #[clap(long, conflicts_with = "create2_salt")]
-    pub random_salt: bool,
+    /// CREATE2 factory salt (hex-encoded bytes32). If not provided, a random salt is used.
+    #[clap(long)]
+    pub create2_factory_salt: Option<H256>,
     /// Upgrade input path relative to l1-contracts root (for no-governance-prepare)
     #[clap(long, default_value = "/upgrade-envs/v0.31.0-interopB/local.toml")]
     pub upgrade_input_path: String,
@@ -119,16 +116,16 @@ pub async fn run(args: EcosystemUpgradeArgs) -> anyhow::Result<()> {
 
     match args.ecosystem_upgrade_stage {
         EcosystemUpgradeStage::NoGovernancePrepare => {
-            run_no_governance_prepare(&mut runner, &sender, &args)
+            run_no_governance_prepare(&mut runner, &sender, &args).await
         }
         stage => {
             let idx = stage.governance_stage_index().unwrap();
-            run_governance_stage(&mut runner, &sender, &args, idx)
+            run_governance_stage(&mut runner, &sender, &args, idx).await
         }
     }
 }
 
-fn run_no_governance_prepare(
+async fn run_no_governance_prepare(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     args: &EcosystemUpgradeArgs,
@@ -140,9 +137,9 @@ fn run_no_governance_prepare(
         anyhow::bail!("Script not found: {}", script_full_path.display());
     }
 
-    let bridgehub = args.bridgehub_proxy_address.ok_or_else(|| {
-        anyhow::anyhow!("--bridgehub-proxy-address is required for no-governance-prepare")
-    })?;
+    let bridgehub = args
+        .bridgehub
+        .ok_or_else(|| anyhow::anyhow!("--bridgehub is required for no-governance-prepare"))?;
     let ctm = args.ctm_proxy_address.ok_or_else(|| {
         anyhow::anyhow!("--ctm-proxy-address is required for no-governance-prepare")
     })?;
@@ -154,11 +151,7 @@ fn run_no_governance_prepare(
         .ok_or_else(|| anyhow::anyhow!("--is-zk-sync-os is required for no-governance-prepare"))?;
     let rollup_da_manager = args.rollup_da_manager_address.unwrap_or_default();
     let governance = args.governance_address.unwrap_or_default();
-    let create2_salt = if args.random_salt {
-        H256::random()
-    } else {
-        args.create2_salt.unwrap_or_default()
-    };
+    let create2_salt = args.create2_factory_salt.unwrap_or_else(H256::random);
 
     let upgrade_input = contracts_path.join(args.upgrade_input_path.trim_start_matches('/'));
     if !upgrade_input.exists() {
@@ -182,7 +175,7 @@ fn run_no_governance_prepare(
     script_args.add_arg(ForgeScriptArg::Broadcast);
     script_args.add_arg(ForgeScriptArg::Ffi);
     script_args.add_arg(ForgeScriptArg::GasLimit {
-        gas_limit: 1000000000000,
+        gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
     });
     // Struct fields are passed as a single tuple argument in parentheses.
     let params_tuple = format!(
@@ -249,11 +242,12 @@ fn run_no_governance_prepare(
     };
     write_output_if_requested(
         "ecosystem.upgrade",
-        args.shared.out_path.as_deref(),
+        &args.shared,
         runner,
         &input_env,
         &out_payload,
-    )?;
+    )
+    .await?;
 
     logger::success("No-governance-prepare completed");
     if let Some(ref out_path) = args.shared.out_path {
@@ -298,7 +292,7 @@ struct EcosystemUpgradeOutput {
     governance_calls: GovernanceCalls,
 }
 
-fn run_governance_stage(
+async fn run_governance_stage(
     runner: &mut ForgeRunner,
     sender: &Wallet,
     args: &EcosystemUpgradeArgs,
@@ -345,7 +339,7 @@ fn run_governance_stage(
     script_args.add_arg(ForgeScriptArg::Broadcast);
     script_args.add_arg(ForgeScriptArg::Ffi);
     script_args.add_arg(ForgeScriptArg::GasLimit {
-        gas_limit: 1000000000000,
+        gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
     });
     script_args.additional_args.extend([
         format!("0x{}", encoded_calls_hex.trim_start_matches("0x")),
@@ -376,11 +370,12 @@ fn run_governance_stage(
     };
     write_output_if_requested(
         "ecosystem.upgrade",
-        args.shared.out_path.as_deref(),
+        &args.shared,
         runner,
         &input_env,
         &out_payload,
-    )?;
+    )
+    .await?;
 
     logger::success(format!("Governance stage {} completed", stage));
     if let Some(ref out_path) = args.shared.out_path {
