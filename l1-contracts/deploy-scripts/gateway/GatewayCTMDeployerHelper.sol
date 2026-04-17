@@ -197,7 +197,9 @@ library GatewayCTMDeployerHelper {
         _deployedContracts.stateTransition.verifierFflonk = verifierFflonk;
         _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;
 
-        bytes memory constructorParams = abi.encode(verifierFflonk, verifierPlonk);
+        // The Airbender PLONK verifier slot is left empty (address(0)) by the default gateway
+        // deploy flow; chains that want Airbender support must deploy their own DualVerifier.
+        bytes memory constructorParams = abi.encode(verifierFflonk, verifierPlonk, address(0));
 
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = _deployInternal(

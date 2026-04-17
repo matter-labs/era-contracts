@@ -305,13 +305,17 @@ contract GatewayCTMDeployer {
         _deployedContracts.stateTransition.verifierFflonk = address(fflonkVerifier);
         L1VerifierPlonk verifierPlonk = new L1VerifierPlonk{salt: _salt}();
         _deployedContracts.stateTransition.verifierPlonk = address(verifierPlonk);
+        // The Airbender PLONK verifier slot is left empty (address(0)) by the default gateway
+        // deploy flow. Chains that want to enable Airbender proofs must deploy their own
+        // DualVerifier with the Airbender verifier wired in and point the diamond at it.
+        IVerifier airbenderPlonkVerifier = IVerifier(address(0));
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = address(
-                new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
+                new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk, airbenderPlonkVerifier)
             );
         } else {
             _deployedContracts.stateTransition.verifier = address(
-                new DualVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
+                new DualVerifier{salt: _salt}(fflonkVerifier, verifierPlonk, airbenderPlonkVerifier)
             );
         }
     }

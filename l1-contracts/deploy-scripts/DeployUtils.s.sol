@@ -401,7 +401,14 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
-            return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
+            // The Airbender PLONK verifier slot is left as address(0) by default. Chains that
+            // want to enable Airbender proofs must deploy their own DualVerifier.
+            return
+                abi.encode(
+                    addresses.stateTransition.verifierFflonk,
+                    addresses.stateTransition.verifierPlonk,
+                    address(0)
+                );
         } else if (compareStrings(contractName, "VerifierFflonk")) {
             return abi.encode();
         } else if (compareStrings(contractName, "VerifierPlonk")) {

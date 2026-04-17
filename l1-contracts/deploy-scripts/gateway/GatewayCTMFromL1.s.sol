@@ -406,7 +406,8 @@ contract GatewayCTMFromL1 is Script {
             verifier = address(
                 _deployInternal(
                     ContractsBytecodesLib.getCreationCode("DualVerifier"),
-                    abi.encode(verifierFflonk, verifierPlonk)
+                    // Airbender PLONK verifier slot left empty by the default L1 gateway flow.
+                    abi.encode(verifierFflonk, verifierPlonk, address(0))
                 )
             );
         }
