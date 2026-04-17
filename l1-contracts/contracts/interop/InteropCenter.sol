@@ -54,6 +54,7 @@ import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
 import {AttributesDecoder} from "./AttributesDecoder.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
+import {ERC7930_V1_MIN_LENGTH} from "./InteropConstants.sol";
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 import {IL2CrossChainSender} from "../bridge/interfaces/IL2CrossChainSender.sol";
 import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
@@ -312,7 +313,7 @@ contract InteropCenter is
     /// @param _interoperableAddress The ERC-7930 address to verify.
     function _ensureEmptyChainReference(bytes calldata _interoperableAddress) internal pure {
         require(
-            _interoperableAddress.length >= 5,
+            _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH,
             InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
         );
         uint8 chainReferenceLength = uint8(_interoperableAddress[0x04]);
@@ -325,12 +326,12 @@ contract InteropCenter is
     /// @param _interoperableAddress The ERC-7930 address to verify.
     function _ensureEmptyAddress(bytes calldata _interoperableAddress) internal pure {
         require(
-            _interoperableAddress.length >= 5,
+            _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH,
             InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
         );
         uint8 chainReferenceLength = uint8(_interoperableAddress[0x04]);
         require(
-            _interoperableAddress.length >= 6 + chainReferenceLength,
+            _interoperableAddress.length >= ERC7930_V1_MIN_LENGTH + chainReferenceLength,
             InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
         );
         uint8 addressLength = uint8(_interoperableAddress[0x05 + chainReferenceLength]);
