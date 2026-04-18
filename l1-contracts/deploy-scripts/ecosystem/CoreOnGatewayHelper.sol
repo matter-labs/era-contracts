@@ -125,8 +125,22 @@ library CoreOnGatewayHelper {
 
     function _getBaseFactoryDependencies(bool _isZKsyncOS) private view returns (bytes[] memory basicDependencies) {
         if (_isZKsyncOS) {
-            // FIXME: add support for base factory dependencies on ZKsyncOS in scripts.
-            return new bytes[](0);
+            // ZKsyncOS has no bootloader / DefaultAccount / EVM emulator — those
+            // are Era-VM concepts. The equivalent "always needed" L2 contracts
+            // for ZKsyncOS live in `_getSharedFactoryDependencyContracts` below.
+            //
+            // One additional baseline: `SystemContractProxy`. It isn't part of the
+            // CoreContract enum (no canonical address), but every
+            // `updateZKsyncOSContract` call that needs to materialize a proxy at a
+            // previously-empty system address force-deploys this bytecode —
+            // requiring its preimage in the store.
+            basicDependencies = new bytes[](1);
+            basicDependencies[0] = BytecodeUtils.readDeployedBytecodeL1(
+                true,
+                "SystemContractProxy.sol",
+                "SystemContractProxy"
+            );
+            return basicDependencies;
         }
         return SystemContractsProcessing.getBaseListOfDependencies();
     }
@@ -135,7 +149,24 @@ library CoreOnGatewayHelper {
         bool _isZKsyncOS
     ) private pure returns (CoreContract[] memory dependencyContracts) {
         if (_isZKsyncOS) {
-            return new CoreContract[](0);
+            // Reuse the canonical "other built-in" list — the same contracts
+            // `buildZKsyncOSForceDeployments` force-deploys on L2 at upgrade
+            // time. Every bytecode hash the upgrade tx's force-deploy path
+            // queries must appear in the tx's `factory_deps`, otherwise the
+            // server has no way to know which `EVMBytecodePublished` events
+            // on `BytecodesSupplier` it should load into the preimage store
+            // and the VM panics on the first missing preimage.
+            //
+            // Plus `UpgradeableBeaconDeployer`, which
+            // `FixedForceDeploymentsData.beaconDeployerInfo` references but
+            // which isn't part of `getOtherBuiltinCoreContracts()`.
+            CoreContract[] memory builtins = SystemContractsProcessing.getOtherBuiltinCoreContracts();
+            dependencyContracts = new CoreContract[](builtins.length + 1);
+            for (uint256 i = 0; i < builtins.length; i++) {
+                dependencyContracts[i] = builtins[i];
+            }
+            dependencyContracts[builtins.length] = CoreContract.UpgradeableBeaconDeployer;
+            return dependencyContracts;
         }
 
         dependencyContracts = new CoreContract[](4);
@@ -199,7 +230,9 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2AssetRouter) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2NativeTokenVault) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2MessageRoot) return ZKsyncOSUpgradeType.SystemProxy;
-        if (_c == CoreContract.L2WrappedBaseToken) return ZKsyncOSUpgradeType.SystemProxy;
+        // Sits at L2_WRAPPED_BASE_TOKEN_IMPL_ADDR directly as the impl (not a proxy);
+        // user-space WETH proxies reference this address. Upgrade via bytecode replacement.
+        if (_c == CoreContract.L2WrappedBaseToken) return ZKsyncOSUpgradeType.Unsafe;
         if (_c == CoreContract.L2MessageVerification) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2ChainAssetHandler) return ZKsyncOSUpgradeType.SystemProxy;
         if (_c == CoreContract.L2InteropRootStorage) return ZKsyncOSUpgradeType.SystemProxy;

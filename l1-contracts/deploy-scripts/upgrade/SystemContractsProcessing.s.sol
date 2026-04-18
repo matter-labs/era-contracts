@@ -342,6 +342,21 @@ library SystemContractsProcessing {
         CoreContract _id
     ) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
         address addr = CoreOnGatewayHelper._resolveAddress(_id);
+
+        // L2WrappedBaseToken sits directly at L2_WRAPPED_BASE_TOKEN_IMPL_ADDR as the
+        // implementation contract — it's *not* behind a TransparentUpgradeableProxy.
+        // User-space WETH proxies reference this address directly. So its upgrade is
+        // a plain bytecode replacement (Unsafe), not a system-proxy upgrade.
+        if (_id == CoreContract.L2WrappedBaseToken) {
+            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _id);
+            return
+                IComplexUpgrader.UniversalContractUpgradeInfo({
+                    upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+                    deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract(fileName, contractName),
+                    newAddress: addr
+                });
+        }
+
         // Try to reuse bytecodeInfo from FixedForceDeploymentsData to avoid double-loading.
         bytes memory bytecodeInfo = _getFixedBytecodeInfo(_fixedData, addr);
 

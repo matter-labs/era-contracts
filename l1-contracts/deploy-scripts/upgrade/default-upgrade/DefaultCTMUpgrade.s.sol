@@ -447,7 +447,12 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             allDeps
         );
 
-        if (result.factoryDepsHashes.length > 0) {
+        // Era-only invariant: factoryDepsHashes[0..3] == (bootloader,
+        // defaultAA, evmEmulator). ZKsyncOS has none of these concepts —
+        // `chainCreationParams.{bootloader,defaultAA,evmEmulator}Hash` are
+        // zero and the factoryDepsHashes describe a different, smaller set
+        // of contracts, so indexing [1]/[2] would go out of bounds.
+        if (!config.isZKsyncOS && result.factoryDepsHashes.length > 0) {
             console.logBytes32(config.contracts.chainCreationParams.bootloaderHash);
             console.log(result.factoryDepsHashes[0]);
             console.logBytes32(config.contracts.chainCreationParams.defaultAAHash);
