@@ -98,7 +98,6 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
             "Chain should not be registered before calling registerChain"
         );
 
-         //@check This was unnecessarily being called by the owner. Test error or implementation error?
         vm.recordLogs();
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
         Vm.Log[] memory logs = vm.getRecordedLogs();
