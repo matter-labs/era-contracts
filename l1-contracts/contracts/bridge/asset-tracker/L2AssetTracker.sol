@@ -14,7 +14,8 @@ import {
     L2_COMPLEX_UPGRADER_ADDR,
     L2_NATIVE_TOKEN_VAULT,
     L2_NATIVE_TOKEN_VAULT_ADDR,
-    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT
 } from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
@@ -32,6 +33,7 @@ import {
     TotalPreV31SupplyShouldBeZero
 } from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
+import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
@@ -450,6 +452,15 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @param _data The migration confirmation data containing the asset ID and migration number.
     function confirmMigrationOnL2(MigrationConfirmationData calldata _data) external onlyServiceTransactionSender {
         assetMigrationNumber[block.chainid][_data.assetId] = _data.assetMigrationNumber;
+    }
+
+    /// @notice Sends L1 -> Gateway migration data to L1 through the L2->L1 messenger.
+    /// @param _data The migration payload.
+    function _sendL1ToGatewayMigrationDataToL1(L1ToGatewayTokenBalanceMigrationData memory _data) internal {
+        // slither-disable-next-line unused-return,reentrancy-no-eth
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            abi.encodeCall(IAssetTrackerDataEncoding.receiveL1ToGatewayMigrationOnL1, _data)
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
