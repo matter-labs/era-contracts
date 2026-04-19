@@ -63,6 +63,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
     address public tokenL1Address;
     SimpleExecutor simpleExecutor;
 
+    // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
         require(users.length == 0, "Addresses already generated");
 
@@ -459,6 +460,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
     // add this to be excluded from coverage report
     function test() internal override {}
 
+    // gets event from logs
     function _getNewPriorityQueueFromLogs(
         Vm.Log[] memory logs
     ) internal pure returns (NewPriorityRequest memory request) {
