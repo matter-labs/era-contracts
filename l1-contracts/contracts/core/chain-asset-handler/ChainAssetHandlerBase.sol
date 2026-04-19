@@ -365,7 +365,8 @@ abstract contract ChainAssetHandlerBase is
             if (zkChain == address(0)) {
                 revert ChainIdNotRegistered(bridgehubMintData.chainId);
             }
-            // We want to allow any chain to be migrated,
+            // We allow migrating chains that were not previously registered on this settlement layer,
+            // so the chain is registered here during bridgeMint.
             IBridgehubBase(_bridgehub()).registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
             _messageRoot().addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         } else {

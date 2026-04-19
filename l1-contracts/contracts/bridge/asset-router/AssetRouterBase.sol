@@ -26,7 +26,8 @@ import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Bridges assets between L1 and ZK chain, supporting both ETH and ERC20 tokens.
+/// @dev Routes asset transfers for both L1 <-> ZK chain bridging and interop between ZK chains,
+/// supporting both ETH and ERC20 tokens.
 /// @dev Designed for use with a proxy for upgradability.
 abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;

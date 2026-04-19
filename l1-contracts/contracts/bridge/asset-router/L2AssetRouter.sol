@@ -47,7 +47,7 @@ import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol"
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC7786Recipient {
-    /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
+    /// @dev Bridgehub smart contract used for asynchronous cross-chain requests, including deposits and interop-related routing.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
     IL2Bridgehub public BRIDGE_HUB;
@@ -82,10 +82,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         return IBridgehubBase(L2_BRIDGEHUB_ADDR);
     }
 
-    /// @notice Checks that the message sender is the L1 Asset Router.
+    /// @notice Checks that the message sender is the asset-router counterpart for messages originating on L1.
     modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
         if (_originChainId == L1_CHAIN_ID) {
-            // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
+            // For messages originating on L1, only the L1 Asset Router counterpart may call this function.
             require(
                 AddressAliasHelper.undoL1ToL2Alias(msg.sender) == address(L1_ASSET_ROUTER),
                 Unauthorized(msg.sender)
@@ -96,10 +96,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _;
     }
 
-    /// @notice Checks that the message sender is the L1 Asset Router.
+    /// @notice Checks that the message sender is the L1 asset-router counterpart or this contract itself.
+    /// @dev Self-calls are used for interop flows where the destination L2AssetRouter re-enters its own finalize path.
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
         if (_chainId == L1_CHAIN_ID) {
-            // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
+            // For messages originating on L1, only the L1 Asset Router counterpart may call this function.
             if (
                 (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(L1_ASSET_ROUTER)) &&
                 msg.sender != address(this)
