@@ -496,8 +496,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes calldata _message
     ) internal returns (uint256 chargeableCallCount) {
         if (_message[0] != BUNDLE_IDENTIFIER) {
-            // This should not be possible in V31. In V31 this will be a trigger.
-            return 0;
+            revert InvalidMessage();
         }
 
         InteropBundle memory interopBundle = abi.decode(_message[1:], (InteropBundle));

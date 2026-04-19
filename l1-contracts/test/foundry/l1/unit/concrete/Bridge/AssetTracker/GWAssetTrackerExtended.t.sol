@@ -198,6 +198,56 @@ contract GWAssetTrackerExtendedTest is Test {
         gwAssetTracker.processLogsAndMessages(input);
     }
 
+    function test_revertWhen_ProcessLogsAndMessages_InvalidInteropBundleIdentifier() public {
+        bytes memory message = ProcessLogsTestHelper.encodeInteropCenterMessage(
+            ProcessLogsTestHelper.createSimpleInteropBundle(CHAIN_ID, CHAIN_ID + 1, BASE_TOKEN_ASSET_ID, 1, bytes32(0))
+        );
+        message[0] = bytes1(uint8(message[0]) + 1);
+
+        L2Log[] memory logs = new L2Log[](1);
+        logs[0] = L2Log({
+            l2ShardId: 0,
+            isService: true,
+            txNumberInBatch: 0,
+            sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            key: bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR))),
+            value: keccak256(message)
+        });
+
+        bytes[] memory messages = new bytes[](1);
+        messages[0] = message;
+
+        bytes32 emptyMultichainBatchRoot = gwAssetTracker.getEmptyMultichainBatchRoot(CHAIN_ID);
+        bytes32 logsRoot = _buildLogsMerkleRoot(logs);
+        bytes32 chainBatchRoot = keccak256(bytes.concat(logsRoot, emptyMultichainBatchRoot));
+
+        ProcessLogsInput memory input = ProcessLogsInput({
+            chainId: CHAIN_ID,
+            batchNumber: 1,
+            logs: logs,
+            messages: messages,
+            chainBatchRoot: chainBatchRoot,
+            multichainBatchRoot: emptyMultichainBatchRoot,
+            settlementFeePayer: address(0)
+        });
+
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, CHAIN_ID),
+            abi.encode(mockZKChain)
+        );
+
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, CHAIN_ID),
+            abi.encode(BASE_TOKEN_ASSET_ID)
+        );
+
+        vm.prank(mockZKChain);
+        vm.expectRevert(InvalidMessage.selector);
+        gwAssetTracker.processLogsAndMessages(input);
+    }
+
     // Test processLogsAndMessages with invalid L2 shard ID
     function test_ProcessLogsAndMessages_InvalidL2ShardId() public {
         bytes memory message = bytes("testMessage");
