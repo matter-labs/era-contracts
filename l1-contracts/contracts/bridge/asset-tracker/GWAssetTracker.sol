@@ -620,20 +620,18 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         (uint256 tokenOriginalChainId, , , ) = this.parseTokenData(erc20Metadata);
         DataEncoding.assetIdCheck(tokenOriginalChainId, _assetId, originalToken);
         _registerToken(_assetId, originalToken, tokenOriginalChainId);
+        _decreaseChainBalance(_sourceChainId, _assetId, amount);
 
         if (_isInteropCall) {
             // Interop calls can not be used to L1.
             // This error should never be triggered, it is just an invariant check.
             require(_destinationChainId != L1_CHAIN_ID, CanNotSendInteropToL1(_destinationChainId));
 
-            _decreaseChainBalance(_sourceChainId, _assetId, amount);
             _increasePendingInteropBalance(_destinationChainId, _assetId, amount);
         } else {
             // When it is not an interop call, we expect it to be a withdrawal to L1
             // This error should never be triggered, it is just an invariant check.
             require(_destinationChainId == L1_CHAIN_ID, MustBeWithdrawalToL1(_destinationChainId));
-
-            _decreaseChainBalance(_sourceChainId, _assetId, amount);
         }
     }
 
