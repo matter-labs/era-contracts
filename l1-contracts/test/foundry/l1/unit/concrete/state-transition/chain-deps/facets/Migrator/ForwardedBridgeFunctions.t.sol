@@ -89,6 +89,10 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
         utilsFacet.util_setPausedDepositsTimestamp(timestamp);
     }
 
+    function _setupReceivingSettlementPausedState() internal {
+        utilsFacet.util_setPausedDepositsTimestamp(1);
+    }
+
     function test_forwardedBridgeBurn_RevertWhen_DepositsNotPaused() public {
         bytes memory data = abi.encode(utilsFacet.util_getProtocolVersion());
         vm.prank(chainAssetHandler);
@@ -197,7 +201,36 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
         migratorFacet.forwardedBridgeMint(data, false);
     }
 
+    function test_forwardedBridgeMint_RevertWhen_DepositsNotPaused_ContractAlreadyDeployed() public {
+        PriorityTreeCommitment memory priorityTreeCommitment = PriorityTreeCommitment({
+            nextLeafIndex: 0,
+            startIndex: 0,
+            unprocessedIndex: 0,
+            sides: new bytes32[](0)
+        });
+
+        ZKChainCommitment memory commitment = ZKChainCommitment({
+            totalBatchesExecuted: 0,
+            totalBatchesVerified: 0,
+            totalBatchesCommitted: 0,
+            l2SystemContractsUpgradeTxHash: bytes32(0),
+            l2SystemContractsUpgradeBatchNumber: 0,
+            batchHashes: new bytes32[](1),
+            priorityTree: priorityTreeCommitment,
+            isPermanentRollup: false,
+            precommitmentForTheLatestBatch: bytes32(0)
+        });
+
+        bytes memory data = abi.encode(commitment);
+
+        vm.prank(chainAssetHandler);
+        vm.expectRevert(DepositsNotPaused.selector);
+        migratorFacet.forwardedBridgeMint(data, true);
+    }
+
     function test_forwardedBridgeMint_RevertWhen_OutdatedProtocolVersion() public {
+        _setupReceivingSettlementPausedState();
+
         // Setup: create a commitment with a different protocol version
         uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
         uint256 differentVersion = currentProtocolVersion + 1;
@@ -239,6 +272,8 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
     }
 
     function test_forwardedBridgeMint_RevertWhen_ExecutedIsNotConsistentWithVerified() public {
+        _setupReceivingSettlementPausedState();
+
         address ctm = utilsFacet.util_getChainTypeManager();
         uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
         vm.mockCall(
@@ -275,6 +310,8 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
     }
 
     function test_forwardedBridgeMint_RevertWhen_VerifiedIsNotConsistentWithCommitted() public {
+        _setupReceivingSettlementPausedState();
+
         address ctm = utilsFacet.util_getChainTypeManager();
         uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
         vm.mockCall(
@@ -311,6 +348,8 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
     }
 
     function test_forwardedBridgeMint_RevertWhen_InvalidNumberOfBatchHashes() public {
+        _setupReceivingSettlementPausedState();
+
         address ctm = utilsFacet.util_getChainTypeManager();
         uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
         vm.mockCall(
@@ -397,6 +436,8 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
     //////////////////////////////////////////////////////////////*/
 
     function test_forwardedBridgeMint_RevertWhen_NotHistoricalRoot_OnL1() public {
+        _setupReceivingSettlementPausedState();
+
         // Setup: on L1, check historical root validation
         address ctm = utilsFacet.util_getChainTypeManager();
         uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
@@ -439,6 +480,8 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
     }
 
     function test_forwardedBridgeMint_RevertWhen_NotMigrated_OnL1_ContractAlreadyDeployed() public {
+        _setupReceivingSettlementPausedState();
+
         // Setup: on L1, with _contractAlreadyDeployed=true but settlementLayer=address(0)
         address ctm = utilsFacet.util_getChainTypeManager();
         uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
@@ -500,6 +543,8 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
     }
 
     function test_forwardedBridgeMint_RevertWhen_NotMigrated_OnGateway_ContractAlreadyDeployed() public {
+        _setupReceivingSettlementPausedState();
+
         // Switch to Gateway chain (not L1)
         uint256 gatewayChainId = 505;
         vm.chainId(gatewayChainId);

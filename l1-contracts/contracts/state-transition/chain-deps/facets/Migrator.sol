@@ -208,6 +208,10 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         bytes calldata _data,
         bool _contractAlreadyDeployed
     ) external payable override onlyChainAssetHandler {
+        if (_contractAlreadyDeployed) {
+            require(s.pausedDepositsTimestamp != 0, DepositsNotPaused());
+        }
+
         ZKChainCommitment memory _commitment = abi.decode(_data, (ZKChainCommitment));
 
         IChainTypeManager ctm = IChainTypeManager(s.chainTypeManager);
