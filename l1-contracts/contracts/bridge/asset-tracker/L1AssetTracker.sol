@@ -516,6 +516,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// *that would reduce the chainBalance of the chain*. One could say it is `totalWithdrawalsToL1 + totalFailedDepositsFromL1 - totalClaimed`.
     /// Note, both `totalWithdrawalsToL1` and `totalFailedDepositsFromL1` must only refer to messages that happened when the chain
     /// settled on L1, while `totalClaimed` should only include claims for such withdrawals/failed deposits.
+    /// For non-base tokens, failed L1 -> L2 deposits may later be claimed back on L1 and so naturally fit this model.
+    /// Base token is different: failed deposits are refunded on L2 to the refundRecipient instead of being claimed on L1.
+    /// We still use the same aggregate formula below, but the term `(totalDepositedFromL1 - totalSuccessfulDepositsFromL1)`
+    /// should be read as "deposits that did not end up in the chain's finalized L2 supply while settling on L1", not as a
+    /// statement that every such failed deposit will later be claimed on L1.
     /// We calculate `totalFailedDepositsFromL1` as the difference between the total deposits for when the chain settled on L1 and the total successful
     /// deposits from the same period. All in all, we get the following formula:
     /// `amountToKeep = totalWithdrawalsToL1 + (totalDepositedFromL1 - totalSuccessfulDepositsFromL1) - totalClaimedOnL1`.
