@@ -753,6 +753,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
             /// In this case the balance might never have been migrated back to L1.
             chainBalance[_data.chainId][_data.assetId] += _data.amount;
+        } else {
+            address zkChain = _bridgehub().getZKChain(_data.chainId);
+            require(zkChain != address(0), ChainIdNotRegistered(_data.chainId));
+            IMigrator(zkChain).unpauseDepositsOnGateway();
         }
 
         // For migrations from GW, the chainBalance and assetMigrationNumber are updated at the initiation of the migration.

@@ -22,10 +22,11 @@ contract MigratorTest is UtilsCallMockerTest {
     DummyBridgehub internal dummyBridgehub;
 
     function getMigratorSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](6);
+        bytes4[] memory selectors = new bytes4[](7);
         uint256 i = 0;
         selectors[i++] = IMigrator.pauseDepositsBeforeInitiatingMigration.selector;
         selectors[i++] = IMigrator.unpauseDeposits.selector;
+        selectors[i++] = IMigrator.unpauseDepositsOnGateway.selector;
         selectors[i++] = IMigrator.forwardedBridgeBurn.selector;
         selectors[i++] = IMigrator.forwardedBridgeMint.selector;
         selectors[i++] = IMigrator.forwardedBridgeConfirmTransferResult.selector;
