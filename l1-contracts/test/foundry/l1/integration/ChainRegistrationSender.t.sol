@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage, console2} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
@@ -23,10 +23,20 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
-import {ChainsSettlementLayerMismatch, ChainsSettlingOnL1} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {
+    ChainsSettlementLayerMismatch,
+    ChainsSettlingOnL1,
+    ChainAlreadyRegistered
+} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+
+import {LogFinder} from "test-utils/LogFinder.sol";
+
+import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestsConstants.sol";
 
 contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
+    using LogFinder for Vm.Log[];
+
     uint256 constant TEST_USERS_COUNT = 10;
     uint256 constant GATEWAY_CHAIN_ID = 506;
     address[] public users;
@@ -82,41 +92,36 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
     }
 
     function test_chainRegistrationSender() public {
-        address owner = Ownable(address(addresses.bridgehub)).owner();
-
-        // Verify chain is not registered before
-        bool registeredBefore = addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]);
-
-        stdstore
-            .target(address(addresses.chainRegistrationSender))
-            .sig(addresses.chainRegistrationSender.chainRegisteredOnChain.selector)
-            .with_key(zkChainIds[0])
-            .with_key(zkChainIds[1])
-            .checked_write(false);
-
-        // Verify storage was updated
+        // Verify chain is not registered in fresh deployment
         assertFalse(
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
             "Chain should not be registered before calling registerChain"
         );
 
-        vm.startBroadcast(owner);
+        vm.recordLogs();
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
-        vm.stopBroadcast();
+        Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Verify chain is now registered
+        // Storage: chainRegisteredOnChain flag set to true
         assertTrue(
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
             "Chain should be registered after calling registerChain"
         );
+
+        // Event: NewPriorityRequest from the mailbox (service transaction was queued)
+        logs.requireOne(NEW_PRIORITY_REQUEST_SIGNATURE);
     }
 
-    // deposits ERC20 token to the ZK chain where base token is ETH
-    // this function use requestL2TransactionTwoBridges function from shared bridge.
-    // tokenAddress should be any ERC20 token, excluding ETH
-    // Returns the resultant transaction hash
-    function chainRegistrationSenderDeposit(uint256 l2Value, address tokenAddress) private returns (bytes32) {
-        TestnetERC20Token currentToken = TestnetERC20Token(tokenAddress);
+    function test_chainRegistrationSender_revertWhen_alreadyRegistered() public {
+        addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
+
+        vm.expectRevert(ChainAlreadyRegistered.selector);
+        addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
+    }
+
+    /// This function use requestL2TransactionTwoBridges function through ChainRegistrationSender.
+    /// No ERC20 tokens are involved — only ETH for base token gas.
+    function _chainRegistrationSenderDeposit() private returns (bytes32, Vm.Log[] memory) {
         uint256 currentChainId = zkChainIds[0];
         address currentUser = users[0];
 
@@ -135,8 +140,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         uint256 mintValue = minRequiredGas;
         vm.deal(currentUser, mintValue);
 
-        // currentToken.mint(currentUser, l2Value);
-        // currentToken.approve(address(addresses.sharedBridge), l2Value);
+        uint256 userEthBefore = currentUser.balance;
 
         bytes memory secondBridgeCallData = bytes.concat(
             CHAIN_REGISTRATION_SENDER_ENCODING_VERSION,
@@ -154,42 +158,48 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         });
 
         vm.recordLogs();
+        vm.prank(currentUser);
         bytes32 resultantHash = addresses.bridgehub.requestL2TransactionTwoBridges{value: mintValue}(requestTx);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Verify the transaction was successful
-        assertNotEq(resultantHash, bytes32(0), "Resultant hash should not be zero");
-        assertTrue(logs.length > 0, "Transaction should emit logs");
+        // Balance assertion
+        console2.log("balance before", userEthBefore);
+        console2.log("mint value", mintValue);
+        assertEq(currentUser.balance, userEthBefore - mintValue, "User ETH should decrease by mintValue");
 
-        return resultantHash;
+        return (resultantHash, logs);
     }
 
     function test_chainRegistrationSenderDeposit() public {
         // Verify chain is not registered initially
-        stdstore
-            .target(address(addresses.chainRegistrationSender))
-            .sig(addresses.chainRegistrationSender.chainRegisteredOnChain.selector)
-            .with_key(zkChainIds[0])
-            .with_key(zkChainIds[1])
-            .checked_write(false);
-
         assertFalse(
             addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
             "Chain should not be registered before deposit"
         );
 
-        // Perform deposit and capture the transaction hash
-        bytes32 txHash = chainRegistrationSenderDeposit(1000000, ETH_TOKEN_ADDRESS);
+        // Perform deposit and capture the transaction hash and emitted events
+        (bytes32 txHash, Vm.Log[] memory logs) = _chainRegistrationSenderDeposit();
 
         // Verify the L2 transaction was submitted successfully
         // The txHash is the canonical transaction hash for the L2 transaction
         assertNotEq(txHash, bytes32(0), "Transaction hash should be non-zero after successful deposit");
 
-        // Verify the transaction hash has expected format (non-zero bytes)
-        assertTrue(uint256(txHash) > 0, "Transaction hash should be a valid non-zero value");
+        // Verify event: BridgehubDepositBaseTokenInitiated
+        Vm.Log memory baseTokenLog = logs.requireOne(
+            "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
+        );
+        assertEq(uint256(baseTokenLog.topics[1]), zkChainIds[0], "Base token deposit event chainId mismatch");
+
+        // The TwoBridges path through ChainRegistrationSender does NOT update
+        // chainRegisteredOnChain. Verify it remains unchanged.
+        assertFalse(
+            addresses.chainRegistrationSender.chainRegisteredOnChain(zkChainIds[0], zkChainIds[1]),
+            "chainRegisteredOnChain should remain false after TwoBridges deposit"
+        );
     }
 
     function test_chainRegistrationSender_revertWhen_chainsSettleOnL1() public {
+        // Override settlement layers to L1 (block.chainid) to trigger the ChainsSettlingOnL1 guard
         stdstore
             .target(address(addresses.bridgehub))
             .sig("settlementLayer(uint256)")
@@ -210,6 +220,7 @@ contract ChainRegistrationSenderTests is L1ContractDeployer, ZKChainDeployer, To
         uint256 firstSettlementLayer = GATEWAY_CHAIN_ID;
         uint256 secondSettlementLayer = GATEWAY_CHAIN_ID + 1;
 
+        // Override settlement layers to different values to trigger the mismatch guard
         stdstore
             .target(address(addresses.bridgehub))
             .sig("settlementLayer(uint256)")
