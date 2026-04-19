@@ -251,6 +251,10 @@ contract UtilsFacet is ZKChainBase {
         s.nativeTokenVault = _nativeTokenVault;
     }
 
+    function util_setIsPermanentRollup(bool _isPermanentRollup) external {
+        s.isPermanentRollup = _isPermanentRollup;
+    }
+
     function util_setTotalBatchesVerified(uint256 _totalBatchesVerified) external {
         s.totalBatchesVerified = _totalBatchesVerified;
     }

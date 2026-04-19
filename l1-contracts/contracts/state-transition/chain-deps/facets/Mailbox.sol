@@ -46,6 +46,7 @@ import {
     OnlyEraSupported,
     TooManyFactoryDeps,
     TransactionNotAllowed,
+    ValueMismatch,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
 import {DepositsPaused, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
@@ -308,6 +309,9 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
         }
         if (IBridgehubBase(s.bridgehub).getZKChain(_chainId) != msg.sender) {
             revert NotHyperchain();
+        }
+        if (_expirationTimestamp != 0) {
+            revert ValueMismatch(0, _expirationTimestamp);
         }
         // Note during the upgrade to V31 no chain will be on GW.
 
