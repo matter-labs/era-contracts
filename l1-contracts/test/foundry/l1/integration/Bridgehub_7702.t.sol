@@ -60,7 +60,7 @@ contract Bridgehub_7702 is BridgehubInvariantTests {
 
         simpleExecutor = new SimpleExecutor();
 
-        uint256 l2GasLimit = 1000000;
+        uint256 l2GasLimit = 1000000; // reverts with 8
         uint256 minRequiredGas = _getMinRequiredGasPriceForChain(
             currentChainId,
             gasPrice,
