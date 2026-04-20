@@ -69,7 +69,7 @@ async fn accept_ownership(
     governor: &Wallet,
     forge: ForgeScript,
 ) -> anyhow::Result<()> {
-    let forge = forge.with_wallet(governor, runner.simulate);
+    let forge = forge.with_wallet(governor);
     runner.run(forge)?;
     Ok(())
 }
@@ -119,7 +119,7 @@ pub async fn call_script(
     let forge = match mode {
         AdminScriptMode::OnlySave => forge,
         AdminScriptMode::Broadcast(ref wallet) => {
-            forge.with_broadcast().with_wallet(wallet, runner.simulate)
+            forge.with_broadcast().with_wallet(wallet)
         }
     };
 

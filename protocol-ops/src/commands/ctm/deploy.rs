@@ -32,7 +32,6 @@ pub struct CtmDeployInput {
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
     pub zk_token_asset_id: Option<H256>,
-    pub create2_factory_addr: Option<Address>,
     pub create2_factory_salt: Option<H256>,
 }
 
@@ -45,9 +44,9 @@ pub fn deploy(
     let l1_network = L1Network::from_l1_rpc(&runner.rpc_url)?;
     let mut initial_deployment_config = InitialDeploymentConfig::default();
 
-    if let Some(addr) = input.create2_factory_addr {
-        initial_deployment_config.create2_factory_addr = Some(addr);
-    }
+    // CREATE2 factory address isn't configurable: the Solidity script
+    // unconditionally uses `Utils.DETERMINISTIC_CREATE2_ADDRESS`
+    // (0x4e59b4…c, an EVM-wide constant).
     if let Some(salt) = input.create2_factory_salt {
         initial_deployment_config.create2_factory_salt = salt;
     }
@@ -83,8 +82,7 @@ pub fn deploy(
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow()
-        .with_wallet(auth, runner.simulate)
+        .with_wallet(auth)
         .with_env(
             "CREATE2_FACTORY_SALT",
             format!("{:#x}", initial_deployment_config.create2_factory_salt),

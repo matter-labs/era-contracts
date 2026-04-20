@@ -1,4 +1,3 @@
-use std::str::FromStr;
 
 use clap::Parser;
 use ethers::types::{Address, H256};
@@ -10,7 +9,7 @@ use crate::commands::hub::init::{hub_init, HubInitInput};
 use crate::commands::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{
-    constants::DETERMINISTIC_CREATE2_ADDRESS, forge::ForgeRunner, logger, wallets::Wallet,
+    forge::ForgeRunner, logger, wallets::Wallet,
 };
 use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
 use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
@@ -20,13 +19,16 @@ use crate::types::VMOption;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct EcosystemInitArgs {
-    /// Owner address for the deployed contracts (default: sender)
+    /// Owner address for the deployed contracts (default: deployer)
     #[clap(long, help_heading = "Signers")]
     pub owner: Option<Address>,
 
-    /// Owner private key
-    #[clap(long, visible_alias = "owner-pk", help_heading = "Auth")]
-    pub owner_private_key: Option<H256>,
+    /// Deployer EOA address. Bootstrap is prepare-only: protocol-ops emits a
+    /// directory of Safe bundles via `--out`; the deployer applies them with
+    /// `dev execute-safe` (or any Safe-bundle-aware executor). No key is
+    /// handed to protocol-ops.
+    #[clap(long, help_heading = "Signers")]
+    pub deployer_address: Address,
 
     #[clap(flatten)]
     #[serde(flatten)]
@@ -48,9 +50,6 @@ pub struct EcosystemInitArgs {
     /// ZK token asset ID
     #[clap(long, help_heading = "Advanced input")]
     pub zk_token_asset_id: Option<H256>,
-    /// CREATE2 factory address (if already deployed)
-    #[clap(long, help_heading = "Advanced input")]
-    pub create2_factory_addr: Option<Address>,
     /// CREATE2 factory salt (random by default)
     #[clap(long, help_heading = "Advanced input")]
     pub create2_factory_salt: Option<H256>,
@@ -59,14 +58,9 @@ pub struct EcosystemInitArgs {
 // ── run() ───────────────────────────────────────────────────────────────────
 
 pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
-    let sender = Wallet::parse(args.shared.private_key, args.shared.sender)?;
-    let owner = Wallet::resolve(args.owner, args.owner_private_key, &sender)?;
-
-    let mut runner = ForgeRunner::new(
-        args.shared.simulate,
-        &args.shared.l1_rpc_url,
-        args.shared.forge_args.clone(),
-    )?;
+    let mut runner = ForgeRunner::new(&args.shared)?;
+    let sender = runner.prepare_sender(args.deployer_address).await?;
+    let owner = Wallet::resolve(args.owner, None, &sender)?;
 
     let input = EcosystemInitInput {
         sender: sender.address,
@@ -76,7 +70,6 @@ pub async fn run(args: EcosystemInitArgs) -> anyhow::Result<()> {
         with_testnet_verifier: args.with_testnet_verifier,
         with_legacy_bridge: args.with_legacy_bridge,
         zk_token_asset_id: args.zk_token_asset_id,
-        create2_factory_addr: args.create2_factory_addr,
         create2_factory_salt: args.create2_factory_salt,
     };
     let output = ecosystem_init(&mut runner, &sender, &owner, &input).await?;
@@ -105,17 +98,15 @@ pub async fn ecosystem_init(
     owner: &Wallet,
     input: &EcosystemInitInput,
 ) -> anyhow::Result<EcosystemInitOutputData> {
-    // Determine CREATE2 factory address (pre-deployed at genesis)
-    let create2_factory_addr = input
-        .create2_factory_addr
-        .unwrap_or_else(|| Address::from_str(DETERMINISTIC_CREATE2_ADDRESS).unwrap());
+    // The deterministic CREATE2 factory is an EVM-wide constant
+    // (0x4e59b4…c). The Solidity script uses it unconditionally via
+    // `Utils.DETERMINISTIC_CREATE2_ADDRESS` — no override needed.
 
     // Initialize Bridgehub contracts
     let hub_input = HubInitInput {
         owner: owner.address,
         era_chain_id: input.era_chain_id,
         with_legacy_bridge: input.with_legacy_bridge,
-        create2_factory_addr: Some(create2_factory_addr),
         create2_factory_salt: input.create2_factory_salt,
     };
     let hub_output = hub_init(runner, &sender, &owner, &hub_input).await?;
@@ -130,7 +121,6 @@ pub async fn ecosystem_init(
         with_testnet_verifier: input.with_testnet_verifier,
         with_legacy_bridge: input.with_legacy_bridge,
         zk_token_asset_id: input.zk_token_asset_id,
-        create2_factory_addr: Some(create2_factory_addr),
         create2_factory_salt: input.create2_factory_salt,
     };
     let ctm_output = ctm_init(runner, &sender, &owner, &owner, &ctm_input).await?;
@@ -152,7 +142,6 @@ pub struct EcosystemInitInput {
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
     pub zk_token_asset_id: Option<H256>,
-    pub create2_factory_addr: Option<Address>,
     pub create2_factory_salt: Option<H256>,
 }
 

@@ -19,6 +19,7 @@ use crate::common::{
     logger, paths,
     traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
+    SharedRunArgs,
 };
 use crate::config::forge_interface::script_params::ForgeScriptParams;
 
@@ -41,55 +42,112 @@ impl ForgeScriptRun {
 }
 
 /// Encapsulates the full execution environment for forge scripts:
-/// shell, forge CLI args, target RPC, foundry path, simulation mode, and run history.
+/// shell, forge CLI args, target anvil-fork RPC, foundry path, and run history.
 pub struct ForgeRunner {
     /// Shell used for file I/O and command execution.
     pub shell: Shell,
     /// User-supplied forge CLI flags (--verify, --verifier-url, etc.).
     pub forge_args: ForgeScriptArgs,
-    /// Effective RPC URL (anvil URL when simulating, original URL otherwise).
+    /// Effective RPC URL (always the anvil fork — protocol-ops never
+    /// broadcasts against real L1).
     pub rpc_url: String,
-    /// Whether this runner is in simulation mode (forked anvil, no real broadcast).
-    pub simulate: bool,
     /// Path to the `l1-contracts` foundry project root.
     pub foundry_scripts_path: PathBuf,
     /// Keeps the anvil instance alive while this runner exists.
-    _anvil: Option<AnvilInstance>,
+    _anvil: AnvilInstance,
     runs: Vec<ForgeScriptRun>,
 }
 
 impl ForgeRunner {
-    /// Create a new runner.
+    /// Create a new runner from the shared CLI args.
     ///
-    /// If `simulate` is true, forks `l1_rpc_url` with anvil and targets the fork.
-    pub fn new(
-        simulate: bool,
-        l1_rpc_url: &str,
-        forge_args: ForgeScriptArgs,
-    ) -> anyhow::Result<Self> {
+    /// Always forks `shared.l1_rpc_url` with anvil and targets the fork —
+    /// protocol-ops is prepare-only and never touches real L1.
+    pub fn new(shared: &SharedRunArgs) -> anyhow::Result<Self> {
         let shell = Shell::new().context("failed to create shell")?;
 
-        let (rpc_url, anvil) = if simulate {
-            logger::warn(format!(
-                "[SIMULATION] Forking {} via anvil (no on-chain changes)",
-                l1_rpc_url
-            ));
-            let instance = anvil::start_anvil_fork(l1_rpc_url)?;
-            let url = instance.rpc_url().to_string();
-            (url, Some(instance))
-        } else {
-            (l1_rpc_url.to_string(), None)
-        };
+        logger::warn(format!(
+            "[SIMULATION] Forking {} via anvil (no on-chain changes)",
+            shared.l1_rpc_url
+        ));
+        let anvil = anvil::start_anvil_fork(&shared.l1_rpc_url)?;
+        let rpc_url = anvil.rpc_url().to_string();
 
         Ok(ForgeRunner {
             shell,
-            forge_args,
+            forge_args: shared.forge_args.clone(),
             rpc_url,
             foundry_scripts_path: paths::path_to_foundry_scripts(),
-            simulate,
             _anvil: anvil,
             runs: Vec::new(),
         })
+    }
+
+    /// Fund `address` on the anvil fork via `anvil_setBalance`.
+    ///
+    /// Needed when the auto-resolved sender is a contract (e.g. Governance)
+    /// or an EOA without ETH on the forked chain — forge's `--sender
+    /// --unlocked` still requires the impersonated address to pay gas.
+    pub async fn fund_sender(&self, address: ethers::types::Address) -> anyhow::Result<()> {
+        anvil::set_balance(&self.rpc_url, address).await
+    }
+
+    /// Build a `Wallet` (private-key-less, unlocked) for `address` and fund
+    /// it on the anvil fork. Convenience wrapper around
+    /// `Wallet::parse(None, Some(address))` + `fund_sender`, since every
+    /// prepare-shape command needs both.
+    pub async fn prepare_sender(
+        &self,
+        address: ethers::types::Address,
+    ) -> anyhow::Result<Wallet> {
+        self.fund_sender(address).await?;
+        Wallet::parse(None, Some(address))
+    }
+
+    /// Resolve the chain admin via `Bridgehub.getZKChain(chain_id).getAdmin()`
+    /// and prepare it as a sender on the fork (fund + impersonate).
+    pub async fn prepare_chain_admin(
+        &self,
+        bridgehub: ethers::types::Address,
+        chain_id: u64,
+    ) -> anyhow::Result<Wallet> {
+        let admin =
+            crate::common::l1_contracts::resolve_chain_admin(&self.rpc_url, bridgehub, chain_id)
+                .await
+                .context("resolving chain admin from L1")?;
+        self.prepare_sender(admin).await
+    }
+
+    /// Resolve the chain admin's *owner* EOA (one Ownable hop past
+    /// [`Self::prepare_chain_admin`]) and prepare it as a sender. Use this
+    /// when the script's broadcast must come from a signable EOA — the
+    /// ChainAdmin contract itself has no private key.
+    pub async fn prepare_chain_admin_owner(
+        &self,
+        bridgehub: ethers::types::Address,
+        chain_id: u64,
+    ) -> anyhow::Result<Wallet> {
+        let owner = crate::common::l1_contracts::resolve_chain_admin_owner(
+            &self.rpc_url,
+            bridgehub,
+            chain_id,
+        )
+        .await
+        .context("resolving chain admin owner EOA from L1")?;
+        self.prepare_sender(owner).await
+    }
+
+    /// Resolve the governance contract's owner EOA via
+    /// `Governance(bridgehub.owner()).owner()` and prepare it as a sender.
+    pub async fn prepare_governance_owner(
+        &self,
+        bridgehub: ethers::types::Address,
+    ) -> anyhow::Result<Wallet> {
+        let owner =
+            crate::common::l1_contracts::resolve_governance_owner(&self.rpc_url, bridgehub)
+                .await
+                .context("resolving governance owner EOA from L1")?;
+        self.prepare_sender(owner).await
     }
 
     /// Run a forge script.
@@ -128,9 +186,7 @@ impl ForgeRunner {
             .script(&params.script(), self.forge_args.clone())
             .with_ffi()
             .with_rpc_url(self.rpc_url.clone())
-            .with_broadcast()
-            .with_slow()
-            .with_wallet(wallet, self.simulate);
+            .with_wallet(wallet);
 
         self.run(forge)?;
 
@@ -181,13 +237,19 @@ impl ForgeRunner {
                     .get("timestamp")
                     .and_then(|t| t.as_i64())
                     .unwrap_or(0);
-                // Forge timestamp can be in seconds or millis. Normalize to millis.
-                let run_ts_ms = if run_ts_raw > 1_000_000_000_000 {
-                    run_ts_raw
+                // Forge writes `timestamp` as whole seconds (`Utc::now().timestamp()`).
+                // Compare at seconds precision on both sides: a pre-run captured mid-
+                // second would otherwise falsely "beat" forge's truncated timestamp
+                // for a fast run (cached build, small script) and we'd drop a live
+                // broadcast file as stale. Normalize each side to seconds, treating
+                // anything > 1e12 as already-ms (some older forge builds).
+                let run_ts_s = if run_ts_raw > 1_000_000_000_000 {
+                    run_ts_raw / 1000
                 } else {
-                    run_ts_raw * 1000
+                    run_ts_raw
                 };
-                if run_ts_ms < pre_run_ts_ms {
+                let pre_run_ts_s = pre_run_ts_ms / 1000;
+                if run_ts_s < pre_run_ts_s {
                     // Broadcast file predates this run - likely a stale file from a previous invocation
                     (Some(broadcast_file), serde_json::Value::Null)
                 } else {
@@ -210,12 +272,19 @@ impl ForgeRunner {
         if !root.exists() {
             return Ok(None);
         }
-        let Some(script_name) = script.script_name().file_name() else {
+        let Some(raw_script_name) = script.script_name().file_name() else {
             return Err(anyhow::anyhow!(
                 "Script name not found in {}",
                 script.script_name().display()
             ));
         };
+        // Forge accepts `path.sol:Contract` to disambiguate contracts but names
+        // the broadcast directory after the file only. `:` isn't a Unix path
+        // separator, so `file_name()` preserves the suffix — strip it.
+        let script_name_str = raw_script_name
+            .to_str()
+            .ok_or_else(|| anyhow::anyhow!("Script name contains invalid UTF-8"))?;
+        let script_name = script_name_str.split(':').next().unwrap_or(script_name_str);
         let chain_id = query_chain_id_sync(&self.rpc_url)?;
         let mut script_dir = root.join(script_name).join(chain_id.to_string());
         if !script.is_broadcast() {

@@ -51,7 +51,7 @@ uint256 constant SYSTEM_CONTRACTS_COUNT = 30;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
 uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 13;
 /// @dev System contracts (0x800x) with l1-contracts EVM bytecodes for ZKsyncOS proxy upgrades.
-uint256 constant ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT = 4;
+uint256 constant ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT = 3;
 
 /// @notice A built-in contract's identity plus its Era bytecode.
 struct BuiltinContractDeployInfo {
@@ -182,12 +182,14 @@ library SystemContractsProcessing {
 
     /// @notice System contracts that have l1-contracts EVM bytecodes and need ZKsyncOS proxy upgrades.
     /// @dev Separate from getOtherBuiltinCoreContracts because Era handles these via getSystemContractsForceDeployments.
+    ///      ContractDeployer (0x8006) is intentionally excluded: it's a sequencer hook dispatcher,
+    ///      not a wrappable contract. Attempting to force-deploy a SystemContractProxy at 0x8006
+    ///      and then calling forceInitAdmin on it hits the hook with an unknown selector and reverts.
     function getZKsyncOSExtraSystemContracts() internal pure returns (ZkSyncOsSystemContract[] memory ids) {
         ids = new ZkSyncOsSystemContract[](ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT);
         ids[0] = ZkSyncOsSystemContract.L2BaseToken;
         ids[1] = ZkSyncOsSystemContract.L1Messenger;
         ids[2] = ZkSyncOsSystemContract.SystemContext;
-        ids[3] = ZkSyncOsSystemContract.ContractDeployer;
     }
 
     /// @notice Returns address+bytecode pairs for all "other built-in" contracts.

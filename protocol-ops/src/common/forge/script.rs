@@ -53,8 +53,15 @@ impl ForgeScript {
     }
 
     /// Add the broadcast flag to the forge script command.
+    ///
+    /// Also adds `--skip-simulation`: forge otherwise runs the script twice —
+    /// once locally to build the tx list, once against the RPC for gas
+    /// estimation. Protocol-ops always targets an anvil fork, so the second
+    /// pass is pure overhead. The broadcast JSON that downstream reads is
+    /// produced by the local pass either way.
     pub fn with_broadcast(mut self) -> Self {
         self.args.add_arg(ForgeScriptArg::Broadcast);
+        self.args.add_arg(ForgeScriptArg::SkipSimulation);
         self
     }
 
@@ -94,18 +101,13 @@ impl ForgeScript {
         self
     }
 
-    /// Apply wallet authentication.
-    ///
-    /// If `simulate` is true or the wallet has no private key, uses `--sender --unlocked`
-    /// (anvil auto-impersonation or unlocked node). Otherwise uses `--private-key`.
-    pub fn with_wallet(self, wallet: &Wallet, simulate: bool) -> Self {
-        if simulate || wallet.private_key.is_none() {
-            self.with_sender(format!("{:#x}", wallet.address))
-                .with_unlocked()
-        } else {
-            let pk = wallet.private_key_h256().unwrap();
-            self.with_private_key(pk)
-        }
+    /// Apply wallet authentication against the anvil fork: always uses
+    /// `--sender --unlocked` so forge impersonates the wallet's address via
+    /// anvil auto-impersonation. Any private key on the wallet is ignored —
+    /// protocol-ops never broadcasts against real L1.
+    pub fn with_wallet(self, wallet: &Wallet) -> Self {
+        self.with_sender(format!("{:#x}", wallet.address))
+            .with_unlocked()
     }
 
     /// Adds the private key of the deployer account.
@@ -267,6 +269,7 @@ pub enum ForgeScriptArg {
     Skip {
         skip_path: String,
     },
+    SkipSimulation,
 }
 
 /// ForgeScriptArgs is a set of arguments that can be passed to the forge script command.

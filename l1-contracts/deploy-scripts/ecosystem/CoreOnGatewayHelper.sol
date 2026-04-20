@@ -118,6 +118,15 @@ library CoreOnGatewayHelper {
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, sharedDependencies);
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(factoryDeps, additionalDependencies);
+
+        // The ZkSyncOsSystemContract list (L2BaseTokenZKOS, L1MessengerZKOS, SystemContext,
+        // ZKOSContractDeployer) is force-deployed by buildZKsyncOSForceDeployments at upgrade
+        // time but lives in a separate enum — without this merge their preimages never land
+        // in the sequencer's oracle and the VM panics on the first SLOAD of their code.
+        if (_isZKsyncOS) {
+            factoryDeps = SystemContractsProcessing.mergeBytesArrays(factoryDeps, _getZKsyncOSExtraBytecodes());
+        }
+
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
     }
 
@@ -129,16 +138,23 @@ library CoreOnGatewayHelper {
             // are Era-VM concepts. The equivalent "always needed" L2 contracts
             // for ZKsyncOS live in `_getSharedFactoryDependencyContracts` below.
             //
-            // One additional baseline: `SystemContractProxy`. It isn't part of the
-            // CoreContract enum (no canonical address), but every
-            // `updateZKsyncOSContract` call that needs to materialize a proxy at a
-            // previously-empty system address force-deploys this bytecode —
-            // requiring its preimage in the store.
-            basicDependencies = new bytes[](1);
+            // Two additional baselines, neither in the CoreContract enum:
+            //  - `SystemContractProxy`: every `updateZKsyncOSContract` call that needs
+            //    to materialize a proxy at a previously-empty system address force-deploys
+            //    this bytecode.
+            //  - `SystemContractProxyAdmin` (at 0x1000c): force-deployed once during every
+            //    upgrade via `_buildZKsyncOSProxyAdminEntry`, so its preimage must be
+            //    published too.
+            basicDependencies = new bytes[](2);
             basicDependencies[0] = BytecodeUtils.readDeployedBytecodeL1(
                 true,
                 "SystemContractProxy.sol",
                 "SystemContractProxy"
+            );
+            basicDependencies[1] = BytecodeUtils.readDeployedBytecodeL1(
+                true,
+                "SystemContractProxyAdmin.sol",
+                "SystemContractProxyAdmin"
             );
             return basicDependencies;
         }
@@ -189,6 +205,18 @@ library CoreOnGatewayHelper {
             } else {
                 dependencyBytecodes[i] = ContractsBytecodesLib.getCreationCodeEra(contractName);
             }
+        }
+    }
+
+    /// @notice EVM deployed bytecodes for the ZkSyncOsSystemContract enum (L2BaseTokenZKOS,
+    ///         L1MessengerZKOS, SystemContext, ZKOSContractDeployer). Parallel loop to
+    ///         `_getFactoryDependencyBytecodes` because the enums aren't interchangeable.
+    function _getZKsyncOSExtraBytecodes() private view returns (bytes[] memory out) {
+        ZkSyncOsSystemContract[] memory ids = SystemContractsProcessing.getZKsyncOSExtraSystemContracts();
+        out = new bytes[](ids.length);
+        for (uint256 i = 0; i < ids.length; i++) {
+            string memory contractName = _resolveZkOsSystemContractName(ids[i]);
+            out[i] = ContractsBytecodesLib.getL2DeployedBytecode(contractName, true);
         }
     }
 

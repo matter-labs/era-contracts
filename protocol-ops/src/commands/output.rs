@@ -1,90 +1,41 @@
+//! Output writer for prepare-shape commands.
+//!
+//! Each invocation that passed `--out <dir>` produces:
+//!
+//!   `<dir>/NN_<step>_<signer>.safe.json` — one Safe Transaction Builder file
+//!                                          per consecutive same-signer group
+//!   `<dir>/manifest.json`                — append-only index with per-bundle
+//!                                          info plus per-command debug metadata
+//!
+//! `manifest.json` shape:
+//!
+//! ```json
+//! {
+//!   "bundles": [
+//!     { "index": 1, "file": "01_…safe.json", "target": "0x…", "steps": […],
+//!       "tx_count": 3, "signer": "ecosystem.deployer" }
+//!   ],
+//!   "metadata": [
+//!     { "command": "ecosystem.upgrade-prepare", "input": {…}, "output": {…} }
+//!   ]
+//! }
+//! ```
+//!
+//! Multiple invocations writing into the same `--out` dir append to both
+//! arrays — `manifest.json` is read-modify-write.
+
+use std::collections::HashMap;
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use serde_json::{json, Value};
 
-use crate::common::forge::{all_runs_cast_transactions, ForgeRunner};
+use crate::common::forge::{split_into_bundles, ForgeRunner, SafeBundle};
 use crate::common::logger;
 
-/// Current output format version.
-pub const OUTPUT_VERSION: u32 = 1;
-
-/// Standard envelope for all protocol_ops command `--out` JSON.
-///
-/// Includes flat **`transactions`** (`to` / `data` / `value`) for
-/// `chain execute-simulated-transactions` / `ExecuteProtocolOpsOut.s.sol`.
-#[derive(Serialize)]
-pub struct CommandEnvelope {
-    pub command: String,
-    pub version: u32,
-    pub runs: Vec<RunEntry>,
-    pub transactions: Vec<Value>,
-    pub input: Value,
-    pub output: Value,
-}
-
-/// A single forge script execution record.
-#[derive(Serialize)]
-pub struct RunEntry {
-    pub script: String,
-    pub run: Value,
-}
-
-impl CommandEnvelope {
-    pub fn new<I: Serialize, O: Serialize>(
-        command: &str,
-        runner: &ForgeRunner,
-        input: &I,
-        output: &O,
-    ) -> anyhow::Result<Self> {
-        let runs = runner
-            .runs()
-            .iter()
-            .map(|r| RunEntry {
-                script: r.script.display().to_string(),
-                run: r.payload.clone(),
-            })
-            .collect();
-        let transactions = all_runs_cast_transactions(runner);
-
-        Ok(Self {
-            command: command.to_string(),
-            version: OUTPUT_VERSION,
-            runs,
-            transactions,
-            input: serde_json::to_value(input)?,
-            output: serde_json::to_value(output)?,
-        })
-    }
-
-    pub fn write_to_file(&self, path: &std::path::Path) -> anyhow::Result<()> {
-        if let Some(parent) = path.parent() {
-            if !parent.exists() {
-                std::fs::create_dir_all(parent).map_err(|e| {
-                    anyhow::anyhow!(
-                        "Failed to create output directory '{}': {e}",
-                        parent.display()
-                    )
-                })?;
-            }
-        }
-        let json = serde_json::to_string_pretty(self)?;
-        std::fs::write(path, &json).map_err(|e| {
-            anyhow::anyhow!("Failed to write output file '{}': {e}", path.display())
-        })?;
-        Ok(())
-    }
-}
-
-/// Fetch the L1 chain ID from the given RPC URL.
-async fn fetch_l1_chain_id(l1_rpc_url: &str) -> anyhow::Result<u64> {
-    use ethers::providers::{Http, Middleware, Provider};
-    let provider = Provider::<Http>::try_from(l1_rpc_url)?;
-    let chain_id = provider.get_chainid().await?;
-    Ok(chain_id.as_u64())
-}
-
-/// Write `--out` JSON file if the user requested it. No-op otherwise.
+/// Write Safe bundles + append metadata into `manifest.json` if the user
+/// passed `--out`. No-op otherwise.
 pub async fn write_output_if_requested<I, O>(
     command: &str,
     shared: &crate::common::SharedRunArgs,
@@ -96,71 +47,242 @@ where
     I: Serialize,
     O: Serialize,
 {
-    if shared.out_path.is_some() || shared.safe_transactions_out.is_some() {
-        let envelope = CommandEnvelope::new(command, runner, input, output)?;
-        if let Some(ref out_path) = shared.out_path {
-            envelope.write_to_file(out_path)?;
-            logger::info(format!("Full output written to: {}", out_path.display()));
-        }
-        if let Some(ref safe_path) = shared.safe_transactions_out {
-            let l1_chain_id = fetch_l1_chain_id(&shared.l1_rpc_url).await?;
-            write_safe_transactions(command, &envelope.transactions, l1_chain_id, safe_path)?;
-            logger::info(format!(
-                "Safe transactions written to: {}",
-                safe_path.display()
-            ));
-        }
-    }
+    let Some(ref out_dir) = shared.out else {
+        return Ok(());
+    };
+
+    let bundles = split_into_bundles(runner, command)?;
+    let l1_chain_id = fetch_l1_chain_id(&shared.l1_rpc_url).await?;
+    let address_names = shared
+        .wallets_yaml
+        .as_ref()
+        .map(|p| build_address_name_map(p))
+        .transpose()?
+        .unwrap_or_default();
+    let metadata = json!({
+        "command": command,
+        "input": serde_json::to_value(input)?,
+        "output": serde_json::to_value(output)?,
+    });
+    write_safe_bundles_dir(command, &bundles, l1_chain_id, out_dir, &address_names, metadata)?;
+    logger::info(format!(
+        "Safe bundles ({} file(s)) + metadata written to: {}",
+        bundles.len(),
+        out_dir.display()
+    ));
     Ok(())
 }
 
-/// Write transactions in Gnosis Safe Transaction Builder JSON format.
-fn write_safe_transactions(
+/// Fetch the L1 chain ID from the given RPC URL.
+async fn fetch_l1_chain_id(l1_rpc_url: &str) -> anyhow::Result<u64> {
+    use ethers::providers::{Http, Middleware, Provider};
+    let provider = Provider::<Http>::try_from(l1_rpc_url)?;
+    let chain_id = provider.get_chainid().await?;
+    Ok(chain_id.as_u64())
+}
+
+/// Write one Safe Transaction Builder JSON file per bundle under `dir`, plus
+/// append (or create) `manifest.json` with the per-bundle index entries and
+/// the per-command metadata block.
+///
+/// Filename: `NN_<first-step>_<target-address>.safe.json`, where `NN` is a
+/// zero-padded index (continuing past any existing files in the same dir) and
+/// `target-address` is the 20-byte signer lowercased — so ops can eyeball the
+/// directory and see which multisig is expected to execute each file.
+///
+/// **Appending.** `manifest.json` is read-modify-write: both `bundles` and
+/// `metadata` arrays are appended to. This lets phase commands share an
+/// `--out` dir cleanly even when invoked across multiple protocol-ops calls.
+fn write_safe_bundles_dir(
     command: &str,
-    transactions: &[Value],
+    bundles: &[SafeBundle],
     l1_chain_id: u64,
-    path: &std::path::Path,
+    dir: &Path,
+    address_names: &HashMap<String, String>,
+    metadata_entry: Value,
 ) -> anyhow::Result<()> {
-    let created_at = SystemTime::now()
+    std::fs::create_dir_all(dir).map_err(|e| {
+        anyhow::anyhow!("Failed to create out dir '{}': {e}", dir.display())
+    })?;
+
+    let manifest_path = dir.join("manifest.json");
+    let (mut bundle_entries, mut metadata_entries) = read_existing_manifest(&manifest_path)?;
+    let next_index = bundle_entries
+        .iter()
+        .filter_map(|b| b.get("index").and_then(|v| v.as_u64()))
+        .max()
+        .unwrap_or(0)
+        + 1;
+
+    let created_at_ms = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
 
-    let safe_txs: Vec<Value> = transactions
-        .iter()
-        .map(|tx| {
-            json!({
-                "to": tx.get("to").and_then(|v| v.as_str()).unwrap_or(""),
-                "value": tx.get("value").and_then(|v| v.as_str()).unwrap_or("0"),
-                "data": tx.get("data").and_then(|v| v.as_str()).unwrap_or("0x"),
-                "contractMethod": null,
-                "contractInputsValues": null,
-            })
-        })
-        .collect();
+    for (i, bundle) in bundles.iter().enumerate() {
+        let idx = next_index + i as u64;
+        let first_step = bundle
+            .steps
+            .first()
+            .cloned()
+            .unwrap_or_else(|| command.to_string());
+        let target_lower = bundle.target.to_ascii_lowercase();
+        let filename = format!("{:02}_{}_{}.safe.json", idx, first_step, target_lower);
+        let filepath = dir.join(&filename);
 
-    let envelope = json!({
-        "version": "1.0",
-        "chainId": l1_chain_id.to_string(),
-        "createdAt": created_at,
-        "meta": {
-            "name": command,
-            "description": format!("Transactions generated by protocol_ops: {command}"),
-        },
-        "transactions": safe_txs,
+        let safe_txs = safe_txs_from_bundle(bundle)?;
+        let description = if bundle.steps.is_empty() {
+            format!("Transactions generated by protocol_ops: {command}")
+        } else {
+            format!(
+                "Transactions generated by protocol_ops: {}",
+                bundle.steps.join(" + ")
+            )
+        };
+        let envelope = json!({
+            "version": "1.0",
+            "chainId": l1_chain_id.to_string(),
+            "createdAt": created_at_ms,
+            "meta": {
+                "name": first_step,
+                "description": description,
+            },
+            "transactions": safe_txs,
+        });
+
+        std::fs::write(&filepath, serde_json::to_string_pretty(&envelope)?).map_err(|e| {
+            anyhow::anyhow!("Failed to write safe file '{}': {e}", filepath.display())
+        })?;
+
+        let mut entry = json!({
+            "index": idx,
+            "file": filename,
+            "target": target_lower,
+            "steps": bundle.steps,
+            "tx_count": bundle.txs.len(),
+        });
+        if let Some(name) = address_names.get(&target_lower) {
+            entry["signer"] = json!(name);
+        }
+        bundle_entries.push(entry);
+    }
+
+    metadata_entries.push(metadata_entry);
+
+    let manifest = json!({
+        "bundles": bundle_entries,
+        "metadata": metadata_entries,
     });
+    std::fs::write(&manifest_path, serde_json::to_string_pretty(&manifest)?).map_err(|e| {
+        anyhow::anyhow!("Failed to write manifest '{}': {e}", manifest_path.display())
+    })?;
 
-    if let Some(parent) = path.parent() {
-        if !parent.exists() {
-            std::fs::create_dir_all(parent)?;
+    Ok(())
+}
+
+/// Read `manifest.json` if present and return its `(bundles, metadata)` arrays;
+/// missing file → empty arrays. Missing `metadata` array on an existing manifest
+/// is also tolerated (older manifests didn't have it).
+fn read_existing_manifest(path: &Path) -> anyhow::Result<(Vec<Value>, Vec<Value>)> {
+    if !path.exists() {
+        return Ok((Vec::new(), Vec::new()));
+    }
+    let body = std::fs::read_to_string(path).map_err(|e| {
+        anyhow::anyhow!("Failed to read existing manifest '{}': {e}", path.display())
+    })?;
+    let parsed: Value = serde_json::from_str(&body).map_err(|e| {
+        anyhow::anyhow!("Failed to parse existing manifest '{}': {e}", path.display())
+    })?;
+    let bundles = parsed
+        .get("bundles")
+        .and_then(|b| b.as_array())
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Existing manifest '{}' is missing a `bundles` array",
+                path.display()
+            )
+        })?
+        .clone();
+    let metadata = parsed
+        .get("metadata")
+        .and_then(|m| m.as_array())
+        .cloned()
+        .unwrap_or_default();
+    Ok((bundles, metadata))
+}
+
+/// Parse `wallets.yaml` and build a reverse map from lowercase address to
+/// human-readable wallet path (e.g. `"0xabcd…" → "ecosystem.deployer"`).
+///
+/// The YAML has a two-level structure:
+/// ```yaml
+/// ecosystem:
+///   deployer:
+///     address: "0x..."
+///   owner:
+///     address: "0x..."
+/// gateway:
+///   owner:
+///     address: "0x..."
+///   commit_operator:
+///     address: "0x..."
+/// ```
+fn build_address_name_map(path: &Path) -> anyhow::Result<HashMap<String, String>> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| anyhow::anyhow!("Failed to read wallets.yaml '{}': {e}", path.display()))?;
+    let root: serde_yaml::Value = serde_yaml::from_str(&content)
+        .map_err(|e| anyhow::anyhow!("Failed to parse wallets.yaml '{}': {e}", path.display()))?;
+
+    let mut map = HashMap::new();
+    if let serde_yaml::Value::Mapping(top) = &root {
+        for (section_key, section_val) in top {
+            let section = match section_key.as_str() {
+                Some(s) => s,
+                None => continue,
+            };
+            let roles = match section_val.as_mapping() {
+                Some(m) => m,
+                None => continue,
+            };
+            for (role_key, role_val) in roles {
+                let role = match role_key.as_str() {
+                    Some(s) => s,
+                    None => continue,
+                };
+                if let Some(addr) = role_val
+                    .as_mapping()
+                    .and_then(|m| m.get(&serde_yaml::Value::String("address".into())))
+                    .and_then(|v| v.as_str())
+                {
+                    map.insert(addr.to_ascii_lowercase(), format!("{section}.{role}"));
+                }
+            }
         }
     }
-    let json = serde_json::to_string_pretty(&envelope)?;
-    std::fs::write(path, &json).map_err(|e| {
-        anyhow::anyhow!(
-            "Failed to write safe transactions to '{}': {e}",
-            path.display()
-        )
-    })?;
-    Ok(())
+    Ok(map)
+}
+
+fn safe_txs_from_bundle(bundle: &SafeBundle) -> anyhow::Result<Vec<Value>> {
+    let mut out = Vec::with_capacity(bundle.txs.len());
+    for (idx, tx) in bundle.txs.iter().enumerate() {
+        let to = tx
+            .get("to")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Safe-bound tx #{idx} missing required `to` field"))?;
+        let value = tx.get("value").and_then(|v| v.as_str()).ok_or_else(|| {
+            anyhow::anyhow!("Safe-bound tx #{idx} missing required `value` field")
+        })?;
+        let data = tx
+            .get("data")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Safe-bound tx #{idx} missing required `data` field"))?;
+        out.push(json!({
+            "to": to,
+            "value": value,
+            "data": data,
+            "contractMethod": null,
+            "contractInputsValues": null,
+        }));
+    }
+    Ok(out)
 }
