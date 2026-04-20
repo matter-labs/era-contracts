@@ -94,11 +94,11 @@ jobs:
         working-directory: ./l1-contracts
         run: |
           # `forge build --sizes` prints a table and exits with error if any contract
-          # exceeds 24,576 bytes. We exclude test/dev/mock contracts since they are
-          # never deployed to production.
+          # exceeds 24,576 bytes. We exclude test/dev/mock contracts and known data-only
+          # contracts that are never deployed standalone.
           forge build --sizes --force 2>&1 \
             | grep -E '^\|' \
-            | grep -v 'test/\|Test \|Mock\|dev-contracts/' \
+            | grep -v 'test/\|Test \|Mock\|dev-contracts/\|L2AssetTrackerData' \
             | tee /tmp/sizes.txt
 
           # Check for any negative runtime margin (= over the limit)
