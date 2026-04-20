@@ -1,5 +1,39 @@
 [
   {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_wethToken",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_assetRouter",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_l1Nullifier",
+        "type": "address",
+        "internalType": "contract IL1Nullifier"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "ASSET_ROUTER",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IAssetRouterBase"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "type": "function",
     "name": "BASE_TOKEN_ASSET_ID",
     "inputs": [],
@@ -8,58 +42,6 @@
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "BASE_TOKEN_DECIMALS",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "BASE_TOKEN_NAME",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "BASE_TOKEN_ORIGIN_TOKEN",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "BASE_TOKEN_SYMBOL",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "string",
-        "internalType": "string"
       }
     ],
     "stateMutability": "view"
@@ -79,26 +61,13 @@
   },
   {
     "type": "function",
-    "name": "L2_LEGACY_SHARED_BRIDGE",
+    "name": "L1_NULLIFIER",
     "inputs": [],
     "outputs": [
       {
         "name": "",
         "type": "address",
-        "internalType": "contract IL2SharedBridgeLegacy"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "L2_TOKEN_PROXY_BYTECODE_HASH",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "internalType": "contract IL1Nullifier"
       }
     ],
     "stateMutability": "view"
@@ -111,7 +80,7 @@
       {
         "name": "",
         "type": "address",
-        "internalType": "address"
+        "internalType": "contract IWETH9"
       }
     ],
     "stateMutability": "view"
@@ -196,6 +165,67 @@
   },
   {
     "type": "function",
+    "name": "bridgeCheckCounterpartAddress",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_assetHandlerAddressOnCounterpart",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "bridgeConfirmTransferResult",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_txStatus",
+        "type": "uint8",
+        "internalType": "enum TxStatus"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_depositSender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_data",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
     "name": "bridgeMint",
     "inputs": [
       {
@@ -272,7 +302,7 @@
         "internalType": "uint256"
       },
       {
-        "name": "_l1Token",
+        "name": "_nonNativeToken",
         "type": "address",
         "internalType": "address"
       }
@@ -288,16 +318,27 @@
   },
   {
     "type": "function",
-    "name": "deployBridgedStandardERC20",
+    "name": "chainBalance",
     "inputs": [
       {
-        "name": "_owner",
-        "type": "address",
-        "internalType": "address"
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -344,25 +385,10 @@
   },
   {
     "type": "function",
-    "name": "initL2",
+    "name": "initialize",
     "inputs": [
       {
-        "name": "_l1ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_aliasedOwner",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_l2TokenProxyBytecodeHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_legacySharedBridge",
+        "name": "_owner",
         "type": "address",
         "internalType": "address"
       },
@@ -370,55 +396,6 @@
         "name": "_bridgedTokenBeacon",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "_wethToken",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_baseTokenBridgingData",
-        "type": "tuple",
-        "internalType": "struct TokenBridgingData",
-        "components": [
-          {
-            "name": "assetId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "originChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "originToken",
-            "type": "address",
-            "internalType": "address"
-          }
-        ]
-      },
-      {
-        "name": "_baseTokenMetadata",
-        "type": "tuple",
-        "internalType": "struct TokenMetadata",
-        "components": [
-          {
-            "name": "name",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "symbol",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "decimals",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
       }
     ],
     "outputs": [],
@@ -426,22 +403,40 @@
   },
   {
     "type": "function",
-    "name": "l2TokenAddress",
+    "name": "l1AssetTracker",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IL1AssetTracker"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "migrateTokenBalanceToAssetTracker",
     "inputs": [
       {
-        "name": "_l1Token",
-        "type": "address",
-        "internalType": "address"
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_assetId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [
       {
-        "name": "expectedToken",
-        "type": "address",
-        "internalType": "address"
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -529,7 +524,7 @@
   },
   {
     "type": "function",
-    "name": "registerBaseTokenIfNeeded",
+    "name": "registerEthToken",
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
@@ -556,23 +551,16 @@
   },
   {
     "type": "function",
-    "name": "setLegacyTokenAssetId",
+    "name": "setAssetTracker",
     "inputs": [
       {
-        "name": "_l2TokenAddress",
+        "name": "_l1AssetTracker",
         "type": "address",
         "internalType": "address"
       }
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "test",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "pure"
   },
   {
     "type": "function",
@@ -670,83 +658,6 @@
     "stateMutability": "nonpayable"
   },
   {
-    "type": "function",
-    "name": "updateL2",
-    "inputs": [
-      {
-        "name": "_l1ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_aliasedOwner",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_l2TokenProxyBytecodeHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "_legacySharedBridge",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_wethToken",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_baseTokenBridgingData",
-        "type": "tuple",
-        "internalType": "struct TokenBridgingData",
-        "components": [
-          {
-            "name": "assetId",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "originChainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "originToken",
-            "type": "address",
-            "internalType": "address"
-          }
-        ]
-      },
-      {
-        "name": "_baseTokenMetadata",
-        "type": "tuple",
-        "internalType": "struct TokenMetadata",
-        "components": [
-          {
-            "name": "name",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "symbol",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "decimals",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
     "type": "event",
     "name": "BridgeBurn",
     "inputs": [
@@ -816,37 +727,6 @@
   },
   {
     "type": "event",
-    "name": "FinalizeDeposit",
-    "inputs": [
-      {
-        "name": "l1Sender",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "l2Receiver",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "l2Token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "Initialized",
     "inputs": [
       {
@@ -854,25 +734,6 @@
         "type": "uint8",
         "indexed": false,
         "internalType": "uint8"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "L2TokenBeaconUpdated",
-    "inputs": [
-      {
-        "name": "l2TokenBeacon",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "l2TokenProxyBytecodeHash",
-        "type": "bytes32",
-        "indexed": true,
-        "internalType": "bytes32"
       }
     ],
     "anonymous": false
@@ -930,12 +791,12 @@
   },
   {
     "type": "event",
-    "name": "Unpaused",
+    "name": "TokenBeaconUpdated",
     "inputs": [
       {
-        "name": "account",
+        "name": "l2TokenBeacon",
         "type": "address",
-        "indexed": false,
+        "indexed": true,
         "internalType": "address"
       }
     ],
@@ -943,31 +804,13 @@
   },
   {
     "type": "event",
-    "name": "WithdrawalInitiated",
+    "name": "Unpaused",
     "inputs": [
       {
-        "name": "l2Sender",
+        "name": "account",
         "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "l1Receiver",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "l2Token",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
         "indexed": false,
-        "internalType": "uint256"
+        "internalType": "address"
       }
     ],
     "anonymous": false
@@ -1016,38 +859,17 @@
   },
   {
     "type": "error",
-    "name": "AssetIdNotSupported",
-    "inputs": [
-      {
-        "name": "assetId",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "BurningNativeWETHNotSupported",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "ChainIdMismatch",
+    "name": "ClaimFailedDepositFailed",
     "inputs": []
   },
   {
     "type": "error",
     "name": "DeployingBridgedTokenForNativeToken",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "EmptyAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "EmptyBytes32",
     "inputs": []
   },
   {
@@ -1067,23 +889,12 @@
   },
   {
     "type": "error",
-    "name": "InvalidCaller",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "InvalidNTVBurnData",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "NoLegacySharedBridge",
+    "name": "NoFundsTransferred",
     "inputs": []
   },
   {
@@ -1093,17 +904,17 @@
   },
   {
     "type": "error",
-    "name": "SlotOccupied",
+    "name": "OnlyFailureStatusAllowed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "OriginChainIdNotFound",
     "inputs": []
   },
   {
     "type": "error",
     "name": "TokenAlreadyInBridgedTokensList",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "TokenIsLegacy",
     "inputs": []
   },
   {
@@ -1158,6 +969,16 @@
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "WithdrawFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "WrongCounterpart",
+    "inputs": []
   },
   {
     "type": "error",

@@ -1,0 +1,1162 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_eraChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l1ChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_chainAssetHandler",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_eip7702Checker",
+        "type": "address",
+        "internalType": "contract IEIP7702Checker"
+      },
+      {
+        "name": "_isTestnet",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "bridgehubRequestL2Transaction",
+    "inputs": [
+      {
+        "name": "_request",
+        "type": "tuple",
+        "internalType": "struct BridgehubL2TransactionRequest",
+        "components": [
+          {
+            "name": "sender",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "contractL2",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "mintValue",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "l2Value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "l2Calldata",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "l2GasLimit",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "l2GasPerPubdataByteLimit",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "factoryDeps",
+            "type": "bytes[]",
+            "internalType": "bytes[]"
+          },
+          {
+            "name": "refundRecipient",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "canonicalTxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "bridgehubRequestL2TransactionOnGateway",
+    "inputs": [
+      {
+        "name": "_canonicalTxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "depositsPaused",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "finalizeEthWithdrawal",
+    "inputs": [
+      {
+        "name": "_l2BatchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2MessageIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2TxNumberInBatch",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "_message",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_merkleProof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getName",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "l2TransactionBaseCost",
+    "inputs": [
+      {
+        "name": "_gasPrice",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2GasLimit",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2GasPerPubdataByteLimit",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proveL1DepositParamsInclusion",
+    "inputs": [
+      {
+        "name": "_finalizeWithdrawalParams",
+        "type": "tuple",
+        "internalType": "struct FinalizeL1DepositParams",
+        "components": [
+          {
+            "name": "chainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "l2BatchNumber",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "l2MessageIndex",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "l2Sender",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "l2TxNumberInBatch",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "message",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "merkleProof",
+            "type": "bytes32[]",
+            "internalType": "bytes32[]"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "success",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proveL1ToL2TransactionStatus",
+    "inputs": [
+      {
+        "name": "_l2TxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_l2BatchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2MessageIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2TxNumberInBatch",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "_merkleProof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      },
+      {
+        "name": "_status",
+        "type": "uint8",
+        "internalType": "enum TxStatus"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proveL1ToL2TransactionStatusShared",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2TxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_l2BatchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2MessageIndex",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2TxNumberInBatch",
+        "type": "uint16",
+        "internalType": "uint16"
+      },
+      {
+        "name": "_merkleProof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      },
+      {
+        "name": "_status",
+        "type": "uint8",
+        "internalType": "enum TxStatus"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proveL2LeafInclusion",
+    "inputs": [
+      {
+        "name": "_batchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_leafProofMask",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_leaf",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_proof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proveL2LeafInclusionShared",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_blockOrBatchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_leafProofMask",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_leaf",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_proof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proveL2LeafInclusionSharedRecursive",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_blockOrBatchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_leafProofMask",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_leaf",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_proof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      },
+      {
+        "name": "_depth",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proveL2LogInclusion",
+    "inputs": [
+      {
+        "name": "_batchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_index",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_log",
+        "type": "tuple",
+        "internalType": "struct L2Log",
+        "components": [
+          {
+            "name": "l2ShardId",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "isService",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "txNumberInBatch",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "sender",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "key",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "value",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ]
+      },
+      {
+        "name": "_proof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proveL2LogInclusionShared",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_blockOrBatchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_index",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_log",
+        "type": "tuple",
+        "internalType": "struct L2Log",
+        "components": [
+          {
+            "name": "l2ShardId",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "isService",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "txNumberInBatch",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "sender",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "key",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "value",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ]
+      },
+      {
+        "name": "_proof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proveL2MessageInclusion",
+    "inputs": [
+      {
+        "name": "_batchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_index",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_message",
+        "type": "tuple",
+        "internalType": "struct L2Message",
+        "components": [
+          {
+            "name": "txNumberInBatch",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "sender",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      },
+      {
+        "name": "_proof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proveL2MessageInclusionShared",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_blockOrBatchNumber",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_index",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_message",
+        "type": "tuple",
+        "internalType": "struct L2Message",
+        "components": [
+          {
+            "name": "txNumberInBatch",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "sender",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      },
+      {
+        "name": "_proof",
+        "type": "bytes32[]",
+        "internalType": "bytes32[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "requestL2ServiceTransaction",
+    "inputs": [
+      {
+        "name": "_contractL2",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_l2Calldata",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "canonicalTxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "requestL2Transaction",
+    "inputs": [
+      {
+        "name": "_contractL2",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_l2Value",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_calldata",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_l2GasLimit",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_l2GasPerPubdataByteLimit",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_factoryDeps",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      },
+      {
+        "name": "_refundRecipient",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "canonicalTxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "requestL2TransactionToGatewayMailboxWithBalanceChange",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_canonicalTxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "_expirationTimestamp",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "_baseTokenAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_getBalanceChange",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "canonicalTxHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "NewPriorityRequest",
+    "inputs": [
+      {
+        "name": "txId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "txHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "expirationTimestamp",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      },
+      {
+        "name": "transaction",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct L2CanonicalTransaction",
+        "components": [
+          {
+            "name": "txType",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "from",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "to",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "gasLimit",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "gasPerPubdataByteLimit",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxFeePerGas",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxPriorityFeePerGas",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "paymaster",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "nonce",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "reserved",
+            "type": "uint256[4]",
+            "internalType": "uint256[4]"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "signature",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "factoryDeps",
+            "type": "uint256[]",
+            "internalType": "uint256[]"
+          },
+          {
+            "name": "paymasterInput",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "reservedDynamic",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      },
+      {
+        "name": "factoryDeps",
+        "type": "bytes[]",
+        "indexed": false,
+        "internalType": "bytes[]"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewPriorityRequestId",
+    "inputs": [
+      {
+        "name": "txId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "txHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "NewRelayedPriorityTransaction",
+    "inputs": [
+      {
+        "name": "txId",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "txHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "expirationTimestamp",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "AddressNotZero",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "BaseTokenGasPriceDenominatorNotSet",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "DepositsPaused",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "GasPerPubdataMismatch",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidChainId",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "LengthIsNotDivisibleBy32",
+    "inputs": [
+      {
+        "name": "length",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "MalformedBytecode",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint8",
+        "internalType": "enum BytecodeError"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "MsgValueTooLow",
+    "inputs": [
+      {
+        "name": "required",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "provided",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NotAssetRouter",
+    "inputs": [
+      {
+        "name": "sender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "assetRouter",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NotHyperchain",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotInitializedReentrancyGuard",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotL1",
+    "inputs": [
+      {
+        "name": "blockChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NotSettlementLayer",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "OnlyEraSupported",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PubdataGreaterThanLimit",
+    "inputs": [
+      {
+        "name": "limit",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "length",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "Reentrancy",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TooManyFactoryDeps",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TooMuchGas",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TransactionNotAllowed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "TxnBodyGasLimitNotEnoughGas",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Unauthorized",
+    "inputs": [
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ValidateTxnNotEnoughGas",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroAddress",
+    "inputs": []
+  }
+]

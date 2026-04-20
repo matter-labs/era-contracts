@@ -679,11 +679,6 @@
         "internalType": "uint256"
       },
       {
-        "name": "_aliasedOwner",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "_l2TokenProxyBytecodeHash",
         "type": "bytes32",
         "internalType": "bytes32"

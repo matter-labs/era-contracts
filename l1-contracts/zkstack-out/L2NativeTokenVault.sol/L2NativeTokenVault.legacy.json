@@ -267,12 +267,12 @@
     "name": "calculateCreate2TokenAddress",
     "inputs": [
       {
-        "name": "_originChainId",
+        "name": "_tokenOriginChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "_l1Token",
+        "name": "_nonNativeToken",
         "type": "address",
         "internalType": "address"
       }
@@ -285,19 +285,6 @@
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "deployBridgedStandardERC20",
-    "inputs": [
-      {
-        "name": "_owner",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -569,13 +556,6 @@
   },
   {
     "type": "function",
-    "name": "test",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "pure"
-  },
-  {
-    "type": "function",
     "name": "tokenAddress",
     "inputs": [
       {
@@ -677,11 +657,6 @@
         "name": "_l1ChainId",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "_aliasedOwner",
-        "type": "address",
-        "internalType": "address"
       },
       {
         "name": "_l2TokenProxyBytecodeHash",
@@ -1037,6 +1012,11 @@
   },
   {
     "type": "error",
+    "name": "DeployFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "DeployingBridgedTokenForNativeToken",
     "inputs": []
   },
@@ -1125,6 +1105,11 @@
   {
     "type": "error",
     "name": "TokensWithFeesNotSupported",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "U32CastOverflow",
     "inputs": []
   },
   {

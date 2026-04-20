@@ -10,7 +10,7 @@
         "internalType": "address"
       }
     ],
-    "stateMutability": "pure"
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -262,25 +262,6 @@
   },
   {
     "type": "function",
-    "name": "getEmptyMultichainBatchRoot",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getMerklePathForChain",
     "inputs": [
       {
@@ -397,24 +378,6 @@
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "initL2",
-    "inputs": [
-      {
-        "name": "_l1ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_eraGatewayChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -794,24 +757,6 @@
     "stateMutability": "view"
   },
   {
-    "type": "function",
-    "name": "updateL2",
-    "inputs": [
-      {
-        "name": "_l1ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_eraGatewayChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
     "type": "event",
     "name": "AddedChain",
     "inputs": [
@@ -967,28 +912,6 @@
   },
   {
     "type": "error",
-    "name": "InvalidCaller",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InvalidMaxLeafNumber",
-    "inputs": [
-      {
-        "name": "_maxLeafNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "InvalidProofLengthForFinalNode",
     "inputs": []
   },
@@ -1101,16 +1024,6 @@
         "internalType": "address"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "OnlyL1",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "SlotOccupied",
-    "inputs": []
   },
   {
     "type": "error",
