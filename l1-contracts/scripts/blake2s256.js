@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+/* eslint-env node */
+/* eslint-disable @typescript-eslint/no-var-requires */
 
 const blakejs = require("blakejs");
 const fs = require("fs");
