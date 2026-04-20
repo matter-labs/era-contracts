@@ -87,6 +87,7 @@ contract MockV31UpgradeNativeTokenVault {
 
     function updateL2(
         uint256 _l1ChainId,
+        address /* _aliasedOwner */,
         bytes32 _l2TokenProxyBytecodeHash,
         address _legacySharedBridge,
         address _wethToken,

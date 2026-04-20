@@ -82,16 +82,17 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     ) external reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
 
-        updateL2(_l1ChainId, _bridgehub, _assetRouter, _messageRoot);
-
-        _transferOwnership(_owner);
+        updateL2(_l1ChainId, _owner, _bridgehub, _assetRouter, _messageRoot);
     }
 
     /// @notice Updates the contract.
     /// @dev This function is used to initialize the new implementation of L2ChainAssetHandler on existing chains during
     /// the upgrade.
+    /// @param _owner The expected owner. If the current owner is different (e.g. a temporary
+    ///        multisig on a chain that predates decentralized governance), it will be reset.
     function updateL2(
         uint256 _l1ChainId,
+        address _owner,
         address _bridgehub,
         address _assetRouter,
         address _messageRoot
@@ -101,6 +102,9 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
         ASSET_ROUTER = IAssetRouterBase(_assetRouter);
         MESSAGE_ROOT = IMessageRootBase(_messageRoot);
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
+        if (owner() != _owner) {
+            _transferOwnership(_owner);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
