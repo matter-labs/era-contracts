@@ -293,7 +293,7 @@ contract GWAssetTrackerFeesTest is Test {
         address payer = makeAddr("payer");
 
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
     }
@@ -305,15 +305,15 @@ contract GWAssetTrackerFeesTest is Test {
         emit SettlementFeePayerAgreementUpdated(payer, CHAIN_ID, true);
 
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
     }
 
     function test_agreeToPaySettlementFees_MultipleChains() public {
         address payer = makeAddr("payer");
 
         vm.startPrank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
-        gwAssetTracker.agreeToPaySettlementFees(OTHER_CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
+        gwAssetTracker.setSettlementFeePayerAgreement(OTHER_CHAIN_ID, true);
         vm.stopPrank();
 
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
@@ -324,8 +324,8 @@ contract GWAssetTrackerFeesTest is Test {
         address payer = makeAddr("payer");
 
         vm.startPrank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID); // Call again
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true); // Call again
         vm.stopPrank();
 
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
@@ -336,12 +336,12 @@ contract GWAssetTrackerFeesTest is Test {
 
         // First agree
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
 
         // Then revoke
         vm.prank(payer);
-        gwAssetTracker.revokeSettlementFeePayerAgreement(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, false);
         assertFalse(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
     }
 
@@ -350,13 +350,13 @@ contract GWAssetTrackerFeesTest is Test {
 
         // First agree
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         vm.expectEmit(true, true, false, true);
         emit SettlementFeePayerAgreementUpdated(payer, CHAIN_ID, false);
 
         vm.prank(payer);
-        gwAssetTracker.revokeSettlementFeePayerAgreement(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, false);
     }
 
     function test_revokeSettlementFeePayerAgreement_OnlyAffectsSpecificChain() public {
@@ -364,11 +364,11 @@ contract GWAssetTrackerFeesTest is Test {
 
         // Agree for both chains
         vm.startPrank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
-        gwAssetTracker.agreeToPaySettlementFees(OTHER_CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
+        gwAssetTracker.setSettlementFeePayerAgreement(OTHER_CHAIN_ID, true);
 
         // Revoke for one chain
-        gwAssetTracker.revokeSettlementFeePayerAgreement(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, false);
         vm.stopPrank();
 
         assertFalse(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
@@ -380,7 +380,7 @@ contract GWAssetTrackerFeesTest is Test {
 
         // Revoking without ever agreeing should not revert
         vm.prank(payer);
-        gwAssetTracker.revokeSettlementFeePayerAgreement(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, false);
 
         assertFalse(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
     }
@@ -409,7 +409,7 @@ contract GWAssetTrackerFeesTest is Test {
 
         // Only payer1 agrees
         vm.prank(payer1);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer1, CHAIN_ID));
         assertFalse(gwAssetTracker.settlementFeePayerAgreement(payer2, CHAIN_ID));
@@ -421,7 +421,7 @@ contract GWAssetTrackerFeesTest is Test {
 
         // Attacker cannot make payer agree
         vm.prank(attacker);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         // Only attacker is recorded as agreed, not payer
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(attacker, CHAIN_ID));
@@ -441,7 +441,7 @@ contract GWAssetTrackerFeesTest is Test {
 
         address payer = makeAddr("unagreedPayer");
 
-        // Payer has NOT called agreeToPaySettlementFees
+        // Payer has NOT opted in to pay settlement fees
         assertFalse(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
 
         // Build input first (makes external calls), then expect revert on processLogsAndMessages
@@ -461,12 +461,12 @@ contract GWAssetTrackerFeesTest is Test {
 
         // Payer agrees
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
 
         // Payer revokes
         vm.prank(payer);
-        gwAssetTracker.revokeSettlementFeePayerAgreement(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, false);
         assertFalse(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
 
         // Build input first, then expect revert
@@ -486,7 +486,7 @@ contract GWAssetTrackerFeesTest is Test {
 
         // Payer agrees
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         // Payer has enough balance but insufficient allowance
         wrappedZKToken.mint(payer, 100 ether);
@@ -510,7 +510,7 @@ contract GWAssetTrackerFeesTest is Test {
 
         // Payer agrees
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         // Payer has approval but not enough balance
         wrappedZKToken.mint(payer, 1 ether); // Only 1 ether, but 5 * 1 ether = 5 ether needed
@@ -551,7 +551,7 @@ contract GWAssetTrackerFeesTest is Test {
         address payer = makeAddr("exactPayer");
 
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         uint256 mintAmount = 100 ether;
         wrappedZKToken.mint(payer, mintAmount);
@@ -633,7 +633,7 @@ contract GWAssetTrackerFeesTest is Test {
         address payer = makeAddr("multiPayer");
 
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         wrappedZKToken.mint(payer, 100 ether);
         vm.prank(payer);
@@ -666,7 +666,7 @@ contract GWAssetTrackerFeesTest is Test {
         address payer = makeAddr("multiBundlePayer");
 
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         wrappedZKToken.mint(payer, 100 ether);
         vm.prank(payer);
@@ -707,7 +707,7 @@ contract GWAssetTrackerFeesTest is Test {
         address payer = makeAddr("mixedPayer");
 
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         wrappedZKToken.mint(payer, 100 ether);
         vm.prank(payer);
