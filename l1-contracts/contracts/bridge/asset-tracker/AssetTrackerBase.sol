@@ -152,6 +152,12 @@ abstract contract AssetTrackerBase is
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
 
+    function _getChainMigrationNumber(uint256 _chainId) internal view virtual returns (uint256);
+
+    /*//////////////////////////////////////////////////////////////
+                            PAUSE
+    //////////////////////////////////////////////////////////////*/
+
     /// @notice Pauses interop-related functionality in trackers that explicitly check `whenNotPaused`.
     function pause() external onlyOwner {
         _pause();
@@ -161,6 +167,4 @@ abstract contract AssetTrackerBase is
     function unpause() external onlyOwner {
         _unpause();
     }
-
-    function _getChainMigrationNumber(uint256 _chainId) internal view virtual returns (uint256);
 }
