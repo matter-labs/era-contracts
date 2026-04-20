@@ -224,6 +224,23 @@ contract InteroperableAddressTest is Test {
         assertFalse(success);
     }
 
+    function test_tryParseV1Calldata_failsOnMissingAddressLengthByte() public view {
+        bytes memory tooShort = hex"0001000000";
+
+        (bool success, , , ) = helper.tryParseV1Calldata(tooShort);
+        assertFalse(success);
+    }
+
+    function test_tryParseV1Calldata_failsOnTrailingBytes() public view {
+        bytes memory formattedWithTrailingByte = bytes.concat(
+            InteroperableAddress.formatEvmV1(uint256(1), address(0x1234)),
+            hex"00"
+        );
+
+        (bool success, , , ) = helper.tryParseV1Calldata(formattedWithTrailingByte);
+        assertFalse(success);
+    }
+
     // ============ parseEvmV1 Tests ============
 
     function test_parseEvmV1_validInput() public pure {
