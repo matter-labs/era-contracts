@@ -120,13 +120,7 @@ contract GWAssetTrackerTest is Test {
         // L2ChainAssetHandler: real bytecode + init so requestPauseDepositsForChainOnGateway works.
         vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, type(L2ChainAssetHandler).runtimeCode);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
-            L1_CHAIN_ID,
-            address(this),
-            L2_BRIDGEHUB_ADDR,
-            L2_ASSET_ROUTER_ADDR,
-            L2_MESSAGE_ROOT_ADDR
-        );
+        L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(L1_CHAIN_ID, address(this));
 
         // Mock the WETH_TOKEN() call on NativeTokenVault
         address mockWrappedZKToken = makeAddr("mockWrappedZKToken");

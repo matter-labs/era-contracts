@@ -90,13 +90,7 @@ contract GWAssetTrackerFeesTest is Test {
         // L2ChainAssetHandler: real bytecode + init.
         vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, type(L2ChainAssetHandler).runtimeCode);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
-            1,
-            address(this),
-            L2_BRIDGEHUB_ADDR,
-            L2_ASSET_ROUTER_ADDR,
-            L2_MESSAGE_ROOT_ADDR
-        );
+        L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(1, address(this));
 
         // Mock the WETH_TOKEN() call on NativeTokenVault to return our test token
         vm.mockCall(
