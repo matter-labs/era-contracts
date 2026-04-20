@@ -364,13 +364,13 @@ library L2GenesisForceDeploymentsHelper {
             _additionalForceDeploymentsData.baseTokenMetadata
         );
 
-        L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).updateL2(
-            _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.aliasedL1Governance,
-            L2_BRIDGEHUB_ADDR,
-            L2_ASSET_ROUTER_ADDR,
-            L2_MESSAGE_ROOT_ADDR
-        );
+        L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).updateL2({
+            _l1ChainId: _fixedForceDeploymentsData.l1ChainId,
+            _owner: _fixedForceDeploymentsData.aliasedL1Governance,
+            _bridgehub: L2_BRIDGEHUB_ADDR,
+            _assetRouter: L2_ASSET_ROUTER_ADDR,
+            _messageRoot: L2_MESSAGE_ROOT_ADDR
+        });
     }
 
     function _finalizeDeployments(

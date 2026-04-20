@@ -435,7 +435,15 @@ contract MockContract {
     function updateL2(uint256, uint256, address, address, bytes32, address) external {}
 
     // L2NativeTokenVault.updateL2
-    function updateL2(uint256, address, bytes32, address, address, TokenBridgingData calldata, TokenMetadata calldata) external {}
+    function updateL2(
+        uint256,
+        address,
+        bytes32,
+        address,
+        address,
+        TokenBridgingData calldata,
+        TokenMetadata calldata
+    ) external {}
 
     // L2ChainAssetHandler.updateL2
     function updateL2(uint256, address, address, address, address) external {}

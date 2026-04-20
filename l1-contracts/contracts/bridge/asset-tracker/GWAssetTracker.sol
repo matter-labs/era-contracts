@@ -790,5 +790,4 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
         return L2_CHAIN_ASSET_HANDLER.migrationNumber(_chainId);
     }
-
 }
