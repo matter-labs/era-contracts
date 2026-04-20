@@ -262,6 +262,25 @@
   },
   {
     "type": "function",
+    "name": "getEmptyMultichainBatchRoot",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getMerklePathForChain",
     "inputs": [
       {
@@ -954,6 +973,17 @@
         "name": "",
         "type": "address",
         "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidMaxLeafNumber",
+    "inputs": [
+      {
+        "name": "_maxLeafNumber",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },

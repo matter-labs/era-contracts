@@ -21,19 +21,6 @@
   },
   {
     "type": "function",
-    "name": "agreeToPaySettlementFees",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "assetMigrationNumber",
     "inputs": [
       {
@@ -510,32 +497,6 @@
   },
   {
     "type": "function",
-    "name": "requestPauseDepositsForChain",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "revokeSettlementFeePayerAgreement",
-    "inputs": [
-      {
-        "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setGatewaySettlementFee",
     "inputs": [
       {
@@ -574,7 +535,7 @@
   },
   {
     "type": "function",
-    "name": "setLegacySharedBridgeAddressForLocalTesting",
+    "name": "setSettlementFeePayerAgreement",
     "inputs": [
       {
         "name": "_chainId",
@@ -582,9 +543,9 @@
         "internalType": "uint256"
       },
       {
-        "name": "_legacySharedBridgeAddress",
-        "type": "address",
-        "internalType": "address"
+        "name": "_agreed",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
     "outputs": [],
@@ -1062,17 +1023,6 @@
   },
   {
     "type": "error",
-    "name": "InvalidMaxLeafNumber",
-    "inputs": [
-      {
-        "name": "_maxLeafNumber",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "InvalidMessage",
     "inputs": []
   },
@@ -1087,22 +1037,6 @@
     "inputs": [
       {
         "name": "messageLen",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "MerkleWrongIndex",
-    "inputs": [
-      {
-        "name": "index",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "maxNodeNumber",
         "type": "uint256",
         "internalType": "uint256"
       }

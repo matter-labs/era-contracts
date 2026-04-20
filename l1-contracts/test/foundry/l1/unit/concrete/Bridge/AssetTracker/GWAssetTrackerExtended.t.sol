@@ -6,6 +6,8 @@ import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 import {IL2ChainAssetHandler} from "contracts/core/chain-asset-handler/IL2ChainAssetHandler.sol";
+import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
+import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 
 import {BalanceChange, MigrationConfirmationData, L2Log, TxStatus} from "contracts/common/Messaging.sol";
 import {
@@ -95,12 +97,27 @@ contract GWAssetTrackerExtendedTest is Test {
         mockZKChain = makeAddr("mockZKChain");
         mockAssetRouter = makeAddr("mockAssetRouter");
 
-        // Mock the L2 contract addresses
+        // Etch real bytecode for contracts that tests interact with directly, and simple
+        // mock code for the rest.
         vm.etch(L2_BRIDGEHUB_ADDR, address(mockBridgehub).code);
-        vm.etch(L2_MESSAGE_ROOT_ADDR, address(mockMessageRoot).code);
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, address(mockNativeTokenVault).code);
-        vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, address(mockChainAssetHandler).code);
         vm.etch(L2_ASSET_ROUTER_ADDR, address(mockAssetRouter).code);
+
+        // L2MessageRoot: real bytecode + init so getEmptyMultichainBatchRoot works.
+        vm.etch(L2_MESSAGE_ROOT_ADDR, type(L2MessageRoot).runtimeCode);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(L1_CHAIN_ID, 0);
+
+        // L2ChainAssetHandler: real bytecode + init so requestPauseDepositsForChainOnGateway works.
+        vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, type(L2ChainAssetHandler).runtimeCode);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
+            L1_CHAIN_ID,
+            address(this),
+            L2_BRIDGEHUB_ADDR,
+            L2_ASSET_ROUTER_ADDR,
+            L2_MESSAGE_ROOT_ADDR
+        );
 
         // Mock the WETH_TOKEN() call on NativeTokenVault (required by initL2)
         vm.mockCall(

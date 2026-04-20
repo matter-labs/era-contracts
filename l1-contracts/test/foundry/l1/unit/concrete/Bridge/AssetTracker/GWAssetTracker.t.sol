@@ -106,13 +106,19 @@ contract GWAssetTrackerTest is Test {
         mockDestZKChain = makeAddr("mockDestZKChain");
         mockAssetRouter = makeAddr("mockAssetRouter");
 
-        // Mock the L2 contract addresses — etch real bytecode for contracts that the tests
-        // interact with directly (L2ChainAssetHandler), and simple mock code for the rest.
+        // Etch real bytecode for contracts that the tests interact with directly, and simple
+        // mock code for the rest.
         vm.etch(L2_BRIDGEHUB_ADDR, address(mockBridgehub).code);
-        vm.etch(L2_MESSAGE_ROOT_ADDR, address(mockMessageRoot).code);
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, address(mockNativeTokenVault).code);
+        vm.etch(L2_ASSET_ROUTER_ADDR, address(mockAssetRouter).code);
+
+        // L2MessageRoot: real bytecode + init so getEmptyMultichainBatchRoot works.
+        vm.etch(L2_MESSAGE_ROOT_ADDR, type(L2MessageRoot).runtimeCode);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(L1_CHAIN_ID, 0);
+
+        // L2ChainAssetHandler: real bytecode + init so requestPauseDepositsForChainOnGateway works.
         vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, type(L2ChainAssetHandler).runtimeCode);
-        // Initialize the etched L2ChainAssetHandler so its modifiers and storage work correctly.
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
             L1_CHAIN_ID,
@@ -121,7 +127,6 @@ contract GWAssetTrackerTest is Test {
             L2_ASSET_ROUTER_ADDR,
             L2_MESSAGE_ROOT_ADDR
         );
-        vm.etch(L2_ASSET_ROUTER_ADDR, address(mockAssetRouter).code);
 
         // Mock the WETH_TOKEN() call on NativeTokenVault
         address mockWrappedZKToken = makeAddr("mockWrappedZKToken");
