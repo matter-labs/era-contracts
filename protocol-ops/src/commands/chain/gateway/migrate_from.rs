@@ -308,13 +308,10 @@ pub(crate) async fn stage_submit_from(
 ) -> anyhow::Result<u64> {
     let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
 
-    let gateway_chain_id = crate::common::l1_contracts::resolve_settlement_layer(
-        &runner.rpc_url,
-        bridgehub,
-        chain_id,
-    )
-    .await
-    .context("Failed to resolve gateway chain ID from bridgehub")?;
+    let gateway_chain_id =
+        crate::common::l1_contracts::resolve_settlement_layer(&runner.rpc_url, bridgehub, chain_id)
+            .await
+            .context("Failed to resolve gateway chain ID from bridgehub")?;
     logger::info(format!("Gateway chain ID (from L1): {gateway_chain_id}"));
 
     let contracts_path = paths::resolve_l1_contracts_path()?;
@@ -663,11 +660,19 @@ async fn get_finalize_withdrawal_params(
         .await?;
     if let Some(result) = raw_resp.get("result") {
         let status = result.get("status").and_then(|v| v.as_str()).unwrap_or("?");
-        let gas_used = result.get("gasUsed").and_then(|v| v.as_str()).unwrap_or("?");
+        let gas_used = result
+            .get("gasUsed")
+            .and_then(|v| v.as_str())
+            .unwrap_or("?");
         let to = result.get("to").and_then(|v| v.as_str()).unwrap_or("?");
-        logger::info(format!("Receipt: status={status}, gasUsed={gas_used}, to={to}"));
+        logger::info(format!(
+            "Receipt: status={status}, gasUsed={gas_used}, to={to}"
+        ));
         if let Some(logs) = result.get("logs") {
-            logger::info(format!("Raw receipt logs: {} entries", logs.as_array().map(|a| a.len()).unwrap_or(0)));
+            logger::info(format!(
+                "Raw receipt logs: {} entries",
+                logs.as_array().map(|a| a.len()).unwrap_or(0)
+            ));
         }
         // Fail immediately if the L2 priority tx reverted — no point retrying.
         if status == "0x0" {
@@ -701,13 +706,19 @@ async fn get_finalize_withdrawal_params(
 
             // Try eth_call to replay and get revert data.
             let tx_result = result;
-            let from_addr = tx_result.get("from").and_then(|v| v.as_str()).unwrap_or("0x0");
+            let from_addr = tx_result
+                .get("from")
+                .and_then(|v| v.as_str())
+                .unwrap_or("0x0");
             let input_full = tx_resp
                 .get("result")
                 .and_then(|r| r.get("input"))
                 .and_then(|v| v.as_str())
                 .unwrap_or("0x");
-            let block_num = tx_result.get("blockNumber").and_then(|v| v.as_str()).unwrap_or("latest");
+            let block_num = tx_result
+                .get("blockNumber")
+                .and_then(|v| v.as_str())
+                .unwrap_or("latest");
             let call_body = serde_json::json!({
                 "jsonrpc": "2.0", "id": 1,
                 "method": "eth_call",
@@ -739,7 +750,10 @@ async fn get_finalize_withdrawal_params(
             );
         }
         if let Some(l2_to_l1) = result.get("l2ToL1Logs") {
-            logger::info(format!("Raw receipt l2ToL1Logs: {} entries", l2_to_l1.as_array().map(|a| a.len()).unwrap_or(0)));
+            logger::info(format!(
+                "Raw receipt l2ToL1Logs: {} entries",
+                l2_to_l1.as_array().map(|a| a.len()).unwrap_or(0)
+            ));
             if let Some(arr) = l2_to_l1.as_array() {
                 for (i, log) in arr.iter().enumerate() {
                     logger::info(format!("  raw l2ToL1Log[{i}]: {}", log));
@@ -747,8 +761,8 @@ async fn get_finalize_withdrawal_params(
             }
         }
     }
-    let receipt_resp: JsonRpcResponse<ZksyncL2Receipt> = serde_json::from_value(raw_resp)
-        .context("Failed to parse receipt response")?;
+    let receipt_resp: JsonRpcResponse<ZksyncL2Receipt> =
+        serde_json::from_value(raw_resp).context("Failed to parse receipt response")?;
     let receipt = receipt_resp
         .result
         .context("eth_getTransactionReceipt returned null")?;
@@ -776,7 +790,11 @@ async fn get_finalize_withdrawal_params(
             (i as u64, tx_idx)
         })
         .ok_or_else(|| {
-            let senders: Vec<_> = receipt.l2_to_l1_logs.iter().map(|l| l.sender.as_str()).collect();
+            let senders: Vec<_> = receipt
+                .l2_to_l1_logs
+                .iter()
+                .map(|l| l.sender.as_str())
+                .collect();
             anyhow::anyhow!(
                 "No L2→L1 log from L1Messenger in withdrawal receipt \
                  (found {} logs with senders: {:?})",
@@ -868,13 +886,11 @@ async fn wait_for_gateway_batch_executed_on_l1(
     use crate::common::l1_contracts;
     use ethers::providers::{Http, Provider};
 
-    let provider = std::sync::Arc::new(
-        Provider::<Http>::try_from(l1_rpc_url).context("connect L1 provider")?,
-    );
-    let gateway_diamond =
-        l1_contracts::resolve_zk_chain(l1_rpc_url, bridgehub, gateway_chain_id)
-            .await
-            .context("resolve gateway diamond proxy on L1")?;
+    let provider =
+        std::sync::Arc::new(Provider::<Http>::try_from(l1_rpc_url).context("connect L1 provider")?);
+    let gateway_diamond = l1_contracts::resolve_zk_chain(l1_rpc_url, bridgehub, gateway_chain_id)
+        .await
+        .context("resolve gateway diamond proxy on L1")?;
     let zk_chain = ZkChainAbi::new(gateway_diamond, provider);
 
     let timeout = std::time::Duration::from_secs(300);

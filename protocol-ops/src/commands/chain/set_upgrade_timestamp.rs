@@ -73,7 +73,9 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         .script(script_path, script_args)
         .with_wallet(&sender);
 
-    logger::step("Preparing set-upgrade-timestamp Safe bundle via AdminFunctions.s.sol (simulation)");
+    logger::step(
+        "Preparing set-upgrade-timestamp Safe bundle via AdminFunctions.s.sol (simulation)",
+    );
     logger::info(format!("Admin address: {:#x}", admin_address));
     logger::info(format!(
         "Access control restriction: {:#x}",

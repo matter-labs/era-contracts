@@ -72,12 +72,20 @@ pub struct UpgradePrepareArgs {
 
     /// Forge-internal: upgrade config TOML path relative to l1-contracts root.
     /// Passed through to the Solidity script; rarely needs overriding.
-    #[clap(long, default_value = "/upgrade-envs/v0.31.0-interopB/local.toml", hide = true)]
+    #[clap(
+        long,
+        default_value = "/upgrade-envs/v0.31.0-interopB/local.toml",
+        hide = true
+    )]
     pub upgrade_input_path: String,
 
     /// Forge-internal: ecosystem output TOML path relative to l1-contracts root.
     /// Passed through to the Solidity script; rarely needs overriding.
-    #[clap(long, default_value = "/script-out/v31-upgrade-ecosystem.toml", hide = true)]
+    #[clap(
+        long,
+        default_value = "/script-out/v31-upgrade-ecosystem.toml",
+        hide = true
+    )]
     pub upgrade_output_path: String,
 
     /// Write the governance calls TOML to this path (consumed by the
@@ -109,10 +117,9 @@ pub async fn run_upgrade_prepare(args: UpgradePrepareArgs) -> anyhow::Result<()>
     // Auto-resolve contract addresses from L1.
     // CTM is always discoverable (even on v30). Other addresses may need
     // explicit overrides on pre-v31 ecosystems.
-    let chain_ids =
-        crate::common::l1_contracts::resolve_all_chain_ids(&runner.rpc_url, bridgehub)
-            .await
-            .context("Failed to query registered chain IDs from bridgehub")?;
+    let chain_ids = crate::common::l1_contracts::resolve_all_chain_ids(&runner.rpc_url, bridgehub)
+        .await
+        .context("Failed to query registered chain IDs from bridgehub")?;
     let representative_chain = *chain_ids
         .first()
         .context("No chains registered on bridgehub")?;
@@ -286,12 +293,8 @@ pub async fn run_upgrade_prepare(args: UpgradePrepareArgs) -> anyhow::Result<()>
         if let Some(parent) = toml_out.parent() {
             fs::create_dir_all(parent)?;
         }
-        fs::copy(&ecosystem_path, toml_out).with_context(|| {
-            format!(
-                "Failed to copy ecosystem TOML to {}",
-                toml_out.display()
-            )
-        })?;
+        fs::copy(&ecosystem_path, toml_out)
+            .with_context(|| format!("Failed to copy ecosystem TOML to {}", toml_out.display()))?;
         logger::info(format!(
             "Governance TOML written to: {}",
             toml_out.display()
@@ -472,7 +475,10 @@ async fn stage_governance_execute(
         crate::common::l1_contracts::resolve_governance(&runner.rpc_url, bridgehub)
             .await
             .context("Failed to auto-resolve governance address from bridgehub")?;
-    logger::info(format!("Governance (auto-resolved): {:#x}", governance_addr));
+    logger::info(format!(
+        "Governance (auto-resolved): {:#x}",
+        governance_addr
+    ));
 
     let script_path = "deploy-scripts/AdminFunctions.s.sol";
     let mut script_args = forge_args.clone();

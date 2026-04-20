@@ -96,10 +96,7 @@ impl ForgeRunner {
     /// it on the anvil fork. Convenience wrapper around
     /// `Wallet::parse(None, Some(address))` + `fund_sender`, since every
     /// prepare-shape command needs both.
-    pub async fn prepare_sender(
-        &self,
-        address: ethers::types::Address,
-    ) -> anyhow::Result<Wallet> {
+    pub async fn prepare_sender(&self, address: ethers::types::Address) -> anyhow::Result<Wallet> {
         self.fund_sender(address).await?;
         Wallet::parse(None, Some(address))
     }
@@ -143,10 +140,9 @@ impl ForgeRunner {
         &self,
         bridgehub: ethers::types::Address,
     ) -> anyhow::Result<Wallet> {
-        let owner =
-            crate::common::l1_contracts::resolve_governance_owner(&self.rpc_url, bridgehub)
-                .await
-                .context("resolving governance owner EOA from L1")?;
+        let owner = crate::common::l1_contracts::resolve_governance_owner(&self.rpc_url, bridgehub)
+            .await
+            .context("resolving governance owner EOA from L1")?;
         self.prepare_sender(owner).await
     }
 

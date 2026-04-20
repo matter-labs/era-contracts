@@ -45,13 +45,10 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
     let (eco, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
-    let chain_address = crate::common::l1_contracts::resolve_zk_chain(
-        &runner.rpc_url,
-        eco.bridgehub,
-        chain_id,
-    )
-    .await
-    .context("resolving chain diamond proxy from L1")?;
+    let chain_address =
+        crate::common::l1_contracts::resolve_zk_chain(&runner.rpc_url, eco.bridgehub, chain_id)
+            .await
+            .context("resolving chain diamond proxy from L1")?;
     // Sender is always the chain admin.
     let sender = runner.prepare_chain_admin(eco.bridgehub, chain_id).await?;
     let admin_address = sender.address;

@@ -43,10 +43,7 @@ pub async fn resolve_ctm_proxy(
 /// 1. If any chains are registered, use `chainTypeManager(first_chain_id)`.
 /// 2. Otherwise, scan `ChainTypeManagerAdded(address indexed)` events on the
 ///    bridgehub and return the most recently added CTM.
-pub async fn discover_ctm_proxy(
-    l1_rpc_url: &str,
-    bridgehub: Address,
-) -> anyhow::Result<Address> {
+pub async fn discover_ctm_proxy(l1_rpc_url: &str, bridgehub: Address) -> anyhow::Result<Address> {
     use ethers::providers::Middleware;
     use ethers::types::Filter;
 
@@ -72,9 +69,8 @@ pub async fn discover_ctm_proxy(
 
     // No chains — scan ChainTypeManagerAdded events.
     // event ChainTypeManagerAdded(address indexed chainTypeManager)
-    let topic0 = ethers::types::H256::from(ethers::utils::keccak256(
-        b"ChainTypeManagerAdded(address)",
-    ));
+    let topic0 =
+        ethers::types::H256::from(ethers::utils::keccak256(b"ChainTypeManagerAdded(address)"));
     let filter = Filter::new()
         .address(bridgehub)
         .topic0(topic0)
@@ -95,10 +91,7 @@ pub async fn discover_ctm_proxy(
 }
 
 /// Resolve `bridgehub.l1CtmDeployer()` → CTM deployment tracker (STM tracker).
-pub async fn resolve_stm_tracker(
-    l1_rpc_url: &str,
-    bridgehub: Address,
-) -> anyhow::Result<Address> {
+pub async fn resolve_stm_tracker(l1_rpc_url: &str, bridgehub: Address) -> anyhow::Result<Address> {
     let bh = BridgehubAbi::new(bridgehub, provider(l1_rpc_url)?);
     let tracker = bh
         .l_1_ctm_deployer()
@@ -187,10 +180,7 @@ pub async fn resolve_settlement_layer(
 ///
 /// The bridgehub's owner is the Governance contract (set during ecosystem
 /// deployment via `transferOwnership`).
-pub async fn resolve_governance(
-    l1_rpc_url: &str,
-    bridgehub: Address,
-) -> anyhow::Result<Address> {
+pub async fn resolve_governance(l1_rpc_url: &str, bridgehub: Address) -> anyhow::Result<Address> {
     let bh = BridgehubAbi::new(bridgehub, provider(l1_rpc_url)?);
     let gov = bh
         .owner()
@@ -301,7 +291,6 @@ pub async fn resolve_validator_timelock(
     ensure_nonzero(vt, "ctm.validatorTimelockPostV29()")
 }
 
-
 /// Resolve a chain's admin: `IZKChain(bridgehub.getZKChain(chainId)).getAdmin()`.
 ///
 /// The result is the `ChainAdmin` contract that gates every admin-only facet
@@ -338,10 +327,7 @@ pub async fn resolve_rollup_da_manager(
 }
 
 /// Resolve `ctm.isZKsyncOS()` → bool.
-pub async fn resolve_is_zksync_os(
-    l1_rpc_url: &str,
-    ctm_proxy: Address,
-) -> anyhow::Result<bool> {
+pub async fn resolve_is_zksync_os(l1_rpc_url: &str, ctm_proxy: Address) -> anyhow::Result<bool> {
     let ctm = IChainTypeManagerAbi::new(ctm_proxy, provider(l1_rpc_url)?);
     ctm.is_z_ksync_os()
         .call()
@@ -376,8 +362,7 @@ pub async fn resolve_is_testnet_verifier(
     ensure_nonzero(verifier, "ctm.protocolVersionVerifier()")?;
 
     // IS_TESTNET_VERIFIER() selector = 0x272d0f1a
-    let calldata =
-        ethers::types::Bytes::from(ethers::utils::hex::decode("272d0f1a").unwrap());
+    let calldata = ethers::types::Bytes::from(ethers::utils::hex::decode("272d0f1a").unwrap());
     let tx = ethers::types::TransactionRequest::new()
         .to(verifier)
         .data(calldata)

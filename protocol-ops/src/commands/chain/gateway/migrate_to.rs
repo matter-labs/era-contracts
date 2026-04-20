@@ -197,13 +197,10 @@ pub(crate) async fn stage_enable_validators(
 ) -> anyhow::Result<(u64, usize)> {
     let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
 
-    let gateway_chain_id = crate::common::l1_contracts::resolve_settlement_layer(
-        &runner.rpc_url,
-        bridgehub,
-        chain_id,
-    )
-    .await
-    .context("Failed to resolve gateway chain ID from bridgehub")?;
+    let gateway_chain_id =
+        crate::common::l1_contracts::resolve_settlement_layer(&runner.rpc_url, bridgehub, chain_id)
+            .await
+            .context("Failed to resolve gateway chain ID from bridgehub")?;
     logger::info(format!("Gateway chain ID (from L1): {gateway_chain_id}"));
     let contracts_path = paths::resolve_l1_contracts_path()?;
 
@@ -286,22 +283,18 @@ pub(crate) async fn stage_set_da_validator_pair(
 ) -> anyhow::Result<(u64, Address)> {
     let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
 
-    let gateway_chain_id = crate::common::l1_contracts::resolve_settlement_layer(
-        &runner.rpc_url,
-        bridgehub,
-        chain_id,
-    )
-    .await
-    .context("Failed to resolve gateway chain ID from bridgehub")?;
+    let gateway_chain_id =
+        crate::common::l1_contracts::resolve_settlement_layer(&runner.rpc_url, bridgehub, chain_id)
+            .await
+            .context("Failed to resolve gateway chain ID from bridgehub")?;
     logger::info(format!("Gateway chain ID (from L1): {gateway_chain_id}"));
     let contracts_path = paths::resolve_l1_contracts_path()?;
 
     // Resolve the chain's diamond proxy on the gateway via L2 RPC.
     logger::step("Resolving chain diamond proxy on gateway");
-    let chain_diamond_on_gw =
-        resolve_chain_diamond_on_gateway(inputs.gateway_rpc_url, chain_id)
-            .await
-            .context("Failed to resolve chain diamond proxy on gateway")?;
+    let chain_diamond_on_gw = resolve_chain_diamond_on_gateway(inputs.gateway_rpc_url, chain_id)
+        .await
+        .context("Failed to resolve chain diamond proxy on gateway")?;
     logger::info(format!(
         "Chain {} diamond proxy on gateway: {:#x}",
         chain_id, chain_diamond_on_gw
@@ -785,9 +778,7 @@ pub struct Phase0PauseDepositsArgs {
     pub topology: EcosystemChainArgs,
 }
 
-pub async fn run_phase0_pause_deposits(
-    args: Phase0PauseDepositsArgs,
-) -> anyhow::Result<()> {
+pub async fn run_phase0_pause_deposits(args: Phase0PauseDepositsArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
@@ -897,13 +888,10 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
     logger::info(format!("Migration L1 tx: {:#x}", l1_tx_hash));
 
     // Step 2: Extract priority op hash from the L1 receipt
-    let priority_op_hash = extract_priority_op_hash(
-        &args.shared.l1_rpc_url,
-        l1_tx_hash,
-        gateway_diamond_proxy,
-    )
-    .await
-    .context("Failed to extract priority op hash from migration tx")?;
+    let priority_op_hash =
+        extract_priority_op_hash(&args.shared.l1_rpc_url, l1_tx_hash, gateway_diamond_proxy)
+            .await
+            .context("Failed to extract priority op hash from migration tx")?;
     logger::info(format!("Priority op L2 tx hash: {:#x}", priority_op_hash));
 
     // Step 3: Wait for the L2 tx to be finalized on the gateway
@@ -1057,14 +1045,10 @@ pub async fn run_phase3_validators(args: Phase3ValidatorsArgs) -> anyhow::Result
         gateway_rpc_url: &args.gateway_rpc_url,
         l1_gas_price: args.l1_gas_price,
     };
-    let (gateway_chain_id, n_validators) = stage_enable_validators(
-        &mut runner,
-        bridgehub,
-        chain_id,
-        &enable_inputs,
-    )
-    .await
-    .context("phase-3 enable-validators stage")?;
+    let (gateway_chain_id, n_validators) =
+        stage_enable_validators(&mut runner, bridgehub, chain_id, &enable_inputs)
+            .await
+            .context("phase-3 enable-validators stage")?;
 
     let da_inputs = SetDaValidatorPairInputs {
         l1_da_validator: args.l1_da_validator,
@@ -1072,14 +1056,10 @@ pub async fn run_phase3_validators(args: Phase3ValidatorsArgs) -> anyhow::Result
         gateway_rpc_url: &args.gateway_rpc_url,
         l1_gas_price: args.l1_gas_price,
     };
-    let (_gateway_chain_id, chain_diamond_on_gw) = stage_set_da_validator_pair(
-        &mut runner,
-        bridgehub,
-        chain_id,
-        &da_inputs,
-    )
-    .await
-    .context("phase-3 set-da-validator-pair stage")?;
+    let (_gateway_chain_id, chain_diamond_on_gw) =
+        stage_set_da_validator_pair(&mut runner, bridgehub, chain_id, &da_inputs)
+            .await
+            .context("phase-3 set-da-validator-pair stage")?;
 
     write_output_if_requested(
         "chain.gateway.migrate-to.phase-3-validators",

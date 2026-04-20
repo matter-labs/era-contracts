@@ -39,15 +39,12 @@ impl Ecosystem {
 
     /// Resolve a chain's ID by name; fails loudly if the chain isn't listed.
     pub fn chain_id(&self, chain_name: &str) -> anyhow::Result<u64> {
-        self.chains
-            .get(chain_name)
-            .copied()
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "chain {chain_name:?} not found in ecosystem.yaml (known: {:?})",
-                    self.chains.keys().collect::<Vec<_>>()
-                )
-            })
+        self.chains.get(chain_name).copied().ok_or_else(|| {
+            anyhow::anyhow!(
+                "chain {chain_name:?} not found in ecosystem.yaml (known: {:?})",
+                self.chains.keys().collect::<Vec<_>>()
+            )
+        })
     }
 }
 

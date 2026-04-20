@@ -67,12 +67,10 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
 
     // Bridgehub is the single source of truth — admin + owner come straight
     // from it. No override.
-    let bridgehub_admin_addr = crate::common::l1_contracts::resolve_bridgehub_admin(
-        &runner.rpc_url,
-        args.bridgehub,
-    )
-    .await
-    .context("resolving bridgehub.admin() from L1")?;
+    let bridgehub_admin_addr =
+        crate::common::l1_contracts::resolve_bridgehub_admin(&runner.rpc_url, args.bridgehub)
+            .await
+            .context("resolving bridgehub.admin() from L1")?;
     let bridgehub_admin = runner.prepare_sender(bridgehub_admin_addr).await?;
 
     // When `--reuse-gov-and-admin` is set the governance owner collapses to
@@ -81,12 +79,10 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
     let bridgehub_owner = if args.reuse_gov_and_admin {
         bridgehub_admin.clone()
     } else {
-        let owner_addr = crate::common::l1_contracts::resolve_governance(
-            &runner.rpc_url,
-            args.bridgehub,
-        )
-        .await
-        .context("resolving bridgehub.owner() from L1")?;
+        let owner_addr =
+            crate::common::l1_contracts::resolve_governance(&runner.rpc_url, args.bridgehub)
+                .await
+                .context("resolving bridgehub.owner() from L1")?;
         runner.prepare_sender(owner_addr).await?
     };
 

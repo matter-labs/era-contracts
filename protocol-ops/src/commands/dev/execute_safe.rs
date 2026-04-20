@@ -70,11 +70,13 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
     let provider = Provider::<Http>::try_from(args.l1_rpc_url.as_str())
         .context("connect L1 provider")?
         .interval(std::time::Duration::from_millis(5));
-    let chain_id = provider.get_chainid().await.context("eth_chainId")?.as_u64();
-    let client = ethers::middleware::SignerMiddleware::new(
-        provider,
-        wallet.with_chain_id(chain_id),
-    );
+    let chain_id = provider
+        .get_chainid()
+        .await
+        .context("eth_chainId")?
+        .as_u64();
+    let client =
+        ethers::middleware::SignerMiddleware::new(provider, wallet.with_chain_id(chain_id));
 
     logger::info(format!(
         "Replaying {} tx(s) under broadcaster {:#x}",
@@ -93,7 +95,7 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
         .context("eth_getTransactionCount(pending)")?;
 
     // Parse + sign + submit all txs concurrently.
-    let pendings = try_join_all(safe_txs.iter().enumerate().map(|(idx, tx)| {
+    let pending = try_join_all(safe_txs.iter().enumerate().map(|(idx, tx)| {
         let client = &client;
         async move {
             let to: Address = tx
@@ -173,10 +175,8 @@ fn parse_decimal_or_hex_u256(raw: &str) -> anyhow::Result<U256> {
         if hex.is_empty() {
             return Ok(U256::zero());
         }
-        U256::from_str_radix(hex, 16)
-            .with_context(|| format!("invalid hex u256 {trimmed:?}"))
+        U256::from_str_radix(hex, 16).with_context(|| format!("invalid hex u256 {trimmed:?}"))
     } else {
-        U256::from_dec_str(trimmed)
-            .with_context(|| format!("invalid decimal u256 {trimmed:?}"))
+        U256::from_dec_str(trimmed).with_context(|| format!("invalid decimal u256 {trimmed:?}"))
     }
 }

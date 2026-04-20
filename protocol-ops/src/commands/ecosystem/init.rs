@@ -1,4 +1,3 @@
-
 use clap::Parser;
 use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
@@ -8,9 +7,7 @@ use crate::commands::hub::init::{hub_init, HubInitInput};
 
 use crate::commands::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
-use crate::common::{
-    forge::ForgeRunner, logger, wallets::Wallet,
-};
+use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
 use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
 use crate::config::forge_interface::deploy_ecosystem::output::DeployL1CoreContractsOutput;
 use crate::types::VMOption;

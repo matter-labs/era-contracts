@@ -45,10 +45,9 @@ pub(crate) async fn stage_deploy_filterer(
     });
     script_args.add_arg(ForgeScriptArg::Broadcast);
     script_args.add_arg(ForgeScriptArg::Ffi);
-    script_args.additional_args.extend([
-        format!("{:#x}", bridgehub),
-        chain_id.to_string(),
-    ]);
+    script_args
+        .additional_args
+        .extend([format!("{:#x}", bridgehub), chain_id.to_string()]);
 
     let script = Forge::new(&contracts_path)
         .script(
@@ -108,7 +107,10 @@ pub(crate) async fn stage_grant_whitelist(
     let stm_tracker = crate::common::l1_contracts::resolve_stm_tracker(&runner.rpc_url, bridgehub)
         .await
         .context("Failed to resolve CTM deployment tracker from bridgehub")?;
-    logger::info(format!("CTM deployment tracker (auto-resolved): {:#x}", stm_tracker));
+    logger::info(format!(
+        "CTM deployment tracker (auto-resolved): {:#x}",
+        stm_tracker
+    ));
 
     let governance = crate::common::l1_contracts::resolve_governance(&runner.rpc_url, bridgehub)
         .await
@@ -270,15 +272,18 @@ validator_timelock_execution_delay = 0
         refund = inputs.refund_recipient,
         testnet_verifier = {
             let v = crate::common::l1_contracts::resolve_is_testnet_verifier(
-                &runner.rpc_url, ctm_proxy,
-            ).await.context("Failed to resolve testnet verifier status")?;
+                &runner.rpc_url,
+                ctm_proxy,
+            )
+            .await
+            .context("Failed to resolve testnet verifier status")?;
             logger::info(format!("Testnet verifier (from L1): {v}"));
             v
         },
         zksync_os = {
-            let v = crate::common::l1_contracts::resolve_is_zksync_os(
-                &runner.rpc_url, ctm_proxy,
-            ).await.context("Failed to resolve isZKsyncOS from CTM")?;
+            let v = crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
+                .await
+                .context("Failed to resolve isZKsyncOS from CTM")?;
             logger::info(format!("ZKsync OS (from L1): {v}"));
             v
         },

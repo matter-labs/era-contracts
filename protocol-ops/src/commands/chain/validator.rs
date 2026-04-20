@@ -13,8 +13,7 @@ use crate::abi::ADMINFUNCTIONSABI_ABI;
 use crate::commands::output::write_output_if_requested;
 use crate::common::{
     forge::{Forge, ForgeRunner, ForgeScriptArg},
-    logger,
-    SharedRunArgs,
+    logger, SharedRunArgs,
 };
 
 lazy_static! {
@@ -128,10 +127,7 @@ async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
         "Access control restriction: {:#x}",
         args.access_control_restriction
     ));
-    logger::info(format!(
-        "Validator timelock: {:#x}",
-        validator_timelock
-    ));
+    logger::info(format!("Validator timelock: {:#x}", validator_timelock));
     logger::info(format!("Chain ID: {}", chain_id));
     logger::info(format!("Validator address: {:#x}", args.validator_address));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));

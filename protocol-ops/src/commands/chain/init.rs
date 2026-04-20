@@ -149,31 +149,25 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
 
     let owner = Wallet::resolve(args.owner, None, &deployer)?;
 
-    let bridgehub_admin_addr = crate::common::l1_contracts::resolve_bridgehub_admin(
-        &runner.rpc_url,
-        args.bridgehub,
-    )
-    .await
-    .context("resolving bridgehub.admin() from L1")?;
+    let bridgehub_admin_addr =
+        crate::common::l1_contracts::resolve_bridgehub_admin(&runner.rpc_url, args.bridgehub)
+            .await
+            .context("resolving bridgehub.admin() from L1")?;
     let bridgehub_admin = runner.prepare_sender(bridgehub_admin_addr).await?;
 
     // Discover CTM proxy from L1.
-    let ctm_proxy = crate::common::l1_contracts::discover_ctm_proxy(
-        &runner.rpc_url,
-        args.bridgehub,
-    )
-    .await
-    .context("Failed to discover CTM proxy from L1")?;
+    let ctm_proxy =
+        crate::common::l1_contracts::discover_ctm_proxy(&runner.rpc_url, args.bridgehub)
+            .await
+            .context("Failed to discover CTM proxy from L1")?;
     logger::info(format!("CTM proxy (from L1): {:#x}", ctm_proxy));
 
     // Resolve VM type from CTM.
     let vm_type = {
-        let is_zksync_os = crate::common::l1_contracts::resolve_is_zksync_os(
-            &runner.rpc_url,
-            ctm_proxy,
-        )
-        .await
-        .context("Failed to resolve isZKsyncOS from CTM")?;
+        let is_zksync_os =
+            crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
+                .await
+                .context("Failed to resolve isZKsyncOS from CTM")?;
         if is_zksync_os {
             VMOption::ZKSyncOsVM
         } else {

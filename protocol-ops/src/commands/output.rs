@@ -64,7 +64,14 @@ where
         "input": serde_json::to_value(input)?,
         "output": serde_json::to_value(output)?,
     });
-    write_safe_bundles_dir(command, &bundles, l1_chain_id, out_dir, &address_names, metadata)?;
+    write_safe_bundles_dir(
+        command,
+        &bundles,
+        l1_chain_id,
+        out_dir,
+        &address_names,
+        metadata,
+    )?;
     logger::info(format!(
         "Safe bundles ({} file(s)) + metadata written to: {}",
         bundles.len(),
@@ -101,9 +108,8 @@ fn write_safe_bundles_dir(
     address_names: &HashMap<String, String>,
     metadata_entry: Value,
 ) -> anyhow::Result<()> {
-    std::fs::create_dir_all(dir).map_err(|e| {
-        anyhow::anyhow!("Failed to create out dir '{}': {e}", dir.display())
-    })?;
+    std::fs::create_dir_all(dir)
+        .map_err(|e| anyhow::anyhow!("Failed to create out dir '{}': {e}", dir.display()))?;
 
     let manifest_path = dir.join("manifest.json");
     let (mut bundle_entries, mut metadata_entries) = read_existing_manifest(&manifest_path)?;
@@ -174,7 +180,10 @@ fn write_safe_bundles_dir(
         "metadata": metadata_entries,
     });
     std::fs::write(&manifest_path, serde_json::to_string_pretty(&manifest)?).map_err(|e| {
-        anyhow::anyhow!("Failed to write manifest '{}': {e}", manifest_path.display())
+        anyhow::anyhow!(
+            "Failed to write manifest '{}': {e}",
+            manifest_path.display()
+        )
     })?;
 
     Ok(())
@@ -191,7 +200,10 @@ fn read_existing_manifest(path: &Path) -> anyhow::Result<(Vec<Value>, Vec<Value>
         anyhow::anyhow!("Failed to read existing manifest '{}': {e}", path.display())
     })?;
     let parsed: Value = serde_json::from_str(&body).map_err(|e| {
-        anyhow::anyhow!("Failed to parse existing manifest '{}': {e}", path.display())
+        anyhow::anyhow!(
+            "Failed to parse existing manifest '{}': {e}",
+            path.display()
+        )
     })?;
     let bundles = parsed
         .get("bundles")
