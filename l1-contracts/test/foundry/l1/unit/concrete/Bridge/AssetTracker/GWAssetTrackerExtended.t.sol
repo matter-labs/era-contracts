@@ -5,6 +5,7 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
+import {IL2ChainAssetHandler} from "contracts/core/chain-asset-handler/IL2ChainAssetHandler.sol";
 
 import {BalanceChange, MigrationConfirmationData, L2Log, TxStatus} from "contracts/common/Messaging.sol";
 import {
@@ -688,7 +689,7 @@ contract GWAssetTrackerExtendedTest is Test {
         vm.mockCall(mockZKChain, abi.encodeWithSelector(IMigrator.pauseDepositsOnGateway.selector), abi.encode());
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        gwAssetTracker.requestPauseDepositsForChain(CHAIN_ID);
+        IL2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).requestPauseDepositsForChainOnGateway(CHAIN_ID);
     }
 
     // Test Gateway->L1 confirmation does not modify chain balance on Gateway.

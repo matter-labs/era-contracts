@@ -9,7 +9,11 @@ import {
     L1ToGatewayTokenBalanceMigrationData,
     MigrationConfirmationData
 } from "../../common/Messaging.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    GW_ASSET_TRACKER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR
+} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {InvalidChainId, InvalidProof, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {
@@ -48,6 +52,7 @@ import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IChainAssetHandlerBase} from "../../core/chain-asset-handler/IChainAssetHandler.sol";
+import {IL2ChainAssetHandler} from "../../core/chain-asset-handler/IL2ChainAssetHandler.sol";
 import {IL1MessageRoot} from "../../core/message-root/IL1MessageRoot.sol";
 import {MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1} from "../../common/Config.sol";
 
@@ -474,10 +479,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     function requestPauseDepositsForChainOnGateway(uint256 _chainId) external onlyChain(_chainId) {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
         require(settlementLayer != block.chainid, InvalidSettlementLayer());
+        /// It sends it to the L2 ChainAssetHandler to keep the GWAT small.
         _sendToChain(
             settlementLayer,
-            GW_ASSET_TRACKER_ADDR,
-            abi.encodeCall(IGWAssetTracker.requestPauseDepositsForChain, (_chainId))
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            abi.encodeCall(IL2ChainAssetHandler.requestPauseDepositsForChainOnGateway, (_chainId))
         );
         emit IL1AssetTracker.PauseDepositsForChainRequested(_chainId, settlementLayer);
     }

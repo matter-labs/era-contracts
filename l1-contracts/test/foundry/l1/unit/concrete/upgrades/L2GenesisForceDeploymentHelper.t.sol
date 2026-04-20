@@ -10,7 +10,7 @@ import "forge-std/console.sol";
 import "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
-import {TokenBridgingData} from "contracts/common/Messaging.sol";
+import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import "contracts/core/message-root/IMessageRoot.sol";
@@ -431,11 +431,17 @@ contract MockContract {
 
     function initL2(uint256, address, address, address, address) external {}
 
-    function updateL2(uint256, bytes32, address, address, bytes32) external {}
+    // L2AssetRouter.updateL2
+    function updateL2(uint256, uint256, address, address, bytes32, address) external {}
 
-    function updateL2(uint256, address, address, address) external {}
+    // L2NativeTokenVault.updateL2
+    function updateL2(uint256, address, bytes32, address, address, TokenBridgingData calldata, TokenMetadata calldata) external {}
 
-    function updateL2(uint256, uint256) external {}
+    // L2ChainAssetHandler.updateL2
+    function updateL2(uint256, address, address, address, address) external {}
+
+    // L2Bridgehub.updateL2
+    function updateL2(uint256, address, uint256) external {}
 
     function deployUpgradeableBeacon(address) external returns (address) {
         return makeAddr("upgradeableBeacon");

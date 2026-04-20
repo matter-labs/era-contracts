@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
-import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
+import {GWAssetTrackerDev} from "contracts/dev-contracts/test/GWAssetTrackerDev.sol";
 
 import {BalanceChange, MigrationConfirmationData, L2Log} from "contracts/common/Messaging.sol";
 import {
@@ -29,6 +29,7 @@ import {
 } from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {ChainIdNotRegistered, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IL2ChainAssetHandler} from "contracts/core/chain-asset-handler/IL2ChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {ProcessLogsTestHelper} from "./ProcessLogsTestHelper.sol";
@@ -39,8 +40,8 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
-contract GWAssetTrackerTestHelper is GWAssetTracker {
-    constructor() GWAssetTracker() {}
+contract GWAssetTrackerTestHelper is GWAssetTrackerDev {
+    constructor() GWAssetTrackerDev() {}
     function getEmptyMultichainBatchRoot(uint256 _chainId) external returns (bytes32) {
         return _getEmptyMultichainBatchRoot(_chainId);
     }
@@ -427,7 +428,7 @@ contract GWAssetTrackerTest is Test {
 
     function test_RequestPauseDepositsForChain_Unauthorized() public {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        gwAssetTracker.requestPauseDepositsForChain(CHAIN_ID);
+        IL2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).requestPauseDepositsForChainOnGateway(CHAIN_ID);
     }
 
     function test_RequestPauseDepositsForChain_ChainNotRegistered() public {
@@ -440,7 +441,7 @@ contract GWAssetTrackerTest is Test {
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
         vm.expectRevert(abi.encodeWithSelector(ChainIdNotRegistered.selector, CHAIN_ID));
-        gwAssetTracker.requestPauseDepositsForChain(CHAIN_ID);
+        IL2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).requestPauseDepositsForChainOnGateway(CHAIN_ID);
     }
 
     function test_InitiateGatewayToL1MigrationOnGateway_ChainNotRegistered() public {

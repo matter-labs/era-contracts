@@ -123,16 +123,6 @@ interface IInteropCenter {
     /// @param _zkTokenAssetId The ZK token asset ID.
     function initL2(uint256 _l1ChainId, address _owner, bytes32 _zkTokenAssetId) external;
 
-    /// @notice Reserved for FUTURE protocol upgrades (v32+) on chains that already initialized
-    ///         InteropCenter via `initL2()`.
-    /// @dev NOT used in the v31 upgrade flow (which uses `initL2()` instead) and NOT used in
-    ///      genesis. Currently performs the same parameter refresh as `initL2()` minus the
-    ///      one-shot fields (reentrancy guard, ZK_TOKEN_ASSET_ID). Add upgrade-specific logic
-    ///      here for future protocol versions.
-    /// @param _l1ChainId The chain ID of L1.
-    /// @param _owner The owner address.
-    function updateL2(uint256 _l1ChainId, address _owner) external;
-
     /// @notice Forwards a transaction from the gateway to a chain mailbox (from L1).
     /// @dev Note, that `_canonicalTxHash` is provided by the chain and so should not be trusted to be unique,
     /// while the rest of the fields are trusted to be populated correctly inside the `Mailbox` of the Gateway.

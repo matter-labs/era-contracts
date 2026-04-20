@@ -44,6 +44,7 @@ import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
+import {GWAssetTrackerDev} from "contracts/dev-contracts/test/GWAssetTrackerDev.sol";
 // import {InteropAccount} from "contracts/interop/InteropAccount.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 
@@ -213,9 +214,9 @@ library L2Utils {
     }
 
     function forceDeployGWAssetTracker(SystemContractsArgs memory _args) internal {
-        new GWAssetTracker();
+        new GWAssetTrackerDev();
 
-        forceDeployWithoutConstructor("GWAssetTracker", GW_ASSET_TRACKER_ADDR);
+        forceDeployWithoutConstructor("GWAssetTrackerDev", GW_ASSET_TRACKER_ADDR);
     }
 
     /// @notice Deploys the L2AssetRouter contract.

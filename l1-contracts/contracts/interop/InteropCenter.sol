@@ -169,17 +169,7 @@ contract InteropCenter is
         require(_zkTokenAssetId != bytes32(0), ZKTokenNotAvailable());
         ZK_TOKEN_ASSET_ID = _zkTokenAssetId;
 
-        _initInteropCenter(_l1ChainId, _owner);
-    }
-
-    /// @inheritdoc IInteropCenter
-    function updateL2(uint256 _l1ChainId, address _owner) public onlyUpgrader {
-        _initInteropCenter(_l1ChainId, _owner);
-    }
-
-    function _initInteropCenter(uint256 _l1ChainId, address _owner) private {
         require(_owner != address(0), ZeroAddress());
-
         L1_CHAIN_ID = _l1ChainId;
         ZK_INTEROP_FEE = DEFAULT_ZK_INTEROP_FEE;
         _transferOwnership(_owner);

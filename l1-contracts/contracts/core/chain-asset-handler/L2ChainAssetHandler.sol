@@ -3,13 +3,14 @@
 pragma solidity 0.8.28;
 
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
-import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {InvalidCaller} from "../../common/L1ContractErrors.sol";
+import {ChainIdNotRegistered, InvalidCaller, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {IAssetRouterBase} from "../../bridge/asset-router/IAssetRouterBase.sol";
+import {IMigrator} from "../../state-transition/chain-interfaces/IMigrator.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -71,6 +72,13 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
         _;
     }
 
+    modifier onlyServiceTransactionSender() {
+        if (msg.sender != SERVICE_TRANSACTION_SENDER) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
     function initL2(
@@ -82,16 +90,17 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     ) external reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
 
-        updateL2(_l1ChainId, _bridgehub, _assetRouter, _messageRoot);
-
-        _transferOwnership(_owner);
+        updateL2(_l1ChainId, _owner, _bridgehub, _assetRouter, _messageRoot);
     }
 
     /// @notice Updates the contract.
     /// @dev This function is used to initialize the new implementation of L2ChainAssetHandler on existing chains during
     /// the upgrade.
+    /// @param _owner The expected owner. If the current owner is different (e.g. a temporary
+    ///        multisig on a chain that predates decentralized governance), it will be reset.
     function updateL2(
         uint256 _l1ChainId,
+        address _owner,
         address _bridgehub,
         address _assetRouter,
         address _messageRoot
@@ -101,6 +110,9 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
         ASSET_ROUTER = IAssetRouterBase(_assetRouter);
         MESSAGE_ROOT = IMessageRootBase(_messageRoot);
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
+        if (owner() != _owner) {
+            _transferOwnership(_owner);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -119,6 +131,13 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
         if (_previousSettlementLayerChainId != _currentSettlementLayerChainId) {
             ++migrationNumber[block.chainid];
         }
+    }
+
+    /// @notice Used to pause deposits on Gateway from L1 for migration back to L1.
+    function requestPauseDepositsForChainOnGateway(uint256 _chainId) external onlyServiceTransactionSender {
+        address zkChain = _bridgehub().getZKChain(_chainId);
+        require(zkChain != address(0), ChainIdNotRegistered(_chainId));
+        IMigrator(zkChain).pauseDepositsOnGateway(block.timestamp);
     }
 
     function _recordMigrationToSL(

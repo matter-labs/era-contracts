@@ -356,6 +356,7 @@ library L2GenesisForceDeploymentsHelper {
         // solhint-disable-next-line func-named-parameters
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateL2(
             _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.aliasedL1Governance,
             previousL2TokenProxyBytecodeHash,
             _getLegacySharedBridge(),
             _wrappedBaseTokenAddress,
@@ -365,6 +366,7 @@ library L2GenesisForceDeploymentsHelper {
 
         L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).updateL2(
             _fixedForceDeploymentsData.l1ChainId,
+            _fixedForceDeploymentsData.aliasedL1Governance,
             L2_BRIDGEHUB_ADDR,
             L2_ASSET_ROUTER_ADDR,
             L2_MESSAGE_ROOT_ADDR
