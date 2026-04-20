@@ -119,6 +119,8 @@ async fn run() -> Result<()> {
     let upgrade_tx_hash = upgrade::find_upgrade_tx_hash(
         &settlement_provider,
         ctm,
+        cli.bridgehub_address,
+        cli.chain_id,
         target_protocol_version,
         LOOKBACK_BLOCKS,
     )

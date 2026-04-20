@@ -1,13 +1,17 @@
 //! Locate the pending protocol upgrade transaction on the settlement layer and
 //! compute its canonical hash.
 
-use alloy::primitives::{keccak256, Address, B256, U256};
+use alloy::primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy::providers::{DynProvider, Provider};
 use alloy::rpc::types::Filter;
 use alloy::sol_types::{SolEvent, SolValue};
 use anyhow::{anyhow, Context};
+use tracing::{debug, info};
 
-use crate::abi::{IBridgehub::IBridgehubInstance, IChainTypeManager::NewUpgradeCutData, L2CanonicalTransaction};
+use crate::abi::{
+    IBridgehub::IBridgehubInstance, IChainTypeManager::NewUpgradeCutData,
+    ISettlementLayerUpgrade::ISettlementLayerUpgradeInstance, L2CanonicalTransaction,
+};
 
 /// How many settlement-layer blocks to scan per `eth_getLogs` request. Keeps us under
 /// typical provider limits while still terminating in a reasonable number of round trips.
@@ -39,11 +43,20 @@ pub async fn resolve_ctm(
 /// `protocol_version` and compute the canonical tx hash of the embedded
 /// L2 upgrade transaction.
 ///
+/// For v31+ upgrades, `SettlementLayerV31UpgradeBase.upgrade()` mutates
+/// `l2ProtocolUpgradeTx.data` per-chain before hashing (to splice in
+/// `ZKChainSpecificForceDeploymentsData` queried from the bridgehub/NTV). We
+/// replicate that by calling the upgrade contract's `getL2UpgradeTxData` view
+/// directly — single source of truth. Pre-v31 upgrade contracts don't expose
+/// that selector; the eth_call reverts and we fall back to the unmutated data.
+///
 /// `lookback_blocks` caps how far back we scan; scans are performed newest-first
 /// so recent upgrades are found quickly.
 pub async fn find_upgrade_tx_hash(
     provider: &DynProvider,
     ctm_address: Address,
+    bridgehub_address: Address,
+    chain_id: u64,
     protocol_version: U256,
     lookback_blocks: u64,
 ) -> anyhow::Result<B256> {
@@ -73,7 +86,14 @@ pub async fn find_upgrade_tx_hash(
                 "NewUpgradeCutData event decode failed — ABI mismatch with the deployed CTM",
             )?;
             let diamond_cut = decoded.inner.data.diamondCutData;
-            return tx_hash_from_init_calldata(&diamond_cut.initCalldata);
+            return tx_hash_from_init_calldata(
+                provider,
+                diamond_cut.initAddress,
+                bridgehub_address,
+                chain_id,
+                &diamond_cut.initCalldata,
+            )
+            .await;
         }
 
         if from == start {
@@ -88,9 +108,16 @@ pub async fn find_upgrade_tx_hash(
 }
 
 /// Decode `ProposedUpgrade` from the DiamondCutData init calldata (the first 4 bytes
-/// are the upgrade selector, the rest is `ProposedUpgrade` ABI-encoded) and compute
+/// are the upgrade selector, the rest is `ProposedUpgrade` ABI-encoded), apply the
+/// per-chain `.data` mutation performed by v31+ upgrade contracts, and compute
 /// `keccak256(L2CanonicalTransaction.abi_encode())`.
-fn tx_hash_from_init_calldata(init_calldata: &[u8]) -> anyhow::Result<B256> {
+async fn tx_hash_from_init_calldata(
+    provider: &DynProvider,
+    init_address: Address,
+    bridgehub_address: Address,
+    chain_id: u64,
+    init_calldata: &[u8],
+) -> anyhow::Result<B256> {
     if init_calldata.len() < 4 {
         anyhow::bail!("DiamondCutData.initCalldata too short ({} bytes)", init_calldata.len());
     }
@@ -99,7 +126,56 @@ fn tx_hash_from_init_calldata(init_calldata: &[u8]) -> anyhow::Result<B256> {
         &init_calldata[4..],
     )
     .context("ProposedUpgrade decode from initCalldata")?;
-    Ok(canonical_tx_hash(&proposed.l2ProtocolUpgradeTx))
+
+    let mut tx = proposed.l2ProtocolUpgradeTx;
+    tx.data = rebuild_tx_data_if_v31plus(
+        provider,
+        init_address,
+        bridgehub_address,
+        chain_id,
+        tx.data.clone(),
+    )
+    .await;
+
+    Ok(canonical_tx_hash(&tx))
+}
+
+/// For v31+ upgrade contracts, call `initAddress.getL2UpgradeTxData(bridgehub, chainId,
+/// originalData)` and return the rebuilt data. For pre-v31 contracts (or any other failure),
+/// fall back to `original_data` — the older hashing path didn't mutate per-chain.
+async fn rebuild_tx_data_if_v31plus(
+    provider: &DynProvider,
+    init_address: Address,
+    bridgehub_address: Address,
+    chain_id: u64,
+    original_data: Bytes,
+) -> Bytes {
+    let upgrade = ISettlementLayerUpgradeInstance::new(init_address, provider.clone());
+    match upgrade
+        .getL2UpgradeTxData(bridgehub_address, U256::from(chain_id), original_data.clone())
+        .call()
+        .await
+    {
+        Ok(rebuilt) => {
+            info!(
+                %init_address,
+                original_len = original_data.len(),
+                rebuilt_len = rebuilt.len(),
+                "applied v31+ per-chain tx-data mutation via getL2UpgradeTxData"
+            );
+            rebuilt
+        }
+        Err(err) => {
+            // Pre-v31 upgrade contract, or selector genuinely missing — caller's hash
+            // is computed from the original data, matching pre-v31 behavior.
+            debug!(
+                %init_address,
+                error = %err,
+                "getL2UpgradeTxData not available on upgrade contract; using original tx data"
+            );
+            original_data
+        }
+    }
 }
 
 /// The canonical L2 priority-op hash: `keccak256(abi_encode(L2CanonicalTransaction))`.
