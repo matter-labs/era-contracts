@@ -22,6 +22,8 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {ZKsyncOSSettlementLayerV31Upgrade} from "contracts/upgrades/ZKsyncOSSettlementLayerV31Upgrade.sol";
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
+import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 import {
     L2_COMPLEX_UPGRADER_ADDR,
     L2_VERSION_SPECIFIC_UPGRADER_ADDR
@@ -350,6 +352,55 @@ contract SettlementLayerV31UpgradeSharedTest is SettlementLayerV31UpgradeTestBas
         bytes memory data = upgrade.getConstructedCalldata(mockBridgehub, testChainId, _placeholderV31Calldata());
 
         assertEq(data, _expectedV31Calldata());
+    }
+
+    function test_BuildsChainSpecificForceDeploymentsData_UsesLocalTokenMetadataForBridgedBaseToken() public {
+        _setupMocks();
+
+        uint256 originChainId = 999;
+        address originToken = makeAddr("originToken");
+        address localToken = makeAddr("localToken");
+        string memory expectedName = "Bridged Token";
+        string memory expectedSymbol = "BTKN";
+        uint8 expectedDecimals = 6;
+
+        vm.mockCall(
+            mockNativeTokenVault,
+            abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, baseTokenAssetId),
+            abi.encode(originChainId)
+        );
+        vm.mockCall(
+            mockNativeTokenVault,
+            abi.encodeWithSelector(INativeTokenVaultBase.originToken.selector, baseTokenAssetId),
+            abi.encode(originToken)
+        );
+        vm.mockCall(
+            mockNativeTokenVault,
+            abi.encodeWithSelector(INativeTokenVaultBase.tokenAddress.selector, baseTokenAssetId),
+            abi.encode(localToken)
+        );
+
+        vm.mockCall(localToken, abi.encodeWithSignature("name()"), abi.encode(expectedName));
+        vm.mockCall(localToken, abi.encodeWithSignature("symbol()"), abi.encode(expectedSymbol));
+        vm.mockCall(localToken, abi.encodeWithSignature("decimals()"), abi.encode(expectedDecimals));
+
+        bytes memory forceDeploymentsData = upgrade.exposeBuildChainSpecificForceDeploymentsData(
+            mockBridgehub,
+            testChainId
+        );
+
+        ZKChainSpecificForceDeploymentsData memory decoded = abi.decode(
+            forceDeploymentsData,
+            (ZKChainSpecificForceDeploymentsData)
+        );
+
+        assertEq(decoded.baseTokenL1Address, originToken);
+        assertEq(decoded.baseTokenMetadata.name, expectedName);
+        assertEq(decoded.baseTokenMetadata.symbol, expectedSymbol);
+        assertEq(decoded.baseTokenMetadata.decimals, expectedDecimals);
+        assertEq(decoded.baseTokenBridgingData.assetId, baseTokenAssetId);
+        assertEq(decoded.baseTokenBridgingData.originChainId, originChainId);
+        assertEq(decoded.baseTokenBridgingData.originToken, originToken);
     }
 
     function testFuzz_RevertWhen_BatchesMismatch(uint256 committed, uint256 executed) public {

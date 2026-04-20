@@ -5,6 +5,7 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
 import {GWAssetTrackerDev} from "contracts/dev-contracts/test/GWAssetTrackerDev.sol";
+import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
 
 import {BalanceChange, MigrationConfirmationData, L2Log} from "contracts/common/Messaging.sol";
 import {
@@ -105,11 +106,21 @@ contract GWAssetTrackerTest is Test {
         mockDestZKChain = makeAddr("mockDestZKChain");
         mockAssetRouter = makeAddr("mockAssetRouter");
 
-        // Mock the L2 contract addresses
+        // Mock the L2 contract addresses — etch real bytecode for contracts that the tests
+        // interact with directly (L2ChainAssetHandler), and simple mock code for the rest.
         vm.etch(L2_BRIDGEHUB_ADDR, address(mockBridgehub).code);
         vm.etch(L2_MESSAGE_ROOT_ADDR, address(mockMessageRoot).code);
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, address(mockNativeTokenVault).code);
-        vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, address(mockChainAssetHandler).code);
+        vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, type(L2ChainAssetHandler).runtimeCode);
+        // Initialize the etched L2ChainAssetHandler so its modifiers and storage work correctly.
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
+            L1_CHAIN_ID,
+            address(this),
+            L2_BRIDGEHUB_ADDR,
+            L2_ASSET_ROUTER_ADDR,
+            L2_MESSAGE_ROOT_ADDR
+        );
         vm.etch(L2_ASSET_ROUTER_ADDR, address(mockAssetRouter).code);
 
         // Mock the WETH_TOKEN() call on NativeTokenVault
