@@ -142,8 +142,8 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
     .await?;
 
     // Await all receipts concurrently.
-    let tx_hashes: Vec<H256> = pendings.iter().map(|p| p.tx_hash()).collect();
-    let receipts = try_join_all(pendings.into_iter().enumerate().map(|(idx, pending)| {
+    let tx_hashes: Vec<H256> = pending.iter().map(|p| p.tx_hash()).collect();
+    let receipts = try_join_all(pending.into_iter().enumerate().map(|(idx, pending)| {
         let tx_hash = tx_hashes[idx];
         async move {
             pending

@@ -33,14 +33,6 @@ pub fn query_chain_id_sync(rpc_url: &str) -> anyhow::Result<u64> {
     Ok(id.as_u64())
 }
 
-/// Derive the `0x…` address string owned by a hex private key.
-pub fn derive_address_from_private_key(private_key: &str) -> anyhow::Result<String> {
-    let key = H256::from_str(private_key).with_context(|| "invalid private key (expected hex)")?;
-    let wallet = LocalWallet::from_bytes(key.as_bytes())
-        .with_context(|| "invalid private key (failed to construct signer)")?;
-    Ok(format!("{:#x}", wallet.address()))
-}
-
 pub fn create_ethers_client(
     mut wallet: LocalWallet,
     l1_rpc: String,
