@@ -106,7 +106,7 @@ pub async fn ecosystem_init(
         with_legacy_bridge: input.with_legacy_bridge,
         create2_factory_salt: input.create2_factory_salt,
     };
-    let hub_output = hub_init(runner, &sender, &owner, &hub_input).await?;
+    let hub_output = hub_init(runner, sender, owner, &hub_input).await?;
     let bridgehub_addr = hub_output.deployed_addresses.bridgehub.bridgehub_proxy_addr;
 
     // Initialize CTM contracts
@@ -120,7 +120,7 @@ pub async fn ecosystem_init(
         zk_token_asset_id: input.zk_token_asset_id,
         create2_factory_salt: input.create2_factory_salt,
     };
-    let ctm_output = ctm_init(runner, &sender, &owner, &owner, &ctm_input).await?;
+    let ctm_output = ctm_init(runner, sender, owner, owner, &ctm_input).await?;
 
     Ok(EcosystemInitOutputData {
         hub: hub_output,

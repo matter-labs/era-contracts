@@ -263,7 +263,7 @@ fn build_address_name_map(path: &Path) -> anyhow::Result<HashMap<String, String>
                 };
                 if let Some(addr) = role_val
                     .as_mapping()
-                    .and_then(|m| m.get(&serde_yaml::Value::String("address".into())))
+                    .and_then(|m| m.get(serde_yaml::Value::String("address".into())))
                     .and_then(|v| v.as_str())
                 {
                     map.insert(addr.to_ascii_lowercase(), format!("{section}.{role}"));

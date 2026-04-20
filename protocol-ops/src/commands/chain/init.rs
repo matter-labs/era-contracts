@@ -184,7 +184,7 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         owner: owner.address,
         commit_operator: args.commit_operator,
         prove_operator: args.prove_operator,
-        execute_operator: args.execute_operator.unwrap_or_else(|| Address::zero()),
+        execute_operator: args.execute_operator.unwrap_or_else(Address::zero),
         token_multiplier_setter: args.token_multiplier_setter,
         da_mode: args.da_mode,
         vm_type,

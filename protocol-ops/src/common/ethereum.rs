@@ -1,4 +1,3 @@
-use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -6,7 +5,6 @@ use ethers::{
     core::k256::ecdsa::SigningKey,
     middleware::{Middleware as _, MiddlewareBuilder},
     prelude::{Http, LocalWallet, Provider, Signer, SignerMiddleware},
-    types::H256,
 };
 use tokio::task::block_in_place;
 

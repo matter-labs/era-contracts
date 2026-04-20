@@ -58,7 +58,7 @@ pub async fn discover_ctm_proxy(l1_rpc_url: &str, bridgehub: Address) -> anyhow:
         .context("bridgehub.getAllZKChainChainIDs()")?;
     if let Some(first) = chain_ids.first() {
         let ctm = bh
-            .chain_type_manager(first.clone())
+            .chain_type_manager(*first)
             .call()
             .await
             .context("bridgehub.chainTypeManager()")?;
