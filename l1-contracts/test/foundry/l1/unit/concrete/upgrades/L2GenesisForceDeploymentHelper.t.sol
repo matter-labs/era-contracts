@@ -6,6 +6,7 @@ pragma solidity 0.8.28;
 import "forge-std/Test.sol";
 import "forge-std/Vm.sol";
 import "forge-std/console.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 import "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -29,7 +30,7 @@ import "contracts/l2-upgrades/ISystemContractProxy.sol";
  * @title L2GenesisForceDeploymentsHelperTest
  * @notice Tests for the L2GenesisForceDeploymentsHelper library covering both ZKsyncOS and Era deployment scenarios
  */
-contract L2GenesisForceDeploymentsHelperTest is Test {
+contract L2GenesisForceDeploymentsHelperTest is MigrationTestBase {
     using L2GenesisForceDeploymentsHelper for *;
 
     bytes32 internal constant CONTRACT_UPGRADED_SIG = keccak256("ContractUpgraded(uint8,address)");
@@ -51,7 +52,8 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
     MockZKOSContractDeployer mockDeployer;
     MockSystemContractProxyAdmin mockProxyAdmin;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         // Initialize test addresses
         ctmDeployerAddress = makeAddr("ctmDeployer");
         aliasedL1GovernanceAddress = makeAddr("aliasedL1Governance");

@@ -2,18 +2,20 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Proxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
-contract BridgedStandardERC20_ReinitializeGuard_Test is Test {
+contract BridgedStandardERC20_ReinitializeGuard_Test is MigrationTestBase {
     BridgedStandardERC20 implementation;
     address originToken = address(0xBEEF);
     bytes32 assetId = keccak256(abi.encode("assetId"));
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         implementation = new BridgedStandardERC20();
     }
 

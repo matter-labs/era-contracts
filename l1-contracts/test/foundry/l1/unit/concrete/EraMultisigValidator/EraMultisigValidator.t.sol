@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
@@ -11,8 +12,6 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {AddressHasNoCode, RoleAccessDenied} from "contracts/common/L1ContractErrors.sol";
 import {
     AlreadySigned,
@@ -23,21 +22,19 @@ import {
     NotSigner
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-contract EraMultisigValidatorTest is Test {
+contract EraMultisigValidatorTest is MigrationTestBase {
     EraMultisigValidator eraMultisig;
     ValidatorTimelock validatorTimelock;
-    DummyBridgehub dummyBridgehub;
-    DummyChainTypeManagerForValidatorTimelock chainTypeManager;
 
     address owner;
-    address chainAddress;
+    address eraMultisigChainAddress;
     address executor;
     address member1;
     address member2;
     address member3;
     address nonMember;
 
-    uint256 chainId;
+    uint256 eraMultisigChainId;
     uint32 executionDelay;
 
     bytes32 precommitterRole;
@@ -46,29 +43,30 @@ contract EraMultisigValidatorTest is Test {
     bytes32 proverRole;
     bytes32 executorRole;
 
-    function setUp() public {
-        owner = makeAddr("owner");
-        chainAddress = makeAddr("chainAddress");
+    function setUp() public override {
+        // Deploy full integration ecosystem to get real bridgehub and chain
+        _deployIntegrationBase();
+
+        // Use the real chain from the integration deployment
+        eraMultisigChainAddress = chainAddress;
+        eraMultisigChainId = testChainId;
+
+        // Use the real chain's admin as the owner for validators
+        owner = IGetters(eraMultisigChainAddress).getAdmin();
+
         executor = makeAddr("executor");
         member1 = makeAddr("member1");
         member2 = makeAddr("member2");
         member3 = makeAddr("member3");
         nonMember = makeAddr("nonMember");
 
-        chainId = 1;
         executionDelay = 0;
 
-        // Deploy dummy bridgehub and register chain
-        dummyBridgehub = new DummyBridgehub();
-        chainTypeManager = new DummyChainTypeManagerForValidatorTimelock(owner, chainAddress);
-        vm.mockCall(chainAddress, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(owner));
-        vm.mockCall(chainAddress, abi.encodeCall(IGetters.getChainId, ()), abi.encode(chainId));
-        dummyBridgehub.setZKChain(chainId, chainAddress);
-
-        // Deploy the downstream ValidatorTimelock (the one EraMultisig forwards to)
+        // Deploy ValidatorTimelock with the REAL bridgehub (no DummyBridgehub)
         validatorTimelock = ValidatorTimelock(_deployValidatorTimelock(owner, executionDelay));
 
-        // Mock the validator timelock to accept forwarded calls
+        // Mock the validator timelock to accept forwarded calls.
+        // This is valid isolation: we're testing multisig logic, not batch processing.
         vm.mockCall(
             address(validatorTimelock),
             abi.encodeWithSelector(ICommitter.commitBatchesSharedBridge.selector),
@@ -95,7 +93,7 @@ contract EraMultisigValidatorTest is Test {
             ""
         );
 
-        // Deploy EraMultisigValidator via proxy
+        // Deploy EraMultisigValidator via proxy with real bridgehub
         eraMultisig = EraMultisigValidator(_deployEraMultisig(owner, executionDelay, address(validatorTimelock)));
 
         // Cache role identifiers
@@ -107,7 +105,7 @@ contract EraMultisigValidatorTest is Test {
 
         // Grant executor all validator roles on the EraMultisigValidator
         vm.prank(owner);
-        eraMultisig.addValidatorForChainId(chainId, executor);
+        eraMultisig.addValidatorForChainId(eraMultisigChainId, executor);
 
         // Setup default multisig: 3 members, threshold 2
         address[] memory membersToAdd = new address[](3);
@@ -124,7 +122,8 @@ contract EraMultisigValidatorTest is Test {
 
     function _deployValidatorTimelock(address _owner, uint32 _delay) internal returns (address) {
         ProxyAdmin admin = new ProxyAdmin();
-        ValidatorTimelock impl = new ValidatorTimelock(address(dummyBridgehub));
+        // Use real bridgehub from integration deployment
+        ValidatorTimelock impl = new ValidatorTimelock(address(addresses.bridgehub));
         return
             address(
                 new TransparentUpgradeableProxy(
@@ -137,7 +136,8 @@ contract EraMultisigValidatorTest is Test {
 
     function _deployEraMultisig(address _owner, uint32 _delay, address _validatorTimelock) internal returns (address) {
         ProxyAdmin admin = new ProxyAdmin();
-        EraMultisigValidator impl = new EraMultisigValidator(address(dummyBridgehub));
+        // Use real bridgehub from integration deployment
+        EraMultisigValidator impl = new EraMultisigValidator(address(addresses.bridgehub));
         return
             address(
                 new TransparentUpgradeableProxy(
@@ -154,12 +154,12 @@ contract EraMultisigValidatorTest is Test {
 
     function _sampleHash() internal view returns (bytes32) {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
-        return eraMultisig.calculateHash(chainAddress, from, to, data);
+        return eraMultisig.calculateHash(eraMultisigChainAddress, from, to, data);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      INITIALIZATION
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_initialize_setsOwner() public view {
         assertEq(eraMultisig.owner(), owner);
@@ -177,7 +177,7 @@ contract EraMultisigValidatorTest is Test {
     function test_initialize_parentTwoParamInitializeReverts() public {
         // The 2-param initialize inherited from ValidatorTimelock is disabled
         ProxyAdmin admin = new ProxyAdmin();
-        EraMultisigValidator impl = new EraMultisigValidator(address(dummyBridgehub));
+        EraMultisigValidator impl = new EraMultisigValidator(address(addresses.bridgehub));
         vm.expectRevert();
         new TransparentUpgradeableProxy(
             address(impl),
@@ -189,7 +189,7 @@ contract EraMultisigValidatorTest is Test {
     function test_initialize_revertsIfTimelockHasNoCode() public {
         address eoa = makeAddr("eoa");
         ProxyAdmin admin = new ProxyAdmin();
-        EraMultisigValidator impl = new EraMultisigValidator(address(dummyBridgehub));
+        EraMultisigValidator impl = new EraMultisigValidator(address(addresses.bridgehub));
         vm.expectRevert(abi.encodeWithSelector(AddressHasNoCode.selector, eoa));
         new TransparentUpgradeableProxy(
             address(impl),
@@ -198,9 +198,9 @@ contract EraMultisigValidatorTest is Test {
         );
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      THRESHOLD MANAGEMENT
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_changeThreshold_setsNewValue() public {
         vm.prank(owner);
@@ -227,9 +227,9 @@ contract EraMultisigValidatorTest is Test {
         assertEq(eraMultisig.threshold(), 0);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      MEMBERSHIP MANAGEMENT
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_changeMembers_addsMembers() public view {
         assertTrue(eraMultisig.executionMultisigMember(member1));
@@ -316,7 +316,7 @@ contract EraMultisigValidatorTest is Test {
     }
 
     function test_changeMembers_removeAndAddSameAddress() public {
-        // Remove and then add the same address in one call — add wins (executed second)
+        // Remove and then add the same address in one call -- add wins (executed second)
         address[] memory toAdd = new address[](1);
         toAdd[0] = member1;
         address[] memory toRemove = new address[](1);
@@ -328,9 +328,9 @@ contract EraMultisigValidatorTest is Test {
         assertTrue(eraMultisig.executionMultisigMember(member1));
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      HASH APPROVAL
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_approveHash_recordsApproval() public {
         bytes32 hash = _sampleHash();
@@ -382,8 +382,8 @@ contract EraMultisigValidatorTest is Test {
     }
 
     function test_approveHash_differentHashesAreIndependent() public {
-        bytes32 hash1 = eraMultisig.calculateHash(chainAddress, 1, 10, hex"aa");
-        bytes32 hash2 = eraMultisig.calculateHash(chainAddress, 1, 10, hex"bb");
+        bytes32 hash1 = eraMultisig.calculateHash(eraMultisigChainAddress, 1, 10, hex"aa");
+        bytes32 hash2 = eraMultisig.calculateHash(eraMultisigChainAddress, 1, 10, hex"bb");
 
         vm.prank(member1);
         eraMultisig.approveHash(hash1);
@@ -395,9 +395,9 @@ contract EraMultisigValidatorTest is Test {
         assertEq(eraMultisig.getApprovals(hash2), 1);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      GET APPROVALS
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_getApprovals_returnsZeroForUnapprovedHash() public view {
         bytes32 hash = _sampleHash();
@@ -444,7 +444,7 @@ contract EraMultisigValidatorTest is Test {
 
         assertEq(eraMultisig.getApprovals(hash), 0);
 
-        // Re-add member1 — their old approval should count again
+        // Re-add member1 -- their old approval should count again
         address[] memory reAdd = new address[](1);
         reAdd[0] = member1;
         address[] memory noRemove = new address[](0);
@@ -478,13 +478,13 @@ contract EraMultisigValidatorTest is Test {
         assertEq(eraMultisig.getApprovals(hash), 0);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      EXECUTE BATCHES
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_executeBatches_succeedsWhenThresholdMet() public {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
-        bytes32 hash = eraMultisig.calculateHash(chainAddress, from, to, data);
+        bytes32 hash = eraMultisig.calculateHash(eraMultisigChainAddress, from, to, data);
 
         vm.prank(member1);
         eraMultisig.approveHash(hash);
@@ -492,12 +492,12 @@ contract EraMultisigValidatorTest is Test {
         eraMultisig.approveHash(hash);
 
         vm.prank(executor);
-        eraMultisig.executeBatchesSharedBridge(chainAddress, from, to, data);
+        eraMultisig.executeBatchesSharedBridge(eraMultisigChainAddress, from, to, data);
     }
 
     function test_executeBatches_revertsWhenBelowThreshold() public {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
-        bytes32 hash = eraMultisig.calculateHash(chainAddress, from, to, data);
+        bytes32 hash = eraMultisig.calculateHash(eraMultisigChainAddress, from, to, data);
 
         // Only 1 approval, threshold is 2
         vm.prank(member1);
@@ -505,7 +505,7 @@ contract EraMultisigValidatorTest is Test {
 
         vm.prank(executor);
         vm.expectRevert(NotEnoughSignatures.selector);
-        eraMultisig.executeBatchesSharedBridge(chainAddress, from, to, data);
+        eraMultisig.executeBatchesSharedBridge(eraMultisigChainAddress, from, to, data);
     }
 
     function test_executeBatches_revertsWithZeroApprovalsAndNonZeroThreshold() public {
@@ -513,7 +513,7 @@ contract EraMultisigValidatorTest is Test {
 
         vm.prank(executor);
         vm.expectRevert(NotEnoughSignatures.selector);
-        eraMultisig.executeBatchesSharedBridge(chainAddress, from, to, data);
+        eraMultisig.executeBatchesSharedBridge(eraMultisigChainAddress, from, to, data);
     }
 
     function test_executeBatches_succeedsWithThresholdZero() public {
@@ -524,12 +524,12 @@ contract EraMultisigValidatorTest is Test {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
 
         vm.prank(executor);
-        eraMultisig.executeBatchesSharedBridge(chainAddress, from, to, data);
+        eraMultisig.executeBatchesSharedBridge(eraMultisigChainAddress, from, to, data);
     }
 
     function test_executeBatches_failsAfterMemberRemovalDropsBelowThreshold() public {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
-        bytes32 hash = eraMultisig.calculateHash(chainAddress, from, to, data);
+        bytes32 hash = eraMultisig.calculateHash(eraMultisigChainAddress, from, to, data);
 
         // Both member1 and member2 approve (meets threshold of 2)
         vm.prank(member1);
@@ -537,7 +537,7 @@ contract EraMultisigValidatorTest is Test {
         vm.prank(member2);
         eraMultisig.approveHash(hash);
 
-        // Remove member1 — drops valid approvals to 1
+        // Remove member1 -- drops valid approvals to 1
         address[] memory toAdd = new address[](0);
         address[] memory toRemove = new address[](1);
         toRemove[0] = member1;
@@ -546,12 +546,12 @@ contract EraMultisigValidatorTest is Test {
 
         vm.prank(executor);
         vm.expectRevert(NotEnoughSignatures.selector);
-        eraMultisig.executeBatchesSharedBridge(chainAddress, from, to, data);
+        eraMultisig.executeBatchesSharedBridge(eraMultisigChainAddress, from, to, data);
     }
 
     function test_executeBatches_succeedsAfterReaddingMember() public {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
-        bytes32 hash = eraMultisig.calculateHash(chainAddress, from, to, data);
+        bytes32 hash = eraMultisig.calculateHash(eraMultisigChainAddress, from, to, data);
 
         vm.prank(member1);
         eraMultisig.approveHash(hash);
@@ -565,7 +565,7 @@ contract EraMultisigValidatorTest is Test {
         vm.prank(owner);
         eraMultisig.changeExecutionMultisigMember(toAdd, toRemove);
 
-        // Re-add member1 — restores to 2 valid approvals
+        // Re-add member1 -- restores to 2 valid approvals
         address[] memory reAdd = new address[](1);
         reAdd[0] = member1;
         address[] memory noRemove = new address[](0);
@@ -573,24 +573,26 @@ contract EraMultisigValidatorTest is Test {
         eraMultisig.changeExecutionMultisigMember(reAdd, noRemove);
 
         vm.prank(executor);
-        eraMultisig.executeBatchesSharedBridge(chainAddress, from, to, data);
+        eraMultisig.executeBatchesSharedBridge(eraMultisigChainAddress, from, to, data);
     }
 
     function test_executeBatches_revertsIfNotExecutorRole() public {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
 
         vm.prank(nonMember);
-        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, executorRole, nonMember));
-        eraMultisig.executeBatchesSharedBridge(chainAddress, from, to, data);
+        vm.expectRevert(
+            abi.encodeWithSelector(RoleAccessDenied.selector, eraMultisigChainAddress, executorRole, nonMember)
+        );
+        eraMultisig.executeBatchesSharedBridge(eraMultisigChainAddress, from, to, data);
     }
 
     function test_executeBatches_thresholdHigherThanMemberCount() public {
-        // Set threshold to 5 but only 3 members exist — impossible to execute
+        // Set threshold to 5 but only 3 members exist -- impossible to execute
         vm.prank(owner);
         eraMultisig.changeThreshold(5);
 
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
-        bytes32 hash = eraMultisig.calculateHash(chainAddress, from, to, data);
+        bytes32 hash = eraMultisig.calculateHash(eraMultisigChainAddress, from, to, data);
 
         vm.prank(member1);
         eraMultisig.approveHash(hash);
@@ -601,82 +603,90 @@ contract EraMultisigValidatorTest is Test {
 
         vm.prank(executor);
         vm.expectRevert(NotEnoughSignatures.selector);
-        eraMultisig.executeBatchesSharedBridge(chainAddress, from, to, data);
+        eraMultisig.executeBatchesSharedBridge(eraMultisigChainAddress, from, to, data);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      PRECOMMIT / COMMIT / PROVE / REVERT FORWARDING
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_precommit_forwardsWithoutApprovalCheck() public {
         vm.prank(executor);
-        eraMultisig.precommitSharedBridge(chainAddress, 1, hex"aa");
+        eraMultisig.precommitSharedBridge(eraMultisigChainAddress, 1, hex"aa");
     }
 
     function test_precommit_revertsIfNotPrecommitterRole() public {
         vm.prank(nonMember);
-        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, precommitterRole, nonMember));
-        eraMultisig.precommitSharedBridge(chainAddress, 1, hex"aa");
+        vm.expectRevert(
+            abi.encodeWithSelector(RoleAccessDenied.selector, eraMultisigChainAddress, precommitterRole, nonMember)
+        );
+        eraMultisig.precommitSharedBridge(eraMultisigChainAddress, 1, hex"aa");
     }
 
     function test_commitBatches_forwardsWithoutApprovalCheck() public {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
 
         vm.prank(executor);
-        eraMultisig.commitBatchesSharedBridge(chainAddress, from, to, data);
+        eraMultisig.commitBatchesSharedBridge(eraMultisigChainAddress, from, to, data);
     }
 
     function test_commitBatches_revertsIfNotCommitterRole() public {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
 
         vm.prank(nonMember);
-        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, committerRole, nonMember));
-        eraMultisig.commitBatchesSharedBridge(chainAddress, from, to, data);
+        vm.expectRevert(
+            abi.encodeWithSelector(RoleAccessDenied.selector, eraMultisigChainAddress, committerRole, nonMember)
+        );
+        eraMultisig.commitBatchesSharedBridge(eraMultisigChainAddress, from, to, data);
     }
 
     function test_proveBatches_forwardsWithoutApprovalCheck() public {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
 
         vm.prank(executor);
-        eraMultisig.proveBatchesSharedBridge(chainAddress, from, to, data);
+        eraMultisig.proveBatchesSharedBridge(eraMultisigChainAddress, from, to, data);
     }
 
     function test_proveBatches_revertsIfNotProverRole() public {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
 
         vm.prank(nonMember);
-        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, proverRole, nonMember));
-        eraMultisig.proveBatchesSharedBridge(chainAddress, from, to, data);
+        vm.expectRevert(
+            abi.encodeWithSelector(RoleAccessDenied.selector, eraMultisigChainAddress, proverRole, nonMember)
+        );
+        eraMultisig.proveBatchesSharedBridge(eraMultisigChainAddress, from, to, data);
     }
 
     function test_revertBatches_forwardsWithoutApprovalCheck() public {
         vm.prank(executor);
-        eraMultisig.revertBatchesSharedBridge(chainAddress, 5);
+        eraMultisig.revertBatchesSharedBridge(eraMultisigChainAddress, 5);
     }
 
     function test_revertBatches_revertsIfNotReverterRole() public {
         vm.prank(nonMember);
-        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, chainAddress, reverterRole, nonMember));
-        eraMultisig.revertBatchesSharedBridge(chainAddress, 5);
+        vm.expectRevert(
+            abi.encodeWithSelector(RoleAccessDenied.selector, eraMultisigChainAddress, reverterRole, nonMember)
+        );
+        eraMultisig.revertBatchesSharedBridge(eraMultisigChainAddress, 5);
     }
 
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
     //                      CALCULATE HASH (EIP-712)
-    // ═══════════════════════════════════════════════════════════════════
+    // =====================================================================
 
     function test_calculateHash_deterministic() public view {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
-        bytes32 hash1 = eraMultisig.calculateHash(chainAddress, from, to, data);
-        bytes32 hash2 = eraMultisig.calculateHash(chainAddress, from, to, data);
+        bytes32 hash1 = eraMultisig.calculateHash(eraMultisigChainAddress, from, to, data);
+        bytes32 hash2 = eraMultisig.calculateHash(eraMultisigChainAddress, from, to, data);
         assertEq(hash1, hash2);
     }
 
     function test_calculateHash_differentParamsProduceDifferentHashes() public {
         address otherChain = makeAddr("otherChain");
-        bytes32 hash1 = eraMultisig.calculateHash(chainAddress, 1, 10, hex"aa");
-        bytes32 hash2 = eraMultisig.calculateHash(chainAddress, 1, 11, hex"aa");
-        bytes32 hash3 = eraMultisig.calculateHash(chainAddress, 2, 10, hex"aa");
-        bytes32 hash4 = eraMultisig.calculateHash(chainAddress, 1, 10, hex"bb");
+        bytes32 hash1 = eraMultisig.calculateHash(eraMultisigChainAddress, 1, 10, hex"aa");
+        bytes32 hash2 = eraMultisig.calculateHash(eraMultisigChainAddress, 1, 11, hex"aa");
+        bytes32 hash3 = eraMultisig.calculateHash(eraMultisigChainAddress, 2, 10, hex"aa");
+        bytes32 hash4 = eraMultisig.calculateHash(eraMultisigChainAddress, 1, 10, hex"bb");
         bytes32 hash5 = eraMultisig.calculateHash(otherChain, 1, 10, hex"aa");
 
         assertTrue(hash1 != hash2);
@@ -687,7 +697,7 @@ contract EraMultisigValidatorTest is Test {
 
     function test_calculateHash_nonZero() public view {
         (uint256 from, uint256 to, bytes memory data) = _sampleBatchData();
-        bytes32 hash = eraMultisig.calculateHash(chainAddress, from, to, data);
+        bytes32 hash = eraMultisig.calculateHash(eraMultisigChainAddress, from, to, data);
         assertTrue(hash != bytes32(0));
     }
 }

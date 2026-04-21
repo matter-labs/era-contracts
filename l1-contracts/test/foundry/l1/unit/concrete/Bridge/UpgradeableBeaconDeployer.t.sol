@@ -2,15 +2,17 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {UpgradeableBeaconDeployer} from "contracts/bridge/UpgradeableBeaconDeployer.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
 /// @notice Unit tests for UpgradeableBeaconDeployer
-contract UpgradeableBeaconDeployerTest is Test {
+contract UpgradeableBeaconDeployerTest is MigrationTestBase {
     UpgradeableBeaconDeployer internal deployer;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         deployer = new UpgradeableBeaconDeployer();
     }
 

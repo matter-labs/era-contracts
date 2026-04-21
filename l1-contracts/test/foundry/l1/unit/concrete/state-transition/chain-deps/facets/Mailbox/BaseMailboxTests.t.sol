@@ -9,8 +9,8 @@ import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
 import {BaseTokenGasPriceDenominatorNotSet} from "contracts/common/L1ContractErrors.sol";
 
 contract MailboxBaseTests is MailboxTest {
-    function setUp() public virtual {
-        setupDiamondProxy();
+    function setUp() public virtual override {
+        super.setUp();
         utilsFacet.util_setBaseTokenGasPriceMultiplierDenominator(1);
         utilsFacet.util_setBaseTokenGasPriceMultiplierNominator(1);
     }

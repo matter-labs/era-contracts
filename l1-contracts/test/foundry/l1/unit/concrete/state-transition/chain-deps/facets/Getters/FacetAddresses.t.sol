@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 
 contract FacetAddressesTest is GettersFacetTest {
-    function test() public {
+    function test_getter() public {
         address[] memory expected = new address[](2);
         expected[0] = address(1);
         expected[1] = address(2);

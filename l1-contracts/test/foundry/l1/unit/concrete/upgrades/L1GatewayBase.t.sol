@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {L1FixedForceDeploymentsHelper} from "contracts/upgrades/L1FixedForceDeploymentsHelper.sol"; // Adjust the import path accordingly
 import {ZKChainStorage} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
@@ -56,7 +57,7 @@ contract MockERC20TokenWithMetadata {
 
 contract MockERC20TokenWithoutMetadata {}
 
-contract L1FixedForceDeploymentsHelperTest is Test {
+contract L1FixedForceDeploymentsHelperTest is MigrationTestBase {
     TestL1FixedForceDeploymentsHelper testGateway;
     // Mocks for dependencies
     address bridgehubMock;
@@ -72,11 +73,15 @@ contract L1FixedForceDeploymentsHelperTest is Test {
     uint256 chainId = 123;
     bytes32 baseTokenAssetId;
 
-    function setUp() public {
+    function setUp() public override {
+        // Deploy real ecosystem — real bridgehub provides assetRouter and NTV
+        _deployIntegrationBase();
+
         baseTokenAssetId = bytes32("baseTokenAssetId");
-        bridgehubMock = makeAddr("bridgehubMock");
-        sharedBridgeMock = makeAddr("sharedBridgeMock");
-        nativeTokenVaultMock = makeAddr("nativeTokenVaultMock");
+        // Use real bridgehub — assetRouter() and nativeTokenVault() resolve without mocks
+        bridgehubMock = address(addresses.bridgehub);
+        sharedBridgeMock = address(addresses.sharedBridge);
+        nativeTokenVaultMock = address(addresses.l1NativeTokenVault);
         legacySharedBridgeAddress = makeAddr("legacySharedBridgeAddress");
 
         testGateway = new TestL1FixedForceDeploymentsHelper();
@@ -87,16 +92,12 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         // Set base token asset ID
         testGateway.setBaseTokenAssetId(baseTokenAssetId);
 
-        vm.mockCall(bridgehubMock, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(sharedBridgeMock));
+        // Real bridgehub.assetRouter() and assetRouter.nativeTokenVault() resolve — no mocks needed.
+        // Keep mocks for test-specific data: chain 123 not registered, fake baseTokenAssetId.
         vm.mockCall(
             sharedBridgeMock,
             abi.encodeCall(IL1SharedBridgeLegacy.l2BridgeAddress, (chainId)),
             abi.encode(address(legacySharedBridgeAddress))
-        );
-        vm.mockCall(
-            sharedBridgeMock,
-            abi.encodeCall(IL1AssetRouter.nativeTokenVault, ()),
-            abi.encode(nativeTokenVaultMock)
         );
         vm.mockCall(
             nativeTokenVaultMock,

@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {
@@ -21,7 +22,7 @@ import {
 import {CTMNotRegistered, UnsupportedEncodingVersion} from "contracts/common/L1ContractErrors.sol";
 
 /// @title Extended tests for CTMDeploymentTracker to increase coverage
-contract CTMDeploymentTrackerExtendedTest is Test {
+contract CTMDeploymentTrackerExtendedTest is MigrationTestBase {
     CTMDeploymentTracker public ctmDeploymentTracker;
 
     address public owner;
@@ -30,7 +31,8 @@ contract CTMDeploymentTrackerExtendedTest is Test {
     address public assetRouter;
     address public chainAssetHandler;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         owner = makeAddr("owner");
         proxyAdmin = makeAddr("proxyAdmin");
         bridgehub = makeAddr("bridgehub");

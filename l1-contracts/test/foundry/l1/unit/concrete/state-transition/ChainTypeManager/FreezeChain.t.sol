@@ -8,7 +8,8 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {DiamondAlreadyFrozen} from "contracts/common/L1ContractErrors.sol";
 
 contract freezeChainTest is ChainTypeManagerTest {
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         deploy();
     }
 

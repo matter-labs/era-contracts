@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.21;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -16,7 +16,7 @@ import {Utils} from "../../Utils/Utils.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
-contract L1Erc20BridgeTest is Test {
+contract L1Erc20BridgeTest is MigrationTestBase {
     L1ERC20Bridge internal bridge;
 
     ReenterL1ERC20Bridge internal reenterL1ERC20Bridge;
@@ -66,5 +66,5 @@ contract L1Erc20BridgeTest is Test {
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal virtual override {}
 }

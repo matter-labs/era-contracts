@@ -12,7 +12,7 @@ contract IsFacetFreezableTest is GettersFacetTest {
         assertFalse(received, "Received isFacetFreezable is incorrect");
     }
 
-    function test() public {
+    function test_getter() public {
         address facet = makeAddr("facet");
         gettersFacetWrapper.util_setIsFacetFreezable(facet, true);
 

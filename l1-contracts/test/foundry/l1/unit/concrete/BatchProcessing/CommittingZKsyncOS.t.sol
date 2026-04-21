@@ -22,7 +22,9 @@ contract CommittingTest is ExecutorTest {
         return true;
     }
 
-    function setUp() public {}
+    function setUp() public override {
+        super.setUp();
+    }
 
     function test_SuccessfullyCommitBatchWithCalldata() public {
         // Calldata DA

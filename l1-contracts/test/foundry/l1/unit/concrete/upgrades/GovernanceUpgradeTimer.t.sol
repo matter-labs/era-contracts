@@ -3,6 +3,7 @@ pragma solidity ^0.8.18;
 
 // Import Foundry's Test framework
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 
@@ -15,7 +16,7 @@ import {
     ZeroAddress
 } from "contracts/common/L1ContractErrors.sol";
 
-contract GovernanceUpgradeTimerTest is Test {
+contract GovernanceUpgradeTimerTest is MigrationTestBase {
     // Instance of the contract under test
     GovernanceUpgradeTimer timer;
 
@@ -35,7 +36,8 @@ contract GovernanceUpgradeTimerTest is Test {
     event DeadlineChanged(uint256 newDeadline);
 
     // setUp is run before each test
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         owner = makeAddr("owner");
         newOwner = makeAddr("newOwner");
         timerGovernance = makeAddr("timerGovernance");

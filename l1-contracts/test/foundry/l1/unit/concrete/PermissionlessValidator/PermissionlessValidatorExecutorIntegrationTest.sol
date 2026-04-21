@@ -16,7 +16,8 @@ contract PermissionlessValidatorExecutorIntegrationTest is ExecutorTest {
         return true;
     }
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         _activatePriorityMode();
     }
 

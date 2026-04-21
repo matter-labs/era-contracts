@@ -42,11 +42,12 @@ import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7
 
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
+import {L1ContractDeployer} from "foundry-test/l1/integration/_SharedL1ContractDeployer.t.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
-contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
+contract ZKsyncOSChainTypeManagerTest is MigrationTestBase {
     using stdStorage for StdStorage;
 
     ZKsyncOSChainTypeManager internal chainTypeManager;
@@ -77,7 +78,8 @@ contract ZKsyncOSChainTypeManagerTest is UtilsCallMockerTest {
 
     Diamond.FacetCut[] internal facetCuts;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         // Avoid block.timestamp == 0 to keep paused-deposits sentinel semantics stable in tests.
         vm.warp(1);
 

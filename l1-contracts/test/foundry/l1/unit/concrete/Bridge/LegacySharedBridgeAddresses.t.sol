@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {
     LegacySharedBridgeAddresses,
@@ -19,7 +20,7 @@ contract LegacySharedBridgeAddressesWrapper {
 }
 
 /// @notice Unit tests for LegacySharedBridgeAddresses library
-contract LegacySharedBridgeAddressesTest is Test {
+contract LegacySharedBridgeAddressesTest is MigrationTestBase {
     LegacySharedBridgeAddressesWrapper internal wrapper;
 
     address constant STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS =
@@ -29,7 +30,8 @@ contract LegacySharedBridgeAddressesTest is Test {
     address constant MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS =
         LegacySharedBridgeAddresses.MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         wrapper = new LegacySharedBridgeAddressesWrapper();
     }
 

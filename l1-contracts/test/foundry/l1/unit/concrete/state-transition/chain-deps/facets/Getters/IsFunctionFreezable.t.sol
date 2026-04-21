@@ -14,7 +14,7 @@ contract IsFunctionFreezableTest is GettersFacetTest {
         assertFalse(gettersFacet.isFunctionFreezable(selector));
     }
 
-    function test() public {
+    function test_getter() public {
         bytes4 selector = bytes4(keccak256("asdfghfjtyhrewd"));
         gettersFacetWrapper.util_setFacetAddress(selector, makeAddr("nonZeroAddress"));
         gettersFacetWrapper.util_setIsFunctionFreezable(selector, true);

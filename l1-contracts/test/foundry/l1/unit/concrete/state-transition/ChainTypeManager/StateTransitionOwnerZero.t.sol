@@ -12,7 +12,8 @@ import {
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract initializingCTMOwnerZeroTest is ChainTypeManagerTest {
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         deploy();
     }
 

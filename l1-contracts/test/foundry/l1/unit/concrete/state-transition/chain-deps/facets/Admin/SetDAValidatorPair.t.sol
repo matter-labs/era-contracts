@@ -6,6 +6,7 @@ import {InvalidL2DACommitmentScheme, Unauthorized} from "contracts/common/L1Cont
 import {L1DAValidatorAddressIsZero} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 contract SetDAValidatorPair is AdminTest {
     function test_revertWhen_calledByNonAdmin() public {
@@ -22,10 +23,14 @@ contract SetDAValidatorPair is AdminTest {
     function test_SuccessfulSet() public {
         address admin = utilsFacet.util_getAdmin();
 
+        // Get current DA state (may be non-zero from integration deployment)
+        (address currentL1DAValidator, L2DACommitmentScheme currentScheme) = IGetters(address(adminFacet))
+            .getDAValidatorPair();
+
         vm.expectEmit(true, true, true, true, address(adminFacet));
-        emit IAdmin.NewL1DAValidator(address(0), address(1));
+        emit IAdmin.NewL1DAValidator(currentL1DAValidator, address(1));
         vm.expectEmit(true, true, true, true, address(adminFacet));
-        emit IAdmin.NewL2DACommitmentScheme(L2DACommitmentScheme.NONE, L2DACommitmentScheme.EMPTY_NO_DA);
+        emit IAdmin.NewL2DACommitmentScheme(currentScheme, L2DACommitmentScheme.EMPTY_NO_DA);
 
         vm.startPrank(admin);
         adminFacet.setDAValidatorPair(address(1), L2DACommitmentScheme.EMPTY_NO_DA);

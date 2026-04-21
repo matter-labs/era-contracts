@@ -52,7 +52,8 @@ contract UpgradeLogicTest is DiamondCutTest {
         return selectors;
     }
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         admin = makeAddr("admin");
         chainTypeManager = address(new DummyChainTypeManager());
         randomSigner = makeAddr("randomSigner");

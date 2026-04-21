@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 
 contract GetTotalBlocksVerifiedTest is GettersFacetTest {
-    function test() public {
+    function test_getter() public {
         uint256 expected = 123456787654345789;
         gettersFacetWrapper.util_setTotalBatchesVerified(expected);
 

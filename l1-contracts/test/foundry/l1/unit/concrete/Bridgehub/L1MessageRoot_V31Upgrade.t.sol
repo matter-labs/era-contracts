@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "test/foundry/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/message-root/IMessageRoot.sol";
@@ -16,33 +16,31 @@ import {
     OnlyOnSettlementLayer
 } from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 
-contract L1MessageRootV31UpgradeTest is Test {
+contract L1MessageRootV31UpgradeTest is MigrationTestBase {
     address bridgeHub;
     L1MessageRoot messageRoot;
 
     uint256 constant CHAIN_ID = 271;
     uint256 constant TOTAL_BATCHES_EXECUTED = 100;
 
-    function setUp() public {
-        bridgeHub = makeAddr("bridgeHub");
+    function setUp() public virtual override {
+        // Deploy real ecosystem — real bridgehub answers queries without mocks
+        _deployIntegrationBase();
 
-        // Mock getAllZKChainChainIDs to return empty array for constructor
-        uint256[] memory allZKChainChainIDs = new uint256[](0);
+        bridgeHub = address(addresses.bridgehub);
+        address chainAssetHandler = addresses.bridgehub.chainAssetHandler();
+
+        // L1MessageRoot rejects construction when bridgehub has registered chains.
         vm.mockCall(
             bridgeHub,
             abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
-            abi.encode(allZKChainChainIDs)
-        );
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(makeAddr("chainAssetHandler"))
+            abi.encode(new uint256[](0))
         );
 
         messageRoot = L1MessageRoot(
             address(
                 new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(bridgeHub, 1, makeAddr("chainAssetHandler"))),
+                    address(new L1MessageRoot(bridgeHub, block.chainid, chainAssetHandler)),
                     address(uint160(1)),
                     abi.encodeCall(L1MessageRoot.initialize, ())
                 )
@@ -55,7 +53,7 @@ contract L1MessageRootV31UpgradeTest is Test {
     }
 
     function test_ERA_GATEWAY_CHAIN_ID() public view {
-        assertEq(messageRoot.ERA_GATEWAY_CHAIN_ID(), 1);
+        assertEq(messageRoot.ERA_GATEWAY_CHAIN_ID(), block.chainid);
     }
 
     function test_RevertWhen_SaveV31UpgradeChainBatchNumber_NotOnSettlementLayer() public {

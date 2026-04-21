@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {SystemContractProxy} from "contracts/l2-upgrades/SystemContractProxy.sol";
 import {ISystemContractProxy} from "contracts/l2-upgrades/ISystemContractProxy.sol";
@@ -49,7 +50,7 @@ contract MockImplementation {
     }
 }
 
-contract SystemContractProxyTest is Test {
+contract SystemContractProxyTest is MigrationTestBase {
     // ERC1967 slots (from OpenZeppelin):
     // bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1)
     bytes32 internal constant _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
@@ -67,7 +68,8 @@ contract SystemContractProxyTest is Test {
     MockImplementation internal impl1;
     MockImplementation internal impl2;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         owner = makeAddr("owner");
         newAdmin = makeAddr("newAdmin");
         user = makeAddr("user");

@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {L2ProxyAdminDeployer} from "contracts/governance/L2ProxyAdminDeployer.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 /// @notice Unit tests for L2ProxyAdminDeployer
-contract L2ProxyAdminDeployerTest is Test {
+contract L2ProxyAdminDeployerTest is MigrationTestBase {
     address internal aliasedGovernance;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         aliasedGovernance = makeAddr("aliasedGovernance");
     }
 

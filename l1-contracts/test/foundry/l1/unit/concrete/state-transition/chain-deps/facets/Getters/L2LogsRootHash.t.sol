@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 
 contract L2LogsRootHashTest is GettersFacetTest {
-    function test() public {
+    function test_getter() public {
         uint256 batchNumber = 42;
         bytes32 expected = keccak256("L2 Logs Root Hash");
         gettersFacetWrapper.util_setL2LogsRootHash(batchNumber, expected);

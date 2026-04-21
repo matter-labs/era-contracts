@@ -13,7 +13,8 @@ import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract ChainTypeManagerSetters is ChainTypeManagerTest {
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         deploy();
     }
 

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "test/foundry/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/message-root/IMessageRoot.sol";
@@ -12,19 +12,17 @@ import {V31UpgradeChainBatchNumberAlreadySet} from "contracts/core/bridgehub/L1B
 
 /// @title L1MessageRootPlaceholderRegressionTest
 /// @notice Regression tests for the V31 upgrade batch number placeholder fix
-contract L1MessageRootPlaceholderRegressionTest is Test {
+contract L1MessageRootPlaceholderRegressionTest is MigrationTestBase {
     address bridgeHub;
 
     uint256 constant CHAIN_ID = 271;
     uint256 constant TOTAL_BATCHES_EXECUTED = 100;
 
-    function setUp() public {
-        bridgeHub = makeAddr("bridgeHub");
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(makeAddr("chainAssetHandler"))
-        );
+    function setUp() public virtual override {
+        // Deploy real ecosystem — real bridgehub answers chainAssetHandler() without mocks
+        _deployIntegrationBase();
+
+        bridgeHub = address(addresses.bridgehub);
     }
 
     /// @notice Test demonstrating the regression: chains with placeholder value can be updated

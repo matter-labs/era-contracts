@@ -56,7 +56,8 @@ contract RevertBatchesTest is ChainTypeManagerTest {
     CommitterFacet internal committerFacet;
     GettersFacet internal gettersFacet;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         deploy();
 
         defaultBlobCommitment = Utils.getDefaultBlobCommitment();
@@ -111,8 +112,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(0));
         }
 
-        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
-
+        // Real bridgehub provides assetRouter/NTV/assetTracker — no interop center mocks needed.
         newChainAddress = createNewChain(getDiamondCutData(diamondInit));
         vm.mockCall(
             address(bridgehub),

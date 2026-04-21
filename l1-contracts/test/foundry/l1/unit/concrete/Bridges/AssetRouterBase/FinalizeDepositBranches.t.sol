@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
@@ -78,12 +79,13 @@ contract TestAssetRouterBase is AssetRouterBase {
     }
 }
 
-contract AssetRouterBase_FinalizeDepositBranches_Test is Test {
+contract AssetRouterBase_FinalizeDepositBranches_Test is MigrationTestBase {
     TestAssetRouterBase router;
     MockAssetHandler existingHandler;
     MockAssetHandler ntvHandler;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         router = new TestAssetRouterBase();
         existingHandler = new MockAssetHandler();
         ntvHandler = new MockAssetHandler();

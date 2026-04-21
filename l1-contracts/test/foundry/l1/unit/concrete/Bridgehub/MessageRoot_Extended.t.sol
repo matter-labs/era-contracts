@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "test/foundry/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
@@ -32,7 +32,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
-contract MessageRoot_Extended_Test is Test {
+contract MessageRoot_Extended_Test is MigrationTestBase {
     address bridgeHub;
     uint256 L1_CHAIN_ID;
     uint256 gatewayChainId;
@@ -41,27 +41,22 @@ contract MessageRoot_Extended_Test is Test {
     address assetTracker;
     address chainAssetHandler;
 
-    function setUp() public {
-        bridgeHub = address(new L1Bridgehub(makeAddr("owner"), 10));
-        chainAssetHandler = makeAddr("chainAssetHandler");
+    function setUp() public virtual override {
+        // Deploy real ecosystem — real bridgehub answers queries without mocks
+        _deployIntegrationBase();
+
+        bridgeHub = address(addresses.bridgehub);
+        chainAssetHandler = addresses.bridgehub.chainAssetHandler();
         assetTracker = makeAddr("assetTracker");
         L1_CHAIN_ID = 1;
         gatewayChainId = 506;
 
-        vm.mockCall(bridgeHub, abi.encodeWithSelector(IL1Bridgehub.L1_CHAIN_ID.selector), abi.encode(L1_CHAIN_ID));
+        // L1MessageRoot rejects construction when bridgehub has registered chains.
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(chainAssetHandler)
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
+            abi.encode(new uint256[](0))
         );
-        vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
-
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector),
-            abi.encode(makeAddr("chainTypeManager"))
-        );
-        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector), abi.encode(0));
 
         messageRoot = L1MessageRoot(
             address(
@@ -74,13 +69,8 @@ contract MessageRoot_Extended_Test is Test {
         );
         l2MessageRoot = new L2MessageRoot();
 
-        uint256[] memory allZKChainChainIDs = new uint256[](1);
-        allZKChainChainIDs[0] = 271;
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
-            abi.encode(allZKChainChainIDs)
-        );
+        // Real bridgehub answers: L1_CHAIN_ID, chainAssetHandler, owner,
+        // chainTypeManager, settlementLayer — no mocks needed
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);

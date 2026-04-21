@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -64,7 +65,7 @@ contract MockBridgedToken is ERC20 {
     }
 }
 
-contract L1NativeTokenVaultExtendedTest is Test {
+contract L1NativeTokenVaultExtendedTest is MigrationTestBase {
     using stdStorage for StdStorage;
 
     L1NativeTokenVault public l1NTV;
@@ -82,7 +83,8 @@ contract L1NativeTokenVaultExtendedTest is Test {
     uint256 public constant CHAIN_ID = 123;
     bytes32 public baseTokenAssetId;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         owner = makeAddr("owner");
         proxyAdmin = makeAddr("proxyAdmin");
         wethToken = makeAddr("wethToken");

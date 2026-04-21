@@ -14,7 +14,8 @@ import {CommitBatchInfo} from "contracts/state-transition/chain-interfaces/IComm
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
+import {L1ContractDeployer} from "foundry-test/l1/integration/_SharedL1ContractDeployer.t.sol";
 import {EraTestnetVerifier} from "contracts/state-transition/verifiers/EraTestnetVerifier.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
@@ -55,8 +56,8 @@ contract TestCommitterFacet is CommitterFacet {
     function test() internal virtual {}
 }
 
-contract ExecutorProofTest is UtilsCallMockerTest {
-    UtilsFacet internal utilsFacet;
+contract ExecutorProofTest is MigrationTestBase {
+    // utilsFacet inherited from MigrationTestBase
     TestExecutorFacet internal executor;
     TestCommitterFacet internal committer;
     address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
@@ -75,7 +76,8 @@ contract ExecutorProofTest is UtilsCallMockerTest {
         return selectors;
     }
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(new TestExecutorFacet()),

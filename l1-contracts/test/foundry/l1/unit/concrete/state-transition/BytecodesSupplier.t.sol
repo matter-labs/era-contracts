@@ -2,13 +2,14 @@
 pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import "contracts/upgrades/BytecodesSupplier.sol";
 import "contracts/common/l2-helpers/L2ContractHelper.sol";
 import "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-contract BytecodesSupplierTest is Test {
+contract BytecodesSupplierTest is MigrationTestBase {
     BytecodesSupplier bytecodesSupplier;
     bytes internal bytecode1 = hex"0000000000000000000000000000000000000000000000000000000000000000";
     bytes internal bytecode2 = hex"1111111111111111111111111111111111111111111111111111111111111111";
@@ -20,7 +21,8 @@ contract BytecodesSupplierTest is Test {
     event BytecodePublished(bytes32 indexed bytecodeHash, bytes bytecode);
     event EVMBytecodePublished(bytes32 indexed bytecodeHash, bytes bytecode);
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         // Deploy with transparent upgradeable proxy
         // Use a separate admin address to avoid "admin cannot fallback to proxy target" error
         address proxyAdmin = makeAddr("proxyAdmin");

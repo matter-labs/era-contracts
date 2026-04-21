@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "test/foundry/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import "forge-std/console.sol";
 
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
@@ -14,10 +14,12 @@ import {DepthMoreThanOneForRecursiveMerkleProof} from "contracts/core/bridgehub/
 /// @title L2MessageVerificationDepthRegressionTest
 /// @notice Regression tests for the depth argument fix in L2MessageVerification
 /// passes _depth + 1.
-contract L2MessageVerificationDepthRegressionTest is Test {
+contract L2MessageVerificationDepthRegressionTest is MigrationTestBase {
     L2MessageVerification l2MessageVerification;
 
-    function setUp() public {
+    function setUp() public virtual override {
+        super.setUp();
+
         l2MessageVerification = new L2MessageVerification();
     }
 

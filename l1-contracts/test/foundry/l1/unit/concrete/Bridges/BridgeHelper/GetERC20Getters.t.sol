@@ -2,15 +2,17 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {BridgeHelperTest} from "contracts/dev-contracts/test/BridgeHelperTest.sol";
 import {RevertFallback} from "contracts/dev-contracts/RevertFallback.sol";
 
-contract GetERC20GettersTest is Test {
+contract GetERC20GettersTest is MigrationTestBase {
     BridgeHelperTest helper;
     RevertFallback bad;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         helper = new BridgeHelperTest();
         bad = new RevertFallback();
     }

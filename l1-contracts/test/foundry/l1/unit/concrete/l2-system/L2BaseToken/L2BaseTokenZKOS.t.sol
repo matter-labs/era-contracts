@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {L2BaseTokenZKOS} from "contracts/l2-system/zksync-os/L2BaseTokenZKOS.sol";
 import {IL2BaseTokenBase} from "contracts/l2-system/interfaces/IL2BaseTokenBase.sol";
@@ -36,7 +37,7 @@ import {DummyL2BaseTokenHolder} from "contracts/dev-contracts/test/DummyL2BaseTo
 
 /// @title L2BaseTokenZKOSTest
 /// @notice Unit tests for L2BaseTokenZKOS contract
-contract L2BaseTokenZKOSTest is Test {
+contract L2BaseTokenZKOSTest is MigrationTestBase {
     L2BaseTokenZKOS internal l2BaseToken;
 
     address internal l1Receiver;
@@ -51,7 +52,8 @@ contract L2BaseTokenZKOSTest is Test {
     );
     event L1MessageSent(address indexed _sender, bytes32 indexed _hash, bytes _message);
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         l2BaseToken = new L2BaseTokenZKOS();
         l1Receiver = makeAddr("l1Receiver");
 

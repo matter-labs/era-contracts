@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 
 contract GetChainTypeManagerTest is GettersFacetTest {
-    function test() public {
+    function test_getter() public {
         address expected = makeAddr("chainTypeManager");
         gettersFacetWrapper.util_setChainTypeManager(expected);
 

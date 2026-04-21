@@ -2,7 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
+import {L1ContractDeployer} from "foundry-test/l1/integration/_SharedL1ContractDeployer.t.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
@@ -12,7 +13,7 @@ import {Forwarder} from "contracts/dev-contracts/Forwarder.sol";
 import {RevertFallback} from "contracts/dev-contracts/RevertFallback.sol";
 import {EventOnFallbackTargetExpected} from "../../../../L1TestsErrors.sol";
 
-contract GovernanceTest is Test, EventOnFallback {
+contract GovernanceTest is MigrationTestBase, EventOnFallback {
     address internal owner;
     address internal securityCouncil;
     address internal randomSigner;
@@ -21,7 +22,9 @@ contract GovernanceTest is Test, EventOnFallback {
     Forwarder internal forwarder;
     RevertFallback internal revertFallback;
 
-    constructor() {
+    function setUp() public virtual override {
+        super.setUp();
+
         owner = makeAddr("owner");
         securityCouncil = makeAddr("securityCouncil");
         randomSigner = makeAddr("randomSigner");
@@ -30,9 +33,7 @@ contract GovernanceTest is Test, EventOnFallback {
         eventOnFallback = new EventOnFallback();
         forwarder = new Forwarder();
         revertFallback = new RevertFallback();
-    }
 
-    function setUp() external {
         vm.warp(100000000);
     }
 
@@ -67,6 +68,9 @@ contract GovernanceTest is Test, EventOnFallback {
         return IGovernance.Operation({calls: calls, salt: bytes32(0), predecessor: bytes32(0)});
     }
 
+    // Resolve test() from multiple base classes (EventOnFallback and L1ContractDeployer)
+    function test() internal virtual override(EventOnFallback, L1ContractDeployer) {}
+
     // add this to be excluded from coverage report
-    function test() internal override {}
+    function testGovernanceShared() internal {}
 }

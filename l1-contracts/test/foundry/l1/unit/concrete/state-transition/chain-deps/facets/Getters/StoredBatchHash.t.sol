@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 
 contract StoredBatchHashTest is GettersFacetTest {
-    function test() public {
+    function test_getter() public {
         uint256 batchNumber = 42;
         bytes32 expected = keccak256("Stored Batch Hash");
         gettersFacetWrapper.util_setStoredBatchHash(batchNumber, expected);

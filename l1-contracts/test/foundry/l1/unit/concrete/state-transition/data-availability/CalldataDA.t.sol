@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {Utils} from "../../Utils/Utils.sol";
 import {TestCalldataDA} from "contracts/dev-contracts/test/TestCalldataDA.sol";
 import {
@@ -20,10 +21,11 @@ import {
     PubdataLengthTooBig
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-contract CalldataDATest is Test {
+contract CalldataDATest is MigrationTestBase {
     TestCalldataDA calldataDA;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         calldataDA = new TestCalldataDA();
     }
 

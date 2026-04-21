@@ -6,7 +6,7 @@ import {GettersFacetTest} from "./_Getters_Shared.t.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 contract GetVerifierParamsTest is GettersFacetTest {
-    function test() public {
+    function test_getter() public {
         VerifierParams memory expected = VerifierParams({
             recursionNodeLevelVkHash: keccak256("recursionNodeLevelVkHash"),
             recursionLeafLevelVkHash: keccak256("recursionLeafLevelVkHash"),

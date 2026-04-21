@@ -15,7 +15,8 @@ contract InitializationTest is DiamondCutTest {
     address private returnSomethingAddress;
     address private signerAddress; // EOA
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         signerAddress = makeAddr("signer");
         diamondCutTestContract = new DiamondCutTestContract();
         revertFallbackAddress = address(new RevertFallback());

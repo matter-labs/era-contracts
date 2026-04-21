@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
@@ -20,7 +20,7 @@ import {
     ZeroUpgradeTimestamp
 } from "contracts/common/L1ContractErrors.sol";
 
-contract ChainAdminTest is Test {
+contract ChainAdminTest is MigrationTestBase {
     ChainAdmin internal chainAdmin;
     AccessControlRestriction internal restriction;
     GettersFacet internal gettersFacet;
@@ -32,7 +32,8 @@ contract ChainAdminTest is Test {
     uint32 internal patch;
     bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         owner = makeAddr("random address");
 
         restriction = new AccessControlRestriction(0, owner);

@@ -5,7 +5,8 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
 contract AdminTest is ChainTypeManagerTest {
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         deploy();
     }
 

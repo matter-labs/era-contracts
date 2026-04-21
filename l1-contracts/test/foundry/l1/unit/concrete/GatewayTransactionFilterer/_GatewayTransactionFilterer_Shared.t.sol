@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.21;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -10,21 +10,25 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 
-contract GatewayTransactionFiltererTest is Test {
+contract GatewayTransactionFiltererTest is MigrationTestBase {
     GatewayTransactionFilterer internal transactionFiltererProxy;
     GatewayTransactionFilterer internal transactionFiltererImplementation;
-    address internal owner = makeAddr("owner");
-    address internal admin = makeAddr("admin");
-    address internal sender = makeAddr("sender");
-    address internal bridgehub = makeAddr("bridgehub");
-    address internal assetRouter = makeAddr("assetRouter");
+    address internal owner;
+    address internal admin;
+    address internal sender;
+    address internal bridgehub;
+    address internal assetRouter;
 
-    constructor() {
+    function setUp() public virtual override {
+        _deployIntegrationBase();
+
         owner = makeAddr("owner");
         admin = makeAddr("admin");
         sender = makeAddr("sender");
-        bridgehub = makeAddr("bridgehub");
-        assetRouter = makeAddr("assetRouter");
+        // Use real bridgehub and assetRouter from integration deployment
+        bridgehub = address(addresses.bridgehub);
+        assetRouter = address(addresses.sharedBridge);
+
         transactionFiltererImplementation = new GatewayTransactionFilterer(IBridgehubBase(bridgehub), assetRouter);
 
         transactionFiltererProxy = GatewayTransactionFilterer(
@@ -39,5 +43,5 @@ contract GatewayTransactionFiltererTest is Test {
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal virtual override {}
 }

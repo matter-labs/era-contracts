@@ -2,8 +2,10 @@
 
 pragma solidity ^0.8.21;
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
-import {console2 as console} from "forge-std/Script.sol";
+import {StdStorage, stdStorage} from "forge-std/Test.sol";
+
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
+import {L1ContractDeployer} from "foundry-test/l1/integration/_SharedL1ContractDeployer.t.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -45,12 +47,12 @@ import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7
 
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 import {L1ChainAssetHandler} from "contracts/core/chain-asset-handler/L1ChainAssetHandler.sol";
 import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 import {PermissionlessValidator} from "contracts/state-transition/validators/PermissionlessValidator.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
-contract ChainTypeManagerTest is UtilsCallMockerTest {
+contract ChainTypeManagerTest is MigrationTestBase {
     using stdStorage for StdStorage;
 
     EraChainTypeManager internal chainTypeManager;
@@ -70,11 +72,11 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     address internal validator;
     address internal l1Nullifier;
     address internal serverNotifier;
-    bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
+    bytes32 internal baseTokenAssetId;
     address internal newChainAdmin;
-    uint256 l1ChainId = 5;
+    uint256 l1ChainId;
     uint256 chainId = 112;
-    address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier;
     bytes internal forceDeploymentsData = hex"";
 
     uint256 eraChainId = 9;
@@ -82,54 +84,76 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
 
     Diamond.FacetCut[] internal facetCuts;
 
+    function setUp() public virtual override {
+        _deployIntegrationBase();
+    }
+
     function deploy() public {
-        // Avoid block.timestamp == 0 to keep paused-deposits sentinel semantics stable in tests.
-        vm.warp(1);
-
-        interopCenterAddress = makeAddr("interopCenter");
-        governor = makeAddr("governor");
-        admin = makeAddr("admin");
-        baseToken = makeAddr("baseToken");
-        sharedBridge = makeAddr("sharedBridge");
-        validator = makeAddr("validator");
-        l1Nullifier = makeAddr("l1Nullifier");
-        serverNotifier = makeAddr("serverNotifier");
-        bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
-        chainAssetHandler = new L1ChainAssetHandler(governor, address(bridgehub));
-        permissionlessValidator = new PermissionlessValidator();
-        messageroot = L1MessageRoot(
-            address(
-                new TransparentUpgradeableProxy(
-                    address(new L1MessageRoot(address(bridgehub), 1, address(chainAssetHandler))),
-                    address(uint160(1)),
-                    abi.encodeCall(L1MessageRoot.initialize, ())
+        // If the integration base was initialized (super.setUp() was called), use real ecosystem.
+        // Otherwise fall back to creating a fresh local ecosystem (for tests like PermanentRestriction
+        // that need to call bridgehub.setAddresses() which requires a clean Bridgehub).
+        if (address(addresses.bridgehub) != address(0)) {
+            bridgehub = addresses.bridgehub;
+            governor = bridgehub.owner();
+            sharedBridge = address(addresses.sharedBridge);
+            l1Nullifier = address(addresses.l1Nullifier);
+            chainAssetHandler = L1ChainAssetHandler(IBridgehubBase(address(bridgehub)).chainAssetHandler());
+            messageroot = L1MessageRoot(address(bridgehub.messageRoot()));
+            interopCenterAddress = address(addresses.interopCenter);
+        } else {
+            // Fallback: create isolated local ecosystem (for tests that modify Bridgehub state)
+            vm.warp(1);
+            interopCenterAddress = makeAddr("interopCenter");
+            governor = makeAddr("governor");
+            sharedBridge = makeAddr("sharedBridge");
+            l1Nullifier = makeAddr("l1Nullifier");
+            serverNotifier = makeAddr("serverNotifier");
+            bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
+            chainAssetHandler = new L1ChainAssetHandler(governor, address(bridgehub));
+            permissionlessValidator = new PermissionlessValidator();
+            messageroot = L1MessageRoot(
+                address(
+                    new TransparentUpgradeableProxy(
+                        address(new L1MessageRoot(address(bridgehub), 1, address(chainAssetHandler))),
+                        address(uint160(1)),
+                        abi.encodeCall(L1MessageRoot.initialize, ())
+                    )
                 )
-            )
-        );
-        stdstore
-            .target(address(messageroot))
-            .sig(IL1MessageRoot.v31UpgradeChainBatchNumber.selector)
-            .with_key(chainId)
-            .checked_write(uint256(1));
-        vm.prank(governor);
-        bridgehub.setAddresses(
-            sharedBridge,
-            ICTMDeploymentTracker(address(0)),
-            messageroot,
-            address(chainAssetHandler),
-            address(0)
-        );
-        vm.prank(governor);
-        chainAssetHandler.setAddresses();
+            );
+            stdstore
+                .target(address(messageroot))
+                .sig(IL1MessageRoot.v31UpgradeChainBatchNumber.selector)
+                .with_key(chainId)
+                .checked_write(uint256(1));
+            vm.prank(governor);
+            bridgehub.setAddresses(
+                sharedBridge,
+                ICTMDeploymentTracker(address(0)),
+                messageroot,
+                address(chainAssetHandler),
+                address(0)
+            );
+            vm.prank(governor);
+            chainAssetHandler.setAddresses();
+            vm.mockCall(
+                address(sharedBridge),
+                abi.encodeCall(L1AssetRouter.l2BridgeAddress, (chainId)),
+                abi.encode(makeAddr("l2BridgeAddress"))
+            );
+        }
+        l1ChainId = block.chainid;
 
-        vm.mockCall(
-            address(sharedBridge),
-            abi.encodeCall(L1AssetRouter.l2BridgeAddress, (chainId)),
-            abi.encode(makeAddr("l2BridgeAddress"))
-        );
-
+        admin = makeAddr("admin");
+        // Use real ERC20 if integration deployed (eliminates IERC20Metadata mocks), else makeAddr
+        baseToken = tokens.length > 0 ? tokens[0] : makeAddr("baseToken");
+        validator = makeAddr("validator");
+        serverNotifier = makeAddr("serverNotifier");
         newChainAdmin = makeAddr("chainadmin");
+        baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
+        testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+        permissionlessValidator = new PermissionlessValidator();
 
+        // Deploy fresh CTM for CTM-specific tests (initialization, chain creation, etc.)
         chainTypeManager = new EraChainTypeManager(address(bridgehub), interopCenterAddress, address(0), address(0));
         diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
@@ -263,28 +287,13 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function createNewChain(Diamond.DiamondCutData memory _diamondCut) internal returns (address) {
-        vm.mockCall(
-            address(sharedBridge),
-            abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
-            abi.encode(l1Nullifier)
-        );
-
-        vm.mockCall(
-            address(l1Nullifier),
-            abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
-            abi.encode(l1Nullifier)
-        );
-
+        // baseToken is a real ERC20 from integration — no IERC20Metadata mocks needed.
+        // Keep baseToken(chainId) mock (chainId 112 unregistered in real bridgehub).
         vm.mockCall(
             address(bridgehub),
             abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
             abi.encode(baseToken)
         );
-        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
-        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
-        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
-
-        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
 
         vm.prank(address(bridgehub));
         return
@@ -299,25 +308,10 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
 
     function createNewChainWithId(Diamond.DiamondCutData memory _diamondCut, uint256 id) internal {
         vm.mockCall(
-            address(sharedBridge),
-            abi.encodeWithSelector(IL1AssetRouter.L1_NULLIFIER.selector),
-            abi.encode(l1Nullifier)
-        );
-
-        vm.mockCall(
-            address(l1Nullifier),
-            abi.encodeWithSelector(IL1Nullifier.l2BridgeAddress.selector),
-            abi.encode(l1Nullifier)
-        );
-
-        vm.mockCall(
             address(bridgehub),
             abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
             abi.encode(baseToken)
         );
-        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
-        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
-        vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.decimals.selector), abi.encode(18));
 
         vm.prank(address(bridgehub));
         chainContractAddress.createNewChain({
@@ -330,25 +324,14 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     }
 
     function _mockGetZKChainFromBridgehub(address _chainAddress) internal {
-        // We have to mock the call to the bridgehub's getZKChain since we are mocking calls in the ChainTypeManagerTest.createNewChain() as well...
-        // So, although ideally the bridgehub SHOULD have responded with the correct address for the chain when we call getZKChain(chainId), in our case it will not
-        // So, we mock that behavior again.
         vm.mockCall(address(bridgehub), abi.encodeCall(IBridgehubBase.getZKChain, chainId), abi.encode(_chainAddress));
     }
 
     function _mockMigrationPausedFromBridgehub() internal {
-        address mockChainAssetHandler = makeAddr("mockChainAssetHandler");
-        vm.mockCall(
-            address(bridgehub),
-            abi.encodeWithSignature("chainAssetHandler()"),
-            abi.encode(mockChainAssetHandler)
-        );
-        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
+        // Mock migrationPaused() on the real chain asset handler (test-specific: force paused state)
+        address realChainAssetHandler = address(chainAssetHandler);
+        vm.mockCall(realChainAssetHandler, abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
     }
-
-    ////////////////////////////////////////////////////////////////////////////////////////////
-    // Functions that have been migrated from the erstwhile StateTransitionManager to Bridgehub
-    ////////////////////////////////////////////////////////////////////////////////////////////
 
     function _getAllZKChainIDs() internal view returns (uint256[] memory chainIDs) {
         chainIDs = bridgehub.getAllZKChainChainIDs();
@@ -361,4 +344,7 @@ contract ChainTypeManagerTest is UtilsCallMockerTest {
     function _registerAlreadyDeployedZKChain(uint256 _chainId, address _zkChain) internal {
         bridgehub.registerAlreadyDeployedZKChain(_chainId, _zkChain);
     }
+
+    // Resolve test() from base chain
+    function test() internal virtual override(L1ContractDeployer) {}
 }

@@ -48,17 +48,14 @@ contract UnpauseDepositsTest is MigratorTest {
         _pauseDeposits();
         uint256 chainId = utilsFacet.util_getChainId();
         address admin = utilsFacet.util_getAdmin();
-        address bridgehub = utilsFacet.util_getBridgehub();
-        address mockChainAssetHandler = makeAddr("mockChainAssetHandler");
 
-        // We need to fake a migration in progress
+        // Use the real Bridgehub and its real chainAssetHandler, but mock the migration state.
+        // This mock is justified: we need to simulate an in-progress migration that can't be
+        // easily triggered through real operations in this test context.
+        address bridgehubAddr = utilsFacet.util_getBridgehub();
+        address realChainAssetHandler = IBridgehubBase(bridgehubAddr).chainAssetHandler();
         vm.mockCall(
-            bridgehub,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(mockChainAssetHandler)
-        );
-        vm.mockCall(
-            mockChainAssetHandler,
+            realChainAssetHandler,
             abi.encodeWithSelector(IL1ChainAssetHandler.isMigrationInProgress.selector, chainId),
             abi.encode(true)
         );
@@ -72,19 +69,9 @@ contract UnpauseDepositsTest is MigratorTest {
         _pauseDeposits();
         uint256 chainId = utilsFacet.util_getChainId();
         address admin = utilsFacet.util_getAdmin();
-        address bridgehub = utilsFacet.util_getBridgehub();
-        address mockChainAssetHandler = makeAddr("mockChainAssetHandler");
 
-        vm.mockCall(
-            bridgehub,
-            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(mockChainAssetHandler)
-        );
-        vm.mockCall(
-            mockChainAssetHandler,
-            abi.encodeWithSelector(IL1ChainAssetHandler.isMigrationInProgress.selector, chainId),
-            abi.encode(false)
-        );
+        // No mocks needed: the real deployed Bridgehub and ChainAssetHandler already
+        // have migration NOT in progress, so unpauseDeposits should succeed.
 
         vm.startPrank(admin);
         vm.expectEmit(true, false, false, false);

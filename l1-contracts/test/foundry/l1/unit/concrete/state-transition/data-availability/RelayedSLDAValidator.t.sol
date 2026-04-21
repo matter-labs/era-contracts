@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test, console} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {Utils} from "../../Utils/Utils.sol";
 import {RelayedSLDAValidator} from "contracts/state-transition/data-availability/RelayedSLDAValidator.sol";
 import {L1DAValidatorOutput, PubdataSource} from "contracts/state-transition/chain-interfaces/IL1DAValidator.sol";
@@ -18,12 +19,13 @@ import {
     PubdataInputTooSmall
 } from "contracts/state-transition/L1StateTransitionErrors.sol";
 
-contract RelayedSLDAValidatorTest is Test {
+contract RelayedSLDAValidatorTest is MigrationTestBase {
     uint256 constant CHAIN_ID = 193;
     address constant CHAIN_ADDRESS = address(0x1234);
     RelayedSLDAValidator daValidator;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         daValidator = new RelayedSLDAValidator();
         vm.etch(address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR), abi.encode(address(daValidator)));
         vm.mockCall(

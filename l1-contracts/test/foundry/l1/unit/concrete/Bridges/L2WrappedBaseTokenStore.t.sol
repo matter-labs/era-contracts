@@ -2,10 +2,11 @@
 pragma solidity ^0.8.19;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
 import {Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
-contract L2WrappedBaseTokenStoreTest is Test {
+contract L2WrappedBaseTokenStoreTest is MigrationTestBase {
     L2WrappedBaseTokenStore store;
 
     address owner;
@@ -22,7 +23,8 @@ contract L2WrappedBaseTokenStoreTest is Test {
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
     event NewWBaseTokenAddress(uint256 indexed chainId, address indexed l2WBaseTokenAddress);
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         owner = makeAddr("owner");
         admin = makeAddr("admin");
         other = makeAddr("other");

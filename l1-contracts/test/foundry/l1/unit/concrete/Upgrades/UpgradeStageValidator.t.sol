@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
@@ -46,7 +47,7 @@ contract MockBridgehub {
 }
 
 /// @notice Unit tests for UpgradeStageValidator contract
-contract UpgradeStageValidatorTest is Test {
+contract UpgradeStageValidatorTest is MigrationTestBase {
     UpgradeStageValidator internal validator;
     MockChainTypeManager internal mockCTM;
     MockBridgehub internal mockBridgehub;
@@ -54,7 +55,8 @@ contract UpgradeStageValidatorTest is Test {
 
     uint256 internal constant NEW_PROTOCOL_VERSION = 12345;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         // Create mock chain asset handler
         mockChainAssetHandler = new MockChainAssetHandler();
 

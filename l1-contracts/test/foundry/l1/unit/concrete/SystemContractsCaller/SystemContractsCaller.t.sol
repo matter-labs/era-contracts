@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {
     CalldataForwardingMode,
@@ -11,7 +12,7 @@ import {
     Utils
 } from "contracts/common/l2-helpers/SystemContractsCaller.sol";
 
-contract SystemContractsCallerTest is Test {
+contract SystemContractsCallerTest is MigrationTestBase {
     using SystemContractsCaller for *;
 
     address public constant TEST_TARGET = address(0x123);
@@ -20,7 +21,9 @@ contract SystemContractsCallerTest is Test {
     uint128 public constant TEST_VALUE_128 = 1 ether;
     bytes public constant TEST_DATA = "test data";
 
-    function setUp() public {}
+    function setUp() public override {
+        super.setUp();
+    }
 
     function test_Utils_SafeCastToU32_Success() public {
         uint256 value = 1000;

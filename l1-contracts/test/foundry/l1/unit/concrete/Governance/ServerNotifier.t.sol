@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
@@ -13,7 +13,7 @@ import {DummyChainAssetHandler} from "contracts/dev-contracts/test/DummyChainAss
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {InvalidProtocolVersion, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
-contract ServerNotifierTest is Test {
+contract ServerNotifierTest is MigrationTestBase {
     ServerNotifier internal serverNotifier;
     DummyChainTypeManager internal chainTypeManager;
     DummyBridgehub internal bridgehub;
@@ -23,7 +23,8 @@ contract ServerNotifierTest is Test {
     address internal chainAdmin;
     uint256 internal chainId;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         chainId = 1;
         owner = makeAddr("owner");
         chainAdmin = makeAddr("chainAdmin");

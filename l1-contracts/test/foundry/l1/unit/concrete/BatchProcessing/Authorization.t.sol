@@ -13,7 +13,8 @@ contract AuthorizationTest is ExecutorTest {
     IExecutor.StoredBatchInfo private storedBatchInfo;
     CommitBatchInfo private commitBatchInfo;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         storedBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: 0,
             batchHash: Utils.randomBytes32("batchHash"),

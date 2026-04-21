@@ -4,7 +4,8 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
-import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
+import {L1ContractDeployer} from "foundry-test/l1/integration/_SharedL1ContractDeployer.t.sol";
 
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -23,11 +24,11 @@ import {NotSettlementLayer} from "contracts/state-transition/L1StateTransitionEr
 
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
-contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
+contract ZKChainBaseModifiersTest is MigrationTestBase {
     IAdmin internal adminFacet;
     IExecutor internal executorFacet;
     IMailbox internal mailboxFacet;
-    UtilsFacet internal utilsFacet;
+    // utilsFacet inherited from MigrationTestBase
     DummyBridgehub internal dummyBridgehub;
     address internal testnetVerifier = address(new EraTestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     uint256 constant eraChainId = 9;
@@ -54,7 +55,8 @@ contract ZKChainBaseModifiersTest is UtilsCallMockerTest {
         return selectors;
     }
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(new AdminFacet(block.chainid, RollupDAManager(address(0)))),

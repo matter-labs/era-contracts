@@ -10,7 +10,8 @@ import {TxStatus} from "contracts/common/Messaging.sol";
 contract ChainTypeManagerBridgingTest is ChainTypeManagerTest {
     address internal chainAssetHandlerMock;
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         deploy();
         chainAssetHandlerMock = makeAddr("chainAssetHandler");
     }

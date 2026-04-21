@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -11,14 +12,13 @@ import {ValidatorTimelock} from "contracts/state-transition/validators/Validator
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, ICommitter} from "contracts/state-transition/chain-interfaces/ICommitter.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {NotAZKChain, RoleAccessDenied, TimeNotReached} from "contracts/common/L1ContractErrors.sol";
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
-import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 
-contract ValidatorTimelockTest is Test {
+contract ValidatorTimelockTest is MigrationTestBase {
     /// @notice A new validator has been added.
     event ValidatorAdded(uint256 indexed _chainId, address _addedValidator);
 
@@ -35,8 +35,6 @@ contract ValidatorTimelockTest is Test {
     bytes32 constant DEFAULT_ADMIN_ROLE = bytes32(0);
 
     ValidatorTimelock validator;
-    DummyChainTypeManagerForValidatorTimelock chainTypeManager;
-    DummyBridgehub dummyBridgehub;
 
     address owner;
     address zkSync;
@@ -61,25 +59,23 @@ contract ValidatorTimelockTest is Test {
     bytes32 executorAdminRole;
     bytes32 upgraderAdminRole;
 
-    function setUp() public {
-        owner = makeAddr("owner");
-        zkSync = makeAddr("zkSync");
+    function setUp() public override {
+        // Deploy full integration ecosystem to get real bridgehub and chains
+        _deployIntegrationBase();
+
+        // Use real chain and admin from integration deployment
+        zkSync = chainAddress;
+        chainId = testChainId;
+        eraChainId = zkChainIds[0]; // Era chain from _deployEra()
+        owner = IGetters(zkSync).getAdmin();
+
         alice = makeAddr("alice");
         bob = makeAddr("bob");
         dan = makeAddr("dan");
-        chainId = 1;
-        eraChainId = 9;
         lastBatchNumber = 123;
         executionDelay = 10;
 
-        dummyBridgehub = new DummyBridgehub();
-
-        chainTypeManager = new DummyChainTypeManagerForValidatorTimelock(owner, zkSync);
-
-        vm.mockCall(zkSync, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(owner));
-        vm.mockCall(zkSync, abi.encodeCall(IGetters.getChainId, ()), abi.encode(chainId));
-        dummyBridgehub.setZKChain(chainId, zkSync);
-
+        // Deploy ValidatorTimelock with real bridgehub (no DummyBridgehub)
         validator = ValidatorTimelock(_deployValidatorTimelock(owner, executionDelay));
         vm.prank(owner);
         validator.addValidatorForChainId(chainId, alice);
@@ -102,7 +98,8 @@ contract ValidatorTimelockTest is Test {
 
     function _deployValidatorTimelock(address _initialOwner, uint32 _initialExecutionDelay) internal returns (address) {
         ProxyAdmin admin = new ProxyAdmin();
-        ValidatorTimelock timelockImplementation = new ValidatorTimelock(address(dummyBridgehub));
+        // Use real bridgehub from integration deployment
+        ValidatorTimelock timelockImplementation = new ValidatorTimelock(address(addresses.bridgehub));
         return
             address(
                 new TransparentUpgradeableProxy(
@@ -341,6 +338,9 @@ contract ValidatorTimelockTest is Test {
             abi.encodeWithSelector(IExecutor.proveBatchesSharedBridge.selector),
             abi.encode(storedBatches)
         );
+        // Mock the execute forwarding to the real chain (valid isolation:
+        // we're testing timelock delay logic, not batch execution)
+        vm.mockCall(zkSync, abi.encodeWithSelector(IExecutor.executeBatchesSharedBridge.selector), abi.encode());
 
         vm.prank(alice);
         vm.warp(timestamp + executionDelay + 1);
@@ -570,8 +570,12 @@ contract ValidatorTimelockTest is Test {
 
         vm.mockCall(fakeChain, abi.encodeCall(IGetters.getChainId, ()), abi.encode(fakeChainId));
         vm.mockCall(fakeChain, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(owner));
-        // Make bridgehub return a different address for this chain ID (simulating NotAZKChain)
-        dummyBridgehub.setZKChain(fakeChainId, zkSync); // zkSync != fakeChain
+        // Make real bridgehub return a different address for this chain ID (simulating NotAZKChain)
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeCall(IBridgehubBase.getZKChain, (fakeChainId)),
+            abi.encode(zkSync) // zkSync != fakeChain
+        );
 
         IValidatorTimelock.ValidatorRotationParams memory params = IValidatorTimelock.ValidatorRotationParams({
             rotatePrecommitterRole: true,

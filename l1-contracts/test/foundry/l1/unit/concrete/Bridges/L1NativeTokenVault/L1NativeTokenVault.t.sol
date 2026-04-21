@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {StdStorage, stdStorage} from "forge-std/StdStorage.sol";
+import {MigrationTestBase} from "foundry-test/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -59,111 +60,117 @@ contract L1NativeTokenVaultTestHelper is L1NativeTokenVault {
     function test() internal virtual {}
 }
 
-contract L1NativeTokenVaultTest is Test {
+contract L1NativeTokenVaultTest is MigrationTestBase {
     using stdStorage for StdStorage;
 
     L1NativeTokenVaultTestHelper public nativeTokenVault;
-    L1AssetRouter public assetRouter;
-    L1Nullifier public l1Nullifier;
-    L1AssetTracker public l1AssetTracker;
+    L1AssetRouter public localAssetRouter;
+    L1Nullifier public localL1Nullifier;
+    L1AssetTracker public localL1AssetTracker;
     TestnetERC20Token public testToken;
 
-    address public owner;
-    address public proxyAdmin;
-    address public bridgehubAddress;
-    address public messageRootAddress;
-    address public interopCenterAddress;
-    address public chainAssetHandler;
-    address public l1WethAddress;
-    address public tokenBeacon;
+    address public localOwner;
+    address public localProxyAdmin;
+    address public localBridgehubAddress;
+    address public localMessageRootAddress;
+    address public localInteropCenterAddress;
+    address public localChainAssetHandler;
+    address public localL1WethAddress;
+    address public localTokenBeacon;
 
-    uint256 public chainId;
-    uint256 public eraChainId;
-    address public eraDiamondProxy;
+    uint256 public localChainId;
+    uint256 public localEraChainId;
+    address public localEraDiamondProxy;
 
     bytes32 public tokenAssetId;
     bytes32 public ETH_TOKEN_ASSET_ID;
 
-    function setUp() public {
-        owner = makeAddr("owner");
-        proxyAdmin = makeAddr("proxyAdmin");
-        bridgehubAddress = makeAddr("bridgehub");
-        messageRootAddress = makeAddr("messageRoot");
-        interopCenterAddress = makeAddr("interopCenter");
-        chainAssetHandler = makeAddr("chainAssetHandler");
-        l1WethAddress = makeAddr("weth");
-        tokenBeacon = makeAddr("tokenBeacon");
+    function setUp() public override {
+        super.setUp();
 
-        chainId = 1;
-        eraChainId = 9;
-        eraDiamondProxy = makeAddr("eraDiamondProxy");
+        localOwner = makeAddr("owner");
+        localProxyAdmin = makeAddr("proxyAdmin");
+        localBridgehubAddress = makeAddr("bridgehub");
+        localMessageRootAddress = makeAddr("messageRoot");
+        localInteropCenterAddress = makeAddr("interopCenter");
+        localChainAssetHandler = makeAddr("chainAssetHandler");
+        localL1WethAddress = makeAddr("weth");
+        localTokenBeacon = makeAddr("tokenBeacon");
+
+        localChainId = 1;
+        localEraChainId = 9;
+        localEraDiamondProxy = makeAddr("eraDiamondProxy");
 
         // Deploy L1Nullifier
         L1NullifierDev l1NullifierImpl = new L1NullifierDev({
-            _bridgehub: IL1Bridgehub(bridgehubAddress),
-            _messageRoot: IMessageRootBase(messageRootAddress),
-            _eraChainId: eraChainId,
-            _eraDiamondProxy: eraDiamondProxy
+            _bridgehub: IL1Bridgehub(localBridgehubAddress),
+            _messageRoot: IMessageRootBase(localMessageRootAddress),
+            _eraChainId: localEraChainId,
+            _eraDiamondProxy: localEraDiamondProxy
         });
         TransparentUpgradeableProxy l1NullifierProxy = new TransparentUpgradeableProxy(
             address(l1NullifierImpl),
-            proxyAdmin,
-            abi.encodeWithSelector(L1Nullifier.initialize.selector, owner, 1, 1, 1, 0)
+            localProxyAdmin,
+            abi.encodeWithSelector(L1Nullifier.initialize.selector, localOwner, 1, 1, 1, 0)
         );
-        l1Nullifier = L1Nullifier(payable(l1NullifierProxy));
+        localL1Nullifier = L1Nullifier(payable(l1NullifierProxy));
 
         // Deploy L1AssetRouter
         L1AssetRouter assetRouterImpl = new L1AssetRouter({
-            _l1WethToken: l1WethAddress,
-            _bridgehub: bridgehubAddress,
-            _l1Nullifier: address(l1Nullifier),
-            _eraChainId: eraChainId,
-            _eraDiamondProxy: eraDiamondProxy
+            _l1WethToken: localL1WethAddress,
+            _bridgehub: localBridgehubAddress,
+            _l1Nullifier: address(localL1Nullifier),
+            _eraChainId: localEraChainId,
+            _eraDiamondProxy: localEraDiamondProxy
         });
         TransparentUpgradeableProxy assetRouterProxy = new TransparentUpgradeableProxy(
             address(assetRouterImpl),
-            proxyAdmin,
-            abi.encodeWithSelector(L1AssetRouter.initialize.selector, owner)
+            localProxyAdmin,
+            abi.encodeWithSelector(L1AssetRouter.initialize.selector, localOwner)
         );
-        assetRouter = L1AssetRouter(payable(assetRouterProxy));
+        localAssetRouter = L1AssetRouter(payable(assetRouterProxy));
 
         // Deploy L1NativeTokenVault test helper
         L1NativeTokenVaultTestHelper nativeTokenVaultImpl = new L1NativeTokenVaultTestHelper({
-            _wethToken: l1WethAddress,
-            _assetRouter: address(assetRouter),
-            _l1Nullifier: l1Nullifier
+            _wethToken: localL1WethAddress,
+            _assetRouter: address(localAssetRouter),
+            _l1Nullifier: localL1Nullifier
         });
         TransparentUpgradeableProxy nativeTokenVaultProxy = new TransparentUpgradeableProxy(
             address(nativeTokenVaultImpl),
-            proxyAdmin,
-            abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner, tokenBeacon)
+            localProxyAdmin,
+            abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, localOwner, localTokenBeacon)
         );
         nativeTokenVault = L1NativeTokenVaultTestHelper(payable(nativeTokenVaultProxy));
 
         // Setup mocks
         vm.mockCall(
-            bridgehubAddress,
+            localBridgehubAddress,
             abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
-            abi.encode(address(chainAssetHandler))
+            abi.encode(address(localChainAssetHandler))
         );
         vm.mockCall(
-            chainAssetHandler,
+            localChainAssetHandler,
             abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
             abi.encode(0)
         );
 
         // Deploy L1AssetTracker
-        l1AssetTracker = new L1AssetTracker(bridgehubAddress, address(nativeTokenVault), messageRootAddress);
+        localL1AssetTracker = new L1AssetTracker(
+            localBridgehubAddress,
+            address(nativeTokenVault),
+            localMessageRootAddress
+        );
 
         // Set asset tracker
-        vm.prank(owner);
-        nativeTokenVault.setAssetTracker(address(l1AssetTracker));
+        vm.prank(localOwner);
+        nativeTokenVault.setAssetTracker(address(localL1AssetTracker));
 
         // Setup L1Nullifier
-        vm.prank(owner);
-        l1Nullifier.setL1AssetRouter(address(assetRouter));
-        vm.prank(owner);
-        l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(address(nativeTokenVault)));
+        vm.prank(localOwner);
+        localL1Nullifier.setL1AssetRouter(address(localAssetRouter));
+        vm.prank(localOwner);
+        localL1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(address(nativeTokenVault)));
 
         // Deploy and setup test token
         testToken = new TestnetERC20Token("Test Token", "TST", 18);
@@ -171,8 +178,8 @@ contract L1NativeTokenVaultTest is Test {
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
 
         // Set NTV in asset router
-        vm.prank(owner);
-        assetRouter.setNativeTokenVault(INativeTokenVaultBase(address(nativeTokenVault)));
+        vm.prank(localOwner);
+        localAssetRouter.setNativeTokenVault(INativeTokenVaultBase(address(nativeTokenVault)));
 
         // Register tokens
         vm.prank(address(nativeTokenVault));
@@ -214,7 +221,7 @@ contract L1NativeTokenVaultTest is Test {
     function test_getOriginChainId_ReturnsBlockChainIdWhenNullifierHasBalance() public {
         // When L1Nullifier has balance of the token, should return block.chainid
         TestnetERC20Token token2 = new TestnetERC20Token("Test2", "TST2", 18);
-        token2.mint(address(l1Nullifier), 1000);
+        token2.mint(address(localL1Nullifier), 1000);
 
         bytes32 token2AssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token2));
         nativeTokenVault.setTokenAddress(token2AssetId, address(token2));
@@ -259,13 +266,13 @@ contract L1NativeTokenVaultTest is Test {
     function test_bridgeConfirmTransferResult_RevertWhen_NotFailure() public {
         bytes memory data = abi.encode(100, address(0), bytes(""));
 
-        vm.prank(address(assetRouter));
+        vm.prank(address(localAssetRouter));
         vm.expectRevert(OnlyFailureStatusAllowed.selector);
         nativeTokenVault.bridgeConfirmTransferResult(
-            chainId,
+            localChainId,
             TxStatus.Success, // Should revert for non-Failure status
             tokenAssetId,
-            owner,
+            localOwner,
             data
         );
     }
@@ -285,18 +292,18 @@ contract L1NativeTokenVaultTest is Test {
         // Don't mint any tokens to NTV or Nullifier (so _getOriginChainId returns 0)
 
         // Create bridge burn data
-        bytes memory data = DataEncoding.encodeBridgeBurnData(100, owner, address(0));
+        bytes memory data = DataEncoding.encodeBridgeBurnData(100, localOwner, address(0));
 
         // Mock the asset tracker call
         vm.mockCall(
-            address(l1AssetTracker),
+            address(localL1AssetTracker),
             abi.encodeWithSelector(L1AssetTracker.handleChainBalanceDecreaseOnL1.selector),
             abi.encode()
         );
 
-        vm.prank(address(assetRouter));
+        vm.prank(address(localAssetRouter));
         vm.expectRevert(OriginChainIdNotFound.selector);
-        nativeTokenVault.bridgeConfirmTransferResult(chainId, TxStatus.Failure, unknownAssetId, owner, data);
+        nativeTokenVault.bridgeConfirmTransferResult(localChainId, TxStatus.Failure, unknownAssetId, localOwner, data);
     }
 
     function test_bridgeConfirmTransferResult_BridgeMintPath() public {
@@ -313,11 +320,11 @@ contract L1NativeTokenVaultTest is Test {
         nativeTokenVault.setOriginChainId(bridgedAssetId, otherChainId);
 
         uint256 amount = 100;
-        bytes memory data = DataEncoding.encodeBridgeBurnData(amount, owner, address(0));
+        bytes memory data = DataEncoding.encodeBridgeBurnData(amount, localOwner, address(0));
 
         // Mock the asset tracker call
         vm.mockCall(
-            address(l1AssetTracker),
+            address(localL1AssetTracker),
             abi.encodeWithSelector(L1AssetTracker.handleChainBalanceDecreaseOnL1.selector),
             abi.encode()
         );
@@ -325,12 +332,12 @@ contract L1NativeTokenVaultTest is Test {
         // Mock the bridgeMint call
         vm.mockCall(
             mockBridgedToken,
-            abi.encodeWithSelector(IBridgedStandardToken.bridgeMint.selector, owner, amount),
+            abi.encodeWithSelector(IBridgedStandardToken.bridgeMint.selector, localOwner, amount),
             abi.encode()
         );
 
-        vm.prank(address(assetRouter));
-        nativeTokenVault.bridgeConfirmTransferResult(chainId, TxStatus.Failure, bridgedAssetId, owner, data);
+        vm.prank(address(localAssetRouter));
+        nativeTokenVault.bridgeConfirmTransferResult(localChainId, TxStatus.Failure, bridgedAssetId, localOwner, data);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -339,16 +346,16 @@ contract L1NativeTokenVaultTest is Test {
 
     function test_migrateTokenBalanceToAssetTracker_RevertWhen_NotAssetTracker() public {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        nativeTokenVault.migrateTokenBalanceToAssetTracker(chainId, tokenAssetId);
+        nativeTokenVault.migrateTokenBalanceToAssetTracker(localChainId, tokenAssetId);
     }
 
     function test_migrateTokenBalanceToAssetTracker_Success() public {
         // This should work when called by asset tracker
-        vm.prank(address(l1AssetTracker));
-        uint256 result = nativeTokenVault.migrateTokenBalanceToAssetTracker(chainId, tokenAssetId);
+        vm.prank(address(localL1AssetTracker));
+        uint256 result = nativeTokenVault.migrateTokenBalanceToAssetTracker(localChainId, tokenAssetId);
         assertEq(result, 0); // No deprecated balance set
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal virtual override {}
 }

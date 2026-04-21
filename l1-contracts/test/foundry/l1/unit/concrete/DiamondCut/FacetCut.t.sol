@@ -37,7 +37,8 @@ contract FacetCutTest is DiamondCutTest {
         return selectors;
     }
 
-    function setUp() public {
+    function setUp() public override {
+        super.setUp();
         eraChainId = 9;
         diamondCutTestContract = new DiamondCutTestContract();
         IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());

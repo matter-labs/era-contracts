@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {MigrationTestBase} from "test/foundry/l1/integration/unit-migration/_SharedMigrationBase.t.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
@@ -25,14 +25,17 @@ contract DummyGWAssetTracker {
     function registerBaseTokenOnGateway(TokenBridgingData calldata) external {}
 }
 
-contract BridgehubBase_Extended_Test is Test {
+contract BridgehubBase_Extended_Test is MigrationTestBase {
     L1Bridgehub bridgehub;
     address owner;
     uint256 maxNumberOfChains;
 
-    function setUp() public {
+    function setUp() public virtual override {
+        super.setUp();
+
         owner = makeAddr("owner");
         maxNumberOfChains = 100;
+        // Create a fresh L1Bridgehub for these tests that rely on empty state
         bridgehub = new L1Bridgehub(owner, maxNumberOfChains);
     }
 
