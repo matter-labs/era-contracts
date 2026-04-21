@@ -62,10 +62,7 @@ contract L2ChainAssetHandlerTest is Test {
             abi.encode(mockZKChain)
         );
 
-        vm.expectCall(
-            mockZKChain,
-            abi.encodeWithSelector(IMigrator.pauseDepositsOnGateway.selector, block.timestamp)
-        );
+        vm.expectCall(mockZKChain, abi.encodeWithSelector(IMigrator.pauseDepositsOnGateway.selector, block.timestamp));
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
         L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).requestPauseDepositsForChainOnGateway(CHAIN_ID);
