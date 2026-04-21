@@ -402,7 +402,6 @@ pub fn register_chain(
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow()
         .with_wallet(auth)
         .with_env("CREATE2_FACTORY_SALT", format!("{:#x}", salt));
 
@@ -453,7 +452,6 @@ fn enable_evm_emulator_step(
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow()
         .with_wallet(auth);
 
     runner.run(forge)?;
@@ -498,7 +496,6 @@ fn deploy_l2_contracts_step(
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow()
         .with_wallet(auth);
 
     runner.run(forge)?;
@@ -536,7 +533,6 @@ fn deploy_paymaster_step(
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow()
         .with_wallet(auth);
 
     runner.run(forge)?;
@@ -565,7 +561,6 @@ fn _register_on_all_chains_step(
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow()
         .with_wallet(auth);
 
     runner.run(forge)?;
@@ -588,7 +583,6 @@ fn setup_legacy_bridge_step(
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow()
         .with_wallet(auth);
 
     runner.run(forge)?;
