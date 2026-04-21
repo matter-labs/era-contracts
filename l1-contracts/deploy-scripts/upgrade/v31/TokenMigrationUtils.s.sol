@@ -4,6 +4,8 @@ pragma solidity 0.8.28;
 // solhint-disable no-console, gas-custom-errors
 
 import {console2 as console} from "forge-std/Script.sol";
+import {stdToml} from "forge-std/StdToml.sol";
+import {VmSafe} from "forge-std/Vm.sol";
 
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -18,6 +20,10 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 /// @notice Shared token migration utilities for the v31 upgrade.
 /// @dev Used by both EcosystemUpgrade_v31 (stage3) and ChainUpgrade_v31.
 library TokenMigrationUtils {
+    using stdToml for string;
+
+    VmSafe private constant vm = VmSafe(address(uint160(uint256(keccak256("hevm cheat code")))));
+
     /// @notice Register all legacy bridged tokens in the AssetTracker.
     /// @dev Iterates through all bridged tokens in NTV and calls registerLegacyToken on the AssetTracker.
     function registerAllLegacyTokens(address _bridgehub) internal {
@@ -95,9 +101,8 @@ library TokenMigrationUtils {
         console.log("Token balance migration complete");
     }
 
-    /// @notice Register legacy bridged tokens (ETH) in NTV bridged tokens list.
-    /// @dev For production use, this function should be extended to register all bridged tokens
-    /// from a config file or by querying on-chain state. Currently only registers ETH for fresh deployments.
+    /// @notice Register legacy bridged tokens in the NTV bridged tokens list for v31 stage3.
+    /// @dev Registers ETH plus any extra legacy L1 tokens declared in the dedicated bridged-tokens TOML.
     function registerBridgedTokensInNTV(address _bridgehub) internal {
         console.log("Registering bridged tokens in NTV...");
 
@@ -105,27 +110,51 @@ library TokenMigrationUtils {
             address(IL1AssetRouter(address(IBridgehubBase(_bridgehub).assetRouter())).nativeTokenVault())
         );
 
-        // For fresh deployments, register the ETH base token
-        address ethTokenAddress = ETH_TOKEN_ADDRESS;
+        address[] memory legacyTokens = _readConfiguredBridgedTokens();
+        uint256 bridgedTokenCount = legacyTokens.length + 1;
+        address[] memory tokensToRegister = new address[](bridgedTokenCount);
+        tokensToRegister[0] = ETH_TOKEN_ADDRESS;
 
-        bytes32 ethAssetId = ntv.assetId(ethTokenAddress);
-        console.log("ETH token address:", ethTokenAddress);
+        for (uint256 i = 0; i < legacyTokens.length; ++i) {
+            tokensToRegister[i + 1] = legacyTokens[i];
+        }
 
-        bytes32[] memory savedBridgedTokens = new bytes32[](1);
-        savedBridgedTokens[0] = ethAssetId;
+        console.log("Registering tokens, count:", tokensToRegister.length);
 
-        console.log("Registering tokens, count:", savedBridgedTokens.length);
+        for (uint256 i = 0; i < tokensToRegister.length; ++i) {
+            address tokenAddress = tokensToRegister[i];
+            bytes32 assetId = ntv.assetId(tokenAddress);
+            console.log("  Token address:", tokenAddress);
 
-        for (uint256 i = 0; i < savedBridgedTokens.length; ++i) {
-            bytes32 assetId = savedBridgedTokens[i];
-            address tokenAddress = ntv.tokenAddress(assetId);
-            console.log("  Registering assetId:", tokenAddress);
+            if (assetId == bytes32(0)) {
+                revert("Token assetId is not registered in NTV");
+            }
+
+            uint256 index = ntv.tokenIndex(assetId);
+            if (index != 0 || (index == 0 && ntv.bridgedTokens(0) == assetId)) {
+                console.log("  Token already present in bridged tokens list, skipping");
+                continue;
+            }
 
             ntv.addLegacyTokenToBridgedTokensList(tokenAddress);
-
             console.log("  Token registered successfully");
         }
 
         console.log("Bridged tokens registration complete");
+    }
+
+    function _readConfiguredBridgedTokens() private view returns (address[] memory) {
+        string memory inputPath = "/script-config/v31-bridged-tokens.toml";
+        try vm.envString("UPGRADE_BRIDGED_TOKENS_INPUT_OVERRIDE") returns (string memory overridePath) {
+            inputPath = overridePath;
+        } catch {}
+
+        string memory upgradeToml = vm.readFile(string.concat(vm.projectRoot(), inputPath));
+
+        if (!upgradeToml.keyExists("$.tokens.bridged_tokens")) {
+            return new address[](0);
+        }
+
+        return upgradeToml.readAddressArray("$.tokens.bridged_tokens");
     }
 }
