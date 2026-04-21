@@ -24,6 +24,11 @@
       "chainId": 13,
       "port": 4053,
       "isL1": false
+    },
+    {
+      "chainId": 14,
+      "port": 4054,
+      "isL1": false
     }
   ],
   "batchSettler": {
