@@ -30,6 +30,8 @@ import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors
 abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
     using Bytes for bytes;
 
+    error UnexpectedZKsyncOSFlag(bool expected, bool actual);
+
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
@@ -112,6 +114,9 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
             _existingUpgradeCalldata.slice(4),
             (bool, address, bytes, bytes)
         );
+        if (isZKsyncOS != s.zksyncOS) {
+            revert UnexpectedZKsyncOSFlag(s.zksyncOS, isZKsyncOS);
+        }
 
         // Construct per-chain ZKChainSpecificForceDeploymentsData from L1 state.
         bytes memory additionalForceDeploymentsData = _buildChainSpecificForceDeploymentsData(_bridgehub, _chainId);

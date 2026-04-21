@@ -176,8 +176,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         require(wrappedZK != address(0), ZeroAddress());
         wrappedZKToken = IERC20(wrappedZK);
 
-        require(_owner != address(0), ZeroAddress());
-        _transferOwnership(_owner);
+        if (owner() != _owner) {
+            require(_owner != address(0), ZeroAddress());
+            _transferOwnership(_owner);
+        }
     }
 
     /// @inheritdoc IGWAssetTracker
