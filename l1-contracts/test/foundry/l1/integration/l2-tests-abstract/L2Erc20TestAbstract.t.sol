@@ -4,9 +4,10 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
+import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -28,14 +29,19 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
+import {LogFinder} from "test-utils/LogFinder.sol";
+
 abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
+    using LogFinder for Vm.Log[];
 
     function test_shouldFinalizeERC20Deposit() public {
         address depositor = makeAddr("depositor");
         address receiver = makeAddr("receiver");
 
+        vm.recordLogs();
         performDeposit(depositor, receiver, 100);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
 
         address l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
 
@@ -44,6 +50,15 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         assertEq(BridgedStandardERC20(l2TokenAddress).name(), TOKEN_DEFAULT_NAME);
         assertEq(BridgedStandardERC20(l2TokenAddress).symbol(), TOKEN_DEFAULT_SYMBOL);
         assertEq(BridgedStandardERC20(l2TokenAddress).decimals(), TOKEN_DEFAULT_DECIMALS);
+
+        // Verify Transfer event (mint: from address(0) to receiver)
+        Vm.Log memory mintLog = logs.requireOneFrom("Transfer(address,address,uint256)", l2TokenAddress);
+        assertEq(mintLog.topics[1], bytes32(uint256(0)), "Transfer should originate from zero address");
+        assertEq(mintLog.topics[2], bytes32(uint256(uint160(receiver))), "Transfer receiver mismatch");
+        assertEq(abi.decode(mintLog.data, (uint256)), 100, "Transfer amount should be 100");
+
+        // Verify DepositFinalizedAssetRouter event
+        logs.requireOne("DepositFinalizedAssetRouter(uint256,bytes32,bytes)");
     }
 
     function test_governanceShouldBeAbleToReinitializeToken() public {
@@ -72,7 +87,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             ignoreDecimals: false
         });
 
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(NonSequentialVersion.selector));
         vm.prank(ownerWallet);
         BridgedStandardERC20(l2TokenAddress).reinitializeToken(getters, "TestTokenNewName", "TTN", 20);
     }

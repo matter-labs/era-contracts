@@ -105,6 +105,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         _deployTokens();
         _registerNewTokens(tokens);
 
+        // TODO(EVM-1391): Justify commented code
         // _deployEra();
         // _deployZKChain(ETH_TOKEN_ADDRESS);
         // _deployZKChain(ETH_TOKEN_ADDRESS);
@@ -156,7 +157,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         tokenAddress = tokens[1];
         assetId = DataEncoding.encodeNTVAssetId(block.chainid, tokenAddress);
 
-        // 0x13b704bded2382d6e555a218f4d57330c8d624337c03a7aa1779d78f557b4126;
+        // 0x13b704bded2382d6e555a218f4d57330c8d624337c03a7aa1779d78f557b4126; // TODO(EVM-1391): Justify commented code
         // the below does not work for some reason:
     }
 
@@ -183,6 +184,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     }
 
     function test_migrationL1ToGateway() public {
+        // TODO(EVM-1391): Justify commented code
         // vm.chainId(eraZKChainId);
         // vm.mockCall(
         //     L2_NATIVE_TOKEN_VAULT_ADDR,
