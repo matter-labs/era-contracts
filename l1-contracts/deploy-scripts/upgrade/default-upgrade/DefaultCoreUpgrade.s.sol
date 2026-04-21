@@ -107,11 +107,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         return coreAddresses;
     }
 
-    /// @dev Test-only: inject AssetTracker address when v29/v30 introspection returns 0.
-    function setAssetTrackerProxy_TestOnly(address _addr) public {
-        coreAddresses.bridgehub.proxies.assetTracker = _addr;
-    }
-
     function initializeConfigWithArgs(
         address bridgehubProxyAddress,
         bool isZKsyncOS,

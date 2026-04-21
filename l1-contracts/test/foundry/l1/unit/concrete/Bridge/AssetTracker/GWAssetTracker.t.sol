@@ -27,7 +27,7 @@ import {
     InsufficientPendingInteropBalance,
     InsufficientChainBalance
 } from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
-import {ChainIdNotRegistered, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {ChainIdNotRegistered, SlotOccupied, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -165,16 +165,14 @@ contract GWAssetTrackerTest is Test {
     }
 
     function test_InitL2() public {
-        uint256 newL1ChainId = 999;
-
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        gwAssetTracker.initL2(newL1ChainId, address(this));
-
-        assertEq(gwAssetTracker.L1_CHAIN_ID(), newL1ChainId);
+        // setUp already called initL2; verify the values it set.
+        assertEq(gwAssetTracker.L1_CHAIN_ID(), L1_CHAIN_ID);
     }
 
-    function test_InitL2_Unauthorized() public {
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+    function test_InitL2_CannotBeCalledTwice() public {
+        // initL2 uses reentrancyGuardInitializer — second call must revert.
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        vm.expectRevert(SlotOccupied.selector);
         gwAssetTracker.initL2(999, address(this));
     }
 
@@ -445,11 +443,11 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.L1_CHAIN_ID(), L1_CHAIN_ID);
     }
 
-    function testFuzz_InitL2(uint256 _l1ChainId) public {
+    function testFuzz_InitL2_CannotBeCalledTwice(uint256 _l1ChainId) public {
+        // setUp already called initL2; second call must revert.
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        vm.expectRevert(SlotOccupied.selector);
         gwAssetTracker.initL2(_l1ChainId, address(this));
-
-        assertEq(gwAssetTracker.L1_CHAIN_ID(), _l1ChainId);
     }
 
     function testFuzz_HandleChainBalanceIncreaseOnGateway(uint256 _amount, uint256 _baseTokenAmount) public {
