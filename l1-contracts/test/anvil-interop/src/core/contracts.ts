@@ -41,6 +41,7 @@ const ARTIFACTS = {
   L2BaseTokenZKOS: "L2BaseTokenZKOS.sol/L2BaseTokenZKOS.json",
   L2Bridgehub: "L2Bridgehub.sol/L2Bridgehub.json",
   L2ChainAssetHandler: "L2ChainAssetHandler.sol/L2ChainAssetHandler.json",
+  L2ChainAssetHandlerDev: "L2ChainAssetHandlerDev.sol/L2ChainAssetHandlerDev.json",
   L2ComplexUpgrader: "L2ComplexUpgrader.sol/L2ComplexUpgrader.json",
   L2GenesisUpgrade: "L2GenesisUpgrade.sol/L2GenesisUpgrade.json",
   L2MessageRoot: "L2MessageRoot.sol/L2MessageRoot.json",

@@ -67,9 +67,15 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Build DummyInteropRecipient artifact
+      - name: Build anvil-interop dev artifacts
         working-directory: l1-contracts
-        run: forge build contracts/dev-contracts/test/DummyInteropRecipient.sol
+        # `DummyInteropRecipient` is deployed at test runtime via `anvil_setCode`.
+        # `L2ChainAssetHandlerDev` is installed over the production `L2ChainAssetHandler`
+        # on the Gateway to expose `setMigrationNumberForTesting` for reverse TBM setup.
+        run: |
+          forge build \
+            contracts/dev-contracts/test/DummyInteropRecipient.sol \
+            contracts/dev-contracts/L2ChainAssetHandlerDev.sol
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
