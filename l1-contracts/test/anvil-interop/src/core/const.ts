@@ -85,3 +85,26 @@ export const NEW_PRIORITY_REQUEST_EVENT_SIG =
   "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])";
 export const L1_MESSAGE_SENT_EVENT_SIG = "L1MessageSent(address,bytes32,bytes)";
 export const FINALIZE_DEPOSIT_SIG = "finalizeDeposit(uint256,bytes32,bytes)";
+
+// Anvil account #2 — used as a secondary distinct recipient
+export const ANVIL_ACCOUNT2_ADDR = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
+// Anvil account #2 private key
+export const ANVIL_ACCOUNT2_PRIVATE_KEY = "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a";
+
+// ── Interop enums (mirror Solidity Messaging.sol) ──────────────
+
+export enum BundleStatus {
+  Unreceived = 0,
+  Verified = 1,
+  FullyExecuted = 2,
+  Unbundled = 3,
+}
+
+export enum CallStatus {
+  Unprocessed = 0,
+  Executed = 1,
+  Cancelled = 2,
+}
+
+// Selector for a non-existent function: someVeryUnfortunateCall()
+export const FAILING_CALL_CALLDATA = "0x00056d83";

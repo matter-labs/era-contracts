@@ -1,0 +1,59 @@
+name: Build and Push Docker Image for zksync-os-integration-tests
+
+on:
+  push:
+    branches:
+      - main
+      - gateway-commands-in-protocol-ops
+
+jobs:
+  build-and-push:
+    name: Build and push protocol-ops Docker image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE_NAME: protocol-ops
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: recursive
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: tags
+        shell: bash
+        run: |
+          SHA=$(git rev-parse HEAD)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          BRANCH=${GITHUB_REF_NAME}
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
+          echo "Tags: $SHA, $BRANCH"
+
+          TAGS="ghcr.io/${{ github.repository_owner }}/${IMAGE_NAME}:${SHA}"
+          TAGS="${TAGS},ghcr.io/${{ github.repository_owner }}/${IMAGE_NAME}:${BRANCH}"
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@471d1dc4e07e5cdedd4c2171150001c434f0b7a4 # v6.15.0
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          file: docker/protocol/Dockerfile
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:buildcache,mode=max

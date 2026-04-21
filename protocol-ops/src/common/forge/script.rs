@@ -117,16 +117,17 @@ impl ForgeScript {
     }
 
     // Do not start the script if balance is not enough
-    pub fn private_key(&self) -> Option<LocalWallet> {
-        self.args.args.iter().find_map(|a| {
+    pub fn private_key(&self) -> anyhow::Result<Option<LocalWallet>> {
+        for a in &self.args.args {
             if let ForgeScriptArg::PrivateKey { private_key } = a {
-                let key = H256::from_str(private_key).unwrap();
-                let key = LocalWallet::from_bytes(key.as_bytes()).unwrap();
-                Some(key)
-            } else {
-                None
+                let key = H256::from_str(private_key)
+                    .map_err(|e| anyhow::anyhow!("invalid private key hex: {e}"))?;
+                let wallet = LocalWallet::from_bytes(key.as_bytes())
+                    .map_err(|e| anyhow::anyhow!("invalid private key: {e}"))?;
+                return Ok(Some(wallet));
             }
-        })
+        }
+        Ok(None)
     }
 
     pub fn rpc_url(&self) -> Option<String> {
@@ -156,15 +157,15 @@ impl ForgeScript {
             .any(|a| matches!(a, ForgeScriptArg::Broadcast))
     }
 
-    pub fn address(&self) -> Option<Address> {
-        self.private_key().map(|k| k.address())
+    pub fn address(&self) -> anyhow::Result<Option<Address>> {
+        Ok(self.private_key()?.map(|k| k.address()))
     }
 
     pub async fn get_the_balance(&self) -> anyhow::Result<Option<U256>> {
         let Some(rpc_url) = self.rpc_url() else {
             return Ok(None);
         };
-        let Some(private_key) = self.private_key() else {
+        let Some(private_key) = self.private_key()? else {
             return Ok(None);
         };
         let client = create_ethers_client(private_key, rpc_url, None)?;

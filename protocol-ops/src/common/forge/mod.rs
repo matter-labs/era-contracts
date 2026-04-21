@@ -7,6 +7,9 @@ pub use cast_transactions::all_runs_cast_transactions;
 pub use runner::ForgeRunner;
 pub use script::{ForgeScript, ForgeScriptArg, ForgeScriptArgs};
 
+/// Default gas limit for forge scripts that execute L1→L2 or governance transactions.
+pub const DEFAULT_SCRIPT_GAS_LIMIT: u64 = 1_000_000_000_000;
+
 /// Forge is a wrapper around the forge binary.
 pub struct Forge {
     path: PathBuf,

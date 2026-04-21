@@ -31,6 +31,10 @@ pub struct SharedRunArgs {
     #[clap(long = "out", help_heading = "Output")]
     pub out_path: Option<PathBuf>,
 
+    /// Write transactions in Gnosis Safe Transaction Builder JSON format
+    #[clap(long, help_heading = "Output")]
+    pub safe_transactions_out: Option<PathBuf>,
+
     #[clap(flatten)]
     #[serde(flatten)]
     pub forge_args: ForgeScriptArgs,

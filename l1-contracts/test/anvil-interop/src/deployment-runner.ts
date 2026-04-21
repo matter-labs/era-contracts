@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as zlib from "zlib";
-import { Contract, Wallet, providers } from "ethers";
+import { Contract, ContractFactory, Wallet, ethers, providers } from "ethers";
 import type { AnvilManager } from "./daemons/anvil-manager";
 import { ForgeDeployer } from "./deployers/deployer";
 import { ChainRegistry } from "./deployers/chain-registry";
@@ -18,9 +18,11 @@ import type {
   PriorityRequestData,
 } from "./core/types";
 import { getChainIdsByRole, timeIt } from "./core/utils";
-import { getAbi } from "./core/contracts";
+import { getAbi, getCreationBytecode } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./core/const";
+import { encodeNtvAssetId } from "./core/data-encoding";
 import { deployTestTokens } from "./helpers/deploy-test-token";
+import { depositERC20ToL2 } from "./helpers/l1-deposit-helper";
 import { registerAndMigrateTestTokens } from "./helpers/token-balance-migration-helper";
 
 export interface StartChainOptions {
@@ -41,6 +43,9 @@ export class DeploymentRunner {
   private stateDir: string;
   private configDir: string;
   private configPath: string;
+  /** Maps chainId → deployed L1 base token address for chains with custom base tokens. */
+  private customBaseTokens: Map<number, string> = new Map();
+  private zkToken?: { l1Address: string; assetId: string };
 
   constructor(baseDir: string = __dirname + "/..") {
     const runSuffix = process.env.ANVIL_INTEROP_RUN_SUFFIX || "";
@@ -84,8 +89,23 @@ export class DeploymentRunner {
     this.saveState({});
   }
 
+  private toChainConfigMap(chainConfigs: AnvilConfig["chains"]): Map<number, AnvilConfig["chains"][number]> {
+    return new Map(chainConfigs.map((chainConfig) => [chainConfig.chainId, chainConfig]));
+  }
+
   private toRpcUrlMap(l2Chains: L2ChainInfo[]): Map<number, string> {
     return new Map(l2Chains.map((chain) => [chain.chainId, chain.rpcUrl]));
+  }
+
+  private getChainConfigOrThrow(
+    chainConfigsById: Map<number, AnvilConfig["chains"][number]>,
+    chainId: number
+  ): AnvilChainConfig {
+    const chainConfig = chainConfigsById.get(chainId);
+    if (!chainConfig) {
+      throw new Error(`Chain config not found for chain ${chainId}`);
+    }
+    return chainConfig;
   }
 
   private computeInteropChainIds(chainId: number, chainConfigs: AnvilChainConfig[]): number[] {
@@ -112,15 +132,110 @@ export class DeploymentRunner {
     );
   }
 
-  private buildRegistrationConfigs(l2Chains: L2ChainInfo[]) {
+  private buildRegistrationConfigs(
+    l2Chains: L2ChainInfo[],
+    chainConfigsById: Map<number, AnvilConfig["chains"][number]>
+  ) {
     return l2Chains.map((l2Chain) => {
+      const chainConfig = this.getChainConfigOrThrow(chainConfigsById, l2Chain.chainId);
+      const baseToken = this.customBaseTokens.get(chainConfig.chainId) ?? ETH_TOKEN_ADDRESS;
       return {
-        chainId: l2Chain.chainId,
+        chainId: chainConfig.chainId,
         rpcUrl: l2Chain.rpcUrl,
-        baseToken: ETH_TOKEN_ADDRESS, // TODO(EVM-1297): support non-ETH base tokens
-        validiumMode: false, // TODO(EVM-1297): support validium mode (requires batch settlement)
+        baseToken,
+        validiumMode: false,
       };
     });
+  }
+
+  /**
+   * Deploy custom ERC20 base tokens on L1 for chains that specify `baseToken: "custom"`.
+   * Must be called before chain registration, since the Forge registration script validates
+   * that the base token address is a deployed contract.
+   */
+  private async deployCustomBaseTokens(l1RpcUrl: string, chainConfigs: AnvilChainConfig[]): Promise<void> {
+    const chainsNeedingCustomToken = chainConfigs.filter((c) => c.baseToken === "custom");
+    if (chainsNeedingCustomToken.length === 0) return;
+
+    console.log(`\nDeploying custom base tokens for ${chainsNeedingCustomToken.length} chain(s)...`);
+
+    const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, new providers.JsonRpcProvider(l1RpcUrl));
+    const abi = getAbi("TestnetERC20Token");
+    const bytecode = getCreationBytecode("TestnetERC20Token");
+
+    for (const chainConfig of chainsNeedingCustomToken) {
+      const factory = new ContractFactory(abi, bytecode, wallet);
+      const token = await factory.deploy(`BaseToken${chainConfig.chainId}`, `BT${chainConfig.chainId}`, 18);
+      await token.deployed();
+      this.customBaseTokens.set(chainConfig.chainId, token.address);
+      console.log(`  Chain ${chainConfig.chainId} base token deployed at ${token.address}`);
+    }
+
+    // Persist to state so tests can look up custom base token addresses
+    const state = this.loadState();
+    state.customBaseTokens = Object.fromEntries(this.customBaseTokens);
+    this.saveState(state);
+  }
+
+  private async deployL1ZkToken(l1RpcUrl: string): Promise<{ l1Address: string; assetId: string }> {
+    console.log("\nDeploying L1 ZK token for fixed-fee interop coverage...");
+
+    const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, new providers.JsonRpcProvider(l1RpcUrl));
+    const factory = new ContractFactory(getAbi("TestnetERC20Token"), getCreationBytecode("TestnetERC20Token"), wallet);
+    const token = await factory.deploy("ZK Token", "ZK", 18);
+    await token.deployed();
+
+    const mintAmount = ethers.utils.parseUnits("1000000", 18);
+    const mintTx = await token.mint(wallet.address, mintAmount);
+    await mintTx.wait();
+
+    this.zkToken = {
+      l1Address: token.address,
+      assetId: encodeNtvAssetId((await wallet.getChainId()) as number, token.address),
+    };
+
+    const state = this.loadState();
+    state.zkToken = this.zkToken;
+    this.saveState(state);
+
+    console.log(`  L1 ZK token deployed at ${this.zkToken.l1Address}`);
+    console.log(`  L1 ZK token assetId: ${this.zkToken.assetId}`);
+
+    return this.zkToken;
+  }
+
+  private async seedWrappedZkOnEthChains(state: DeploymentState): Promise<void> {
+    if (!state.chains?.l1 || !state.chains.l2 || !state.l1Addresses || !state.zkToken) {
+      throw new Error("Deployment state incomplete for wrapped ZK seeding");
+    }
+
+    const gatewayChain = state.chains.l2.find((chain) =>
+      state.chains!.config.some((cfg) => cfg.chainId === chain.chainId && cfg.role === "gateway")
+    );
+    const targetConfigs = state.chains.config.filter(
+      (chainConfig) =>
+        chainConfig.role !== "l1" && (!chainConfig.baseToken || chainConfig.baseToken === ETH_TOKEN_ADDRESS)
+    );
+    const amount = ethers.utils.parseUnits("1000", 18);
+
+    console.log("\nSeeding wrapped ZK balances on ETH-base-token L2 chains...");
+
+    for (const chainConfig of targetConfigs) {
+      const l2Chain = state.chains.l2.find((chain) => chain.chainId === chainConfig.chainId);
+      if (!l2Chain) {
+        throw new Error(`Missing L2 chain info for chain ${chainConfig.chainId}`);
+      }
+
+      await depositERC20ToL2({
+        l1RpcUrl: state.chains.l1.rpcUrl,
+        l2RpcUrl: l2Chain.rpcUrl,
+        chainId: chainConfig.chainId,
+        l1Addresses: state.l1Addresses,
+        tokenAddress: state.zkToken.l1Address,
+        amount,
+        gwRpcUrl: chainConfig.role === "gwSettled" ? gatewayChain?.rpcUrl : undefined,
+      });
+    }
   }
 
   private getGatewayChainOrThrow(gatewayChainId: number, l2Chains: L2ChainInfo[]): L2ChainInfo {
@@ -242,8 +357,10 @@ export class DeploymentRunner {
     await deployer.acceptBridgehubAdmin(l1Addresses.bridgehub);
     done();
 
+    const zkToken = await this.deployL1ZkToken(l1RpcUrl);
+
     done = timeIt("deployCTM (forge script)");
-    const ctmAddresses = await deployer.deployCTM(l1Addresses.bridgehub);
+    const ctmAddresses = await deployer.deployCTM(l1Addresses.bridgehub, zkToken.assetId);
     done();
     console.log("\nCTM Addresses:");
     console.log(`  ChainTypeManager: ${ctmAddresses.chainTypeManager}`);
@@ -255,6 +372,7 @@ export class DeploymentRunner {
     const state = this.loadState();
     state.l1Addresses = l1Addresses;
     state.ctmAddresses = ctmAddresses;
+    state.zkToken = zkToken;
     this.saveState(state);
 
     return { l1Addresses, ctmAddresses };
@@ -263,6 +381,7 @@ export class DeploymentRunner {
   async step3And4RegisterAndInitChains(
     l1RpcUrl: string,
     l2Chains: L2ChainInfo[],
+    chainConfigs: AnvilConfig["chains"],
     l1Addresses: CoreDeployedAddresses,
     ctmAddresses: CTMDeployedAddresses
   ): Promise<{
@@ -272,10 +391,11 @@ export class DeploymentRunner {
 
     const privateKey = ANVIL_DEFAULT_PRIVATE_KEY;
     const registry = new ChainRegistry(l1RpcUrl, privateKey, l1Addresses, ctmAddresses);
+    const chainConfigsById = this.toChainConfigMap(chainConfigs);
     const l2RpcUrlsByChainId = this.toRpcUrlMap(l2Chains);
 
     // Batch-register all chains in a single forge call (avoids nonce conflicts)
-    const configs = this.buildRegistrationConfigs(l2Chains);
+    const configs = this.buildRegistrationConfigs(l2Chains, chainConfigsById);
 
     const regDone = timeIt(`registerChains batch [${configs.map((c) => c.chainId).join(",")}]`);
     const { chainAddresses, genesisPriorityTxs } = await registry.registerChainBatch(configs);
@@ -367,7 +487,7 @@ export class DeploymentRunner {
       throw new Error(`addresses.json not found in ${stateDir}`);
     }
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
-    const { l1Addresses, ctmAddresses, chainAddresses, testTokens } = addresses;
+    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, customBaseTokens, zkToken } = addresses;
 
     // Decompress hex-gzip state files to native JSON for --load-state CLI.
     // This is more portable than anvil_loadState RPC across anvil versions.
@@ -402,7 +522,7 @@ export class DeploymentRunner {
     for (const tmpFile of Object.values(loadStatePaths)) {
       fs.unlinkSync(tmpFile);
     }
-    fs.rmdirSync(tmpDir);
+    fs.rmSync(tmpDir, { recursive: true });
 
     const l1Chain = anvilManager.getL1Chain();
     const l2Chains = anvilManager.getL2Chains();
@@ -421,6 +541,12 @@ export class DeploymentRunner {
     state.chainAddresses = chainAddresses;
     if (testTokens) {
       state.testTokens = testTokens;
+    }
+    if (customBaseTokens) {
+      state.customBaseTokens = customBaseTokens;
+    }
+    if (zkToken) {
+      state.zkToken = zkToken;
     }
     this.saveState(state);
 
@@ -502,10 +628,14 @@ export class DeploymentRunner {
     // Step 2: Deploy L1 contracts
     const { l1Addresses, ctmAddresses } = await this.step2DeployL1(chains.l1.rpcUrl);
 
+    // Deploy custom ERC20 base tokens on L1 (before chain registration needs them)
+    await this.deployCustomBaseTokens(chains.l1.rpcUrl, config.chains);
+
     // Step 3+4: Register & initialize all L2 chains
     const { chainAddresses } = await this.step3And4RegisterAndInitChains(
       chains.l1.rpcUrl,
       chains.l2,
+      chains.config,
       l1Addresses,
       ctmAddresses
     );
@@ -628,6 +758,9 @@ export class DeploymentRunner {
         });
       }
     }
+
+    const stateAfterTbm = this.loadState();
+    await this.seedWrappedZkOnEthChains(stateAfterTbm);
 
     return result;
   }

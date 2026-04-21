@@ -26,3 +26,23 @@ fn default_contracts_root() -> PathBuf {
 pub fn path_to_foundry_scripts() -> PathBuf {
     path_from_root("l1-contracts")
 }
+
+/// Resolves the `l1-contracts` directory, trying `<root>/l1-contracts` first and then
+/// `<root>/contracts/l1-contracts` as a fallback (for mono-repo layouts).
+pub fn resolve_l1_contracts_path() -> anyhow::Result<PathBuf> {
+    let repo_root = contracts_root();
+    let direct = repo_root.join("l1-contracts");
+    if direct.exists() {
+        return Ok(direct);
+    }
+    let nested = repo_root.join("contracts").join("l1-contracts");
+    if nested.exists() {
+        return Ok(nested);
+    }
+    anyhow::bail!(
+        "Could not resolve l1-contracts path under {} (tried {} and {})",
+        repo_root.display(),
+        direct.display(),
+        nested.display()
+    )
+}

@@ -30,7 +30,9 @@ function loadArtifactFromOut(artifactRelativePath: string): ForgeArtifact {
 export function loadAbiFromOut(artifactRelativePath: string): JsonFragment[] {
   const zkstackPath = path.join(ZKSTACK_OUT_ROOT, artifactRelativePath);
   if (fs.existsSync(zkstackPath)) {
-    return JSON.parse(fs.readFileSync(zkstackPath, "utf-8")) as JsonFragment[];
+    const content = JSON.parse(fs.readFileSync(zkstackPath, "utf-8"));
+    // zkstack-out files can be either raw ABI arrays or full forge artifacts
+    return Array.isArray(content) ? content : content.abi;
   }
   return loadArtifactFromOut(artifactRelativePath).abi;
 }
@@ -41,7 +43,12 @@ export function loadBytecodeFromOut(artifactRelativePath: string): string {
   return artifact.deployedBytecode?.object || artifact.bytecode?.object || "0x";
 }
 
-/** Load creation (init) bytecode — needed for ContractFactory.deploy(). */
+/**
+ * Load creation (init) bytecode — needed for ContractFactory.deploy().
+ *
+ * Deployment bytecode always comes from forge build output in out/.
+ * zkstack-out intentionally stores ABI-oriented artifacts only.
+ */
 export function loadCreationBytecodeFromOut(artifactRelativePath: string): string {
   const artifact = loadArtifactFromOut(artifactRelativePath);
   return artifact.bytecode?.object || "0x";

@@ -18,6 +18,7 @@ use crate::admin_functions::{
     unpause_deposits, AdminScriptMode,
 };
 use crate::commands::output::write_output_if_requested;
+
 use crate::common::SharedRunArgs;
 use crate::common::{
     ethereum::get_ethers_provider,
@@ -208,11 +209,12 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
 
     write_output_if_requested(
         "chain.init",
-        args.shared.out_path.as_deref(),
+        &args.shared,
         &runner,
         &input,
         &ChainInitOutputData::from_full_output(&output),
-    )?;
+    )
+    .await?;
 
     logger::info("Chain initialized");
     logger::info(format!("Diamond proxy: {:#x}", output.diamond_proxy_addr));
@@ -257,29 +259,29 @@ pub async fn chain_init(
         .await?;
     }
 
-    // TODO: remove (pass as constructor parameter for chain admin)
-    // Set token multiplier setter (only needed for non-ETH base tokens)
-    let eth_base_token = Address::from_low_u64_be(1);
-    if input.chain_params.base_token_addr != eth_base_token {
-        if let Some(setter) = input.chain_params.token_multiplier_setter {
-            if !setter.is_zero() {
-                logger::step("Setting token multiplier setter...");
-                set_token_multiplier_setter(
-                    runner,
-                    owner,
-                    register_output.chain_admin_addr,
-                    register_output.access_control_restriction_addr,
-                    diamond_proxy,
-                    setter,
-                )
-                .await?;
-            }
-        }
-    }
-
     // TODO: for now, just replicating logic from `zkstack`, but not all of these are
     // priority txs, so we need to fix this + skip steps irrelevant for ZKSync OS.
     if !input.skip_priority_txs {
+        // TODO: remove (pass as constructor parameter for chain admin)
+        // Set token multiplier setter (only needed for non-ETH base tokens)
+        let eth_base_token = Address::from_low_u64_be(1);
+        if input.chain_params.base_token_addr != eth_base_token {
+            if let Some(setter) = input.chain_params.token_multiplier_setter {
+                if !setter.is_zero() {
+                    logger::step("Setting token multiplier setter...");
+                    set_token_multiplier_setter(
+                        runner,
+                        owner,
+                        register_output.chain_admin_addr,
+                        register_output.access_control_restriction_addr,
+                        diamond_proxy,
+                        setter,
+                    )
+                    .await?;
+                }
+            }
+        }
+
         // Set DA validator pair
         logger::step("Setting DA validator pair...");
         let commitment_scheme =
@@ -358,10 +360,11 @@ pub fn register_chain(
     auth: &Wallet,
     input: &ChainInitInput,
 ) -> anyhow::Result<RegisterChainOutput> {
+    let salt = input.create2_factory_salt.unwrap_or_else(H256::random);
     let deploy_config = RegisterChainL1Config::new(
         &input.chain_params,
         input.create2_factory_addr.unwrap_or(Address::zero()),
-        input.create2_factory_salt,
+        Some(salt),
         input.with_legacy_bridge,
         input.evm_emulator,
     )?;
@@ -386,7 +389,8 @@ pub fn register_chain(
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
         .with_slow()
-        .with_wallet(auth, runner.simulate);
+        .with_wallet(auth, runner.simulate)
+        .with_env("CREATE2_FACTORY_SALT", format!("{:#x}", salt));
 
     runner.run(forge)?;
 
