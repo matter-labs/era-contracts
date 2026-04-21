@@ -169,10 +169,12 @@ contract InteropCenter is
         require(_zkTokenAssetId != bytes32(0), ZKTokenNotAvailable());
         ZK_TOKEN_ASSET_ID = _zkTokenAssetId;
 
-        require(_owner != address(0), ZeroAddress());
         L1_CHAIN_ID = _l1ChainId;
         ZK_INTEROP_FEE = DEFAULT_ZK_INTEROP_FEE;
-        _transferOwnership(_owner);
+        if (owner() != _owner) {
+            require(_owner != address(0), ZeroAddress());
+            _transferOwnership(_owner);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

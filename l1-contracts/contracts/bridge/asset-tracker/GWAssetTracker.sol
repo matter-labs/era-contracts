@@ -167,7 +167,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     /// @inheritdoc IGWAssetTracker
-    function initL2(uint256 _l1ChainId, address _owner) external onlyUpgrader {
+    function initL2(uint256 _l1ChainId, address _owner) external reentrancyGuardInitializer onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
 
         // Fetch wrapped ZK token from Native Token Vault
@@ -176,8 +176,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         require(wrappedZK != address(0), ZeroAddress());
         wrappedZKToken = IERC20(wrappedZK);
 
-        require(_owner != address(0), ZeroAddress());
-        _transferOwnership(_owner);
+        if (owner() != _owner) {
+            require(_owner != address(0), ZeroAddress());
+            _transferOwnership(_owner);
+        }
     }
 
     /// @inheritdoc IGWAssetTracker

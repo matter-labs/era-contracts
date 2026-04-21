@@ -429,7 +429,8 @@ contract MockContract {
 
     function initL2(uint256, address, bytes32, address, address, address, bytes32) external {}
 
-    function initL2(uint256, address, address, address, address) external {}
+    // L2ChainAssetHandler.initL2 (constants are resolved internally)
+    function initL2(uint256, address) external {}
 
     // L2AssetRouter.updateL2
     function updateL2(uint256, uint256, address, address, bytes32, address) external {}
@@ -446,7 +447,7 @@ contract MockContract {
     ) external {}
 
     // L2ChainAssetHandler.updateL2
-    function updateL2(uint256, address, address, address, address) external {}
+    function updateL2(uint256, address) external {}
 
     // L2Bridgehub.updateL2
     function updateL2(uint256, address, uint256) external {}

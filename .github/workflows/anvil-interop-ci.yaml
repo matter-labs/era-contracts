@@ -41,7 +41,8 @@ on:
       - "yarn.lock"
 
 jobs:
-  # Fast job: uses pre-generated chain states from the repo, no contract compilation needed.
+  # Fast job: uses pre-generated chain states from the repo.
+  # We still compile DummyInteropRecipient so deploy bytecode is available in out/.
   integration-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -52,7 +53,7 @@ jobs:
         with:
           submodules: true
 
-      - name: Install Foundry (for Anvil only, no compilation needed)
+      - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.5.1
@@ -65,6 +66,10 @@ jobs:
 
       - name: Install dependencies
         run: yarn
+
+      - name: Build DummyInteropRecipient artifact
+        working-directory: l1-contracts
+        run: forge build contracts/dev-contracts/test/DummyInteropRecipient.sol
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop

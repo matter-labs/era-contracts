@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
-import {IL2ChainAssetHandler} from "contracts/core/chain-asset-handler/IL2ChainAssetHandler.sol";
+import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 
 import {BalanceChange, MigrationConfirmationData, L2Log, TxStatus} from "contracts/common/Messaging.sol";
 import {
@@ -51,7 +51,6 @@ import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainA
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
-import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
@@ -95,12 +94,16 @@ contract GWAssetTrackerExtendedTest is Test {
         mockZKChain = makeAddr("mockZKChain");
         mockAssetRouter = makeAddr("mockAssetRouter");
 
-        // Mock the L2 contract addresses
+        // Etch real bytecode for contracts that tests interact with directly, and simple
+        // mock code for the rest.
         vm.etch(L2_BRIDGEHUB_ADDR, address(mockBridgehub).code);
-        vm.etch(L2_MESSAGE_ROOT_ADDR, address(mockMessageRoot).code);
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, address(mockNativeTokenVault).code);
-        vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, address(mockChainAssetHandler).code);
         vm.etch(L2_ASSET_ROUTER_ADDR, address(mockAssetRouter).code);
+
+        // L2MessageRoot: real bytecode + init so getEmptyMultichainBatchRoot works.
+        vm.etch(L2_MESSAGE_ROOT_ADDR, type(L2MessageRoot).runtimeCode);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(L1_CHAIN_ID, 0);
 
         // Mock the WETH_TOKEN() call on NativeTokenVault (required by initL2)
         vm.mockCall(
@@ -674,22 +677,6 @@ contract GWAssetTrackerExtendedTest is Test {
         // Base token balance is NOT decreased for failed deposits,
         // as the funds stay on L2 inside the refundRecipient's balance.
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), BASE_TOKEN_AMOUNT);
-    }
-
-    // Test requestPauseDepositsForChain success (line 543)
-    function test_RequestPauseDepositsForChain_Success() public {
-        // Mock getZKChain to return a valid chain
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, CHAIN_ID),
-            abi.encode(mockZKChain)
-        );
-
-        // Mock pauseDepositsOnGateway
-        vm.mockCall(mockZKChain, abi.encodeWithSelector(IMigrator.pauseDepositsOnGateway.selector), abi.encode());
-
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        IL2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).requestPauseDepositsForChainOnGateway(CHAIN_ID);
     }
 
     // Test Gateway->L1 confirmation does not modify chain balance on Gateway.

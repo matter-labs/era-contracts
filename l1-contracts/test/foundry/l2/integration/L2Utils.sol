@@ -161,13 +161,7 @@ library L2Utils {
         forceDeployWithoutConstructor("L2ChainAssetHandler", L2_CHAIN_ASSET_HANDLER_ADDR);
         L2ChainAssetHandler chainAssetHandler = L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        chainAssetHandler.initL2(
-            _args.l1ChainId,
-            _args.aliasedOwner,
-            L2_BRIDGEHUB_ADDR,
-            L2_ASSET_ROUTER_ADDR,
-            L2_MESSAGE_ROOT_ADDR
-        );
+        chainAssetHandler.initL2(_args.l1ChainId, _args.aliasedOwner);
     }
 
     function forceDeployL2MessageVerification(SystemContractsArgs memory _args) internal {

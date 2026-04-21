@@ -45,6 +45,7 @@ import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.
 import {
     DeployFailed,
     UnsupportedUpgradeType,
+    ZeroAddress,
     ZKsyncOSNotForceDeployForExistingContract,
     ZKsyncOSNotForceDeployToPrecompileAddress,
     NonCanonicalRepresentation
@@ -225,6 +226,10 @@ library L2GenesisForceDeploymentsHelper {
 
         _setupProxyAdmin();
 
+        // The aliased L1 governance address is used as the owner for all L2 contracts.
+        // Validate it once here rather than at every individual initL2/updateL2 call site.
+        require(fixedForceDeploymentsData.aliasedL1Governance != address(0), ZeroAddress());
+
         // Ensure WETH token exists. During genesis NTV.WETH_TOKEN() returns address(0)
         // (uninitialized storage), so _ensureWethToken deploys a new proxy.
         // During upgrades it returns the existing address and _ensureWethToken is a no-op.
@@ -313,13 +318,9 @@ library L2GenesisForceDeploymentsHelper {
             _additionalForceDeploymentsData.baseTokenMetadata
         );
 
-        // solhint-disable-next-line func-named-parameters
         L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
             _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.aliasedL1Governance,
-            L2_BRIDGEHUB_ADDR,
-            L2_ASSET_ROUTER_ADDR,
-            L2_MESSAGE_ROOT_ADDR
+            _fixedForceDeploymentsData.aliasedL1Governance
         );
     }
 
@@ -366,10 +367,7 @@ library L2GenesisForceDeploymentsHelper {
 
         L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).updateL2(
             _fixedForceDeploymentsData.l1ChainId,
-            _fixedForceDeploymentsData.aliasedL1Governance,
-            L2_BRIDGEHUB_ADDR,
-            L2_ASSET_ROUTER_ADDR,
-            L2_MESSAGE_ROOT_ADDR
+            _fixedForceDeploymentsData.aliasedL1Governance
         );
     }
 

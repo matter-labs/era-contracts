@@ -27,9 +27,8 @@ import {
     InsufficientPendingInteropBalance,
     InsufficientChainBalance
 } from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
-import {ChainIdNotRegistered, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {ChainIdNotRegistered, SlotOccupied, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {IL2ChainAssetHandler} from "contracts/core/chain-asset-handler/IL2ChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {ProcessLogsTestHelper} from "./ProcessLogsTestHelper.sol";
@@ -105,12 +104,16 @@ contract GWAssetTrackerTest is Test {
         mockDestZKChain = makeAddr("mockDestZKChain");
         mockAssetRouter = makeAddr("mockAssetRouter");
 
-        // Mock the L2 contract addresses
+        // Etch real bytecode for contracts that the tests interact with directly, and simple
+        // mock code for the rest.
         vm.etch(L2_BRIDGEHUB_ADDR, address(mockBridgehub).code);
-        vm.etch(L2_MESSAGE_ROOT_ADDR, address(mockMessageRoot).code);
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, address(mockNativeTokenVault).code);
-        vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, address(mockChainAssetHandler).code);
         vm.etch(L2_ASSET_ROUTER_ADDR, address(mockAssetRouter).code);
+
+        // L2MessageRoot: real bytecode + init so getEmptyMultichainBatchRoot works.
+        vm.etch(L2_MESSAGE_ROOT_ADDR, type(L2MessageRoot).runtimeCode);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(L1_CHAIN_ID, 0);
 
         // Mock the WETH_TOKEN() call on NativeTokenVault
         address mockWrappedZKToken = makeAddr("mockWrappedZKToken");
@@ -162,16 +165,14 @@ contract GWAssetTrackerTest is Test {
     }
 
     function test_InitL2() public {
-        uint256 newL1ChainId = 999;
-
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        gwAssetTracker.initL2(newL1ChainId, address(this));
-
-        assertEq(gwAssetTracker.L1_CHAIN_ID(), newL1ChainId);
+        // setUp already called initL2; verify the values it set.
+        assertEq(gwAssetTracker.L1_CHAIN_ID(), L1_CHAIN_ID);
     }
 
-    function test_InitL2_Unauthorized() public {
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
+    function test_InitL2_CannotBeCalledTwice() public {
+        // initL2 uses reentrancyGuardInitializer — second call must revert.
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        vm.expectRevert(SlotOccupied.selector);
         gwAssetTracker.initL2(999, address(this));
     }
 
@@ -426,24 +427,6 @@ contract GWAssetTrackerTest is Test {
         gwAssetTracker.registerNewTokenIfNeeded(ASSET_ID, ORIGIN_CHAIN_ID);
     }
 
-    function test_RequestPauseDepositsForChain_Unauthorized() public {
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        IL2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).requestPauseDepositsForChainOnGateway(CHAIN_ID);
-    }
-
-    function test_RequestPauseDepositsForChain_ChainNotRegistered() public {
-        // Mock bridgehub to return address(0) for getZKChain
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, CHAIN_ID),
-            abi.encode(address(0))
-        );
-
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        vm.expectRevert(abi.encodeWithSelector(ChainIdNotRegistered.selector, CHAIN_ID));
-        IL2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).requestPauseDepositsForChainOnGateway(CHAIN_ID);
-    }
-
     function test_InitiateGatewayToL1MigrationOnGateway_ChainNotRegistered() public {
         // Mock bridgehub to return address(0) for getZKChain
         vm.mockCall(
@@ -460,11 +443,11 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.L1_CHAIN_ID(), L1_CHAIN_ID);
     }
 
-    function testFuzz_InitL2(uint256 _l1ChainId) public {
+    function testFuzz_InitL2_CannotBeCalledTwice(uint256 _l1ChainId) public {
+        // setUp already called initL2; second call must revert.
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        vm.expectRevert(SlotOccupied.selector);
         gwAssetTracker.initL2(_l1ChainId, address(this));
-
-        assertEq(gwAssetTracker.L1_CHAIN_ID(), _l1ChainId);
     }
 
     function testFuzz_HandleChainBalanceIncreaseOnGateway(uint256 _amount, uint256 _baseTokenAmount) public {

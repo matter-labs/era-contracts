@@ -12,7 +12,7 @@ import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
-import {UnexpectedUpgradeSelector, PriorityQueueNotReady} from "../common/L1ContractErrors.sol";
+import {UnexpectedUpgradeSelector, PriorityQueueNotReady, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {TokenBridgingData, TokenMetadata} from "../common/Messaging.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
@@ -30,6 +30,8 @@ import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors
 abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
     using Bytes for bytes;
 
+    error UnexpectedZKsyncOSFlag(bool expected, bool actual);
+
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
@@ -42,9 +44,12 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
         // the bridgehub. DiamondInit does the same on chain creation.
         s.nativeTokenVault = nativeTokenVaultAddr;
 
-        // Note that this call will revert if the native token vault has not been upgraded, i.e.
-        // if a chain settling on Gateway tries to upgrade before ZK Gateway has done the upgrade.
-        s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
+        // This call reverts with an unrecognised selector if NTV has not been upgraded to v31.
+        // If NTV is upgraded but l1AssetTracker has not been set yet, it returns address(0),
+        // so we assert non-zero to avoid silently leaving s.assetTracker zeroed.
+        address assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
+        require(assetTracker != address(0), ZeroAddress());
+        s.assetTracker = assetTracker;
         s.__DEPRECATED_l2DAValidator = address(0);
         // Reset DA validators, mirroring what the v30 upgrade did. ZKsync OS chains already reset
         // these during their v30 upgrade, so we only need to do it for Era chains here.
@@ -109,6 +114,9 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
             _existingUpgradeCalldata.slice(4),
             (bool, address, bytes, bytes)
         );
+        if (isZKsyncOS != s.zksyncOS) {
+            revert UnexpectedZKsyncOSFlag(s.zksyncOS, isZKsyncOS);
+        }
 
         // Construct per-chain ZKChainSpecificForceDeploymentsData from L1 state.
         bytes memory additionalForceDeploymentsData = _buildChainSpecificForceDeploymentsData(_bridgehub, _chainId);

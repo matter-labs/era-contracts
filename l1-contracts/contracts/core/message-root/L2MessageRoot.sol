@@ -111,7 +111,7 @@ contract L2MessageRoot is MessageRootBase {
         historicalRoot[block.number] = sharedTreeRoot;
     }
 
-    function getEmptyMultichainBatchRoot(uint256 _chainId) external view returns (bytes32) {
+    function getEmptyMultichainBatchRoot(uint256 _chainId) external pure returns (bytes32) {
         FullMerkleMemory.FullTree memory localSharedTree;
         localSharedTree.createTree(1);
         // slither-disable-next-line unused-return
