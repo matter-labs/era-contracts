@@ -261,7 +261,6 @@ pub enum ForgeScriptArg {
     Skip {
         skip_path: String,
     },
-    SkipSimulation,
 }
 
 /// ForgeScriptArgs is a set of arguments that can be passed to the forge script command.
