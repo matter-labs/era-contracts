@@ -470,6 +470,10 @@ contract DummyZKsyncOSSettlementLayerV31Upgrade is ZKsyncOSSettlementLayerV31Upg
         s.chainId = _chainId;
     }
 
+    function setZksyncOS(bool _v) public {
+        s.zksyncOS = _v;
+    }
+
     function setTotalBatchesCommitted(uint256 _v) public {
         s.totalBatchesCommitted = _v;
     }
@@ -514,6 +518,7 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
         zkosUpgrade = new DummyZKsyncOSSettlementLayerV31Upgrade();
         zkosUpgrade.setBridgehub(mockBridgehub);
         zkosUpgrade.setChainId(testChainId);
+        zkosUpgrade.setZksyncOS(true);
         zkosUpgrade.setChainTypeManager(mockChainTypeManager);
         zkosUpgrade.setTotalBatchesCommitted(100);
         zkosUpgrade.setTotalBatchesExecuted(100);
