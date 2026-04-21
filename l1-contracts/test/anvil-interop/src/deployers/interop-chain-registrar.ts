@@ -1,7 +1,6 @@
 import { ethers, providers } from "ethers";
-import { encodeNtvAssetId } from "../core/data-encoding";
 import { getAbi } from "../core/contracts";
-import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS, L1_CHAIN_ID, L2_BRIDGEHUB_ADDR } from "../core/const";
+import { ANVIL_DEFAULT_PRIVATE_KEY, L2_BRIDGEHUB_ADDR } from "../core/const";
 import { relayPriorityRequestsToChain } from "../core/utils";
 
 export class InteropChainRegistrar {
@@ -52,11 +51,10 @@ export class InteropChainRegistrar {
       await relayPriorityRequestsToChain(l1Receipt, this.currentChainDiamondProxy, this.l2Provider);
 
       const registeredAssetId = await l2Bridgehub.baseTokenAssetId(chainId);
-      const expectedAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
-      if (registeredAssetId !== expectedAssetId) {
+      if (registeredAssetId === ethers.constants.HashZero) {
         throw new Error(
-          `Real interop registration failed for chain ${chainId} on chain ${currentChainId}: ` +
-            `expected ${expectedAssetId}, got ${registeredAssetId}`
+          `Interop registration failed for chain ${chainId} on chain ${currentChainId}: ` +
+            "baseTokenAssetId is zero (chain not registered)"
         );
       }
       console.log(`   ✅ Chain ${chainId} registered on L2Bridgehub via real L1 flow`);

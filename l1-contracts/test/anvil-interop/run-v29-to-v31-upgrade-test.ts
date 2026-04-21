@@ -178,6 +178,9 @@ async function main(): Promise<void> {
     cleanup: () => void;
   } | null = null;
 
+  // Use the anvil-interop Foundry profile for deterministic bytecode across platforms
+  process.env.FOUNDRY_PROFILE = "anvil-interop";
+
   try {
     // ── Step 1: Load v29 chain states ───────────────────────────────
     console.log(`\n=== Step 1: Loading v0.29.0 chain states (${elapsed()}) ===\n`);
@@ -329,8 +332,8 @@ async function main(): Promise<void> {
     //    (TotalBatchesExecutedZero) and totalBatchesCommitted == totalBatchesExecuted
     //    (NotAllBatchesExecuted).
     //
-    // NOTE: Eventually the v29 state generation branch should be rebased on
-    // zksync-os-stable, which would eliminate most of these patches.
+    // TODO: Eliminate these patches by rebasing the kl/generate-v29-state branch on
+    // zksync-os-stable, which would produce states with correct batch counts and flags.
     console.log(`\n=== Step 6: Patching v29 chain storage (${elapsed()}) ===\n`);
     await applyV29UpgradeHarnessPatches(provider, chainAddresses);
 
