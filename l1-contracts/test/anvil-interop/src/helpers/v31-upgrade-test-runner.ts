@@ -155,6 +155,12 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     if (scenario.seedBatchCounters) {
       await seedBatchCounters(l1Provider, upgradeChainAddresses);
     }
+    // For ZKsyncOS chains upgrading from v30, s.zksyncOS (slot 60) may not be set in the
+    // pre-generated state. The v31 SettlementLayerV31UpgradeBase checks that the calldata's
+    // isZKsyncOS flag matches s.zksyncOS; seed it here so the check passes.
+    if (scenario.isZKsyncOS) {
+      await seedZksyncOSFlag(l1Provider, upgradeChainAddresses);
+    }
 
     // ── Run per-chain upgrades (L1) and relay to L2 ──
     const settlementLayerUpgradeAddr = readNestedString(
@@ -275,7 +281,14 @@ async function runEcosystemUpgradeScripts(rpcUrl: string, envVars: Record<string
   // data and other CTM state can't be reliably round-tripped through TOML between invocations.
   // It needs extra EVM memory (256MB) to hold the L2 bytecodes.
   await runForgeScript({ ...baseParams, sig: "step1()" });
-  await runForgeScript({ ...baseParams, sig: "step2()", extraForgeArgs: ["--memory-limit", "268435456"] });
+  // step2 deploys CTM contracts + generates governance calls in a single forge invocation.
+  // ZKsyncOS upgrades are more gas-intensive (larger bytecodes), so we raise both the EVM
+  // memory limit and the gas limit to prevent OOG in the forge simulation.
+  await runForgeScript({
+    ...baseParams,
+    sig: "step2()",
+    extraForgeArgs: ["--memory-limit", "536870912", "--gas-limit", "18446744073709551615"],
+  });
 }
 
 // ── Per-chain upgrade + L2 relay ─────────────────────────────────────
@@ -322,6 +335,14 @@ async function runChainUpgradesAndRelayL2(params: {
 
     // Decode the L2 upgrade tx from the broadcast
     const originalUpgradeTxData = decodeLatestL2UpgradeTxData(broadcastPath);
+
+    // getL2UpgradeTxData is called externally (not delegatecalled from the diamond),
+    // so it reads s.zksyncOS from the upgrade contract's own storage. Seed it for ZKsyncOS chains.
+    if (isZKsyncOS) {
+      const ZKSYNC_OS_SLOT = ethers.utils.hexZeroPad(ethers.utils.hexlify(60), 32);
+      const TRUE = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 32);
+      await l1Provider.send("anvil_setStorageAt", [settlementLayerUpgradeAddr, ZKSYNC_OS_SLOT, TRUE]);
+    }
 
     // Rewrite the L2 upgrade tx with per-chain data via SettlementLayerV31Upgrade
     const rewrittenUpgradeTxData = await settlementLayerUpgrade.getL2UpgradeTxData(
@@ -842,6 +863,19 @@ async function seedBatchCounters(
   for (const chain of chains) {
     await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_EXECUTED_SLOT, ONE]);
     await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_COMMITTED_SLOT, ONE]);
+  }
+}
+
+async function seedZksyncOSFlag(
+  provider: ethers.providers.JsonRpcProvider,
+  chains: Array<{ chainId: number; diamondProxy: string }>
+): Promise<void> {
+  // s.zksyncOS is at storage slot 60 in ZKChainStorage.
+  const ZKSYNC_OS_SLOT = ethers.utils.hexZeroPad(ethers.utils.hexlify(60), 32);
+  const TRUE = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 32);
+
+  for (const chain of chains) {
+    await provider.send("anvil_setStorageAt", [chain.diamondProxy, ZKSYNC_OS_SLOT, TRUE]);
   }
 }
 
