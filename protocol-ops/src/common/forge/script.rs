@@ -54,18 +54,11 @@ impl ForgeScript {
 
     /// Add the broadcast flag to the forge script command.
     ///
-    /// Also adds `--skip-simulation`: forge otherwise runs the script twice —
-    /// once locally to build the tx list, once against the RPC for gas
-    /// estimation. Protocol-ops always targets an anvil fork, so the second
-    /// pass is pure overhead. The broadcast JSON that downstream reads is
-    /// produced by the local pass either way.
-    ///
     /// Also adds `--slow`: forge waits for each tx to be confirmed before
     /// sending the next, which is required for correctness against the anvil
     /// fork.
     pub fn with_broadcast(mut self) -> Self {
         self.args.add_arg(ForgeScriptArg::Broadcast);
-        self.args.add_arg(ForgeScriptArg::SkipSimulation);
         self.args.add_arg(ForgeScriptArg::Slow);
         self
     }
