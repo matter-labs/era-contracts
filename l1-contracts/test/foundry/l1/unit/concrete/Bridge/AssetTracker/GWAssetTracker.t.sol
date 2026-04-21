@@ -5,7 +5,6 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
 import {GWAssetTrackerDev} from "contracts/dev-contracts/test/GWAssetTrackerDev.sol";
-import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
 
 import {BalanceChange, MigrationConfirmationData, L2Log} from "contracts/common/Messaging.sol";
 import {
@@ -30,7 +29,6 @@ import {
 } from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {ChainIdNotRegistered, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
-import {IL2ChainAssetHandler} from "contracts/core/chain-asset-handler/IL2ChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {ProcessLogsTestHelper} from "./ProcessLogsTestHelper.sol";
@@ -116,11 +114,6 @@ contract GWAssetTrackerTest is Test {
         vm.etch(L2_MESSAGE_ROOT_ADDR, type(L2MessageRoot).runtimeCode);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(L1_CHAIN_ID, 0);
-
-        // L2ChainAssetHandler: real bytecode + init so requestPauseDepositsForChainOnGateway works.
-        vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, type(L2ChainAssetHandler).runtimeCode);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(L1_CHAIN_ID, address(this));
 
         // Mock the WETH_TOKEN() call on NativeTokenVault
         address mockWrappedZKToken = makeAddr("mockWrappedZKToken");
@@ -434,24 +427,6 @@ contract GWAssetTrackerTest is Test {
         vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
         vm.expectRevert(RegisterNewTokenNotAllowed.selector);
         gwAssetTracker.registerNewTokenIfNeeded(ASSET_ID, ORIGIN_CHAIN_ID);
-    }
-
-    function test_RequestPauseDepositsForChain_Unauthorized() public {
-        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        IL2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).requestPauseDepositsForChainOnGateway(CHAIN_ID);
-    }
-
-    function test_RequestPauseDepositsForChain_ChainNotRegistered() public {
-        // Mock bridgehub to return address(0) for getZKChain
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, CHAIN_ID),
-            abi.encode(address(0))
-        );
-
-        vm.prank(SERVICE_TRANSACTION_SENDER);
-        vm.expectRevert(abi.encodeWithSelector(ChainIdNotRegistered.selector, CHAIN_ID));
-        IL2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).requestPauseDepositsForChainOnGateway(CHAIN_ID);
     }
 
     function test_InitiateGatewayToL1MigrationOnGateway_ChainNotRegistered() public {

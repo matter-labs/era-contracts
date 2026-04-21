@@ -300,7 +300,7 @@ contract GWAssetTrackerFeesTest is Test {
                     SETTLEMENT FEE PAYER AGREEMENT
     //////////////////////////////////////////////////////////////*/
 
-    function test_agreeToPaySettlementFees() public {
+    function test_setSettlementFeePayerAgreement_Enable() public {
         address payer = makeAddr("payer");
 
         vm.prank(payer);
@@ -309,7 +309,7 @@ contract GWAssetTrackerFeesTest is Test {
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
     }
 
-    function test_agreeToPaySettlementFees_EmitsEvent() public {
+    function test_setSettlementFeePayerAgreement_Enable_EmitsEvent() public {
         address payer = makeAddr("payer");
 
         vm.expectEmit(true, true, false, true);
@@ -319,7 +319,7 @@ contract GWAssetTrackerFeesTest is Test {
         gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
     }
 
-    function test_agreeToPaySettlementFees_MultipleChains() public {
+    function test_setSettlementFeePayerAgreement_Enable_MultipleChains() public {
         address payer = makeAddr("payer");
 
         vm.startPrank(payer);
@@ -331,7 +331,7 @@ contract GWAssetTrackerFeesTest is Test {
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, OTHER_CHAIN_ID));
     }
 
-    function test_agreeToPaySettlementFees_Idempotent() public {
+    function test_setSettlementFeePayerAgreement_Enable_Idempotent() public {
         address payer = makeAddr("payer");
 
         vm.startPrank(payer);
@@ -342,7 +342,7 @@ contract GWAssetTrackerFeesTest is Test {
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
     }
 
-    function test_revokeSettlementFeePayerAgreement() public {
+    function test_setSettlementFeePayerAgreement_Disable() public {
         address payer = makeAddr("payer");
 
         // First agree
@@ -356,7 +356,7 @@ contract GWAssetTrackerFeesTest is Test {
         assertFalse(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
     }
 
-    function test_revokeSettlementFeePayerAgreement_EmitsEvent() public {
+    function test_setSettlementFeePayerAgreement_Disable_EmitsEvent() public {
         address payer = makeAddr("payer");
 
         // First agree
@@ -370,7 +370,7 @@ contract GWAssetTrackerFeesTest is Test {
         gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, false);
     }
 
-    function test_revokeSettlementFeePayerAgreement_OnlyAffectsSpecificChain() public {
+    function test_setSettlementFeePayerAgreement_Disable_OnlyAffectsSpecificChain() public {
         address payer = makeAddr("payer");
 
         // Agree for both chains
@@ -386,7 +386,7 @@ contract GWAssetTrackerFeesTest is Test {
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, OTHER_CHAIN_ID));
     }
 
-    function test_revokeSettlementFeePayerAgreement_NeverAgreed() public {
+    function test_setSettlementFeePayerAgreement_Disable_NeverAgreed() public {
         address payer = makeAddr("payer");
 
         // Revoking without ever agreeing should not revert

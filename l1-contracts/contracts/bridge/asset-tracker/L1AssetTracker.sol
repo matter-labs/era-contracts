@@ -479,7 +479,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     function requestPauseDepositsForChainOnGateway(uint256 _chainId) external onlyChain(_chainId) {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
         require(settlementLayer != block.chainid, InvalidSettlementLayer());
-        /// It sends it to the L2 ChainAssetHandler to keep the GWAT small.
+        /// It sends it to the L2 ChainAssetHandler to keep the GWAssetTracker small.
         _sendToChain(
             settlementLayer,
             L2_CHAIN_ASSET_HANDLER_ADDR,
