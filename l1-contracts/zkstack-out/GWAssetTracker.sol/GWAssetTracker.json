@@ -1092,6 +1092,11 @@
   },
   {
     "type": "error",
+    "name": "SlotOccupied",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "Unauthorized",
     "inputs": [
       {
