@@ -11,12 +11,29 @@
  *   - Forward TBM (L1 → GW) for ETH and an NTV test token, verifying that the L1
  *     and GW sides agree on `assetMigrationNumber` and that the GW per-chain
  *     `chainBalance` is bounded by the L1 `chainBalance[GW][ETH]`.
- *   - Reverse TBM (GW → L1) after the GW-settled chain is migrated back to L1,
- *     driven by:
+ *   - Reverse TBM (GW → L1):
  *       - `setSettlementLayerViaBootloader` on the L2 side (real SystemContext path),
  *       - `simulateGWChainMigrationBurn` on the GW side, which reproduces the two
  *         observable effects of production `bridgeBurn` via the real Solidity entry
- *         points (see `harness-shims.ts` for the full rationale).
+ *         points (see `harness-shims.ts` for the full rationale),
+ *       - `GWAssetTracker.initiateGatewayToL1MigrationOnGateway` drives the real
+ *         reverse-TBM entry point on GW and the test asserts the full GW-side
+ *         state transition (chainBalance drained, `assetMigrationNumber` = 2) plus
+ *         replay protection.
+ *
+ *     L1 finalisation (`receiveGatewayToL1MigrationOnL1` → confirmation priority
+ *     txs back to GW and L2) requires `L1ChainAssetHandler.migrationNumber[chainId]
+ *     == MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1`. That counter is bumped by
+ *     `L1ChainAssetHandler.bridgeMint` during the chain-level migrate-from-gateway
+ *     governance flow, which pulls in the chain-migration message-relay machinery
+ *     and is out of scope for this PR. L1ChainAssetHandler also carries immutables
+ *     (BRIDGEHUB, L1_CHAIN_ID, ETH_TOKEN_ASSET_ID), so an `anvil_setCode`-based
+ *     dev swap isn't applicable there either.
+ *
+ *     Instead of silently stopping at the GW side, the spec drives the real L1
+ *     entry point and asserts the exact revert (`InvalidChainMigrationNumber`)
+ *     that defines the boundary — so the scope limitation is encoded as a test
+ *     invariant rather than a comment.
  *
  * Chain topology (see `config/anvil-config.json`):
  *
@@ -31,12 +48,13 @@ import { expect } from "chai";
 import { BigNumber, Contract, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import {
+  buildFinalizeWithdrawalParams,
+  buildMockInteropProof,
+  getChainDiamondProxy,
   getChainIdByRole,
   getChainIdsByRole,
-  getChainDiamondProxy,
   getL1RpcUrl,
   getL2RpcUrl,
-  buildMockInteropProof,
 } from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
@@ -364,6 +382,9 @@ describe("10 - Token Balance Migration Lifecycle", function () {
     let depositAmount: BigNumber;
     let l1GWBalanceBeforeDeposit: BigNumber;
     let gwBalanceBeforeDeposit: BigNumber;
+    // Captured from the `initiateGatewayToL1MigrationOnGateway` tx so the follow-up
+    // test can build an L1 finalisation payload from the same GW→L1 message.
+    let gwToL1MigrationReceipt: ethers.providers.TransactionReceipt;
 
     before(async () => {
       depositAmount = randomBigNumber(TBM_DEPOSIT_AMOUNT_RANGE.min, TBM_DEPOSIT_AMOUNT_RANGE.max);
@@ -446,7 +467,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       ).to.equal(true);
     });
 
-    it("initiating reverse TBM drains GW chainBalance and advances assetMigrationNumber to 2", async () => {
+    it("reverse TBM: initiate on GW drains chainBalance, bumps GW assetMigrationNumber to 2, and emits the GW→L1 finalisation message", async () => {
       const gwBalanceBefore = await getGWChainBalance(gwProvider, reverseTbmChainId, ethAssetId);
       expect(gwBalanceBefore.gt(0), "GW chainBalance > 0 before reverse TBM").to.equal(true);
 
@@ -456,8 +477,9 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       const tx = await gwAssetTracker
         .connect(gwWallet)
         .initiateGatewayToL1MigrationOnGateway(reverseTbmChainId, ethAssetId, { gasLimit: 5_000_000 });
-      await tx.wait();
+      gwToL1MigrationReceipt = await tx.wait();
 
+      // GW side: chainBalance is drained and GWAT assetMigrationNumber advances to 2.
       const gwBalanceAfter = await getGWChainBalance(gwProvider, reverseTbmChainId, ethAssetId);
       expect(gwBalanceAfter.eq(0), `GW chainBalance drained to 0 (was ${gwBalanceAfter})`).to.equal(true);
 
@@ -468,10 +490,50 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         reverseTbmChainId,
         ethAssetId
       );
-      expect(gwMig, "GWAT assetMigrationNumber == 2 after reverse TBM").to.equal(POST_REVERSE_MIGRATION_NUMBER);
+      expect(gwMig, "GWAT assetMigrationNumber").to.equal(POST_REVERSE_MIGRATION_NUMBER);
     });
 
-    it("reverse TBM is idempotent — repeating it reverts with InvalidAssetMigrationNumber", async () => {
+    it("L1 finalisation is guarded by the chain-level migrate-from-gateway flow — reverts with InvalidChainMigrationNumber when L1 is not yet synced", async () => {
+      // Scope boundary: `L1AssetTracker.receiveGatewayToL1MigrationOnL1` requires
+      // `L1ChainAssetHandler.migrationNumber[chainId] == MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1`
+      // (i.e. 2). That L1 counter is bumped by `L1ChainAssetHandler.bridgeMint`
+      // when the chain-level migrate-from-gateway flow lands on L1 — a flow whose
+      // L1 contract carries immutables (BRIDGEHUB, L1_CHAIN_ID, ETH_TOKEN_ASSET_ID)
+      // and therefore cannot be dev-swapped via `anvil_setCode`, and whose
+      // production path pulls in the chain-migration governance machinery
+      // (out of scope for this PR).
+      //
+      // Rather than silently skipping the L1 side, this test asserts the exact
+      // invariant that defines the scope boundary: the real L1 entry point is
+      // called, it reverts with the documented custom error, and the revert
+      // data matches the expected (current, required) values.
+      const l1AssetTracker = new Contract(l1AssetTrackerAddr, getAbi("L1AssetTracker"), l1Provider);
+      const l1Wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
+      const finalizeParams = buildFinalizeWithdrawalParams(gwToL1MigrationReceipt, gwChainId);
+
+      await expectRevert(
+        () =>
+          l1AssetTracker
+            .connect(l1Wallet)
+            .callStatic.receiveGatewayToL1MigrationOnL1(finalizeParams, { gasLimit: 10_000_000 }),
+        "L1 finalisation before chain-level migrate-from-gateway",
+        customError("L1AssetTracker", "InvalidChainMigrationNumber(uint256,uint256)"),
+        l1Provider
+      );
+
+      // L2AT stays at 1: the confirmation priority tx from L1 that would bump it
+      // only fires once `receiveGatewayToL1MigrationOnL1` succeeds.
+      const l2Mig = await queryMigrationNumber(
+        reverseTbmProvider,
+        L2_ASSET_TRACKER_ADDR,
+        "L2AssetTracker",
+        reverseTbmChainId,
+        ethAssetId
+      );
+      expect(l2Mig, "L2AT assetMigrationNumber stays at 1 while L1 finalisation is blocked").to.equal(1);
+    });
+
+    it("reverse TBM is idempotent — repeating it on GW reverts with InvalidAssetMigrationNumber", async () => {
       const gwAssetTracker = new Contract(GW_ASSET_TRACKER_ADDR, getAbi("GWAssetTracker"), gwProvider);
       const gwWallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, gwProvider);
 
@@ -485,18 +547,6 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         "reverse TBM replay",
         customError("GWAssetTracker", "InvalidAssetMigrationNumber()"),
         gwProvider
-      );
-    });
-
-    it("L2 assetMigrationNumber still lags GW (stays at 1 pending L1 finalisation)", async () => {
-      // `L2AssetTracker.assetMigrationNumber` for ETH is only advanced once the L1
-      // finalisation round-trip completes and emits the confirmation priority tx
-      // back to L2. This test does not drive that step; spec 10 keeps the scope
-      // limited to the GW-side effects of reverse TBM initiation.
-      const l2AssetTracker = new Contract(L2_ASSET_TRACKER_ADDR, getAbi("L2AssetTracker"), reverseTbmProvider);
-      const ethMigNum = BigNumber.from(await l2AssetTracker.assetMigrationNumber(reverseTbmChainId, ethAssetId));
-      expect(ethMigNum.eq(1), `L2 assetMigrationNumber[${reverseTbmChainId}][ETH] pending L1 finalisation`).to.equal(
-        true
       );
     });
   });
