@@ -549,7 +549,9 @@ describe("10 - Token Balance Migration Lifecycle", function () {
 
       const gwBalanceAfter = await getGWChainBalance(gwProvider, reverseTbmChainId, ethAssetId);
       const gwDelta = gwBalanceAfter.sub(gwBalanceBeforeDeposit);
-      expect(gwDelta.eq(expectedDelta), `GW chainBalance delta ${gwDelta} == mintValue ${expectedDelta}`).to.equal(true);
+      expect(gwDelta.eq(expectedDelta), `GW chainBalance delta ${gwDelta} == mintValue ${expectedDelta}`).to.equal(
+        true
+      );
 
       const l1GWBalanceAfter = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, gwChainId, ethAssetId);
       const l1GWDelta = l1GWBalanceAfter.sub(l1GWBalanceBeforeDeposit);
