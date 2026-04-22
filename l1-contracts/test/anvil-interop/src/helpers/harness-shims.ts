@@ -1,15 +1,20 @@
 import type { providers } from "ethers";
-import { Contract } from "ethers";
+import { Contract, ContractFactory, Wallet, ethers } from "ethers";
 import type { ContractInterface } from "@ethersproject/contracts";
 import { impersonateAndRun } from "../core/utils";
 import {
+  ANVIL_DEFAULT_PRIVATE_KEY,
   L2_BOOTLOADER_ADDR,
   L2_BRIDGEHUB_ADDR,
   L2_CHAIN_ASSET_HANDLER_ADDR,
   L2_COMPLEX_UPGRADER_ADDR,
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
-import { getAbi, getBytecode } from "../core/contracts";
+import { getAbi, getBytecode, getCreationBytecode } from "../core/contracts";
+
+// EIP-1967 storage slot for the implementation address of a TransparentUpgradeableProxy.
+//   keccak256("eip1967.proxy.implementation") - 1
+const EIP1967_IMPLEMENTATION_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 
 const systemContextAbi = getAbi("SystemContext") as ContractInterface;
 
@@ -140,6 +145,93 @@ export async function simulateGWChainMigrationBurn(params: {
     const tx = await chainAssetHandler
       .connect(signer)
       .setMigrationNumberForTesting(chainId, newMigrationNumber, { gasLimit });
+    await tx.wait();
+  });
+}
+
+/**
+ * Install the `L1ChainAssetHandlerDev` implementation behind the production
+ * `L1ChainAssetHandler` TransparentUpgradeableProxy on L1.
+ *
+ * L1 `_getChainMigrationNumber(chainId)` reads `L1ChainAssetHandler.migrationNumber[chainId]`,
+ * which production bumps via `bridgeMint` during the chain-level migrate-from-gateway
+ * governance flow. That flow ultimately drives `Migrator.forwardedBridgeBurn` on the
+ * migrating chain's Gateway diamond proxy, which enforces invariants
+ * (`priorityTree.getSize() == 0`, `totalBatchesCommitted == totalBatchesExecuted`)
+ * that a sequencer-less / prover-less Anvil harness cannot satisfy. The dev variant
+ * exposes `setMigrationNumberForTesting(chainId, value)` so the harness can drive
+ * the same observable transition through a real `onlyOwner`-gated call.
+ *
+ * L1 differs from L2 in two ways: (1) the contract has immutables
+ * (`BRIDGEHUB`, `L1_CHAIN_ID`, `ETH_TOKEN_ASSET_ID`), and (2) it sits behind a
+ * `TransparentUpgradeableProxy`. We handle both with a "deploy-fresh-then-swap"
+ * pattern:
+ *   1. Deploy a fresh `L1ChainAssetHandlerDev` on L1 with constructor args
+ *      matching the production impl (owner = anything, bridgehub = production
+ *      bridgehub). The fresh deploy runs the constructor on L1, so the baked-in
+ *      immutables hold the exact production values.
+ *   2. Read the fresh deploy's runtime bytecode via `eth_getCode`.
+ *   3. Read the production proxy's EIP-1967 implementation slot.
+ *   4. `anvil_setCode(prodImpl, freshRuntimeBytecode)`.
+ *
+ * After the swap, calls to the production proxy delegatecall into the Dev bytecode
+ * at `prodImpl` with the production proxy's storage. Every inherited entry point
+ * keeps its production semantics; `setMigrationNumberForTesting` becomes reachable
+ * to the `onlyOwner` caller.
+ */
+export async function installL1ChainAssetHandlerDev(
+  l1Provider: providers.JsonRpcProvider,
+  bridgehubAddr: string
+): Promise<{ proxy: string; impl: string }> {
+  const bridgehub = new Contract(bridgehubAddr, getAbi("IL1Bridgehub"), l1Provider);
+  const proxy: string = await bridgehub.chainAssetHandler();
+
+  const implSlotValue = await l1Provider.getStorageAt(proxy, EIP1967_IMPLEMENTATION_SLOT);
+  const impl = ethers.utils.getAddress("0x" + implSlotValue.slice(26));
+
+  const deployer = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
+  const factory = new ContractFactory(
+    getAbi("L1ChainAssetHandlerDev"),
+    getCreationBytecode("L1ChainAssetHandlerDev"),
+    deployer
+  );
+  // The fresh deploy's constructor runs on L1, so `L1_CHAIN_ID` and
+  // `ETH_TOKEN_ASSET_ID` are derived from `block.chainid` the same way production
+  // derived them. `BRIDGEHUB` is passed explicitly and must match production.
+  // `_owner` is inconsequential for the swap: the fresh deploy's storage is
+  // abandoned; `onlyOwner` checks run against the production proxy's storage.
+  const freshDev = await factory.deploy(deployer.address, bridgehubAddr, { gasLimit: 8_000_000 });
+  await freshDev.deployed();
+
+  const freshRuntimeBytecode = await l1Provider.getCode(freshDev.address);
+  if (!freshRuntimeBytecode || freshRuntimeBytecode === "0x") {
+    throw new Error(`Fresh L1ChainAssetHandlerDev deploy at ${freshDev.address} has no code`);
+  }
+
+  await l1Provider.send("anvil_setCode", [impl, freshRuntimeBytecode]);
+  return { proxy, impl };
+}
+
+/**
+ * Bump `L1ChainAssetHandler.migrationNumber[chainId]` via the dev setter installed
+ * by {@link installL1ChainAssetHandlerDev}. Standing in for the production
+ * `bridgeMint`-driven update that lands on L1 at the end of the chain-level
+ * migrate-from-gateway flow.
+ */
+export async function setL1ChainMigrationNumber(params: {
+  l1Provider: providers.JsonRpcProvider;
+  chainAssetHandlerProxy: string;
+  chainId: number;
+  newMigrationNumber: number;
+  gasLimit?: number;
+}): Promise<void> {
+  const { l1Provider, chainAssetHandlerProxy, chainId, newMigrationNumber, gasLimit = 1_000_000 } = params;
+
+  const cah = new Contract(chainAssetHandlerProxy, getAbi("L1ChainAssetHandlerDev"), l1Provider);
+  const owner: string = await cah.owner();
+
+  await impersonateAndRun(l1Provider, owner, async (signer) => {
+    const tx = await cah.connect(signer).setMigrationNumberForTesting(chainId, newMigrationNumber, { gasLimit });
     await tx.wait();
   });
 }
