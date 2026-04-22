@@ -486,9 +486,14 @@ async function deployL2Contracts(
   }
 
   // Deploy the delegateTo target (L2V31Upgrade).
-  // The existing ComplexUpgrader from the v29/v30 state is used as-is — the L1 side
-  // (SettlementLayerV31Upgrade) constructs calldata compatible with its ABI.
   await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V31Upgrade")]);
+
+  // For ZKsyncOS upgrades, the ComplexUpgrader entry point changes from the v30
+  // `upgrade(address,bytes)` to `forceDeployAndUpgradeUniversal(...)`. The v30 chain state
+  // has the old ComplexUpgrader that doesn't have this function, so we deploy the new one.
+  if (isZKsyncOS) {
+    await l2Provider.send("anvil_setCode", [L2_COMPLEX_UPGRADER_ADDR, getBytecode("L2ComplexUpgrader")]);
+  }
 
   // L2BaseToken: for Era it's deployed directly as L2BaseTokenEra (not in force deployment list).
   // For ZKsyncOS it's in the force deployment list as ZKsyncOSSystemProxyUpgrade and handled above.
