@@ -68,7 +68,7 @@ export async function setSettlementLayerViaBootloader(params: {
 }
 
 /**
- * Install the `L2ChainAssetHandlerDev` implementation at `L2_CHAIN_ASSET_HANDLER_ADDR`
+ * Deploy the `L2ChainAssetHandlerDev` implementation at `L2_CHAIN_ASSET_HANDLER_ADDR`
  * on the given provider via `anvil_setCode`.
  *
  * Reverse TBM testing needs to drive the chain's `migrationNumber` counter on the
