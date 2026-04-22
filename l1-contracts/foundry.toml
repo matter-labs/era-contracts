@@ -30,6 +30,8 @@ fs_permissions = [
     { access = "read-write", path = "./test/foundry/l1/integration/upgrade-envs/script-out/" },
     { access = "read", path = "zkout" },
     { access = "read", path = "./deploy-scripts/evm-predeploys/evm-predeploy-datas" },
+    { access = "read-write", path = "./test/anvil-interop/config/" },
+    { access = "read-write", path = "./test/anvil-interop/outputs/" },
 ]
 ignored_error_codes = ["missing-receive-ether", "code-size"]
 ignored_warnings_from = ["test", "contracts/dev-contracts"]

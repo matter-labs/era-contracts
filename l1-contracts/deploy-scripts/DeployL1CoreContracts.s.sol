@@ -57,6 +57,11 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         bridgehub.acceptAdmin();
     }
 
+    /// @notice Like runForTest but without acceptAdmin — caller handles admin acceptance separately.
+    function runDeployOnly() public {
+        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
+    }
+
     function getAddresses() public view returns (DeployedAddresses memory) {
         return addresses;
     }
