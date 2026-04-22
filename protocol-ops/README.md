@@ -64,17 +64,6 @@ Commands that support **`--out`** write a **`CommandEnvelope`** snapshot after a
 | **`input`**        | Serialized command input (may be `{}` if the command passes an empty object).                                                |
 | **`output`**       | Command-specific result object (may be `{}`).                                                                                |
 
-**Replay on a real RPC:** `chain execute-simulated-transactions` reads a previously written envelope, extracts **`transactions`**, and runs `l1-contracts/deploy-scripts/ExecuteProtocolOpsOut.s.sol`. Example:
-
-```bash
-./target/release/protocol_ops chain execute-simulated-transactions \
-  --out /path/from/protocol-ops.json \
-  --private-key … \
-  --l1-rpc-url …
-```
-
-Here **`--out`** is the **input** path to that JSON file (not an envelope field name).
-
 **Exception:** `chain set-upgrade-timestamp --simulate --out` writes a minimal JSON (`command`, **`transactions`**) built from `cast calldata` — no **`runs`** array.
 
 ## Requirements

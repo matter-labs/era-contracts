@@ -68,5 +68,10 @@
     "type": "error",
     "name": "InvalidChainId",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroAddress",
+    "inputs": []
   }
 ]

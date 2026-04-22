@@ -1019,12 +1019,10 @@ library Utils {
     }
 
     function blakeHashBytecode(bytes memory _bytecode) internal returns (bytes32 hashedBytecode) {
-        string[] memory input = new string[](5);
-        input[0] = "yarn";
-        input[1] = "--silent";
-        input[2] = "ts-node";
-        input[3] = "./scripts/blake2s256.ts";
-        input[4] = vm.toString(_bytecode);
+        string[] memory input = new string[](3);
+        input[0] = "node";
+        input[1] = "./scripts/blake2s256.js";
+        input[2] = vm.toString(_bytecode);
         hashedBytecode = bytes32(vm.ffi(input));
     }
 

@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - gateway-commands-in-protocol-ops
+      - zksyncos-v31-deploy-script-fixes
 
 jobs:
   build-and-push:

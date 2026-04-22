@@ -1,10 +1,11 @@
-#!/usr/bin/env ts-node
+#!/usr/bin/env node
+/* eslint-env node */
+/* eslint-disable @typescript-eslint/no-var-requires */
 
-import * as blakejs from "blakejs";
-import * as fs from "fs";
+const blakejs = require("blakejs");
+const fs = require("fs");
 
-// Helper to convert a hex string to Uint8Array
-function hexToBytes(hex: string): Uint8Array {
+function hexToBytes(hex) {
   if (hex.startsWith("0x")) hex = hex.slice(2);
   if (hex.length % 2 !== 0) {
     throw new Error("Invalid hex string");
@@ -19,11 +20,9 @@ function hexToBytes(hex: string): Uint8Array {
 const args = process.argv.slice(2);
 
 if (args[0] === "--batch") {
-  // Batch mode: read hex bytecodes (one per line) from a file,
-  // output all 32-byte hashes concatenated as a single 0x-prefixed hex string.
   const inputFile = args[1];
   if (!inputFile) {
-    console.error("Usage: blake2s256.ts --batch <input-file>");
+    console.error("Usage: blake2s256.js --batch <input-file>");
     process.exit(1);
   }
   const lines = fs.readFileSync(inputFile, "utf-8").split("\n").filter(Boolean);
@@ -33,10 +32,9 @@ if (args[0] === "--batch") {
   }
   console.log("0x" + output);
 } else {
-  // Single mode: hash hex from CLI args
   const input = args.join(" ");
   if (!input) {
-    console.error("Usage: blake2s256.ts <hex-string>");
+    console.error("Usage: blake2s256.js <hex-string>");
     process.exit(1);
   }
   console.log(blakejs.blake2sHex(hexToBytes(input)));

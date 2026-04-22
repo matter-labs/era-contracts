@@ -652,6 +652,11 @@
   },
   {
     "type": "error",
+    "name": "SlotOccupied",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "TokenBalanceNotMigratedToGateway",
     "inputs": [
       {

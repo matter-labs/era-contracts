@@ -2,7 +2,7 @@
 
 ARG FOUNDRY_ARCH=linux_amd64
 ARG FOUNDRY_ZKSYNC_TAG=nightly-807f47ace7cdd90eed7190dc4481952cfaa25938
-ARG FOUNDRY_VANILLA_VERSION=v1.3.5
+ARG FOUNDRY_VANILLA_VERSION=v1.5.1
 ARG NODE_MAJOR=20
 ARG RUST_TARGET=x86_64-unknown-linux-gnu
 ARG RUST_TOOLCHAIN=nightly-2025-09-19
@@ -129,7 +129,7 @@ RUN yarn --cwd system-contracts build:foundry
 # === Calculate hashes ===
 RUN yarn calculate-hashes:check
 
-# Keep full node_modules — forge ffi scripts need devDependencies (ts-node, etc.)
+# Keep full node_modules — forge ffi scripts depend on packages here (e.g. blakejs).
 
 ########################################
 # 3) Runtime
@@ -142,9 +142,10 @@ ARG YARN_VERSION
 ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/contracts/protocol-ops:/contracts/tools/zksync-os-genesis-gen:/contracts/tools/wallets-gen:/usr/local/bin:$PATH \
     FOUNDRY_DISABLE_NIGHTLY_WARNING=1 \
+    FOUNDRY_OFFLINE=true \
     XDG_CONFIG_HOME=/etc/xdg
 
-# Runtime deps + Node.js (needed for forge ffi scripts like blake2s256.ts)
+# Runtime deps + Node.js (needed for forge ffi scripts like blake2s256.js)
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates bash openssl jq curl gnupg && \
     curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - && \

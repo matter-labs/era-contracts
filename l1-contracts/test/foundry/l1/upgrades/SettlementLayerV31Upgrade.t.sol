@@ -208,6 +208,20 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
             abi.encode(mockGWChain)
         );
 
+        // Mock bridgehub.getZKChain for testChainId — the upgrade contract reads
+        // getZKsyncOS() from the diamond proxy to avoid relying on s.zksyncOS
+        // (which is empty when getL2UpgradeTxData is called directly, not via delegatecall).
+        vm.mockCall(
+            mockBridgehub,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, testChainId),
+            abi.encode(address(upgrade))
+        );
+        vm.mockCall(
+            address(upgrade),
+            abi.encodeWithSelector(IGetters.getZKsyncOS.selector),
+            abi.encode(false)
+        );
+
         // Mock gwChain.getSemverProtocolVersion - returns version >= 30
         vm.mockCall(
             mockGWChain,
@@ -579,6 +593,18 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
             mockChainTypeManager,
             abi.encodeWithSelector(IChainTypeManager.PERMISSIONLESS_VALIDATOR.selector),
             abi.encode(makeAddr("permissionlessValidator"))
+        );
+
+        // Mock bridgehub.getZKChain for testChainId and getZKsyncOS on the diamond proxy.
+        vm.mockCall(
+            mockBridgehub,
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, testChainId),
+            abi.encode(address(zkosUpgrade))
+        );
+        vm.mockCall(
+            address(zkosUpgrade),
+            abi.encodeWithSelector(IGetters.getZKsyncOS.selector),
+            abi.encode(true)
         );
     }
 

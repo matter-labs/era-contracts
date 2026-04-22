@@ -60,7 +60,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
     using stdToml for string;
 
     /// @dev Cache for batched blake2s hashing (keccak256(bytecode) => blake2s(bytecode)).
-    /// ZKsyncOS bytecode info requires blake2s hashes, computed via FFI (`yarn ts-node blake2s256.ts`).
+    /// ZKsyncOS bytecode info requires blake2s hashes, computed via FFI (`node blake2s256.js`).
     /// Without caching, each call to `Utils.getZKOSProxyUpgradeBytecodeInfo` spawns 2 FFI processes
     /// (one for the impl, one for SystemContractProxy). With ~10 contracts in `_buildForceDeploymentsData`,
     /// that's ~20 sequential FFI calls. The cache batches all bytecodes into a single FFI call in
@@ -522,13 +522,11 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
         vm.writeLine(tmpFile, vm.toString(proxyBytecode));
 
         // Single FFI call to batch-hash all bytecodes
-        string[] memory input = new string[](6);
-        input[0] = "yarn";
-        input[1] = "--silent";
-        input[2] = "ts-node";
-        input[3] = "./scripts/blake2s256.ts";
-        input[4] = "--batch";
-        input[5] = tmpFile;
+        string[] memory input = new string[](4);
+        input[0] = "node";
+        input[1] = "./scripts/blake2s256.js";
+        input[2] = "--batch";
+        input[3] = tmpFile;
         bytes memory result = vm.ffi(input);
 
         uint256 totalBytecodes = 11;

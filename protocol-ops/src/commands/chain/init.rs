@@ -1,13 +1,11 @@
+use anyhow::Context;
 use clap::Parser;
 use ethers::{
     contract::BaseContract,
-    middleware::Middleware,
     types::{Address, H256, U256},
-    utils::hex,
 };
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use tokio::task::block_in_place;
 
 use crate::abi::{
     IDEPLOYL2CONTRACTSABI_ABI, IDEPLOYPAYMASTERABI_ABI, IENABLEEVMEMULATORABI_ABI,
@@ -21,7 +19,6 @@ use crate::commands::output::write_output_if_requested;
 
 use crate::common::SharedRunArgs;
 use crate::common::{
-    ethereum::get_ethers_provider,
     forge::{Forge, ForgeRunner},
     logger,
     traits::{FileConfigTrait, ReadConfig, SaveConfig},
@@ -63,9 +60,6 @@ lazy_static! {
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct ChainInitArgs {
     // Input
-    /// CTM (Chain Type Manager) proxy address
-    #[clap(long, help_heading = "Input")]
-    pub ctm_proxy: Address,
     /// L1 DA validator address
     #[clap(long, help_heading = "Input")]
     pub l1_da_validator: Address,
@@ -81,21 +75,20 @@ pub struct ChainInitArgs {
     /// L1 batch execute operator (ZKSync OS only)
     #[clap(long, help_heading = "Input")]
     pub execute_operator: Option<Address>,
-    /// VM type: zksyncos or eravm
-    #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM, help_heading = "Input")]
-    pub vm_type: VMOption,
+
+    /// Bridgehub proxy address
+    #[clap(long, help_heading = "Input")]
+    pub bridgehub: Address,
 
     /// Owner address for the chain (default: sender)
     #[clap(long, help_heading = "Signers")]
     pub owner: Option<Address>,
 
-    // Auth (owner and bridgehub; sender key lives in `shared`)
-    /// Owner private key
-    #[clap(long, visible_alias = "owner-pk", help_heading = "Auth")]
-    pub owner_private_key: Option<H256>,
-    /// Bridgehub admin private key
-    #[clap(long, visible_alias = "bridgehub-admin-pk", help_heading = "Auth")]
-    pub bridgehub_admin_private_key: Option<H256>,
+    /// Deployer EOA address. Bootstrap is prepare-only: protocol-ops emits a
+    /// directory of Safe bundles via `--out`; the deployer applies them with
+    /// `dev execute-safe` (or any Safe-bundle-aware executor).
+    #[clap(long, help_heading = "Signers")]
+    pub deployer_address: Address,
 
     #[clap(flatten)]
     #[serde(flatten)]
@@ -144,12 +137,6 @@ pub struct ChainInitArgs {
     /// Enable support for legacy bridge testing
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_legacy_bridge: bool,
-    /// CREATE2 factory address
-    #[clap(long, help_heading = "Advanced input")]
-    pub create2_factory_addr: Option<Address>,
-    /// CREATE2 factory salt
-    #[clap(long, help_heading = "Advanced input")]
-    pub create2_factory_salt: Option<H256>,
 }
 
 // ── run() ───────────────────────────────────────────────────────────────────
@@ -157,23 +144,37 @@ pub struct ChainInitArgs {
 pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
     let (price_ratio_num, price_ratio_den) = parse_ratio(&args.base_token_price_ratio)?;
 
-    let deployer = Wallet::parse(args.shared.private_key, args.shared.sender)?;
-    let mut runner = ForgeRunner::new(
-        args.shared.simulate,
-        &args.shared.l1_rpc_url,
-        args.shared.forge_args.clone(),
-    )?;
+    let mut runner = ForgeRunner::new(&args.shared)?;
+    let deployer = runner.prepare_sender(args.deployer_address).await?;
 
-    let owner = Wallet::resolve(args.owner, args.owner_private_key, &deployer)?;
+    let owner = Wallet::resolve(args.owner, None, &deployer)?;
 
-    let bridgehub_admin = if let Some(pk) = args.bridgehub_admin_private_key {
-        Wallet::parse(Some(pk), None)?
-    } else {
-        deployer.clone()
+    let bridgehub_admin_addr =
+        crate::common::l1_contracts::resolve_bridgehub_admin(&runner.rpc_url, args.bridgehub)
+            .await
+            .context("resolving bridgehub.admin() from L1")?;
+    let bridgehub_admin = runner.prepare_sender(bridgehub_admin_addr).await?;
+
+    // Discover CTM proxy from L1.
+    let ctm_proxy =
+        crate::common::l1_contracts::discover_ctm_proxy(&runner.rpc_url, args.bridgehub)
+            .await
+            .context("Failed to discover CTM proxy from L1")?;
+    logger::info(format!("CTM proxy (from L1): {:#x}", ctm_proxy));
+
+    // Resolve VM type from CTM.
+    let vm_type = {
+        let is_zksync_os =
+            crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
+                .await
+                .context("Failed to resolve isZKsyncOS from CTM")?;
+        if is_zksync_os {
+            VMOption::ZKSyncOsVM
+        } else {
+            VMOption::EraVM
+        }
     };
-
-    // TODO: move this to forge script
-    let bridgehub = query_bridgehub(&runner.rpc_url, args.ctm_proxy)?;
+    logger::info(format!("VM type (from L1): {:?}", vm_type));
 
     let chain_params = NewChainParams {
         chain_id: L2ChainId::from(args.chain_id as u32),
@@ -183,22 +184,21 @@ pub async fn run(args: ChainInitArgs) -> anyhow::Result<()> {
         owner: owner.address,
         commit_operator: args.commit_operator,
         prove_operator: args.prove_operator,
-        execute_operator: args.execute_operator.unwrap_or_else(|| Address::zero()),
+        execute_operator: args.execute_operator.unwrap_or_else(Address::zero),
         token_multiplier_setter: args.token_multiplier_setter,
         da_mode: args.da_mode,
-        vm_type: args.vm_type,
+        vm_type,
     };
 
     let input = ChainInitInput {
-        ctm_proxy: args.ctm_proxy,
-        bridgehub,
+        ctm_proxy,
+        bridgehub: args.bridgehub,
         l1_da_validator: args.l1_da_validator,
         chain_params,
-        vm_type: args.vm_type,
+        vm_type,
         l2_da_commitment_scheme: args.l2_da_commitment_scheme,
         with_legacy_bridge: args.with_legacy_bridge,
-        create2_factory_addr: args.create2_factory_addr,
-        create2_factory_salt: args.create2_factory_salt,
+        create2_factory_salt: None,
         pause_deposits: args.pause_deposits,
         evm_emulator: args.evm_emulator,
         deploy_paymaster: args.deploy_paymaster,
@@ -235,7 +235,15 @@ pub async fn chain_init(
         "Registering chain ({}) on CTM...",
         input.chain_params.chain_id.as_u64()
     ));
-    let register_output = register_chain(runner, bridgehub_admin, input)?;
+    // Forge `--sender` controls the `from` field recorded for every bare
+    // `vm.broadcast()` in RegisterZKChain.s.sol (including Utils'
+    // `deployViaCreate2` which broadcasts as `tx.origin`). Passing the
+    // bridgehub admin *contract* here is wrong: the resulting Safe bundle
+    // targets a contract, which `dev execute-safe --private-key` can't
+    // replay. Admin-gated calls in the script already broadcast explicitly
+    // via `vm.broadcast(admin.owner())`, so they don't need `--sender` to
+    // be the admin — the deployer EOA works for everything else.
+    let register_output = register_chain(runner, deployer, input)?;
     let diamond_proxy = register_output.diamond_proxy_addr;
     let chain_admin = register_output.chain_admin_addr;
     let mut full_output = FullChainInitOutput::from_register(&register_output);
@@ -301,9 +309,24 @@ pub async fn chain_init(
             logger::step("Enabling EVM emulator...");
             enable_evm_emulator_step(runner, owner, chain_admin, diamond_proxy)?;
         }
-        let governance = register_output.governance_addr;
 
-        // Deploy L2 contracts
+        // Deploy paymaster (if requested, as owner — before L2 contracts so
+        // all owner/multisig transactions are grouped together)
+        if input.deploy_paymaster {
+            logger::step("Deploying paymaster...");
+            let paymaster_addr = deploy_paymaster_step(
+                runner,
+                owner,
+                input.bridgehub,
+                input.chain_params.chain_id.as_u64(),
+            )?;
+            full_output.paymaster_addr = Some(paymaster_addr);
+            logger::info(format!("Paymaster deployed at: {:#x}", paymaster_addr));
+        }
+
+        // Deploy L2 contracts (deployer — last so all owner/multisig
+        // transactions above are in a single signing batch)
+        let governance = register_output.governance_addr;
         logger::step("Deploying L2 contracts...");
         let l2_output = deploy_l2_contracts_step(
             runner,
@@ -319,19 +342,6 @@ pub async fn chain_init(
         full_output.consensus_registry_proxy = Some(l2_output.consensus_registry_proxy);
         full_output.multicall3 = Some(l2_output.multicall3);
         full_output.timestamp_asserter = Some(l2_output.timestamp_asserter);
-
-        // Deploy paymaster (if requested)
-        if input.deploy_paymaster {
-            logger::step("Deploying paymaster...");
-            let paymaster_addr = deploy_paymaster_step(
-                runner,
-                owner,
-                input.bridgehub,
-                input.chain_params.chain_id.as_u64(),
-            )?;
-            full_output.paymaster_addr = Some(paymaster_addr);
-            logger::info(format!("Paymaster deployed at: {:#x}", paymaster_addr));
-        }
     }
 
     // Make permanent rollup (if requested, as owner)
@@ -361,9 +371,13 @@ pub fn register_chain(
     input: &ChainInitInput,
 ) -> anyhow::Result<RegisterChainOutput> {
     let salt = input.create2_factory_salt.unwrap_or_else(H256::random);
+    // CREATE2 factory address is the deterministic proxy — the Solidity
+    // script hardcodes `Utils.DETERMINISTIC_CREATE2_ADDRESS` and ignores
+    // this config field. Passing zero to make that dead-code nature
+    // explicit.
     let deploy_config = RegisterChainL1Config::new(
         &input.chain_params,
-        input.create2_factory_addr.unwrap_or(Address::zero()),
+        Address::zero(),
         Some(salt),
         input.with_legacy_bridge,
         input.evm_emulator,
@@ -388,8 +402,7 @@ pub fn register_chain(
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow()
-        .with_wallet(auth, runner.simulate)
+        .with_wallet(auth)
         .with_env("CREATE2_FACTORY_SALT", format!("{:#x}", salt));
 
     runner.run(forge)?;
@@ -420,32 +433,6 @@ fn parse_ratio(s: &str) -> anyhow::Result<(u64, u64)> {
     Ok((num, den))
 }
 
-/// Query the bridgehub address from a CTM proxy contract via `BRIDGE_HUB()`.
-fn query_bridgehub(rpc_url: &str, ctm_proxy: Address) -> anyhow::Result<Address> {
-    let provider = get_ethers_provider(rpc_url)?;
-    let calldata = ethers::types::Bytes::from(hex::decode("5d4edca7").unwrap());
-    let tx: ethers::types::transaction::eip2718::TypedTransaction =
-        ethers::types::TransactionRequest::new()
-            .to(ctm_proxy)
-            .data(calldata)
-            .into();
-    let fut = provider.call(&tx, None);
-    let result = if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        block_in_place(|| handle.block_on(fut))?
-    } else {
-        tokio::runtime::Runtime::new()
-            .map_err(|e| anyhow::anyhow!("Failed to create Tokio runtime: {}", e))?
-            .block_on(fut)?
-    };
-    if result.len() < 32 {
-        anyhow::bail!(
-            "Invalid response from BRIDGE_HUB() call on CTM proxy {:#x}",
-            ctm_proxy
-        );
-    }
-    Ok(Address::from_slice(&result[12..32]))
-}
-
 fn enable_evm_emulator_step(
     runner: &mut ForgeRunner,
     auth: &Wallet,
@@ -465,7 +452,7 @@ fn enable_evm_emulator_step(
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_wallet(auth, runner.simulate);
+        .with_wallet(auth);
 
     runner.run(forge)?;
     Ok(())
@@ -509,8 +496,7 @@ fn deploy_l2_contracts_step(
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow()
-        .with_wallet(auth, runner.simulate);
+        .with_wallet(auth);
 
     runner.run(forge)?;
 
@@ -547,8 +533,7 @@ fn deploy_paymaster_step(
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow()
-        .with_wallet(auth, runner.simulate);
+        .with_wallet(auth);
 
     runner.run(forge)?;
 
@@ -576,8 +561,7 @@ fn _register_on_all_chains_step(
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow()
-        .with_wallet(auth, runner.simulate);
+        .with_wallet(auth);
 
     runner.run(forge)?;
     Ok(())
@@ -599,8 +583,7 @@ fn setup_legacy_bridge_step(
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow()
-        .with_wallet(auth, runner.simulate);
+        .with_wallet(auth);
 
     runner.run(forge)?;
     Ok(())
@@ -617,7 +600,6 @@ pub struct ChainInitInput {
     pub vm_type: VMOption,
     pub l2_da_commitment_scheme: Option<L2DACommitmentScheme>,
     pub with_legacy_bridge: bool,
-    pub create2_factory_addr: Option<Address>,
     pub create2_factory_salt: Option<H256>,
     pub pause_deposits: bool,
     pub evm_emulator: bool,
