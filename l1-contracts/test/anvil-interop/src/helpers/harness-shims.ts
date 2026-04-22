@@ -235,3 +235,59 @@ export async function setL1ChainMigrationNumber(params: {
     await tx.wait();
   });
 }
+
+/**
+ * Flip `L1Bridgehub.settlementLayer[chainId]` back to `L1_CHAIN_ID` by calling
+ * `forwardedBridgeMint` via the chain-asset-handler access surface.
+ *
+ * In production this runs at the end of the chain-level migrate-from-gateway
+ * flow, when `L1ChainAssetHandler.bridgeMint` invokes
+ * `L1Bridgehub.forwardedBridgeMint(...)`. Without it, L1 still routes
+ * deposits/withdrawals for the chain through the L1→GW→L2 path (the
+ * `settlementLayerChainId` encoded into withdrawal proofs picks the GW
+ * `chainBalance` for decrement), so the downstream reverse-TBM withdrawal
+ * lifecycle can't distinguish "pre-finalisation" from "post-finalisation".
+ *
+ * Idempotent with production state: every non-settlement-layer field
+ * `forwardedBridgeMint` writes (`chainTypeManager`, `baseTokenAssetId`,
+ * `assetIdIsRegistered`) was already set during chain registration and is
+ * rewritten to the same value here.
+ */
+export async function completeL1ChainMigrationSettlementLayer(params: {
+  l1Provider: providers.JsonRpcProvider;
+  chainAssetHandlerProxy: string;
+  bridgehubAddr: string;
+  chainId: number;
+  baseTokenAssetId: string;
+  baseTokenOriginChainId: number;
+  baseTokenOriginAddress: string;
+  gasLimit?: number;
+}): Promise<void> {
+  const {
+    l1Provider,
+    chainAssetHandlerProxy,
+    bridgehubAddr,
+    chainId,
+    baseTokenAssetId,
+    baseTokenOriginChainId,
+    baseTokenOriginAddress,
+    gasLimit = 2_000_000,
+  } = params;
+
+  const bridgehub = new Contract(bridgehubAddr, getAbi("IL1Bridgehub"), l1Provider);
+  const ctmAssetId: string = await bridgehub.ctmAssetIdFromChainId(chainId);
+
+  await impersonateAndRun(l1Provider, chainAssetHandlerProxy, async (signer) => {
+    const tx = await bridgehub.connect(signer).forwardedBridgeMint(
+      ctmAssetId,
+      chainId,
+      {
+        assetId: baseTokenAssetId,
+        originChainId: baseTokenOriginChainId,
+        originToken: baseTokenOriginAddress,
+      },
+      { gasLimit }
+    );
+    await tx.wait();
+  });
+}
