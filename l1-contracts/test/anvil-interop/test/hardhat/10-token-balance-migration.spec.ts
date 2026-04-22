@@ -55,8 +55,9 @@ import {
   getChainIdsByRole,
   getL1RpcUrl,
   getL2RpcUrl,
+  impersonateAndRun,
 } from "../../src/core/utils";
-import { getAbi } from "../../src/core/contracts";
+import { getAbi, getCreationBytecode } from "../../src/core/contracts";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
@@ -68,6 +69,7 @@ import {
   L2_BRIDGEHUB_ADDR,
   L2_CHAIN_ASSET_HANDLER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
+  L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../../src/core/const";
 import { migrateTokenBalanceToGW } from "../../src/helpers/token-balance-migration-helper";
 import { depositETHToL2 } from "../../src/helpers/l1-deposit-helper";
@@ -262,6 +264,35 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       }
     });
 
+    it("L1AT and GWAT assetMigrationNumber match for the NTV test token on every GW-settled chain", async () => {
+      // Mirrors the source suite's "Correctly assigns chain token balances" check,
+      // applied to the per-chain NTV test token that the anvil harness deploys and
+      // migrates to GW during `registerAndMigrateTestTokens`.
+      for (const chainId of gwSettledChainIds) {
+        const tokenAddr = state.testTokens![chainId];
+        if (!tokenAddr) continue;
+        const testTokenAssetId = encodeNtvAssetId(chainId, tokenAddr);
+
+        const l1Mig = await queryMigrationNumber(
+          l1Provider,
+          l1AssetTrackerAddr,
+          "L1AssetTracker",
+          chainId,
+          testTokenAssetId
+        );
+        const gwMig = await queryMigrationNumber(
+          gwProvider,
+          GW_ASSET_TRACKER_ADDR,
+          "GWAssetTracker",
+          chainId,
+          testTokenAssetId
+        );
+
+        expect(l1Mig, `L1AT assetMigrationNumber[${chainId}][testToken]`).to.be.gte(1);
+        expect(l1Mig, `L1AT/GWAT assetMigrationNumber should match for chain ${chainId} (test token)`).to.equal(gwMig);
+      }
+    });
+
     it("sum of GW per-chain balances is <= L1 chainBalance[GW][ETH] (conservation)", async () => {
       const l1GWBalance = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, gwChainId, ethAssetId);
 
@@ -327,20 +358,22 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       expect(l1MigAfter, "L1 and GW assetMigrationNumber agree").to.equal(gwMigAfter);
     });
 
-    it("cannot initiate migration for a bogus assetId (NTV lookup fails)", async () => {
+    it("cannot initiate migration for a bogus assetId (AssetIdNotRegistered)", async () => {
       const l2AssetTracker = new Contract(L2_ASSET_TRACKER_ADDR, getAbi("L2AssetTracker"), reverseTbmProvider);
       const bogusAssetId = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("bogus-asset-tbm-spec"));
 
-      // The L2AssetTracker tries to resolve the token via `_tryGetTokenAddress`,
-      // which reverts when the asset isn't registered on the NTV. No specific
-      // selector is asserted because the revert bubbles up from the NTV and is
-      // not part of L2AssetTracker's custom error surface.
+      // The L2AssetTracker resolves the token via `_tryGetTokenAddress`, which
+      // reverts with `AssetIdNotRegistered(bytes32)` when the asset isn't
+      // registered on the NTV. This mirrors the source test assertion
+      // (selector 0xda72d995 in zksync-era/token-balance-migration.test.ts).
       await expectRevert(
         () =>
           l2AssetTracker
             .connect(new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, reverseTbmProvider))
             .callStatic.initiateL1ToGatewayMigrationOnL2(bogusAssetId, { gasLimit: 5_000_000 }),
-        "initiateL1ToGatewayMigrationOnL2 with bogus assetId"
+        "initiateL1ToGatewayMigrationOnL2 with bogus assetId",
+        customError("L2AssetTracker", "AssetIdNotRegistered(bytes32)"),
+        reverseTbmProvider
       );
     });
 
@@ -353,6 +386,62 @@ describe("10 - Token Balance Migration Lifecycle", function () {
 
       expect(ethMigNum.gt(0), `L2 assetMigrationNumber[${reverseTbmChainId}][ETH] > 0`).to.equal(true);
       expect(unmigratedMigNum.eq(0), "L2 assetMigrationNumber[·][unmigrated] == 0").to.equal(true);
+    });
+
+    it("cannot bridge out an NTV-registered-but-unmigrated token (TokenBalanceNotMigratedToGateway)", async () => {
+      // Mirrors the source suite's "Cannot withdraw tokens that have not been
+      // migrated" (selector 0x90ed63bb in zksync-era/token-balance-migration.test.ts).
+      //
+      // Setup: deploy a fresh TestnetERC20Token on the GW-settled chain and
+      // register it on the L2 NTV. The NTV registration assigns an `assetId` and
+      // records the token in `_tryGetTokenAddress`, but `assetMigrationNumber`
+      // stays at 0 because we deliberately do NOT run TBM for it. Since the
+      // chain's `migrationNumber` is 1 (migrated to GW during setup),
+      // `_checkAssetMigrationNumber` must revert on any outbound bridge attempt.
+      const deployerWallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, reverseTbmProvider);
+      const erc20Factory = new ethers.ContractFactory(
+        getAbi("TestnetERC20Token"),
+        getCreationBytecode("TestnetERC20Token"),
+        deployerWallet
+      );
+      const unmigratedToken = await erc20Factory.deploy("UnmigratedToken", "UNMIG", 18, {
+        gasLimit: 5_000_000,
+      });
+      await unmigratedToken.deployed();
+
+      const l2Ntv = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), deployerWallet);
+      const registerTx = await l2Ntv.registerToken(unmigratedToken.address, { gasLimit: 1_000_000 });
+      await registerTx.wait();
+
+      const unmigratedAssetId = encodeNtvAssetId(reverseTbmChainId, unmigratedToken.address);
+      const unmigratedMigNum = BigNumber.from(
+        await new Contract(L2_ASSET_TRACKER_ADDR, getAbi("L2AssetTracker"), reverseTbmProvider).assetMigrationNumber(
+          reverseTbmChainId,
+          unmigratedAssetId
+        )
+      );
+      expect(unmigratedMigNum, "freshly-registered token starts at assetMigrationNumber=0").to.equal(0);
+
+      // The only valid caller of `handleInitiateBridgingOnL2` is the L2 NTV, so
+      // we impersonate it to exercise the exact same code path a production
+      // outbound bridge would take. This is the same surface the source
+      // `tokens.L2Native.withdraw(chainHandler)` call eventually reaches.
+      await impersonateAndRun(reverseTbmProvider, L2_NATIVE_TOKEN_VAULT_ADDR, async (ntvSigner) => {
+        const l2AssetTracker = new Contract(L2_ASSET_TRACKER_ADDR, getAbi("L2AssetTracker"), ntvSigner);
+        await expectRevert(
+          () =>
+            l2AssetTracker.callStatic.handleInitiateBridgingOnL2(
+              L1_CHAIN_ID,
+              unmigratedAssetId,
+              BigNumber.from(1),
+              reverseTbmChainId,
+              { gasLimit: 1_000_000 }
+            ),
+          "bridging out an unmigrated token",
+          customError("L2AssetTracker", "TokenBalanceNotMigratedToGateway(bytes32,uint256,uint256)"),
+          reverseTbmProvider
+        );
+      });
     });
 
     it("cannot send an interop bundle to an unregistered destination chain (DestinationChainNotRegistered)", async () => {

@@ -72,10 +72,14 @@ jobs:
         # `DummyInteropRecipient` is deployed at test runtime via `anvil_setCode`.
         # `L2ChainAssetHandlerDev` is installed over the production `L2ChainAssetHandler`
         # on the Gateway to expose `setMigrationNumberForTesting` for reverse TBM setup.
+        # `TestnetERC20Token` is deployed at test runtime to exercise the
+        # `TokenBalanceNotMigratedToGateway` revert path on a freshly-registered,
+        # unmigrated asset (spec 10).
         run: |
           forge build \
             contracts/dev-contracts/test/DummyInteropRecipient.sol \
-            contracts/dev-contracts/L2ChainAssetHandlerDev.sol
+            contracts/dev-contracts/L2ChainAssetHandlerDev.sol \
+            contracts/dev-contracts/TestnetERC20Token.sol
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
