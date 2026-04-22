@@ -1,4 +1,4 @@
-import { Contract, ethers, providers, Wallet } from "ethers";
+import { BigNumber, Contract, ethers, providers, Wallet } from "ethers";
 import { getAbi } from "../core/contracts";
 import {
   ANVIL_DEFAULT_PRIVATE_KEY,
@@ -204,4 +204,34 @@ export async function registerAndMigrateTestTokens(params: {
     });
     log(`   TBM complete for test token on chain ${chainId}`);
   }
+}
+
+/**
+ * Read `assetMigrationNumber(chainId, assetId)` off an asset tracker.
+ * Works uniformly against `L1AssetTracker`, `GWAssetTracker`, and `L2AssetTracker`
+ * since they share the getter shape.
+ */
+export async function queryAssetMigrationNumber(
+  provider: providers.JsonRpcProvider,
+  contractAddr: string,
+  contractName: "L1AssetTracker" | "GWAssetTracker" | "L2AssetTracker",
+  chainId: number,
+  assetId: string
+): Promise<number> {
+  const contract = new Contract(contractAddr, getAbi(contractName), provider);
+  const result = await contract.assetMigrationNumber(chainId, assetId);
+  return BigNumber.from(result).toNumber();
+}
+
+/**
+ * Read `L1AssetTracker.chainBalance(chainId, assetId)` on L1.
+ */
+export async function queryL1ChainBalance(
+  l1Provider: providers.JsonRpcProvider,
+  l1AssetTrackerAddr: string,
+  chainId: number,
+  assetId: string
+): Promise<BigNumber> {
+  const contract = new Contract(l1AssetTrackerAddr, getAbi("L1AssetTracker"), l1Provider);
+  return contract.chainBalance(chainId, assetId);
 }
