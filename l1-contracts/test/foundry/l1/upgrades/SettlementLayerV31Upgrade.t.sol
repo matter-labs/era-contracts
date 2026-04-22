@@ -28,6 +28,7 @@ import {
     L2_COMPLEX_UPGRADER_ADDR,
     L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2UpgradeTxLib} from "contracts/upgrades/L2UpgradeTxLib.sol";
 
 contract DummySettlementLayerV31Upgrade is EraSettlementLayerV31Upgrade, BaseUpgradeUtils {
     function setTotalBatchesCommitted(uint256 _totalBatchesCommitted) public {
@@ -67,14 +68,14 @@ contract DummySettlementLayerV31Upgrade is EraSettlementLayerV31Upgrade, BaseUpg
         uint256 _chainId,
         bytes memory _existingUpgradeCalldata
     ) public view returns (bytes memory) {
-        return _buildL2V31UpgradeCalldata(_bridgehub, _chainId, _existingUpgradeCalldata);
+        return L2UpgradeTxLib.buildL2V31UpgradeCalldata(_bridgehub, _chainId, _existingUpgradeCalldata);
     }
 
     function exposeBuildChainSpecificForceDeploymentsData(
         address _bridgehub,
         uint256 _chainId
     ) public view returns (bytes memory) {
-        return _buildChainSpecificForceDeploymentsData(_bridgehub, _chainId);
+        return L2UpgradeTxLib.buildChainSpecificForceDeploymentsData(_bridgehub, _chainId);
     }
 
     function setChainTypeManager(address _chainTypeManager) public override {
@@ -504,7 +505,7 @@ contract DummyZKsyncOSSettlementLayerV31Upgrade is ZKsyncOSSettlementLayerV31Upg
         address _bridgehub,
         uint256 _chainId
     ) public view returns (bytes memory) {
-        return _buildChainSpecificForceDeploymentsData(_bridgehub, _chainId);
+        return L2UpgradeTxLib.buildChainSpecificForceDeploymentsData(_bridgehub, _chainId);
     }
 }
 
