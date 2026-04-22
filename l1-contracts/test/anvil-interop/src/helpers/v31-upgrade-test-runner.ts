@@ -366,8 +366,7 @@ async function runChainUpgradesAndRelayL2(params: {
  * On Anvil EVM, neither the Era ContractDeployer nor ZKsyncOS bytecode deployer
  * infrastructure works. Instead we:
  *   1. Pre-deploy all known contracts via anvil_setCode
- *   2. Place a MockContractDeployer at 0x8006 so force-deployment phase by re-encoding as `upgrade(delegateTo, calldata)`
- *   3. Send the upgrade tx which just delegatecalls to L2V31Upgrade
+ *   2. Place a MockContractDeployer at 0x8006
  */
 async function prepareAndRelayL2Upgrade(
   l2Provider: ethers.providers.JsonRpcProvider,
