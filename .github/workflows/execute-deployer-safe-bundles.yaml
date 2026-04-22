@@ -1,0 +1,150 @@
+name: "Execute Deployer Safe Bundles"
+
+# Apply Safe Transaction Builder bundles whose `target` is the ecosystem
+# deployer EOA (i.e. bundles emitted by the chain-init workflow, the
+# ecosystem upgrade-prepare workflow, and the migrate-from/to
+# phase-2-finalize workflows). The deployer's private key is pulled from a
+# per-environment secret and used to sign every tx in the bundle via
+# `protocol-ops dev execute-safe`.
+#
+# The workflow downloads bundles produced by a prior "generate" workflow
+# run, so it's typically dispatched after a generate workflow has been
+# reviewed off-chain.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment (selects DEPLOYER_PRIVATE_KEY_* secret + env dir)"
+        required: true
+        type: choice
+        options:
+          - stage
+          - stage-interop-tests
+          - sepolia
+          - mainnet
+      protocol_ops_tag:
+        description: "protocol-ops Docker image tag (e.g. latest, v0.31.0)"
+        required: true
+        type: string
+      l1_rpc_url:
+        description: "L1 RPC URL to broadcast against"
+        required: true
+        type: string
+      source_run_id:
+        description: "GitHub workflow run ID that produced the Safe-bundle artifact"
+        required: true
+        type: string
+      artifact_name:
+        description: "Name of the uploaded Safe-bundle artifact (e.g. safe-bundles-chain-init-my_chain-sepolia)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read  # for downloading artifacts from another workflow run
+
+jobs:
+  execute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ENV_DIR: environments/${{ inputs.environment }}
+      BUNDLE_DIR: bundles
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install yq + jq
+        run: |
+          sudo wget -qO /usr/local/bin/yq \
+            https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq
+
+      - name: Download Safe-bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ env.BUNDLE_DIR }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.source_run_id }}
+
+      - name: Resolve deployer address from ecosystem.yaml
+        id: deployer
+        run: |
+          addr=$(yq -er '.deployer' "$ENV_DIR/ecosystem.yaml")
+          if [[ -z "$addr" || "$addr" == "null" ]]; then
+            echo "error: ecosystem.yaml in $ENV_DIR has no .deployer field — set it or pass the deployer explicitly" >&2
+            exit 1
+          fi
+          echo "addr=$addr" >> "$GITHUB_OUTPUT"
+          echo "Deployer (from $ENV_DIR/ecosystem.yaml): $addr"
+
+      - name: Verify every bundle targets the deployer
+        env:
+          DEPLOYER_ADDR: ${{ steps.deployer.outputs.addr }}
+        run: |
+          # Sanity check: refuse to broadcast with the deployer key if any
+          # bundle's `target` doesn't match the deployer EOA. Prevents
+          # signing a governance- or chain-admin-targeted bundle with the
+          # wrong signer and landing on a revert (or, worse, a silent
+          # wrong-sender broadcast on a multisig setup).
+          shopt -s nocasematch
+          manifest="$BUNDLE_DIR/manifest.json"
+          if [[ ! -f "$manifest" ]]; then
+            echo "error: $manifest not found in artifact" >&2
+            exit 1
+          fi
+          mismatches=0
+          while read -r target file; do
+            if [[ "$target" != "$DEPLOYER_ADDR" ]]; then
+              echo "error: bundle $file has target $target, expected deployer $DEPLOYER_ADDR" >&2
+              mismatches=$((mismatches + 1))
+            fi
+          done < <(jq -r '.bundles[] | "\(.target) \(.file)"' "$manifest")
+          if [[ $mismatches -gt 0 ]]; then
+            echo "refusing to execute $mismatches non-deployer bundle(s) with the deployer key" >&2
+            exit 1
+          fi
+          echo "All bundles target the deployer EOA."
+
+      - name: Select deployer private key
+        id: key
+        env:
+          KEY_STAGE: ${{ secrets.DEPLOYER_PRIVATE_KEY_STAGE }}
+          KEY_SEPOLIA: ${{ secrets.DEPLOYER_PRIVATE_KEY_SEPOLIA }}
+          KEY_MAINNET: ${{ secrets.DEPLOYER_PRIVATE_KEY_MAINNET }}
+        run: |
+          case "${{ inputs.environment }}" in
+            stage)   key="$KEY_STAGE" ;;
+            sepolia) key="$KEY_SEPOLIA" ;;
+            mainnet) key="$KEY_MAINNET" ;;
+            *)       echo "unknown environment" >&2; exit 1 ;;
+          esac
+          if [[ -z "$key" ]]; then
+            echo "error: DEPLOYER_PRIVATE_KEY_${{ inputs.environment }} secret is empty" >&2
+            exit 1
+          fi
+          # Don't echo the key into $GITHUB_OUTPUT (GH redacts, but keep it
+          # in $GITHUB_ENV which is scoped to this job only).
+          echo "DEPLOYER_KEY=$key" >> "$GITHUB_ENV"
+          echo "::add-mask::$key"
+
+      - name: Execute bundles in manifest order
+        run: |
+          # Iterate manifest.json in declared order; `dev execute-safe` is
+          # idempotent per-bundle (each call is a discrete tx batch under
+          # the deployer key), so a failure mid-way can be resumed by
+          # rerunning with the same artifact — txs already landed will
+          # short-circuit in subsequent runs.
+          manifest="$BUNDLE_DIR/manifest.json"
+          jq -r '.bundles[].file' "$manifest" | while read -r file; do
+            echo ">>> dev execute-safe $file"
+            bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
+              dev execute-safe \
+              --safe-file "$BUNDLE_DIR/$file" \
+              --l1-rpc-url "${{ inputs.l1_rpc_url }}" \
+              --private-key "$DEPLOYER_KEY"
+          done
