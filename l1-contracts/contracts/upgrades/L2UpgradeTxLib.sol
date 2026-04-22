@@ -7,7 +7,6 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
-import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
 import {UnexpectedUpgradeSelector} from "../common/L1ContractErrors.sol";
 import {UnexpectedZKsyncOSFlag} from "./ZkSyncUpgradeErrors.sol";
@@ -31,10 +30,12 @@ library L2UpgradeTxLib {
     /// extract ecosystem-wide fields, then re-encode with per-chain additionalForceDeploymentsData.
     /// @param _bridgehub The address of the bridgehub.
     /// @param _chainId The chain ID to build the upgrade data for.
+    /// @param _zksyncOS Whether the chain is a ZKsyncOS chain, passed from diamond storage.
     /// @param _existingUpgradeCalldata The placeholder L2V31Upgrade.upgrade() calldata.
     function buildL2V31UpgradeCalldata(
         address _bridgehub,
         uint256 _chainId,
+        bool _zksyncOS,
         bytes memory _existingUpgradeCalldata
     ) internal view returns (bytes memory) {
         // Decode the placeholder to extract isZKsyncOS, ctmDeployer, and fixedForceDeploymentsData
@@ -45,11 +46,9 @@ library L2UpgradeTxLib {
             (bool, address, bytes, bytes)
         );
 
-        // Read the zksyncOS flag from the diamond proxy (the authoritative source).
-        address diamondProxy = IBridgehubBase(_bridgehub).getZKChain(_chainId);
-        bool chainZksyncOS = IGetters(diamondProxy).getZKsyncOS();
-        if (isZKsyncOS != chainZksyncOS) {
-            revert UnexpectedZKsyncOSFlag(chainZksyncOS, isZKsyncOS);
+        // Validate that the wrapped calldata matches the chain type from diamond storage.
+        if (isZKsyncOS != _zksyncOS) {
+            revert UnexpectedZKsyncOSFlag(_zksyncOS, isZKsyncOS);
         }
 
         // Construct per-chain ZKChainSpecificForceDeploymentsData from L1 state.
