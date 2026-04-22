@@ -66,9 +66,10 @@ contract DummySettlementLayerV31Upgrade is EraSettlementLayerV31Upgrade, BaseUpg
     function getConstructedCalldata(
         address _bridgehub,
         uint256 _chainId,
+        bool _zksyncOS,
         bytes memory _existingUpgradeCalldata
     ) public view returns (bytes memory) {
-        return L2UpgradeTxLib.buildL2V31UpgradeCalldata(_bridgehub, _chainId, _existingUpgradeCalldata);
+        return L2UpgradeTxLib.buildL2V31UpgradeCalldata(_bridgehub, _chainId, _zksyncOS, _existingUpgradeCalldata);
     }
 
     function exposeBuildChainSpecificForceDeploymentsData(
@@ -275,6 +276,7 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
         bytes memory expectedUpgradeTxData = upgrade.getL2UpgradeTxData(
             mockBridgehub,
             testChainId,
+            false,
             originalUpgradeTxData
         );
         proposedUpgrade.l2ProtocolUpgradeTx.data = expectedUpgradeTxData;
@@ -364,7 +366,8 @@ contract SettlementLayerV31UpgradeSharedTest is SettlementLayerV31UpgradeTestBas
     function test_ConstructsChainSpecificL2V31UpgradeCalldata() public {
         _setupMocks();
 
-        bytes memory data = upgrade.getConstructedCalldata(mockBridgehub, testChainId, _placeholderV31Calldata());
+        bytes memory data =
+            upgrade.getConstructedCalldata(mockBridgehub, testChainId, false, _placeholderV31Calldata());
 
         assertEq(data, _expectedV31Calldata());
     }
@@ -471,7 +474,10 @@ contract SettlementLayerV31UpgradeEraV29Test is SettlementLayerV31UpgradeTestBas
             (forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, _expectedV31Calldata())
         );
 
-        assertEq(upgrade.getL2UpgradeTxData(mockBridgehub, testChainId, originalUpgradeTxData), expectedUpgradeTxData);
+        assertEq(
+            upgrade.getL2UpgradeTxData(mockBridgehub, testChainId, false, originalUpgradeTxData),
+            expectedUpgradeTxData
+        );
         _assertUpgradeRewritesTx(originalUpgradeTxData);
     }
 }
@@ -634,7 +640,7 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
         );
 
         assertEq(
-            zkosUpgrade.getL2UpgradeTxData(mockBridgehub, testChainId, originalUpgradeTxData),
+            zkosUpgrade.getL2UpgradeTxData(mockBridgehub, testChainId, true, originalUpgradeTxData),
             expectedUpgradeTxData
         );
     }

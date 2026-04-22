@@ -57,6 +57,7 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
         proposedUpgrade.l2ProtocolUpgradeTx.data = getL2UpgradeTxData(
             address(bridgehub),
             s.chainId,
+            s.zksyncOS,
             proposedUpgrade.l2ProtocolUpgradeTx.data
         );
 
@@ -86,6 +87,7 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
     function getL2UpgradeTxData(
         address _bridgehub,
         uint256 _chainId,
+        bool _zksyncOS,
         bytes memory _existingTxData
     ) public view virtual returns (bytes memory);
 }

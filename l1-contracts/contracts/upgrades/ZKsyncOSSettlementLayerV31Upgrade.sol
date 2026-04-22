@@ -19,6 +19,7 @@ contract ZKsyncOSSettlementLayerV31Upgrade is SettlementLayerV31UpgradeBase {
     function getL2UpgradeTxData(
         address _bridgehub,
         uint256 _chainId,
+        bool _zksyncOS,
         bytes memory _existingTxData
     ) public view override returns (bytes memory) {
         (
@@ -31,6 +32,7 @@ contract ZKsyncOSSettlementLayerV31Upgrade is SettlementLayerV31UpgradeBase {
         bytes memory l2V31UpgradeCalldata = L2UpgradeTxLib.buildL2V31UpgradeCalldata(
             _bridgehub,
             _chainId,
+            _zksyncOS,
             existingUpgradeCalldata
         );
 
