@@ -106,7 +106,7 @@ library CoreOnGatewayHelper {
         bool _isZKsyncOS,
         CoreContract[] memory _additionalDependencyContracts
     ) internal returns (bytes[] memory factoryDeps) {
-        bytes[] memory basicDependencies = _getBaseFactoryDependencies(_isZKsyncOS);
+        bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies(_isZKsyncOS);
         bytes[] memory sharedDependencies = _getFactoryDependencyBytecodes(
             _isZKsyncOS,
             _getSharedFactoryDependencyContracts(_isZKsyncOS)
@@ -131,35 +131,6 @@ library CoreOnGatewayHelper {
     }
 
     // ======================== Private helpers ========================
-
-    function _getBaseFactoryDependencies(bool _isZKsyncOS) private view returns (bytes[] memory basicDependencies) {
-        if (_isZKsyncOS) {
-            // ZKsyncOS has no bootloader / DefaultAccount / EVM emulator — those
-            // are Era-VM concepts. The equivalent "always needed" L2 contracts
-            // for ZKsyncOS live in `_getSharedFactoryDependencyContracts` below.
-            //
-            // Two additional baselines, neither in the CoreContract enum:
-            //  - `SystemContractProxy`: every `updateZKsyncOSContract` call that needs
-            //    to materialize a proxy at a previously-empty system address force-deploys
-            //    this bytecode.
-            //  - `SystemContractProxyAdmin` (at 0x1000c): force-deployed once during every
-            //    upgrade via `_buildZKsyncOSProxyAdminEntry`, so its preimage must be
-            //    published too.
-            basicDependencies = new bytes[](2);
-            basicDependencies[0] = BytecodeUtils.readDeployedBytecodeL1(
-                true,
-                "SystemContractProxy.sol",
-                "SystemContractProxy"
-            );
-            basicDependencies[1] = BytecodeUtils.readDeployedBytecodeL1(
-                true,
-                "SystemContractProxyAdmin.sol",
-                "SystemContractProxyAdmin"
-            );
-            return basicDependencies;
-        }
-        return SystemContractsProcessing.getBaseListOfDependencies();
-    }
 
     function _getSharedFactoryDependencyContracts(
         bool _isZKsyncOS

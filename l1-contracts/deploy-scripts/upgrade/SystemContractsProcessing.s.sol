@@ -288,7 +288,28 @@ library SystemContractsProcessing {
         forceDeployments = mergeForceDeployments(systemForceDeployments, otherForceDeployments);
     }
 
-    function getBaseListOfDependencies() internal view returns (bytes[] memory factoryDeps) {
+    function getBaseListOfDependencies(bool _isZKsyncOS) internal view returns (bytes[] memory factoryDeps) {
+        if (_isZKsyncOS) {
+            // ZKsyncOS has no bootloader / DefaultAccount / EVM emulator — those
+            // are Era-VM concepts.
+            //
+            // Two additional baselines, neither in the CoreContract enum:
+            //  - `SystemContractProxy`: every `updateZKsyncOSContract` call that needs
+            //    to materialize a proxy at a previously-empty system address force-deploys
+            //    this bytecode.
+            //  - `SystemContractProxyAdmin` (at 0x1000c): force-deployed once during every
+            //    upgrade via `_buildZKsyncOSProxyAdminEntry`, so its preimage must be
+            //    published too.
+            factoryDeps = new bytes[](2);
+            factoryDeps[0] = BytecodeUtils.readDeployedBytecodeL1(true, "SystemContractProxy.sol", "SystemContractProxy");
+            factoryDeps[1] = BytecodeUtils.readDeployedBytecodeL1(
+                true,
+                "SystemContractProxyAdmin.sol",
+                "SystemContractProxyAdmin"
+            );
+            return factoryDeps;
+        }
+
         // Note that it is *important* that these go first in this exact order,
         // since the server will rely on it.
         bytes[] memory basicBytecodes = new bytes[](3);
