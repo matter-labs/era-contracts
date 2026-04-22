@@ -27,10 +27,11 @@
 #     `TokenBalanceNotMigratedToGateway` revert path on a freshly-registered,
 #     unmigrated asset (spec 10).
 #
-#   TransparentUpgradeableProxy
-#     `ITransparentUpgradeableProxy` ABI loaded by the harness to call
-#     `upgradeTo` when installing `L1ChainAssetHandlerDev` through the real
-#     proxy-admin surface.
+#   TransparentUpgradeableProxyForHarness
+#     A zero-byte stub whose only job is to transitively pull
+#     `TransparentUpgradeableProxy` into forge `out/`, so the harness can load
+#     the `ITransparentUpgradeableProxy` ABI and call `upgradeTo` on the real
+#     proxy-admin surface when installing `L1ChainAssetHandlerDev`.
 
 set -euo pipefail
 
@@ -41,4 +42,4 @@ forge build \
   contracts/dev-contracts/L2ChainAssetHandlerDev.sol \
   contracts/dev-contracts/L1ChainAssetHandlerDev.sol \
   contracts/dev-contracts/TestnetERC20Token.sol \
-  node_modules/@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol
+  contracts/dev-contracts/TransparentUpgradeableProxyForHarness.sol

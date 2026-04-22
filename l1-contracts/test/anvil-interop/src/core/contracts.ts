@@ -30,9 +30,7 @@ const ARTIFACTS = {
   IL2AssetRouter: "IL2AssetRouter.sol/IL2AssetRouter.json",
   InteropCenter: "InteropCenter.sol/InteropCenter.json",
   InteropHandler: "InteropHandler.sol/InteropHandler.json",
-  // Sourced from OpenZeppelin via `node_modules/@openzeppelin/contracts-v4/proxy/transparent/…`,
-  // so forge places the artifact under `out/transparent/`.
-  ITransparentUpgradeableProxy: "transparent/TransparentUpgradeableProxy.sol/ITransparentUpgradeableProxy.json",
+  ITransparentUpgradeableProxy: "TransparentUpgradeableProxy.sol/ITransparentUpgradeableProxy.json",
   L1AssetRouter: "L1AssetRouter.sol/L1AssetRouter.json",
   L1MessengerZKOS: "L1MessengerZKOS.sol/L1MessengerZKOS.json",
   L1AssetTracker: "L1AssetTracker.sol/L1AssetTracker.json",
