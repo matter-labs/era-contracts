@@ -19,8 +19,8 @@ import {InsufficientChainBalance} from "./AssetTrackerErrors.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 
 /// @dev Inherits PausableUpgradeable to keep the storage layout consistent with other cross-layer
-/// bases (e.g., NativeTokenVaultBase, AssetRouterBase). On L2 derivatives (L2AssetTracker,
-/// GWAssetTracker) the pause functionality is intentionally unused; see AGENTS.md for details.
+/// bases (e.g., NativeTokenVaultBase, AssetRouterBase). It is intentionally not used and kept to 
+/// enable adding it in the future without the need for a storage layout change.
 abstract contract AssetTrackerBase is
     IAssetTrackerBase,
     Ownable2StepUpgradeable,
