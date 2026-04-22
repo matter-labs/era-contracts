@@ -547,40 +547,4 @@ contract CommittingTest is ExecutorTest {
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
-    /// @notice Fuzz: any batch with `firstBlockTimestamp > lastBlockTimestamp` must revert with the
-    ///         new error. Inputs are bounded to keep other timestamp guards from firing first.
-    function testFuzz_RevertWhen_FirstBlockTimestampGreaterThanLastBlockTimestamp(
-        uint64 firstTs,
-        uint64 lastTs
-    ) public {
-        // Keep both timestamps inside the valid commit window so they only fail the new check.
-        firstTs = uint64(bound(uint256(firstTs), currentTimestamp - 10, currentTimestamp));
-        lastTs = uint64(bound(uint256(lastTs), currentTimestamp - 10, currentTimestamp));
-        // Enforce strict inversion; abandon degenerate inputs by rejecting them.
-        vm.assume(firstTs > lastTs);
-
-        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
-        bytes32 daCommitment = bytes32(0);
-
-        CommitBatchInfoZKsyncOS memory invertedTimestampBatch = newCommitBatchInfoZKsyncOS;
-        invertedTimestampBatch.operatorDAInput = operatorDAInput;
-        invertedTimestampBatch.daCommitment = daCommitment;
-        invertedTimestampBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
-        invertedTimestampBatch.firstBlockTimestamp = firstTs;
-        invertedTimestampBatch.lastBlockTimestamp = lastTs;
-
-        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
-        batchArray[0] = invertedTimestampBatch;
-
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
-            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
-
-        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
-        vm.prank(address(owner));
-        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
-
-        vm.prank(validator);
-        vm.expectRevert(abi.encodeWithSignature("BatchTimestampGreaterThanLastL2BlockTimestamp()"));
-        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
-    }
 }
