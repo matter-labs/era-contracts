@@ -487,4 +487,100 @@ contract CommittingTest is ExecutorTest {
         vm.expectRevert(); // TimeNotReached error
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
+
+    /// @notice Reverts when the batch-level `firstBlockTimestamp` exceeds `lastBlockTimestamp`.
+    /// @dev Both timestamps stay inside the [block.timestamp - NOT_OLDER, block.timestamp + DELTA] window
+    ///      so that the earlier `TimeNotReached` and `L2TimestampTooBig` checks do not trigger first.
+    function test_RevertWhen_FirstBlockTimestampGreaterThanLastBlockTimestamp() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        CommitBatchInfoZKsyncOS memory invertedTimestampBatch = newCommitBatchInfoZKsyncOS;
+        invertedTimestampBatch.operatorDAInput = operatorDAInput;
+        invertedTimestampBatch.daCommitment = daCommitment;
+        invertedTimestampBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        // firstBlockTimestamp > lastBlockTimestamp triggers the new invariant.
+        invertedTimestampBatch.firstBlockTimestamp = uint64(currentTimestamp);
+        invertedTimestampBatch.lastBlockTimestamp = uint64(currentTimestamp - 1);
+
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = invertedTimestampBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSignature("BatchTimestampGreaterThanLastL2BlockTimestamp()"));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    /// @notice Boundary case: `firstBlockTimestamp == lastBlockTimestamp` must still commit successfully,
+    ///         because the guard uses a strict `>` comparison.
+    function test_SuccessfullyCommit_WhenFirstEqualsLastBlockTimestamp() public {
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        CommitBatchInfoZKsyncOS memory equalTimestampBatch = newCommitBatchInfoZKsyncOS;
+        equalTimestampBatch.operatorDAInput = operatorDAInput;
+        equalTimestampBatch.daCommitment = daCommitment;
+        equalTimestampBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        // Pick a value strictly inside the valid window and set both bounds equal.
+        uint64 equalTs = uint64(currentTimestamp - 5);
+        equalTimestampBatch.firstBlockTimestamp = equalTs;
+        equalTimestampBatch.lastBlockTimestamp = equalTs;
+
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = equalTimestampBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    /// @notice Fuzz: any batch with `firstBlockTimestamp > lastBlockTimestamp` must revert with the
+    ///         new error. Inputs are bounded to keep other timestamp guards from firing first.
+    function testFuzz_RevertWhen_FirstBlockTimestampGreaterThanLastBlockTimestamp(
+        uint64 firstTs,
+        uint64 lastTs
+    ) public {
+        // Keep both timestamps inside the valid commit window so they only fail the new check.
+        firstTs = uint64(bound(uint256(firstTs), currentTimestamp - 10, currentTimestamp));
+        lastTs = uint64(bound(uint256(lastTs), currentTimestamp - 10, currentTimestamp));
+        // Enforce strict inversion; abandon degenerate inputs by rejecting them.
+        vm.assume(firstTs > lastTs);
+
+        bytes memory operatorDAInput = abi.encodePacked(bytes32(0));
+        bytes32 daCommitment = bytes32(0);
+
+        CommitBatchInfoZKsyncOS memory invertedTimestampBatch = newCommitBatchInfoZKsyncOS;
+        invertedTimestampBatch.operatorDAInput = operatorDAInput;
+        invertedTimestampBatch.daCommitment = daCommitment;
+        invertedTimestampBatch.daCommitmentScheme = L2DACommitmentScheme.EMPTY_NO_DA;
+        invertedTimestampBatch.firstBlockTimestamp = firstTs;
+        invertedTimestampBatch.lastBlockTimestamp = lastTs;
+
+        CommitBatchInfoZKsyncOS[] memory batchArray = new CommitBatchInfoZKsyncOS[](1);
+        batchArray[0] = invertedTimestampBatch;
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils
+            .encodeCommitBatchesDataZKsyncOS(genesisStoredBatchInfo, batchArray);
+
+        address validiumL1DAValidator = address(new ValidiumL1DAValidator());
+        vm.prank(address(owner));
+        admin.setDAValidatorPair(validiumL1DAValidator, L2DACommitmentScheme.EMPTY_NO_DA);
+
+        vm.prank(validator);
+        vm.expectRevert(abi.encodeWithSignature("BatchTimestampGreaterThanLastL2BlockTimestamp()"));
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
 }

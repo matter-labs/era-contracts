@@ -29,6 +29,7 @@ import {
 import {
     BatchHashMismatch,
     BatchNumberMismatch,
+    BatchTimestampGreaterThanLastL2BlockTimestamp,
     CanOnlyProcessOneBatch,
     HashMismatch,
     InvalidLogSender,
@@ -176,6 +177,41 @@ contract CommittingTest is ExecutorTest {
         vm.blobhashes(defaultBlobVersionedHashes);
 
         vm.expectRevert(abi.encodeWithSelector(TimeNotReached.selector, 1, 2));
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            wrongNewCommitBatchInfoArray
+        );
+        committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    /// @notice Reverts when the packed (batchTimestamp, lastL2BlockTimestamp) pair has
+    ///         batchTimestamp strictly greater than lastL2BlockTimestamp. Both values are kept inside
+    ///         the valid commit window so the earlier TimeNotReached / L2TimestampTooBig guards do
+    ///         not fire first — we are specifically testing the new invariant in `_verifyBatchTimestamp`.
+    function test_RevertWhen_CommittingWithBatchTimestampGreaterThanLastL2BlockTimestamp() public {
+        uint64 batchTimestamp = uint64(currentTimestamp);
+        uint64 lastL2BlockTimestamp = uint64(currentTimestamp - 1);
+
+        bytes[] memory wrongL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
+        wrongL2Logs[uint256(uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY))] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(batchTimestamp, lastL2BlockTimestamp)
+        );
+
+        CommitBatchInfo memory wrongNewCommitBatchInfo = newCommitBatchInfo;
+        wrongNewCommitBatchInfo.systemLogs = Utils.encodePacked(wrongL2Logs);
+        wrongNewCommitBatchInfo.timestamp = batchTimestamp; // must equal the packed batchTimestamp
+        wrongNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+
+        CommitBatchInfo[] memory wrongNewCommitBatchInfoArray = new CommitBatchInfo[](1);
+        wrongNewCommitBatchInfoArray[0] = wrongNewCommitBatchInfo;
+
+        vm.prank(validator);
+        vm.blobhashes(defaultBlobVersionedHashes);
+
+        vm.expectRevert(abi.encodeWithSelector(BatchTimestampGreaterThanLastL2BlockTimestamp.selector));
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
