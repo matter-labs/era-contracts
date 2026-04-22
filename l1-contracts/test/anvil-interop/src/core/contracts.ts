@@ -30,6 +30,7 @@ const ARTIFACTS = {
   IL2AssetRouter: "IL2AssetRouter.sol/IL2AssetRouter.json",
   InteropCenter: "InteropCenter.sol/InteropCenter.json",
   InteropHandler: "InteropHandler.sol/InteropHandler.json",
+  ITransparentUpgradeableProxy: "TransparentUpgradeableProxy.sol/ITransparentUpgradeableProxy.json",
   L1AssetRouter: "L1AssetRouter.sol/L1AssetRouter.json",
   L1MessengerZKOS: "L1MessengerZKOS.sol/L1MessengerZKOS.json",
   L1AssetTracker: "L1AssetTracker.sol/L1AssetTracker.json",
