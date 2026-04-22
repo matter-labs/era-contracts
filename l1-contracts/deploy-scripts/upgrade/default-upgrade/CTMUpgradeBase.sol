@@ -25,6 +25,7 @@ import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/li
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
+import {EraForceDeploymentsLib} from "./EraForceDeploymentsLib.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
@@ -83,7 +84,7 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         }
         return (
             address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR),
-            abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (unwrapEraDeployments(_deployments)))
+            abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (EraForceDeploymentsLib.unwrap(_deployments)))
         );
     }
 
@@ -318,40 +319,5 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory)
     {
         return new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
-    }
-
-    /// @notice Wrap Era ForceDeployment[] into UniversalContractUpgradeInfo[].
-    /// Each ForceDeployment is abi-encoded into deployedBytecodeInfo so it can be
-    /// unwrapped back losslessly when encoding the L2 calldata.
-    function wrapEraDeployments(
-        IL2ContractDeployer.ForceDeployment[] memory _fds
-    ) internal pure returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory _result) {
-        _result = new IComplexUpgrader.UniversalContractUpgradeInfo[](_fds.length);
-        for (uint256 i = 0; i < _fds.length; i++) {
-            _result[i] = IComplexUpgrader.UniversalContractUpgradeInfo({
-                upgradeType: IComplexUpgrader.ContractUpgradeType.EraForceDeployment,
-                deployedBytecodeInfo: abi.encode(_fds[i]),
-                newAddress: _fds[i].newAddress
-            });
-        }
-    }
-
-    /// @notice Unwrap Era entries from UniversalContractUpgradeInfo[] back to ForceDeployment[].
-    function unwrapEraDeployments(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _infos
-    ) internal pure returns (IL2ContractDeployer.ForceDeployment[] memory _result) {
-        uint256 count = 0;
-        for (uint256 i = 0; i < _infos.length; i++) {
-            if (_infos[i].upgradeType == IComplexUpgrader.ContractUpgradeType.EraForceDeployment) {
-                count++;
-            }
-        }
-        _result = new IL2ContractDeployer.ForceDeployment[](count);
-        uint256 idx = 0;
-        for (uint256 i = 0; i < _infos.length; i++) {
-            if (_infos[i].upgradeType == IComplexUpgrader.ContractUpgradeType.EraForceDeployment) {
-                _result[idx++] = abi.decode(_infos[i].deployedBytecodeInfo, (IL2ContractDeployer.ForceDeployment));
-            }
-        }
     }
 }
