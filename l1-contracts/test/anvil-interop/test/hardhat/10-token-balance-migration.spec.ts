@@ -72,8 +72,15 @@ import {
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../../src/core/const";
 import { migrateTokenBalanceToGW } from "../../src/helpers/token-balance-migration-helper";
-import { depositETHToL2 } from "../../src/helpers/l1-deposit-helper";
+import { depositETHToL2, depositERC20ToL2 } from "../../src/helpers/l1-deposit-helper";
+import type { PendingWithdrawal } from "../../src/helpers/l2-withdrawal-helper";
 import {
+  finalizeWithdrawalOnL1,
+  initiateErc20Withdrawal,
+  initiateEthWithdrawal,
+} from "../../src/helpers/l2-withdrawal-helper";
+import {
+  completeL1ChainMigrationSettlementLayer,
   installL1ChainAssetHandlerDev,
   installL2ChainAssetHandlerDev,
   setL1ChainMigrationNumber,
@@ -99,6 +106,10 @@ const POST_REVERSE_MIGRATION_NUMBER = 2;
 const TBM_DEPOSIT_AMOUNT_RANGE = {
   min: ethers.utils.parseEther("0.25"),
   max: ethers.utils.parseEther("0.75"),
+};
+const TBM_WITHDRAWAL_AMOUNT_RANGE = {
+  min: BigNumber.from(1),
+  max: BigNumber.from(1_000),
 };
 const INTEROP_SMOKE_BUNDLE_VALUE_RANGE = {
   min: BigNumber.from(1),
@@ -473,6 +484,27 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         reverseTbmProvider
       );
     });
+
+    it("can withdraw the migrated NTV test token from the GW-settled chain post-TBM", async () => {
+      // Mirrors the source suite's "Can withdraw tokens after migrating token
+      // balances to gateway". The token was migrated to GW during
+      // `registerAndMigrateTestTokens`, so `_checkAssetMigrationNumber` must
+      // pass on the GW-settled chain and the L2 withdrawal must go through.
+      const amount = randomBigNumber(TBM_WITHDRAWAL_AMOUNT_RANGE.min, TBM_WITHDRAWAL_AMOUNT_RANGE.max);
+      const pending = await initiateErc20Withdrawal({
+        l2RpcUrl: getL2RpcUrl(state, reverseTbmChainId),
+        l1RpcUrl: getL1RpcUrl(state),
+        chainId: reverseTbmChainId,
+        l1Addresses: state.l1Addresses!,
+        amount,
+        l2TokenAddress: state.testTokens![reverseTbmChainId],
+        // Test tokens in this harness are deployed on L2, so the assetId's
+        // origin chain is the L2 chain id itself.
+        tokenOriginChainId: reverseTbmChainId,
+      });
+      expect(pending.l2TxHash, "L2 withdraw tx hash").to.not.be.null;
+      expect(pending.amount.eq(amount), "withdrawal captures the requested amount").to.equal(true);
+    });
   });
 
   // ── Reverse TBM (GW → L1) ────────────────────────────────────────────
@@ -486,9 +518,16 @@ describe("10 - Token Balance Migration Lifecycle", function () {
     let depositAmount: BigNumber;
     let l1GWBalanceBeforeDeposit: BigNumber;
     let gwBalanceBeforeDeposit: BigNumber;
-    // Captured from the `initiateGatewayToL1MigrationOnGateway` tx so the follow-up
-    // test can build an L1 finalisation payload from the same GW→L1 message.
-    let gwToL1MigrationReceipt: ethers.providers.TransactionReceipt;
+    // Captured from each `initiateGatewayToL1MigrationOnGateway` tx so the
+    // follow-up test can build an L1 finalisation payload from the same GW→L1
+    // message. Keyed by asset (ETH, NTV test token) so we can finalise both.
+    const gwToL1MigrationReceipts: Record<string, ethers.providers.TransactionReceipt> = {};
+    // Withdrawals initiated on the chain after L1 sees the chain as migrated back
+    // (L1 CAH `migrationNumber = 2`), but before L1 `chainBalance` is restored.
+    // L1 finalisation must revert with `InsufficientChainBalance` here, and then
+    // succeed after the reverse TBM completes. Mirrors the source suite's
+    // `unfinalizedWithdrawals` → `withdrawals` lifecycle.
+    const pendingWithdrawals: Record<string, PendingWithdrawal> = {};
 
     before(async () => {
       depositAmount = randomBigNumber(TBM_DEPOSIT_AMOUNT_RANGE.min, TBM_DEPOSIT_AMOUNT_RANGE.max);
@@ -571,30 +610,38 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       ).to.equal(true);
     });
 
-    it("reverse TBM: initiate on GW drains chainBalance, bumps GW assetMigrationNumber to 2, and emits the GW→L1 finalisation message", async () => {
-      const gwBalanceBefore = await getGWChainBalance(gwProvider, reverseTbmChainId, ethAssetId);
-      expect(gwBalanceBefore.gt(0), "GW chainBalance > 0 before reverse TBM").to.equal(true);
-
+    it("reverse TBM: initiate on GW drains chainBalance for ETH + the NTV test token, advances their assetMigrationNumber to 2", async () => {
+      // Drive the reverse-TBM initiate step for every asset we want to finalise
+      // on L1 later: ETH (base token) and the NTV test token. Each invocation
+      // drains the GW's per-chain `chainBalance[chainId][assetId]`, bumps the
+      // GW asset-tracker's `assetMigrationNumber`, and emits the GW→L1 message
+      // the L1 finalisation step consumes.
       const gwAssetTracker = new Contract(GW_ASSET_TRACKER_ADDR, getAbi("GWAssetTracker"), gwProvider);
       const gwWallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, gwProvider);
 
-      const tx = await gwAssetTracker
-        .connect(gwWallet)
-        .initiateGatewayToL1MigrationOnGateway(reverseTbmChainId, ethAssetId, { gasLimit: 5_000_000 });
-      gwToL1MigrationReceipt = await tx.wait();
+      const assetsToMigrate: Array<{ label: string; assetId: string }> = [
+        { label: "baseToken", assetId: ethAssetId },
+        { label: "testToken", assetId: reverseTbmTestTokenAssetId },
+      ];
 
-      // GW side: chainBalance is drained and GWAT assetMigrationNumber advances to 2.
-      const gwBalanceAfter = await getGWChainBalance(gwProvider, reverseTbmChainId, ethAssetId);
-      expect(gwBalanceAfter.eq(0), `GW chainBalance drained to 0 (was ${gwBalanceAfter})`).to.equal(true);
+      for (const { label, assetId } of assetsToMigrate) {
+        const tx = await gwAssetTracker
+          .connect(gwWallet)
+          .initiateGatewayToL1MigrationOnGateway(reverseTbmChainId, assetId, { gasLimit: 5_000_000 });
+        gwToL1MigrationReceipts[label] = await tx.wait();
 
-      const gwMig = await queryMigrationNumber(
-        gwProvider,
-        GW_ASSET_TRACKER_ADDR,
-        "GWAssetTracker",
-        reverseTbmChainId,
-        ethAssetId
-      );
-      expect(gwMig, "GWAT assetMigrationNumber").to.equal(POST_REVERSE_MIGRATION_NUMBER);
+        const gwBalanceAfter = await getGWChainBalance(gwProvider, reverseTbmChainId, assetId);
+        expect(gwBalanceAfter.eq(0), `GW chainBalance for ${label} drained to 0`).to.equal(true);
+
+        const gwMig = await queryMigrationNumber(
+          gwProvider,
+          GW_ASSET_TRACKER_ADDR,
+          "GWAssetTracker",
+          reverseTbmChainId,
+          assetId
+        );
+        expect(gwMig, `GWAT assetMigrationNumber for ${label}`).to.equal(POST_REVERSE_MIGRATION_NUMBER);
+      }
     });
 
     it("bump L1 ChainAssetHandler.migrationNumber to 2 via the dev setter (standing in for the chain-level migrate-from-gateway bridgeMint)", async () => {
@@ -622,83 +669,230 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       ).to.equal(true);
     });
 
-    it("finalise reverse TBM on L1, relay confirmations to GW and L2, assert both sides reach assetMigrationNumber = 2", async () => {
+    it("flip L1 Bridgehub.settlementLayer back to L1 via forwardedBridgeMint (real onlyChainAssetHandler path)", async () => {
+      // Completes the chain-migration-from-gateway on the L1 side by calling
+      // `L1Bridgehub.forwardedBridgeMint(...)` from the L1ChainAssetHandler —
+      // the exact caller surface production uses in `L1ChainAssetHandler.bridgeMint`.
+      // After this step, L1 routes deposits/withdrawals for the chain through
+      // the direct L1↔L2 path, which is what the source suite's
+      // post-migrate-from-gateway tests (deposit, withdraw, finalise) rely on.
+      await completeL1ChainMigrationSettlementLayer({
+        l1Provider,
+        chainAssetHandlerProxy: l1ChainAssetHandlerProxy,
+        bridgehubAddr,
+        chainId: reverseTbmChainId,
+        baseTokenAssetId: ethAssetId,
+        baseTokenOriginChainId: L1_CHAIN_ID,
+        baseTokenOriginAddress: ETH_TOKEN_ADDRESS,
+      });
+
+      const l1Bridgehub = new Contract(bridgehubAddr, getAbi("IL1Bridgehub"), l1Provider);
+      const sl: BigNumber = BigNumber.from(await l1Bridgehub.settlementLayer(reverseTbmChainId));
+      expect(sl.eq(L1_CHAIN_ID), `L1 Bridgehub.settlementLayer[${reverseTbmChainId}] == L1`).to.equal(true);
+    });
+
+    it("withdraw ETH and the NTV test token from the chain (pending on L1 until reverse TBM completes)", async () => {
+      // Mirrors the source suite's "Can withdraw tokens from the chain". With L1
+      // now seeing the chain as migrated back (`chainAssetHandler.migrationNumber = 2`),
+      // outbound withdrawals are routed through the L1-direct path, but L1's
+      // `chainBalance[chainId][assetId]` is still drained until the reverse TBM
+      // finalises — so the resulting L1 finalisations are expected to revert
+      // until `receiveGatewayToL1MigrationOnL1` lands. We capture each
+      // {@link PendingWithdrawal} here and drive its lifecycle in the two
+      // tests below.
+      const ethAmount = randomBigNumber(TBM_WITHDRAWAL_AMOUNT_RANGE.min, TBM_WITHDRAWAL_AMOUNT_RANGE.max);
+      pendingWithdrawals.baseToken = await initiateEthWithdrawal({
+        l2RpcUrl: getL2RpcUrl(state, reverseTbmChainId),
+        l1RpcUrl: getL1RpcUrl(state),
+        chainId: reverseTbmChainId,
+        l1Addresses: state.l1Addresses!,
+        amount: ethAmount,
+      });
+
+      const tokenAmount = randomBigNumber(TBM_WITHDRAWAL_AMOUNT_RANGE.min, TBM_WITHDRAWAL_AMOUNT_RANGE.max);
+      pendingWithdrawals.testToken = await initiateErc20Withdrawal({
+        l2RpcUrl: getL2RpcUrl(state, reverseTbmChainId),
+        l1RpcUrl: getL1RpcUrl(state),
+        chainId: reverseTbmChainId,
+        l1Addresses: state.l1Addresses!,
+        amount: tokenAmount,
+        l2TokenAddress: state.testTokens![reverseTbmChainId],
+        tokenOriginChainId: reverseTbmChainId,
+      });
+
+      expect(pendingWithdrawals.baseToken.l2TxHash, "ETH withdrawal L2 tx").to.not.be.null;
+      expect(pendingWithdrawals.testToken.l2TxHash, "ERC20 withdrawal L2 tx").to.not.be.null;
+    });
+
+    it("cannot finalise pending withdrawals on L1 before reverse TBM completes (InsufficientChainBalance)", async () => {
+      // Mirrors the source suite's "Cannot finalize pending withdrawals before
+      // finalizing token balance migration to L1" (selector 0x07859b3b).
+      // `L1AssetTracker._decreaseChainBalance` (invoked by `L1Nullifier.finalizeDeposit`)
+      // reverts with this exact custom error when `chainBalance[chainId][assetId] < _amount`.
+      const insufficientSelector = new ethers.utils.Interface(getAbi("L1AssetTracker")).getSighash(
+        "InsufficientChainBalance(uint256,bytes32,uint256)"
+      );
+      for (const [label, pending] of Object.entries(pendingWithdrawals)) {
+        const result = await finalizeWithdrawalOnL1(getL1RpcUrl(state), state.l1Addresses!, pending);
+        expect(result.success, `${label} finalisation must revert before reverse TBM`).to.equal(false);
+        expect(
+          (result.revertData ?? "").toLowerCase().startsWith(insufficientSelector.toLowerCase()),
+          `${label} revert data starts with InsufficientChainBalance selector ${insufficientSelector}; got revertData=${result.revertData?.slice(0, 32)}...`
+        ).to.equal(true);
+      }
+    });
+
+    it("finalise reverse TBM on L1 for ETH + test token, relay confirmations to GW and L2, assert all three sides reach assetMigrationNumber = 2", async () => {
       const l1Wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
       const l1AssetTracker = new Contract(l1AssetTrackerAddr, getAbi("L1AssetTracker"), l1Provider);
-      const finalizeParams = buildFinalizeWithdrawalParams(gwToL1MigrationReceipt, gwChainId);
 
-      const l1BalanceBefore = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, reverseTbmChainId, ethAssetId);
+      const assetsToFinalise: Array<{ label: string; assetId: string; receiptLabel: string }> = [
+        { label: "baseToken", assetId: ethAssetId, receiptLabel: "baseToken" },
+        { label: "testToken", assetId: reverseTbmTestTokenAssetId, receiptLabel: "testToken" },
+      ];
 
-      const tx = await l1AssetTracker
-        .connect(l1Wallet)
-        .receiveGatewayToL1MigrationOnL1(finalizeParams, { gasLimit: 10_000_000 });
-      const l1Receipt = await tx.wait();
+      for (const { label, assetId, receiptLabel } of assetsToFinalise) {
+        const finalizeParams = buildFinalizeWithdrawalParams(gwToL1MigrationReceipts[receiptLabel], gwChainId);
+        const l1BalanceBefore = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, reverseTbmChainId, assetId);
 
-      // L1 assetMigrationNumber advances to the chain migration number.
-      const l1AssetMig = await queryMigrationNumber(
+        const tx = await l1AssetTracker
+          .connect(l1Wallet)
+          .receiveGatewayToL1MigrationOnL1(finalizeParams, { gasLimit: 10_000_000 });
+        const l1Receipt = await tx.wait();
+
+        // L1 assetMigrationNumber advances to the chain migration number.
+        const l1AssetMig = await queryMigrationNumber(
+          l1Provider,
+          l1AssetTrackerAddr,
+          "L1AssetTracker",
+          reverseTbmChainId,
+          assetId
+        );
+        expect(l1AssetMig, `L1AT assetMigrationNumber for ${label}`).to.equal(POST_REVERSE_MIGRATION_NUMBER);
+
+        // L1 chainBalance is restored by `_migrateFunds` in the finalisation path.
+        const l1BalanceAfter = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, reverseTbmChainId, assetId);
+        expect(
+          l1BalanceAfter.gte(l1BalanceBefore),
+          `L1AT chainBalance for ${label} monotonically restored (${l1BalanceBefore} -> ${l1BalanceAfter})`
+        ).to.equal(true);
+
+        // Relay the confirmation priority txs the L1 receipt emitted: the
+        // service tx targeting `GW_ASSET_TRACKER_ADDR` (confirmMigrationOnGateway)
+        // goes to GW, and the one targeting `L2_ASSET_TRACKER_ADDR`
+        // (confirmMigrationOnL2) goes to the migrating L2 chain. The L1→GW→L2
+        // wrapping event on GW's L1 diamond is intentionally skipped: the
+        // GW-side state is already migrated (via `simulateGWChainMigrationBurn`)
+        // and the L1-side state is now too (via
+        // `completeL1ChainMigrationSettlementLayer`), so the unwrapped priority
+        // tx emitted by chain 12's own L1 diamond carries the confirmation
+        // directly to L2.
+        const gwConfirmationEvents = extractNewPriorityRequests(l1Receipt, gwDiamondProxy).filter(
+          (r) => r.to.toLowerCase() === GW_ASSET_TRACKER_ADDR.toLowerCase()
+        );
+        const l2ConfirmationEvents = extractNewPriorityRequests(l1Receipt, reverseTbmDiamondProxy).filter(
+          (r) => r.to.toLowerCase() === L2_ASSET_TRACKER_ADDR.toLowerCase()
+        );
+        expect(gwConfirmationEvents.length, `${label}: exactly one confirmMigrationOnGateway priority tx`).to.equal(1);
+        expect(l2ConfirmationEvents.length, `${label}: exactly one confirmMigrationOnL2 priority tx`).to.equal(1);
+
+        for (const req of gwConfirmationEvents) {
+          const result = await relayTx(gwProvider, req.from, req.to, req.calldata, req.value);
+          expect(result.success, `${label} confirmMigrationOnGateway relay`).to.equal(true);
+        }
+        for (const req of l2ConfirmationEvents) {
+          const result = await relayTx(reverseTbmProvider, req.from, req.to, req.calldata, req.value);
+          expect(result.success, `${label} confirmMigrationOnL2 relay`).to.equal(true);
+        }
+
+        const gwAssetMigPost = await queryMigrationNumber(
+          gwProvider,
+          GW_ASSET_TRACKER_ADDR,
+          "GWAssetTracker",
+          reverseTbmChainId,
+          assetId
+        );
+        expect(gwAssetMigPost, `GWAT assetMigrationNumber for ${label} post-confirmation`).to.equal(
+          POST_REVERSE_MIGRATION_NUMBER
+        );
+
+        const l2AssetMigPost = await queryMigrationNumber(
+          reverseTbmProvider,
+          L2_ASSET_TRACKER_ADDR,
+          "L2AssetTracker",
+          reverseTbmChainId,
+          assetId
+        );
+        expect(l2AssetMigPost, `L2AT assetMigrationNumber for ${label} post-confirmation`).to.equal(
+          POST_REVERSE_MIGRATION_NUMBER
+        );
+      }
+    });
+
+    it("can finalise pending withdrawals on L1 now that reverse TBM has restored chainBalance", async () => {
+      // Mirrors the source suite's "Can finalize pending withdrawals after
+      // migrating token balances from gateway". The reverse-TBM finalisation
+      // above called `_migrateFunds` inside `L1AssetTracker.receiveGatewayToL1MigrationOnL1`,
+      // restoring `L1AssetTracker.chainBalance[chainId][assetId]` to a value
+      // that covers each pending withdrawal. The same finalisation call that
+      // reverted with `InsufficientChainBalance` above now lands.
+      for (const [label, pending] of Object.entries(pendingWithdrawals)) {
+        const result = await finalizeWithdrawalOnL1(getL1RpcUrl(state), state.l1Addresses!, pending);
+        expect(
+          result.success,
+          `${label} finalisation after reverse TBM: ${result.errorMessage?.slice(0, 200)}`
+        ).to.equal(true);
+      }
+    });
+
+    it("depositing a fresh L1-native ERC20 to the chain after reverse TBM shows L1AT = 2 and no GW tracking", async () => {
+      // Mirrors the source suite's "Can deposit a token to the chain after
+      // migrating from gateway". L1's `ChainAssetHandler.migrationNumber[chainId]`
+      // is now 2, so when the new asset registers on the L1 NTV its
+      // `assetMigrationNumber` is set to the chain's current migration number
+      // (`_forceSetAssetMigrationNumber(2)`) on L1; GW never sees it, so its
+      // GWAT entry stays at 0.
+      const deployer = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
+      const factory = new ethers.ContractFactory(
+        getAbi("TestnetERC20Token"),
+        getCreationBytecode("TestnetERC20Token"),
+        deployer
+      );
+      const freshL1Token = await factory.deploy("PostMigrateToken", "PMT", 18, { gasLimit: 5_000_000 });
+      await freshL1Token.deployed();
+      const mintAmount = ethers.utils.parseUnits("1000", 18);
+      await (await freshL1Token.mint(deployer.address, mintAmount, { gasLimit: 500_000 })).wait();
+
+      const depositAmount = randomBigNumber(TBM_WITHDRAWAL_AMOUNT_RANGE.min, TBM_WITHDRAWAL_AMOUNT_RANGE.max.mul(10));
+      const depositResult = await depositERC20ToL2({
+        l1RpcUrl: getL1RpcUrl(state),
+        l2RpcUrl: getL2RpcUrl(state, reverseTbmChainId),
+        chainId: reverseTbmChainId,
+        l1Addresses: state.l1Addresses!,
+        tokenAddress: freshL1Token.address,
+        amount: depositAmount,
+      });
+      expect(depositResult.l1TxHash, "L1 deposit tx hash").to.not.be.null;
+
+      const freshAssetId = depositResult.assetId;
+      const l1Mig = await queryMigrationNumber(
         l1Provider,
         l1AssetTrackerAddr,
         "L1AssetTracker",
         reverseTbmChainId,
-        ethAssetId
+        freshAssetId
       );
-      expect(l1AssetMig, "L1AT assetMigrationNumber").to.equal(POST_REVERSE_MIGRATION_NUMBER);
-
-      // L1 chainBalance is restored by `_migrateFunds` in the finalisation path.
-      const l1BalanceAfter = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, reverseTbmChainId, ethAssetId);
-      expect(
-        l1BalanceAfter.gt(l1BalanceBefore),
-        `L1AT chainBalance[${reverseTbmChainId}][ETH] restored (${l1BalanceBefore} -> ${l1BalanceAfter})`
-      ).to.equal(true);
-
-      // Relay the confirmation priority txs the L1 receipt emitted: the service
-      // tx targeting `GW_ASSET_TRACKER_ADDR` (confirmMigrationOnGateway) goes to
-      // GW, and the one targeting `L2_ASSET_TRACKER_ADDR` (confirmMigrationOnL2)
-      // goes to the migrating L2 chain.
-      //
-      // For GW-settled chains, the L1 receipt also contains a wrapping priority
-      // tx on GW's L1 diamond that encodes the L1→GW→L2 forwarding for the L2
-      // confirmation. We don't need that wrapping layer because the Anvil harness
-      // can deliver the unwrapped priority tx directly from chain 12's own L1
-      // diamond emission, and our GW-side state has already been migrated
-      // (L2Bridgehub.settlementLayer[chainId] = L1 via simulateGWChainMigrationBurn).
-      // Filtering by target address picks up exactly the two confirmation txs and
-      // ignores the wrapping event.
-      const gwConfirmationEvents = extractNewPriorityRequests(l1Receipt, gwDiamondProxy).filter(
-        (r) => r.to.toLowerCase() === GW_ASSET_TRACKER_ADDR.toLowerCase()
-      );
-      const l2ConfirmationEvents = extractNewPriorityRequests(l1Receipt, reverseTbmDiamondProxy).filter(
-        (r) => r.to.toLowerCase() === L2_ASSET_TRACKER_ADDR.toLowerCase()
-      );
-      expect(gwConfirmationEvents.length, "exactly one confirmMigrationOnGateway priority tx").to.equal(1);
-      expect(l2ConfirmationEvents.length, "exactly one confirmMigrationOnL2 priority tx").to.equal(1);
-
-      for (const req of gwConfirmationEvents) {
-        const result = await relayTx(gwProvider, req.from, req.to, req.calldata, req.value);
-        expect(result.success, "confirmMigrationOnGateway relay").to.equal(true);
-      }
-      for (const req of l2ConfirmationEvents) {
-        const result = await relayTx(reverseTbmProvider, req.from, req.to, req.calldata, req.value);
-        expect(result.success, "confirmMigrationOnL2 relay").to.equal(true);
-      }
-
-      const gwAssetMig = await queryMigrationNumber(
+      const gwMig = await queryMigrationNumber(
         gwProvider,
         GW_ASSET_TRACKER_ADDR,
         "GWAssetTracker",
         reverseTbmChainId,
-        ethAssetId
+        freshAssetId
       );
-      expect(gwAssetMig, "GWAT assetMigrationNumber post-confirmation").to.equal(POST_REVERSE_MIGRATION_NUMBER);
-
-      const l2AssetMig = await queryMigrationNumber(
-        reverseTbmProvider,
-        L2_ASSET_TRACKER_ADDR,
-        "L2AssetTracker",
-        reverseTbmChainId,
-        ethAssetId
+      expect(l1Mig, "L1AT assetMigrationNumber matches chain's post-reverse-TBM migrationNumber").to.equal(
+        POST_REVERSE_MIGRATION_NUMBER
       );
-      expect(l2AssetMig, "L2AT assetMigrationNumber post-confirmation").to.equal(POST_REVERSE_MIGRATION_NUMBER);
+      expect(gwMig, "GWAT assetMigrationNumber stays at 0 for a token deposited after reverse TBM").to.equal(0);
     });
 
     it("reverse TBM is idempotent — repeating it on GW reverts with InvalidAssetMigrationNumber", async () => {
