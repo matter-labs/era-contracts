@@ -946,11 +946,17 @@ function prepareUpgradeHarnessInputs(
   upgradeInput = replaceTomlBareValue(upgradeInput, "sample_chain_id", String(primaryChainId));
   fs.writeFileSync(upgradeInputPath, upgradeInput);
 
+  // stage3 reads a bridged-tokens config for legacy token migration.
+  // In test environments there are no legacy bridged tokens, so provide an empty list.
+  const bridgedTokensPath = path.join(tempDir, "v31-bridged-tokens.toml");
+  fs.writeFileSync(bridgedTokensPath, "[tokens]\n");
+
   return {
     envVars: {
       PERMANENT_VALUES_INPUT_OVERRIDE: `/${path.relative(l1ContractsDir, permanentValuesPath)}`,
       UPGRADE_INPUT_OVERRIDE: `/${path.relative(l1ContractsDir, upgradeInputPath)}`,
       UPGRADE_ECOSYSTEM_OUTPUT_OVERRIDE: `/${path.relative(l1ContractsDir, ecosystemOutputPath)}`,
+      UPGRADE_BRIDGED_TOKENS_INPUT_OVERRIDE: `/${path.relative(l1ContractsDir, bridgedTokensPath)}`,
     },
     ecosystemOutputPath,
     cleanup: () => fs.rmSync(tempDir, { recursive: true, force: true }),
