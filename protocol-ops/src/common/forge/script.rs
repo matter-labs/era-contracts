@@ -54,14 +54,12 @@ impl ForgeScript {
 
     /// Add the broadcast flag to the forge script command.
     ///
-    /// Also adds `--skip-simulation`: forge otherwise runs the script twice —
-    /// once locally to build the tx list, once against the RPC for gas
-    /// estimation. Protocol-ops always targets an anvil fork, so the second
-    /// pass is pure overhead. The broadcast JSON that downstream reads is
-    /// produced by the local pass either way.
+    /// Also adds `--slow`: forge waits for each tx to be confirmed before
+    /// sending the next, which is required for correctness against the anvil
+    /// fork.
     pub fn with_broadcast(mut self) -> Self {
         self.args.add_arg(ForgeScriptArg::Broadcast);
-        self.args.add_arg(ForgeScriptArg::SkipSimulation);
+        self.args.add_arg(ForgeScriptArg::Slow);
         self
     }
 
@@ -86,12 +84,6 @@ impl ForgeScript {
 
     pub fn with_gas_limit(mut self, gas_limit: u64) -> Self {
         self.args.add_arg(ForgeScriptArg::GasLimit { gas_limit });
-        self
-    }
-
-    /// Makes sure a transaction is sent, only after its previous one has been confirmed and succeeded.
-    pub fn with_slow(mut self) -> Self {
-        self.args.add_arg(ForgeScriptArg::Slow);
         self
     }
 
@@ -269,7 +261,6 @@ pub enum ForgeScriptArg {
     Skip {
         skip_path: String,
     },
-    SkipSimulation,
 }
 
 /// ForgeScriptArgs is a set of arguments that can be passed to the forge script command.

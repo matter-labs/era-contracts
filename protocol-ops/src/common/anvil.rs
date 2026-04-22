@@ -54,18 +54,9 @@ pub fn start_anvil_fork(fork_url: &str) -> anyhow::Result<AnvilInstance> {
             "--port",
             &port.to_string(),
             "--auto-impersonate",
-            // Skip the 10 default pre-funded accounts — protocol-ops uses
-            // auto-impersonation for every broadcast, so the default keys
-            // are never used. Saves ~50-100ms on startup.
-            "--accounts",
-            "0",
             // Scripts like bridgehub multicalls can exceed the 30M default
             // block gas limit; lift it so simulations don't spuriously OOG.
             "--disable-block-gas-limit",
-            // anvil rate-limits fork RPC calls at 330 CU/s by default; we're
-            // forking localhost so there's no reason to throttle.
-            "--compute-units-per-second",
-            "0",
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
