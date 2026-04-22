@@ -7,7 +7,7 @@ import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-v5/utils/draft-InteroperableAddress.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_INTEROP_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";

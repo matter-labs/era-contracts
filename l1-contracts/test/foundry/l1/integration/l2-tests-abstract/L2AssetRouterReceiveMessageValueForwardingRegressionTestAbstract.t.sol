@@ -6,7 +6,7 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-v5/utils/draft-InteroperableAddress.sol";
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_INTEROP_HANDLER_ADDR,

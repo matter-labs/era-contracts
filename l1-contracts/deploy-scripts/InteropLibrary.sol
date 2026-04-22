@@ -15,7 +15,7 @@ import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 // import {IInteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropCallStarter} from "contracts/common/Messaging.sol";
-import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-v5/utils/draft-InteroperableAddress.sol";
 import {AmountMustBeGreaterThanZero, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";

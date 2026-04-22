@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {Calldata} from "contracts/vendor/Calldata.sol";
+import {Calldata} from "@openzeppelin/contracts-v5/utils/Calldata.sol";
 
 /// @notice Helper contract to test Calldata library functions
 /// @dev The Calldata library functions return calldata types, so we need a helper

@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.24;
 
-import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-v5/utils/draft-InteroperableAddress.sol";
 
 import {
     L2_BRIDGEHUB,

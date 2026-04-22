@@ -39,7 +39,7 @@ import {
 } from "../../common/L1ContractErrors.sol";
 import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
-import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-v5/utils/draft-InteroperableAddress.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
