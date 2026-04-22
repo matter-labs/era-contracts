@@ -2,26 +2,19 @@
 
 pragma solidity 0.8.28;
 
-import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
-
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "../core/message-root/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
-import {IL2V31Upgrade} from "./IL2V31Upgrade.sol";
-import {UnexpectedUpgradeSelector, PriorityQueueNotReady, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
-import {TokenBridgingData, TokenMetadata} from "../common/Messaging.sol";
+import {PriorityQueueNotReady, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
-import {Bytes} from "../vendor/Bytes.sol";
-import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "../common/Config.sol";
+import {L2DACommitmentScheme} from "../common/Config.sol";
 import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
-import {UnexpectedZKsyncOSFlag} from "./ZkSyncUpgradeErrors.sol";
+import {L2UpgradeTxLib} from "./L2UpgradeTxLib.sol";
 
 /// @author Matter Labs
 /// @title SettlementLayerV31UpgradeBase
@@ -29,8 +22,6 @@ import {UnexpectedZKsyncOSFlag} from "./ZkSyncUpgradeErrors.sol";
 /// delegates L2 tx construction to subclasses (Era vs ZKsyncOS).
 /// @custom:security-contact security@matterlabs.dev
 abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
-    using Bytes for bytes;
-
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
@@ -97,95 +88,4 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
         uint256 _chainId,
         bytes memory _existingTxData
     ) public view virtual returns (bytes memory);
-
-    /// @notice Replace the placeholder inner calldata with real per-chain data.
-    /// @dev The inner calldata is IL2V31Upgrade.upgrade() — we decode the placeholder to
-    /// extract ecosystem-wide fields, then re-encode with per-chain additionalForceDeploymentsData.
-    function _buildL2V31UpgradeCalldata(
-        address _bridgehub,
-        uint256 _chainId,
-        bytes memory _existingUpgradeCalldata
-    ) internal view returns (bytes memory) {
-        // Decode the placeholder to extract isZKsyncOS, ctmDeployer, and fixedForceDeploymentsData
-        // (these are ecosystem-wide and don't change per chain).
-        (bool isZKsyncOS, address ctmDeployer, bytes memory fixedForceDeploymentsData, ) = abi.decode(
-            // ignore placeholder additionalForceDeploymentsData
-            _existingUpgradeCalldata.slice(4),
-            (bool, address, bytes, bytes)
-        );
-        // Read the zksyncOS flag from the diamond proxy (the authoritative source).
-        // This contract is also called directly by the server not just via delegatecall from the diamond,
-        // so reading `s.zksyncOS` would resolve to the upgrade contract's own empty storage.
-        address diamondProxy = IBridgehubBase(_bridgehub).getZKChain(_chainId);
-        bool chainZksyncOS = IGetters(diamondProxy).getZKsyncOS();
-        if (isZKsyncOS != chainZksyncOS) {
-            revert UnexpectedZKsyncOSFlag(chainZksyncOS, isZKsyncOS);
-        }
-
-        // Construct per-chain ZKChainSpecificForceDeploymentsData from L1 state.
-        bytes memory additionalForceDeploymentsData = _buildChainSpecificForceDeploymentsData(_bridgehub, _chainId);
-
-        return
-            abi.encodeCall(
-                IL2V31Upgrade.upgrade,
-                (isZKsyncOS, ctmDeployer, fixedForceDeploymentsData, additionalForceDeploymentsData)
-            );
-    }
-
-    /// @notice Build per-chain ZKChainSpecificForceDeploymentsData from L1 state.
-    function _buildChainSpecificForceDeploymentsData(
-        address _bridgehub,
-        uint256 _chainId
-    ) internal view returns (bytes memory) {
-        IBridgehubBase bridgehub = IBridgehubBase(_bridgehub);
-        address assetRouter = address(bridgehub.assetRouter());
-        address nativeTokenVaultAddr = address(IL1AssetRouter(assetRouter).nativeTokenVault());
-        bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(_chainId);
-        INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(nativeTokenVaultAddr);
-        address originToken = nativeTokenVault.originToken(baseTokenAssetId);
-
-        string memory baseTokenName;
-        string memory baseTokenSymbol;
-        uint256 baseTokenDecimals;
-
-        if (originToken == ETH_TOKEN_ADDRESS) {
-            baseTokenName = "Ether";
-            baseTokenSymbol = "ETH";
-            baseTokenDecimals = 18;
-        } else {
-            // Use `tokenAddress` (the local bridged representation on this settlement layer)
-            // instead of `originToken` (which is the address on the origin chain and may have no
-            // code here if the token was bridged from another chain).
-            address localToken = nativeTokenVault.tokenAddress(baseTokenAssetId);
-            baseTokenName = IERC20Metadata(localToken).name();
-            baseTokenSymbol = IERC20Metadata(localToken).symbol();
-            baseTokenDecimals = IERC20Metadata(localToken).decimals();
-        }
-
-        return
-            abi.encode(
-                ZKChainSpecificForceDeploymentsData({
-                    l2LegacySharedBridge: address(0),
-                    predeployedL2WethAddress: address(0),
-                    baseTokenL1Address: originToken,
-                    baseTokenMetadata: TokenMetadata({
-                        name: baseTokenName,
-                        symbol: baseTokenSymbol,
-                        decimals: baseTokenDecimals
-                    }),
-                    baseTokenBridgingData: TokenBridgingData({
-                        assetId: baseTokenAssetId,
-                        originChainId: nativeTokenVault.originChainId(baseTokenAssetId),
-                        originToken: originToken
-                    })
-                })
-            );
-    }
-
-    /// @notice Validate that the inner calldata targets L2V31Upgrade.
-    function _validateWrappedUpgrade(bytes memory _existingUpgradeCalldata) internal pure {
-        if (bytes4(_existingUpgradeCalldata) != IL2V31Upgrade.upgrade.selector) {
-            revert UnexpectedUpgradeSelector();
-        }
-    }
 }

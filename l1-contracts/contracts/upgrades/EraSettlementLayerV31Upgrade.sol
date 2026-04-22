@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {SettlementLayerV31UpgradeBase} from "./SettlementLayerV31UpgradeBase.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
+import {L2UpgradeTxLib} from "./L2UpgradeTxLib.sol";
 import {Bytes} from "../vendor/Bytes.sol";
 
 /// @author Matter Labs
@@ -27,8 +28,12 @@ contract EraSettlementLayerV31Upgrade is SettlementLayerV31UpgradeBase {
             bytes memory existingUpgradeCalldata
         ) = abi.decode(_existingTxData.slice(4), (IL2ContractDeployer.ForceDeployment[], address, bytes));
 
-        _validateWrappedUpgrade(existingUpgradeCalldata);
-        bytes memory l2V31UpgradeCalldata = _buildL2V31UpgradeCalldata(_bridgehub, _chainId, existingUpgradeCalldata);
+        L2UpgradeTxLib.validateWrappedUpgrade(existingUpgradeCalldata);
+        bytes memory l2V31UpgradeCalldata = L2UpgradeTxLib.buildL2V31UpgradeCalldata(
+            _bridgehub,
+            _chainId,
+            existingUpgradeCalldata
+        );
 
         return
             abi.encodeCall(
