@@ -16,6 +16,7 @@ import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisFo
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
+import {EraForceDeploymentsLib} from "../default-upgrade/EraForceDeploymentsLib.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 
@@ -62,9 +63,13 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         return deploySimpleContract(contractName, false);
     }
 
-    function getForceDeploymentContracts() internal override returns (CoreContract[] memory forceDeploymentContracts) {
-        forceDeploymentContracts = new CoreContract[](1);
-        forceDeploymentContracts[0] = CoreContract.L2V31Upgrade;
+    function getAdditionalForcedCoreContracts()
+        internal
+        override
+        returns (CoreContract[] memory additionalForcedCoreContracts)
+    {
+        additionalForcedCoreContracts = new CoreContract[](1);
+        additionalForcedCoreContracts[0] = CoreContract.L2V31Upgrade;
     }
 
     function getL2UpgradeTargetAndData(
@@ -98,7 +103,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         } else {
             complexUpgraderCalldata = abi.encodeCall(
                 IComplexUpgrader.forceDeployAndUpgrade,
-                (unwrapEraDeployments(_deployments), L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
+                (EraForceDeploymentsLib.unwrap(_deployments), L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
             );
         }
 
