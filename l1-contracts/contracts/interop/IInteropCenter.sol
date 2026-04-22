@@ -106,12 +106,6 @@ interface IInteropCenter {
     /// @param _receiver Address to receive the fees.
     function claimZKFees(address _receiver) external;
 
-    /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
-    function pause() external;
-
-    /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
-    function unpause() external;
-
     /// @notice Initializes the InteropCenter on a fresh genesis deployment.
     /// @param _l1ChainId The chain ID of L1.
     /// @param _owner The owner address.

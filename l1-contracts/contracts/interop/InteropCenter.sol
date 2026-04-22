@@ -195,7 +195,7 @@ contract InteropCenter is
         bytes calldata recipient,
         bytes calldata payload,
         bytes[] calldata attributes
-    ) external payable whenNotPaused nonReentrant returns (bytes32 sendId) {
+    ) external payable nonReentrant returns (bytes32 sendId) {
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
 
         _ensureL2ToL2(recipientChainId);
@@ -242,7 +242,7 @@ contract InteropCenter is
         bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
-    ) external payable whenNotPaused nonReentrant returns (bytes32 bundleHash) {
+    ) external payable nonReentrant returns (bytes32 bundleHash) {
         // Validate that the destination chain ERC-7930 address has an empty address field.
         _ensureEmptyAddress(_destinationChainId);
 
@@ -686,20 +686,6 @@ contract InteropCenter is
                 IERC7786Attributes.unbundlerAddress.selector,
                 IERC7786Attributes.useFixedFee.selector
             ];
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            PAUSE
-    //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc IInteropCenter
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    /// @inheritdoc IInteropCenter
-    function unpause() external onlyOwner {
-        _unpause();
     }
 
     /*//////////////////////////////////////////////////////////////

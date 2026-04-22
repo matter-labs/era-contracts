@@ -47,12 +47,15 @@ import {
 } from "./InteropErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
 import {IAssetTrackerDataEncoding} from "../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 /// @title InteropHandler
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev This contract serves as the entry-point for executing, verifying and unbundling interop bundles.
-contract InteropHandler is IInteropHandler, ReentrancyGuard {
+/// @dev Inherits PausableUpgradeable for potential future use. It is intentionally not used and kept to 
+/// enable adding it in the future without the need for a storage layout change.
+contract InteropHandler is IInteropHandler, ReentrancyGuard, PausableUpgradeable {
     /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 public L1_CHAIN_ID;
