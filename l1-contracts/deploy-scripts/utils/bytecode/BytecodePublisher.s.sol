@@ -11,6 +11,13 @@ import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol
 import {ZKSyncOSBytecodeInfo} from "contracts/common/libraries/ZKSyncOSBytecodeInfo.sol";
 import {Utils} from "../Utils.sol";
 
+/// @notice Result of publishing and processing factory dependencies.
+struct PublishFactoryDepsResult {
+    /// @dev Factory dep hashes for the upgrade transaction.
+    ///      Era: L2 bytecode hashes as uint256. ZKsyncOS: empty array.
+    uint256[] factoryDepsHashes;
+}
+
 library BytecodePublisher {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -110,6 +117,36 @@ library BytecodePublisher {
             bytecodesSupplier.publishEVMBytecodes(batch);
         } else {
             bytecodesSupplier.publishEraBytecodes(batch);
+        }
+    }
+
+    /// @notice Publish bytecodes and compute factory dependency hashes in one call.
+    ///         Era: publishes bytecodes, computes L2 bytecode hashes, returns populated result.
+    ///         EVM bytecodes: publishes bytecodes, returns empty array (no factory deps concept).
+    function publishAndProcessFactoryDeps(
+        bool _isEVMBytecode,
+        BytecodesSupplier _supplier,
+        bytes[] memory _allDeps
+    ) internal returns (PublishFactoryDepsResult memory result) {
+        if (_isEVMBytecode) {
+            publishEVMBytecodesInBatches(_supplier, _allDeps);
+        } else {
+            publishEraBytecodesInBatches(_supplier, _allDeps);
+        }
+
+        if (_isEVMBytecode) {
+            // EVM bytecodes do not use factory deps in upgrade transactions — bytecodes are
+            // published to BytecodesSupplier above but no hashes are needed in the tx.
+            result.factoryDepsHashes = new uint256[](0);
+            return result;
+        }
+
+        uint256 depsLen = _allDeps.length;
+        require(depsLen <= 64, "Too many deps");
+
+        result.factoryDepsHashes = new uint256[](depsLen);
+        for (uint256 i = 0; i < depsLen; i++) {
+            result.factoryDepsHashes[i] = uint256(L2ContractHelper.hashL2Bytecode(_allDeps[i]));
         }
     }
 

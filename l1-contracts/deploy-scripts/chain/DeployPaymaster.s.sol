@@ -6,6 +6,7 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "../utils/Utils.sol";
+import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IDeployPaymaster} from "contracts/script-interfaces/IDeployPaymaster.sol";
 
@@ -45,7 +46,7 @@ contract DeployPaymaster is Script, IDeployPaymaster {
     }
 
     function deploy() internal {
-        bytes memory testnetPaymasterBytecode = Utils.readZKFoundryBytecodeL2(
+        bytes memory testnetPaymasterBytecode = BytecodeUtils.readZKFoundryBytecodeL2(
             "TestnetPaymaster.sol",
             "TestnetPaymaster"
         );

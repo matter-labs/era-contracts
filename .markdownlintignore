@@ -12,6 +12,9 @@ l1-contracts-foundry/lib
 # l2-contracts
 l2-contracts/node_modules
 
+# protocol-ops
+protocol-ops/target
+
 # system-contracts
 system-contracts/node_modules
 system-contracts/bootloader/test_infra/target

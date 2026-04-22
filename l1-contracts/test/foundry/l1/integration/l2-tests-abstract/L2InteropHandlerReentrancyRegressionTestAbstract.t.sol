@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {Test} from "forge-std/Test.sol";
-import "forge-std/console.sol";
 
 import {IERC7786Recipient} from "contracts/interop/IERC7786Recipient.sol";
 import {
@@ -23,6 +22,7 @@ import {InteroperableAddress} from "@openzeppelin/contracts-v5/utils/draft-Inter
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
+import {Reentrancy} from "contracts/common/L1ContractErrors.sol";
 
 import {
     L2_INTEROP_CENTER_ADDR,
@@ -119,65 +119,72 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             // If it succeeds, that's fine - reentrancy didn't block it
         } catch (bytes memory reason) {
             // Check that it's not a reentrancy error
-            // ReentrancyGuard error would be "ReentrancyGuard: reentrant call"
-            string memory revertReason = _getRevertMessage(reason);
-            assertTrue(!_containsString(revertReason, "reentrant"), "Should not revert due to reentrancy");
+            // The InteropHandler contract used our custom ReentrancyGuard implementation, not the OZ one
+            assertFalse(
+                reason.length >= 4 && bytes4(reason) == Reentrancy.selector,
+                "Should not revert due to reentrancy"
+            );
         }
     }
 
     /// @notice Test that executeBundle doesn't have nonReentrant modifier blocking nested calls
-    /// @dev Directly tests that two calls to executeBundle in the same transaction don't revert
+    /// @dev Creates an outer bundle that calls receiveMessage on InteropHandler,
+    ///      which dispatches to this.executeBundle() for an inner bundle.
+    ///      With nonReentrant present, the nested executeBundle call triggers reentrancy.
     function test_regression_executeBundleNoReentrancyGuard() public {
-        // This test verifies the function signature change - nonReentrant was removed
-        // We test by checking that the contract can handle the scenario where
-        // executeBundle might be called from within another executeBundle
-
         uint256 sourceChainId = block.chainid;
 
-        // Create two separate bundles
-        InteropCall[] memory calls1 = new InteropCall[](1);
-        calls1[0] = InteropCall({
+        // Create the inner bundle that will be executed via receiveMessage -> executeBundle
+        InteropCall[] memory innerCalls = new InteropCall[](1);
+        innerCalls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
             shadowAccount: false,
             from: bundleExecutor,
-            to: makeAddr("recipient1"),
+            to: makeAddr("innerRecipient"),
             value: 0,
             data: hex""
         });
 
-        InteropBundle memory bundle1 = InteropBundle({
+        InteropBundle memory innerBundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: sourceChainId,
             destinationChainId: destinationChainId,
             destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             interopBundleSalt: bytes32(uint256(1)),
-            calls: calls1,
+            calls: innerCalls,
             bundleAttributes: _createBundleAttributes(bundleExecutor)
         });
 
-        InteropCall[] memory calls2 = new InteropCall[](1);
-        calls2[0] = InteropCall({
+        bytes memory encodedInnerBundle = abi.encode(innerBundle);
+        MessageInclusionProof memory innerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
+
+        // Payload for receiveMessage that dispatches to executeBundle(innerBundle)
+        bytes memory innerPayload = abi.encodeCall(IInteropHandler.executeBundle, (encodedInnerBundle, innerProof));
+
+        // Outer bundle: its call targets InteropHandler.receiveMessage with the above payload.
+        // Call chain: executeBundle(outer) -> _executeCalls -> receiveMessage -> this.executeBundle(inner)
+        InteropCall[] memory outerCalls = new InteropCall[](1);
+        outerCalls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
             shadowAccount: false,
             from: bundleExecutor,
-            to: makeAddr("recipient2"),
+            to: L2_INTEROP_HANDLER_ADDR,
             value: 0,
-            data: hex""
+            data: innerPayload
         });
 
-        InteropBundle memory bundle2 = InteropBundle({
+        InteropBundle memory outerBundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: sourceChainId,
             destinationChainId: destinationChainId,
             destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             interopBundleSalt: bytes32(uint256(2)),
-            calls: calls2,
+            calls: outerCalls,
             bundleAttributes: _createBundleAttributes(bundleExecutor)
         });
 
-        bytes memory encodedBundle1 = abi.encode(bundle1);
-        bytes memory encodedBundle2 = abi.encode(bundle2);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
+        bytes memory encodedOuterBundle = abi.encode(outerBundle);
+        MessageInclusionProof memory outerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
 
         // Mock the message verification to return true
         vm.mockCall(
@@ -186,14 +193,9 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
             abi.encode(true)
         );
 
-        // Mock receiveMessage on recipients to return correct selector
+        // Mock receiveMessage on recipient to return correct selector
         vm.mockCall(
-            makeAddr("recipient1"),
-            abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
-            abi.encode(IERC7786Recipient.receiveMessage.selector)
-        );
-        vm.mockCall(
-            makeAddr("recipient2"),
+            makeAddr("innerRecipient"),
             abi.encodeWithSelector(IERC7786Recipient.receiveMessage.selector),
             abi.encode(IERC7786Recipient.receiveMessage.selector)
         );
@@ -201,52 +203,77 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         // Switch to destination chain
         vm.chainId(destinationChainId);
 
-        // Execute first bundle
+        // It should revert due to ExecutingNotAllowed or similar
+        // The key assertion is that if we see a revert, it's not the reentrancy revert
         vm.prank(bundleExecutor);
-        L2_INTEROP_HANDLER.executeBundle(encodedBundle1, proof);
-
-        // Execute second bundle in the same transaction context
-        // Before fix: If there was remaining reentrancy state, this could fail
-        // After fix: Each call is independent
-        vm.prank(bundleExecutor);
-        L2_INTEROP_HANDLER.executeBundle(encodedBundle2, proof);
-
-        // If we reach here, both bundles executed without reentrancy issues
-        // Verify bundle statuses
-        bytes32 bundleHash1 = keccak256(abi.encode(sourceChainId, encodedBundle1));
-        bytes32 bundleHash2 = keccak256(abi.encode(sourceChainId, encodedBundle2));
-
-        // Both should be marked as executed (or verified, depending on the flow)
-        // The main assertion is that we got here without reentrancy revert
-        assertTrue(true, "Both bundles executed without reentrancy error");
+        try L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof) {
+            // Success - reentrancy did not block the nested executeBundle call
+        } catch (bytes memory reason) {
+            assertFalse(
+                reason.length >= 4 && bytes4(reason) == Reentrancy.selector,
+                "Should not revert due to reentrancy"
+            );
+        }
     }
 
     /// @notice Test that verifyBundle doesn't have nonReentrant blocking it
+    /// @dev Creates an outer bundle that calls receiveMessage on InteropHandler,
+    ///      which dispatches to this.verifyBundle() for an inner bundle.
+    ///      With nonReentrant present, the nested verifyBundle call triggers reentrancy.
     function test_regression_verifyBundleNoReentrancyGuard() public {
         uint256 sourceChainId = block.chainid;
 
-        InteropCall[] memory calls = new InteropCall[](1);
-        calls[0] = InteropCall({
+        // Create the inner bundle that will be verified via receiveMessage -> verifyBundle
+        InteropCall[] memory innerCalls = new InteropCall[](1);
+        innerCalls[0] = InteropCall({
             version: INTEROP_CALL_VERSION,
             shadowAccount: false,
             from: bundleExecutor,
-            to: makeAddr("recipient"),
+            to: makeAddr("innerRecipient"),
             value: 0,
             data: hex""
         });
 
-        InteropBundle memory bundle = InteropBundle({
+        InteropBundle memory innerBundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: sourceChainId,
             destinationChainId: destinationChainId,
             destinationBaseTokenAssetId: destinationBaseTokenAssetId,
             interopBundleSalt: bytes32(uint256(1)),
-            calls: calls,
+            calls: innerCalls,
             bundleAttributes: _createBundleAttributes(bundleExecutor)
         });
 
-        bytes memory encodedBundle = abi.encode(bundle);
-        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
+        bytes memory encodedInnerBundle = abi.encode(innerBundle);
+        MessageInclusionProof memory innerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
+
+        // Payload for receiveMessage that dispatches to verifyBundle(innerBundle)
+        bytes memory innerPayload = abi.encodeCall(IInteropHandler.verifyBundle, (encodedInnerBundle, innerProof));
+
+        // Outer bundle: its call targets InteropHandler.receiveMessage with the above payload.
+        // Call chain: executeBundle(outer) -> _executeCalls -> receiveMessage -> this.verifyBundle(inner)
+        InteropCall[] memory outerCalls = new InteropCall[](1);
+        outerCalls[0] = InteropCall({
+            version: INTEROP_CALL_VERSION,
+            shadowAccount: false,
+            from: bundleExecutor,
+            to: L2_INTEROP_HANDLER_ADDR,
+            value: 0,
+            data: innerPayload
+        });
+
+        InteropBundle memory outerBundle = InteropBundle({
+            version: INTEROP_BUNDLE_VERSION,
+            sourceChainId: sourceChainId,
+            destinationChainId: destinationChainId,
+            destinationBaseTokenAssetId: destinationBaseTokenAssetId,
+            interopBundleSalt: bytes32(uint256(2)),
+            calls: outerCalls,
+            bundleAttributes: _createBundleAttributes(bundleExecutor)
+        });
+
+        bytes memory encodedOuterBundle = abi.encode(outerBundle);
+        MessageInclusionProof memory outerProof = getInclusionProof(L2_INTEROP_CENTER_ADDR, sourceChainId);
 
         // Mock the message verification to return true
         vm.mockCall(
@@ -258,17 +285,16 @@ abstract contract L2InteropHandlerReentrancyRegressionTestAbstract is L2InteropT
         // Switch to destination chain
         vm.chainId(destinationChainId);
 
-        // Call verifyBundle - this should work without reentrancy guard
-        // Note: This will likely revert due to NotInGatewayMode, but not due to reentrancy
         vm.prank(bundleExecutor);
-        try L2_INTEROP_HANDLER.verifyBundle(encodedBundle, proof) {
-            // Success - no reentrancy issue
+        try L2_INTEROP_HANDLER.executeBundle(encodedOuterBundle, outerProof) {
+            // Success - reentrancy did not block the nested verifyBundle call
         } catch (bytes memory reason) {
-            string memory revertReason = _getRevertMessage(reason);
-            assertTrue(!_containsString(revertReason, "reentrant"), "verifyBundle should not revert due to reentrancy");
+            assertFalse(
+                reason.length >= 4 && bytes4(reason) == Reentrancy.selector,
+                "Should not revert due to reentrancy"
+            );
         }
     }
-
     /// @notice Helper to create bundle attributes with execution address
     function _createBundleAttributes(address executor) internal view returns (BundleAttributes memory) {
         return

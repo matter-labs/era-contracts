@@ -9,7 +9,8 @@ import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "../../cha
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "../../IChainTypeManager.sol";
 import {ServerNotifier} from "../../../governance/ServerNotifier.sol";
 
-import {Facets, GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
+import {Facets} from "contracts/common/StateTransitionTypes.sol";
+import {GatewayCTMDeployerConfig, GatewayCTMFinalConfig, GatewayCTMFinalResult} from "./GatewayCTMDeployer.sol";
 
 /// @title GatewayCTMDeployerCTMBase
 /// @author Matter Labs

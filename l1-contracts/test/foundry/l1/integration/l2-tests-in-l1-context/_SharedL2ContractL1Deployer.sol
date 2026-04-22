@@ -22,6 +22,7 @@ import {DummyInteropRecipient} from "contracts/dev-contracts/test/DummyInteropRe
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
+import {DeployCTML1OrGateway} from "deploy-scripts/ctm/DeployCTML1OrGateway.sol";
 
 contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegrationScript {
     using stdToml for string;
@@ -50,26 +51,23 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
             "/l1-contracts",
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml"
         );
-        string memory permanentValuesInputPath = string.concat(
-            root,
-            "/test/foundry/l1/integration/deploy-scripts/script-config/permanent-values.toml"
-        );
-        initializeConfig(inputPath, permanentValuesInputPath, L2_BRIDGEHUB_ADDR);
+        initializeConfig(inputPath, L2_BRIDGEHUB_ADDR);
         coreAddresses.bridgehub.proxies.bridgehub = L2_BRIDGEHUB_ADDR;
         coreAddresses.bridges.proxies.l1AssetRouter = L2_ASSET_ROUTER_ADDR;
         coreAddresses.bridges.proxies.l1NativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
-        if (!_skip) {
-            instantiateCreate2Factory();
-        }
 
         // TODO refactor
         ctmAddresses.admin.transparentProxyAdmin = makeAddr("transparentProxyAdmin");
         ctmAddresses.admin.governance = makeAddr("governance");
         ctmAddresses.chainAdmin = makeAddr("chainAdmin");
         ctmAddresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
-        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract("Verifier", true);
+        (, string memory verifierName) = DeployCTML1OrGateway.resolveMainVerifier(
+            config.isZKsyncOS,
+            config.testnetVerifier
+        );
+        ctmAddresses.stateTransition.verifiers.verifier = deploySimpleContract(verifierName, true);
         ctmAddresses.stateTransition.proxies.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
         (
             ctmAddresses.stateTransition.implementations.serverNotifier,
