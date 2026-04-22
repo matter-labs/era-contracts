@@ -8,7 +8,7 @@ import {ERC7930_V1_MIN_LENGTH} from "./InteropConstants.sol";
 /// @title StrictInteroperableAddressesParser
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Strict wrappers around the parse/tryParse helpers from the vendored
+/// @notice Strict wrappers around the parse helpers from the vendored
 /// {InteroperableAddress} library. The vendored library accepts inputs with trailing bytes
 /// beyond the declared chainReference/address, because it checks
 /// `self.length < 0x06 + chainReferenceLength + addrLength` (strictly less than) as the
@@ -51,17 +51,6 @@ library StrictInteroperableAddressesParser {
         return InteroperableAddress.parseV1Calldata(_self);
     }
 
-    /// @notice Strict variant of {InteroperableAddress-tryParseV1Calldata}. Returns `false`
-    /// instead of reverting when the payload has trailing bytes beyond the declared layout.
-    function tryParseV1Calldata(
-        bytes calldata _self
-    ) internal pure returns (bool success, bytes2 chainType, bytes calldata chainReference, bytes calldata addr) {
-        if (!_hasStrictLengthCalldata(_self)) {
-            return (false, 0x0000, _self[0:0], _self[0:0]);
-        }
-        return InteroperableAddress.tryParseV1Calldata(_self);
-    }
-
     /// @notice Strict variant of {InteroperableAddress-parseEvmV1}. Reverts with
     /// `InteroperableAddressParsingError` if the payload has trailing bytes beyond the
     /// declared layout.
@@ -76,17 +65,5 @@ library StrictInteroperableAddressesParser {
     function parseEvmV1Calldata(bytes calldata _self) internal pure returns (uint256 chainId, address addr) {
         require(_hasStrictLengthCalldata(_self), InteroperableAddress.InteroperableAddressParsingError(_self));
         return InteroperableAddress.parseEvmV1Calldata(_self);
-    }
-
-    /// @notice Strict variant of {InteroperableAddress-tryParseEvmV1Calldata}. Returns
-    /// `false` instead of reverting when the payload has trailing bytes beyond the
-    /// declared layout.
-    function tryParseEvmV1Calldata(
-        bytes calldata _self
-    ) internal pure returns (bool success, uint256 chainId, address addr) {
-        if (!_hasStrictLengthCalldata(_self)) {
-            return (false, 0, address(0));
-        }
-        return InteroperableAddress.tryParseEvmV1Calldata(_self);
     }
 }

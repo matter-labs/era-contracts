@@ -16,20 +16,8 @@ contract StrictInteroperableAddressesParserHelper {
         return StrictInteroperableAddressesParser.parseV1Calldata(data);
     }
 
-    function tryParseV1Calldata(
-        bytes calldata data
-    ) external pure returns (bool success, bytes2 chainType, bytes calldata chainReference, bytes calldata addr) {
-        return StrictInteroperableAddressesParser.tryParseV1Calldata(data);
-    }
-
     function parseEvmV1Calldata(bytes calldata data) external pure returns (uint256 chainId, address addr) {
         return StrictInteroperableAddressesParser.parseEvmV1Calldata(data);
-    }
-
-    function tryParseEvmV1Calldata(
-        bytes calldata data
-    ) external pure returns (bool success, uint256 chainId, address addr) {
-        return StrictInteroperableAddressesParser.tryParseEvmV1Calldata(data);
     }
 }
 
@@ -104,40 +92,6 @@ contract StrictInteroperableAddressesParserTest is Test {
         helper.parseV1Calldata(truncated);
     }
 
-    // ============ tryParseV1Calldata ============
-
-    function test_tryParseV1Calldata_validInput() public view {
-        bytes memory formatted = InteroperableAddress.formatEvmV1(uint256(1), address(0x1234));
-
-        (bool success, bytes2 chainType, , ) = helper.tryParseV1Calldata(formatted);
-        assertTrue(success);
-        assertEq(chainType, bytes2(0x0000));
-    }
-
-    function test_tryParseV1Calldata_failsOnTrailingBytes() public view {
-        bytes memory formattedWithTrailingByte = bytes.concat(
-            InteroperableAddress.formatEvmV1(uint256(1), address(0x1234)),
-            hex"00"
-        );
-
-        (bool success, , , ) = helper.tryParseV1Calldata(formattedWithTrailingByte);
-        assertFalse(success);
-    }
-
-    function test_tryParseV1Calldata_failsOnMissingAddressLengthByte() public view {
-        bytes memory tooShort = hex"0001000000";
-
-        (bool success, , , ) = helper.tryParseV1Calldata(tooShort);
-        assertFalse(success);
-    }
-
-    function test_tryParseV1Calldata_failsOnTruncatedChainReference() public view {
-        bytes memory truncated = hex"00010000030100";
-
-        (bool success, , , ) = helper.tryParseV1Calldata(truncated);
-        assertFalse(success);
-    }
-
     // ============ parseEvmV1Calldata ============
 
     function test_parseEvmV1Calldata_validInput() public view {
@@ -188,37 +142,6 @@ contract StrictInteroperableAddressesParserTest is Test {
             )
         );
         StrictInteroperableAddressesParser.parseEvmV1(formattedWithTrailingByte);
-    }
-
-    // ============ tryParseEvmV1Calldata ============
-
-    function test_tryParseEvmV1Calldata_validInput() public view {
-        address expectedAddr = address(0x1234567890123456789012345678901234567890);
-        bytes memory formatted = InteroperableAddress.formatEvmV1(uint256(1), expectedAddr);
-
-        (bool success, uint256 chainId, address addr) = helper.tryParseEvmV1Calldata(formatted);
-        assertTrue(success);
-        assertEq(chainId, 1);
-        assertEq(addr, expectedAddr);
-    }
-
-    function test_tryParseEvmV1Calldata_failsOnTrailingBytes() public view {
-        bytes memory formattedWithTrailingByte = bytes.concat(
-            InteroperableAddress.formatEvmV1(uint256(1), address(0x1234)),
-            hex"00"
-        );
-
-        (bool success, , ) = helper.tryParseEvmV1Calldata(formattedWithTrailingByte);
-        assertFalse(success);
-    }
-
-    function test_tryParseEvmV1Calldata_failsOnInvalidChainType() public view {
-        // Non-EVM chainType (0x0001 instead of 0x0000), length matches strictly.
-        // Strict length check passes, but vendor tryParseEvmV1Calldata rejects the chainType.
-        bytes memory nonEvm = hex"000100010114001234567890123456789012345678901234567890";
-
-        (bool success, , ) = helper.tryParseEvmV1Calldata(nonEvm);
-        assertFalse(success);
     }
 
     // ============ Fuzz ============
