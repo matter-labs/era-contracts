@@ -145,20 +145,16 @@ export class L2GenesisUpgradeDeployer {
   }
 
   private async ensureSystemContract(address: string, artifactPath: string, name: string): Promise<void> {
-    const existingCode = await this.l2Provider.getCode(address);
-    if (existingCode !== "0x" && existingCode !== "0x0") {
-      console.log(`   ✅ ${name} already deployed at ${address}`);
-      return;
-    }
-
     const bytecode = loadBytecodeFromOut(artifactPath);
     if (!bytecode || bytecode === "0x") {
       throw new Error(`No bytecode found for ${name} at ${artifactPath}`);
     }
 
-    console.log(`   Deploying ${name} at ${address}...`);
+    // Always deploy — anvil-zksync pre-populates system addresses with built-in stubs
+    // that lack functions added in later protocol versions (e.g. L2ComplexUpgrader's
+    // forceDeployAndUpgradeUniversal). Overwrite with the correct l1-contracts bytecode.
     await this.l2Provider.send("anvil_setCode", [address, bytecode]);
-    console.log(`   ✅ ${name} deployed`);
+    console.log(`   ✅ ${name} deployed at ${address}`);
   }
 
   private async ensurePredeployedContracts(): Promise<void> {
