@@ -329,18 +329,11 @@ async function runChainUpgradesAndRelayL2(params: {
     // Decode the L2 upgrade tx from the broadcast
     const originalUpgradeTxData = decodeLatestL2UpgradeTxData(broadcastPath);
 
-    // getL2UpgradeTxData is called externally (not delegatecalled from the diamond),
-    // so it reads s.zksyncOS from the upgrade contract's own storage. Seed it for ZKsyncOS chains.
-    if (isZKsyncOS) {
-      const ZKSYNC_OS_SLOT = ethers.utils.hexZeroPad(ethers.utils.hexlify(60), 32);
-      const TRUE = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 32);
-      await l1Provider.send("anvil_setStorageAt", [settlementLayerUpgradeAddr, ZKSYNC_OS_SLOT, TRUE]);
-    }
-
     // Rewrite the L2 upgrade tx with per-chain data via SettlementLayerV31Upgrade
     const rewrittenUpgradeTxData = await settlementLayerUpgrade.getL2UpgradeTxData(
       bridgehubAddr,
       chain.chainId,
+      isZKsyncOS,
       originalUpgradeTxData
     );
 
