@@ -17,23 +17,21 @@
  *         observable effects of production `bridgeBurn` via the real Solidity entry
  *         points (see `harness-shims.ts` for the full rationale),
  *       - `GWAssetTracker.initiateGatewayToL1MigrationOnGateway` drives the real
- *         reverse-TBM entry point on GW and the test asserts the full GW-side
- *         state transition (chainBalance drained, `assetMigrationNumber` = 2) plus
- *         replay protection.
+ *         reverse-TBM entry point on GW (`chainBalance` drained, GW
+ *         `assetMigrationNumber` advanced to 2),
+ *       - `installL1ChainAssetHandlerDev` + `setL1ChainMigrationNumber` bump the
+ *         L1 `ChainAssetHandler.migrationNumber[chainId]` to 2 — matching the
+ *         observable effect of the chain-level migrate-from-gateway `bridgeMint`
+ *         the zksync-era source test covers via a real sequencer/prover pipeline
+ *         that the Anvil harness cannot instantiate (priority-tree + batch
+ *         invariants on `Migrator.forwardedBridgeBurn`),
+ *       - `receiveGatewayToL1MigrationOnL1` then runs against the real L1
+ *         contract path, finalises the reverse TBM on L1, and emits
+ *         confirmation priority txs that are relayed to GW and L2 so that
+ *         `assetMigrationNumber` reaches 2 on all three sides.
  *
- *     L1 finalisation (`receiveGatewayToL1MigrationOnL1` → confirmation priority
- *     txs back to GW and L2) requires `L1ChainAssetHandler.migrationNumber[chainId]
- *     == MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1`. That counter is bumped by
- *     `L1ChainAssetHandler.bridgeMint` during the chain-level migrate-from-gateway
- *     governance flow, which pulls in the chain-migration message-relay machinery
- *     and is out of scope for this PR. L1ChainAssetHandler also carries immutables
- *     (BRIDGEHUB, L1_CHAIN_ID, ETH_TOKEN_ASSET_ID), so an `anvil_setCode`-based
- *     dev swap isn't applicable there either.
- *
- *     Instead of silently stopping at the GW side, the spec drives the real L1
- *     entry point and asserts the exact revert (`InvalidChainMigrationNumber`)
- *     that defines the boundary — so the scope limitation is encoded as a test
- *     invariant rather than a comment.
+ *     Replay protection is asserted on GW with the exact
+ *     `InvalidAssetMigrationNumber` selector.
  *
  * Chain topology (see `config/anvil-config.json`):
  *
@@ -50,12 +48,14 @@ import { DeploymentRunner } from "../../src/deployment-runner";
 import {
   buildFinalizeWithdrawalParams,
   buildMockInteropProof,
+  extractNewPriorityRequests,
   getChainDiamondProxy,
   getChainIdByRole,
   getChainIdsByRole,
   getL1RpcUrl,
   getL2RpcUrl,
   impersonateAndRun,
+  relayTx,
 } from "../../src/core/utils";
 import { getAbi, getCreationBytecode } from "../../src/core/contracts";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
@@ -74,7 +74,9 @@ import {
 import { migrateTokenBalanceToGW } from "../../src/helpers/token-balance-migration-helper";
 import { depositETHToL2 } from "../../src/helpers/l1-deposit-helper";
 import {
+  installL1ChainAssetHandlerDev,
   installL2ChainAssetHandlerDev,
+  setL1ChainMigrationNumber,
   setSettlementLayerViaBootloader,
   simulateGWChainMigrationBurn,
 } from "../../src/helpers/harness-shims";
@@ -145,7 +147,9 @@ describe("10 - Token Balance Migration Lifecycle", function () {
   let reverseTbmProvider: ethers.providers.JsonRpcProvider;
 
   // Addresses
+  let bridgehubAddr: string;
   let l1AssetTrackerAddr: string;
+  let l1ChainAssetHandlerProxy: string;
   let gwDiamondProxy: string;
   let reverseTbmDiamondProxy: string;
 
@@ -169,6 +173,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
     directProvider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, directSettledChainId));
     reverseTbmProvider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, reverseTbmChainId));
 
+    bridgehubAddr = state.l1Addresses!.bridgehub;
     l1AssetTrackerAddr = state.l1Addresses!.l1AssetTracker;
     gwDiamondProxy = getChainDiamondProxy(state.chainAddresses!, gwChainId);
     reverseTbmDiamondProxy = getChainDiamondProxy(state.chainAddresses!, reverseTbmChainId);
@@ -182,6 +187,16 @@ describe("10 - Token Balance Migration Lifecycle", function () {
     // preserves the production storage layout and entry points — all non-test flows
     // behave identically. See harness-shims.installL2ChainAssetHandlerDev.
     await installL2ChainAssetHandlerDev(gwProvider);
+
+    // Install the dev variant of L1ChainAssetHandler on L1 behind its
+    // TransparentUpgradeableProxy. The constructor of L1ChainAssetHandler has
+    // immutables (BRIDGEHUB, L1_CHAIN_ID, ETH_TOKEN_ASSET_ID); the install helper
+    // deploys a fresh Dev instance with matching args, then swaps only the
+    // implementation's runtime bytecode while the proxy (and its storage)
+    // remains untouched. Production behaviour is unchanged; only the dev setter
+    // becomes reachable to the `onlyOwner` caller.
+    const installed = await installL1ChainAssetHandlerDev(l1Provider, bridgehubAddr);
+    l1ChainAssetHandlerProxy = installed.proxy;
   });
 
   // ── Pre-migration state on the direct-settled chain ─────────────────
@@ -582,44 +597,108 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       expect(gwMig, "GWAT assetMigrationNumber").to.equal(POST_REVERSE_MIGRATION_NUMBER);
     });
 
-    it("L1 finalisation is guarded by the chain-level migrate-from-gateway flow — reverts with InvalidChainMigrationNumber when L1 is not yet synced", async () => {
-      // Scope boundary: `L1AssetTracker.receiveGatewayToL1MigrationOnL1` requires
-      // `L1ChainAssetHandler.migrationNumber[chainId] == MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1`
-      // (i.e. 2). That L1 counter is bumped by `L1ChainAssetHandler.bridgeMint`
-      // when the chain-level migrate-from-gateway flow lands on L1 — a flow whose
-      // L1 contract carries immutables (BRIDGEHUB, L1_CHAIN_ID, ETH_TOKEN_ASSET_ID)
-      // and therefore cannot be dev-swapped via `anvil_setCode`, and whose
-      // production path pulls in the chain-migration governance machinery
-      // (out of scope for this PR).
-      //
-      // Rather than silently skipping the L1 side, this test asserts the exact
-      // invariant that defines the scope boundary: the real L1 entry point is
-      // called, it reverts with the documented custom error, and the revert
-      // data matches the expected (current, required) values.
-      const l1AssetTracker = new Contract(l1AssetTrackerAddr, getAbi("L1AssetTracker"), l1Provider);
+    it("bump L1 ChainAssetHandler.migrationNumber to 2 via the dev setter (standing in for the chain-level migrate-from-gateway bridgeMint)", async () => {
+      // In production, `L1ChainAssetHandler.migrationNumber[chainId]` is bumped
+      // to `MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1` (= 2) by `bridgeMint` at the
+      // end of the chain-level migrate-from-gateway governance flow — a flow that
+      // requires the migrating chain's Gateway diamond to satisfy
+      // `Migrator.forwardedBridgeBurn` invariants (`priorityTree.getSize() == 0`
+      // and `totalBatchesCommitted == totalBatchesExecuted`). The Anvil harness
+      // has no sequencer or prover pipeline to satisfy those, so we drive the
+      // same observable L1 state transition through the dev setter. See
+      // `installL1ChainAssetHandlerDev` and `setL1ChainMigrationNumber`.
+      await setL1ChainMigrationNumber({
+        l1Provider,
+        chainAssetHandlerProxy: l1ChainAssetHandlerProxy,
+        chainId: reverseTbmChainId,
+        newMigrationNumber: POST_REVERSE_MIGRATION_NUMBER,
+      });
+
+      const cah = new Contract(l1ChainAssetHandlerProxy, getAbi("L1ChainAssetHandler"), l1Provider);
+      const l1CahMig: BigNumber = BigNumber.from(await cah.migrationNumber(reverseTbmChainId));
+      expect(
+        l1CahMig.eq(POST_REVERSE_MIGRATION_NUMBER),
+        `L1 ChainAssetHandler.migrationNumber[${reverseTbmChainId}] == ${POST_REVERSE_MIGRATION_NUMBER}`
+      ).to.equal(true);
+    });
+
+    it("finalise reverse TBM on L1, relay confirmations to GW and L2, assert both sides reach assetMigrationNumber = 2", async () => {
       const l1Wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
+      const l1AssetTracker = new Contract(l1AssetTrackerAddr, getAbi("L1AssetTracker"), l1Provider);
       const finalizeParams = buildFinalizeWithdrawalParams(gwToL1MigrationReceipt, gwChainId);
 
-      await expectRevert(
-        () =>
-          l1AssetTracker
-            .connect(l1Wallet)
-            .callStatic.receiveGatewayToL1MigrationOnL1(finalizeParams, { gasLimit: 10_000_000 }),
-        "L1 finalisation before chain-level migrate-from-gateway",
-        customError("L1AssetTracker", "InvalidChainMigrationNumber(uint256,uint256)"),
-        l1Provider
-      );
+      const l1BalanceBefore = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, reverseTbmChainId, ethAssetId);
 
-      // L2AT stays at 1: the confirmation priority tx from L1 that would bump it
-      // only fires once `receiveGatewayToL1MigrationOnL1` succeeds.
-      const l2Mig = await queryMigrationNumber(
+      const tx = await l1AssetTracker
+        .connect(l1Wallet)
+        .receiveGatewayToL1MigrationOnL1(finalizeParams, { gasLimit: 10_000_000 });
+      const l1Receipt = await tx.wait();
+
+      // L1 assetMigrationNumber advances to the chain migration number.
+      const l1AssetMig = await queryMigrationNumber(
+        l1Provider,
+        l1AssetTrackerAddr,
+        "L1AssetTracker",
+        reverseTbmChainId,
+        ethAssetId
+      );
+      expect(l1AssetMig, "L1AT assetMigrationNumber").to.equal(POST_REVERSE_MIGRATION_NUMBER);
+
+      // L1 chainBalance is restored by `_migrateFunds` in the finalisation path.
+      const l1BalanceAfter = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, reverseTbmChainId, ethAssetId);
+      expect(
+        l1BalanceAfter.gt(l1BalanceBefore),
+        `L1AT chainBalance[${reverseTbmChainId}][ETH] restored (${l1BalanceBefore} -> ${l1BalanceAfter})`
+      ).to.equal(true);
+
+      // Relay the confirmation priority txs the L1 receipt emitted: the service
+      // tx targeting `GW_ASSET_TRACKER_ADDR` (confirmMigrationOnGateway) goes to
+      // GW, and the one targeting `L2_ASSET_TRACKER_ADDR` (confirmMigrationOnL2)
+      // goes to the migrating L2 chain.
+      //
+      // For GW-settled chains, the L1 receipt also contains a wrapping priority
+      // tx on GW's L1 diamond that encodes the L1→GW→L2 forwarding for the L2
+      // confirmation. We don't need that wrapping layer because the Anvil harness
+      // can deliver the unwrapped priority tx directly from chain 12's own L1
+      // diamond emission, and our GW-side state has already been migrated
+      // (L2Bridgehub.settlementLayer[chainId] = L1 via simulateGWChainMigrationBurn).
+      // Filtering by target address picks up exactly the two confirmation txs and
+      // ignores the wrapping event.
+      const gwConfirmationEvents = extractNewPriorityRequests(l1Receipt, gwDiamondProxy).filter(
+        (r) => r.to.toLowerCase() === GW_ASSET_TRACKER_ADDR.toLowerCase()
+      );
+      const l2ConfirmationEvents = extractNewPriorityRequests(l1Receipt, reverseTbmDiamondProxy).filter(
+        (r) => r.to.toLowerCase() === L2_ASSET_TRACKER_ADDR.toLowerCase()
+      );
+      expect(gwConfirmationEvents.length, "exactly one confirmMigrationOnGateway priority tx").to.equal(1);
+      expect(l2ConfirmationEvents.length, "exactly one confirmMigrationOnL2 priority tx").to.equal(1);
+
+      for (const req of gwConfirmationEvents) {
+        const result = await relayTx(gwProvider, req.from, req.to, req.calldata, req.value);
+        expect(result.success, "confirmMigrationOnGateway relay").to.equal(true);
+      }
+      for (const req of l2ConfirmationEvents) {
+        const result = await relayTx(reverseTbmProvider, req.from, req.to, req.calldata, req.value);
+        expect(result.success, "confirmMigrationOnL2 relay").to.equal(true);
+      }
+
+      const gwAssetMig = await queryMigrationNumber(
+        gwProvider,
+        GW_ASSET_TRACKER_ADDR,
+        "GWAssetTracker",
+        reverseTbmChainId,
+        ethAssetId
+      );
+      expect(gwAssetMig, "GWAT assetMigrationNumber post-confirmation").to.equal(POST_REVERSE_MIGRATION_NUMBER);
+
+      const l2AssetMig = await queryMigrationNumber(
         reverseTbmProvider,
         L2_ASSET_TRACKER_ADDR,
         "L2AssetTracker",
         reverseTbmChainId,
         ethAssetId
       );
-      expect(l2Mig, "L2AT assetMigrationNumber stays at 1 while L1 finalisation is blocked").to.equal(1);
+      expect(l2AssetMig, "L2AT assetMigrationNumber post-confirmation").to.equal(POST_REVERSE_MIGRATION_NUMBER);
     });
 
     it("reverse TBM is idempotent — repeating it on GW reverts with InvalidAssetMigrationNumber", async () => {
