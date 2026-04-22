@@ -22,7 +22,11 @@ import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.
 
 /// @notice Script used for gateway upgrade flow. Not used in V31, but was used in V29 and will be used in V32.
 contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
-    function getForceDeploymentContracts() internal override returns (CoreContract[] memory forceDeploymentContracts) {
+    function getAdditionalForcedCoreContracts()
+        internal
+        override
+        returns (CoreContract[] memory additionalForcedCoreContracts)
+    {
         if (config.isZKsyncOS) {
             return new CoreContract[](0);
         }
@@ -84,7 +88,11 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
         } else {
             complexUpgraderCalldata = abi.encodeCall(
                 IComplexUpgrader.forceDeployAndUpgrade,
-                (unwrapEraDeployments(_deployments), L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2V31UpgradeCalldata)
+                (
+                    EraForceDeploymentsLib.unwrap(_deployments),
+                    L2_VERSION_SPECIFIC_UPGRADER_ADDR,
+                    l2V31UpgradeCalldata
+                )
             );
         }
 
