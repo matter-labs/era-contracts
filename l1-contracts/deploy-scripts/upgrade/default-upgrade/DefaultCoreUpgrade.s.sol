@@ -53,13 +53,20 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         address bridgehubProxyAddress,
         bool isZKsyncOS,
         bytes32 create2FactorySalt,
+        address create2FactoryAddress,
         string memory upgradeInputPath,
         string memory _outputPath
     ) public virtual {
         string memory root = vm.projectRoot();
         upgradeInputPath = string.concat(root, upgradeInputPath);
 
-        initializeConfigWithArgs(bridgehubProxyAddress, isZKsyncOS, create2FactorySalt, upgradeInputPath);
+        initializeConfigWithArgs(
+            bridgehubProxyAddress,
+            isZKsyncOS,
+            create2FactorySalt,
+            create2FactoryAddress,
+            upgradeInputPath
+        );
 
         upgradeConfig.outputPath = string.concat(root, _outputPath);
         upgradeConfig.initialized = true;
@@ -111,6 +118,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         address bridgehubProxyAddress,
         bool isZKsyncOS,
         bytes32 create2FactorySalt,
+        address create2FactoryAddress,
         string memory upgradeInputPath
     ) public virtual {
         string memory upgradeToml = vm.readFile(upgradeInputPath);
@@ -119,6 +127,9 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         // When zero, the script falls back to the CREATE2_FACTORY_SALT env var or built-in default.
         if (create2FactorySalt != bytes32(0)) {
             setCreate2Salt(create2FactorySalt);
+        }
+        if (create2FactoryAddress != address(0)) {
+            setCreate2FactoryAddress(create2FactoryAddress);
         }
 
         additionalConfig.isZKsyncOS = isZKsyncOS;

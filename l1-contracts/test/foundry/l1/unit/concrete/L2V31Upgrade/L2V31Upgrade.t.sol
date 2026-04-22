@@ -114,6 +114,67 @@ contract MockV31UpgradeNativeTokenVault {
     }
 }
 
+/// @dev Mock NTV that emulates the legacy v29/v30 readback shape after code replacement:
+/// WETH_TOKEN is readable, but L2_TOKEN_PROXY_BYTECODE_HASH() reads as zero from the new storage-backed getter.
+contract MockV31UpgradeLegacyReadbackNativeTokenVault {
+    bytes32 public immutable BASE_TOKEN_ASSET_ID;
+    uint256 public immutable L1_CHAIN_ID;
+
+    bytes32 private immutable EXPECTED_PROXY_BYTECODE_HASH;
+    address private immutable EXPECTED_WETH_TOKEN;
+
+    address public BASE_TOKEN_ORIGIN_TOKEN;
+    string public BASE_TOKEN_NAME;
+    string public BASE_TOKEN_SYMBOL;
+    uint256 public BASE_TOKEN_DECIMALS;
+
+    uint256 public updateCalls;
+
+    constructor(bytes32 _assetId, uint256 _l1ChainId, bytes32 _expectedProxyBytecodeHash, address _expectedWethToken) {
+        BASE_TOKEN_ASSET_ID = _assetId;
+        L1_CHAIN_ID = _l1ChainId;
+        EXPECTED_PROXY_BYTECODE_HASH = _expectedProxyBytecodeHash;
+        EXPECTED_WETH_TOKEN = _expectedWethToken;
+    }
+
+    function WETH_TOKEN() external view returns (address) {
+        return EXPECTED_WETH_TOKEN;
+    }
+
+    function L2_TOKEN_PROXY_BYTECODE_HASH() external pure returns (bytes32) {
+        return bytes32(0);
+    }
+
+    function registerBaseTokenIfNeeded() external {
+        // No-op for mock
+    }
+
+    function updateL2(
+        uint256 _l1ChainId,
+        address /* _aliasedOwner */,
+        bytes32 _l2TokenProxyBytecodeHash,
+        address /* _legacySharedBridge */,
+        address _wethToken,
+        TokenBridgingData calldata _baseTokenBridgingData,
+        TokenMetadata calldata _baseTokenMetadata
+    ) external {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+
+        require(_l1ChainId == L1_CHAIN_ID, "unexpected L1 chain id");
+        require(_l2TokenProxyBytecodeHash == EXPECTED_PROXY_BYTECODE_HASH, "unexpected proxy bytecode hash");
+        require(_wethToken == EXPECTED_WETH_TOKEN, "unexpected weth token");
+        require(_baseTokenBridgingData.assetId == BASE_TOKEN_ASSET_ID, "unexpected base token asset id");
+
+        BASE_TOKEN_ORIGIN_TOKEN = _baseTokenBridgingData.originToken;
+        BASE_TOKEN_NAME = _baseTokenMetadata.name;
+        BASE_TOKEN_SYMBOL = _baseTokenMetadata.symbol;
+        BASE_TOKEN_DECIMALS = _baseTokenMetadata.decimals;
+        updateCalls++;
+    }
+}
+
 /// @dev Mock AssetTracker that records initL2 and registerBaseTokenDuringUpgrade calls.
 contract MockV31UpgradeAssetTracker {
     uint256 public L1_CHAIN_ID;
@@ -270,6 +331,35 @@ contract L2V31UpgradeUnitTest is Test {
         assertEq(baseToken.initCalls(), 1, "base token should be initialized exactly once");
         assertEq(baseToken.lastInitializedL1ChainId(), L1_CHAIN_ID, "base token L1 chain id mismatch");
         assertTrue(baseToken.sawRegisteredBaseToken(), "base token should be initialized after registration");
+    }
+
+    function test_UpgradeViaComplexUpgrader_UsesL1ProvidedProxyHashWhenLegacyGetterReturnsZero() public {
+        _etchCode(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            address(
+                new MockV31UpgradeLegacyReadbackNativeTokenVault(
+                    BASE_TOKEN_ASSET_ID,
+                    L1_CHAIN_ID,
+                    L2_TOKEN_PROXY_BYTECODE_HASH,
+                    PREDEPLOYED_WETH
+                )
+            )
+        );
+
+        bytes memory fixedData = abi.encode(_buildFixedForceDeploymentsData());
+        bytes memory additionalData = abi.encode(_buildZKChainSpecificData());
+
+        vm.prank(L2_FORCE_DEPLOYER_ADDR);
+        L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(
+            address(testUpgrade),
+            abi.encodeCall(IL2V31Upgrade.upgrade, (false, CTM_DEPLOYER, fixedData, additionalData))
+        );
+
+        MockV31UpgradeLegacyReadbackNativeTokenVault nativeTokenVault = MockV31UpgradeLegacyReadbackNativeTokenVault(
+            L2_NATIVE_TOKEN_VAULT_ADDR
+        );
+        assertEq(nativeTokenVault.updateCalls(), 1, "native token vault should be updated exactly once");
+        assertEq(nativeTokenVault.BASE_TOKEN_ORIGIN_TOKEN(), BASE_TOKEN_ORIGIN_ADDRESS, "origin token mismatch");
     }
 
     function _buildFixedForceDeploymentsData() private pure returns (FixedForceDeploymentsData memory) {

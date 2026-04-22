@@ -194,7 +194,7 @@ library SystemContractsProcessing {
     /// @dev Loads Era (zkout) bytecodes.
     function getOtherBuiltinContracts() internal view returns (BuiltinContractDeployInfo[] memory contracts) {
         CoreContract[] memory ids = getOtherBuiltinCoreContracts();
-        contracts = new BuiltinContractDeployInfo[](ids.length);
+        contracts = new BuiltinContractDeployInfo[](ids.length + 1);
         for (uint256 i = 0; i < ids.length; i++) {
             string memory eraName = CoreOnGatewayHelper._resolveContractName(false, ids[i]);
             contracts[i] = BuiltinContractDeployInfo({
@@ -203,6 +203,17 @@ library SystemContractsProcessing {
                 bytecode: ContractsBytecodesLib.getCreationCodeEra(eraName)
             });
         }
+        // ProxyAdmin is not part of the standard Era built-ins list, but v31 upgrade logic
+        // unconditionally calls it from `_setupProxyAdmin()`, so it must be force-deployed.
+        contracts[ids.length] = BuiltinContractDeployInfo({
+            id: CoreContract.ProxyAdmin,
+            addr: L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
+            bytecode: BytecodeUtils.readBytecodeL1(
+                false,
+                "SystemContractProxyAdmin.sol",
+                "SystemContractProxyAdmin"
+            )
+        });
     }
 
     /// @notice Build Era-style ForceDeployment[] from the built-in contracts list.

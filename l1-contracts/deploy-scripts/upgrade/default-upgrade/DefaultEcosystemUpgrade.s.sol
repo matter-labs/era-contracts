@@ -84,6 +84,7 @@ contract DefaultEcosystemUpgrade is Script {
             _params.bridgehubProxyAddress,
             _params.isZKsyncOS,
             _params.create2FactorySalt,
+            _params.create2FactoryAddress,
             _params.upgradeInputPath,
             _coreOutputPath
         );
@@ -97,6 +98,7 @@ contract DefaultEcosystemUpgrade is Script {
             _params.isZKsyncOS,
             _params.rollupDAManager,
             _params.create2FactorySalt,
+            _params.create2FactoryAddress,
             _params.upgradeInputPath,
             _ctmOutputPath,
             _params.governance,

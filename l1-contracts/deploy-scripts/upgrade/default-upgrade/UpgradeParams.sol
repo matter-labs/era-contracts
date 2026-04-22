@@ -11,6 +11,7 @@ struct EcosystemUpgradeParams {
     address rollupDAManager;
     bool isZKsyncOS;
     bytes32 create2FactorySalt;
+    address create2FactoryAddress;
     string upgradeInputPath;
     string ecosystemOutputPath;
     address governance;

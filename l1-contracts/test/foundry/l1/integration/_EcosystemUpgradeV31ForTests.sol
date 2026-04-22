@@ -96,6 +96,7 @@ contract EcosystemUpgradeV31ForTests is EcosystemUpgrade_v31 {
             : address(0);
         bool isZKsyncOS = pvToml.readBool("$.is_zk_sync_os");
         bytes32 create2FactorySalt = pvToml.readBytes32("$.permanent_contracts.create2_factory_salt");
+        address create2FactoryAddress = pvToml.readAddress("$.permanent_contracts.create2_factory_addr");
         // The ZK token asset ID is passed to `InteropCenter.initL2`, which requires it to be
         // non-zero. `initializeConfig` enforces this; we read it here and let the assertion fire
         // at TOML parse time if it's missing.
@@ -113,6 +114,7 @@ contract EcosystemUpgradeV31ForTests is EcosystemUpgrade_v31 {
                 rollupDAManager: rollupDAManager,
                 isZKsyncOS: isZKsyncOS,
                 create2FactorySalt: create2FactorySalt,
+                create2FactoryAddress: create2FactoryAddress,
                 upgradeInputPath: upgradeInputPath,
                 ecosystemOutputPath: ecosystemOutputPath,
                 governance: governance,

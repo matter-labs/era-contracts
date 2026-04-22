@@ -91,6 +91,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     struct PermanentCTMConfig {
         bytes32 create2FactorySalt;
+        address create2FactoryAddress;
         address ctmProxy;
         address bytecodesSupplier;
         bool isZKsyncOS;
@@ -122,6 +123,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         bool isZKsyncOS,
         address rollupDAManager,
         bytes32 create2FactorySalt,
+        address create2FactoryAddress,
         string memory newConfigPath,
         string memory _outputPath,
         address governance,
@@ -135,6 +137,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             isZKsyncOS,
             rollupDAManager,
             create2FactorySalt,
+            create2FactoryAddress,
             newConfigPath,
             governance,
             zkTokenAssetId
@@ -155,6 +158,9 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         // When zero, the script falls back to the CREATE2_FACTORY_SALT env var or built-in default.
         if (permanentConfig.create2FactorySalt != bytes32(0)) {
             setCreate2Salt(permanentConfig.create2FactorySalt);
+        }
+        if (permanentConfig.create2FactoryAddress != address(0)) {
+            setCreate2FactoryAddress(permanentConfig.create2FactoryAddress);
         }
         config.l1ChainId = block.chainid;
         newConfig.ctm = permanentConfig.ctmProxy;
@@ -199,6 +205,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         bool isZKsyncOS,
         address rollupDAManager,
         bytes32 create2FactorySalt,
+        address create2FactoryAddress,
         string memory newConfigPath,
         address governance,
         bytes32 zkTokenAssetId
@@ -210,6 +217,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             bytecodesSupplier: bytecodesSupplier,
             isZKsyncOS: isZKsyncOS,
             create2FactorySalt: create2FactorySalt,
+            create2FactoryAddress: create2FactoryAddress,
             zkTokenAssetId: zkTokenAssetId
         });
         // Set config.isZKsyncOS before getChainCreationParamsConfig.

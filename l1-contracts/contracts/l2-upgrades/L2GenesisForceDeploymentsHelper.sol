@@ -351,14 +351,13 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData.aliasedL1Governance
         );
 
-        bytes32 previousL2TokenProxyBytecodeHash = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR)
-            .L2_TOKEN_PROXY_BYTECODE_HASH();
-
         // solhint-disable-next-line func-named-parameters
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateL2(
             _fixedForceDeploymentsData.l1ChainId,
             _fixedForceDeploymentsData.aliasedL1Governance,
-            previousL2TokenProxyBytecodeHash,
+            // Legacy Era chains exposed this via an immutable. After the v31 code replacement,
+            // reading it back from storage returns zero, so the L1-provided value is authoritative.
+            _fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
             _getLegacySharedBridge(),
             _wrappedBaseTokenAddress,
             _additionalForceDeploymentsData.baseTokenBridgingData,

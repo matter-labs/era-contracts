@@ -35,7 +35,8 @@ import {
     L2_NTV_BEACON_DEPLOYER_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title CoreOnGatewayHelper
@@ -81,6 +82,11 @@ library CoreOnGatewayHelper {
     function getCreate2DerivedForceDeploymentAddr(bool _isZKsyncOS, CoreContract _c) internal view returns (address) {
         // FIXME: add support for additional force deployments on ZKsyncOS in scripts.
         require(!_isZKsyncOS, "Additional force deployments are not supported for ZKsyncOS scripts");
+        // Era version-specific upgrader contracts must live at the canonical predeploy slot
+        // because the upgrade transaction delegatecalls that fixed address.
+        if (_c == CoreContract.L2V31Upgrade) {
+            return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
+        }
         return Utils.getL2AddressViaCreate2Factory(bytes32(0), getDeployedBytecodeHash(false, _c), hex"");
     }
 
@@ -118,6 +124,11 @@ library CoreOnGatewayHelper {
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, sharedDependencies);
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(factoryDeps, additionalDependencies);
+        if (!_isZKsyncOS) {
+            bytes[] memory proxyDependency = new bytes[](1);
+            proxyDependency[0] = ContractsBytecodesLib.getCreationCodeEra("TransparentUpgradeableProxy");
+            factoryDeps = SystemContractsProcessing.mergeBytesArrays(factoryDeps, proxyDependency);
+        }
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
     }
 
@@ -138,11 +149,14 @@ library CoreOnGatewayHelper {
             return new CoreContract[](0);
         }
 
-        dependencyContracts = new CoreContract[](4);
+        dependencyContracts = new CoreContract[](5);
         dependencyContracts[0] = CoreContract.L2SharedBridgeLegacy;
         dependencyContracts[1] = CoreContract.BridgedStandardERC20;
         dependencyContracts[2] = CoreContract.DiamondProxy;
         dependencyContracts[3] = CoreContract.ProxyAdmin;
+        // L2NativeTokenVault deploys bridged ERC20 proxies via BeaconProxy during deposits.
+        // The upgrade tx must therefore publish this bytecode as a known code hash up front.
+        dependencyContracts[4] = CoreContract.BeaconProxy;
     }
 
     function _getFactoryDependencyBytecodes(

@@ -55,6 +55,7 @@ contract UpgradeIntegrationTestBase is Test {
             "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
         );
         bool isZKsyncOs = outputDeployCTMToml.readBool("$.is_zk_sync_os");
+        address create2FactoryAddress = outputDeployL1Toml.readAddress("$.contracts.create2_factory_addr");
         address rollupDAManager;
         if (isZKsyncOs) {
             rollupDAManager = outputDeployCTMToml.readAddress(
@@ -74,6 +75,7 @@ contract UpgradeIntegrationTestBase is Test {
                 rollupDAManager: rollupDAManager,
                 isZKsyncOS: isZKsyncOs,
                 create2FactorySalt: bytes32(0),
+                create2FactoryAddress: create2FactoryAddress,
                 upgradeInputPath: ECOSYSTEM_UPGRADE_INPUT,
                 ecosystemOutputPath: ECOSYSTEM_OUTPUT,
                 governance: governance,

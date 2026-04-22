@@ -238,12 +238,27 @@ contract AdminFunctions is Script, IAdminFunctions {
             currentProtocolVersion
         );
 
+        bytes memory upgradeCall;
+        uint256 oldMinor = (currentProtocolVersion >> 32) & 0xFFFF;
+        if (oldMinor < 31) {
+            upgradeCall = abi.encodeWithSelector(
+                bytes4(0xfc57565f), // upgradeChainFromVersion(uint256,DiamondCutData)
+                currentProtocolVersion,
+                diamondCut
+            );
+        } else {
+            upgradeCall = abi.encodeCall(
+                IAdmin.upgradeChainFromVersion,
+                (chainAddress, currentProtocolVersion, diamondCut)
+            );
+        }
+
         // Execute the upgrade through the admin flow
         Utils.adminExecute(
             adminAddr,
             accessControlRestriction,
             chainAddress,
-            abi.encodeCall(IAdmin.upgradeChainFromVersion, (chainAddress, currentProtocolVersion, diamondCut)),
+            upgradeCall,
             0
         );
 

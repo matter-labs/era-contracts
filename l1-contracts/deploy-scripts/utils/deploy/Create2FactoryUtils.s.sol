@@ -31,6 +31,9 @@ abstract contract Create2FactoryUtils is Script {
     /// @notice The salt used for deterministic deployments.
     bytes32 internal _create2FactorySalt;
 
+    /// @notice Optional preconfigured CREATE2 factory address from the existing environment.
+    address internal _create2FactoryAddress;
+
     /// @notice Whether the salt was explicitly set via `setCreate2Salt`.
     bool private _saltExplicitlySet;
 
@@ -40,6 +43,13 @@ abstract contract Create2FactoryUtils is Script {
     function setCreate2Salt(bytes32 _salt) internal {
         _create2FactorySalt = _salt;
         _saltExplicitlySet = true;
+    }
+
+    /// @notice Override the default create2 factory address.
+    /// @dev Must be called before the first deployment.
+    /// @param _factoryAddress The factory address to use for subsequent create2 deployments.
+    function setCreate2FactoryAddress(address _factoryAddress) internal {
+        _create2FactoryAddress = _factoryAddress;
     }
 
     function getCreate2FactoryParams() public view returns (address create2FactoryAddr, bytes32 create2FactorySalt) {
@@ -54,6 +64,16 @@ abstract contract Create2FactoryUtils is Script {
     function instantiateCreate2Factory() internal {
         if (!_saltExplicitlySet) {
             _create2FactorySalt = vm.envOr(CREATE2_FACTORY_SALT_ENV, DEFAULT_CREATE2_FACTORY_SALT);
+        }
+
+        if (_create2FactoryAddress != address(0)) {
+            if (_create2FactoryAddress.code.length == 0) {
+                revert AddressHasNoCode(_create2FactoryAddress);
+            }
+
+            create2FactoryState = Create2FactoryState({create2FactoryAddress: _create2FactoryAddress});
+            console.log("Using configured Create2Factory address:", _create2FactoryAddress);
+            return;
         }
 
         if (Utils.DETERMINISTIC_CREATE2_ADDRESS.code.length == 0) {
