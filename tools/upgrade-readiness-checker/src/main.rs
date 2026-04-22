@@ -70,6 +70,15 @@ struct Cli {
     /// Patch component of the target protocol version (e.g. `0` for `0.31.0`).
     #[arg(long, env = "TARGET_PATCH_VERSION", default_value_t = 0)]
     target_patch_version: u32,
+
+    /// Whether the chain being upgraded is a ZKsync OS chain. Needed for the
+    /// v31 upgrade contract's `getL2UpgradeTxData(_, _, zksyncOS, _)` parameter.
+    /// We can't reliably query `diamond.getZKsyncOS()` on pre-v31 chains because
+    /// the getter isn't always registered on the diamond facets, so we require it
+    /// as an explicit flag from the caller. Pass `--zksync-os` (flag) on ZKsync OS
+    /// chains; omit it on Era chains.
+    #[arg(long, env = "ZKSYNC_OS", action = clap::ArgAction::SetTrue)]
+    zksync_os: bool,
 }
 
 #[tokio::main]
@@ -121,6 +130,7 @@ async fn run() -> Result<()> {
         ctm,
         cli.bridgehub_address,
         cli.chain_id,
+        cli.zksync_os,
         target_protocol_version,
         LOOKBACK_BLOCKS,
     )
