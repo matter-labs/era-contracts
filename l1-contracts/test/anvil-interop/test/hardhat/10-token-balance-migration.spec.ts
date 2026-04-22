@@ -71,7 +71,11 @@ import {
   L2_INTEROP_HANDLER_ADDR,
   L2_NATIVE_TOKEN_VAULT_ADDR,
 } from "../../src/core/const";
-import { migrateTokenBalanceToGW } from "../../src/helpers/token-balance-migration-helper";
+import {
+  migrateTokenBalanceToGW,
+  queryAssetMigrationNumber,
+  queryL1ChainBalance,
+} from "../../src/helpers/token-balance-migration-helper";
 import { depositETHToL2, depositERC20ToL2 } from "../../src/helpers/l1-deposit-helper";
 import type { PendingWithdrawal } from "../../src/helpers/l2-withdrawal-helper";
 import {
@@ -115,28 +119,6 @@ const INTEROP_SMOKE_BUNDLE_VALUE_RANGE = {
   min: BigNumber.from(1),
   max: BigNumber.from(1_000_000),
 };
-
-async function queryMigrationNumber(
-  provider: ethers.providers.JsonRpcProvider,
-  contractAddr: string,
-  contractName: "L1AssetTracker" | "GWAssetTracker" | "L2AssetTracker",
-  chainId: number,
-  assetId: string
-): Promise<number> {
-  const contract = new Contract(contractAddr, getAbi(contractName), provider);
-  const result = await contract.assetMigrationNumber(chainId, assetId);
-  return BigNumber.from(result).toNumber();
-}
-
-async function queryL1ChainBalance(
-  l1Provider: ethers.providers.JsonRpcProvider,
-  l1AssetTrackerAddr: string,
-  chainId: number,
-  assetId: string
-): Promise<BigNumber> {
-  const contract = new Contract(l1AssetTrackerAddr, getAbi("L1AssetTracker"), l1Provider);
-  return contract.chainBalance(chainId, assetId);
-}
 
 describe("10 - Token Balance Migration Lifecycle", function () {
   this.timeout(0);
@@ -200,21 +182,20 @@ describe("10 - Token Balance Migration Lifecycle", function () {
     await installL2ChainAssetHandlerDev(gwProvider);
 
     // Install the dev variant of L1ChainAssetHandler on L1 behind its
-    // TransparentUpgradeableProxy. The constructor of L1ChainAssetHandler has
-    // immutables (BRIDGEHUB, L1_CHAIN_ID, ETH_TOKEN_ASSET_ID); the install helper
-    // deploys a fresh Dev instance with matching args, then swaps only the
-    // implementation's runtime bytecode while the proxy (and its storage)
-    // remains untouched. Production behaviour is unchanged; only the dev setter
-    // becomes reachable to the `onlyOwner` caller.
-    const installed = await installL1ChainAssetHandlerDev(l1Provider, bridgehubAddr);
-    l1ChainAssetHandlerProxy = installed.proxy;
+    // TransparentUpgradeableProxy. The install helper deploys a fresh Dev impl
+    // (real constructor → production immutables) and then drives the upgrade
+    // through the proxy's real admin surface (`ITransparentUpgradeableProxy.upgradeTo`,
+    // impersonated from the EIP-1967 admin slot) — the same call shape
+    // `ProxyAdmin.upgrade(proxy, newImpl)` reaches in production. Proxy storage
+    // is untouched; only the dev setter becomes reachable to the `onlyOwner` caller.
+    l1ChainAssetHandlerProxy = await installL1ChainAssetHandlerDev(l1Provider, bridgehubAddr);
   });
 
   // ── Pre-migration state on the direct-settled chain ─────────────────
 
   describe("Pre-migration state (direct-settled chain)", () => {
     it("L1AT assetMigrationNumber is 0 for a direct-settled chain (ETH)", async () => {
-      const migNum = await queryMigrationNumber(
+      const migNum = await queryAssetMigrationNumber(
         l1Provider,
         l1AssetTrackerAddr,
         "L1AssetTracker",
@@ -276,8 +257,14 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       expect(ethBaseChainIds.length, "at least one ETH-base GW-settled chain is expected").to.be.greaterThan(0);
 
       for (const chainId of ethBaseChainIds) {
-        const l1Mig = await queryMigrationNumber(l1Provider, l1AssetTrackerAddr, "L1AssetTracker", chainId, ethAssetId);
-        const gwMig = await queryMigrationNumber(
+        const l1Mig = await queryAssetMigrationNumber(
+          l1Provider,
+          l1AssetTrackerAddr,
+          "L1AssetTracker",
+          chainId,
+          ethAssetId
+        );
+        const gwMig = await queryAssetMigrationNumber(
           gwProvider,
           GW_ASSET_TRACKER_ADDR,
           "GWAssetTracker",
@@ -299,14 +286,14 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         if (!tokenAddr) continue;
         const testTokenAssetId = encodeNtvAssetId(chainId, tokenAddr);
 
-        const l1Mig = await queryMigrationNumber(
+        const l1Mig = await queryAssetMigrationNumber(
           l1Provider,
           l1AssetTrackerAddr,
           "L1AssetTracker",
           chainId,
           testTokenAssetId
         );
-        const gwMig = await queryMigrationNumber(
+        const gwMig = await queryAssetMigrationNumber(
           gwProvider,
           GW_ASSET_TRACKER_ADDR,
           "GWAssetTracker",
@@ -338,14 +325,14 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       // flow — initiate on L2, finalise on L1, relay priority txs — must take
       // the early-return paths in `initiateL1ToGatewayMigrationOnL2` /
       // `receiveL1ToGatewayMigrationOnL1` without advancing any counter.
-      const gwMigBefore = await queryMigrationNumber(
+      const gwMigBefore = await queryAssetMigrationNumber(
         gwProvider,
         GW_ASSET_TRACKER_ADDR,
         "GWAssetTracker",
         reverseTbmChainId,
         reverseTbmTestTokenAssetId
       );
-      const l1MigBefore = await queryMigrationNumber(
+      const l1MigBefore = await queryAssetMigrationNumber(
         l1Provider,
         l1AssetTrackerAddr,
         "L1AssetTracker",
@@ -365,14 +352,14 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         l2DiamondProxyAddr: reverseTbmDiamondProxy,
       });
 
-      const gwMigAfter = await queryMigrationNumber(
+      const gwMigAfter = await queryAssetMigrationNumber(
         gwProvider,
         GW_ASSET_TRACKER_ADDR,
         "GWAssetTracker",
         reverseTbmChainId,
         reverseTbmTestTokenAssetId
       );
-      const l1MigAfter = await queryMigrationNumber(
+      const l1MigAfter = await queryAssetMigrationNumber(
         l1Provider,
         l1AssetTrackerAddr,
         "L1AssetTracker",
@@ -554,19 +541,21 @@ describe("10 - Token Balance Migration Lifecycle", function () {
 
       expect(result.l1TxHash, "L1 tx hash returned").to.not.be.null;
 
-      // GW chainBalance must have grown by at least `depositAmount` (exact match is
-      // not asserted because the deposit flow debits a small base-token fee via
-      // priority tx bookkeeping that already lived on the chain pre-deposit).
+      // For a GW-settled chain the L1 deposit locks `mintValue = amount + baseCost`
+      // on L1 (the full priority-tx value covering both the L2 mint and the L2 gas),
+      // and GW credits that same `mintValue` to the migrating chain's balance
+      // when it relays the priority tx. Both deltas must match exactly.
+      const expectedDelta = result.mintValue;
+
       const gwBalanceAfter = await getGWChainBalance(gwProvider, reverseTbmChainId, ethAssetId);
       const gwDelta = gwBalanceAfter.sub(gwBalanceBeforeDeposit);
-      expect(gwDelta.gte(depositAmount), `GW chainBalance delta ${gwDelta} >= deposit ${depositAmount}`).to.equal(true);
+      expect(gwDelta.eq(expectedDelta), `GW chainBalance delta ${gwDelta} == mintValue ${expectedDelta}`).to.equal(true);
 
-      // L1 chainBalance[GW][ETH] is the aggregate that funds all GW-settled chains
-      // and must also have grown by at least `depositAmount`.
       const l1GWBalanceAfter = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, gwChainId, ethAssetId);
+      const l1GWDelta = l1GWBalanceAfter.sub(l1GWBalanceBeforeDeposit);
       expect(
-        l1GWBalanceAfter.sub(l1GWBalanceBeforeDeposit).gte(depositAmount),
-        "L1 chainBalance[GW][ETH] grows by at least the deposit amount"
+        l1GWDelta.eq(expectedDelta),
+        `L1 chainBalance[GW][ETH] delta ${l1GWDelta} == mintValue ${expectedDelta}`
       ).to.equal(true);
     });
 
@@ -633,7 +622,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         const gwBalanceAfter = await getGWChainBalance(gwProvider, reverseTbmChainId, assetId);
         expect(gwBalanceAfter.eq(0), `GW chainBalance for ${label} drained to 0`).to.equal(true);
 
-        const gwMig = await queryMigrationNumber(
+        const gwMig = await queryAssetMigrationNumber(
           gwProvider,
           GW_ASSET_TRACKER_ADDR,
           "GWAssetTracker",
@@ -761,7 +750,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         const l1Receipt = await tx.wait();
 
         // L1 assetMigrationNumber advances to the chain migration number.
-        const l1AssetMig = await queryMigrationNumber(
+        const l1AssetMig = await queryAssetMigrationNumber(
           l1Provider,
           l1AssetTrackerAddr,
           "L1AssetTracker",
@@ -805,7 +794,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
           expect(result.success, `${label} confirmMigrationOnL2 relay`).to.equal(true);
         }
 
-        const gwAssetMigPost = await queryMigrationNumber(
+        const gwAssetMigPost = await queryAssetMigrationNumber(
           gwProvider,
           GW_ASSET_TRACKER_ADDR,
           "GWAssetTracker",
@@ -816,7 +805,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
           POST_REVERSE_MIGRATION_NUMBER
         );
 
-        const l2AssetMigPost = await queryMigrationNumber(
+        const l2AssetMigPost = await queryAssetMigrationNumber(
           reverseTbmProvider,
           L2_ASSET_TRACKER_ADDR,
           "L2AssetTracker",
@@ -875,14 +864,14 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       expect(depositResult.l1TxHash, "L1 deposit tx hash").to.not.be.null;
 
       const freshAssetId = depositResult.assetId;
-      const l1Mig = await queryMigrationNumber(
+      const l1Mig = await queryAssetMigrationNumber(
         l1Provider,
         l1AssetTrackerAddr,
         "L1AssetTracker",
         reverseTbmChainId,
         freshAssetId
       );
-      const gwMig = await queryMigrationNumber(
+      const gwMig = await queryAssetMigrationNumber(
         gwProvider,
         GW_ASSET_TRACKER_ADDR,
         "GWAssetTracker",
