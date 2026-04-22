@@ -35,7 +35,7 @@ import {
   NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT,
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
-import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
+import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI, LEGACY_COMPLEX_UPGRADER_ABI } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
 import { transferOwnable2Step } from "./harness-shims";
 import { impersonateAndRun } from "../core/utils";
@@ -329,18 +329,11 @@ async function runChainUpgradesAndRelayL2(params: {
     // Decode the L2 upgrade tx from the broadcast
     const originalUpgradeTxData = decodeLatestL2UpgradeTxData(broadcastPath);
 
-    // getL2UpgradeTxData is called externally (not delegatecalled from the diamond),
-    // so it reads s.zksyncOS from the upgrade contract's own storage. Seed it for ZKsyncOS chains.
-    if (isZKsyncOS) {
-      const ZKSYNC_OS_SLOT = ethers.utils.hexZeroPad(ethers.utils.hexlify(60), 32);
-      const TRUE = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 32);
-      await l1Provider.send("anvil_setStorageAt", [settlementLayerUpgradeAddr, ZKSYNC_OS_SLOT, TRUE]);
-    }
-
     // Rewrite the L2 upgrade tx with per-chain data via SettlementLayerV31Upgrade
     const rewrittenUpgradeTxData = await settlementLayerUpgrade.getL2UpgradeTxData(
       bridgehubAddr,
       chain.chainId,
+      isZKsyncOS,
       originalUpgradeTxData
     );
 
@@ -366,8 +359,7 @@ async function runChainUpgradesAndRelayL2(params: {
  * On Anvil EVM, neither the Era ContractDeployer nor ZKsyncOS bytecode deployer
  * infrastructure works. Instead we:
  *   1. Pre-deploy all known contracts via anvil_setCode
- *   2. Skip the force-deployment phase by re-encoding as `upgrade(delegateTo, calldata)`
- *   3. Send the upgrade tx which just delegatecalls to L2V31Upgrade
+ *   2. Place a MockContractDeployer at 0x8006
  */
 async function prepareAndRelayL2Upgrade(
   l2Provider: ethers.providers.JsonRpcProvider,
@@ -480,13 +472,6 @@ async function deployL2Contracts(
 
   // Deploy the delegateTo target (L2V31Upgrade).
   await l2Provider.send("anvil_setCode", [delegateTo, getBytecode("L2V31Upgrade")]);
-
-  // For ZKsyncOS upgrades, the ComplexUpgrader entry point changes from the v30
-  // `upgrade(address,bytes)` to `forceDeployAndUpgradeUniversal(...)`. The v30 chain state
-  // has the old ComplexUpgrader that doesn't have this function, so we deploy the new one.
-  if (isZKsyncOS) {
-    await l2Provider.send("anvil_setCode", [L2_COMPLEX_UPGRADER_ADDR, getBytecode("L2ComplexUpgrader")]);
-  }
 
   // L2BaseToken: for Era it's deployed directly as L2BaseTokenEra (not in force deployment list).
   // For ZKsyncOS it's in the force deployment list as ZKsyncOSSystemProxyUpgrade and handled above.

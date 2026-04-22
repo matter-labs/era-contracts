@@ -97,3 +97,10 @@ export function getCreationBytecode(name: ContractName): string {
 export const LEGACY_ADMIN_ABI: string[] = [
   "function upgradeChainFromVersion(uint256, tuple(tuple(address,uint8,bool,bytes4[])[],address,bytes))",
 ];
+
+/**
+ * Legacy ComplexUpgrader ABI from v30: upgrade(address, bytes).
+ * The v31 ComplexUpgrader adds forceDeployAndUpgradeUniversal for ZKsyncOS.
+ * Used to re-encode upgrade txs for v30 chains that have the old ComplexUpgrader.
+ */
+export const LEGACY_COMPLEX_UPGRADER_ABI: string[] = ["function upgrade(address, bytes)"];
