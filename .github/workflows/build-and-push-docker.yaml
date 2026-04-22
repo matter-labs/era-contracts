@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - main
-      - gateway-commands-in-protocol-ops
-      - zksyncos-v31-deploy-script-fixes
+      - kl/l2V31upgrade
+      - draft-v31
 
 jobs:
   build-and-push:
