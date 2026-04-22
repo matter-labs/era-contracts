@@ -21,6 +21,7 @@ import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {Bytes} from "../vendor/Bytes.sol";
 import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "../common/Config.sol";
 import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
+import {UnexpectedZKsyncOSFlag} from "./ZkSyncUpgradeErrors.sol";
 
 /// @author Matter Labs
 /// @title SettlementLayerV31UpgradeBase
@@ -29,8 +30,6 @@ import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors
 /// @custom:security-contact security@matterlabs.dev
 abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
     using Bytes for bytes;
-
-    error UnexpectedZKsyncOSFlag(bool expected, bool actual);
 
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
@@ -114,8 +113,13 @@ abstract contract SettlementLayerV31UpgradeBase is BaseZkSyncUpgrade {
             _existingUpgradeCalldata.slice(4),
             (bool, address, bytes, bytes)
         );
-        if (isZKsyncOS != s.zksyncOS) {
-            revert UnexpectedZKsyncOSFlag(s.zksyncOS, isZKsyncOS);
+        // Read the zksyncOS flag from the diamond proxy (the authoritative source).
+        // This contract is also called directly by the server not just via delegatecall from the diamond,
+        // so reading `s.zksyncOS` would resolve to the upgrade contract's own empty storage.
+        address diamondProxy = IBridgehubBase(_bridgehub).getZKChain(_chainId);
+        bool chainZksyncOS = IGetters(diamondProxy).getZKsyncOS();
+        if (isZKsyncOS != chainZksyncOS) {
+            revert UnexpectedZKsyncOSFlag(chainZksyncOS, isZKsyncOS);
         }
 
         // Construct per-chain ZKChainSpecificForceDeploymentsData from L1 state.
