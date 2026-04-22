@@ -79,6 +79,7 @@ jobs:
           forge build \
             contracts/dev-contracts/test/DummyInteropRecipient.sol \
             contracts/dev-contracts/L2ChainAssetHandlerDev.sol \
+            contracts/dev-contracts/L1ChainAssetHandlerDev.sol \
             contracts/dev-contracts/TestnetERC20Token.sol
 
       - name: Install anvil-interop dependencies

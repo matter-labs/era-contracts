@@ -55,6 +55,8 @@ const REQUIRED_CONTRACTS = [
   "L1AssetTracker.sol",
   "IL1Bridgehub.sol",
   "L2AssetRouter.sol",
+  "L1ChainAssetHandler.sol",
+  "L1ChainAssetHandlerDev.sol",
   "L2ChainAssetHandler.sol",
   "L2ChainAssetHandlerDev.sol",
   "L2NativeTokenVault.sol",
