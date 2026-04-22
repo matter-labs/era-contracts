@@ -47,6 +47,9 @@ const REQUIRED_CONTRACTS = [
   "IChainAdmin.sol",
   "ISetupLegacyBridge.sol",
   "DefaultUpgrade.sol",
+  // v31 ecosystem upgrade script — zksync-era's zkstack CLI compiles its ABI in via
+  // `abigen!` to encode `noGovernancePrepare(EcosystemUpgradeParams)` calldata.
+  "EcosystemUpgrade_v31.s.sol",
   // Used by anvil-interop test suite (contracts.ts)
   "GWAssetTracker.sol",
   "L2Bridgehub.sol",
