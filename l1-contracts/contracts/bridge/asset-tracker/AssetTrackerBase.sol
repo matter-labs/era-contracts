@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
 import {IAssetTrackerBase} from "./IAssetTrackerBase.sol";
@@ -17,9 +18,13 @@ import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {InsufficientChainBalance} from "./AssetTrackerErrors.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 
+/// @dev Inherits PausableUpgradeable to keep the storage layout consistent with other cross-layer
+/// bases (e.g., NativeTokenVaultBase, AssetRouterBase). On L2 derivatives (L2AssetTracker,
+/// GWAssetTracker) the pause functionality is intentionally unused; see AGENTS.md for details.
 abstract contract AssetTrackerBase is
     IAssetTrackerBase,
     Ownable2StepUpgradeable,
+    PausableUpgradeable,
     AssetHandlerModifiers,
     ReentrancyGuard
 {

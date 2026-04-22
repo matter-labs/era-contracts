@@ -13,6 +13,7 @@ Instead, use the `cleanup.sh` script in the anvil-interop directory, which targe
 1. Avoid using magic numbers. Most constant numbers especially for system params / well known chain ids must be represented as a constant.
 2. All constants should be placed in the dedicated file (e.g. `common/Config.sol` in `l1-contracts`, `Constants.sol` in `system-contracts`, etc). if you do not know where to put the constant to, please closely analyze the corresponding project. If this file can not be found, please create one.
 3. Function parameters must be prefixed with `_` (e.g. `_value`, `_owner`). This convention applies to all functions across all contracts.
+4. All L2 contracts inherit `PausableUpgradeable` for the purpose of potential future use. However, at the moment none of these actually use it as the intended flow of pausing chains is the freezing mechanism: <TODO: link to the zknation doc about freezing>.
 
 ## ⚠️ CRITICAL SOLIDITY CODE RULES ⚠️
 
