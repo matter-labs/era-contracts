@@ -155,13 +155,6 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     if (scenario.seedBatchCounters) {
       await seedBatchCounters(l1Provider, upgradeChainAddresses);
     }
-    // For ZKsyncOS chains upgrading from v30, s.zksyncOS (slot 60) may not be set in the
-    // pre-generated state. The v31 SettlementLayerV31UpgradeBase checks that the calldata's
-    // isZKsyncOS flag matches s.zksyncOS; seed it here so the check passes.
-    if (scenario.isZKsyncOS) {
-      await seedZksyncOSFlag(l1Provider, upgradeChainAddresses);
-    }
-
     // ── Run per-chain upgrades (L1) and relay to L2 ──
     const settlementLayerUpgradeAddr = readNestedString(
       outputToml,
@@ -871,18 +864,7 @@ async function seedBatchCounters(
   }
 }
 
-async function seedZksyncOSFlag(
-  provider: ethers.providers.JsonRpcProvider,
-  chains: Array<{ chainId: number; diamondProxy: string }>
-): Promise<void> {
-  // s.zksyncOS is at storage slot 60 in ZKChainStorage.
-  const ZKSYNC_OS_SLOT = ethers.utils.hexZeroPad(ethers.utils.hexlify(60), 32);
-  const TRUE = ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 32);
 
-  for (const chain of chains) {
-    await provider.send("anvil_setStorageAt", [chain.diamondProxy, ZKSYNC_OS_SLOT, TRUE]);
-  }
-}
 
 // ── Ownership helpers ────────────────────────────────────────────────
 
