@@ -42,6 +42,7 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
+import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
 /// @notice Script used for default CTM upgrade flow. Should be run after Ecosystem upgrade
@@ -614,7 +615,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // Just retrieved it from the contract
         uint256 previousProtocolVersion = getOldProtocolVersion();
-        uint256 deadline = getOldProtocolDeadline();
+        uint256 deadline = UpgradeHelperLib.getOldProtocolDeadline();
         uint256 newProtocolVersion = getNewProtocolVersion();
         Diamond.DiamondCutData memory upgradeCut = abi.decode(
             newlyGeneratedData.upgradeCutData,

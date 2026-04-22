@@ -46,6 +46,7 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
+import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {PublishFactoryDepsResult} from "./CTMUpgradeBase.sol";
 import {Utils} from "../../utils/Utils.sol";
 import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
@@ -435,7 +436,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         );
 
         uint256 previousProtocolVersion = getOldProtocolVersion();
-        uint256 deadline = getOldProtocolDeadline();
+        uint256 deadline = UpgradeHelperLib.getOldProtocolDeadline();
         uint256 newProtocolVersion = getNewProtocolVersion();
         Diamond.DiamondCutData memory upgradeCutData = abi.decode(
             gatewayConfig.upgradeCutData,

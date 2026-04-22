@@ -25,7 +25,6 @@ import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {
     CoreContract,
     EraVmSystemContract,
@@ -35,6 +34,7 @@ import {
 } from "../ecosystem/CoreContract.sol";
 import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
 import {DeduplicateBytecodesCountMismatch} from "../ecosystem/DeployScriptErrors.sol";
+import {EraForceDeploymentsLib} from "./default-upgrade/EraForceDeploymentsLib.sol";
 
 // solhint-disable no-console
 
@@ -327,25 +327,22 @@ library SystemContractsProcessing {
         factoryDeps = mergeBytesArrays(mergeBytesArrays(basicBytecodes, systemBytecodes), otherBytecodes);
     }
 
-    /// @notice Build the full ZKsyncOS force deployment array.
+    /// @notice Build the base ZKsyncOS force deployment array.
     /// Parallel to `getBaseForceDeployments()` for Era — this is the ZKsyncOS equivalent.
-    /// Reuses bytecodeInfo from the already-generated FixedForceDeploymentsData where possible
-    /// to avoid loading large bytecodes from disk twice (OOM prevention).
-    /// @param _fixedData The already-encoded FixedForceDeploymentsData containing bytecodeInfo.
-    /// @param _additionalDeployments Version-specific entries to append (e.g. L2V31Upgrade).
-    function buildZKsyncOSForceDeployments(
-        FixedForceDeploymentsData memory _fixedData,
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _additionalDeployments
-    ) internal returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
+    /// Loads bytecode info per contract instead of materializing one large shared cache for this path.
+    function getBaseZKsyncOSForceDeployments()
+        internal
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
+    {
         CoreContract[] memory builtins = getOtherBuiltinCoreContracts();
         ZkSyncOsSystemContract[] memory sysContracts = getZKsyncOSExtraSystemContracts();
         uint256 totalBase = builtins.length + sysContracts.length + 1;
 
-        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](totalBase + _additionalDeployments.length);
+        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](totalBase);
 
         // Built-in contracts (0x10000+)
         for (uint256 i = 0; i < builtins.length; i++) {
-            deployments[i] = _buildZKsyncOSEntry(_fixedData, builtins[i]);
+            deployments[i] = _buildZKsyncOSEntry(builtins[i]);
         }
         // System contracts with l1-contracts EVM bytecodes (0x800x)
         for (uint256 i = 0; i < sysContracts.length; i++) {
@@ -353,47 +350,45 @@ library SystemContractsProcessing {
         }
         // ProxyAdmin is direct-deployed on ZKsyncOS genesis and must also be available during upgrades.
         deployments[totalBase - 1] = _buildZKsyncOSProxyAdminEntry();
-        // Version-specific entries
-        for (uint256 i = 0; i < _additionalDeployments.length; i++) {
-            deployments[totalBase + i] = _additionalDeployments[i];
+    }
+
+    function mergeUniversalForceDeployments(
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _left,
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _right
+    ) internal pure returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory result) {
+        result = new IComplexUpgrader.UniversalContractUpgradeInfo[](_left.length + _right.length);
+        for (uint256 i = 0; i < _left.length; i++) {
+            result[i] = _left[i];
+        }
+        for (uint256 i = 0; i < _right.length; i++) {
+            result[_left.length + i] = _right[i];
         }
     }
 
     /// @dev Build a single ZKsyncOS force deployment entry for a CoreContract (user-space built-in).
-    function _buildZKsyncOSEntry(
-        FixedForceDeploymentsData memory _fixedData,
-        CoreContract _id
-    ) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
-        address addr = CoreOnGatewayHelper._resolveAddress(_id);
+    function _buildZKsyncOSEntry(CoreContract _id) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
+        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _id);
 
         // L2WrappedBaseToken sits directly at L2_WRAPPED_BASE_TOKEN_IMPL_ADDR as the
         // implementation contract — it's *not* behind a TransparentUpgradeableProxy.
         // User-space WETH proxies reference this address directly. So its upgrade is
         // a plain bytecode replacement (Unsafe), not a system-proxy upgrade.
         if (_id == CoreContract.L2WrappedBaseToken) {
-            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _id);
             return
                 IComplexUpgrader.UniversalContractUpgradeInfo({
                     upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
                     deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract(fileName, contractName),
-                    newAddress: addr
+                    newAddress: CoreOnGatewayHelper._resolveAddress(_id)
                 });
         }
 
-        // Try to reuse bytecodeInfo from FixedForceDeploymentsData to avoid double-loading.
-        bytes memory bytecodeInfo = _getFixedBytecodeInfo(_fixedData, addr);
-
-        if (bytecodeInfo.length == 0) {
-            // Not in FixedForceDeploymentsData — load from disk.
-            (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _id);
-            bytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
-        }
+        bytes memory bytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
 
         return
             IComplexUpgrader.UniversalContractUpgradeInfo({
                 upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
                 deployedBytecodeInfo: bytecodeInfo,
-                newAddress: addr
+                newAddress: CoreOnGatewayHelper._resolveAddress(_id)
             });
     }
 
@@ -427,21 +422,4 @@ library SystemContractsProcessing {
             });
     }
 
-    /// @dev Map a contract address to its bytecodeInfo field in FixedForceDeploymentsData.
-    /// Returns empty bytes if the contract doesn't have a corresponding field.
-    function _getFixedBytecodeInfo(
-        FixedForceDeploymentsData memory _data,
-        address _addr
-    ) private pure returns (bytes memory) {
-        if (_addr == L2_BRIDGEHUB_ADDR) return _data.bridgehubBytecodeInfo;
-        if (_addr == L2_ASSET_ROUTER_ADDR) return _data.l2AssetRouterBytecodeInfo;
-        if (_addr == L2_NATIVE_TOKEN_VAULT_ADDR) return _data.l2NtvBytecodeInfo;
-        if (_addr == L2_MESSAGE_ROOT_ADDR) return _data.messageRootBytecodeInfo;
-        if (_addr == L2_CHAIN_ASSET_HANDLER_ADDR) return _data.chainAssetHandlerBytecodeInfo;
-        if (_addr == L2_INTEROP_CENTER_ADDR) return _data.interopCenterBytecodeInfo;
-        if (_addr == L2_INTEROP_HANDLER_ADDR) return _data.interopHandlerBytecodeInfo;
-        if (_addr == L2_ASSET_TRACKER_ADDR) return _data.assetTrackerBytecodeInfo;
-        if (_addr == L2_BASE_TOKEN_HOLDER_ADDR) return _data.baseTokenHolderBytecodeInfo;
-        return "";
-    }
 }
