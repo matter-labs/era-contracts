@@ -72,7 +72,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     // solhint-disable-next-line gas-struct-packing
     struct NewlyGeneratedData {
-        bytes fixedForceDeploymentsData;
         bytes diamondCutData;
         bytes upgradeCutData;
     }
@@ -273,7 +272,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         //        require(upgradeConfig.ecosystemContractsDeployed, "Ecosystem contracts not deployed");
 
         // Important, this must come after the initializeExpectedL2Addresses
-        generateFixedForceDeploymentsData();
+        getFixedForceDeploymentsData();
         console.log("Generated fixed force deployments data");
         Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(ctmAddresses.stateTransition);
         // TODO probably don't need to assign it to diamondCutData
@@ -345,7 +344,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
                     newChainAssetId,
                     5,
                     msg.sender,
-                    abi.encode(newlyGeneratedData.diamondCutData, newlyGeneratedData.fixedForceDeploymentsData),
+                    abi.encode(newlyGeneratedData.diamondCutData, generatedData.forceDeploymentsData),
                     new bytes[](0)
                 )
             )
@@ -402,22 +401,17 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         );
     }
 
-    function generateFixedForceDeploymentsData() internal virtual {
-        FixedForceDeploymentsData memory forceDeploymentsData = prepareFixedForceDeploymentsData();
+    function getFixedForceDeploymentsData() internal override returns (FixedForceDeploymentsData memory data) {
+        if (upgradeConfig.fixedForceDeploymentsDataGenerated) {
+            return abi.decode(generatedData.forceDeploymentsData, (FixedForceDeploymentsData));
+        }
 
-        newlyGeneratedData.fixedForceDeploymentsData = abi.encode(forceDeploymentsData);
-        generatedData.forceDeploymentsData = abi.encode(forceDeploymentsData);
-        upgradeConfig.fixedForceDeploymentsDataGenerated = true;
-    }
-
-    function getFixedForceDeploymentsData() internal override returns (FixedForceDeploymentsData memory) {
-        return abi.decode(newlyGeneratedData.fixedForceDeploymentsData, (FixedForceDeploymentsData));
-    }
-
-    function prepareFixedForceDeploymentsData() public virtual returns (FixedForceDeploymentsData memory data) {
         require(config.ownerAddress != address(0), "owner not set");
 
         data = _buildForceDeploymentsData(config.ownerAddress, address(0));
+        bytes memory encodedData = abi.encode(data);
+        generatedData.forceDeploymentsData = encodedData;
+        upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
 
     function getUpgradeAddedFacetCuts(
@@ -437,7 +431,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     function publishBytecodes() public virtual {
         bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
             config.isZKsyncOS,
-            getAdditionalDependencyContracts()
+            getAdditionalForcedCoreContracts()
         );
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
@@ -915,11 +909,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // Serialize generated upgrade data
         vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
-        vm.serializeBytes(
-            "contracts_newConfig",
-            "force_deployments_data",
-            newlyGeneratedData.fixedForceDeploymentsData
-        );
+        vm.serializeBytes("contracts_newConfig", "force_deployments_data", generatedData.forceDeploymentsData);
 
         // Serialize protocol version info (needed for upgrade)
         vm.serializeUint("contracts_newConfig", "new_protocol_version", getNewProtocolVersion());
@@ -959,7 +949,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     /// @dev Test-only: inject pre-computed fixed force deployments data.
     function setFixedForceDeploymentsData_TestOnly(bytes memory _data) public {
-        newlyGeneratedData.fixedForceDeploymentsData = _data;
         generatedData.forceDeploymentsData = _data;
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
@@ -967,7 +956,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     /// @notice Returns the encoded FixedForceDeploymentsData bytes.
     function getEncodedFixedForceDeploymentsData() public view returns (bytes memory) {
         require(upgradeConfig.fixedForceDeploymentsDataGenerated, "force deployments data not generated");
-        return newlyGeneratedData.fixedForceDeploymentsData;
+        return generatedData.forceDeploymentsData;
     }
 
     ////////////////////////////// Misc utils /////////////////////////////////

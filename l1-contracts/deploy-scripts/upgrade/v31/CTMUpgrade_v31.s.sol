@@ -84,7 +84,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             (
                 config.isZKsyncOS,
                 coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
-                newlyGeneratedData.fixedForceDeploymentsData,
+                generatedData.forceDeploymentsData,
                 ""
             )
         );
