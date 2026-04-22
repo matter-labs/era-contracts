@@ -34,8 +34,17 @@ import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
+
+/// @dev First protocol minor version that switched `upgradeChainFromVersion` to its 3-argument form
+/// (adding the chain address). Source chains below this version still expect the legacy 2-arg signature.
+uint32 constant UPGRADE_CHAIN_FROM_VERSION_3ARG_MINOR = 31;
+
+/// @dev Selector of the legacy `upgradeChainFromVersion(uint256,DiamondCutData)` signature used by
+/// ZKChain admin facets at protocol minor versions below {UPGRADE_CHAIN_FROM_VERSION_3ARG_MINOR}.
+bytes4 constant LEGACY_UPGRADE_CHAIN_FROM_VERSION_SELECTOR = 0xfc57565f;
 
 contract AdminFunctions is Script, IAdminFunctions {
     using stdToml for string;
@@ -238,11 +247,11 @@ contract AdminFunctions is Script, IAdminFunctions {
             currentProtocolVersion
         );
 
+        (, uint32 oldMinor, ) = SemVer.unpackSemVer(uint96(currentProtocolVersion));
         bytes memory upgradeCall;
-        uint256 oldMinor = (currentProtocolVersion >> 32) & 0xFFFF;
-        if (oldMinor < 31) {
+        if (oldMinor < UPGRADE_CHAIN_FROM_VERSION_3ARG_MINOR) {
             upgradeCall = abi.encodeWithSelector(
-                bytes4(0xfc57565f), // upgradeChainFromVersion(uint256,DiamondCutData)
+                LEGACY_UPGRADE_CHAIN_FROM_VERSION_SELECTOR,
                 currentProtocolVersion,
                 diamondCut
             );
