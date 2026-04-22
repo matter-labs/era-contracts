@@ -10,13 +10,10 @@ import {
     L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
-import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
-import {PublishFactoryDepsResult} from "../default-upgrade/CTMUpgradeBase.sol";
-import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {EraForceDeploymentsLib} from "../default-upgrade/EraForceDeploymentsLib.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.sol";
 
@@ -30,45 +27,8 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
         if (config.isZKsyncOS) {
             return new CoreContract[](0);
         }
-        forceDeploymentContracts = new CoreContract[](1);
-        forceDeploymentContracts[0] = CoreContract.L2V31Upgrade;
-    }
-
-    function getProposedUpgrade(
-        StateTransitionDeployedAddresses memory stateTransition,
-        ChainCreationParamsConfig memory chainCreationParams,
-        uint256,
-        address,
-        PublishFactoryDepsResult memory _factoryDepsResult,
-        uint256 protocolUpgradeNonce
-    ) public virtual override returns (ProposedUpgrade memory proposedUpgrade) {
-        if (!config.isZKsyncOS) {
-            return
-                super.getProposedUpgrade(
-                    stateTransition,
-                    chainCreationParams,
-                    config.l1ChainId,
-                    config.ownerAddress,
-                    _factoryDepsResult,
-                    protocolUpgradeNonce
-                );
-        }
-
-        FixedForceDeploymentsData memory fixedData = getFixedForceDeploymentsData();
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = buildZKsyncOSForceDeployments(fixedData);
-
-        proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: composeUpgradeTx(deployments, _factoryDepsResult, protocolUpgradeNonce),
-            bootloaderHash: chainCreationParams.bootloaderHash,
-            defaultAccountHash: chainCreationParams.defaultAAHash,
-            evmEmulatorHash: chainCreationParams.evmEmulatorHash,
-            verifier: address(0),
-            verifierParams: getEmptyVerifierParams(),
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
-            upgradeTimestamp: 0,
-            newProtocolVersion: chainCreationParams.latestProtocolVersion
-        });
+        additionalForcedCoreContracts = new CoreContract[](1);
+        additionalForcedCoreContracts[0] = CoreContract.L2V31Upgrade;
     }
 
     function getL2UpgradeTargetAndData(
