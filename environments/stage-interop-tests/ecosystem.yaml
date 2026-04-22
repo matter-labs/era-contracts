@@ -1,6 +1,6 @@
 # temporary environment for interop tests (22nd April 2026, to )
 bridgehub: "0xbc5330CBd9eA143Ddd6eCA55454E0C8D5D68dFaC"
-deployer:  "fixme-deployer-address"
+deployer: "fixme-deployer-address"
 chains:
   gateway: 271
   chain_a: 272

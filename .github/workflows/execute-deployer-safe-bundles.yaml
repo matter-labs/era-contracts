@@ -42,7 +42,7 @@ on:
 
 permissions:
   contents: read
-  actions: read  # for downloading artifacts from another workflow run
+  actions: read # for downloading artifacts from another workflow run
 
 jobs:
   execute:

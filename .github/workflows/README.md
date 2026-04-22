@@ -6,29 +6,29 @@ args to `protocol_ops` unless the first post-flag word is `forge`/`cast`).
 
 ## Mapping
 
-| Workflow | Entry point |
-|---|---|
-| `generate-chain-init-calldata` | `protocol-ops chain init` |
-| `generate-chain-upgrade-calldata` | `protocol-ops chain upgrade` |
-| `generate-chain-set-upgrade-timestamp-calldata` | `protocol-ops chain set-upgrade-timestamp` |
-| `generate-chain-add-validator-calldata` | `protocol-ops chain add-validator` |
-| `generate-chain-remove-validator-calldata` | `protocol-ops chain remove-validator` |
-| `generate-gateway-convert-calldata` | `protocol-ops chain gateway convert` |
-| `generate-upgrade-calldata-prepare` | `protocol-ops ecosystem upgrade-prepare` |
-| `generate-upgrade-calldata-governance` | `protocol-ops ecosystem upgrade-governance` (stages 0+1+2) |
-| `generate-migrate-to-gw-phase0-pause` | `protocol-ops chain gateway migrate-to phase-0-pause-deposits` |
-| `generate-migrate-to-gw-phase1-submit` | `protocol-ops chain gateway migrate-to phase-1-submit` |
-| `generate-migrate-to-gw-phase2-finalize` | `protocol-ops chain gateway migrate-to phase-2-finalize` |
-| `generate-migrate-to-gw-phase3-validators` | `protocol-ops chain gateway migrate-to phase-3-validators` |
-| `generate-migrate-from-gw-phase0-pause` | `protocol-ops chain gateway migrate-from phase-0-pause-deposits` |
-| `generate-migrate-from-gw-phase1-submit` | `protocol-ops chain gateway migrate-from phase-1-submit` |
-| `generate-migrate-from-gw-phase2-finalize` | `protocol-ops chain gateway migrate-from phase-2-finalize` |
-| `generate-migrate-from-gw-phase3-set-da` | `protocol-ops chain gateway migrate-from phase-3-set-da-validator-pair` |
+| Workflow                                        | Entry point                                                             |
+| ----------------------------------------------- | ----------------------------------------------------------------------- |
+| `generate-chain-init-calldata`                  | `protocol-ops chain init`                                               |
+| `generate-chain-upgrade-calldata`               | `protocol-ops chain upgrade`                                            |
+| `generate-chain-set-upgrade-timestamp-calldata` | `protocol-ops chain set-upgrade-timestamp`                              |
+| `generate-chain-add-validator-calldata`         | `protocol-ops chain add-validator`                                      |
+| `generate-chain-remove-validator-calldata`      | `protocol-ops chain remove-validator`                                   |
+| `generate-gateway-convert-calldata`             | `protocol-ops chain gateway convert`                                    |
+| `generate-upgrade-calldata-prepare`             | `protocol-ops ecosystem upgrade-prepare`                                |
+| `generate-upgrade-calldata-governance`          | `protocol-ops ecosystem upgrade-governance` (stages 0+1+2)              |
+| `generate-migrate-to-gw-phase0-pause`           | `protocol-ops chain gateway migrate-to phase-0-pause-deposits`          |
+| `generate-migrate-to-gw-phase1-submit`          | `protocol-ops chain gateway migrate-to phase-1-submit`                  |
+| `generate-migrate-to-gw-phase2-finalize`        | `protocol-ops chain gateway migrate-to phase-2-finalize`                |
+| `generate-migrate-to-gw-phase3-validators`      | `protocol-ops chain gateway migrate-to phase-3-validators`              |
+| `generate-migrate-from-gw-phase0-pause`         | `protocol-ops chain gateway migrate-from phase-0-pause-deposits`        |
+| `generate-migrate-from-gw-phase1-submit`        | `protocol-ops chain gateway migrate-from phase-1-submit`                |
+| `generate-migrate-from-gw-phase2-finalize`      | `protocol-ops chain gateway migrate-from phase-2-finalize`              |
+| `generate-migrate-from-gw-phase3-set-da`        | `protocol-ops chain gateway migrate-from phase-3-set-da-validator-pair` |
 
 ## Execute workflows
 
-| Workflow | Purpose |
-|---|---|
+| Workflow                        | Purpose                                                                                                                                                                                                                                   |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `execute-deployer-safe-bundles` | Apply Safe bundles whose `target` is the ecosystem deployer EOA (bundles from the chain-init workflow, the upgrade-prepare workflow, and the migrate-to/from phase-2-finalize workflows). Signs with `DEPLOYER_PRIVATE_KEY_<env>` secret. |
 
 ## Conventions

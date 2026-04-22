@@ -176,7 +176,8 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             return SystemContractsProcessing.getBaseZKsyncOSForceDeployments();
         }
 
-        return EraForceDeploymentsLib.wrap(SystemContractsProcessing.getBaseForceDeployments(_l1ChainId, _ownerAddress));
+        return
+            EraForceDeploymentsLib.wrap(SystemContractsProcessing.getBaseForceDeployments(_l1ChainId, _ownerAddress));
     }
 
     function getAdditionalUniversalForceDeployments()
@@ -188,8 +189,10 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         }
 
         CoreContract[] memory additionalForcedCoreContracts = getAdditionalForcedCoreContracts();
-        IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = new IL2ContractDeployer
-            .ForceDeployment[](additionalForcedCoreContracts.length);
+        IL2ContractDeployer.ForceDeployment[]
+            memory additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](
+                additionalForcedCoreContracts.length
+            );
         for (uint256 i; i < additionalForcedCoreContracts.length; i++) {
             additionalForceDeployments[i] = CoreOnGatewayHelper.getForceDeployment(
                 false,

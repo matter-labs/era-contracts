@@ -35,7 +35,7 @@ import {
   NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT,
   SYSTEM_CONTEXT_ADDR,
 } from "../core/const";
-import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI, LEGACY_COMPLEX_UPGRADER_ABI } from "../core/contracts";
+import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
 import { transferOwnable2Step } from "./harness-shims";
 import { impersonateAndRun } from "../core/utils";
@@ -848,8 +848,6 @@ async function seedBatchCounters(
     await provider.send("anvil_setStorageAt", [chain.diamondProxy, TOTAL_BATCHES_COMMITTED_SLOT, ONE]);
   }
 }
-
-
 
 // ── Ownership helpers ────────────────────────────────────────────────
 

@@ -14,7 +14,6 @@ import {IL1MessageRoot} from "../core/message-root/IL1MessageRoot.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {L2DACommitmentScheme} from "../common/Config.sol";
 import {NotAllBatchesExecuted} from "../state-transition/L1StateTransitionErrors.sol";
-import {L2UpgradeTxLib} from "./L2UpgradeTxLib.sol";
 
 /// @author Matter Labs
 /// @title SettlementLayerV31UpgradeBase

@@ -218,11 +218,7 @@ abstract contract SettlementLayerV31UpgradeTestBase is BaseUpgrade {
             abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, testChainId),
             abi.encode(address(upgrade))
         );
-        vm.mockCall(
-            address(upgrade),
-            abi.encodeWithSelector(IGetters.getZKsyncOS.selector),
-            abi.encode(false)
-        );
+        vm.mockCall(address(upgrade), abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(false));
 
         // Mock gwChain.getSemverProtocolVersion - returns version >= 30
         vm.mockCall(
@@ -366,8 +362,12 @@ contract SettlementLayerV31UpgradeSharedTest is SettlementLayerV31UpgradeTestBas
     function test_ConstructsChainSpecificL2V31UpgradeCalldata() public {
         _setupMocks();
 
-        bytes memory data =
-            upgrade.getConstructedCalldata(mockBridgehub, testChainId, false, _placeholderV31Calldata());
+        bytes memory data = upgrade.getConstructedCalldata(
+            mockBridgehub,
+            testChainId,
+            false,
+            _placeholderV31Calldata()
+        );
 
         assertEq(data, _expectedV31Calldata());
     }
@@ -608,11 +608,7 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
             abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, testChainId),
             abi.encode(address(zkosUpgrade))
         );
-        vm.mockCall(
-            address(zkosUpgrade),
-            abi.encodeWithSelector(IGetters.getZKsyncOS.selector),
-            abi.encode(true)
-        );
+        vm.mockCall(address(zkosUpgrade), abi.encodeWithSelector(IGetters.getZKsyncOS.selector), abi.encode(true));
     }
 
     function test_RewritesZKsyncOSV30UniversalUpgradeWithChainSpecificV31Arguments() public {

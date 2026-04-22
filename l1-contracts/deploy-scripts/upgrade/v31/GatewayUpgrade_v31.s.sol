@@ -48,11 +48,7 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
         } else {
             complexUpgraderCalldata = abi.encodeCall(
                 IComplexUpgrader.forceDeployAndUpgrade,
-                (
-                    EraForceDeploymentsLib.unwrap(_deployments),
-                    L2_VERSION_SPECIFIC_UPGRADER_ADDR,
-                    l2V31UpgradeCalldata
-                )
+                (EraForceDeploymentsLib.unwrap(_deployments), L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2V31UpgradeCalldata)
             );
         }
 

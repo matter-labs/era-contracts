@@ -301,7 +301,11 @@ library SystemContractsProcessing {
             //    upgrade via `_buildZKsyncOSProxyAdminEntry`, so its preimage must be
             //    published too.
             factoryDeps = new bytes[](2);
-            factoryDeps[0] = BytecodeUtils.readDeployedBytecodeL1(true, "SystemContractProxy.sol", "SystemContractProxy");
+            factoryDeps[0] = BytecodeUtils.readDeployedBytecodeL1(
+                true,
+                "SystemContractProxy.sol",
+                "SystemContractProxy"
+            );
             factoryDeps[1] = BytecodeUtils.readDeployedBytecodeL1(
                 true,
                 "SystemContractProxyAdmin.sol",
@@ -366,7 +370,9 @@ library SystemContractsProcessing {
     }
 
     /// @dev Build a single ZKsyncOS force deployment entry for a CoreContract (user-space built-in).
-    function _buildZKsyncOSEntry(CoreContract _id) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
+    function _buildZKsyncOSEntry(
+        CoreContract _id
+    ) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
         (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _id);
 
         // L2WrappedBaseToken sits directly at L2_WRAPPED_BASE_TOKEN_IMPL_ADDR as the
@@ -421,5 +427,4 @@ library SystemContractsProcessing {
                 newAddress: L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
             });
     }
-
 }
