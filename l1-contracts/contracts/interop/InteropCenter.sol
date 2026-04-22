@@ -55,6 +55,7 @@ import {IERC7786Attributes} from "./IERC7786Attributes.sol";
 import {AttributesDecoder} from "./AttributesDecoder.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
 import {ERC7930_V1_MIN_LENGTH} from "./InteropConstants.sol";
+import {StrictInteroperableAddressesParser} from "./StrictInteroperableAddressesParser.sol";
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 import {IL2CrossChainSender} from "../bridge/interfaces/IL2CrossChainSender.sol";
 import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
@@ -197,7 +198,9 @@ contract InteropCenter is
         bytes calldata payload,
         bytes[] calldata attributes
     ) external payable whenNotPaused nonReentrant returns (bytes32 sendId) {
-        (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
+        (uint256 recipientChainId, address recipientAddress) = StrictInteroperableAddressesParser.parseEvmV1Calldata(
+            recipient
+        );
 
         _ensureL2ToL2(recipientChainId);
 
@@ -249,7 +252,7 @@ contract InteropCenter is
 
         // Extract the actual chain ID from the ERC-7930 address
         // slither-disable-next-line unused-return
-        (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
+        (uint256 destinationChainId, ) = StrictInteroperableAddressesParser.parseEvmV1Calldata(_destinationChainId);
 
         // Ensure this is an L2 to L2 transaction
         _ensureL2ToL2(destinationChainId);
@@ -265,7 +268,7 @@ contract InteropCenter is
             _ensureEmptyChainReference(_callStarters[i].to);
 
             // slither-disable-next-line unused-return
-            (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_callStarters[i].to);
+            (, address recipientAddress) = StrictInteroperableAddressesParser.parseEvmV1Calldata(_callStarters[i].to);
 
             // Store original attributes for MessageSent event emission
             originalCallAttributes[i] = _callStarters[i].callAttributes;
@@ -539,7 +542,7 @@ contract InteropCenter is
             );
             // Parse the returned 7930 address from actualCallStarter.to
             // slither-disable-next-line unused-return
-            (, address actualCallRecipient) = InteroperableAddress.parseEvmV1(actualCallStarter.to);
+            (, address actualCallRecipient) = StrictInteroperableAddressesParser.parseEvmV1(actualCallStarter.to);
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
                 shadowAccount: false,

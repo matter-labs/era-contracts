@@ -6,7 +6,6 @@ import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {Bytes} from "./Bytes.sol";
 import {Calldata} from "./Calldata.sol";
-import {ERC7930_V1_MIN_LENGTH} from "../interop/InteropConstants.sol";
 
 /**
  * @dev Helper library to format and parse https://ethereum-magicians.org/t/erc-7930-interoperable-addresses/23365[ERC-7930] interoperable
@@ -97,24 +96,21 @@ library InteroperableAddress {
     ) internal pure returns (bool success, bytes2 chainType, bytes memory chainReference, bytes memory addr) {
         unchecked {
             success = true;
-            if (self.length < ERC7930_V1_MIN_LENGTH) return (false, 0x0000, _emptyBytesMemory(), _emptyBytesMemory());
+            if (self.length < 0x06) return (false, 0x0000, _emptyBytesMemory(), _emptyBytesMemory());
 
             bytes2 version = _readBytes2(self, 0x00);
             if (version != bytes2(0x0001)) return (false, 0x0000, _emptyBytesMemory(), _emptyBytesMemory());
             chainType = _readBytes2(self, 0x02);
 
             uint8 chainReferenceLength = uint8(self[0x04]);
-            if (self.length < ERC7930_V1_MIN_LENGTH + chainReferenceLength)
+            if (self.length < 0x06 + chainReferenceLength)
                 return (false, 0x0000, _emptyBytesMemory(), _emptyBytesMemory());
             chainReference = self.slice(0x05, 0x05 + chainReferenceLength);
 
             uint8 addrLength = uint8(self[0x05 + chainReferenceLength]);
-            if (self.length != ERC7930_V1_MIN_LENGTH + chainReferenceLength + addrLength)
+            if (self.length < 0x06 + chainReferenceLength + addrLength)
                 return (false, 0x0000, _emptyBytesMemory(), _emptyBytesMemory());
-            addr = self.slice(
-                ERC7930_V1_MIN_LENGTH + chainReferenceLength,
-                ERC7930_V1_MIN_LENGTH + chainReferenceLength + addrLength
-            );
+            addr = self.slice(0x06 + chainReferenceLength, 0x06 + chainReferenceLength + addrLength);
         }
     }
 
@@ -126,23 +122,21 @@ library InteroperableAddress {
     ) internal pure returns (bool success, bytes2 chainType, bytes calldata chainReference, bytes calldata addr) {
         unchecked {
             success = true;
-            if (self.length < ERC7930_V1_MIN_LENGTH) return (false, 0x0000, Calldata.emptyBytes(), Calldata.emptyBytes());
+            if (self.length < 0x06) return (false, 0x0000, Calldata.emptyBytes(), Calldata.emptyBytes());
 
             bytes2 version = _readBytes2Calldata(self, 0x00);
             if (version != bytes2(0x0001)) return (false, 0x0000, Calldata.emptyBytes(), Calldata.emptyBytes());
             chainType = _readBytes2Calldata(self, 0x02);
 
             uint8 chainReferenceLength = uint8(self[0x04]);
-            if (self.length < ERC7930_V1_MIN_LENGTH + chainReferenceLength)
+            if (self.length < 0x06 + chainReferenceLength)
                 return (false, 0x0000, Calldata.emptyBytes(), Calldata.emptyBytes());
             chainReference = self[0x05:0x05 + chainReferenceLength];
 
             uint8 addrLength = uint8(self[0x05 + chainReferenceLength]);
-            if (self.length != ERC7930_V1_MIN_LENGTH + chainReferenceLength + addrLength)
+            if (self.length < 0x06 + chainReferenceLength + addrLength)
                 return (false, 0x0000, Calldata.emptyBytes(), Calldata.emptyBytes());
-            addr = self[
-                ERC7930_V1_MIN_LENGTH + chainReferenceLength:ERC7930_V1_MIN_LENGTH + chainReferenceLength + addrLength
-            ];
+            addr = self[0x06 + chainReferenceLength:0x06 + chainReferenceLength + addrLength];
         }
     }
 

@@ -40,6 +40,7 @@ import {
 import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
+import {StrictInteroperableAddressesParser} from "../../interop/StrictInteroperableAddressesParser.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -239,7 +240,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         // 4. Destination L2 validates senderAddress == address(this) for non-L1 sources
         //    (L2AssetRouter address is equal for all ZKsync chains)
 
-        (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
+        (uint256 senderChainId, address senderAddress) = StrictInteroperableAddressesParser.parseEvmV1Calldata(sender);
 
         require((senderChainId != L1_CHAIN_ID && senderAddress == address(this)), Unauthorized(senderAddress));
 

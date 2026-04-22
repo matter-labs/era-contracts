@@ -3,6 +3,7 @@
 pragma solidity ^0.8.24;
 
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
+import {StrictInteroperableAddressesParser} from "./StrictInteroperableAddressesParser.sol";
 
 import {
     L2_BRIDGEHUB,
@@ -89,7 +90,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
         // If the execution address is not specified then the execution is permissionless.
         if (interopBundle.bundleAttributes.executionAddress.length != 0) {
-            (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
+            (uint256 executionChainId, address executionAddress) = StrictInteroperableAddressesParser.parseEvmV1(
                 interopBundle.bundleAttributes.executionAddress
             );
 
@@ -165,7 +166,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
 
-        (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(
+        (uint256 unbundlerChainId, address unbundlerAddress) = StrictInteroperableAddressesParser.parseEvmV1(
             interopBundle.bundleAttributes.unbundlerAddress
         );
 
@@ -370,7 +371,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
         bytes4 selector = bytes4(payload[:4]);
 
-        (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
+        (uint256 senderChainId, address senderAddress) = StrictInteroperableAddressesParser.parseEvmV1Calldata(sender);
 
         // NOTE: it is important that we always support the legacy messages formats (i.e. dont change selectors)
         // since otherwise the messages that were sent before won't be executable.
@@ -403,7 +404,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
         // If the execution address is not specified then the execution is permissionless.
         if (interopBundle.bundleAttributes.executionAddress.length != 0) {
-            (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
+            (uint256 executionChainId, address executionAddress) = StrictInteroperableAddressesParser.parseEvmV1(
                 interopBundle.bundleAttributes.executionAddress
             );
 
@@ -438,7 +439,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         // Decode the bundle to get unbundling permissions
         (InteropBundle memory interopBundle, , ) = _getBundleData(bundle);
 
-        (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(
+        (uint256 unbundlerChainId, address unbundlerAddress) = StrictInteroperableAddressesParser.parseEvmV1(
             interopBundle.bundleAttributes.unbundlerAddress
         );
 
