@@ -18,7 +18,6 @@ pub struct DeployInput {
     pub owner: Address,
     pub era_chain_id: u64,
     pub with_legacy_bridge: bool,
-    pub create2_factory_addr: Option<Address>,
     pub create2_factory_salt: Option<H256>,
 }
 
@@ -30,9 +29,6 @@ pub fn deploy(
 ) -> anyhow::Result<DeployL1CoreContractsOutput> {
     let mut initial_config = InitialDeploymentConfig::default();
 
-    if let Some(addr) = input.create2_factory_addr {
-        initial_config.create2_factory_addr = Some(addr);
-    }
     if let Some(salt) = input.create2_factory_salt {
         initial_config.create2_factory_salt = salt;
     }
@@ -56,8 +52,7 @@ pub fn deploy(
         .with_ffi()
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow()
-        .with_wallet(auth, runner.simulate)
+        .with_wallet(auth)
         .with_env(
             "CREATE2_FACTORY_SALT",
             format!("{:#x}", initial_config.create2_factory_salt),

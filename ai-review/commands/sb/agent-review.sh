@@ -91,10 +91,12 @@ case "$TYPE" in
         --permission-mode bypassPermissions \
         "$PROMPT"
     else
+      # Write permission is always needed for the report file.
       exec claude \
         -p \
         --model opus \
         --effort high \
+        --allowedTools "Write,Read,Glob,Grep,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Agent" \
         "$PROMPT"
     fi
     ;;

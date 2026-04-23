@@ -230,33 +230,34 @@ struct ZKChainStorage {
     /// @dev STORAGE SLOT: 59
     bytes32 precommitmentForTheLatestBatch;
     /// @dev ZKsync OS flag, if `true` state transition is done with ZKsync OS, otherwise Era VM
-    /// @dev STORAGE SLOT: 60
+    /// @dev STORAGE SLOT: 60 (packed: bool + enum + address — shares with l2DACommitmentScheme + assetTracker)
     bool zksyncOS;
     /// @dev The scheme of L2 DA commitment. Different L1 validators may use different schemes.
-    /// @dev STORAGE SLOT: 61
+    /// @dev STORAGE SLOT: 60 (packed with zksyncOS + assetTracker)
     L2DACommitmentScheme l2DACommitmentScheme;
     /// @dev The address of the asset tracker
-    /// @dev STORAGE SLOT: 62
+    /// @dev STORAGE SLOT: 60 (packed with zksyncOS + l2DACommitmentScheme)
     address assetTracker;
     /// @dev The address of the native token vault
-    /// @dev STORAGE SLOT: 63
+    /// @dev STORAGE SLOT: 61
     address nativeTokenVault;
     /// @dev Timestamp when deposits were paused for chain migration to/from Gateway. 0 = not paused.
-    /// @dev STORAGE SLOT: 64
+    /// @dev STORAGE SLOT: 62
     uint256 pausedDepositsTimestamp;
     /// @dev Information required in the Priority Mode packed in one storage slot.
-    /// @dev STORAGE SLOT: 65-66
+    /// @dev STORAGE SLOT: 63-64
     PriorityModeInformation priorityModeInfo;
     /// @dev Timestamp when a priority tx request was made for the specified tx index from priorityTree.
-    /// @dev STORAGE SLOT: 67
+    /// @dev STORAGE SLOT: 65
     mapping(uint256 => uint256) priorityOpsRequestTimestamp;
     /// @dev Timestamp of the last fee params update (changeFeeParams).
-    /// @dev STORAGE SLOT: 68
+    /// @dev STORAGE SLOT: 66
     uint256 lastFeeParamsUpdateTimestamp;
     /// @dev Timestamp of the last base token gas price multiplier update (setTokenMultiplier).
-    /// @dev STORAGE SLOT: 69
+    /// @dev STORAGE SLOT: 67
     uint256 lastTokenMultiplierUpdateTimestamp;
     /// @dev Whether the chain has correct base token total supply tracked. It is the case for all chains,
     /// except for ZKsync OS chains that have existed before the v31 upgrade.
+    /// @dev STORAGE SLOT: 68
     bool baseTokenHasTotalSupply;
 }

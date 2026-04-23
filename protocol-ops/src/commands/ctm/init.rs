@@ -1,3 +1,4 @@
+use anyhow::Context;
 use clap::Parser;
 use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
@@ -28,15 +29,11 @@ pub struct CtmInitArgs {
     #[clap(long, help_heading = "Signers")]
     pub owner: Option<Address>,
 
-    /// Owner private key
-    #[clap(long, visible_alias = "owner-pk", help_heading = "Auth")]
-    pub owner_private_key: Option<H256>,
-    /// Bridgehub governance owner private key
-    #[clap(long, visible_alias = "bridgehub-owner-pk", help_heading = "Auth")]
-    pub bridgehub_owner_private_key: Option<H256>,
-    /// Bridgehub admin private key
-    #[clap(long, visible_alias = "bridgehub-admin-pk", help_heading = "Auth")]
-    pub bridgehub_admin_private_key: Option<H256>,
+    /// Deployer EOA address. Bootstrap is prepare-only: protocol-ops emits a
+    /// directory of Safe bundles via `--out`; the deployer applies them with
+    /// `dev execute-safe` (or any Safe-bundle-aware executor).
+    #[clap(long, help_heading = "Signers")]
+    pub deployer_address: Address,
 
     #[clap(flatten)]
     #[serde(flatten)]
@@ -55,9 +52,6 @@ pub struct CtmInitArgs {
     /// ZK token asset ID
     #[clap(long, help_heading = "Advanced input")]
     pub zk_token_asset_id: Option<H256>,
-    /// CREATE2 factory address
-    #[clap(long, help_heading = "Advanced input")]
-    pub create2_factory_addr: Option<Address>,
     /// CREATE2 factory salt
     #[clap(long, help_heading = "Advanced input")]
     pub create2_factory_salt: Option<H256>,
@@ -66,25 +60,31 @@ pub struct CtmInitArgs {
 // ── run() ───────────────────────────────────────────────────────────────────
 
 pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
-    let deployer = Wallet::parse(args.shared.private_key, args.shared.sender)?;
-    let mut runner = ForgeRunner::new(
-        args.shared.simulate,
-        &args.shared.l1_rpc_url,
-        args.shared.forge_args.clone(),
-    )?;
+    let mut runner = ForgeRunner::new(&args.shared)?;
+    let deployer = runner.prepare_sender(args.deployer_address).await?;
 
-    let owner = Wallet::resolve(args.owner, args.owner_private_key, &deployer)?;
+    let owner = Wallet::resolve(args.owner, None, &deployer)?;
 
-    let bridgehub_admin = Wallet::parse(args.bridgehub_admin_private_key, None)?;
-    let bridgehub_owner = Wallet::resolve(
-        None,
-        args.bridgehub_owner_private_key,
-        if args.reuse_gov_and_admin {
-            &bridgehub_admin
-        } else {
-            &owner
-        },
-    )?;
+    // Bridgehub is the single source of truth — admin + owner come straight
+    // from it. No override.
+    let bridgehub_admin_addr =
+        crate::common::l1_contracts::resolve_bridgehub_admin(&runner.rpc_url, args.bridgehub)
+            .await
+            .context("resolving bridgehub.admin() from L1")?;
+    let bridgehub_admin = runner.prepare_sender(bridgehub_admin_addr).await?;
+
+    // When `--reuse-gov-and-admin` is set the governance owner collapses to
+    // the bridgehub admin by construction; otherwise we query
+    // `IOwnable(bridgehub).owner()`.
+    let bridgehub_owner = if args.reuse_gov_and_admin {
+        bridgehub_admin.clone()
+    } else {
+        let owner_addr =
+            crate::common::l1_contracts::resolve_governance(&runner.rpc_url, args.bridgehub)
+                .await
+                .context("resolving bridgehub.owner() from L1")?;
+        runner.prepare_sender(owner_addr).await?
+    };
 
     let ctm_input = CtmInitInput {
         bridgehub: args.bridgehub,
@@ -94,7 +94,6 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
         with_testnet_verifier: args.with_testnet_verifier,
         with_legacy_bridge: args.with_legacy_bridge,
         zk_token_asset_id: args.zk_token_asset_id,
-        create2_factory_addr: args.create2_factory_addr,
         create2_factory_salt: args.create2_factory_salt,
     };
     let ctm_output = ctm_init(
@@ -134,10 +133,11 @@ pub async fn ctm_init(
         with_testnet_verifier: input.with_testnet_verifier,
         with_legacy_bridge: input.with_legacy_bridge,
         zk_token_asset_id: input.zk_token_asset_id,
-        create2_factory_addr: input.create2_factory_addr,
         create2_factory_salt: input.create2_factory_salt,
     };
+    let t = std::time::Instant::now();
     let deploy_output = deploy(runner, deployer, &deploy_input)?;
+    logger::info(format!("[timing] ctm.deploy: {:.2?}", t.elapsed()));
     let deployed = &deploy_output.deployed_addresses;
     let ctm_proxy = deployed.state_transition.state_transition_proxy_addr;
 
@@ -154,7 +154,9 @@ pub async fn ctm_init(
         bridgehub: input.bridgehub,
         ctm_proxy,
     };
+    let t = std::time::Instant::now();
     register_ctm(runner, admin, &register_input)?;
+    logger::info(format!("[timing] ctm.register: {:.2?}", t.elapsed()));
 
     Ok(deploy_output)
 }
@@ -171,6 +173,5 @@ pub struct CtmInitInput {
     pub with_testnet_verifier: bool,
     pub with_legacy_bridge: bool,
     pub zk_token_asset_id: Option<H256>,
-    pub create2_factory_addr: Option<Address>,
     pub create2_factory_salt: Option<H256>,
 }

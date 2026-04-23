@@ -14,7 +14,13 @@ import {Utils} from "../Utils.sol";
 /// @notice Result of publishing and processing factory dependencies.
 struct PublishFactoryDepsResult {
     /// @dev Factory dep hashes for the upgrade transaction.
-    ///      Era: L2 bytecode hashes as uint256. ZKsyncOS: empty array.
+    ///      Era: `L2ContractHelper.hashL2Bytecode` (padded-bytes L2 hash).
+    ///      ZKsyncOS: keccak256 of the raw bytecode — the same key
+    ///      `BytecodesSupplier` uses for `evmPublishingBlock` and the topic1
+    ///      of `EVMBytecodePublished`, so the server can filter events by
+    ///      topic1 directly and load matching preimages. The server then
+    ///      re-hashes each preimage with Blake2s256 when it inserts into its
+    ///      own store (the ZKsyncOS-specific lookup key the VM queries by).
     uint256[] factoryDepsHashes;
 }
 
@@ -134,17 +140,23 @@ library BytecodePublisher {
             publishEraBytecodesInBatches(_supplier, _allDeps);
         }
 
-        if (_isEVMBytecode) {
-            // EVM bytecodes do not use factory deps in upgrade transactions — bytecodes are
-            // published to BytecodesSupplier above but no hashes are needed in the tx.
-            result.factoryDepsHashes = new uint256[](0);
-            return result;
-        }
-
         uint256 depsLen = _allDeps.length;
         require(depsLen <= 64, "Too many deps");
 
         result.factoryDepsHashes = new uint256[](depsLen);
+        if (_isEVMBytecode) {
+            // Use the EVM-native keccak256 here. It matches the key
+            // `BytecodesSupplier.evmPublishingBlock` uses and the indexed
+            // topic1 of `EVMBytecodePublished`, so the server can filter
+            // events by topic directly. Server-side translation into the
+            // Blake2s256 store key happens after the event payload arrives,
+            // keeping the ZKsyncOS-specific hash layer off the contract.
+            for (uint256 i = 0; i < depsLen; i++) {
+                result.factoryDepsHashes[i] = uint256(keccak256(_allDeps[i]));
+            }
+            return result;
+        }
+
         for (uint256 i = 0; i < depsLen; i++) {
             result.factoryDepsHashes[i] = uint256(L2ContractHelper.hashL2Bytecode(_allDeps[i]));
         }

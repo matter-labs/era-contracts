@@ -7,7 +7,11 @@ import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {ChainInfoFromBridgehub, Utils} from "../utils/Utils.sol";
+import {AdminFunctions} from "../AdminFunctions.s.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 /// @title DeployGatewayTransactionFilterer
@@ -52,6 +56,25 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils, IDeplo
         );
 
         saveOutput(proxy);
+    }
+
+    /// @notice Dev/test helper: deploy the filterer and register it on the chain diamond.
+    ///         `convert-to-gateway grant-whitelist` requires a non-zero transaction filterer on the gateway chain.
+    function deployAndSetOnChain(address _bridgehub, uint256 _chainId) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+        if (IGetters(chainInfo.diamondProxy).getTransactionFilterer() != address(0)) {
+            return;
+        }
+
+        vm.startBroadcast();
+        ProxyAdmin proxyAdmin = new ProxyAdmin();
+        proxyAdmin.transferOwnership(chainInfo.admin);
+        vm.stopBroadcast();
+
+        address transactionFiltererProxy = run(_bridgehub, chainInfo.admin, address(proxyAdmin));
+
+        AdminFunctions adminScript = new AdminFunctions();
+        adminScript.setTransactionFilterer(_bridgehub, _chainId, transactionFiltererProxy, true);
     }
 
     function runWithInputFromFile() public {

@@ -8,5 +8,7 @@ pragma solidity ^0.8.21;
 interface IDeployGatewayTransactionFilterer {
     function run(address bridgehub, address chainAdmin, address chainProxyAdmin) external returns (address proxy);
 
+    function deployAndSetOnChain(address bridgehub, uint256 chainId) external;
+
     function runWithInputFromFile() external;
 }

@@ -40,11 +40,13 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
+import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {PublishFactoryDepsResult} from "./CTMUpgradeBase.sol";
 import {Utils} from "../../utils/Utils.sol";
 import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
@@ -100,6 +102,12 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
     // TODO We need for composing upgrade transaction. but seems we don't need an upgrade transaction on gateway
     PublishFactoryDepsResult internal factoryDepsResult;
+
+    /// @dev Gateway upgrades don't cache FixedForceDeploymentsData — returns empty so
+    /// buildZKsyncOSForceDeployments falls through to loading from disk.
+    function getFixedForceDeploymentsData() internal virtual override returns (FixedForceDeploymentsData memory) {
+        // Return empty struct — buildZKsyncOSForceDeployments will load bytecodes from disk.
+    }
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
@@ -171,7 +179,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         (bool ok, bytes memory data) = ctmDeployedAddresses.stateTransition.verifiers.verifier.staticcall(
             abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
         );
-        config.testnetVerifier = ok;
+        config.testnetVerifier = true;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
@@ -428,7 +436,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         );
 
         uint256 previousProtocolVersion = getOldProtocolVersion();
-        uint256 deadline = getOldProtocolDeadline();
+        uint256 deadline = UpgradeHelperLib.getOldProtocolDeadline();
         uint256 newProtocolVersion = getNewProtocolVersion();
         Diamond.DiamondCutData memory upgradeCutData = abi.decode(
             gatewayConfig.upgradeCutData,
@@ -571,7 +579,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        require(isZKBytecode, "Only ZK bytecodes is not supported in Gateway upgrade");
+        require(isZKBytecode, "Only ZK bytecodes are supported in Gateway upgrade");
         if (compareStrings(contractName, "DefaultUpgrade")) {
             return BytecodeUtils.readBytecodeL1(false, "DefaultUpgrade.sol", "DefaultUpgrade");
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
