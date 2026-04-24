@@ -13,6 +13,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
 // import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
+import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 import {ChainUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -30,7 +31,6 @@ contract UpgradeIntegrationTestBase is Test {
     // For now, this test is testing "stage" - as mainnet wasn't updated yet.
     string public ECOSYSTEM_INPUT = "file_1.toml";
     string public ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/shared.toml";
-    string public PERMANENT_VALUES_INPUT;
     string public ECOSYSTEM_OUTPUT = "file_3.toml";
     string public CTM_INPUT = "/upgrade-envs/v0.31.0-interopB/shared.toml";
     string public CTM_OUTPUT = "/script-out/foundry-upgrade/mainnet-gateway.toml";
@@ -40,8 +40,47 @@ contract UpgradeIntegrationTestBase is Test {
     function setupUpgrade(bool skipFactoryDepsCheck) public virtual {
         console.log("setupUpgrade: Creating EcosystemUpgrade_v31");
         ecosystemUpgrade = createEcosystemUpgrade();
+
+        console.log("setupUpgrade: Reading deployment outputs for initializeWithArgs");
+        string memory root = vm.projectRoot();
+        vm.createDir(string.concat(root, "/script-out/foundry-upgrade"), true);
+        string memory outputDeployL1Toml = vm.readFile(string.concat(root, ECOSYSTEM_INPUT));
+        string memory outputDeployCTMToml = vm.readFile(string.concat(root, CTM_INPUT));
+
+        address bridgehubProxy = outputDeployL1Toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
+        address ctmProxy = outputDeployCTMToml.readAddress(
+            "$.deployed_addresses.state_transition.state_transition_proxy_addr"
+        );
+        address bytecodesSupplier = outputDeployCTMToml.readAddress(
+            "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
+        );
+        bool isZKsyncOs = outputDeployCTMToml.readBool("$.is_zk_sync_os");
+        address rollupDAManager;
+        if (isZKsyncOs) {
+            rollupDAManager = outputDeployCTMToml.readAddress(
+                "$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr"
+            );
+        } else {
+            rollupDAManager = outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
+        }
+        address governance = outputDeployL1Toml.readAddress("$.deployed_addresses.governance_addr");
+
         console.log("setupUpgrade: Initializing ecosystem upgrade");
-        ecosystemUpgrade.initialize(PERMANENT_VALUES_INPUT, ECOSYSTEM_UPGRADE_INPUT, ECOSYSTEM_OUTPUT);
+        ecosystemUpgrade.initializeWithArgs(
+            EcosystemUpgradeParams({
+                bridgehubProxyAddress: bridgehubProxy,
+                ctmProxy: ctmProxy,
+                bytecodesSupplier: bytecodesSupplier,
+                rollupDAManager: rollupDAManager,
+                isZKsyncOS: isZKsyncOs,
+                create2FactorySalt: bytes32(0),
+                upgradeInputPath: ECOSYSTEM_UPGRADE_INPUT,
+                ecosystemOutputPath: ECOSYSTEM_OUTPUT,
+                governance: governance,
+                // Dummy asset ID is fine for these tests — fixed-ZK-fee bundles are not exercised.
+                zkTokenAssetId: bytes32(uint256(1))
+            })
+        );
         console.log("setupUpgrade: Deploying new ecosystem contracts");
         ecosystemUpgrade.deployNewEcosystemContractsL1();
         console.log("setupUpgrade: Creating ChainUpgrade_v31");
@@ -51,7 +90,7 @@ contract UpgradeIntegrationTestBase is Test {
         ecosystemUpgrade.prepareEcosystemUpgrade();
 
         console.log("Preparing chain for the upgrade");
-        chainUpgrade.prepareChain(chainId, PERMANENT_VALUES_INPUT);
+        chainUpgrade.prepareChainWithBridgehub(chainId, bridgehubProxy);
         console.log("setupUpgrade: Complete");
     }
 
@@ -140,79 +179,5 @@ contract UpgradeIntegrationTestBase is Test {
         }
 
         vm.stopBroadcast();
-    }
-
-    function preparePermanentValues() internal {
-        string memory root = vm.projectRoot();
-        string memory permanentValuesInputPath = string.concat(root, PERMANENT_VALUES_INPUT);
-        vm.createDir(string.concat(root, "/script-out/foundry-upgrade"), true);
-        string memory outputDeployL1Toml = vm.readFile(string.concat(root, ECOSYSTEM_INPUT));
-        string memory outputDeployCTMToml = vm.readFile(string.concat(root, CTM_INPUT));
-
-        bytes32 create2FactorySalt = outputDeployL1Toml.readBytes32("$.contracts.create2_factory_salt");
-        address create2FactoryAddr;
-        if (vm.keyExistsToml(outputDeployL1Toml, "$.contracts.create2_factory_addr")) {
-            create2FactoryAddr = outputDeployL1Toml.readAddress("$.contracts.create2_factory_addr");
-        }
-        address ctm = outputDeployCTMToml.readAddress(
-            "$.deployed_addresses.state_transition.state_transition_proxy_addr"
-        );
-        address bytecodesSupplier = outputDeployCTMToml.readAddress(
-            "$.deployed_addresses.state_transition.bytecodes_supplier_addr"
-        );
-        address l1Bridgehub = outputDeployL1Toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
-        bool isZKsyncOs = outputDeployCTMToml.readBool("$.is_zk_sync_os");
-
-        address rollupDAManager;
-        if (isZKsyncOs) {
-            rollupDAManager = outputDeployCTMToml.readAddress(
-                "$.deployed_addresses.blobs_zksync_os_l1_da_validator_addr"
-            );
-        } else {
-            rollupDAManager = outputDeployCTMToml.readAddress("$.deployed_addresses.l1_rollup_da_manager");
-        }
-        uint256 eraChainId = outputDeployL1Toml.readUint("$.era_chain_id");
-
-        // Serialize permanent_contracts section
-        {
-            vm.serializeString("permanent_contracts", "create2_factory_salt", vm.toString(create2FactorySalt));
-            string memory permanent_contracts = vm.serializeAddress(
-                "permanent_contracts",
-                "create2_factory_addr",
-                create2FactoryAddr
-            );
-            vm.serializeString("root2", "permanent_contracts", permanent_contracts);
-        }
-
-        // Serialize ctm_contracts section
-        {
-            vm.serializeAddress("ctm_contracts", "ctm_proxy_addr", ctm);
-            vm.serializeAddress("ctm_contracts", "rollup_da_manager", rollupDAManager);
-            string memory ctm_contracts = vm.serializeAddress(
-                "ctm_contracts",
-                "l1_bytecodes_supplier_addr",
-                bytecodesSupplier
-            );
-            vm.serializeString("root2", "ctm_contracts", ctm_contracts);
-        }
-
-        // Serialize core_contracts section
-        {
-            string memory core_contracts = vm.serializeAddress("core_contracts", "bridgehub_proxy_addr", l1Bridgehub);
-            vm.serializeString("root2", "core_contracts", core_contracts);
-        }
-
-        // Serialize chain2 section
-        {
-            string memory chain2 = vm.serializeUint("chain2", "chain_id", eraChainId);
-            vm.serializeString("root2", "chain2", chain2);
-        }
-
-        // Serialize is_zk_sync_os at root level
-        vm.serializeBool("root2", "is_zk_sync_os", isZKsyncOs);
-
-        // Write the final TOML
-        string memory permanentValuesToml2 = vm.serializeUint("root2", "era_chain_id", eraChainId);
-        vm.writeToml(permanentValuesToml2, permanentValuesInputPath);
     }
 }

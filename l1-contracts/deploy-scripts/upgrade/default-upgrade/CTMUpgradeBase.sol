@@ -9,72 +9,64 @@ import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeploy
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {
+    L2_COMPLEX_UPGRADER_ADDR,
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
     L2_FORCE_DEPLOYER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
-import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
-import {SemVer} from "contracts/common/libraries/SemVer.sol";
-import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
+import {CoreContract} from "../../ecosystem/CoreContract.sol";
+import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
+import {ChainCreationParamsConfig, CTMDeployedAddresses, StateTransitionDeployedAddresses} from "../../utils/Types.sol";
 import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
-import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {DeployCTMScript} from "../../ctm/DeployCTM.s.sol";
-
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {EraForceDeploymentsLib} from "./EraForceDeploymentsLib.sol";
+import {FacetCutsLib} from "./FacetCutsLib.sol";
+import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 
 abstract contract CTMUpgradeBase is DeployCTMScript {
-    function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual returns (bool);
-
-    /// @notice Get protocol upgrade nonce from protocol version
-    function getProtocolUpgradeNonce(uint256 protocolVersion) internal pure returns (uint256) {
-        return (protocolVersion >> 32);
-    }
-
-    /// @notice Check if upgrade is a patch upgrade
-    function isPatchUpgrade(uint256 protocolVersion) internal pure returns (bool) {
-        (uint32 _major, uint32 _minor, uint32 patch) = SemVer.unpackSemVer(SafeCast.toUint96(protocolVersion));
-        return patch != 0;
-    }
-
-    /// @notice Get old protocol deadline (max uint256 by default)
-    function getOldProtocolDeadline() internal pure returns (uint256) {
-        // Note, that it is this way by design, on stage2 it
-        // will be set to 0
-        return type(uint256).max;
-    }
-
-    /// @notice Build empty L1 -> L2 upgrade tx
-    /// @dev Only useful for patch upgrades
-    function emptyUpgradeTx() internal pure returns (L2CanonicalTransaction memory) {
-        return ProposedUpgradeLib.emptyL2CanonicalTransaction();
-    }
-
-    /// @notice Get L2 upgrade target and data
+    /// @notice Get L2 upgrade target and data.
+    /// @dev From V32 onwards, both Era and ZKsyncOS should use forceDeployAndUpgradeUniversal
+    /// (via L2_COMPLEX_UPGRADER_ADDR) since it supports both chain types via ContractUpgradeType.
+    /// The Era branch below uses forceDeployOnAddresses only because V31 Era chains do not yet
+    /// have forceDeployAndUpgradeUniversal deployed.
     function getL2UpgradeTargetAndData(
-        IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
-    ) internal view virtual returns (address, bytes memory) {
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
+    ) internal virtual returns (address, bytes memory) {
+        if (config.isZKsyncOS) {
+            return (
+                address(L2_COMPLEX_UPGRADER_ADDR),
+                abi.encodeCall(IComplexUpgrader.forceDeployAndUpgradeUniversal, (_deployments, address(0), ""))
+            );
+        }
         return (
             address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR),
-            abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (_forceDeployments))
+            abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (EraForceDeploymentsLib.unwrap(_deployments)))
         );
     }
 
     /// @notice Build L1 -> L2 upgrade tx
     function composeUpgradeTx(
-        IL2ContractDeployer.ForceDeployment[] memory forceDeployments,
-        uint256[] memory factoryDepsHashes,
-        uint256 protocolUpgradeNonce,
-        bool isZKsyncOS
-    ) internal view returns (L2CanonicalTransaction memory transaction) {
-        // Sanity check
-        for (uint256 i; i < forceDeployments.length; i++) {
-            require(isHashInFactoryDepsCheck(forceDeployments[i].bytecodeHash), "Bytecode hash not in factory deps");
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments,
+        PublishFactoryDepsResult memory _factoryDepsResult,
+        uint256 _protocolUpgradeNonce
+    ) internal returns (L2CanonicalTransaction memory transaction) {
+        // Sanity check: verify Era bytecodeHashes are in factory deps
+        for (uint256 i; i < _deployments.length; i++) {
+            if (_deployments[i].upgradeType == IComplexUpgrader.ContractUpgradeType.EraForceDeployment) {
+                IL2ContractDeployer.ForceDeployment memory fd = abi.decode(
+                    _deployments[i].deployedBytecodeInfo,
+                    (IL2ContractDeployer.ForceDeployment)
+                );
+                require(_isHashInFactoryDeps(_factoryDepsResult, fd.bytecodeHash), "Bytecode hash not in factory deps");
+            }
         }
 
-        (address target, bytes memory data) = getL2UpgradeTargetAndData(forceDeployments);
+        (address target, bytes memory data) = getL2UpgradeTargetAndData(_deployments);
 
-        uint256 txType = isZKsyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+        uint256 txType = UpgradeHelperLib.getUpgradeTxType(config.isZKsyncOS);
         transaction = L2CanonicalTransaction({
             txType: txType,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
@@ -85,13 +77,13 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             maxFeePerGas: 0,
             maxPriorityFeePerGas: 0,
             paymaster: uint256(uint160(address(0))),
-            nonce: protocolUpgradeNonce,
+            nonce: _protocolUpgradeNonce,
             value: 0,
             reserved: [uint256(0), uint256(0), uint256(0), uint256(0)],
             data: data,
             signature: new bytes(0),
             // All factory deps should've been published before
-            factoryDeps: factoryDepsHashes,
+            factoryDeps: _factoryDepsResult.factoryDepsHashes,
             paymasterInput: new bytes(0),
             // Reserved dynamic type for the future use-case. Using it should be avoided,
             // But it is still here, just in case we want to enable some additional functionality
@@ -99,84 +91,33 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         });
     }
 
-    /// @notice Merge two Call arrays
-    function mergeCalls(Call[] memory a, Call[] memory b) internal pure returns (Call[] memory result) {
-        result = new Call[](a.length + b.length);
-        for (uint256 i = 0; i < a.length; i++) {
-            result[i] = a[i];
-        }
-        for (uint256 i = 0; i < b.length; i++) {
-            result[a.length + i] = b[i];
-        }
-    }
-
-    /// @notice Merge two FacetCut arrays
-    function mergeFacets(
-        Diamond.FacetCut[] memory a,
-        Diamond.FacetCut[] memory b
-    ) internal pure returns (Diamond.FacetCut[] memory result) {
-        result = new Diamond.FacetCut[](a.length + b.length);
-        for (uint256 i = 0; i < a.length; i++) {
-            result[i] = a[i];
-        }
-        for (uint256 i = 0; i < b.length; i++) {
-            result[a.length + i] = b[i];
-        }
-    }
-
-    error NotLatestProtocolVersion();
-
-    /// @notice Get facet cuts that should be removed
-    function getFacetCutsForDeletion(address diamond) internal view returns (Diamond.FacetCut[] memory facetCuts) {
-        IZKChain.Facet[] memory facets = IZKChain(diamond).facets();
-
-        require(
-            IZKChain(diamond).getProtocolVersion() ==
-                IChainTypeManager(IZKChain(diamond).getChainTypeManager()).protocolVersion(),
-            NotLatestProtocolVersion()
-        );
-
-        // Freezability does not matter when deleting, so we just put false everywhere
-        facetCuts = new Diamond.FacetCut[](facets.length);
-        for (uint i = 0; i < facets.length; i++) {
-            facetCuts[i] = Diamond.FacetCut({
-                facet: address(0),
-                action: Diamond.Action.Remove,
-                isFreezable: false,
-                selectors: facets[i].selectors
-            });
-        }
-    }
-
-    /// @notice Generate upgrade cut data
+    /// @notice Generate upgrade cut data.
     function generateUpgradeCutData(
-        StateTransitionDeployedAddresses memory stateTransition,
-        ChainCreationParamsConfig memory chainCreationParams,
-        uint256 l1ChainId,
-        address ownerAddress,
-        uint256[] memory factoryDepsHashes,
-        address registeredChainIdDiamondProxy,
-        bool isZKsyncOS
+        StateTransitionDeployedAddresses memory _stateTransition,
+        ChainCreationParamsConfig memory _chainCreationParams,
+        uint256 _l1ChainId,
+        address _ownerAddress,
+        PublishFactoryDepsResult memory _factoryDepsResult,
+        address _registeredChainIdDiamondProxy
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
-        Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion(registeredChainIdDiamondProxy);
+        Diamond.FacetCut[] memory facetCutsForDeletion = FacetCutsLib.getDeletionCuts(_registeredChainIdDiamondProxy);
 
         Diamond.FacetCut[] memory facetCuts;
-        facetCuts = getChainCreationFacetCuts(stateTransition);
-        facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
-        uint256 nonce = getProtocolUpgradeNonce(chainCreationParams.latestProtocolVersion);
+        facetCuts = getChainCreationFacetCuts(_stateTransition);
+        facetCuts = FacetCutsLib.merge(facetCutsForDeletion, facetCuts);
+        uint256 nonce = UpgradeHelperLib.getProtocolUpgradeNonce(_chainCreationParams.latestProtocolVersion);
         ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(
-            stateTransition,
-            chainCreationParams,
-            l1ChainId,
-            ownerAddress,
-            factoryDepsHashes,
-            nonce,
-            isZKsyncOS
+            _stateTransition,
+            _chainCreationParams,
+            _l1ChainId,
+            _ownerAddress,
+            _factoryDepsResult,
+            nonce
         );
 
         upgradeCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: stateTransition.defaultUpgrade,
+            initAddress: _stateTransition.defaultUpgrade,
             initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
         });
     }
@@ -188,87 +129,85 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
     }
 
     function getProposedUpgrade(
-        StateTransitionDeployedAddresses memory stateTransition,
-        ChainCreationParamsConfig memory chainCreationParams,
-        uint256 l1ChainId,
-        address ownerAddress,
-        uint256[] memory factoryDepsHashes,
-        uint256 protocolUpgradeNonce,
-        bool isZKsyncOS
+        StateTransitionDeployedAddresses memory _stateTransition,
+        ChainCreationParamsConfig memory _chainCreationParams,
+        uint256 _l1ChainId,
+        address _ownerAddress,
+        PublishFactoryDepsResult memory _factoryDepsResult,
+        uint256 _protocolUpgradeNonce
     ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
-        IL2ContractDeployer.ForceDeployment[] memory forceDeployments;
-
-        if (isZKsyncOS) {
-            // ZKsyncOS uses FixedForceDeploymentsData (built in DeployCTM) instead of
-            // Era-style ForceDeployment[] arrays. Return empty — the upgrade tx for
-            // ZKsyncOS chains carries data through a different path.
-            forceDeployments = new IL2ContractDeployer.ForceDeployment[](0);
-        } else {
-            IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
-                .getBaseForceDeployments(l1ChainId, ownerAddress);
-            IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalForceDeployments();
-            forceDeployments = SystemContractsProcessing.mergeForceDeployments(
-                baseForceDeployments,
-                additionalForceDeployments
-            );
-        }
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments = getAllUniversalForceDeployments(
+            _l1ChainId,
+            _ownerAddress
+        );
 
         proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: composeUpgradeTx(
-                forceDeployments,
-                factoryDepsHashes,
-                protocolUpgradeNonce,
-                isZKsyncOS
-            ),
-            bootloaderHash: chainCreationParams.bootloaderHash,
-            defaultAccountHash: chainCreationParams.defaultAAHash,
-            evmEmulatorHash: chainCreationParams.evmEmulatorHash,
+            l2ProtocolUpgradeTx: composeUpgradeTx(deployments, _factoryDepsResult, _protocolUpgradeNonce),
+            bootloaderHash: _chainCreationParams.bootloaderHash,
+            defaultAccountHash: _chainCreationParams.defaultAAHash,
+            evmEmulatorHash: _chainCreationParams.evmEmulatorHash,
             // Verifier is resolved from CTM; keep zeroed fields for calldata compatibility.
             verifier: address(0),
             verifierParams: ProposedUpgradeLib.emptyVerifierParams(),
             l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
+            postUpgradeCalldata: encodePostUpgradeCalldata(_stateTransition),
             upgradeTimestamp: 0,
-            newProtocolVersion: chainCreationParams.latestProtocolVersion
+            newProtocolVersion: _chainCreationParams.latestProtocolVersion
         });
     }
 
-    function getForceDeployment(
-        string memory contractName
-    ) public virtual returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
+    /// @notice Build the complete force-deployment list in the universal upgrader format for the active VM.
+    function getAllUniversalForceDeployments(
+        uint256 _l1ChainId,
+        address _ownerAddress
+    ) internal returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
         return
-            IL2ContractDeployer.ForceDeployment({
-                bytecodeHash: getL2BytecodeHash(contractName),
-                newAddress: getExpectedL2Address(contractName),
-                callConstructor: false,
-                value: 0,
-                input: ""
-            });
+            SystemContractsProcessing.mergeUniversalForceDeployments(
+                getBaseUniversalForceDeployments(_l1ChainId, _ownerAddress),
+                getAdditionalUniversalForceDeployments()
+            );
     }
 
-    function getAdditionalForceDeployments()
+    function getBaseUniversalForceDeployments(
+        uint256 _l1ChainId,
+        address _ownerAddress
+    ) internal returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
+        if (config.isZKsyncOS) {
+            return SystemContractsProcessing.getBaseZKsyncOSForceDeployments();
+        }
+
+        return
+            EraForceDeploymentsLib.wrap(SystemContractsProcessing.getBaseForceDeployments(_l1ChainId, _ownerAddress));
+    }
+
+    function getAdditionalUniversalForceDeployments()
         internal
-        returns (IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments)
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
     {
-        string[] memory forceDeploymentNames = getForceDeploymentNames();
-        additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](forceDeploymentNames.length);
-        for (uint256 i; i < forceDeploymentNames.length; i++) {
-            additionalForceDeployments[i] = getForceDeployment(forceDeploymentNames[i]);
+        if (config.isZKsyncOS) {
+            return getAdditionalZKsyncOSForceDeployments();
         }
-        return additionalForceDeployments;
+
+        CoreContract[] memory additionalForcedCoreContracts = getAdditionalForcedCoreContracts();
+        IL2ContractDeployer.ForceDeployment[]
+            memory additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](
+                additionalForcedCoreContracts.length
+            );
+        for (uint256 i; i < additionalForcedCoreContracts.length; i++) {
+            additionalForceDeployments[i] = CoreOnGatewayHelper.getForceDeployment(
+                false,
+                additionalForcedCoreContracts[i]
+            );
+        }
+        return EraForceDeploymentsLib.wrap(additionalForceDeployments);
     }
 
-    function getAdditionalDependenciesNames() internal virtual returns (string[] memory forceDeploymentNames) {
-        string[] memory additionalForceDeploymentNames = getForceDeploymentNames();
-        forceDeploymentNames = new string[](additionalForceDeploymentNames.length);
-        for (uint256 i; i < additionalForceDeploymentNames.length; i++) {
-            forceDeploymentNames[i] = additionalForceDeploymentNames[i];
-        }
-        return forceDeploymentNames;
-    }
-
-    function getForceDeploymentNames() internal virtual returns (string[] memory forceDeploymentNames) {
-        return new string[](0);
+    function getAdditionalForcedCoreContracts()
+        internal
+        virtual
+        returns (CoreContract[] memory additionalForcedCoreContracts)
+    {
+        return new CoreContract[](0);
     }
 
     /// @notice Encode calldata that will be passed to `_postUpgrade`
@@ -279,7 +218,28 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         return new bytes(0);
     }
 
-    function getExpectedL2Address(string memory contractName) public virtual returns (address) {
-        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
+    function _isHashInFactoryDeps(PublishFactoryDepsResult memory _result, bytes32 _hash) private pure returns (bool) {
+        if (_result.factoryDepsHashes.length == 0) {
+            return true;
+        }
+        for (uint256 i = 0; i < _result.factoryDepsHashes.length; i++) {
+            if (bytes32(_result.factoryDepsHashes[i]) == _hash) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// @notice Returns the FixedForceDeploymentsData for bytecodeInfo reuse.
+    /// @dev Override in DefaultCTMUpgrade to return cached data (avoids double-loading).
+    function getFixedForceDeploymentsData() internal virtual returns (FixedForceDeploymentsData memory);
+
+    /// @notice Override to provide version-specific ZKsyncOS force deployment entries.
+    function getAdditionalZKsyncOSForceDeployments()
+        internal
+        virtual
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory)
+    {
+        return new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
     }
 }

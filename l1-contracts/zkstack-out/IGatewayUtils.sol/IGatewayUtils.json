@@ -1,6 +1,19 @@
 [
   {
     "type": "function",
+    "name": "dumpForceDeployments",
+    "inputs": [
+      {
+        "name": "_ctm",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "finishMigrateChainFromGateway",
     "inputs": [
       {

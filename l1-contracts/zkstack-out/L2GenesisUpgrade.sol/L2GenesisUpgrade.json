@@ -34,25 +34,6 @@
   },
   {
     "type": "event",
-    "name": "ContractUpgraded",
-    "inputs": [
-      {
-        "name": "upgradeType",
-        "type": "uint8",
-        "indexed": true,
-        "internalType": "enum IComplexUpgrader.ContractUpgradeType"
-      },
-      {
-        "name": "targetAddress",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "ForceDeployedContractsInitialized",
     "inputs": [
       {
@@ -85,44 +66,12 @@
   },
   {
     "type": "error",
-    "name": "DeployFailed",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidChainId",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "NonCanonicalRepresentation",
+    "name": "ZeroAddress",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "UnsupportedUpgradeType",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ZKsyncOSNotForceDeployForExistingContract",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "ZKsyncOSNotForceDeployToPrecompileAddress",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
   }
 ]

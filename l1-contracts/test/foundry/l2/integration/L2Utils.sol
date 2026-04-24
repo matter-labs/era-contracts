@@ -44,6 +44,7 @@ import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
+import {GWAssetTrackerDev} from "contracts/dev-contracts/test/GWAssetTrackerDev.sol";
 // import {InteropAccount} from "contracts/interop/InteropAccount.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 
@@ -57,6 +58,7 @@ import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 import {Utils} from "deploy-scripts/utils/Utils.sol";
+import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
 import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
 import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 
@@ -74,7 +76,7 @@ library L2Utils {
      * @dev It is a hack needed to make the tests be able to call system contracts directly.
      */
     function initSystemContracts(SystemContractsArgs memory _args) internal {
-        bytes memory contractDeployerBytecode = Utils.readSystemContractsBytecode("ContractDeployer");
+        bytes memory contractDeployerBytecode = BytecodeUtils.readSystemContractsBytecode("ContractDeployer");
         vm.etch(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, contractDeployerBytecode);
         forceDeploySystemContracts(_args);
     }
@@ -159,13 +161,7 @@ library L2Utils {
         forceDeployWithoutConstructor("L2ChainAssetHandler", L2_CHAIN_ASSET_HANDLER_ADDR);
         L2ChainAssetHandler chainAssetHandler = L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        chainAssetHandler.initL2(
-            _args.l1ChainId,
-            _args.aliasedOwner,
-            L2_BRIDGEHUB_ADDR,
-            L2_ASSET_ROUTER_ADDR,
-            L2_MESSAGE_ROOT_ADDR
-        );
+        chainAssetHandler.initL2(_args.l1ChainId, _args.aliasedOwner);
     }
 
     function forceDeployL2MessageVerification(SystemContractsArgs memory _args) internal {
@@ -212,9 +208,9 @@ library L2Utils {
     }
 
     function forceDeployGWAssetTracker(SystemContractsArgs memory _args) internal {
-        new GWAssetTracker();
+        new GWAssetTrackerDev();
 
-        forceDeployWithoutConstructor("GWAssetTracker", GW_ASSET_TRACKER_ADDR);
+        forceDeployWithoutConstructor("GWAssetTrackerDev", GW_ASSET_TRACKER_ADDR);
     }
 
     /// @notice Deploys the L2AssetRouter contract.
@@ -265,7 +261,11 @@ library L2Utils {
     }
 
     function forceDeployWithoutConstructor(string memory _contractName, address _address) public {
-        bytes memory bytecode = Utils.readZKFoundryBytecodeL1(string.concat(_contractName, ".sol"), _contractName);
+        bytes memory bytecode = BytecodeUtils.readBytecodeL1(
+            false,
+            string.concat(_contractName, ".sol"),
+            _contractName
+        );
 
         bytes32 bytecodehash = L2ContractHelper.hashL2Bytecode(bytecode);
 
