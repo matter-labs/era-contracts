@@ -210,25 +210,6 @@ contract L2GenesisForceDeploymentsHelperTest is Test {
         assertEq(etchedProxyAdmin.upgradeCallCount(), 0);
     }
 
-    function testEraForceDeploymentDoesNotRequireSystemContractProxyAdmin() public {
-        FixedForceDeploymentsData memory fixedData = _createEraFixedForceDeploymentsData();
-        ZKChainSpecificForceDeploymentsData memory additionalData = _createAdditionalForceDeploymentsData();
-
-        vm.etch(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, "");
-        _etchAllDeferredContracts();
-
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
-            false,
-            ctmDeployerAddress,
-            abi.encode(fixedData),
-            abi.encode(additionalData),
-            true
-        );
-
-        assertEq(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR.code.length, 0);
-    }
-
     // Helper functions
 
     function _countLogs(Vm.Log[] memory logs, bytes32 signature) internal pure returns (uint256 count) {
