@@ -133,10 +133,10 @@ library SystemContractsProcessing {
     }
 
     function getSystemContractsBytecodes() internal view returns (bytes[] memory result) {
-        SystemContract[] memory systemContracts = getSystemContracts();
-        result = new bytes[](systemContracts.length);
+        result = new bytes[](SYSTEM_CONTRACTS_COUNT);
 
-        for (uint256 i = 0; i < systemContracts.length; i++) {
+        SystemContract[] memory systemContracts = getSystemContracts();
+        for (uint256 i = 0; i < SYSTEM_CONTRACTS_COUNT; i++) {
             if (systemContracts[i].isPrecompile) {
                 result[i] = BytecodeUtils.readPrecompileBytecode(systemContracts[i].codeName);
             } else {
@@ -163,11 +163,11 @@ library SystemContractsProcessing {
         view
         returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments)
     {
+        forceDeployments = new IL2ContractDeployer.ForceDeployment[](SYSTEM_CONTRACTS_COUNT);
+
         SystemContract[] memory systemContracts = getSystemContracts();
         bytes[] memory bytecodes = getSystemContractsBytecodes();
-        forceDeployments = new IL2ContractDeployer.ForceDeployment[](systemContracts.length);
-
-        for (uint256 i = 0; i < systemContracts.length; i++) {
+        for (uint256 i = 0; i < SYSTEM_CONTRACTS_COUNT; i++) {
             forceDeployments[i] = IL2ContractDeployer.ForceDeployment({
                 bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[i]),
                 newAddress: systemContracts[i].addr,
