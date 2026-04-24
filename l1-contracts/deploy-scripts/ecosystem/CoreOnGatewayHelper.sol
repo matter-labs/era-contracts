@@ -35,7 +35,8 @@ import {
     L2_NTV_BEACON_DEPLOYER_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title CoreOnGatewayHelper
@@ -81,6 +82,9 @@ library CoreOnGatewayHelper {
     function getCreate2DerivedForceDeploymentAddr(bool _isZKsyncOS, CoreContract _c) internal view returns (address) {
         // FIXME: add support for additional force deployments on ZKsyncOS in scripts.
         require(!_isZKsyncOS, "Additional force deployments are not supported for ZKsyncOS scripts");
+        if (_c == CoreContract.L2V29Upgrade || _c == CoreContract.L2V31Upgrade) {
+            return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
+        }
         return Utils.getL2AddressViaCreate2Factory(bytes32(0), getDeployedBytecodeHash(false, _c), hex"");
     }
 
