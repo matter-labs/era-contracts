@@ -46,8 +46,10 @@ struct SystemContract {
     bool isPrecompile; // Whether precompile or not
 }
 
-/// @dev The number of built-in contracts that reside within the "system-contracts" folder
-uint256 constant SYSTEM_CONTRACTS_COUNT = 30;
+/// @dev The number of built-in contracts that reside within the "system-contracts" folder.
+uint256 constant ERA_VM_SYSTEM_CONTRACTS_COUNT = 30;
+/// @dev Era system force deployments: EraVM system contracts plus fixed-address system helpers.
+uint256 constant SYSTEM_CONTRACTS_COUNT = ERA_VM_SYSTEM_CONTRACTS_COUNT + 1;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
 uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 13;
 /// @dev System contracts (0x800x) with l1-contracts EVM bytecodes for ZKsyncOS proxy upgrades.
@@ -63,14 +65,14 @@ struct BuiltinContractDeployInfo {
 library SystemContractsProcessing {
     /// @notice Retrieves the entire list of system contracts as a memory array.
     /// @dev Note that it does not include all built-in contracts. Rather all those
-    /// that are based in the `system-contracts` folder.
+    /// that are based in the `system-contracts` folder plus fixed-address system helpers.
     /// Note, that we do not populate the system contract for the genesis upgrade address,
     /// as it is used during the genesis upgrade or during upgrades (and so it should be populated
     /// as part of the upgrade script).
     /// @return An array of SystemContract structs containing all system contracts
     function getSystemContracts() public pure returns (SystemContract[] memory) {
         SystemContract[] memory systemContracts = new SystemContract[](SYSTEM_CONTRACTS_COUNT);
-        for (uint256 i = 0; i < SYSTEM_CONTRACTS_COUNT; i++) {
+        for (uint256 i = 0; i < ERA_VM_SYSTEM_CONTRACTS_COUNT; i++) {
             EraVmSystemContract id = EraVmSystemContract(i);
             systemContracts[i] = SystemContract({
                 addr: CoreOnGatewayHelper._resolveAddress(id),
@@ -79,6 +81,12 @@ library SystemContractsProcessing {
                 isPrecompile: CoreOnGatewayHelper._resolveIsPrecompile(id)
             });
         }
+        systemContracts[ERA_VM_SYSTEM_CONTRACTS_COUNT] = SystemContract({
+            addr: L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
+            codeName: "SystemContractProxyAdmin",
+            lang: Language.Solidity,
+            isPrecompile: false
+        });
         return systemContracts;
     }
 
@@ -123,16 +131,22 @@ library SystemContractsProcessing {
     }
 
     function getSystemContractsBytecodes() internal view returns (bytes[] memory result) {
-        result = new bytes[](SYSTEM_CONTRACTS_COUNT);
-
         SystemContract[] memory systemContracts = getSystemContracts();
-        for (uint256 i = 0; i < SYSTEM_CONTRACTS_COUNT; i++) {
+        result = new bytes[](systemContracts.length);
+
+        for (uint256 i = 0; i < systemContracts.length; i++) {
             if (systemContracts[i].isPrecompile) {
                 result[i] = BytecodeUtils.readPrecompileBytecode(systemContracts[i].codeName);
             } else {
                 // L2BaseToken is now in l1-contracts as L2BaseTokenEra
                 if (Utils.compareStrings(systemContracts[i].codeName, "L2BaseToken")) {
                     result[i] = BytecodeUtils.readBytecodeL1(false, "L2BaseTokenEra.sol", "L2BaseTokenEra");
+                } else if (Utils.compareStrings(systemContracts[i].codeName, "SystemContractProxyAdmin")) {
+                    result[i] = BytecodeUtils.readBytecodeL1(
+                        false,
+                        "SystemContractProxyAdmin.sol",
+                        "SystemContractProxyAdmin"
+                    );
                 } else if (systemContracts[i].lang == Language.Solidity) {
                     result[i] = BytecodeUtils.readSystemContractsBytecode(systemContracts[i].codeName);
                 } else {
@@ -147,11 +161,11 @@ library SystemContractsProcessing {
         view
         returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments)
     {
-        forceDeployments = new IL2ContractDeployer.ForceDeployment[](SYSTEM_CONTRACTS_COUNT);
-
         SystemContract[] memory systemContracts = getSystemContracts();
         bytes[] memory bytecodes = getSystemContractsBytecodes();
-        for (uint256 i = 0; i < SYSTEM_CONTRACTS_COUNT; i++) {
+        forceDeployments = new IL2ContractDeployer.ForceDeployment[](systemContracts.length);
+
+        for (uint256 i = 0; i < systemContracts.length; i++) {
             forceDeployments[i] = IL2ContractDeployer.ForceDeployment({
                 bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[i]),
                 newAddress: systemContracts[i].addr,
@@ -160,30 +174,6 @@ library SystemContractsProcessing {
                 input: ""
             });
         }
-    }
-
-    function getEraSystemBytecodes() internal view returns (bytes[] memory bytecodes) {
-        bytes[] memory systemBytecodes = getSystemContractsBytecodes();
-        bytecodes = new bytes[](systemBytecodes.length + 1);
-
-        for (uint256 i = 0; i < systemBytecodes.length; i++) {
-            bytecodes[i] = systemBytecodes[i];
-        }
-        bytecodes[systemBytecodes.length] = getSystemContractProxyAdminBytecode();
-    }
-
-    function getEraSystemForceDeployments()
-        internal
-        view
-        returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments)
-    {
-        IL2ContractDeployer.ForceDeployment[] memory systemForceDeployments = getSystemContractsForceDeployments();
-        forceDeployments = new IL2ContractDeployer.ForceDeployment[](systemForceDeployments.length + 1);
-
-        for (uint256 i = 0; i < systemForceDeployments.length; i++) {
-            forceDeployments[i] = systemForceDeployments[i];
-        }
-        forceDeployments[systemForceDeployments.length] = getSystemContractProxyAdminForceDeployment();
     }
 
     /// @notice The list of CoreContract entries that are "other built-in" contracts.
@@ -267,25 +257,6 @@ library SystemContractsProcessing {
         }
     }
 
-    function getSystemContractProxyAdminForceDeployment()
-        internal
-        view
-        returns (IL2ContractDeployer.ForceDeployment memory forceDeployment)
-    {
-        bytes memory proxyAdminBytecode = getSystemContractProxyAdminBytecode();
-        forceDeployment = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(proxyAdminBytecode),
-            newAddress: L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-    }
-
-    function getSystemContractProxyAdminBytecode() internal view returns (bytes memory) {
-        return BytecodeUtils.readBytecodeL1(false, "SystemContractProxyAdmin.sol", "SystemContractProxyAdmin");
-    }
-
     function forceDeploymentsToHashes(
         IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments
     ) internal pure returns (bytes32[] memory hashes) {
@@ -326,7 +297,7 @@ library SystemContractsProcessing {
             l1ChainId,
             owner
         );
-        IL2ContractDeployer.ForceDeployment[] memory systemForceDeployments = getEraSystemForceDeployments();
+        IL2ContractDeployer.ForceDeployment[] memory systemForceDeployments = getSystemContractsForceDeployments();
 
         forceDeployments = mergeForceDeployments(systemForceDeployments, otherForceDeployments);
     }
@@ -364,7 +335,7 @@ library SystemContractsProcessing {
         basicBytecodes[1] = BytecodeUtils.readSystemContractsBytecode("DefaultAccount");
         basicBytecodes[2] = Utils.getEvmEmulatorBytecodeHash();
 
-        bytes[] memory systemBytecodes = getEraSystemBytecodes();
+        bytes[] memory systemBytecodes = getSystemContractsBytecodes();
         BuiltinContractDeployInfo[] memory otherContracts = getOtherBuiltinContracts();
         bytes[] memory otherBytecodes = new bytes[](otherContracts.length + 2);
         for (uint256 i = 0; i < otherContracts.length; i++) {
