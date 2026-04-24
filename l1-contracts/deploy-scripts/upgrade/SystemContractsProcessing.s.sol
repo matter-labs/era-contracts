@@ -162,6 +162,30 @@ library SystemContractsProcessing {
         }
     }
 
+    function getEraSystemBytecodes() internal view returns (bytes[] memory bytecodes) {
+        bytes[] memory systemBytecodes = getSystemContractsBytecodes();
+        bytecodes = new bytes[](systemBytecodes.length + 1);
+
+        for (uint256 i = 0; i < systemBytecodes.length; i++) {
+            bytecodes[i] = systemBytecodes[i];
+        }
+        bytecodes[systemBytecodes.length] = getSystemContractProxyAdminBytecode();
+    }
+
+    function getEraSystemForceDeployments()
+        internal
+        view
+        returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments)
+    {
+        IL2ContractDeployer.ForceDeployment[] memory systemForceDeployments = getSystemContractsForceDeployments();
+        forceDeployments = new IL2ContractDeployer.ForceDeployment[](systemForceDeployments.length + 1);
+
+        for (uint256 i = 0; i < systemForceDeployments.length; i++) {
+            forceDeployments[i] = systemForceDeployments[i];
+        }
+        forceDeployments[systemForceDeployments.length] = getSystemContractProxyAdminForceDeployment();
+    }
+
     /// @notice The list of CoreContract entries that are "other built-in" contracts.
     function getOtherBuiltinCoreContracts() internal pure returns (CoreContract[] memory ids) {
         ids = new CoreContract[](OTHER_BUILT_IN_CONTRACTS_COUNT);
@@ -248,11 +272,7 @@ library SystemContractsProcessing {
         view
         returns (IL2ContractDeployer.ForceDeployment memory forceDeployment)
     {
-        bytes memory proxyAdminBytecode = BytecodeUtils.readBytecodeL1(
-            false,
-            "SystemContractProxyAdmin.sol",
-            "SystemContractProxyAdmin"
-        );
+        bytes memory proxyAdminBytecode = getSystemContractProxyAdminBytecode();
         forceDeployment = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(proxyAdminBytecode),
             newAddress: L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
@@ -260,6 +280,10 @@ library SystemContractsProcessing {
             value: 0,
             input: ""
         });
+    }
+
+    function getSystemContractProxyAdminBytecode() internal view returns (bytes memory) {
+        return BytecodeUtils.readBytecodeL1(false, "SystemContractProxyAdmin.sol", "SystemContractProxyAdmin");
     }
 
     function forceDeploymentsToHashes(
@@ -302,14 +326,9 @@ library SystemContractsProcessing {
             l1ChainId,
             owner
         );
-        IL2ContractDeployer.ForceDeployment[] memory systemForceDeployments = getSystemContractsForceDeployments();
-
-        IL2ContractDeployer.ForceDeployment[] memory proxyAdminForceDeployment =
-            new IL2ContractDeployer.ForceDeployment[](1);
-        proxyAdminForceDeployment[0] = getSystemContractProxyAdminForceDeployment();
+        IL2ContractDeployer.ForceDeployment[] memory systemForceDeployments = getEraSystemForceDeployments();
 
         forceDeployments = mergeForceDeployments(systemForceDeployments, otherForceDeployments);
-        forceDeployments = mergeForceDeployments(forceDeployments, proxyAdminForceDeployment);
     }
 
     function getBaseListOfDependencies(bool _isZKsyncOS) internal view returns (bytes[] memory factoryDeps) {
@@ -345,24 +364,17 @@ library SystemContractsProcessing {
         basicBytecodes[1] = BytecodeUtils.readSystemContractsBytecode("DefaultAccount");
         basicBytecodes[2] = Utils.getEvmEmulatorBytecodeHash();
 
-        bytes[] memory systemBytecodes = getSystemContractsBytecodes();
+        bytes[] memory systemBytecodes = getEraSystemBytecodes();
         BuiltinContractDeployInfo[] memory otherContracts = getOtherBuiltinContracts();
-        bytes[] memory otherBytecodes = new bytes[](otherContracts.length);
+        bytes[] memory otherBytecodes = new bytes[](otherContracts.length + 2);
         for (uint256 i = 0; i < otherContracts.length; i++) {
             otherBytecodes[i] = otherContracts[i].bytecode;
         }
-
-        bytes[] memory upgradeRuntimeBytecodes = new bytes[](3);
-        upgradeRuntimeBytecodes[0] = BytecodeUtils.readBytecodeL1(
-            false,
-            "SystemContractProxyAdmin.sol",
-            "SystemContractProxyAdmin"
-        );
-        upgradeRuntimeBytecodes[1] = ContractsBytecodesLib.getCreationCodeEra("TransparentUpgradeableProxy");
-        upgradeRuntimeBytecodes[2] = ContractsBytecodesLib.getCreationCodeEra("BeaconProxy");
+        // Runtime deployment preimages used by the v31 upgrade path, not force-deployed system contracts.
+        otherBytecodes[otherContracts.length] = ContractsBytecodesLib.getCreationCodeEra("TransparentUpgradeableProxy");
+        otherBytecodes[otherContracts.length + 1] = ContractsBytecodesLib.getCreationCodeEra("BeaconProxy");
 
         factoryDeps = mergeBytesArrays(mergeBytesArrays(basicBytecodes, systemBytecodes), otherBytecodes);
-        factoryDeps = mergeBytesArrays(factoryDeps, upgradeRuntimeBytecodes);
     }
 
     /// @notice Build the base ZKsyncOS force deployment array.
