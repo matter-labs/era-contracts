@@ -79,13 +79,16 @@ library CoreOnGatewayHelper {
 
     // ======================== Force deployments ========================
 
-    function getCreate2DerivedForceDeploymentAddr(bool _isZKsyncOS, CoreContract _c) internal view returns (address) {
-        // FIXME: add support for additional force deployments on ZKsyncOS in scripts.
-        require(!_isZKsyncOS, "Additional force deployments are not supported for ZKsyncOS scripts");
+    function getCreate2DerivedForceDeploymentAddr(CoreContract _c) internal view returns (address) {
+        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getDeployedBytecodeHash(false, _c), hex"");
+    }
+
+    function getEraForceDeploymentAddress(CoreContract _c) internal view returns (address) {
         if (_c == CoreContract.L2V29Upgrade || _c == CoreContract.L2V31Upgrade) {
             return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
         }
-        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getDeployedBytecodeHash(false, _c), hex"");
+
+        return getCreate2DerivedForceDeploymentAddr(_c);
     }
 
     /// @notice Build a force deployment entry for scripts that use additional Era force deployments.
@@ -97,7 +100,7 @@ library CoreOnGatewayHelper {
         require(!_isZKsyncOS, "Additional force deployments are not supported for ZKsyncOS scripts");
         forceDeployment = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: getDeployedBytecodeHash(false, _c),
-            newAddress: getCreate2DerivedForceDeploymentAddr(_isZKsyncOS, _c),
+            newAddress: getEraForceDeploymentAddress(_c),
             callConstructor: false,
             value: 0,
             input: ""
