@@ -40,3 +40,11 @@
 - This is not a prividium-only path. It is the normal integration-test wallet setup path: `core/tests/ts-integration/src/context-owner.ts` deposits the configured ERC20 token before test bodies run.
 - A server-only fix would require injecting the bytecode preimage out of band after the L1-accepted upgrade, or changing the accepted upgrade tx's factory deps locally. Both are shortcuts because the upgraded chain would not be exercising the bytecode publication performed by the real upgrade.
 - The minimal contracts-side fix is to publish `BeaconProxy` creation bytecode in the Era v31 upgrade factory deps. This does not change the BeaconProxy implementation or force-deploy any token proxy; it only makes the bytecode hash that `L2NativeTokenVault` is already configured to use available to the VM.
+
+## Current Implementation Shape
+
+- `SystemContractProxyAdmin` is treated as a normal Era system force deployment, not as a separate merge or one-off helper. `SYSTEM_CONTRACTS_COUNT` is bumped from 30 to 31, while `ERA_VM_SYSTEM_CONTRACTS_COUNT` remains 30 because only the first 30 entries are backed by `EraVmSystemContract`. The 31st entry is `SystemContractProxyAdmin` at `L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR`.
+- `getSystemContractsBytecodes()` and `getSystemContractsForceDeployments()` keep the existing fixed-count array pattern. The only special bytecode-source branch is that `SystemContractProxyAdmin` is read from `l1-contracts`, not from `system-contracts`.
+- `TransparentUpgradeableProxy` and `BeaconProxy` are factory dependencies only. They are not included in `getOtherBuiltinCoreContracts()` because that list is also used to build force deployments.
+- `OTHER_FACTORY_DEPENDENCY_CONTRACTS_COUNT` is bumped from 13 to 15. `getOtherFactoryDependencyContracts()` contains the 13 other built-ins plus `TransparentUpgradeableProxy` and `BeaconProxy`, and `getBaseListOfDependencies()` consumes that list through `getOtherFactoryDependencyBytecodes()`.
+- This preserves the intended distinction: proxy admin is force-deployed at a fixed system address; proxy runtime bytecodes are only published as preimages for real runtime deployments performed by the accepted upgrade path.
