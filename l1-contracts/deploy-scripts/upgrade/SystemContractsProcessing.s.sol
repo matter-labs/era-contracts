@@ -46,10 +46,8 @@ struct SystemContract {
     bool isPrecompile; // Whether precompile or not
 }
 
-/// @dev The number of built-in contracts that reside within the "system-contracts" folder.
-uint256 constant ERA_VM_SYSTEM_CONTRACTS_COUNT = 30;
-/// @dev Era system force deployments: EraVM system contracts plus fixed-address system helpers.
-uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
+/// @dev The number of built-in contracts that reside within the "system-contracts" folder
+uint256 constant SYSTEM_CONTRACTS_COUNT = 30;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
 uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 13;
 /// @dev Era factory dependencies based in `l1-contracts`: other built-ins plus runtime deployment preimages.
@@ -74,7 +72,7 @@ library SystemContractsProcessing {
     /// @return An array of SystemContract structs containing all system contracts
     function getSystemContracts() public pure returns (SystemContract[] memory) {
         SystemContract[] memory systemContracts = new SystemContract[](SYSTEM_CONTRACTS_COUNT);
-        for (uint256 i = 0; i < ERA_VM_SYSTEM_CONTRACTS_COUNT; i++) {
+        for (uint256 i = 0; i < SYSTEM_CONTRACTS_COUNT; i++) {
             EraVmSystemContract id = EraVmSystemContract(i);
             systemContracts[i] = SystemContract({
                 addr: CoreOnGatewayHelper._resolveAddress(id),
@@ -83,12 +81,6 @@ library SystemContractsProcessing {
                 isPrecompile: CoreOnGatewayHelper._resolveIsPrecompile(id)
             });
         }
-        systemContracts[ERA_VM_SYSTEM_CONTRACTS_COUNT] = SystemContract({
-            addr: L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
-            codeName: "SystemContractProxyAdmin",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
         return systemContracts;
     }
 
@@ -143,12 +135,6 @@ library SystemContractsProcessing {
                 // L2BaseToken is now in l1-contracts as L2BaseTokenEra
                 if (Utils.compareStrings(systemContracts[i].codeName, "L2BaseToken")) {
                     result[i] = BytecodeUtils.readBytecodeL1(false, "L2BaseTokenEra.sol", "L2BaseTokenEra");
-                } else if (Utils.compareStrings(systemContracts[i].codeName, "SystemContractProxyAdmin")) {
-                    result[i] = BytecodeUtils.readBytecodeL1(
-                        false,
-                        "SystemContractProxyAdmin.sol",
-                        "SystemContractProxyAdmin"
-                    );
                 } else if (systemContracts[i].lang == Language.Solidity) {
                     result[i] = BytecodeUtils.readSystemContractsBytecode(systemContracts[i].codeName);
                 } else {

@@ -1,27 +1,27 @@
-# v31 Era Upgrade Blocker
+# v31 Era Non-Blocker: SystemContractProxyAdmin
 
 - The `draft-v31` L1 helper output is the source of truth for the v31 L2 upgrade transaction. In the failing local e2e run, the transaction stored by `eth_watch` exactly matched `EraSettlementLayerV31Upgrade.getL2UpgradeTxData(bridgehub, 271, false, existingTxData)`, and the DB `protocol_versions.upgrade_tx_hash` exactly matched `getL2SystemContractsUpgradeTxHash()` on the upgraded diamond.
 - The accepted L2 calldata calls `L2ComplexUpgrader.forceDeployAndUpgrade(...)`, then delegate-calls `L2V31Upgrade.upgrade(...)`. `L2V31Upgrade.upgrade()` calls `L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(...)`, which unconditionally calls `_setupProxyAdmin()`.
 - `_setupProxyAdmin()` calls `SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).owner()` and then may call `forceSetOwner(address(this))`. This requires code at `0x000000000000000000000000000000000001000c`.
 - The exact accepted force-deployment list decoded from the live failing DB calldata did not include `0x000000000000000000000000000000000001000c`.
 - The v29 source chain state used by `era-cacher` had no AccountCodeStorage entry for `0x000000000000000000000000000000000001000c`; genesis code entries existed only through `0x1000a` for the old built-ins plus the generated v31 tx's listed deps.
-- Therefore the accepted upgrade transaction requires a contract that is neither present in the v29 source state nor force-deployed by the accepted v31 calldata. Fixing this in `zksync-era` would require mutating L2 state out-of-band or changing the accepted bytes after L1 acceptance, both of which would be shortcuts and would invalidate the e2e test.
-- The minimal contracts-side fix is to include `SystemContractProxyAdmin` in the Era force-deployment list and publish its bytecode in the Era v31 factory deps. This preserves the L1-accepted-bytes invariant: the server still executes exactly the bytes produced and accepted by the L1 upgrade path.
+- That proved the unconditional Era call was the blocker, not that Era needs `SystemContractProxyAdmin`. Independent code tracing shows `SystemContractProxyAdmin.upgrade(...)` is only used by `updateZKsyncOSContract(...)`, i.e. the `ZKsyncOSSystemProxyUpgrade` path. Era system contracts use `EraForceDeployment` and are written directly to their fixed addresses.
+- The cleaner fix is to call `_setupProxyAdmin()` only when `_isZKsyncOS == true`. This keeps proxy-admin setup where it is required and removes the need to force-deploy or publish `SystemContractProxyAdmin` for Era.
+- Regression proof: `testEraForceDeploymentDoesNotRequireSystemContractProxyAdmin` clears code at `L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR`, runs `performForceDeployedContractsInit(false, ...)`, and asserts the address remains empty. The existing ZKsyncOS genesis and non-genesis tests still pass.
 
 ## v31 Era Upgrade Blocker: WETH Proxy Bytecode
 
-- After adding `SystemContractProxyAdmin`, the L1-accepted v31 upgrade tx still failed during post-upgrade state keeper execution with `Upgrade tx failed`.
-- The accepted calldata now includes `SystemContractProxyAdmin` at `0x000000000000000000000000000000000001000c`, so the prior missing-proxy-admin condition is no longer the active blocker.
+- After removing the Era proxy-admin requirement, the v31 Era path still requires the runtime proxy bytecode used by `_ensureWethToken()`.
 - `L2V31Upgrade.upgrade()` delegate-calls `L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(..., false)`. On the Era path, this calls `_ensureWethToken(L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN(), ...)` before `updateL2()`.
 - `forge inspect contracts/bridge/ntv/L2NativeTokenVault.sol:L2NativeTokenVault storage-layout` shows `WETH_TOKEN` is stored in slot `251` in the v31 implementation. The v29 source DB state for `0x0000000000000000000000000000000000010004` has storage entries only at slots `0`, `0x33`, and `0xc9`; slot `251` is absent, so `WETH_TOKEN()` reads zero after the v31 NTV bytecode is force-deployed.
 - With `_predeployedWethToken == address(0)`, `_ensureWethToken()` executes `new TransparentUpgradeableProxy{salt: bytes32(0)}(L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, _aliasedL1Governance, initData)`. That requires the Era `TransparentUpgradeableProxy` creation bytecode preimage to be available to the VM.
-- The accepted v31 tx generated from the patched contracts has 51 factory deps and includes `SystemContractProxyAdmin`, but does not include the Era `TransparentUpgradeableProxy` hash. Locally computing `L2ContractHelper.hashL2Bytecode` for `zkout/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json` gives `0x0100014917577426e05685e22fd718e45ca70371883ac07790c7f40be3b935f8`, and this hash is absent from the accepted tx factory deps and from the DB `factory_deps` table.
+- The accepted v31 tx generated from the contracts did not include the Era `TransparentUpgradeableProxy` hash. Locally computing `L2ContractHelper.hashL2Bytecode` for `zkout/TransparentUpgradeableProxy.sol/TransparentUpgradeableProxy.json` gives `0x0100014917577426e05685e22fd718e45ca70371883ac07790c7f40be3b935f8`, and this hash was absent from the accepted tx factory deps and from the DB `factory_deps` table.
 - A server-only fix would either add a factory dep to the locally executed upgrade tx, changing the L1-accepted upgrade hash, or inject bytecode preimages that the accepted tx did not request. Both are shortcuts for this e2e test.
 - The minimal contracts-side fix is to publish `TransparentUpgradeableProxy` in the Era v31 factory deps only. It must not be force-deployed; it is needed solely as runtime creation bytecode for the real WETH proxy deployment performed by the accepted upgrade path.
 
 ## v31 Era Upgrade Blocker: Version-Specific Upgrader Address
 
-- After adding the proxy admin and WETH proxy bytecode fixes, the accepted v31 upgrade tx still failed with `Upgrade tx failed`.
+- After fixing the WETH proxy bytecode publication, the accepted v31 upgrade tx still failed with `Upgrade tx failed`.
 - Temporary state-keeper tracing on the same pending DB row showed the failing path was `forceDeployAndUpgrade(...)` -> delegatecall selector `0x98efead8`, which is `L2V31Upgrade.upgrade(bool,address,bytes,bytes)`.
 - Decoding the DB calldata for the L1-accepted v31 tx showed `delegateTo = 0x0000000000000000000000000000000000010001` (`L2_VERSION_SPECIFIC_UPGRADER_ADDR`) but the force-deployment list did not contain that address. The only `L2V31Upgrade` force deployment was at the CREATE2-derived address `0xdd123e10ad18EB82047D3B7aD1D819C13cCA6806`.
 - This mismatch is caused by the generic Era additional force-deployment helper using `getCreate2DerivedForceDeploymentAddr()` for `CoreContract.L2V31Upgrade`, while `CTMUpgrade_v31.getL2UpgradeTargetAndData()` delegates to `L2_VERSION_SPECIFIC_UPGRADER_ADDR`.
@@ -43,8 +43,8 @@
 
 ## Current Implementation Shape
 
-- `SystemContractProxyAdmin` is treated as a normal Era system force deployment, not as a separate merge or one-off helper. `SYSTEM_CONTRACTS_COUNT` is bumped from 30 to 31, while `ERA_VM_SYSTEM_CONTRACTS_COUNT` remains 30 because only the first 30 entries are backed by `EraVmSystemContract`. The 31st entry is `SystemContractProxyAdmin` at `L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR`.
-- `getSystemContractsBytecodes()` and `getSystemContractsForceDeployments()` keep the existing fixed-count array pattern. The only special bytecode-source branch is that `SystemContractProxyAdmin` is read from `l1-contracts`, not from `system-contracts`.
+- `SystemContractProxyAdmin` is not an Era force deployment. Era system force deployments remain the 30 `EraVmSystemContract` entries written directly to their fixed addresses.
+- `SystemContractProxyAdmin` remains in the ZKsyncOS-only force-deployment path, where system contracts are upgraded through `SystemContractProxy` instances and the proxy admin is actually used.
 - `TransparentUpgradeableProxy` and `BeaconProxy` are factory dependencies only. They are not included in `getOtherBuiltinCoreContracts()` because that list is also used to build force deployments.
 - `OTHER_FACTORY_DEPENDENCY_CONTRACTS_COUNT` is bumped from 13 to 15. `getOtherFactoryDependencyContracts()` contains the 13 other built-ins plus `TransparentUpgradeableProxy` and `BeaconProxy`, and `getBaseListOfDependencies()` consumes that list through `getOtherFactoryDependencyBytecodes()`.
-- This preserves the intended distinction: proxy admin is force-deployed at a fixed system address; proxy runtime bytecodes are only published as preimages for real runtime deployments performed by the accepted upgrade path.
+- This preserves the intended distinction: Era system contracts are force-deployed directly to fixed addresses; ZKsyncOS proxy administration stays in the ZKsyncOS path; proxy runtime bytecodes are only published as preimages for real runtime deployments performed by the accepted Era upgrade path.

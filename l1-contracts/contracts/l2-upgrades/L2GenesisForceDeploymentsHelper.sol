@@ -224,7 +224,9 @@ library L2GenesisForceDeploymentsHelper {
             (ZKChainSpecificForceDeploymentsData)
         );
 
-        _setupProxyAdmin();
+        if (_isZKsyncOS) {
+            _setupProxyAdmin();
+        }
 
         // The aliased L1 governance address is used as the owner for all L2 contracts.
         // Validate it once here rather than at every individual initL2/updateL2 call site.
@@ -260,11 +262,8 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function _setupProxyAdmin() private {
-        // For Era chains, the SystemContractProxyAdmin is never used during deployment, but it is expected to be present
-        // just in case. This line is just for consistency.
-        // For ZKsyncOS chains, we expect that both the contract and the owner have been populated at the time of the genesis.
-        // These are not predeployed only for legacy chains. For them, special logic (not covered here) would be used to ensure
-        // that this contract is predeployed and the owner is set correctly.
+        // For ZKsyncOS chains, system contracts are upgraded through SystemContractProxy instances.
+        // The proxy admin must exist and be owned by the ComplexUpgrader while the upgrade runs.
         if (SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).owner() != address(this)) {
             SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).forceSetOwner(address(this));
         }

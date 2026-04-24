@@ -88,6 +88,11 @@ library CoreOnGatewayHelper {
             return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
         }
 
+        (bool hasFixedAddress, address fixedAddress) = tryResolveEraFixedAddress(_c);
+        if (hasFixedAddress) {
+            return fixedAddress;
+        }
+
         return getCreate2DerivedForceDeploymentAddr(_c);
     }
 
@@ -254,21 +259,29 @@ library CoreOnGatewayHelper {
     /// @notice Resolve a CoreContract enum to its canonical L2 address.
     /// @dev Only covers contracts with well-known constant addresses.
     function _resolveAddress(CoreContract _c) internal pure returns (address) {
-        if (_c == CoreContract.L2Bridgehub) return L2_BRIDGEHUB_ADDR;
-        if (_c == CoreContract.L2AssetRouter) return L2_ASSET_ROUTER_ADDR;
-        if (_c == CoreContract.L2NativeTokenVault) return L2_NATIVE_TOKEN_VAULT_ADDR;
-        if (_c == CoreContract.L2MessageRoot) return L2_MESSAGE_ROOT_ADDR;
-        if (_c == CoreContract.L2WrappedBaseToken) return L2_WRAPPED_BASE_TOKEN_IMPL_ADDR;
-        if (_c == CoreContract.L2MessageVerification) return address(L2_MESSAGE_VERIFICATION);
-        if (_c == CoreContract.L2ChainAssetHandler) return L2_CHAIN_ASSET_HANDLER_ADDR;
-        if (_c == CoreContract.L2InteropRootStorage) return address(L2_INTEROP_ROOT_STORAGE);
-        if (_c == CoreContract.BaseTokenHolder) return L2_BASE_TOKEN_HOLDER_ADDR;
-        if (_c == CoreContract.L2AssetTracker) return L2_ASSET_TRACKER_ADDR;
-        if (_c == CoreContract.InteropCenter) return L2_INTEROP_CENTER_ADDR;
-        if (_c == CoreContract.InteropHandler) return L2_INTEROP_HANDLER_ADDR;
-        if (_c == CoreContract.GWAssetTracker) return GW_ASSET_TRACKER_ADDR;
-        if (_c == CoreContract.UpgradeableBeaconDeployer) return L2_NTV_BEACON_DEPLOYER_ADDR;
+        (bool hasFixedAddress, address fixedAddress) = tryResolveEraFixedAddress(_c);
+        if (hasFixedAddress) {
+            return fixedAddress;
+        }
         revert UnknownCoreContract();
+    }
+
+    function tryResolveEraFixedAddress(CoreContract _c) internal pure returns (bool, address) {
+        if (_c == CoreContract.L2Bridgehub) return (true, L2_BRIDGEHUB_ADDR);
+        if (_c == CoreContract.L2AssetRouter) return (true, L2_ASSET_ROUTER_ADDR);
+        if (_c == CoreContract.L2NativeTokenVault) return (true, L2_NATIVE_TOKEN_VAULT_ADDR);
+        if (_c == CoreContract.L2MessageRoot) return (true, L2_MESSAGE_ROOT_ADDR);
+        if (_c == CoreContract.L2WrappedBaseToken) return (true, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR);
+        if (_c == CoreContract.L2MessageVerification) return (true, address(L2_MESSAGE_VERIFICATION));
+        if (_c == CoreContract.L2ChainAssetHandler) return (true, L2_CHAIN_ASSET_HANDLER_ADDR);
+        if (_c == CoreContract.L2InteropRootStorage) return (true, address(L2_INTEROP_ROOT_STORAGE));
+        if (_c == CoreContract.BaseTokenHolder) return (true, L2_BASE_TOKEN_HOLDER_ADDR);
+        if (_c == CoreContract.L2AssetTracker) return (true, L2_ASSET_TRACKER_ADDR);
+        if (_c == CoreContract.InteropCenter) return (true, L2_INTEROP_CENTER_ADDR);
+        if (_c == CoreContract.InteropHandler) return (true, L2_INTEROP_HANDLER_ADDR);
+        if (_c == CoreContract.GWAssetTracker) return (true, GW_ASSET_TRACKER_ADDR);
+        if (_c == CoreContract.UpgradeableBeaconDeployer) return (true, L2_NTV_BEACON_DEPLOYER_ADDR);
+        return (false, address(0));
     }
 
     // ======================== ZkSyncOsSystemContract resolvers ========================
