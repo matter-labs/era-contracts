@@ -352,13 +352,14 @@ library SystemContractsProcessing {
             otherBytecodes[i] = otherContracts[i].bytecode;
         }
 
-        bytes[] memory upgradeRuntimeBytecodes = new bytes[](2);
+        bytes[] memory upgradeRuntimeBytecodes = new bytes[](3);
         upgradeRuntimeBytecodes[0] = BytecodeUtils.readBytecodeL1(
             false,
             "SystemContractProxyAdmin.sol",
             "SystemContractProxyAdmin"
         );
         upgradeRuntimeBytecodes[1] = ContractsBytecodesLib.getCreationCodeEra("TransparentUpgradeableProxy");
+        upgradeRuntimeBytecodes[2] = ContractsBytecodesLib.getCreationCodeEra("BeaconProxy");
 
         factoryDeps = mergeBytesArrays(mergeBytesArrays(basicBytecodes, systemBytecodes), otherBytecodes);
         factoryDeps = mergeBytesArrays(factoryDeps, upgradeRuntimeBytecodes);
