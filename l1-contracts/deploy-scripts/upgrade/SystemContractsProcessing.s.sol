@@ -243,6 +243,25 @@ library SystemContractsProcessing {
         }
     }
 
+    function getSystemContractProxyAdminForceDeployment()
+        internal
+        view
+        returns (IL2ContractDeployer.ForceDeployment memory forceDeployment)
+    {
+        bytes memory proxyAdminBytecode = BytecodeUtils.readBytecodeL1(
+            false,
+            "SystemContractProxyAdmin.sol",
+            "SystemContractProxyAdmin"
+        );
+        forceDeployment = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(proxyAdminBytecode),
+            newAddress: L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
+            callConstructor: false,
+            value: 0,
+            input: ""
+        });
+    }
+
     function forceDeploymentsToHashes(
         IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments
     ) internal pure returns (bytes32[] memory hashes) {
@@ -285,7 +304,12 @@ library SystemContractsProcessing {
         );
         IL2ContractDeployer.ForceDeployment[] memory systemForceDeployments = getSystemContractsForceDeployments();
 
+        IL2ContractDeployer.ForceDeployment[] memory proxyAdminForceDeployment =
+            new IL2ContractDeployer.ForceDeployment[](1);
+        proxyAdminForceDeployment[0] = getSystemContractProxyAdminForceDeployment();
+
         forceDeployments = mergeForceDeployments(systemForceDeployments, otherForceDeployments);
+        forceDeployments = mergeForceDeployments(forceDeployments, proxyAdminForceDeployment);
     }
 
     function getBaseListOfDependencies(bool _isZKsyncOS) internal view returns (bytes[] memory factoryDeps) {
@@ -328,7 +352,16 @@ library SystemContractsProcessing {
             otherBytecodes[i] = otherContracts[i].bytecode;
         }
 
+        bytes[] memory upgradeRuntimeBytecodes = new bytes[](2);
+        upgradeRuntimeBytecodes[0] = BytecodeUtils.readBytecodeL1(
+            false,
+            "SystemContractProxyAdmin.sol",
+            "SystemContractProxyAdmin"
+        );
+        upgradeRuntimeBytecodes[1] = ContractsBytecodesLib.getCreationCodeEra("TransparentUpgradeableProxy");
+
         factoryDeps = mergeBytesArrays(mergeBytesArrays(basicBytecodes, systemBytecodes), otherBytecodes);
+        factoryDeps = mergeBytesArrays(factoryDeps, upgradeRuntimeBytecodes);
     }
 
     /// @notice Build the base ZKsyncOS force deployment array.
