@@ -6,7 +6,7 @@
  *
  * Covered stages:
  *
- *   - Pre-migration state on the direct-settled chain (interop sending is rejected
+ *   - Pre-migration state on the L1-settled chain (interop sending is rejected
  *     until the chain is migrated to GW).
  *   - Forward TBM (L1 → GW) for ETH and an NTV test token, verifying that the L1
  *     and GW sides agree on `assetMigrationNumber` and that the GW per-chain
@@ -35,7 +35,7 @@
  *
  * Chain topology (see `config/anvil-config.json`):
  *
- *   Chain 10  — direct-settled on L1, `migrationNumber = 0`.
+ *   Chain 10  — settling on L1, `migrationNumber = 0`.
  *   Chain 11  — GW.
  *   Chain 12  — GW-settled, `migrationNumber = 1` after gateway setup.
  *   Chain 13  — GW-settled, `migrationNumber = 1`.
@@ -129,14 +129,14 @@ describe("10 - Token Balance Migration Lifecycle", function () {
   // Chain topology
   let gwChainId: number;
   let gwSettledChainIds: number[];
-  let directSettledChainId: number;
+  let l1SettledChainId: number;
   // The GW-settled chain that is the subject of the reverse-TBM flow.
   let reverseTbmChainId: number;
 
   // Providers
   let l1Provider: ethers.providers.JsonRpcProvider;
   let gwProvider: ethers.providers.JsonRpcProvider;
-  let directProvider: ethers.providers.JsonRpcProvider;
+  let l1SettledProvider: ethers.providers.JsonRpcProvider;
   let reverseTbmProvider: ethers.providers.JsonRpcProvider;
 
   // Addresses
@@ -158,12 +158,12 @@ describe("10 - Token Balance Migration Lifecycle", function () {
 
     gwChainId = getChainIdByRole(state.chains.config, "gateway");
     gwSettledChainIds = getChainIdsByRole(state.chains.config, "gwSettled");
-    directSettledChainId = getChainIdByRole(state.chains.config, "directSettled");
+    l1SettledChainId = getChainIdByRole(state.chains.config, "directSettled");
     reverseTbmChainId = gwSettledChainIds[0];
 
     l1Provider = new ethers.providers.JsonRpcProvider(getL1RpcUrl(state));
     gwProvider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, gwChainId));
-    directProvider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, directSettledChainId));
+    l1SettledProvider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, l1SettledChainId));
     reverseTbmProvider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, reverseTbmChainId));
 
     bridgehubAddr = state.l1Addresses!.bridgehub;
@@ -191,22 +191,22 @@ describe("10 - Token Balance Migration Lifecycle", function () {
     l1ChainAssetHandlerProxy = await installL1ChainAssetHandlerDev(l1Provider, bridgehubAddr);
   });
 
-  // ── Pre-migration state on the direct-settled chain ─────────────────
+  // ── Pre-migration state on the L1-settled chain ─────────────────
 
-  describe("Pre-migration state (direct-settled chain)", () => {
-    it("L1AT assetMigrationNumber is 0 for a direct-settled chain (ETH)", async () => {
+  describe("Pre-migration state (L1-settled chain)", () => {
+    it("L1AT assetMigrationNumber is 0 for an L1-settled chain (ETH)", async () => {
       const migNum = await queryAssetMigrationNumber(
         l1Provider,
         l1AssetTrackerAddr,
         "L1AssetTracker",
-        directSettledChainId,
+        l1SettledChainId,
         ethAssetId
       );
-      expect(migNum, `L1AT assetMigrationNumber[${directSettledChainId}][ETH]`).to.equal(0);
+      expect(migNum, `L1AT assetMigrationNumber[${l1SettledChainId}][ETH]`).to.equal(0);
     });
 
-    it("cannot send an interop bundle from a direct-settled chain (NotInGatewayMode)", async () => {
-      const wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, directProvider);
+    it("cannot send an interop bundle from an L1-settled chain (NotInGatewayMode)", async () => {
+      const wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1SettledProvider);
       const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
       // Chain-less ERC-7930 encoding of a dummy destination — the function reverts
       // before decoding because the caller's settlement layer is L1. We use
@@ -216,30 +216,30 @@ describe("10 - Token Balance Migration Lifecycle", function () {
 
       await expectRevert(
         () => interopCenter.callStatic.sendBundle(destinationBytes, [], [], { gasLimit: 500_000, value: 0 }),
-        "sendBundle from direct-settled chain",
+        "sendBundle from L1-settled chain",
         customError("InteropCenter", "NotInGatewayMode()"),
-        directProvider
+        l1SettledProvider
       );
     });
 
-    it("cannot execute an interop bundle on a direct-settled chain", async () => {
-      const wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, directProvider);
+    it("cannot execute an interop bundle on an L1-settled chain", async () => {
+      const wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1SettledProvider);
       const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
       const dummyProof = buildMockInteropProof(gwSettledChainIds[0]);
 
       await expectRevert(
         () => interopHandler.executeBundle("0x", dummyProof, { gasLimit: 500_000 }).then((tx) => tx.wait()),
-        "executeBundle on direct-settled chain"
+        "executeBundle on L1-settled chain"
       );
     });
 
-    it("cannot unbundle an interop bundle on a direct-settled chain", async () => {
-      const wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, directProvider);
+    it("cannot unbundle an interop bundle on an L1-settled chain", async () => {
+      const wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1SettledProvider);
       const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
 
       await expectRevert(
         () => interopHandler.unbundleBundle("0x", [], { gasLimit: 500_000 }).then((tx) => tx.wait()),
-        "unbundleBundle on direct-settled chain"
+        "unbundleBundle on L1-settled chain"
       );
     });
   });
