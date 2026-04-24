@@ -52,6 +52,8 @@ uint256 constant ERA_VM_SYSTEM_CONTRACTS_COUNT = 30;
 uint256 constant SYSTEM_CONTRACTS_COUNT = ERA_VM_SYSTEM_CONTRACTS_COUNT + 1;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
 uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 13;
+/// @dev Era factory dependencies based in `l1-contracts`: other built-ins plus runtime deployment preimages.
+uint256 constant OTHER_FACTORY_DEPENDENCY_CONTRACTS_COUNT = OTHER_BUILT_IN_CONTRACTS_COUNT + 2;
 /// @dev System contracts (0x800x) with l1-contracts EVM bytecodes for ZKsyncOS proxy upgrades.
 uint256 constant ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT = 3;
 
@@ -194,6 +196,16 @@ library SystemContractsProcessing {
         ids[12] = CoreContract.GWAssetTracker;
     }
 
+    function getOtherFactoryDependencyContracts() internal pure returns (CoreContract[] memory ids) {
+        CoreContract[] memory builtins = getOtherBuiltinCoreContracts();
+        ids = new CoreContract[](OTHER_FACTORY_DEPENDENCY_CONTRACTS_COUNT);
+        for (uint256 i = 0; i < builtins.length; i++) {
+            ids[i] = builtins[i];
+        }
+        ids[builtins.length] = CoreContract.TransparentUpgradeableProxy;
+        ids[builtins.length + 1] = CoreContract.BeaconProxy;
+    }
+
     /// @notice System contracts that have l1-contracts EVM bytecodes and need ZKsyncOS proxy upgrades.
     /// @dev Separate from getOtherBuiltinCoreContracts because Era handles these via getSystemContractsForceDeployments.
     ///      ContractDeployer (0x8006) is intentionally excluded: it's a sequencer hook dispatcher,
@@ -218,6 +230,15 @@ library SystemContractsProcessing {
                 addr: CoreOnGatewayHelper._resolveAddress(ids[i]),
                 bytecode: ContractsBytecodesLib.getCreationCodeEra(eraName)
             });
+        }
+    }
+
+    function getOtherFactoryDependencyBytecodes() internal view returns (bytes[] memory bytecodes) {
+        CoreContract[] memory contracts = getOtherFactoryDependencyContracts();
+        bytecodes = new bytes[](contracts.length);
+        for (uint256 i = 0; i < contracts.length; i++) {
+            string memory eraName = CoreOnGatewayHelper._resolveContractName(false, contracts[i]);
+            bytecodes[i] = ContractsBytecodesLib.getCreationCodeEra(eraName);
         }
     }
 
@@ -336,14 +357,7 @@ library SystemContractsProcessing {
         basicBytecodes[2] = Utils.getEvmEmulatorBytecodeHash();
 
         bytes[] memory systemBytecodes = getSystemContractsBytecodes();
-        BuiltinContractDeployInfo[] memory otherContracts = getOtherBuiltinContracts();
-        bytes[] memory otherBytecodes = new bytes[](otherContracts.length + 2);
-        for (uint256 i = 0; i < otherContracts.length; i++) {
-            otherBytecodes[i] = otherContracts[i].bytecode;
-        }
-        // Runtime deployment preimages used by the v31 upgrade path, not force-deployed system contracts.
-        otherBytecodes[otherContracts.length] = ContractsBytecodesLib.getCreationCodeEra("TransparentUpgradeableProxy");
-        otherBytecodes[otherContracts.length + 1] = ContractsBytecodesLib.getCreationCodeEra("BeaconProxy");
+        bytes[] memory otherBytecodes = getOtherFactoryDependencyBytecodes();
 
         factoryDeps = mergeBytesArrays(mergeBytesArrays(basicBytecodes, systemBytecodes), otherBytecodes);
     }

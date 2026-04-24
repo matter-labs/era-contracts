@@ -79,7 +79,8 @@ enum CoreContract {
     L2SharedBridgeLegacy,
     BridgedStandardERC20,
     DiamondProxy,
-    ProxyAdmin
+    ProxyAdmin,
+    TransparentUpgradeableProxy
 }
 
 /// @notice System contracts that have ZKsyncOS-specific implementations in l1-contracts.

@@ -224,6 +224,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.BridgedStandardERC20) return "BridgedStandardERC20";
         if (_c == CoreContract.DiamondProxy) return "DiamondProxy";
         if (_c == CoreContract.ProxyAdmin) return "ProxyAdmin";
+        if (_c == CoreContract.TransparentUpgradeableProxy) return "TransparentUpgradeableProxy";
 
         revert UnknownCoreContract();
     }
