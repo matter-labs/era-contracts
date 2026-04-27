@@ -12,7 +12,6 @@ import {
   GW_ASSET_TRACKER_ADDR,
   INITIAL_BASE_TOKEN_HOLDER_BALANCE,
   INTEROP_CENTER_ADDR,
-  L1_CHAIN_ID,
   L2_ASSET_ROUTER_ADDR,
   L2_ASSET_TRACKER_ADDR,
   L2_BASE_TOKEN_ADDR,
@@ -39,6 +38,7 @@ import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../c
 import type { ContractName } from "../core/contracts";
 import { transferOwnable2Step } from "./harness-shims";
 import { impersonateAndRun } from "../core/utils";
+import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -663,7 +663,7 @@ async function deployL2Contracts(
   await l2Provider.send("anvil_setStorageAt", [
     L2_NATIVE_TOKEN_VAULT_ADDR,
     toSlot(NTV_L1_CHAIN_ID_SLOT),
-    ethers.utils.hexZeroPad(ethers.utils.hexlify(L1_CHAIN_ID), 32),
+    ethers.utils.hexZeroPad(ethers.utils.hexlify(runtimeConfig.l1ChainId), 32),
   ]);
   // NTV: set L2_TOKEN_PROXY_BYTECODE_HASH to a non-zero placeholder
   await l2Provider.send("anvil_setStorageAt", [
@@ -915,8 +915,10 @@ async function verifyL2UpgradeResult(l2Provider: ethers.providers.JsonRpcProvide
   const assetTracker = new ethers.Contract(L2_ASSET_TRACKER_ADDR, getAbi("L2AssetTracker"), l2Provider);
 
   const l1ChainId = await assetTracker.L1_CHAIN_ID();
-  if (!l1ChainId.eq(L1_CHAIN_ID)) {
-    throw new Error(`Chain ${chainId}: L2AssetTracker.L1_CHAIN_ID = ${l1ChainId}, expected ${L1_CHAIN_ID}`);
+  if (!l1ChainId.eq(runtimeConfig.l1ChainId)) {
+    throw new Error(
+      `Chain ${chainId}: L2AssetTracker.L1_CHAIN_ID = ${l1ChainId}, expected ${runtimeConfig.l1ChainId}`
+    );
   }
 
   const baseTokenAssetId = await assetTracker.BASE_TOKEN_ASSET_ID();

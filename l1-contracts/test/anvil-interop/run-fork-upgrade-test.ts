@@ -40,6 +40,7 @@ import { AnvilManager } from "./src/daemons/anvil-manager";
 import { runForgeScript } from "./src/core/forge";
 import { getAbi } from "./src/core/contracts";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR } from "./src/core/const";
+import { runtimeConfig } from "./src/core/runtime-config";
 import { loadForkConfig } from "./src/core/fork-config";
 import { discoverForkChains } from "./src/deployers/fork-chain-discovery";
 import {
@@ -113,12 +114,19 @@ async function main(): Promise<void> {
     }
 
     // ── Step 1: Start forked L1 ──────────────────────────────────
-    // Chain ID forced to 31337 so that the `broadcast/ChainUpgrade_v31.s.sol/31337/` path
-    // used by runChainUpgradesAndRelayL2 resolves correctly. This matches what the pre-generated
-    // state harness does and what the upgrade scripts themselves expect in test mode.
+    // Probe the upstream L1 RPC for its real chain ID and fork with it. Using
+    // a synthetic 31337 makes NTV.originToken(baseTokenAssetId) revert during
+    // per-chain v31 upgrades because the asset's stored originChainId equals
+    // the upstream's real chain ID (e.g. Sepolia 11155111) and `originChainId !=
+    // block.chainid` routes the lookup down the bridged-token branch. Matching
+    // the real chain ID makes the production short-circuit fire correctly.
     console.log(`\n=== Step 1: Starting forked L1 anvil (${elapsed()}) ===\n`);
+    const upstreamProvider = new ethers.providers.JsonRpcProvider(cfg.l1ForkUrl);
+    const upstreamChainId = (await upstreamProvider.getNetwork()).chainId;
+    runtimeConfig.l1ChainId = upstreamChainId;
+    console.log(`  Upstream L1 chain ID: ${upstreamChainId}`);
     await anvilManager.startChain({
-      chainId: 31337,
+      chainId: upstreamChainId,
       port: allocatePort(0),
       role: "l1",
       forkUrl: cfg.l1ForkUrl,
