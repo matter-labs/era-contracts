@@ -1446,13 +1446,21 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
                 return abi.encode(L2_BRIDGEHUB_ADDR);
             }
         } else if (compareStrings(contractName, "Verifier")) {
+            // The Airbender PLONK verifier slot is left as address(0); chains that want to
+            // enable Airbender proofs must deploy their own DualVerifier.
             if (!isZKBytecode) {
-                return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
+                return
+                    abi.encode(
+                        addresses.stateTransition.verifierFflonk,
+                        addresses.stateTransition.verifierPlonk,
+                        address(0)
+                    );
             } else {
                 return
                     abi.encode(
                         gatewayConfig.gatewayStateTransition.verifierFflonk,
-                        gatewayConfig.gatewayStateTransition.verifierPlonk
+                        gatewayConfig.gatewayStateTransition.verifierPlonk,
+                        address(0)
                     );
             }
         } else if (compareStrings(contractName, "AdminFacet")) {

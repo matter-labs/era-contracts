@@ -13,7 +13,11 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// If the proof is not empty, it will verify it using the main verifier contract,
 /// otherwise, it will skip the verification.
 contract TestnetVerifier is DualVerifier {
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) DualVerifier(_fflonkVerifier, _plonkVerifier) {
+    constructor(
+        IVerifierV2 _fflonkVerifier,
+        IVerifier _plonkVerifier,
+        IVerifier _airbenderPlonkVerifier
+    ) DualVerifier(_fflonkVerifier, _plonkVerifier, _airbenderPlonkVerifier) {
         assert(block.chainid != 1);
     }
 
