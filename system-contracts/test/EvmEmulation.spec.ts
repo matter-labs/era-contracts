@@ -35,7 +35,8 @@ describe("EvmEmulation tests", function () {
     expect(testValue).to.be.eq(101);
   });
 
-  // TODO: anvil-zksync uses old EVM emulator
+  // Disabled until anvil-zksync ships the EVM emulator version that supports BLOBBASEFEE.
+  // Re-enable when the runner executes the opcode and validates the expected blob base fee.
   it.skip("Can use BLOBBASEFEE opcode", async () => {
     await enableEvmEmulation();
 
@@ -52,7 +53,8 @@ describe("EvmEmulation tests", function () {
     expect(testValue).to.be.eq(1);
   });
 
-  // TODO: anvil-zksync uses old EVM emulator
+  // Disabled until anvil-zksync ships the EVM emulator version that supports BLOBHASH.
+  // Re-enable when the runner executes the opcode and validates the expected blob hash value.
   it.skip("Can use BLOBHASH opcode", async () => {
     await enableEvmEmulation();
 
