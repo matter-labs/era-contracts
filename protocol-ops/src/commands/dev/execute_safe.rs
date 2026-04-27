@@ -6,13 +6,19 @@ use anyhow::Context;
 use clap::Parser;
 use ethers::middleware::Middleware;
 use ethers::types::{Address, BlockNumber, Bytes, TransactionRequest, H256, U256};
-use futures::future::try_join_all;
 use serde_json::Value;
 
 use ethers::providers::{Http, Provider};
 use ethers::signers::Signer;
 
 use crate::common::logger;
+
+/// Per-tx gas estimate buffer in basis points (12500 = 125% = 25% headroom).
+const GAS_ESTIMATE_BUFFER_BPS: u64 = 12_500;
+/// Maximum per-tx gas limit. Reth's elastic block gas limit converges to
+/// ~30M on a quiet chain; we cap below that so a single tx can never equal
+/// or exceed the block limit (which reth rejects with `gas limit too high`).
+const PER_TX_GAS_LIMIT_CAP: u64 = 20_000_000;
 
 /// Execute a Gnosis Safe Transaction Builder JSON file.
 ///
@@ -24,8 +30,9 @@ use crate::common::logger;
 /// Implementation note: we replay each tx natively via ethers (sign locally,
 /// send via `eth_sendRawTransaction`, await a receipt) instead of shelling
 /// out to forge. Forge involvement here was pure overhead — every bundle
-/// paid ~1-2s of forge startup before the first tx hit the wire. Native
-/// replay drops the per-bundle floor to ~200-500ms total.
+/// paid ~1-2s of forge startup before the first tx hit the wire. Bundles
+/// with N txs now run in N round-trips of (estimateGas, sendTx,
+/// awaitReceipt) sequentially.
 #[derive(Debug, Clone, Parser)]
 pub struct DevExecuteSafeArgs {
     /// Path to a Gnosis Safe Transaction Builder JSON file.
@@ -61,15 +68,12 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
     // Resolve chain id once so the signer can include it in the EIP-155
     // signature (anvil rejects legacy txs without chain id).
     //
-    // Set Provider's polling interval to 5ms before wrapping in a signer.
-    // Default is 7s (tuned for mainnet block time); this is the primary
-    // tail-latency knob on anvil's instamine, where a tx is mined in under
-    // a millisecond and the only wait is the poller waking up. 5ms gives
-    // an expected ~2.5ms wait per bundle and keeps per-bundle cost under
-    // ~20ms end-to-end on localhost.
+    // Override Provider's polling interval (default 7s, tuned for mainnet)
+    // so per-tx receipt polling doesn't dominate bundle latency on anvil's
+    // instamine or reth's sub-second block time.
     let provider = Provider::<Http>::try_from(args.l1_rpc_url.as_str())
         .context("connect L1 provider")?
-        .interval(std::time::Duration::from_millis(5));
+        .interval(std::time::Duration::from_millis(50));
     let chain_id = provider
         .get_chainid()
         .await
@@ -84,82 +88,92 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
         from,
     ));
 
-    // Fetch starting nonce once. Assigning nonces locally lets us submit all
-    // txs in the bundle concurrently — otherwise ethers would serialize on
-    // `eth_getTransactionCount(pending)` inside each `send_transaction`, and
-    // each `pending.await` would block the next submit. Anvil queues
-    // same-account txs by nonce and mines them in order.
+    // Fetch starting nonce once and assign nonces locally — avoids a
+    // serialised `eth_getTransactionCount(pending)` round-trip per tx.
     let base_nonce = client
         .get_transaction_count(from, Some(BlockNumber::Pending.into()))
         .await
         .context("eth_getTransactionCount(pending)")?;
 
-    // Parse + sign + submit all txs concurrently.
-    let pending = try_join_all(safe_txs.iter().enumerate().map(|(idx, tx)| {
-        let client = &client;
-        async move {
-            let to: Address = tx
-                .get("to")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `to`"))?
-                .parse()
-                .with_context(|| format!("Safe tx #{idx} `to` is not a valid address"))?;
-            let data_hex = tx
-                .get("data")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `data`"))?;
-            let data = Bytes::from(
-                ethers::utils::hex::decode(data_hex.trim_start_matches("0x"))
-                    .with_context(|| format!("Safe tx #{idx} `data` is not valid hex"))?,
-            );
-            let value_str = tx
-                .get("value")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `value`"))?;
-            let value = parse_decimal_or_hex_u256(value_str)
-                .with_context(|| format!("Safe tx #{idx} `value` is not a valid number"))?;
+    // Parse + sign + submit each tx sequentially, awaiting its receipt
+    // before the next. Some bundle txs depend on contracts deployed by
+    // earlier txs in the same bundle (e.g. an initializer call after a
+    // CREATE2 deploy), so concurrent `eth_estimateGas` would estimate
+    // against pre-bundle L1 state and revert on dependent txs. Sequential
+    // await-on-receipt also means later txs' estimateGas sees the
+    // side-effects of earlier ones, and a revert in tx N stops the loop
+    // before any tx N+1 hits the wire.
+    for (idx, tx) in safe_txs.iter().enumerate() {
+        let to: Address = tx
+            .get("to")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `to`"))?
+            .parse()
+            .with_context(|| format!("Safe tx #{idx} `to` is not a valid address"))?;
+        let data_hex = tx
+            .get("data")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `data`"))?;
+        let data = Bytes::from(
+            ethers::utils::hex::decode(data_hex.trim_start_matches("0x"))
+                .with_context(|| format!("Safe tx #{idx} `data` is not valid hex"))?,
+        );
+        let value_str = tx
+            .get("value")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `value`"))?;
+        let value = parse_decimal_or_hex_u256(value_str)
+            .with_context(|| format!("Safe tx #{idx} `value` is not a valid number"))?;
 
-            // Legacy (type-0) tx, pre-set gas/gas_price/nonce so ethers skips
-            // all three of `eth_estimateGas`, `eth_gasPrice`, and
-            // `eth_getTransactionCount` — each of those would serialize the
-            // bundle.
-            let req = TransactionRequest::new()
+        // Estimate gas per tx so we don't trip node-side `gas limit too
+        // high` rejections (reth caps tx gas at the current elastic block
+        // gas limit, ~30M on a quiet local chain). Apply
+        // `GAS_ESTIMATE_BUFFER_BPS` headroom and bail if the result
+        // exceeds `PER_TX_GAS_LIMIT_CAP` — silently shipping past the cap
+        // would just OOG on-chain after a successful estimate.
+        let estimate_req: ethers::types::transaction::eip2718::TypedTransaction =
+            TransactionRequest::new()
                 .from(from)
                 .to(to)
-                .data(data)
+                .data(data.clone())
                 .value(value)
-                .chain_id(chain_id)
-                .gas(30_000_000u64)
-                .gas_price(1_000_000_000u64)
-                .nonce(base_nonce + idx);
+                .into();
+        let estimated = client
+            .estimate_gas(&estimate_req, None)
+            .await
+            .with_context(|| format!("eth_estimateGas for Safe tx #{idx} (to {to:#x})"))?;
+        let buffered =
+            estimated.saturating_mul(U256::from(GAS_ESTIMATE_BUFFER_BPS)) / U256::from(10_000);
+        anyhow::ensure!(
+            buffered <= U256::from(PER_TX_GAS_LIMIT_CAP),
+            "Safe tx #{idx} (to {to:#x}) gas estimate {estimated} \
+             ({buffered} buffered) exceeds PER_TX_GAS_LIMIT_CAP {PER_TX_GAS_LIMIT_CAP}; \
+             refusing to submit since the cap would OOG on-chain"
+        );
 
-            client
-                .send_transaction(req, None)
-                .await
-                .with_context(|| format!("eth_sendTransaction for Safe tx #{idx} (to {to:#x})"))
-        }
-    }))
-    .await?;
+        let req = TransactionRequest::new()
+            .from(from)
+            .to(to)
+            .data(data)
+            .value(value)
+            .chain_id(chain_id)
+            .gas(buffered)
+            .gas_price(1_000_000_000u64)
+            .nonce(base_nonce + idx);
 
-    // Await all receipts concurrently.
-    let tx_hashes: Vec<H256> = pending.iter().map(|p| p.tx_hash()).collect();
-    let receipts = try_join_all(pending.into_iter().enumerate().map(|(idx, pending)| {
-        let tx_hash = tx_hashes[idx];
-        async move {
-            pending
-                .await
-                .with_context(|| format!("await receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?
-                .ok_or_else(|| anyhow::anyhow!("no receipt for Safe tx #{idx} (hash {tx_hash:#x})"))
-        }
-    }))
-    .await?;
-
-    for (idx, receipt) in receipts.iter().enumerate() {
+        let pending = client
+            .send_transaction(req, None)
+            .await
+            .with_context(|| format!("eth_sendTransaction for Safe tx #{idx} (to {to:#x})"))?;
+        let tx_hash = pending.tx_hash();
+        let receipt = pending
+            .await
+            .with_context(|| format!("await receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?
+            .ok_or_else(|| anyhow::anyhow!("no receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?;
         let status = receipt.status.unwrap_or_default();
         anyhow::ensure!(
             status == 1.into(),
-            "Safe tx #{idx} (hash {:#x}) reverted (status=0)",
-            tx_hashes[idx],
+            "Safe tx #{idx} (hash {tx_hash:#x}) reverted (status=0)",
         );
     }
 
