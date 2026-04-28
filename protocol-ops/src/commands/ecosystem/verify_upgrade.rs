@@ -5,7 +5,7 @@ use clap::Parser;
 use crate::{
     common::logger,
     upgrade_verification::{
-        artifact_shape, artifacts::PreparedUpgradeArtifacts, report::VerificationResult,
+        artifact_shape, artifacts::PreparedUpgradeArtifacts, verifiers::VerificationResult,
     },
 };
 
