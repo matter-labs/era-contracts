@@ -220,3 +220,126 @@ impl EcosystemChainArgs {
         Ok((eco.bridgehub, chain_id))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Write a tmp zkstack-shaped workspace under a unique dir, return its
+    /// root. Mirrors the layout `from_zkstack_dir` expects: top-level
+    /// `configs/{contracts,wallets}.yaml` plus `chains/<name>/ZkStack.yaml`.
+    fn write_workspace(label: &str, files: &[(&str, &str)]) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "ecosystem_test_{}_{label}",
+            std::process::id()
+        ));
+        // Cleanup from previous test run if any.
+        let _ = std::fs::remove_dir_all(&dir);
+        for (rel, content) in files {
+            let abs = dir.join(rel);
+            std::fs::create_dir_all(abs.parent().unwrap()).unwrap();
+            std::fs::write(&abs, content).unwrap();
+        }
+        dir
+    }
+
+    const CONTRACTS_YAML: &str = "
+core_ecosystem_contracts:
+  bridgehub_proxy_addr: 0x6c6fde934f342f0cc0d1ba22ef181cb2983a4db2
+";
+    const WALLETS_YAML: &str = "
+deployer:
+  address: 0x36615Cf349d7F6344891B1e7CA7C72883F5dc049
+  private_key: 0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110
+governor:
+  address: 0x8002cD98Cfb563492A6fB3E7C8243b7B9Ad4cc92
+  private_key: 0x2d64990aa363e3d38ae3417950fd40801d75e3d3bd57b86d17fcc261a6c951c6
+";
+
+    #[test]
+    fn from_zkstack_dir_single_chain() {
+        let dir = write_workspace(
+            "single_chain",
+            &[
+                ("configs/contracts.yaml", CONTRACTS_YAML),
+                ("configs/wallets.yaml", WALLETS_YAML),
+                (
+                    "chains/era/ZkStack.yaml",
+                    "id: 1\nname: era\nchain_id: 271\n",
+                ),
+            ],
+        );
+        let eco = Ecosystem::from_zkstack_dir(&dir).unwrap();
+        assert_eq!(
+            format!("{:#x}", eco.bridgehub),
+            "0x6c6fde934f342f0cc0d1ba22ef181cb2983a4db2"
+        );
+        assert_eq!(
+            format!("{:#x}", eco.deployer.unwrap()),
+            "0x36615cf349d7f6344891b1e7ca7c72883f5dc049"
+        );
+        assert_eq!(eco.chains.len(), 1);
+        assert_eq!(eco.chain_id("era").unwrap(), 271);
+    }
+
+    #[test]
+    fn from_zkstack_dir_multi_chain_skips_dirs_without_manifest() {
+        let dir = write_workspace(
+            "multi_chain",
+            &[
+                ("configs/contracts.yaml", CONTRACTS_YAML),
+                ("configs/wallets.yaml", WALLETS_YAML),
+                ("chains/era/ZkStack.yaml", "chain_id: 271\n"),
+                ("chains/gateway/ZkStack.yaml", "chain_id: 506\n"),
+                // A subdir with no ZkStack.yaml — should be silently skipped
+                // (e.g. `.git`, `node_modules`, half-removed checkouts).
+                ("chains/scratchpad/README.md", "stray content\n"),
+            ],
+        );
+        let eco = Ecosystem::from_zkstack_dir(&dir).unwrap();
+        assert_eq!(eco.chains.len(), 2);
+        assert_eq!(eco.chain_id("era").unwrap(), 271);
+        assert_eq!(eco.chain_id("gateway").unwrap(), 506);
+        assert!(eco.chain_id("scratchpad").is_err());
+    }
+
+    #[test]
+    fn from_zkstack_dir_missing_bridgehub_errors() {
+        let dir = write_workspace(
+            "missing_bridgehub",
+            &[
+                // contracts.yaml present but missing the nested key
+                (
+                    "configs/contracts.yaml",
+                    "core_ecosystem_contracts: {}\n",
+                ),
+                ("configs/wallets.yaml", WALLETS_YAML),
+                ("chains/era/ZkStack.yaml", "chain_id: 271\n"),
+            ],
+        );
+        let err = Ecosystem::from_zkstack_dir(&dir).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("bridgehub_proxy_addr"),
+            "expected error to mention missing bridgehub_proxy_addr; got: {msg}"
+        );
+    }
+
+    #[test]
+    fn from_zkstack_dir_no_chains_errors() {
+        let dir = write_workspace(
+            "no_chains",
+            &[
+                ("configs/contracts.yaml", CONTRACTS_YAML),
+                ("configs/wallets.yaml", WALLETS_YAML),
+                ("chains/.gitkeep", ""),
+            ],
+        );
+        let err = Ecosystem::from_zkstack_dir(&dir).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("no chains found"),
+            "expected 'no chains found' error; got: {msg}"
+        );
+    }
+}
