@@ -222,24 +222,30 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       );
     });
 
-    it("cannot execute an interop bundle on an L1-settled chain", async () => {
+    it("cannot execute an interop bundle on an L1-settled chain (CannotClaimInteropOnL1Settlement)", async () => {
       const wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1SettledProvider);
       const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
       const dummyProof = buildMockInteropProof(gwSettledChainIds[0]);
 
+      // `callStatic` surfaces the custom-error selector; plain Anvil tx receipts
+      // strip revert data and only report "reverted".
       await expectRevert(
-        () => interopHandler.executeBundle("0x", dummyProof, { gasLimit: 500_000 }).then((tx) => tx.wait()),
-        "executeBundle on L1-settled chain"
+        () => interopHandler.callStatic.executeBundle("0x", dummyProof, { gasLimit: 500_000 }),
+        "executeBundle on L1-settled chain",
+        customError("InteropHandler", "CannotClaimInteropOnL1Settlement()"),
+        l1SettledProvider
       );
     });
 
-    it("cannot unbundle an interop bundle on an L1-settled chain", async () => {
+    it("cannot unbundle an interop bundle on an L1-settled chain (CannotClaimInteropOnL1Settlement)", async () => {
       const wallet = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1SettledProvider);
       const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
 
       await expectRevert(
-        () => interopHandler.unbundleBundle("0x", [], { gasLimit: 500_000 }).then((tx) => tx.wait()),
-        "unbundleBundle on L1-settled chain"
+        () => interopHandler.callStatic.unbundleBundle("0x", [], { gasLimit: 500_000 }),
+        "unbundleBundle on L1-settled chain",
+        customError("InteropHandler", "CannotClaimInteropOnL1Settlement()"),
+        l1SettledProvider
       );
     });
   });
