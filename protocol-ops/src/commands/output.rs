@@ -25,17 +25,32 @@
 //! arrays — `manifest.json` is read-modify-write.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use serde_json::{json, Value};
 
+use crate::commands::dev::execute_safe;
 use crate::common::forge::{split_into_bundles, ForgeRunner, SafeBundle};
 use crate::common::logger;
 
 /// Write Safe bundles + append metadata into `manifest.json` if the user
 /// passed `--out`. No-op otherwise.
+/// Write Safe bundles to disk and/or dispatch them in-process, depending on
+/// what `--out` and `--execute` (in `SharedRunArgs`) were set to.
+///
+/// The four combinations:
+///
+/// | --out | --execute | behaviour                                          |
+/// |-------|-----------|----------------------------------------------------|
+/// | unset | unset     | no-op (used by simulation / dry-run callers)       |
+/// | set   | unset     | write bundles to `--out`, return                   |
+/// | unset | set       | write to a tmp dir, dispatch, remove tmp on success |
+/// | set   | set       | write to `--out`, dispatch from there              |
+///
+/// `--execute` requires at least one `--wallets-yaml`; the merged
+/// address→signer map is used to dispatch each bundle to its target's signer.
 pub async fn write_output_if_requested<I, O>(
     command: &str,
     shared: &crate::common::SharedRunArgs,
@@ -47,36 +62,64 @@ where
     I: Serialize,
     O: Serialize,
 {
-    let Some(ref out_dir) = shared.out else {
+    if shared.out.is_none() && !shared.execute {
         return Ok(());
-    };
+    }
 
     let bundles = split_into_bundles(runner, command)?;
     let l1_chain_id = fetch_l1_chain_id(&shared.l1_rpc_url).await?;
-    let address_names = shared
-        .wallets_yaml
-        .as_ref()
-        .map(|p| build_address_name_map(p))
-        .transpose()?
-        .unwrap_or_default();
+    let mut address_names: HashMap<String, String> = HashMap::new();
+    for path in &shared.wallets_yaml {
+        for (addr, name) in build_address_name_map(path)? {
+            address_names.entry(addr).or_insert(name);
+        }
+    }
     let metadata = json!({
         "command": command,
         "input": serde_json::to_value(input)?,
         "output": serde_json::to_value(output)?,
     });
+
+    // Resolve the bundle directory. Persistent (`--out`) takes precedence
+    // over the tmp dir we allocate for `--execute`-only callers.
+    let (bundle_dir, tmp_dir): (PathBuf, Option<tempfile::TempDir>) = match &shared.out {
+        Some(p) => (p.clone(), None),
+        None => {
+            let tmp = tempfile::tempdir()
+                .map_err(|e| anyhow::anyhow!("failed to allocate tmp dir for --execute: {e}"))?;
+            (tmp.path().to_path_buf(), Some(tmp))
+        }
+    };
+
     write_safe_bundles_dir(
         command,
         &bundles,
         l1_chain_id,
-        out_dir,
+        &bundle_dir,
         &address_names,
         metadata,
     )?;
     logger::info(format!(
         "Safe bundles ({} file(s)) + metadata written to: {}",
         bundles.len(),
-        out_dir.display()
+        bundle_dir.display()
     ));
+
+    if shared.execute {
+        anyhow::ensure!(
+            !shared.wallets_yaml.is_empty(),
+            "--execute requires at least one --wallets-yaml"
+        );
+        execute_safe::execute_manifest(
+            &bundle_dir.join("manifest.json"),
+            &shared.wallets_yaml,
+            &shared.l1_rpc_url,
+        )
+        .await?;
+    }
+
+    // Drop tmp_dir last so the bundle stays around until dispatch completes.
+    drop(tmp_dir);
     Ok(())
 }
 

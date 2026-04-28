@@ -113,7 +113,7 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
 
 /// Replay every bundle in `manifest.json`, dispatching by target address to
 /// the matching signer wallet in any of the supplied wallets.yaml files.
-async fn execute_manifest(
+pub async fn execute_manifest(
     manifest_path: &Path,
     wallets_yaml_paths: &[PathBuf],
     l1_rpc_url: &str,
