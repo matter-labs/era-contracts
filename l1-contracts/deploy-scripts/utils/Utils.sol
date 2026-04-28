@@ -1292,7 +1292,71 @@ library Utils {
         }
 
         vm.startBroadcast(adminOwner);
-        IChainAdmin(_admin).multicall{value: totalValue}(calls, true);
+
+        // Two ChainAdmin shapes coexist on chains we manage:
+        //
+        //   - v31 ChainAdmin: `multicall` has no direct access control;
+        //     internal admin functions (e.g. `setUpgradeTimestamp`) are
+        //     `onlySelf`. Routing every call through `multicall` makes the
+        //     ChainAdmin itself the msg.sender of inner calls, which the
+        //     `onlySelf` checks accept.
+        //
+        //   - v29 ChainAdminOwnable: `multicall` is `onlyOwner`, and the
+        //     ChainAdmin's own admin entrypoints are `onlyOwner` too. So:
+        //       * inner calls *to other contracts* (e.g. Bridgehub) must
+        //         still go through `multicall` so they see msg.sender =
+        //         ChainAdmin, the contract those targets recognise as their
+        //         admin;
+        //       * inner calls *back into the ChainAdmin itself* (e.g.
+        //         `setUpgradeTimestamp`) cannot use `multicall`, because
+        //         they would see msg.sender = ChainAdmin which is not the
+        //         ChainAdmin's owner. Those need a direct call from the
+        //         owner.
+        //
+        // We detect the shape via `getRestrictions()` — present on v31
+        // ChainAdmin, absent on v29. Then for v29 we split `calls` into
+        // self-targeted (direct from owner) and external (batched via
+        // `multicall` from owner).
+        bool isV31Shape;
+        try IChainAdmin(_admin).getRestrictions() returns (address[] memory) {
+            isV31Shape = true;
+        } catch {
+            isV31Shape = false;
+        }
+
+        if (isV31Shape) {
+            IChainAdmin(_admin).multicall{value: totalValue}(calls, true);
+        } else {
+            Call[] memory externalCalls = new Call[](calls.length);
+            uint256 externalCount;
+            uint256 externalValue;
+            for (uint256 i = 0; i < calls.length; i++) {
+                if (calls[i].target == _admin) {
+                    (bool success, bytes memory returnData) = _admin.call{value: calls[i].value}(calls[i].data);
+                    if (!success) {
+                        if (returnData.length > 0) {
+                            assembly {
+                                revert(add(returnData, 0x20), mload(returnData))
+                            }
+                        } else {
+                            revert("ChainAdmin direct admin call failed");
+                        }
+                    }
+                } else {
+                    externalCalls[externalCount] = calls[i];
+                    externalCount++;
+                    externalValue += calls[i].value;
+                }
+            }
+            if (externalCount > 0) {
+                Call[] memory trimmed = new Call[](externalCount);
+                for (uint256 i = 0; i < externalCount; i++) {
+                    trimmed[i] = externalCalls[i];
+                }
+                IChainAdmin(_admin).multicall{value: externalValue}(trimmed, true);
+            }
+        }
+
         vm.stopBroadcast();
     }
 
