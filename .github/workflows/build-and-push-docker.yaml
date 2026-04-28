@@ -4,7 +4,8 @@ on:
   push:
     branches:
       - main
-      - gateway-commands-in-protocol-ops
+      - kl/l2V31upgrade
+      - draft-v31
 
 jobs:
   build-and-push:
@@ -38,7 +39,9 @@ jobs:
         run: |
           SHA=$(git rev-parse HEAD)
           SHORT_SHA=$(git rev-parse --short HEAD)
-          BRANCH=${GITHUB_REF_NAME}
+          # Docker tags can't contain `/`; convert to `-` so branches like
+          # `kl/l2V31upgrade` produce a valid tag.
+          BRANCH=${GITHUB_REF_NAME//\//-}
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "short_sha=$SHORT_SHA" >> "$GITHUB_OUTPUT"
           echo "Tags: $SHA, $BRANCH"

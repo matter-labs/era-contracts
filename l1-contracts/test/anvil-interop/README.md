@@ -200,14 +200,14 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 
 ### Impersonation
 
-| What                          | Who                      | Production equivalent                                                                    |
-| ----------------------------- | ------------------------ | ---------------------------------------------------------------------------------------- |
-| Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade tx                                                           |
-| Interop chain registration    | Default Anvil EOA        | L1 service-tx flow relayed via Bridgehub (impersonated, but contract logic is identical) |
-| GW chain registration         | `ChainAssetHandler`      | Governance flow                                                                          |
-| Settlement layer notification | `L2_BOOTLOADER_ADDR`     | Bootloader at batch start                                                                |
-| Governance calls              | Governance contract      | Multi-sig / timelock                                                                     |
-| GW L2Bridgehub ownership      | Aliased CTM governance   | Shared governance from deployment                                                        |
+| What                          | Who                      | Production equivalent                 |
+| ----------------------------- | ------------------------ | ------------------------------------- |
+| Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade tx        |
+| Interop chain registration    | Default Anvil EOA        | Real L1 service-tx flow relayed to L2 |
+| GW chain registration         | `ChainAssetHandler`      | Governance flow                       |
+| Settlement layer notification | `L2_BOOTLOADER_ADDR`     | Bootloader at batch start             |
+| Governance calls              | Governance contract      | Multi-sig / timelock                  |
+| GW L2Bridgehub ownership      | Aliased CTM governance   | Shared governance from deployment     |
 
 ### Other Shortcuts
 
@@ -218,7 +218,8 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 - **Interop proofs**: Correct struct shape but empty proof arrays
 - **processLogsAndMessages impersonation**: The diamond proxy is impersonated instead of the operator (production uses the operator role)
 - **Settlement layer notification via impersonation**: `SystemContext.setSettlementLayerChainId` is called by impersonating the bootloader. On ZKsync OS, this is only emitted during actual migration between settlement layers (and during genesis/v31 upgrades), not at every batch
-- **v29 -> v31 upgrade harness**: `run-v29-to-v31-upgrade-test.ts` still applies direct `anvil_setStorageAt` patches to legacy chain state before per-chain upgrade. This is a test-only compatibility bridge, not a production upgrade flow.
+- **v29 -> v31 / v30 -> v31 upgrade harnesses**: `run-v29-to-v31-upgrade-test.ts` and `run-v30-to-v31-upgrade-test.ts` still apply direct `anvil_setStorageAt` patches before per-chain upgrade. Today this clears the lingering pre-v31 genesis-upgrade hash and seeds minimal batch counters (`totalBatchesExecuted = totalBatchesCommitted = 1`) so `saveV31UpgradeChainBatchNumber()` can run. This is a test-only compatibility bridge, not a production upgrade flow.
+- **L2 genesis bootstrap**: `l2-genesis-upgrade-deployer.ts` still bootstraps contract code and base-token balance via Anvil RPC before relaying the real genesis transaction. Production chains get that state directly from genesis.
 - **Temporary upgrade inputs**: the upgrade harness copies v29 config inputs into `test/anvil-interop/outputs/upgrade-harness-inputs/` and passes them to Forge via env overrides. It no longer mutates checked-in `upgrade-envs/.../local.toml`.
 
 ## Adding New Tests

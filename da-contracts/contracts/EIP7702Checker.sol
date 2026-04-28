@@ -17,6 +17,12 @@ contract EIP7702Checker {
             let ptr := mload(0x40) // load free memory pointer
             extcodecopy(_account, ptr, 0, 3)
             prefix := mload(ptr) // read back into stack
+            // Advance the free memory pointer even though this function doesn't allocate more
+            // memory afterwards. Project convention: every assembly block that
+            // writes to memory at `mload(0x40)` must keep the free memory pointer in a consistent
+            // state so future refactors (e.g. adding logic after this block or making the function
+            // `internal`) don't silently corrupt adjacent memory.
+            mstore(0x40, add(ptr, 0x20))
         }
 
         return prefix == EIP7702_PREFIX;

@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {MessageRootBase} from "./MessageRootBase.sol";
+import {CHAIN_TREE_EMPTY_ENTRY_HASH, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
 
 import {
     L2_BRIDGEHUB_ADDR,
@@ -15,6 +16,8 @@ import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.s
 
 import {FullMerkle} from "../../common/libraries/FullMerkle.sol";
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
+import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
+import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {InvalidCaller} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
@@ -24,6 +27,8 @@ import {InvalidCaller} from "../../common/L1ContractErrors.sol";
 contract L2MessageRoot is MessageRootBase {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
+    using FullMerkleMemory for FullMerkleMemory.FullTree;
+    using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
     /// @dev Chain ID of L1 for bridging reasons.
     uint256 internal l1ChainId;
@@ -104,6 +109,20 @@ contract L2MessageRoot is MessageRootBase {
 
         _emitRoot(sharedTreeRoot);
         historicalRoot[block.number] = sharedTreeRoot;
+    }
+
+    function getEmptyMultichainBatchRoot(uint256 _chainId) external pure returns (bytes32) {
+        FullMerkleMemory.FullTree memory localSharedTree;
+        localSharedTree.createTree(1);
+        // slither-disable-next-line unused-return
+        localSharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
+
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory localChainTree;
+        localChainTree.createTree(1);
+        bytes32 initialChainTreeHash = localChainTree.setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
+        bytes32 leafHash = MessageHashing.chainIdLeafHash(initialChainTreeHash, _chainId);
+
+        return localSharedTree.pushNewLeaf(leafHash);
     }
 
     function _proveL2LeafInclusionOnSettlementLayer(

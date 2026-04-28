@@ -30,6 +30,7 @@ const ARTIFACTS = {
   IL2AssetRouter: "IL2AssetRouter.sol/IL2AssetRouter.json",
   InteropCenter: "InteropCenter.sol/InteropCenter.json",
   InteropHandler: "InteropHandler.sol/InteropHandler.json",
+  IComplexUpgraderZKsyncOSV29: "IComplexUpgraderZKsyncOSV29.sol/IComplexUpgraderZKsyncOSV29.json",
   ITransparentUpgradeableProxy: "TransparentUpgradeableProxy.sol/ITransparentUpgradeableProxy.json",
   L1AssetRouter: "L1AssetRouter.sol/L1AssetRouter.json",
   L1MessengerZKOS: "L1MessengerZKOS.sol/L1MessengerZKOS.json",
@@ -39,7 +40,9 @@ const ARTIFACTS = {
   L1Nullifier: "L1Nullifier.sol/L1Nullifier.json",
   L2AssetRouter: "L2AssetRouter.sol/L2AssetRouter.json",
   L2AssetTracker: "L2AssetTracker.sol/L2AssetTracker.json",
+  L2BaseTokenEra: "L2BaseTokenEra.sol/L2BaseTokenEra.json",
   L2BaseTokenZKOS: "L2BaseTokenZKOS.sol/L2BaseTokenZKOS.json",
+  ZKOSContractDeployer: "ZKOSContractDeployer.sol/ZKOSContractDeployer.json",
   L2Bridgehub: "L2Bridgehub.sol/L2Bridgehub.json",
   L1ChainAssetHandler: "L1ChainAssetHandler.sol/L1ChainAssetHandler.json",
   L1ChainAssetHandlerDev: "L1ChainAssetHandlerDev.sol/L1ChainAssetHandlerDev.json",
@@ -54,13 +57,20 @@ const ARTIFACTS = {
   L2WrappedBaseToken: "L2WrappedBaseToken.sol/L2WrappedBaseToken.json",
   MailboxFacet: "Mailbox.sol/MailboxFacet.json",
   MigratorFacet: "Migrator.sol/MigratorFacet.json",
+  MockContractDeployer: "MockContractDeployer.sol/MockContractDeployer.json",
   MockL1MessengerHook: "MockL1MessengerHook.sol/MockL1MessengerHook.json",
   MockL2MessageVerification: "MockL2MessageVerification.sol/MockL2MessageVerification.json",
   MockMintBaseTokenHook: "MockMintBaseTokenHook.sol/MockMintBaseTokenHook.json",
   Ownable2Step: "Ownable2Step.sol/Ownable2Step.json",
+  EraSettlementLayerV31Upgrade: "EraSettlementLayerV31Upgrade.sol/EraSettlementLayerV31Upgrade.json",
+  ZKsyncOSSettlementLayerV31Upgrade: "ZKsyncOSSettlementLayerV31Upgrade.sol/ZKsyncOSSettlementLayerV31Upgrade.json",
+  SystemContractProxy: "SystemContractProxy.sol/SystemContractProxy.json",
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
   TestnetERC20Token: "TestnetERC20Token.sol/TestnetERC20Token.json",
+  L2MessageVerification: "L2MessageVerification.sol/L2MessageVerification.json",
+  L2InteropRootStorage: "L2InteropRootStorage.sol/L2InteropRootStorage.json",
+  L2V31Upgrade: "L2V31Upgrade.sol/L2V31Upgrade.json",
   UpgradeableBeaconDeployer: "UpgradeableBeaconDeployer.sol/UpgradeableBeaconDeployer.json",
 } as const;
 
@@ -79,3 +89,15 @@ export function getBytecode(name: ContractName): string {
 export function getCreationBytecode(name: ContractName): string {
   return loadCreationBytecodeFromOut(ARTIFACTS[name]);
 }
+
+// ── Legacy ABIs ─────────────────────────────────────────────────
+// ABIs for older contract versions that no longer exist as artifacts.
+// Kept here (not inline) so every consumer imports from a single source of truth.
+
+/**
+ * Legacy AdminFacet ABI from v29/v30: upgradeChainFromVersion(uint256, DiamondCutData) with 2 params.
+ * The current AdminFacet has upgradeChainFromVersion(address, uint256, DiamondCutData) with 3 params.
+ */
+export const LEGACY_ADMIN_ABI: string[] = [
+  "function upgradeChainFromVersion(uint256, tuple(tuple(address,uint8,bool,bytes4[])[],address,bytes))",
+];

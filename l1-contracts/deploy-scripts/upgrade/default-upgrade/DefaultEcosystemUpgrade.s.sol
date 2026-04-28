@@ -99,7 +99,8 @@ contract DefaultEcosystemUpgrade is Script {
             _params.create2FactorySalt,
             _params.upgradeInputPath,
             _ctmOutputPath,
-            _params.governance
+            _params.governance,
+            _params.zkTokenAssetId
         );
         _ctmInitialized = true;
 
