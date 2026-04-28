@@ -60,6 +60,7 @@ import {
 import { getAbi, getCreationBytecode } from "../../src/core/contracts";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
 import {
+  ANVIL_DEFAULT_ACCOUNT_ADDR,
   ANVIL_DEFAULT_PRIVATE_KEY,
   ETH_TOKEN_ADDRESS,
   GW_ASSET_TRACKER_ADDR,
@@ -93,7 +94,17 @@ import {
 } from "../../src/helpers/harness-shims";
 import { getGWChainBalance } from "../../src/helpers/process-logs-helper";
 import { customError, expectRevert, randomBigNumber } from "../../src/helpers/balance-helpers";
-import { encodeEvmChain } from "../../src/helpers/erc7930";
+import { encodeEvmAddress, encodeEvmChain } from "../../src/helpers/erc7930";
+import type { CallStarter } from "../../src/helpers/interop-helpers";
+import {
+  executionAddressAttr,
+  getInteropProtocolFee,
+  interopCallValueAttr,
+  sendInteropBundle,
+  simulateExecuteBundle,
+  simulateUnbundleBundle,
+  unbundlerAddressAttr,
+} from "../../src/helpers/interop-helpers";
 
 // A chain ID that is intentionally not registered in the anvil-interop topology.
 // Used to exercise the `DestinationChainNotRegistered` reject path.
@@ -519,11 +530,67 @@ describe("10 - Token Balance Migration Lifecycle", function () {
     // succeed after the reverse TBM completes. Mirrors the source suite's
     // `unfinalizedWithdrawals` → `withdrawals` lifecycle.
     const pendingWithdrawals: Record<string, PendingWithdrawal> = {};
+    // Bundles delivered to the reverse-TBM chain *while it is still GW-settled*,
+    // captured here so the post-SL-change tests below can attempt to claim them
+    // and assert the InteropHandler guard fires after the chain migrates to L1.
+    // Source is a different GW-settled chain (so its `currentSettlementLayerChainId`
+    // is GW and `sendBundle` succeeds at the moment of capture).
+    let oldExecuteBundleData: string;
+    let oldUnbundleBundleData: string;
 
     before(async () => {
       depositAmount = randomBigNumber(TBM_DEPOSIT_AMOUNT_RANGE.min, TBM_DEPOSIT_AMOUNT_RANGE.max);
       l1GWBalanceBeforeDeposit = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, gwChainId, ethAssetId);
       gwBalanceBeforeDeposit = await getGWChainBalance(gwProvider, reverseTbmChainId, ethAssetId);
+
+      // Pick a different GW-settled chain than the reverse-TBM target as the bundle
+      // source so the source chain stays settled-on-GW for the duration of the spec
+      // (the reverse-TBM target's SL flips to L1 mid-spec).
+      const ethBaseGwSettledIds = gwSettledChainIds.filter((id) => {
+        if (id === reverseTbmChainId) return false;
+        const cfg = state.chains!.config.find((c) => c.chainId === id);
+        return !cfg?.baseToken || cfg.baseToken === ETH_TOKEN_ADDRESS;
+      });
+      expect(
+        ethBaseGwSettledIds.length,
+        "expected at least one ETH-base GW-settled chain other than the reverse-TBM target"
+      ).to.be.greaterThan(0);
+      const sourceChainIdForOldBundles = ethBaseGwSettledIds[0];
+      const sourceProviderForOldBundles = new ethers.providers.JsonRpcProvider(
+        getL2RpcUrl(state, sourceChainIdForOldBundles)
+      );
+
+      const interopFee = await getInteropProtocolFee(sourceProviderForOldBundles);
+      const recipient = encodeEvmAddress(ANVIL_DEFAULT_ACCOUNT_ADDR);
+      // Two bundles: one targeted at `executeBundle`, one targeted at `unbundleBundle`
+      // (the latter requires an `unbundlerAddress` attribute so the unbundle path is
+      // permissioned, mirroring spec 09's pattern).
+      const callValue = randomBigNumber(BigNumber.from(1), BigNumber.from(1_000));
+      const callStarters: CallStarter[] = [
+        { to: recipient, data: "0x", callAttributes: [interopCallValueAttr(callValue)] },
+      ];
+      const value = interopFee.add(callValue);
+
+      const executeBundle = await sendInteropBundle({
+        sourceProvider: sourceProviderForOldBundles,
+        destinationChainId: reverseTbmChainId,
+        callStarters,
+        bundleAttributes: [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)],
+        value,
+      });
+      oldExecuteBundleData = executeBundle.bundleData;
+
+      const unbundleBundle = await sendInteropBundle({
+        sourceProvider: sourceProviderForOldBundles,
+        destinationChainId: reverseTbmChainId,
+        callStarters,
+        bundleAttributes: [
+          executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR),
+          unbundlerAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR),
+        ],
+        value,
+      });
+      oldUnbundleBundleData = unbundleBundle.bundleData;
     });
 
     // Reverse-TBM asserts a strict, stateful sequence: (deposit → change SL → burn
@@ -583,6 +650,34 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         l2MigNum.eq(POST_REVERSE_MIGRATION_NUMBER),
         `L2 L2ChainAssetHandler.migrationNumber[${reverseTbmChainId}] = ${l2MigNum} after SL change`
       ).to.equal(true);
+    });
+
+    // The previous step set the chain's `SystemContext.currentSettlementLayerChainId`
+    // to L1. The `InteropHandler` guard reads from that exact slot, so any interop
+    // claim on the chain — including a bundle that was sent to the chain *before*
+    // the SL change — must now revert with `CannotClaimInteropOnL1Settlement`.
+    // This documents the production limitation: pending interop bundles delivered
+    // while the chain was settling on GW cannot be claimed once the chain returns
+    // to L1, because there is no `GWAssetTracker` plumbing on L1 to move balances
+    // from `pendingInteropBalance` into `chainBalance` on the destination chain.
+
+    it("executing a bundle delivered while on GW reverts after the SL change to L1", async () => {
+      const sourceChainIdForOldBundles = gwSettledChainIds.find((id) => id !== reverseTbmChainId)!;
+      await expectRevert(
+        () => simulateExecuteBundle(reverseTbmProvider, oldExecuteBundleData, sourceChainIdForOldBundles),
+        "executeBundle on chain after SL→L1",
+        customError("InteropHandler", "CannotClaimInteropOnL1Settlement()"),
+        reverseTbmProvider
+      );
+    });
+
+    it("unbundling a bundle delivered while on GW reverts after the SL change to L1", async () => {
+      await expectRevert(
+        () => simulateUnbundleBundle(reverseTbmProvider, oldUnbundleBundleData, [0]),
+        "unbundleBundle on chain after SL→L1",
+        customError("InteropHandler", "CannotClaimInteropOnL1Settlement()"),
+        reverseTbmProvider
+      );
     });
 
     it("apply the GW-side migration-burn transitions (settlement layer + migration number)", async () => {
