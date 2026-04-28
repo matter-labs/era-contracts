@@ -6,7 +6,10 @@ pub(crate) mod execute_safe;
 
 #[derive(Subcommand, Debug)]
 pub enum DevCommands {
-    /// Execute a Gnosis Safe Transaction Builder JSON file (one bundle, one signer)
+    /// Execute Gnosis Safe Transaction Builder JSON: one bundle under one
+    /// signer (`--safe-file` + `--private-key`), or every bundle in a
+    /// prepare-shape command's manifest with per-bundle signer dispatch
+    /// (`--manifest` + `--wallets-yaml`)
     ExecuteSafe(DevExecuteSafeArgs),
 }
 
