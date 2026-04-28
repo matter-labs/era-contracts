@@ -19,6 +19,7 @@ clap = { version = "4.4", features = ["derive", "wrap_help", "string"] }
 clap_complete = "4.5.33"
 clap-markdown = "0.1.4"
 cliclack = "0.2.5"
+colored = "2.2.0"
 console = "0.15.8"
 dirs = "5.0.1"
 ethers = "2.0"
