@@ -36,7 +36,7 @@ import {
     InteropCallStarter,
     InteropCallStarterInternal
 } from "../common/Messaging.sol";
-import {MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {AssetIdMismatch, MsgValueMismatch, NotL2ToL2, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 import {
@@ -567,7 +567,10 @@ contract InteropCenter is
             revert DestinationChainNotRegistered(_chainId);
         }
 
-        _balanceChange.baseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_chainId);
+        bytes32 baseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_chainId);
+        if (_balanceChange.baseTokenAssetId != baseTokenAssetId) {
+            revert AssetIdMismatch(baseTokenAssetId, _balanceChange.baseTokenAssetId);
+        }
         GW_ASSET_TRACKER.handleChainBalanceIncreaseOnGateway({
             _chainId: _chainId,
             _canonicalTxHash: _canonicalTxHash,

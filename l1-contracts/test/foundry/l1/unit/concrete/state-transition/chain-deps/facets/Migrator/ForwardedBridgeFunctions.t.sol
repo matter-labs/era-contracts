@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {MigratorTest} from "./_Migrator_Shared.t.sol";
-import {NotAZKChain, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {NotAZKChain, RemovingPermanentRestriction, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {
     NotL1,
     AlreadyMigrated,
@@ -345,6 +345,41 @@ contract ForwardedBridgeFunctionsTest is MigratorTest {
         vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(InvalidNumberOfBatchHashes.selector, 2, 6));
         migratorFacet.forwardedBridgeMint(data, false);
+    }
+
+    function test_forwardedBridgeMint_RevertWhen_RemovingPermanentRollupRestriction() public {
+        address ctm = utilsFacet.util_getChainTypeManager();
+        uint256 currentProtocolVersion = utilsFacet.util_getProtocolVersion();
+        vm.mockCall(
+            ctm,
+            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
+            abi.encode(currentProtocolVersion)
+        );
+
+        utilsFacet.util_setIsPermanentRollup(true);
+
+        PriorityTreeCommitment memory priorityTreeCommitment = PriorityTreeCommitment({
+            nextLeafIndex: 0,
+            startIndex: 0,
+            unprocessedIndex: 0,
+            sides: new bytes32[](0)
+        });
+
+        ZKChainCommitment memory nonPermanentCommitment = ZKChainCommitment({
+            totalBatchesExecuted: 0,
+            totalBatchesVerified: 0,
+            totalBatchesCommitted: 0,
+            l2SystemContractsUpgradeTxHash: bytes32(0),
+            l2SystemContractsUpgradeBatchNumber: 0,
+            batchHashes: new bytes32[](1),
+            priorityTree: priorityTreeCommitment,
+            isPermanentRollup: false,
+            precommitmentForTheLatestBatch: bytes32(0)
+        });
+
+        vm.prank(chainAssetHandler);
+        vm.expectRevert(RemovingPermanentRestriction.selector);
+        migratorFacet.forwardedBridgeMint(abi.encode(nonPermanentCommitment), false);
     }
 
     /*//////////////////////////////////////////////////////////////
