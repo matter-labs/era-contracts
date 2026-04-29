@@ -67,9 +67,8 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-      - name: Build DummyInteropRecipient artifact
-        working-directory: l1-contracts
-        run: forge build contracts/dev-contracts/test/DummyInteropRecipient.sol
+      - name: Build anvil-interop dev artifacts
+        run: ./l1-contracts/test/anvil-interop/build-dev-artifacts.sh
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
