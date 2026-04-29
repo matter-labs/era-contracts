@@ -195,7 +195,6 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             );
         for (uint256 i; i < additionalForcedCoreContracts.length; i++) {
             additionalForceDeployments[i] = CoreOnGatewayHelper.getForceDeployment(
-                false,
                 additionalForcedCoreContracts[i]
             );
         }

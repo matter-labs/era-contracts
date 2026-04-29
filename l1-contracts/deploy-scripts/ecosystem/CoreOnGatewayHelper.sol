@@ -79,13 +79,19 @@ library CoreOnGatewayHelper {
 
     // ======================== Force deployments ========================
 
-    /// @notice Build a force deployment entry for scripts that use additional Era force deployments.
+    /// @notice Build a force-deployment entry for an Era CTM upgrade's
+    ///         additional core contracts.
+    /// @dev Era-only by construction: ZKsyncOS upgrades emit their additional
+    ///      force-deployments through a different path
+    ///      (`EcosystemUpgrade_v30_zksync_os_blobs`-style helpers) and do not
+    ///      use this function. Adding ZKsyncOS support here would mean
+    ///      switching `getDeployedBytecodeHash` to the proxy-upgrade
+    ///      bytecode-info shape (see `getBytecodeInfo`) — out of scope while
+    ///      the only caller (`CTMUpgradeBase.publishAdditionalForceDeployments`)
+    ///      is Era-only.
     function getForceDeployment(
-        bool _isZKsyncOS,
         CoreContract _c
     ) internal view returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
-        // FIXME: add support for additional force deployments on ZKsyncOS in scripts.
-        require(!_isZKsyncOS, "Additional force deployments are not supported for ZKsyncOS scripts");
         forceDeployment = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: getDeployedBytecodeHash(false, _c),
             newAddress: _resolveAddress(_c),
