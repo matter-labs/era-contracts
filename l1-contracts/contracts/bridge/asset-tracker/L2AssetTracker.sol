@@ -288,7 +288,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             _fromChainId: _fromChainId,
             _assetId: _assetId,
             _amount: _amount,
-            _tokenOriginChainId: _tokenOriginChainId,
+            _isNativeToThisChain: _tokenOriginChainId == block.chainid,
             _tokenAddress: _tokenAddress
         });
     }
@@ -297,17 +297,17 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 _fromChainId,
         bytes32 _assetId,
         uint256 _amount,
-        uint256 _tokenOriginChainId,
+        bool _isNativeToThisChain,
         address _tokenAddress
     ) internal {
         _registerLegacyTokenIfNeeded(_assetId, _tokenAddress);
 
-        if (_needToForceSetAssetMigrationOnL2(_assetId, _tokenOriginChainId, _tokenAddress)) {
+        if (_needToForceSetAssetMigrationOnL2(_assetId, _isNativeToThisChain, _tokenAddress)) {
             _forceSetAssetMigrationNumber(block.chainid, _assetId);
         }
 
         /// On the L2 we only save chainBalance for native tokens.
-        if (_tokenOriginChainId == block.chainid) {
+        if (_isNativeToThisChain) {
             chainBalance[block.chainid][_assetId] += _amount;
         }
 
@@ -391,7 +391,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             _fromChainId: _fromChainId,
             _assetId: baseTokenAssetId,
             _amount: _amount,
-            _tokenOriginChainId: L1_CHAIN_ID,
+            _isNativeToThisChain: false,
             _tokenAddress: address(L2_BASE_TOKEN_SYSTEM_CONTRACT)
         });
     }
@@ -462,15 +462,15 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @dev for "no deposits have been finalized yet", giving uniform behavior for both base tokens and
     /// @dev ERC20 tokens. The same ordering must be enforced in zksync-os.
     /// @param _assetId The asset ID of the token to check.
-    /// @param _tokenOriginChainId The chain ID where this token originated.
+    /// @param _isNativeToThisChain Whether the asset should be accounted as native to this chain.
     /// @param _tokenAddress The contract address of the token on this chain.
     /// @return bool True if the migration number should be force-set, false otherwise.
     function _needToForceSetAssetMigrationOnL2(
         bytes32 _assetId,
-        uint256 _tokenOriginChainId,
+        bool _isNativeToThisChain,
         address _tokenAddress
     ) internal view returns (bool) {
-        if (_tokenOriginChainId == block.chainid) {
+        if (_isNativeToThisChain) {
             return false;
         }
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
