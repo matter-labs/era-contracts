@@ -591,20 +591,23 @@ describe("L2 upgrade test", function () {
     expect(revertReason).to.contains("PreviousUpgradeNotFinalized");
   });
 
-  // TODO: restore test
-  // it("Should require that the next commit batches contains an upgrade tx", async () => {
-  //   if (!l2UpgradeTxHash) {
-  //     throw new Error("Can not perform this test without l2UpgradeTxHash");
-  //   }
+  it("Should require that the next committed batch contains an upgrade tx hash log", async () => {
+    if (!l2UpgradeTxHash) {
+      throw new Error("Can not perform this test without l2UpgradeTxHash");
+    }
 
-  //   const batch3InfoNoUpgradeTx = await buildCommitBatchInfo(storedBatch2Info, {
-  //     batchNumber: 3,
-  //   });
-  //   const revertReason = await getCallRevertReason(
-  //     proxyExecutor.commitBatchesSharedBridge(chainId, ...encodeCommitBatchesData(storedBatch2Info, [batch3InfoNoUpgradeTx]))
-  //   );
-  //   expect(revertReason).to.contains("MissingSystemLogs");
-  // });
+    const batch3InfoNoUpgradeTx = await buildCommitBatchInfo(storedBatch2Info, {
+      batchNumber: 3,
+    });
+
+    const revertReason = await getCallRevertReason(
+      proxyExecutor.commitBatchesSharedBridge(
+        chainId,
+        ...encodeCommitBatchesData(storedBatch2Info, [batch3InfoNoUpgradeTx])
+      )
+    );
+    expect(revertReason).to.contains("MissingSystemLogs");
+  });
 
   it("Should ensure any additional upgrade logs go to the priority ops hash", async () => {
     if (!l2UpgradeTxHash) {
