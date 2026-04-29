@@ -270,7 +270,7 @@ uint64 constant DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT = 72_000_000;
 /// @dev Used to derive the real circulating supply: circulatingSupply = INITIAL - TotalSupplyBeforeMigration
 uint256 constant INITIAL_BASE_TOKEN_HOLDER_BALANCE = (2 ** 127) - 1;
 
-/// @dev The total number of support interop attributes.
+/// @dev The total number of supported interop attributes.
 uint256 constant SUPPORTED_INTEROP_ATTRIBUTES = 5;
 
 /// @dev Migration number used when a chain migrates from L1 to a settlement layer.
