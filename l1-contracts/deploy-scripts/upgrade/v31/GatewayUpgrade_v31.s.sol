@@ -19,16 +19,22 @@ import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.
 
 /// @notice Script used for gateway upgrade flow. Not used in V31, but was used in V29 and will be used in V32.
 contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
-    function getAdditionalForcedCoreContracts()
+    function getAdditionalEraForcedCoreContracts()
         internal
         override
-        returns (CoreContract[] memory additionalForcedCoreContracts)
+        returns (CoreContract[] memory additionalEraForcedCoreContracts)
     {
-        if (config.isZKsyncOS) {
-            return new CoreContract[](0);
-        }
-        additionalForcedCoreContracts = new CoreContract[](1);
-        additionalForcedCoreContracts[0] = CoreContract.L2V31Upgrade;
+        additionalEraForcedCoreContracts = new CoreContract[](1);
+        additionalEraForcedCoreContracts[0] = CoreContract.L2V31Upgrade;
+    }
+
+    function getAdditionalFactoryDependencyContracts()
+        internal
+        override
+        returns (CoreContract[] memory additionalDependencyContracts)
+    {
+        additionalDependencyContracts = new CoreContract[](1);
+        additionalDependencyContracts[0] = CoreContract.L2V31Upgrade;
     }
 
     function getL2UpgradeTargetAndData(

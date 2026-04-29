@@ -188,26 +188,33 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             return getAdditionalZKsyncOSForceDeployments();
         }
 
-        CoreContract[] memory additionalForcedCoreContracts = getAdditionalForcedCoreContracts();
-        IL2ContractDeployer.ForceDeployment[]
-            memory additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](
-                additionalForcedCoreContracts.length
-            );
-        for (uint256 i; i < additionalForcedCoreContracts.length; i++) {
-            additionalForceDeployments[i] = CoreOnGatewayHelper.getForceDeployment(
-                false,
-                additionalForcedCoreContracts[i]
-            );
+        CoreContract[] memory additionalEraForcedCoreContracts = getAdditionalEraForcedCoreContracts();
+        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](additionalEraForcedCoreContracts.length);
+        for (uint256 i; i < additionalEraForcedCoreContracts.length; i++) {
+            deployments[i] = CoreOnGatewayHelper.getEraForceDeployment(additionalEraForcedCoreContracts[i]);
         }
-        return EraForceDeploymentsLib.wrap(additionalForceDeployments);
     }
 
-    function getAdditionalForcedCoreContracts()
+    /// @notice Override to add version-specific Era force deployments.
+    /// @dev ZKsyncOS uses `getAdditionalZKsyncOSForceDeployments()` instead.
+    function getAdditionalEraForcedCoreContracts()
         internal
         virtual
-        returns (CoreContract[] memory additionalForcedCoreContracts)
+        returns (CoreContract[] memory additionalEraForcedCoreContracts)
     {
         return new CoreContract[](0);
+    }
+
+    /// @notice Override to add version-specific bytecodes to the factory deps publication set.
+    /// @dev Defaults to the Era force-deployment list since Era force deployments must also
+    ///      have their bytecodes published. ZKsyncOS upgrades can override this separately
+    ///      when the deployment list and bytecode publication list differ.
+    function getAdditionalFactoryDependencyContracts()
+        internal
+        virtual
+        returns (CoreContract[] memory additionalDependencyContracts)
+    {
+        return getAdditionalEraForcedCoreContracts();
     }
 
     /// @notice Encode calldata that will be passed to `_postUpgrade`

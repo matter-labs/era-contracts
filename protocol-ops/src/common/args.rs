@@ -36,12 +36,21 @@ pub struct SharedRunArgs {
     #[clap(long, help_heading = "Output")]
     pub out: Option<PathBuf>,
 
-    /// Path to wallets.yaml. When provided, Safe bundle manifest entries
-    /// include a `signer` field mapping each bundle's target address to
-    /// its human-readable wallet name (e.g. "ecosystem.deployer",
-    /// "gateway.owner").
+    /// Path to wallets.yaml. May be specified multiple times — entries from
+    /// every supplied file are merged. Used both for Safe bundle manifest
+    /// annotation (each bundle's `signer` field gets a human-readable name
+    /// like "ecosystem.deployer") and, when `--execute` is set, for in-process
+    /// bundle dispatch (signing the txs).
     #[clap(long, help_heading = "Output")]
-    pub wallets_yaml: Option<PathBuf>,
+    pub wallets_yaml: Vec<PathBuf>,
+
+    /// Dispatch the prepared Safe bundle in this same invocation, instead of
+    /// writing to `--out` for separate `dev execute-safe` replay. Requires at
+    /// least one `--wallets-yaml`. The bundle is written to `--out` if given,
+    /// otherwise to a freshly-allocated tmp dir that is removed after a
+    /// successful dispatch.
+    #[clap(long, help_heading = "Execution")]
+    pub execute: bool,
 
     #[clap(flatten)]
     #[serde(flatten)]

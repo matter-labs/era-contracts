@@ -46,10 +46,15 @@ struct SystemContract {
     bool isPrecompile; // Whether precompile or not
 }
 
-/// @dev The number of built-in contracts that reside within the "system-contracts" folder
-uint256 constant SYSTEM_CONTRACTS_COUNT = 30;
+/// @dev The number of built-in contracts that are handled as Era system force deployments.
+uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
 uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 13;
+/// @dev Runtime deployment preimages needed as factory dependencies but not force-deployed at fixed addresses.
+uint256 constant RUNTIME_FACTORY_DEPENDENCY_CONTRACTS_COUNT = 2;
+/// @dev Era factory dependencies based in `l1-contracts`: other built-ins plus runtime deployment preimages.
+uint256 constant OTHER_FACTORY_DEPENDENCY_CONTRACTS_COUNT = OTHER_BUILT_IN_CONTRACTS_COUNT +
+    RUNTIME_FACTORY_DEPENDENCY_CONTRACTS_COUNT;
 /// @dev System contracts (0x800x) with l1-contracts EVM bytecodes for ZKsyncOS proxy upgrades.
 uint256 constant ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT = 3;
 
@@ -63,7 +68,7 @@ struct BuiltinContractDeployInfo {
 library SystemContractsProcessing {
     /// @notice Retrieves the entire list of system contracts as a memory array.
     /// @dev Note that it does not include all built-in contracts. Rather all those
-    /// that are based in the `system-contracts` folder.
+    /// that are based in the `system-contracts` folder plus fixed-address system helpers.
     /// Note, that we do not populate the system contract for the genesis upgrade address,
     /// as it is used during the genesis upgrade or during upgrades (and so it should be populated
     /// as part of the upgrade script).
@@ -133,6 +138,8 @@ library SystemContractsProcessing {
                 // L2BaseToken is now in l1-contracts as L2BaseTokenEra
                 if (Utils.compareStrings(systemContracts[i].codeName, "L2BaseToken")) {
                     result[i] = BytecodeUtils.readBytecodeL1(false, "L2BaseTokenEra.sol", "L2BaseTokenEra");
+                } else if (Utils.compareStrings(systemContracts[i].codeName, "SystemContractProxyAdmin")) {
+                    result[i] = ContractsBytecodesLib.getCreationCodeEra(systemContracts[i].codeName);
                 } else if (systemContracts[i].lang == Language.Solidity) {
                     result[i] = BytecodeUtils.readSystemContractsBytecode(systemContracts[i].codeName);
                 } else {
@@ -165,6 +172,18 @@ library SystemContractsProcessing {
     /// @notice The list of CoreContract entries that are "other built-in" contracts.
     function getOtherBuiltinCoreContracts() internal pure returns (CoreContract[] memory ids) {
         ids = new CoreContract[](OTHER_BUILT_IN_CONTRACTS_COUNT);
+        _fillOtherBuiltinCoreContracts(ids);
+    }
+
+    function getOtherFactoryDependencyContracts() internal pure returns (CoreContract[] memory ids) {
+        ids = new CoreContract[](OTHER_FACTORY_DEPENDENCY_CONTRACTS_COUNT);
+        _fillOtherBuiltinCoreContracts(ids);
+        uint256 runtimeOnlyIndex = OTHER_BUILT_IN_CONTRACTS_COUNT;
+        ids[runtimeOnlyIndex++] = CoreContract.TransparentUpgradeableProxy;
+        ids[runtimeOnlyIndex++] = CoreContract.BeaconProxy;
+    }
+
+    function _fillOtherBuiltinCoreContracts(CoreContract[] memory ids) private pure {
         ids[0] = CoreContract.L2Bridgehub;
         ids[1] = CoreContract.L2AssetRouter;
         ids[2] = CoreContract.L2NativeTokenVault;
@@ -204,6 +223,15 @@ library SystemContractsProcessing {
                 addr: CoreOnGatewayHelper._resolveAddress(ids[i]),
                 bytecode: ContractsBytecodesLib.getCreationCodeEra(eraName)
             });
+        }
+    }
+
+    function getOtherFactoryDependencyBytecodes() internal view returns (bytes[] memory bytecodes) {
+        CoreContract[] memory contracts = getOtherFactoryDependencyContracts();
+        bytecodes = new bytes[](contracts.length);
+        for (uint256 i = 0; i < contracts.length; i++) {
+            string memory eraName = CoreOnGatewayHelper._resolveContractName(false, contracts[i]);
+            bytecodes[i] = ContractsBytecodesLib.getCreationCodeEra(eraName);
         }
     }
 
@@ -322,11 +350,7 @@ library SystemContractsProcessing {
         basicBytecodes[2] = Utils.getEvmEmulatorBytecodeHash();
 
         bytes[] memory systemBytecodes = getSystemContractsBytecodes();
-        BuiltinContractDeployInfo[] memory otherContracts = getOtherBuiltinContracts();
-        bytes[] memory otherBytecodes = new bytes[](otherContracts.length);
-        for (uint256 i = 0; i < otherContracts.length; i++) {
-            otherBytecodes[i] = otherContracts[i].bytecode;
-        }
+        bytes[] memory otherBytecodes = getOtherFactoryDependencyBytecodes();
 
         factoryDeps = mergeBytesArrays(mergeBytesArrays(basicBytecodes, systemBytecodes), otherBytecodes);
     }
