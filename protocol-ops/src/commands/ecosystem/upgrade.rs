@@ -18,17 +18,20 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::{Address, H256};
+use ethers::types::{Address, Bytes, H256};
+use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::abi_contracts::UPGRADE_V31_CONTRACT;
 use crate::commands::output::write_output_if_requested;
 use crate::common::paths;
 use crate::common::SharedRunArgs;
-use crate::common::{
-    forge::{Forge, ForgeRunner, ForgeScriptArg},
-    logger,
-    wallets::Wallet,
+use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
+use crate::config::forge_interface::script_params::{
+    ADMIN_FUNCTIONS_INVOCATION, ECOSYSTEM_UPGRADE_V31_SCRIPT_PATH, UPGRADE_V31_CORE_OUTPUT_PATH,
+    UPGRADE_V31_CTM_OUTPUT_PATH, UPGRADE_V31_ECOSYSTEM_OUTPUT_PATH,
+    UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH,
 };
 
 // ── upgrade-prepare ───────────────────────────────────────────────────────
@@ -70,11 +73,20 @@ pub struct UpgradePrepareArgs {
     #[clap(long)]
     pub create2_factory_salt: Option<H256>,
 
+    /// CTM proxy override. When set, the upgrade is prepared against this CTM
+    /// instead of auto-resolving via the first registered chain. Required when
+    /// the ecosystem hosts multiple CTMs (e.g. EVM + zkOS) and the caller wants
+    /// to target a specific one. Auto-resolution must still find a registered
+    /// chain that uses this CTM, otherwise other addresses (rollup DA manager,
+    /// etc.) cannot be resolved.
+    #[clap(long)]
+    pub ctm_proxy: Option<Address>,
+
     /// Forge-internal: upgrade config TOML path relative to l1-contracts root.
     /// Passed through to the Solidity script; rarely needs overriding.
     #[clap(
         long,
-        default_value = "/upgrade-envs/v0.31.0-interopB/local.toml",
+        default_value = UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH,
         hide = true
     )]
     pub upgrade_input_path: String,
@@ -83,7 +95,7 @@ pub struct UpgradePrepareArgs {
     /// Passed through to the Solidity script; rarely needs overriding.
     #[clap(
         long,
-        default_value = "/script-out/v31-upgrade-ecosystem.toml",
+        default_value = UPGRADE_V31_ECOSYSTEM_OUTPUT_PATH,
         hide = true
     )]
     pub upgrade_output_path: String,
@@ -92,6 +104,19 @@ pub struct UpgradePrepareArgs {
     /// downstream `upgrade-governance` command).
     #[clap(long)]
     pub governance_toml_out: Option<PathBuf>,
+
+    /// Forge-internal: ecosystem upgrade script path.
+    ///
+    /// Hidden because production callers should use the default script. Test
+    /// harnesses may override this with a subclass that keeps the same
+    /// `noGovernancePrepare(...)` entry point but trims non-essential output
+    /// to stay within local Anvil/Forge memory limits.
+    #[clap(
+        long,
+        default_value = ECOSYSTEM_UPGRADE_V31_SCRIPT_PATH,
+        hide = true
+    )]
+    pub script_path: String,
 }
 
 #[derive(Serialize)]
@@ -105,11 +130,12 @@ struct UpgradePrepareOutput<'a> {
 pub async fn run_upgrade_prepare(args: UpgradePrepareArgs) -> anyhow::Result<()> {
     let bridgehub = args.topology.resolve()?.bridgehub;
     let mut runner = ForgeRunner::new(&args.shared)?;
-    let sender = runner.prepare_sender(args.deployer_address).await?;
+    let deployer = runner.prepare_sender(args.deployer_address).await?;
 
     let contracts_path = resolve_l1_contracts_path(&paths::contracts_root())?;
-    let script_path = "deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol";
-    let script_full_path = contracts_path.join(script_path);
+    let script_path = args.script_path.trim_start_matches('/');
+    let script_file_path = script_path.split(':').next().unwrap_or(script_path);
+    let script_full_path = contracts_path.join(script_file_path);
     if !script_full_path.exists() {
         anyhow::bail!("Script not found: {}", script_full_path.display());
     }
@@ -120,21 +146,51 @@ pub async fn run_upgrade_prepare(args: UpgradePrepareArgs) -> anyhow::Result<()>
     let chain_ids = crate::common::l1_contracts::resolve_all_chain_ids(&runner.rpc_url, bridgehub)
         .await
         .context("Failed to query registered chain IDs from bridgehub")?;
-    let representative_chain = *chain_ids
-        .first()
-        .context("No chains registered on bridgehub")?;
+    if chain_ids.is_empty() {
+        anyhow::bail!("No chains registered on bridgehub");
+    }
 
-    let ctm = crate::common::l1_contracts::resolve_ctm_proxy(
-        &runner.rpc_url,
-        bridgehub,
-        representative_chain,
-    )
-    .await
-    .context("Failed to resolve CTM proxy from bridgehub")?;
-    logger::info(format!(
-        "CTM proxy (from L1 via chain {representative_chain}): {:#x}",
-        ctm
-    ));
+    // If a CTM proxy override is supplied, find a registered chain that uses
+    // it; otherwise default to chain_ids[0]. The representative chain is used
+    // to look up other ecosystem addresses (e.g. rollup DA manager) that vary
+    // per-chain — picking one that actually sits behind the same CTM keeps
+    // the auto-resolved values consistent with the targeted upgrade scope.
+    let (representative_chain, ctm) = match args.ctm_proxy {
+        Some(override_ctm) => {
+            let mut found: Option<(u64, Address)> = None;
+            for &cid in &chain_ids {
+                let chain_ctm =
+                    crate::common::l1_contracts::resolve_ctm_proxy(&runner.rpc_url, bridgehub, cid)
+                        .await
+                        .with_context(|| format!("resolving CTM for chain {cid}"))?;
+                if chain_ctm == override_ctm {
+                    found = Some((cid, chain_ctm));
+                    break;
+                }
+            }
+            let (cid, ctm) = found.with_context(|| {
+                format!(
+                    "No registered chain uses CTM {override_ctm:#x}; cannot pick a \
+                     representative chain. Either register a chain on this CTM \
+                     first or omit --ctm-proxy."
+                )
+            })?;
+            logger::info(format!(
+                "CTM proxy (override; matched via chain {cid}): {:#x}",
+                ctm
+            ));
+            (cid, ctm)
+        }
+        None => {
+            let cid = chain_ids[0];
+            let ctm =
+                crate::common::l1_contracts::resolve_ctm_proxy(&runner.rpc_url, bridgehub, cid)
+                    .await
+                    .context("Failed to resolve CTM proxy from bridgehub")?;
+            logger::info(format!("CTM proxy (from L1 via chain {cid}): {:#x}", ctm));
+            (cid, ctm)
+        }
+    };
     let bytecodes_supplier = match args.bytecodes_supplier_address {
         Some(addr) => addr,
         None => {

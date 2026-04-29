@@ -916,9 +916,7 @@ async function verifyL2UpgradeResult(l2Provider: ethers.providers.JsonRpcProvide
 
   const l1ChainId = await assetTracker.L1_CHAIN_ID();
   if (!l1ChainId.eq(runtimeConfig.l1ChainId)) {
-    throw new Error(
-      `Chain ${chainId}: L2AssetTracker.L1_CHAIN_ID = ${l1ChainId}, expected ${runtimeConfig.l1ChainId}`
-    );
+    throw new Error(`Chain ${chainId}: L2AssetTracker.L1_CHAIN_ID = ${l1ChainId}, expected ${runtimeConfig.l1ChainId}`);
   }
 
   const baseTokenAssetId = await assetTracker.BASE_TOKEN_ASSET_ID();

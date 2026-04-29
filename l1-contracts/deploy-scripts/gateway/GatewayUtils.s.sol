@@ -26,7 +26,6 @@ import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 contract GatewayUtils is Script, IGatewayUtils {
     struct FinishMigrateChainToGatewayParams {
         address bridgehubAddr;
-        bytes gatewayDiamondCutData;
         uint256 migratingChainId;
         uint256 gatewayChainId;
         bytes32 l2TxHash;
@@ -39,7 +38,6 @@ contract GatewayUtils is Script, IGatewayUtils {
 
     function finishMigrateChainToGateway(
         address bridgehubAddr,
-        bytes memory gatewayDiamondCutData,
         uint256 migratingChainId,
         uint256 gatewayChainId,
         bytes32 l2TxHash,
@@ -52,7 +50,6 @@ contract GatewayUtils is Script, IGatewayUtils {
         _finishMigrateChainToGatewayInner(
             FinishMigrateChainToGatewayParams({
                 bridgehubAddr: bridgehubAddr,
-                gatewayDiamondCutData: gatewayDiamondCutData,
                 migratingChainId: migratingChainId,
                 gatewayChainId: gatewayChainId,
                 l2TxHash: l2TxHash,
@@ -74,11 +71,13 @@ contract GatewayUtils is Script, IGatewayUtils {
 
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(data.migratingChainId);
         address chainAdmin = IZKChain(bridgehub.getZKChain(data.migratingChainId)).getAdmin();
+        address gatewayCtm = bridgehub.chainTypeManager(data.gatewayChainId);
+        (bytes memory gatewayDiamondCutData, ) = GetDiamondCutData.getDiamondCutAndForceDeployment(gatewayCtm);
 
         bytes memory transferData = abi.encode(
             BridgehubBurnCTMAssetData({
                 chainId: data.migratingChainId,
-                ctmData: abi.encode(AddressAliasHelper.applyL1ToL2Alias(chainAdmin), data.gatewayDiamondCutData),
+                ctmData: abi.encode(AddressAliasHelper.applyL1ToL2Alias(chainAdmin), gatewayDiamondCutData),
                 chainData: abi.encode(IZKChain(bridgehub.getZKChain(data.migratingChainId)).getProtocolVersion())
             })
         );

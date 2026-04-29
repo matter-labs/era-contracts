@@ -1,4 +1,5 @@
-import { ethers, providers } from "ethers";
+import type { providers } from "ethers";
+import { ethers } from "ethers";
 import { getAbi } from "../core/contracts";
 import type { ForkConfig } from "../core/fork-config";
 

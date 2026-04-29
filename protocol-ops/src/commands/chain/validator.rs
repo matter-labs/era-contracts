@@ -1,24 +1,12 @@
-use std::path::Path;
-
 use anyhow::Context;
 use clap::Parser;
-use ethers::{
-    contract::BaseContract,
-    types::{Address, U256},
-};
-use lazy_static::lazy_static;
+use ethers::types::{Address, U256};
 use serde::{Deserialize, Serialize};
 
-use crate::abi::ADMINFUNCTIONSABI_ABI;
 use crate::commands::output::write_output_if_requested;
-use crate::common::{
-    forge::{Forge, ForgeRunner, ForgeScriptArg},
-    logger, SharedRunArgs,
-};
-
-lazy_static! {
-    static ref ADMIN_FUNCTIONS: BaseContract = BaseContract::from(ADMINFUNCTIONSABI_ABI.clone());
-}
+use crate::common::addresses::ZERO_ADDRESS;
+use crate::common::{forge::ForgeRunner, logger, SharedRunArgs};
+use crate::config::forge_interface::script_params::ADMIN_FUNCTIONS_INVOCATION;
 
 /// Shared args for add-validator / remove-validator.
 ///
@@ -39,8 +27,8 @@ pub struct ChainValidatorArgs {
     pub topology: crate::common::EcosystemChainArgs,
 
     /// AccessControlRestriction contract address.
-    /// Use `0x0000000000000000000000000000000000000000` for Ownable ChainAdmin.
-    #[clap(long, default_value = "0x0000000000000000000000000000000000000000")]
+    /// Use `ZERO_ADDRESS` for Ownable ChainAdmin.
+    #[clap(long, default_value = ZERO_ADDRESS)]
     pub access_control_restriction: Address,
     /// Validator address to add/remove
     #[clap(long)]
@@ -75,49 +63,6 @@ async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
     .await
     .context("resolving validator timelock from L1")?;
 
-    let script_path = Path::new("deploy-scripts/AdminFunctions.s.sol");
-    let script_full_path = runner.foundry_scripts_path.join(script_path);
-    if !script_full_path.exists() {
-        anyhow::bail!("Script not found: {}", script_full_path.display());
-    }
-
-    // ABI-encode the `updateValidator(...)` call once; pass it to forge as the
-    // `--sig` value (hex-encoded). Same mechanism as ecosystem upgrade's
-    // governance stages — lets us reuse AdminFunctions.sol's internal
-    // `Utils.adminExecute` path (which `vm.startBroadcast(adminOwner)`s a
-    // `ChainAdmin.multicall`) without needing a dedicated "prepare" Solidity
-    // function.
-    let calldata = ADMIN_FUNCTIONS
-        .encode(
-            "updateValidator",
-            (
-                admin_address,
-                args.access_control_restriction,
-                validator_timelock,
-                U256::from(chain_id),
-                args.validator_address,
-                add,
-            ),
-        )
-        .map_err(|e| anyhow::anyhow!("Failed to encode updateValidator calldata: {}", e))?;
-
-    let mut script_args = runner.forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: ethers::utils::hex::encode(&calldata),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args.add_arg(ForgeScriptArg::Ffi);
-    // `--broadcast` against the anvil fork produces no real-chain effect —
-    // it just records the tx in forge's run file so protocol-ops can extract
-    // it into the Safe bundle. Without this the Safe output would be empty.
-    script_args.add_arg(ForgeScriptArg::Broadcast);
-
-    let forge = Forge::new(&runner.foundry_scripts_path)
-        .script(script_path, script_args)
-        .with_wallet(&sender);
-
     let action = if add { "Adding" } else { "Removing" };
     logger::step(format!(
         "{action} validator via AdminFunctions.s.sol::updateValidator (simulation)"
@@ -133,7 +78,22 @@ async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
 
     runner
-        .run(forge)
+        .run(
+            runner
+                .with_script_call(
+                    &ADMIN_FUNCTIONS_INVOCATION,
+                    "updateValidator",
+                    (
+                        admin_address,
+                        args.access_control_restriction,
+                        validator_timelock,
+                        U256::from(chain_id),
+                        args.validator_address,
+                        add,
+                    ),
+                )?
+                .with_wallet(&sender),
+        )
         .with_context(|| format!("Failed to {} validator", if add { "add" } else { "remove" }))?;
 
     let command = if add {

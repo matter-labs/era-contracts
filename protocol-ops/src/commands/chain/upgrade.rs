@@ -1,14 +1,14 @@
-use std::path::Path;
-
 use anyhow::Context;
 use clap::Parser;
 use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::output::write_output_if_requested;
-use crate::common::forge::{Forge, ForgeRunner, ForgeScriptArg};
+use crate::common::addresses::ZERO_ADDRESS;
+use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
+use crate::config::forge_interface::script_params::ADMIN_FUNCTIONS_INVOCATION;
 
 /// Chain-level CTM upgrade, prepare-only.
 ///
@@ -26,7 +26,7 @@ pub struct ChainUpgradeArgs {
     /// AccessControlRestriction contract address. Defaults to `0x0…0` for
     /// Ownable ChainAdmin deployments; pass explicitly when the chain uses
     /// an ACR.
-    #[clap(long, default_value = "0x0000000000000000000000000000000000000000")]
+    #[clap(long, default_value = ZERO_ADDRESS)]
     pub access_control_restriction: Address,
 
     #[clap(flatten)]
@@ -53,37 +53,22 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
     let sender = runner.prepare_chain_admin(eco.bridgehub, chain_id).await?;
     let admin_address = sender.address;
 
-    let script_path = Path::new("deploy-scripts/AdminFunctions.s.sol");
-    let script_full_path = runner.foundry_scripts_path.join(script_path);
-    if !script_full_path.exists() {
-        anyhow::bail!("Script not found: {}", script_full_path.display());
-    }
-
-    let mut script_args = runner.forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: "upgradeChainFromCTM(address,address,address)".to_string(),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args.add_arg(ForgeScriptArg::Ffi);
-    script_args.add_arg(ForgeScriptArg::GasLimit {
-        gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
-    });
-    // `--broadcast` against the anvil fork. In this mode the
-    // target RPC is the anvil fork, so "broadcast" produces no real-chain
-    // effect — it just records the tx in forge's run file so protocol-ops can
-    // extract it into the Safe bundle. Without this the Safe output would be
-    // empty.
-    script_args.add_arg(ForgeScriptArg::Broadcast);
-    script_args.additional_args.extend([
-        format!("{:#x}", chain_address),
-        format!("{:#x}", admin_address),
-        format!("{:#x}", args.access_control_restriction),
-    ]);
-
-    let forge = Forge::new(&runner.foundry_scripts_path)
-        .script(script_path, script_args)
+    let forge = runner
+        .with_script_call(
+            &ADMIN_FUNCTIONS_INVOCATION,
+            "upgradeChainFromCTM",
+            (
+                chain_address,
+                admin_address,
+                args.access_control_restriction,
+            ),
+        )?
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+        // `--broadcast` against the anvil fork. In this mode the
+        // target RPC is the anvil fork, so "broadcast" produces no real-chain
+        // effect — it just records the tx in forge's run file so protocol-ops can
+        // extract it into the Safe bundle. Without this the Safe output would be
+        // empty.
         .with_wallet(&sender);
 
     logger::step("Preparing chain upgrade Safe bundle via AdminFunctions.s.sol (simulation)");

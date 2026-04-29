@@ -138,8 +138,6 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
             _getL1GasPrice(),
             migratingChainId,
             _gatewayGovernanceConfig.gatewayChainId,
-            // Not checked in the test
-            hex"",
             msg.sender,
             true
         );

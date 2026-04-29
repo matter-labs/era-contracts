@@ -1,5 +1,6 @@
 mod term;
 
+pub mod addresses;
 pub mod anvil;
 pub mod args;
 pub mod cmd;

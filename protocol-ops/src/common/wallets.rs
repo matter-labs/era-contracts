@@ -1,7 +1,10 @@
+#[cfg(test)]
+use crate::common::addresses::DEFAULT_TEST_WALLET_ADDRESS;
 use anyhow::Context as _;
+#[cfg(test)]
+use ethers::signers::{coins_bip39::English, MnemonicBuilder};
 use ethers::{
-    core::rand::{CryptoRng, Rng},
-    signers::{coins_bip39::English, LocalWallet, MnemonicBuilder, Signer},
+    signers::{LocalWallet, Signer},
     types::{Address, H256},
 };
 use serde::{Deserialize, Serialize};
@@ -120,10 +123,6 @@ impl Wallet {
             .map(|k| parse_h256(&k.signer().to_bytes()).unwrap())
     }
 
-    pub fn random(rng: &mut (impl Rng + CryptoRng)) -> Self {
-        Self::new(LocalWallet::new(rng))
-    }
-
     pub fn new(private_key: LocalWallet) -> Self {
         Self {
             address: private_key.address(),
@@ -131,19 +130,13 @@ impl Wallet {
         }
     }
 
+    #[cfg(test)]
     pub fn from_mnemonic(mnemonic: &str, base_path: &str, index: u32) -> anyhow::Result<Self> {
         let wallet = MnemonicBuilder::<English>::default()
             .phrase(mnemonic)
             .derivation_path(&format!("{}/{}", base_path, index))?
             .build()?;
         Ok(Self::new(wallet))
-    }
-
-    pub fn empty() -> Self {
-        Self {
-            address: Address::zero(),
-            private_key: None,
-        }
     }
 }
 
@@ -162,8 +155,6 @@ fn test_load_localhost_wallets() {
     .unwrap();
     assert_eq!(
         wallet.address,
-        Address::from_slice(
-            &ethers::utils::hex::decode("0xa61464658AfeAf65CccaaFD3a512b69A83B77618").unwrap()
-        )
+        Address::from_slice(&ethers::utils::hex::decode(DEFAULT_TEST_WALLET_ADDRESS).unwrap())
     );
 }

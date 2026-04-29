@@ -52,6 +52,13 @@ interface IAdminLegacy {
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
 }
 
+/// @notice Minimal interface for OZ single-step Ownable contracts (e.g. ProxyAdmin).
+///         Avoids calling `pendingOwner()` (Ownable2Step-only) on plain Ownable.
+interface IOwnableSingleStep {
+    function owner() external view returns (address);
+    function transferOwnership(address newOwner) external;
+}
+
 contract AdminFunctions is Script, IAdminFunctions {
     using stdToml for string;
 
@@ -111,6 +118,135 @@ contract AdminFunctions is Script, IAdminFunctions {
         if (Ownable2Step(chainAssetHandler).pendingOwner() == governor) {
             governanceAcceptOwner(governor, chainAssetHandler);
         }
+    }
+
+    // Conditionally accept ownership directly as `governor`. Caller is expected
+    // to broadcast as `governor` (forge --sender + --unlocked / anvil
+    // impersonation, or governor as a real signer). Skipped when the target's
+    // pendingOwner is not `governor`. Unlike `governanceAcceptOwner`, this does
+    // NOT route through a Governance scheduleTransparent/execute wrapper, so it
+    // works against governance addresses that are not Ownable Governance.sol
+    // contracts (e.g. ProtocolUpgradeHandler on stage/mainnet).
+    function governanceAcceptOwnerConditional(address governor, address target) public {
+        if (Ownable2Step(target).pendingOwner() != governor) {
+            return;
+        }
+        vm.startBroadcast();
+        Ownable2Step(target).acceptOwnership();
+        vm.stopBroadcast();
+    }
+
+    // Conditionally start an Ownable2Step ownership transfer to `newOwner`. Broadcasts
+    // as the script's --sender (which must be the current owner). No-op when ownership
+    // is already at or pending to `newOwner`.
+    function transferOwnerConditional(address target, address newOwner) public {
+        Ownable2Step ownable = Ownable2Step(target);
+        if (ownable.owner() == newOwner || ownable.pendingOwner() == newOwner) {
+            return;
+        }
+        vm.startBroadcast();
+        ownable.transferOwnership(newOwner);
+        vm.stopBroadcast();
+    }
+
+    // Single-step Ownable transfer (e.g. OZ ProxyAdmin) — `transferOwnership`
+    // immediately changes the owner with no acceptOwnership step. No-op when
+    // ownership is already at `newOwner`. Broadcasts as --sender, which must
+    // be the current owner.
+    function transferOwnerSingleConditional(address target, address newOwner) public {
+        IOwnableSingleStep ownable = IOwnableSingleStep(target);
+        if (ownable.owner() == newOwner) {
+            return;
+        }
+        vm.startBroadcast();
+        ownable.transferOwnership(newOwner);
+        vm.stopBroadcast();
+    }
+
+    /// Fund `_addr` with 100 ETH on the current anvil fork via `anvil_setBalance`.
+    /// `vm.deal` only affects forge's in-memory simulation context, so under
+    /// `forge script --broadcast` the impersonated sender would still have 0 ETH
+    /// on chain and gas estimation would fail. `vm.rpc` propagates to the fork.
+    function _anvilFund(address _addr) private {
+        string memory params = string.concat('["', vm.toString(_addr), '","0x56BC75E2D63100000"]');
+        vm.rpc("anvil_setBalance", params);
+    }
+
+    /// Walk every registered chain's CTM (deduplicated) and ensure both the
+    /// CTM (Ownable2Step) and its EIP-1967 ProxyAdmin (single-step Ownable) are
+    /// owned by `governance`. Each individual transfer is conditional, so
+    /// re-running this against an already-correct ecosystem is a no-op. Intended
+    /// for upgrade pre-stages where governance must own these contracts before
+    /// stage 1 governance calls (e.g. ProxyAdmin.upgradeAndCall) execute.
+    ///
+    /// Requires anvil `--auto-impersonate` (or a runner that has unlocked the
+    /// resolved owner addresses) — broadcasts switch sender per-step.
+    function ensureCtmsAndProxyAdminsOwnedByGovernance(address bridgehub, address governance) public {
+        // Per-chain CTMs (Ownable2Step) — transfer + accept, plus their ProxyAdmins.
+        uint256[] memory chainIds = IL1Bridgehub(bridgehub).getAllZKChainChainIDs();
+        address[] memory seenCtms = new address[](chainIds.length);
+        uint256 seenCtmCount = 0;
+        for (uint256 i = 0; i < chainIds.length; i++) {
+            address ctm = IL1Bridgehub(bridgehub).chainTypeManager(chainIds[i]);
+            bool already = false;
+            for (uint256 j = 0; j < seenCtmCount; j++) {
+                if (seenCtms[j] == ctm) {
+                    already = true;
+                    break;
+                }
+            }
+            if (already) continue;
+            seenCtms[seenCtmCount++] = ctm;
+
+            Ownable2Step ctmOwnable = Ownable2Step(ctm);
+            address ctmOwner = ctmOwnable.owner();
+            if (ctmOwner != governance && ctmOwnable.pendingOwner() != governance) {
+                _anvilFund(ctmOwner);
+                vm.startBroadcast(ctmOwner);
+                ctmOwnable.transferOwnership(governance);
+                vm.stopBroadcast();
+            }
+            if (ctmOwnable.pendingOwner() == governance) {
+                _anvilFund(governance);
+                vm.startBroadcast(governance);
+                ctmOwnable.acceptOwnership();
+                vm.stopBroadcast();
+            }
+
+            _ensureProxyAdminOwnedByGovernance(ctm, governance);
+        }
+
+        // Bridgehub-discoverable ecosystem proxies. Mirrors the contracts visited
+        // by `governanceAcceptOwnerAggregated`, since the same ProxyAdmins gate
+        // their `upgradeAndCall` invocations during stage 1 governance calls.
+        address assetRouter = address(IL1Bridgehub(bridgehub).assetRouter());
+        address chainAssetHandler = address(IL1Bridgehub(bridgehub).chainAssetHandler());
+        address ctmDeploymentTracker = address(IL1Bridgehub(bridgehub).l1CtmDeployer());
+        address l1Nullifier = address(IL1AssetRouter(assetRouter).L1_NULLIFIER());
+
+        _ensureProxyAdminOwnedByGovernance(bridgehub, governance);
+        _ensureProxyAdminOwnedByGovernance(assetRouter, governance);
+        _ensureProxyAdminOwnedByGovernance(chainAssetHandler, governance);
+        _ensureProxyAdminOwnedByGovernance(ctmDeploymentTracker, governance);
+        _ensureProxyAdminOwnedByGovernance(l1Nullifier, governance);
+    }
+
+    /// Helper: read the EIP-1967 admin slot of `_proxy`, and if its single-step
+    /// Ownable owner isn't already `_governance`, transfer ownership to it.
+    function _ensureProxyAdminOwnedByGovernance(address _proxy, address _governance) private {
+        bytes32 eip1967AdminSlot = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+        address proxyAdmin = address(uint160(uint256(vm.load(_proxy, eip1967AdminSlot))));
+        if (proxyAdmin == address(0)) {
+            return;
+        }
+        address paOwner = IOwnableSingleStep(proxyAdmin).owner();
+        if (paOwner == _governance) {
+            return;
+        }
+        _anvilFund(paOwner);
+        vm.startBroadcast(paOwner);
+        IOwnableSingleStep(proxyAdmin).transferOwnership(_governance);
+        vm.stopBroadcast();
     }
 
     // This function should be called by the owner to accept the admin role
@@ -573,7 +709,6 @@ contract AdminFunctions is Script, IAdminFunctions {
         uint256 l1GasPrice;
         uint256 l2ChainId;
         uint256 gatewayChainId;
-        bytes _gatewayDiamondCutData;
         address refundRecipient;
         bool _shouldSend;
     }
@@ -603,13 +738,13 @@ contract AdminFunctions is Script, IAdminFunctions {
                 return;
             }
 
+            address gatewayCtm = L1Bridgehub(data.bridgehub).chainTypeManager(data.gatewayChainId);
+            (bytes memory gatewayDiamondCutData, ) = GetDiamondCutData.getDiamondCutAndForceDeployment(gatewayCtm);
+
             bytes memory bridgehubData = abi.encode(
                 BridgehubBurnCTMAssetData({
                     chainId: data.l2ChainId,
-                    ctmData: abi.encode(
-                        AddressAliasHelper.applyL1ToL2Alias(l2ChainInfo.admin),
-                        data._gatewayDiamondCutData
-                    ),
+                    ctmData: abi.encode(AddressAliasHelper.applyL1ToL2Alias(l2ChainInfo.admin), gatewayDiamondCutData),
                     chainData: abi.encode(
                         IZKChain(L1Bridgehub(data.bridgehub).getZKChain(data.l2ChainId)).getProtocolVersion()
                     )
@@ -639,7 +774,6 @@ contract AdminFunctions is Script, IAdminFunctions {
         uint256 l1GasPrice,
         uint256 l2ChainId,
         uint256 gatewayChainId,
-        bytes calldata _gatewayDiamondCutData,
         address refundRecipient,
         bool _shouldSend
     ) public {
@@ -649,7 +783,6 @@ contract AdminFunctions is Script, IAdminFunctions {
                 l1GasPrice: l1GasPrice,
                 l2ChainId: l2ChainId,
                 gatewayChainId: gatewayChainId,
-                _gatewayDiamondCutData: _gatewayDiamondCutData,
                 refundRecipient: refundRecipient,
                 _shouldSend: _shouldSend
             })

@@ -9,7 +9,6 @@ import {TxStatus} from "../../contracts/common/Messaging.sol";
 interface IGatewayUtils {
     function finishMigrateChainToGateway(
         address bridgehubAddr,
-        bytes memory gatewayDiamondCutData,
         uint256 migratingChainId,
         uint256 gatewayChainId,
         bytes32 l2TxHash,

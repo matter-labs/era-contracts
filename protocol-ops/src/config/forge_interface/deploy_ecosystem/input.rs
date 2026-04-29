@@ -3,6 +3,7 @@ use std::str::FromStr;
 use ethers::types::{Address, H256, U256};
 use serde::{Deserialize, Serialize};
 
+use crate::common::addresses::MAINNET_WETH_ADDRESS;
 use crate::common::traits::FileConfigTrait;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -26,8 +27,7 @@ impl Default for InitialDeploymentConfig {
             governance_min_delay: 0,
             max_number_of_chains: 100,
             validator_timelock_execution_delay: 0,
-            token_weth_address: Address::from_str("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
-                .unwrap(),
+            token_weth_address: Address::from_str(MAINNET_WETH_ADDRESS).unwrap(),
             bridgehub_create_new_chain_salt: 0,
             gateway_settlement_fee: U256::from(1000000000),
         }

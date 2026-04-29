@@ -12,6 +12,14 @@ interface IAdminFunctions {
 
     function governanceAcceptOwner(address governor, address target) external;
 
+    function governanceAcceptOwnerConditional(address governor, address target) external;
+
+    function transferOwnerConditional(address target, address newOwner) external;
+
+    function transferOwnerSingleConditional(address target, address newOwner) external;
+
+    function ensureCtmsAndProxyAdminsOwnedByGovernance(address bridgehub, address governance) external;
+
     function governanceAcceptAdmin(address governor, address target) external;
 
     function chainAdminAcceptAdmin(ChainAdmin chainAdmin, address target) external;
@@ -115,7 +123,6 @@ interface IAdminFunctions {
         uint256 l1GasPrice,
         uint256 l2ChainId,
         uint256 gatewayChainId,
-        bytes calldata gatewayDiamondCutData,
         address refundRecipient,
         bool shouldSend
     ) external;

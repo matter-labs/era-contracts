@@ -15,7 +15,7 @@ import anvilConfig from "../../config/anvil-config.json";
 
 const l1DefaultChainId = anvilConfig.chains.find((c) => c.role === "l1")?.chainId;
 if (l1DefaultChainId == null) {
-  throw new Error('anvil-config.json: no chain with role="l1" — runtimeConfig cannot determine default L1 chain id');
+  throw new Error("anvil-config.json: no chain with role=l1 — runtimeConfig cannot determine default L1 chain id");
 }
 
 export const runtimeConfig = {

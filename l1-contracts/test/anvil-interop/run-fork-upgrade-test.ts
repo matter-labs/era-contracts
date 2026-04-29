@@ -52,8 +52,8 @@ import {
   runChainUpgradesAndRelayL2,
   runEcosystemUpgradeScripts,
   verifyProtocolVersions,
-  type V31UpgradeScenario,
 } from "./src/helpers/v31-upgrade-test-runner";
+import type { V31UpgradeScenario } from "./src/helpers/v31-upgrade-test-runner";
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");
