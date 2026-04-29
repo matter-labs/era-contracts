@@ -63,13 +63,22 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         return deploySimpleContract(contractName, false);
     }
 
-    function getAdditionalForcedCoreContracts()
+    function getAdditionalEraForcedCoreContracts()
         internal
         override
-        returns (CoreContract[] memory additionalForcedCoreContracts)
+        returns (CoreContract[] memory additionalEraForcedCoreContracts)
     {
-        additionalForcedCoreContracts = new CoreContract[](1);
-        additionalForcedCoreContracts[0] = CoreContract.L2V31Upgrade;
+        additionalEraForcedCoreContracts = new CoreContract[](1);
+        additionalEraForcedCoreContracts[0] = CoreContract.L2V31Upgrade;
+    }
+
+    function getAdditionalFactoryDependencyContracts()
+        internal
+        override
+        returns (CoreContract[] memory additionalDependencyContracts)
+    {
+        additionalDependencyContracts = new CoreContract[](1);
+        additionalDependencyContracts[0] = CoreContract.L2V31Upgrade;
     }
 
     function getL2UpgradeTargetAndData(

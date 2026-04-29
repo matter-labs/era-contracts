@@ -432,7 +432,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     function publishBytecodes() public virtual {
         bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
             config.isZKsyncOS,
-            getAdditionalForcedCoreContracts()
+            getAdditionalFactoryDependencyContracts()
         );
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
