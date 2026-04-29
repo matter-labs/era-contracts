@@ -105,9 +105,9 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
         }
         // clap's conflicts_with + required_unless_present prevents the
         // (None, None) and (Some, Some) cases.
-        _ => unreachable!(
-            "clap should reject both/neither --safe-file and --manifest at parse time"
-        ),
+        _ => {
+            unreachable!("clap should reject both/neither --safe-file and --manifest at parse time")
+        }
     }
 }
 
@@ -355,10 +355,7 @@ fn parse_manifest(path: &Path) -> anyhow::Result<ManifestForExecute> {
         let target: Address = target_str
             .parse()
             .with_context(|| format!("manifest bundle #{i} target is not a valid address"))?;
-        let tx_count = bundle
-            .get("tx_count")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0);
+        let tx_count = bundle.get("tx_count").and_then(|v| v.as_u64()).unwrap_or(0);
         bundles.push(ManifestBundle {
             index,
             file,
@@ -372,9 +369,7 @@ fn parse_manifest(path: &Path) -> anyhow::Result<ManifestForExecute> {
 /// Merge wallets from multiple wallets.yaml files into one
 /// `address → wallet` map. Bails if two files declare the same address
 /// with different keys.
-fn parse_wallets_yaml_files(
-    paths: &[PathBuf],
-) -> anyhow::Result<HashMap<Address, LocalWallet>> {
+fn parse_wallets_yaml_files(paths: &[PathBuf]) -> anyhow::Result<HashMap<Address, LocalWallet>> {
     let mut merged: HashMap<Address, LocalWallet> = HashMap::new();
     for path in paths {
         let from_this_file = parse_wallets_yaml(path)?;
@@ -625,10 +620,7 @@ deployer:
         let empty_yaml = "{}\n";
         let path = write_tmp("empty.yaml", empty_yaml);
         let err = parse_wallets_yaml_files(&[path]).unwrap_err();
-        assert!(
-            err.to_string().contains("no wallet entries"),
-            "got: {err}"
-        );
+        assert!(err.to_string().contains("no wallet entries"), "got: {err}");
     }
 
     #[test]

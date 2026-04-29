@@ -188,17 +188,11 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
             return getAdditionalZKsyncOSForceDeployments();
         }
 
-        CoreContract[] memory additionalForcedCoreContracts = getAdditionalForcedCoreContracts();
-        IL2ContractDeployer.ForceDeployment[]
-            memory additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](
-                additionalForcedCoreContracts.length
-            );
-        for (uint256 i; i < additionalForcedCoreContracts.length; i++) {
-            additionalForceDeployments[i] = CoreOnGatewayHelper.getForceDeployment(
-                additionalForcedCoreContracts[i]
-            );
+        CoreContract[] memory additionalEraForcedCoreContracts = getAdditionalForcedCoreContracts();
+        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](additionalEraForcedCoreContracts.length);
+        for (uint256 i; i < additionalEraForcedCoreContracts.length; i++) {
+            deployments[i] = CoreOnGatewayHelper.getEraForceDeployment(additionalEraForcedCoreContracts[i]);
         }
-        return EraForceDeploymentsLib.wrap(additionalForceDeployments);
     }
 
     function getAdditionalForcedCoreContracts()

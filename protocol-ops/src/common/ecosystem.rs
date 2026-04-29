@@ -90,29 +90,22 @@ impl Ecosystem {
 
 /// Read a YAML file and walk a dotted path to extract an `Address`.
 fn read_yaml_address(path: &Path, dotted_path: &[&str]) -> anyhow::Result<Address> {
-    let text = std::fs::read_to_string(path)
-        .with_context(|| format!("read {}", path.display()))?;
+    let text = std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
     let root: serde_yaml::Value =
         serde_yaml::from_str(&text).with_context(|| format!("parse {}", path.display()))?;
     let mut node = &root;
     for key in dotted_path {
         node = node.get(key).with_context(|| {
-            format!(
-                "missing `{}` at {}",
-                dotted_path.join("."),
-                path.display()
-            )
+            format!("missing `{}` at {}", dotted_path.join("."), path.display())
         })?;
     }
-    node.as_str()
-        .and_then(|s| s.parse().ok())
-        .with_context(|| {
-            format!(
-                "value at `{}` in {} is not a hex address",
-                dotted_path.join("."),
-                path.display()
-            )
-        })
+    node.as_str().and_then(|s| s.parse().ok()).with_context(|| {
+        format!(
+            "value at `{}` in {} is not a hex address",
+            dotted_path.join("."),
+            path.display()
+        )
+    })
 }
 
 /// Walk every `chains/<name>/ZkStack.yaml` under `chains_dir` and collect
@@ -229,10 +222,8 @@ mod tests {
     /// root. Mirrors the layout `from_zkstack_dir` expects: top-level
     /// `configs/{contracts,wallets}.yaml` plus `chains/<name>/ZkStack.yaml`.
     fn write_workspace(label: &str, files: &[(&str, &str)]) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "ecosystem_test_{}_{label}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("ecosystem_test_{}_{label}", std::process::id()));
         // Cleanup from previous test run if any.
         let _ = std::fs::remove_dir_all(&dir);
         for (rel, content) in files {
@@ -309,10 +300,7 @@ governor:
             "missing_bridgehub",
             &[
                 // contracts.yaml present but missing the nested key
-                (
-                    "configs/contracts.yaml",
-                    "core_ecosystem_contracts: {}\n",
-                ),
+                ("configs/contracts.yaml", "core_ecosystem_contracts: {}\n"),
                 ("configs/wallets.yaml", WALLETS_YAML),
                 ("chains/era/ZkStack.yaml", "chain_id: 271\n"),
             ],

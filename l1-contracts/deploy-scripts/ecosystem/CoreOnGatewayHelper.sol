@@ -6,6 +6,7 @@ import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {SystemContractsProcessing} from "../upgrade/SystemContractsProcessing.s.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
 import {
     CoreContract,
@@ -79,7 +80,7 @@ library CoreOnGatewayHelper {
 
     // ======================== Force deployments ========================
 
-    /// @notice Build a force-deployment entry for an Era CTM upgrade's
+    /// @notice Build a universal force-deployment entry for an Era CTM upgrade's
     ///         additional core contracts.
     /// @dev Era-only by construction: ZKsyncOS upgrades emit their additional
     ///      force-deployments through a different path
@@ -87,18 +88,30 @@ library CoreOnGatewayHelper {
     ///      use this function. Adding ZKsyncOS support here would mean
     ///      switching `getDeployedBytecodeHash` to the proxy-upgrade
     ///      bytecode-info shape (see `getBytecodeInfo`) — out of scope while
-    ///      the only caller (`CTMUpgradeBase.publishAdditionalForceDeployments`)
-    ///      is Era-only.
-    function getForceDeployment(
+    ///      the only caller that executes the result is Era-only.
+    function getEraForceDeployment(
         CoreContract _c
-    ) internal view returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
-        forceDeployment = IL2ContractDeployer.ForceDeployment({
+    ) internal view returns (IComplexUpgrader.UniversalContractUpgradeInfo memory deployment) {
+        IL2ContractDeployer.ForceDeployment memory forceDeployment = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: getDeployedBytecodeHash(false, _c),
-            newAddress: _resolveAddress(_c),
+            newAddress: _resolveEraForceDeploymentAddress(_c),
             callConstructor: false,
             value: 0,
             input: ""
         });
+
+        deployment = IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.EraForceDeployment,
+            deployedBytecodeInfo: abi.encode(forceDeployment),
+            newAddress: forceDeployment.newAddress
+        });
+    }
+
+    function _resolveEraForceDeploymentAddress(CoreContract _c) private view returns (address) {
+        if (_c == CoreContract.L2V29Upgrade) {
+            return Utils.getL2AddressViaCreate2Factory(bytes32(0), getDeployedBytecodeHash(false, _c), hex"");
+        }
+        return _resolveAddress(_c);
     }
 
     // ======================== Factory dependencies ========================
@@ -248,7 +261,7 @@ library CoreOnGatewayHelper {
     /// @notice Resolve a CoreContract enum to its canonical L2 address.
     /// @dev Only covers contracts with well-known constant addresses.
     function _resolveAddress(CoreContract _c) internal pure returns (address) {
-        if (_c == CoreContract.L2V29Upgrade || _c == CoreContract.L2V31Upgrade) {
+        if (_c == CoreContract.L2V31Upgrade) {
             return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
         }
         if (_c == CoreContract.L2Bridgehub) return L2_BRIDGEHUB_ADDR;

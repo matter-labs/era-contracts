@@ -120,8 +120,7 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
     logger::info(format!("L1 DA validator: {:#x}", args.l1_da_validator));
     logger::info(format!(
         "L2 DA commitment scheme: {} ({})",
-        args.l2_da_commitment_scheme,
-        args.l2_da_commitment_scheme as u8,
+        args.l2_da_commitment_scheme, args.l2_da_commitment_scheme as u8,
     ));
     logger::info(format!(
         "Access control restriction: {:#x}",

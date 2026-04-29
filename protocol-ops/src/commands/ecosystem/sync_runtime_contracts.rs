@@ -123,8 +123,8 @@ fn lookup_toml_string(value: &toml::Value, path: &[&str]) -> Option<String> {
 /// the rest of the file. Mirrors the per-line `sed -i` patching that
 /// downstream consumers had been doing in shell.
 fn patch_yaml_field(path: &Path, field: &str, new_value: &str) -> anyhow::Result<()> {
-    let content = std::fs::read_to_string(path)
-        .with_context(|| format!("read {}", path.display()))?;
+    let content =
+        std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
     let key_token = format!("{field}:");
     let mut found = false;
     let mut out = String::with_capacity(content.len());
@@ -164,10 +164,8 @@ mod tests {
     use super::*;
 
     fn write_tmp_workspace(label: &str, files: &[(&str, &str)]) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "sync_runtime_test_{}_{label}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("sync_runtime_test_{}_{label}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         for (rel, content) in files {
             let abs = dir.join(rel);
@@ -181,12 +179,7 @@ mod tests {
     fn patch_yaml_field_preserves_structure() {
         let yaml = "ecosystem_contracts:\n  l1_bytecodes_supplier_addr: 0xAAA\n  other: 0xBBB\n";
         let dir = write_tmp_workspace("patch_preserve", &[("c.yaml", yaml)]);
-        patch_yaml_field(
-            &dir.join("c.yaml"),
-            "l1_bytecodes_supplier_addr",
-            "0xCCC",
-        )
-        .unwrap();
+        patch_yaml_field(&dir.join("c.yaml"), "l1_bytecodes_supplier_addr", "0xCCC").unwrap();
         let result = std::fs::read_to_string(dir.join("c.yaml")).unwrap();
         assert_eq!(
             result,

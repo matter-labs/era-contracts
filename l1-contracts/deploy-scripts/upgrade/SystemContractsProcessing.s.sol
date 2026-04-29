@@ -50,8 +50,11 @@ struct SystemContract {
 uint256 constant SYSTEM_CONTRACTS_COUNT = 30;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
 uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 13;
+/// @dev Runtime deployment preimages needed as factory dependencies but not force-deployed at fixed addresses.
+uint256 constant RUNTIME_FACTORY_DEPENDENCY_CONTRACTS_COUNT = 2;
 /// @dev Era factory dependencies based in `l1-contracts`: other built-ins plus runtime deployment preimages.
-uint256 constant OTHER_FACTORY_DEPENDENCY_CONTRACTS_COUNT = 15;
+uint256 constant OTHER_FACTORY_DEPENDENCY_CONTRACTS_COUNT = OTHER_BUILT_IN_CONTRACTS_COUNT +
+    RUNTIME_FACTORY_DEPENDENCY_CONTRACTS_COUNT;
 /// @dev System contracts (0x800x) with l1-contracts EVM bytecodes for ZKsyncOS proxy upgrades.
 uint256 constant ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT = 3;
 
@@ -173,8 +176,9 @@ library SystemContractsProcessing {
     function getOtherFactoryDependencyContracts() internal pure returns (CoreContract[] memory ids) {
         ids = new CoreContract[](OTHER_FACTORY_DEPENDENCY_CONTRACTS_COUNT);
         _fillOtherBuiltinCoreContracts(ids);
-        ids[OTHER_BUILT_IN_CONTRACTS_COUNT] = CoreContract.TransparentUpgradeableProxy;
-        ids[OTHER_BUILT_IN_CONTRACTS_COUNT + 1] = CoreContract.BeaconProxy;
+        uint256 runtimeOnlyIndex = OTHER_BUILT_IN_CONTRACTS_COUNT;
+        ids[runtimeOnlyIndex++] = CoreContract.TransparentUpgradeableProxy;
+        ids[runtimeOnlyIndex++] = CoreContract.BeaconProxy;
     }
 
     function _fillOtherBuiltinCoreContracts(CoreContract[] memory ids) private pure {
