@@ -4,12 +4,11 @@ import { DeploymentRunner } from "../../src/deployment-runner";
 import { getChainIdsByRole, getL2Chain } from "../../src/core/utils";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
 import {
-  ANVIL_DEFAULT_ACCOUNT_ADDR,
-  ANVIL_RECIPIENT_ADDR,
-  ANVIL_ACCOUNT2_ADDR,
-  INTEROP_CENTER_ADDR,
-  L2_ASSET_ROUTER_ADDR,
-} from "../../src/core/const";
+  getInteropRecipientAddress,
+  getInteropSecondaryRecipientAddress,
+  getInteropTestAddress,
+} from "../../src/core/accounts";
+import { INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
 import { encodeEvmAddress } from "../../src/helpers/erc7930";
 import {
   sendInteropBundle,
@@ -24,6 +23,7 @@ import {
   getInteropProtocolFee,
   getAccumulatedZkFees,
   getZkInteropFee,
+  getZkTokenAssetId,
   getZkTokenAddress,
   deployDummyInteropRecipient,
 } from "../../src/helpers/interop-helpers";
@@ -75,6 +75,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   let sourceTokenAddress: string;
   let sourceAssetId: string;
   let sourceZkTokenAddress: string;
+  let fixedZkFeeTestsEnabled = false;
 
   // Interop protocol fee (per call)
   let interopFee: BigNumber;
@@ -84,9 +85,18 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   let dummyRecipient1: string;
   let dummyRecipient2: string;
 
+  function getTestTokenAssetId(chainId: number, tokenAddress: string): string {
+    return state.testTokenAssetIds?.[chainId] || encodeNtvAssetId(chainId, tokenAddress);
+  }
+
+  async function currentInteropFee(): Promise<BigNumber> {
+    interopFee = await getInteropProtocolFee(sourceProvider);
+    return interopFee;
+  }
+
   before(async () => {
     state = runner.loadState();
-    if (!state.chains || !state.l1Addresses || !state.chainAddresses || !state.testTokens || !state.zkToken) {
+    if (!state.chains || !state.l1Addresses || !state.chainAddresses || !state.testTokens) {
       throw new Error("Deployment state incomplete. Run setup first.");
     }
 
@@ -104,7 +114,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     destProvider = new ethers.providers.JsonRpcProvider(destChain.rpcUrl);
 
     sourceTokenAddress = state.testTokens![sourceChainId];
-    sourceAssetId = encodeNtvAssetId(sourceChainId, sourceTokenAddress);
+    sourceAssetId = getTestTokenAssetId(sourceChainId, sourceTokenAddress);
 
     // Query the per-call interop protocol fee
     interopFee = await getInteropProtocolFee(sourceProvider);
@@ -112,13 +122,31 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     console.log(`   Interop protocol fee: ${interopFee.toString()}`);
     console.log(`   Fixed ZK interop fee: ${zkInteropFee.toString()}`);
 
-    sourceZkTokenAddress = await getTokenAddressForAsset(sourceProvider, state.zkToken.assetId);
-    expect(sourceZkTokenAddress, "wrapped ZK token should be bridged to the source chain").to.not.equal(
-      ethers.constants.AddressZero
-    );
-    expect(await getZkTokenAddress(sourceProvider), "InteropCenter should resolve the seeded ZK token").to.equal(
-      sourceZkTokenAddress
-    );
+    const zkTokenAssetId = state.zkToken?.assetId || (await getZkTokenAssetId(sourceProvider));
+    if (zkTokenAssetId === ethers.constants.HashZero) {
+      console.warn("   The ZK token has not yet been bridged to the source chain; fixed ZK fee tests will be skipped.");
+    } else {
+      sourceZkTokenAddress = await getTokenAddressForAsset(sourceProvider, zkTokenAssetId);
+      const interopZkTokenAddress = await getZkTokenAddress(sourceProvider);
+      if (
+        sourceZkTokenAddress === ethers.constants.AddressZero ||
+        interopZkTokenAddress === ethers.constants.AddressZero
+      ) {
+        console.warn(
+          "   The ZK token has not yet been bridged to the source chain; fixed ZK fee tests will be skipped."
+        );
+      } else {
+        expect(interopZkTokenAddress, "InteropCenter should resolve the seeded ZK token").to.equal(
+          sourceZkTokenAddress
+        );
+        const zkBalance = await getTokenBalance(sourceProvider, sourceZkTokenAddress, getInteropTestAddress());
+        if (zkBalance.isZero()) {
+          console.warn("   ZK token balance is zero; fixed ZK fee tests will be skipped.");
+        } else {
+          fixedZkFeeTestsEnabled = true;
+        }
+      }
+    }
 
     // Deploy DummyInteropRecipient contracts on destination chain for direct-call tests
     dummyRecipient1 = await deployDummyInteropRecipient(destProvider);
@@ -129,6 +157,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
   it("can send and execute a single direct call bundle", async () => {
     const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
+    const interopFee = await currentInteropFee();
     const msgValue = interopFee.add(amount);
 
     const callStarters: CallStarter[] = [
@@ -139,7 +168,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       },
     ];
 
-    const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
+    const bundleAttributes = [executionAddressAttr(getInteropTestAddress())];
 
     const balBefore = await captureBalance(sourceProvider);
 
@@ -173,9 +202,13 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     console.log("   [receive] Single direct call bundle executed");
   });
 
-  it("can send and execute a single direct call bundle with fixed ZK fees", async () => {
+  it("can send and execute a single direct call bundle with fixed ZK fees", async function () {
+    if (!fixedZkFeeTestsEnabled) {
+      this.skip();
+    }
+
     const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
-    const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR), useFixedFeeAttr(true)];
+    const bundleAttributes = [executionAddressAttr(getInteropTestAddress()), useFixedFeeAttr(true)];
     const callStarters: CallStarter[] = [
       {
         to: encodeEvmAddress(dummyRecipient1),
@@ -183,6 +216,12 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
         callAttributes: [interopCallValueAttr(amount)],
       },
     ];
+
+    const zkBalance = await getTokenBalance(sourceProvider, sourceZkTokenAddress, getInteropTestAddress());
+    expect(
+      zkBalance.gte(zkInteropFee),
+      `single direct call fixed fee: sender ZK token balance ${zkBalance.toString()} is below required fee ${zkInteropFee.toString()}`
+    ).to.be.true;
 
     await approveToken(sourceProvider, sourceZkTokenAddress, INTEROP_CENTER_ADDR, zkInteropFee);
 
@@ -216,6 +255,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
   it("can send and execute a single indirect call bundle", async () => {
     const tokenAmount = randomBigNumber(ERC20_TOKEN_MIN, ERC20_TOKEN_MAX);
+    const interopFee = await currentInteropFee();
     const msgValue = interopFee;
 
     await approveTokenForNtv(sourceProvider, sourceTokenAddress, tokenAmount);
@@ -223,7 +263,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     const callStarters: CallStarter[] = [
       {
         to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
-        data: getTokenTransferData(sourceAssetId, tokenAmount, ANVIL_RECIPIENT_ADDR),
+        data: getTokenTransferData(sourceAssetId, tokenAmount, getInteropRecipientAddress()),
         callAttributes: [indirectCallAttr()],
       },
     ];
@@ -255,7 +295,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     // ── Execute on destination ──
     // Token may not exist on dest chain yet — resolve after execution
     let destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
-    const recipientTokenBefore = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
+    const recipientTokenBefore = await getTokenBalance(destProvider, destTokenAddress, getInteropRecipientAddress());
 
     const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
 
@@ -264,7 +304,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     // Re-resolve token address (NTV may have deployed the bridged token during executeBundle)
     destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
 
-    const recipientTokenAfter = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
+    const recipientTokenAfter = await getTokenBalance(destProvider, destTokenAddress, getInteropRecipientAddress());
     expectBalanceDelta(recipientTokenBefore, recipientTokenAfter, tokenAmount, "single indirect call: recipient token");
 
     console.log("   [receive] Single indirect call bundle executed");
@@ -272,6 +312,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
   it("can send and execute a two direct call bundle", async () => {
     const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
+    const interopFee = await currentInteropFee();
     const msgValue = interopFee.mul(2).add(amount.mul(2));
 
     const callStarters: CallStarter[] = [
@@ -287,7 +328,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       },
     ];
 
-    const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
+    const bundleAttributes = [executionAddressAttr(getInteropTestAddress())];
 
     const balBefore = await captureBalance(sourceProvider);
 
@@ -328,6 +369,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   it("can send and execute a two indirect call bundle", async () => {
     const tokenAmount = randomBigNumber(ERC20_TOKEN_MIN, ERC20_TOKEN_MAX);
     const totalTokenAmount = tokenAmount.mul(2);
+    const interopFee = await currentInteropFee();
     const msgValue = interopFee.mul(2);
 
     await approveTokenForNtv(sourceProvider, sourceTokenAddress, totalTokenAmount);
@@ -335,12 +377,12 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     const callStarters: CallStarter[] = [
       {
         to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
-        data: getTokenTransferData(sourceAssetId, tokenAmount, ANVIL_RECIPIENT_ADDR),
+        data: getTokenTransferData(sourceAssetId, tokenAmount, getInteropRecipientAddress()),
         callAttributes: [indirectCallAttr()],
       },
       {
         to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
-        data: getTokenTransferData(sourceAssetId, tokenAmount, ANVIL_ACCOUNT2_ADDR),
+        data: getTokenTransferData(sourceAssetId, tokenAmount, getInteropSecondaryRecipientAddress()),
         callAttributes: [indirectCallAttr()],
       },
     ];
@@ -370,16 +412,24 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
     // ── Execute on destination ──
     let destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
-    const recipient1TokenBefore = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
-    const recipient2TokenBefore = await getTokenBalance(destProvider, destTokenAddress, ANVIL_ACCOUNT2_ADDR);
+    const recipient1TokenBefore = await getTokenBalance(destProvider, destTokenAddress, getInteropRecipientAddress());
+    const recipient2TokenBefore = await getTokenBalance(
+      destProvider,
+      destTokenAddress,
+      getInteropSecondaryRecipientAddress()
+    );
 
     const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
 
     expect(receipt.status, "two indirect calls: executeBundle tx should succeed").to.equal(1);
 
     destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
-    const recipient1TokenAfter = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
-    const recipient2TokenAfter = await getTokenBalance(destProvider, destTokenAddress, ANVIL_ACCOUNT2_ADDR);
+    const recipient1TokenAfter = await getTokenBalance(destProvider, destTokenAddress, getInteropRecipientAddress());
+    const recipient2TokenAfter = await getTokenBalance(
+      destProvider,
+      destTokenAddress,
+      getInteropSecondaryRecipientAddress()
+    );
 
     expectBalanceDelta(
       recipient1TokenBefore,
@@ -400,6 +450,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   it("can send and execute a mixed call bundle", async () => {
     const valueAmount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
     const tokenAmount = randomBigNumber(ERC20_TOKEN_MIN, ERC20_TOKEN_MAX);
+    const interopFee = await currentInteropFee();
     const msgValue = interopFee.mul(2).add(valueAmount);
 
     await approveTokenForNtv(sourceProvider, sourceTokenAddress, tokenAmount);
@@ -407,7 +458,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     const callStarters: CallStarter[] = [
       {
         to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
-        data: getTokenTransferData(sourceAssetId, tokenAmount, ANVIL_RECIPIENT_ADDR),
+        data: getTokenTransferData(sourceAssetId, tokenAmount, getInteropRecipientAddress()),
         callAttributes: [indirectCallAttr()],
       },
       {
@@ -417,7 +468,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       },
     ];
 
-    const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
+    const bundleAttributes = [executionAddressAttr(getInteropTestAddress())];
 
     const balBefore = await captureBalance(sourceProvider, sourceTokenAddress);
 
@@ -445,7 +496,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
     // ── Execute on destination ──
     let destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
-    const recipientTokenBefore = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
+    const recipientTokenBefore = await getTokenBalance(destProvider, destTokenAddress, getInteropRecipientAddress());
     const recipient2NativeBefore = await getNativeBalance(destProvider, dummyRecipient2);
 
     const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
@@ -453,7 +504,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     expect(receipt.status, "mixed bundle: executeBundle tx should succeed").to.equal(1);
 
     destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);
-    const recipientTokenAfter = await getTokenBalance(destProvider, destTokenAddress, ANVIL_RECIPIENT_ADDR);
+    const recipientTokenAfter = await getTokenBalance(destProvider, destTokenAddress, getInteropRecipientAddress());
     const recipient2NativeAfter = await getNativeBalance(destProvider, dummyRecipient2);
 
     expectBalanceDelta(recipientTokenBefore, recipientTokenAfter, tokenAmount, "mixed bundle: recipient token");
@@ -466,6 +517,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
   it("cannot execute the same bundle twice (replay protection)", async () => {
     const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
+    const interopFee = await currentInteropFee();
     const msgValue = interopFee.add(amount);
 
     const callStarters: CallStarter[] = [
@@ -476,7 +528,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       },
     ];
 
-    const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
+    const bundleAttributes = [executionAddressAttr(getInteropTestAddress())];
 
     const sendResult = await sendInteropBundle({
       sourceProvider,
@@ -502,6 +554,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
   it("cannot execute a bundle from a non-matching executionAddress", async () => {
     const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
+    const interopFee = await currentInteropFee();
     const msgValue = interopFee.add(amount);
 
     const callStarters: CallStarter[] = [
@@ -512,8 +565,8 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       },
     ];
 
-    // Set executionAddress to a specific address (ANVIL_RECIPIENT_ADDR)
-    const bundleAttributes = [executionAddressAttr(ANVIL_RECIPIENT_ADDR)];
+    // Set executionAddress to a signer other than the default test signer.
+    const bundleAttributes = [executionAddressAttr(getInteropSecondaryRecipientAddress())];
 
     const sendResult = await sendInteropBundle({
       sourceProvider,
@@ -535,14 +588,14 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
   it("accepts a bundle with zero calls", async () => {
     // The protocol allows empty bundles — they can be sent, verified, and executed.
-    const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
+    const bundleAttributes = [executionAddressAttr(getInteropTestAddress())];
 
     const sendResult = await sendInteropBundle({
       sourceProvider,
       destinationChainId: destChainId,
       callStarters: [],
       bundleAttributes,
-      value: 0,
+      value: ethers.BigNumber.from(0),
     });
 
     expect(sendResult.txHash).to.not.be.null;
@@ -555,6 +608,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
   it("rejects a bundle with excess msg.value", async () => {
     const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
+    const interopFee = await currentInteropFee();
     const correctValue = interopFee.add(amount);
     const excessValue = correctValue.add(ethers.utils.parseEther("1"));
 
@@ -566,7 +620,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       },
     ];
 
-    const bundleAttributes = [executionAddressAttr(ANVIL_DEFAULT_ACCOUNT_ADDR)];
+    const bundleAttributes = [executionAddressAttr(getInteropTestAddress())];
 
     await expectRevert(
       () =>

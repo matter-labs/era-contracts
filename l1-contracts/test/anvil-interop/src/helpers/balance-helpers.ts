@@ -10,7 +10,8 @@ import type { ContractName } from "../core/contracts";
 import type { providers } from "ethers";
 import { BigNumber, Contract, ethers, Wallet } from "ethers";
 import { getAbi } from "../core/contracts";
-import { ANVIL_DEFAULT_PRIVATE_KEY, L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
+import { getInteropTestPrivateKey, isLiveInteropMode } from "../core/accounts";
+import { L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
 
 // ── Balance snapshot utilities ─────────────────────────────────
 
@@ -27,7 +28,7 @@ export async function captureBalance(
   provider: providers.JsonRpcProvider,
   tokenAddress?: string
 ): Promise<BalanceSnapshot> {
-  const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
+  const wallet = new Wallet(getInteropTestPrivateKey(), provider);
   const native = await provider.getBalance(wallet.address);
 
   let token: BigNumber | undefined;
@@ -71,7 +72,7 @@ export async function approveToken(
   spender: string,
   amount: BigNumber
 ): Promise<void> {
-  const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
+  const wallet = new Wallet(getInteropTestPrivateKey(), provider);
   const erc20 = new Contract(tokenAddress, getAbi("TestnetERC20Token"), wallet);
   const approveTx = await erc20.approve(spender, amount);
   await approveTx.wait();
@@ -197,6 +198,14 @@ async function extractRevertDataFromCall(provider: providers.JsonRpcProvider, er
   return "";
 }
 
+function isLiveMissingRevertData(message: string, errorData: string): boolean {
+  return (
+    isLiveInteropMode() &&
+    (errorData === "" || errorData === "0x") &&
+    (message.includes("missing revert data") || message.includes("reverted without a reason string"))
+  );
+}
+
 /**
  * Assert that an async call reverts (throws).
  * Optionally match the error message / revert data against a selector or ABI-derived custom error.
@@ -221,6 +230,9 @@ export async function expectRevert(
         errorData = await extractRevertDataFromCall(provider, errorWithData);
       }
       const hasReasonInData = errorData.includes(matchValue);
+      if (!hasReasonInMessage && !hasReasonInData && isLiveMissingRevertData(msg, errorData)) {
+        return;
+      }
       expect(
         hasReasonInMessage || hasReasonInData,
         `${label}: revert reason mismatch — expected ${description} in message or data.\nMessage: ${msg.slice(0, 200)}\nData: ${String(errorData).slice(0, 200)}`

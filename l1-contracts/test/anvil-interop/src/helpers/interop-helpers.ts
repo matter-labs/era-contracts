@@ -9,8 +9,8 @@
 import type { providers, BigNumber } from "ethers";
 import { Contract, ethers, Wallet } from "ethers";
 import { getAbi, getCreationBytecode } from "../core/contracts";
+import { getInteropTestPrivateKey, isLiveInteropMode } from "../core/accounts";
 import {
-  ANVIL_DEFAULT_PRIVATE_KEY,
   DEFAULT_TX_GAS_LIMIT,
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
@@ -20,8 +20,10 @@ import {
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
 import { buildMockInteropProof } from "../core/utils";
 import { encodeEvmChain, encodeEvmAddress } from "./erc7930";
+import { waitForLiveInteropProof } from "./temp-sdk";
 
 const abiCoder = ethers.utils.defaultAbiCoder;
+const sendResultsByBundleData = new Map<string, InteropSendResult>();
 
 /** IERC7786Attributes interface — used for attribute encoding via encodeFunctionData. */
 const erc7786Iface = new ethers.utils.Interface(getAbi("IERC7786Attributes"));
@@ -85,6 +87,9 @@ export interface SendBundleOptions {
 
 export interface InteropSendResult {
   txHash: string;
+  sourceTxHash: string;
+  sourceProvider: providers.JsonRpcProvider;
+  proofIndex: number;
   receipt: ethers.providers.TransactionReceipt;
   /** Raw decoded InteropBundle struct from the InteropBundleSent event (ethers tuple). */
   interopBundle: unknown;
@@ -98,7 +103,7 @@ export interface InteropSendResult {
  * Returns the tx receipt and the extracted InteropBundle struct.
  */
 export async function sendInteropBundle(options: SendBundleOptions): Promise<InteropSendResult> {
-  const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, options.sourceProvider);
+  const wallet = new Wallet(getInteropTestPrivateKey(), options.sourceProvider);
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
   const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
@@ -134,14 +139,25 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
 
   const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
 
-  return { txHash: tx.hash, receipt, interopBundle, bundleData, bundleHash };
+  const result = {
+    txHash: tx.hash,
+    sourceTxHash: tx.hash,
+    sourceProvider: options.sourceProvider,
+    proofIndex: 0,
+    receipt,
+    interopBundle,
+    bundleData,
+    bundleHash,
+  };
+  sendResultsByBundleData.set(bundleData, result);
+  return result;
 }
 
 /**
  * Simulate InteropCenter.sendBundle via callStatic to capture revert data without sending a tx.
  */
 export async function simulateInteropBundle(options: SendBundleOptions): Promise<void> {
-  const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, options.sourceProvider);
+  const wallet = new Wallet(getInteropTestPrivateKey(), options.sourceProvider);
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
   const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
@@ -172,7 +188,7 @@ export interface SendMessageOptions {
  * Returns the tx receipt and the extracted InteropBundle struct (sendMessage wraps into a bundle).
  */
 export async function sendInteropMessage(options: SendMessageOptions): Promise<InteropSendResult> {
-  const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, options.sourceProvider);
+  const wallet = new Wallet(getInteropTestPrivateKey(), options.sourceProvider);
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
   const tx = await interopCenter.sendMessage(options.recipient, options.payload, options.attributes, {
@@ -202,26 +218,73 @@ export async function sendInteropMessage(options: SendMessageOptions): Promise<I
 
   const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
 
-  return { txHash: tx.hash, receipt, interopBundle, bundleData, bundleHash };
+  const result = {
+    txHash: tx.hash,
+    sourceTxHash: tx.hash,
+    sourceProvider: options.sourceProvider,
+    proofIndex: 0,
+    receipt,
+    interopBundle,
+    bundleData,
+    bundleHash,
+  };
+  sendResultsByBundleData.set(bundleData, result);
+  return result;
 }
 
 // ── InteropHandler.executeBundle wrapper ───────────────────────
 
+export type BundleExecutionInput = string | InteropSendResult;
+
+export interface InteropExecutionData {
+  bundleData: string;
+  proof: unknown;
+}
+
+export async function getInteropExecutionData(
+  destProvider: providers.JsonRpcProvider,
+  bundleInput: BundleExecutionInput,
+  sourceChainId: number
+): Promise<InteropExecutionData> {
+  if (!isLiveInteropMode()) {
+    return {
+      bundleData: getBundleData(bundleInput),
+      proof: buildMockInteropProof(sourceChainId),
+    };
+  }
+
+  const sendResult = getLiveSendResult(bundleInput);
+  const liveData = await waitForLiveInteropProof(
+    sendResult.sourceProvider,
+    destProvider,
+    sendResult.sourceTxHash,
+    sourceChainId,
+    sendResult.proofIndex
+  );
+  if (!liveData.rawData || !liveData.proofDecoded) {
+    throw new Error(`Live interop proof was not available for ${sendResult.sourceTxHash}`);
+  }
+  return {
+    bundleData: liveData.rawData,
+    proof: liveData.proofDecoded,
+  };
+}
+
 /**
  * Execute an interop bundle on the destination chain via InteropHandler.executeBundle.
- * Uses a mock proof (verification is bypassed in the Anvil test environment).
+ * Uses a mock proof in Anvil and a proof-based gateway proof in live mode.
  */
 export async function executeBundle(
   destProvider: providers.JsonRpcProvider,
-  bundleData: string,
+  bundleInput: BundleExecutionInput,
   sourceChainId: number,
   gasLimit?: number
 ): Promise<ethers.providers.TransactionReceipt> {
-  const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, destProvider);
+  const wallet = new Wallet(getInteropTestPrivateKey(), destProvider);
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
-  const mockProof = buildMockInteropProof(sourceChainId);
+  const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
-  const tx = await interopHandler.executeBundle(bundleData, mockProof, {
+  const tx = await interopHandler.executeBundle(bundleData, proof, {
     gasLimit: gasLimit || DEFAULT_TX_GAS_LIMIT,
   });
   return tx.wait();
@@ -232,15 +295,15 @@ export async function executeBundle(
  */
 export async function simulateExecuteBundle(
   destProvider: providers.JsonRpcProvider,
-  bundleData: string,
+  bundleInput: BundleExecutionInput,
   sourceChainId: number,
   gasLimit?: number
 ): Promise<void> {
-  const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, destProvider);
+  const wallet = new Wallet(getInteropTestPrivateKey(), destProvider);
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
-  const mockProof = buildMockInteropProof(sourceChainId);
+  const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
-  await interopHandler.callStatic.executeBundle(bundleData, mockProof, {
+  await interopHandler.callStatic.executeBundle(bundleData, proof, {
     gasLimit: gasLimit || DEFAULT_TX_GAS_LIMIT,
   });
 }
@@ -251,16 +314,33 @@ export async function simulateExecuteBundle(
  */
 export async function verifyBundle(
   destProvider: providers.JsonRpcProvider,
-  bundleData: string,
+  bundleInput: BundleExecutionInput,
   sourceChainId: number,
   signerKey?: string
 ): Promise<ethers.providers.TransactionReceipt> {
-  const wallet = new Wallet(signerKey || ANVIL_DEFAULT_PRIVATE_KEY, destProvider);
+  const wallet = new Wallet(signerKey || getInteropTestPrivateKey(), destProvider);
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
-  const mockProof = buildMockInteropProof(sourceChainId);
+  const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
-  const tx = await interopHandler.verifyBundle(bundleData, mockProof, { gasLimit: DEFAULT_TX_GAS_LIMIT });
+  const tx = await interopHandler.verifyBundle(bundleData, proof, { gasLimit: DEFAULT_TX_GAS_LIMIT });
   return tx.wait();
+}
+
+function getBundleData(bundleInput: BundleExecutionInput): string {
+  return typeof bundleInput === "string" ? bundleInput : bundleInput.bundleData;
+}
+
+function getLiveSendResult(bundleInput: BundleExecutionInput): InteropSendResult {
+  if (typeof bundleInput !== "string") {
+    return bundleInput;
+  }
+  const sendResult = sendResultsByBundleData.get(bundleInput);
+  if (!sendResult) {
+    throw new Error(
+      "Live interop execution requires an InteropSendResult or bundleData returned by sendInteropBundle/sendInteropMessage in this process"
+    );
+  }
+  return sendResult;
 }
 
 /**
@@ -272,7 +352,7 @@ export async function unbundleBundle(
   callStatuses: number[],
   signerKey?: string
 ): Promise<ethers.providers.TransactionReceipt> {
-  const wallet = new Wallet(signerKey || ANVIL_DEFAULT_PRIVATE_KEY, destProvider);
+  const wallet = new Wallet(signerKey || getInteropTestPrivateKey(), destProvider);
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
 
   const tx = await interopHandler.unbundleBundle(bundleData, callStatuses, { gasLimit: DEFAULT_TX_GAS_LIMIT });
@@ -288,7 +368,7 @@ export async function simulateUnbundleBundle(
   callStatuses: number[],
   signerKey?: string
 ): Promise<void> {
-  const wallet = new Wallet(signerKey || ANVIL_DEFAULT_PRIVATE_KEY, destProvider);
+  const wallet = new Wallet(signerKey || getInteropTestPrivateKey(), destProvider);
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
 
   await interopHandler.callStatic.unbundleBundle(bundleData, callStatuses, { gasLimit: DEFAULT_TX_GAS_LIMIT });
@@ -320,7 +400,7 @@ export async function getCallStatus(
  * Get the interop protocol fee from InteropCenter.
  */
 export async function getInteropProtocolFee(provider: providers.JsonRpcProvider): Promise<BigNumber> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("IInteropCenter"), provider);
   return interopCenter.interopProtocolFee();
 }
 
@@ -328,15 +408,23 @@ export async function getInteropProtocolFee(provider: providers.JsonRpcProvider)
  * Get the fixed ZK interop fee from InteropCenter.
  */
 export async function getZkInteropFee(provider: providers.JsonRpcProvider): Promise<BigNumber> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("IInteropCenter"), provider);
   return interopCenter.ZK_INTEROP_FEE();
+}
+
+/**
+ * Get the configured ZK token asset ID from InteropCenter.
+ */
+export async function getZkTokenAssetId(provider: providers.JsonRpcProvider): Promise<string> {
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("IInteropCenter"), provider);
+  return interopCenter.ZK_TOKEN_ASSET_ID();
 }
 
 /**
  * Get the resolved ZK token address from InteropCenter.
  */
 export async function getZkTokenAddress(provider: providers.JsonRpcProvider): Promise<string> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("IInteropCenter"), provider);
   return interopCenter.getZKTokenAddress();
 }
 
@@ -344,7 +432,7 @@ export async function getZkTokenAddress(provider: providers.JsonRpcProvider): Pr
  * Get accumulated ZK fees for a coinbase address.
  */
 export async function getAccumulatedZkFees(provider: providers.JsonRpcProvider, coinbase: string): Promise<BigNumber> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("IInteropCenter"), provider);
   return interopCenter.accumulatedZKFees(coinbase);
 }
 
@@ -358,7 +446,7 @@ export async function deployDummyInteropRecipient(
   provider: providers.JsonRpcProvider,
   signerKey?: string
 ): Promise<string> {
-  const wallet = new Wallet(signerKey || ANVIL_DEFAULT_PRIVATE_KEY, provider);
+  const wallet = new Wallet(signerKey || getInteropTestPrivateKey(), provider);
   const factory = new ethers.ContractFactory(
     getAbi("DummyInteropRecipient"),
     getCreationBytecode("DummyInteropRecipient"),
@@ -380,7 +468,7 @@ export async function deployRevertingContract(
   provider: providers.JsonRpcProvider,
   signerKey?: string
 ): Promise<string> {
-  const wallet = new Wallet(signerKey || ANVIL_DEFAULT_PRIVATE_KEY, provider);
+  const wallet = new Wallet(signerKey || getInteropTestPrivateKey(), provider);
   // Init code that returns 0x60006000fd as the deployed runtime code
   // PUSH5 0x60006000fd PUSH1 0x00 MSTORE PUSH1 0x05 PUSH1 0x1b RETURN
   const initCode = "0x6460006000fd6000526005601bf3";
