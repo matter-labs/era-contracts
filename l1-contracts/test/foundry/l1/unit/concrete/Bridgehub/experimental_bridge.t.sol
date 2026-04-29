@@ -449,28 +449,30 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function test_removeChainTypeManager_cannotBeCalledByRandomAddress(
-        address _randomAddressWithoutTheCorrectInterface,
+        address _chainTypeManager,
         address _randomCaller
     ) public {
-        vm.assume(_randomAddressWithoutTheCorrectInterface != address(0));
+        vm.assume(_chainTypeManager != address(0));
         vm.assume(_randomCaller != bridgeOwner);
 
+        // Removing a non-registered CTM is still owner-only.
         vm.prank(_randomCaller);
         vm.expectRevert(bytes("Ownable: caller is not the owner"));
-        bridgehub.removeChainTypeManager(_randomAddressWithoutTheCorrectInterface);
+        bridgehub.removeChainTypeManager(_chainTypeManager);
 
+        // Register the CTM so the second check covers the successful-removal path.
         vm.prank(bridgeOwner);
-        bridgehub.addChainTypeManager(_randomAddressWithoutTheCorrectInterface);
-        assertTrue(bridgehub.chainTypeManagerIsRegistered(_randomAddressWithoutTheCorrectInterface));
+        bridgehub.addChainTypeManager(_chainTypeManager);
+        assertTrue(bridgehub.chainTypeManagerIsRegistered(_chainTypeManager));
 
         vm.prank(_randomCaller);
         vm.expectRevert(bytes("Ownable: caller is not the owner"));
-        bridgehub.removeChainTypeManager(_randomAddressWithoutTheCorrectInterface);
-        assertTrue(bridgehub.chainTypeManagerIsRegistered(_randomAddressWithoutTheCorrectInterface));
+        bridgehub.removeChainTypeManager(_chainTypeManager);
+        assertTrue(bridgehub.chainTypeManagerIsRegistered(_chainTypeManager));
 
         vm.prank(bridgeOwner);
-        bridgehub.removeChainTypeManager(_randomAddressWithoutTheCorrectInterface);
-        assertFalse(bridgehub.chainTypeManagerIsRegistered(_randomAddressWithoutTheCorrectInterface));
+        bridgehub.removeChainTypeManager(_chainTypeManager);
+        assertFalse(bridgehub.chainTypeManagerIsRegistered(_chainTypeManager));
     }
 
     function test_addAssetId(address randomAddress) public {

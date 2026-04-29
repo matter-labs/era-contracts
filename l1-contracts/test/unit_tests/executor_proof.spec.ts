@@ -4,6 +4,8 @@ import type { ExecutorProvingTest } from "../../typechain";
 import { ExecutorProvingTestFactory } from "../../typechain";
 
 describe("Executor proof helpers", function () {
+  const EXPECTED_PROOF_PUBLIC_INPUT = "0xb29c9adf0177455f74d0a0f38065e77a6d425370d418cd37dbf3eaa0";
+
   let executor: ExecutorProvingTest;
 
   before(async function () {
@@ -18,6 +20,6 @@ describe("Executor proof helpers", function () {
 
     const result = await executor.getBatchProofPublicInput(prevCommitment, nextCommitment);
 
-    expect(result.toHexString()).to.equal("0xb29c9adf0177455f74d0a0f38065e77a6d425370d418cd37dbf3eaa0");
+    expect(result.toHexString()).to.equal(EXPECTED_PROOF_PUBLIC_INPUT);
   });
 });
