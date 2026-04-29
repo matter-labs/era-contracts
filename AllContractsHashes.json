@@ -290,16 +290,6 @@
     "evmDeployedBytecodeLength": null
   },
   {
-    "contractName": "system-contracts/L2V29Upgrade",
-    "zkBytecodeHash": "0x01000353a71221ab29e79d1fad9435f622036447fbc15acf1a070c388a96757b",
-    "zkBytecodePath": "/system-contracts/zkout/L2V29Upgrade.sol/L2V29Upgrade.json",
-    "evmBytecodeHash": null,
-    "evmBytecodePath": null,
-    "evmDeployedBytecodeHash": null,
-    "evmDeployedBytecodeBlakeHash": null,
-    "evmDeployedBytecodeLength": null
-  },
-  {
     "contractName": "system-contracts/Merkle",
     "zkBytecodeHash": "0x01000007379ddea58978efdc212d22f47fa34b2e76da3b47ac0efee1e4a09ee1",
     "zkBytecodePath": "/system-contracts/zkout/Merkle.sol/Merkle.json",

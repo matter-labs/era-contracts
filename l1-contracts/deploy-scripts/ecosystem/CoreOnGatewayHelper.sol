@@ -94,7 +94,7 @@ library CoreOnGatewayHelper {
     ) internal view returns (IComplexUpgrader.UniversalContractUpgradeInfo memory deployment) {
         IL2ContractDeployer.ForceDeployment memory forceDeployment = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: getDeployedBytecodeHash(false, _c),
-            newAddress: _resolveEraForceDeploymentAddress(_c),
+            newAddress: _resolveAddress(_c),
             callConstructor: false,
             value: 0,
             input: ""
@@ -105,13 +105,6 @@ library CoreOnGatewayHelper {
             deployedBytecodeInfo: abi.encode(forceDeployment),
             newAddress: forceDeployment.newAddress
         });
-    }
-
-    function _resolveEraForceDeploymentAddress(CoreContract _c) private view returns (address) {
-        if (_c == CoreContract.L2V29Upgrade) {
-            return Utils.getL2AddressViaCreate2Factory(bytes32(0), getDeployedBytecodeHash(false, _c), hex"");
-        }
-        return _resolveAddress(_c);
     }
 
     // ======================== Factory dependencies ========================
@@ -225,7 +218,6 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.L2InteropRootStorage) return "L2InteropRootStorage";
         if (_c == CoreContract.GWAssetTracker) return "GWAssetTracker";
         if (_c == CoreContract.BeaconProxy) return "BeaconProxy";
-        if (_c == CoreContract.L2V29Upgrade) return "L2V29Upgrade";
         if (_c == CoreContract.L2V31Upgrade) return "L2V31Upgrade";
         if (_c == CoreContract.L2SharedBridgeLegacy) return "L2SharedBridgeLegacy";
         if (_c == CoreContract.BridgedStandardERC20) return "BridgedStandardERC20";
