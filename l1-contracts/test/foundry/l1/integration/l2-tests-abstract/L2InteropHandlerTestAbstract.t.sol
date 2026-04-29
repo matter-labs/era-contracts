@@ -817,9 +817,9 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
 
         // Verify BaseTokenBurntInterop event is emitted
         vm.expectEmit(true, false, false, true, L2_BASE_TOKEN_HOLDER_ADDR);
-        emit IBaseTokenHolder.BaseTokenBurntInterop(L2_INTEROP_HANDLER_ADDR, toChainId, burnAmount);
+        emit IBaseTokenHolder.BaseTokenBurntInterop(L2_INTEROP_CENTER_ADDR, toChainId, burnAmount);
 
-        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        vm.prank(L2_INTEROP_CENTER_ADDR);
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(toChainId);
 
         // Verify asset tracker storage was actually updated

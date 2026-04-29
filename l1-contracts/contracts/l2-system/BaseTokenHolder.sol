@@ -69,13 +69,11 @@ contract BaseTokenHolder is IBaseTokenHolder {
     }
 
     /// @notice Modifier that restricts access to callers that can bridge base tokens.
-    /// @dev InteropHandler: returns burned tokens during interop operations
     /// @dev InteropCenter: returns burned tokens during interop operations
     /// @dev NativeTokenVault: returns tokens during bridged base token burns
     /// @dev L2BaseToken: returns burned tokens during withdrawals
     modifier onlyBridgingCaller() {
         if (
-            msg.sender != L2_INTEROP_HANDLER_ADDR &&
             msg.sender != L2_INTEROP_CENTER_ADDR &&
             msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR &&
             msg.sender != L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
@@ -116,7 +114,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
     }
 
     /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
-    /// @dev Called by InteropHandler, InteropCenter, NativeTokenVault, and L2BaseToken during bridging operations.
+    /// @dev Called by InteropCenter, NativeTokenVault, and L2BaseToken during bridging operations.
     /// @dev This function notifies L2AssetTracker to track the bridging operation.
     /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable onlyBridgingCaller {
