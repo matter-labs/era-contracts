@@ -7,7 +7,6 @@ import {
   ANVIL_FUND_BALANCE,
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
-  L1_CHAIN_ID,
   L1_MESSAGE_SENT_EVENT_SIG,
   L1_TO_L2_ALIAS_OFFSET,
   L2_ASSET_TRACKER_ADDR,
@@ -15,6 +14,7 @@ import {
   L2_INTEROP_HANDLER_ADDR,
   NEW_PRIORITY_REQUEST_EVENT_SIG,
 } from "./const";
+import { runtimeConfig } from "./runtime-config";
 import { getAbi } from "./contracts";
 import type {
   AnvilChainConfig,
@@ -261,7 +261,7 @@ export async function getSettlementLayerChainId(
   const bridgehub = new ethers.Contract(bridgehubAddr, getAbi("IL1Bridgehub"), l1Provider);
   const slChainId = await bridgehub.settlementLayer(chainId);
   const slChainIdNum = slChainId.toNumber();
-  const isGatewaySettled = slChainIdNum !== 0 && slChainIdNum !== L1_CHAIN_ID;
+  const isGatewaySettled = slChainIdNum !== 0 && slChainIdNum !== runtimeConfig.l1ChainId;
   return isGatewaySettled ? slChainIdNum : 0;
 }
 

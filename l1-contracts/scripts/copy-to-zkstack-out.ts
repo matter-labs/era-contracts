@@ -34,6 +34,8 @@ const REQUIRED_CONTRACTS = [
   "IRegisterCTM.sol",
   "IRegisterOnAllChains.sol",
   "IGatewayMigrateTokenBalances.sol",
+  "IFinalizeChainInit.sol",
+  "IUpgradeV31.sol",
   "IFinalizeUpgrade.sol",
   "IL1NativeTokenVault.sol",
   "IL2NativeTokenVault.sol",

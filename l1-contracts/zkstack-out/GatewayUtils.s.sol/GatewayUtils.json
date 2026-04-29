@@ -83,11 +83,6 @@
         "internalType": "address"
       },
       {
-        "name": "gatewayDiamondCutData",
-        "type": "bytes",
-        "internalType": "bytes"
-      },
-      {
         "name": "migratingChainId",
         "type": "uint256",
         "internalType": "uint256"

@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execSync, spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import { parse as parseToml } from "toml";
@@ -12,7 +12,6 @@ import {
   GW_ASSET_TRACKER_ADDR,
   INITIAL_BASE_TOKEN_HOLDER_BALANCE,
   INTEROP_CENTER_ADDR,
-  L1_CHAIN_ID,
   L2_ASSET_ROUTER_ADDR,
   L2_ASSET_TRACKER_ADDR,
   L2_BASE_TOKEN_ADDR,
@@ -39,6 +38,7 @@ import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../c
 import type { ContractName } from "../core/contracts";
 import { transferOwnable2Step } from "./harness-shims";
 import { impersonateAndRun } from "../core/utils";
+import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -55,6 +55,7 @@ const UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY = 2;
 
 const anvilInteropDir = path.resolve(__dirname, "../..");
 const l1ContractsDir = path.resolve(anvilInteropDir, "../..");
+const contractsRootDir = path.resolve(l1ContractsDir, "..");
 const ECOSYSTEM_UPGRADE_TEST_SCRIPT =
   "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:EcosystemUpgradeV31ForTests";
 
@@ -108,9 +109,11 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     const defaultSigner = new ethers.Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
 
     // ── Transfer L1 contract ownership to governance ──
+    console.log("\n── Preparing L1 ownership for upgrade ──");
     await transferL1Ownership(l1Provider, defaultSigner, l1Addresses, ctmAddresses, scenario);
 
     // ── Deploy ChainAdmin for each upgrade target ──
+    console.log("\n── Deploying temporary ChainAdminOwnable contracts ──");
     await deployChainAdmins(l1Provider, defaultSigner, upgradeChainAddresses);
 
     // ── Run ecosystem upgrade forge scripts (L1 deployments) ──
@@ -121,38 +124,32 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     });
     cleanupUpgradeHarnessInputs = upgradeHarnessInputs.cleanup;
 
-    await runEcosystemUpgradeScripts(l1Chain.rpcUrl, upgradeHarnessInputs.envVars);
+    console.log("\n── Preparing ecosystem upgrade bundles via protocol-ops ──");
+    await runEcosystemUpgradeScripts({
+      rpcUrl: l1Chain.rpcUrl,
+      upgradeHarnessInputs,
+      executeBundles: true,
+    });
 
-    // ── Execute governance calls (stages 0-2) ──
+    // ── Execute governance calls (stages 0-2) via protocol-ops bundle ──
+    console.log("\n── Replaying governance upgrade bundles ──");
+    await runEcosystemGovernanceUpgrade({
+      rpcUrl: l1Chain.rpcUrl,
+      ecosystemYamlPath: upgradeHarnessInputs.ecosystemYamlPath,
+      governanceTomlPath: upgradeHarnessInputs.governanceTomlPath,
+      outDir: path.join(upgradeHarnessInputs.protocolOpsOutDir, "governance"),
+      executeBundles: true,
+    });
+
     const outputToml = readEcosystemOutput(upgradeHarnessInputs.ecosystemOutputPath);
-    const govCalls = outputToml.governance_calls as Record<string, string> | undefined;
-    if (!govCalls) {
-      throw new Error("No governance_calls section in ecosystem output");
-    }
-    await executeGovernanceCalls(
-      l1Provider,
-      l1Addresses.governance,
-      decodeGovernanceCalls(govCalls.stage0_calls),
-      "Stage 0"
-    );
-    await executeGovernanceCalls(
-      l1Provider,
-      l1Addresses.governance,
-      decodeGovernanceCalls(govCalls.stage1_calls),
-      "Stage 1"
-    );
-    await executeGovernanceCalls(
-      l1Provider,
-      l1Addresses.governance,
-      decodeGovernanceCalls(govCalls.stage2_calls),
-      "Stage 2"
-    );
 
     // ── Prepare diamond state for chain upgrades ──
     if (scenario.clearGenesisUpgradeTxHash) {
+      console.log("\n── Clearing legacy genesis upgrade tx hashes ──");
       await clearGenesisUpgradeTxHash(l1Provider, upgradeChainAddresses);
     }
     if (scenario.seedBatchCounters) {
+      console.log("\n── Seeding batch counters for v31 upgrade compatibility ──");
       await seedBatchCounters(l1Provider, upgradeChainAddresses);
     }
     // ── Run per-chain upgrades (L1) and relay to L2 ──
@@ -169,9 +166,12 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       ctmAddr: ctmAddresses.chainTypeManager,
       upgradeChainAddresses,
       isZKsyncOS: scenario.isZKsyncOS,
+      ecosystemYamlPath: upgradeHarnessInputs.ecosystemYamlPath,
+      protocolOpsOutDir: path.join(upgradeHarnessInputs.protocolOpsOutDir, "chains"),
     });
 
     // ── Stage 3: post-governance migration ──
+    console.log("\n── Running stage3 post-governance migration ──");
     await runForgeScript({
       scriptPath: ECOSYSTEM_UPGRADE_TEST_SCRIPT,
       envVars: upgradeHarnessInputs.envVars,
@@ -258,35 +258,176 @@ async function deployChainAdmins(
   }
 }
 
-// ── Ecosystem upgrade (L1 forge scripts) ─────────────────────────────
+// ── Protocol-ops bundle generation/replay ───────────────────────────
 
-async function runEcosystemUpgradeScripts(rpcUrl: string, envVars: Record<string, string>): Promise<void> {
-  const baseParams = {
-    scriptPath: ECOSYSTEM_UPGRADE_TEST_SCRIPT,
-    envVars,
-    rpcUrl,
-    senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
-    projectRoot: l1ContractsDir,
-  };
-  // Split into two calls to reduce peak EVM memory and avoid broadcast deadlocks.
-  // step2 loads all L2 bytecodes for the diamond cut AND generates governance calls — it
-  // must be a single forge invocation because state-transition facet addresses, diamond-cut
-  // data and other CTM state can't be reliably round-tripped through TOML between invocations.
-  // It needs extra EVM memory (256MB) to hold the L2 bytecodes.
-  await runForgeScript({ ...baseParams, sig: "step1()" });
-  // step2 deploys CTM contracts + generates governance calls in a single forge invocation.
-  // ZKsyncOS upgrades are more gas-intensive (larger bytecodes), so we raise both the EVM
-  // memory limit and the gas limit to prevent OOG in the forge simulation.
-  await runForgeScript({
-    ...baseParams,
-    sig: "step2()",
-    extraForgeArgs: ["--memory-limit", "536870912", "--gas-limit", "18446744073709551615"],
+type UpgradeHarnessInputs = ReturnType<typeof prepareUpgradeHarnessInputs>;
+
+function runProtocolOps(args: string[], extraEnv?: Record<string, string>): void {
+  const result = spawnSync("./protocol-ops.sh", args, {
+    cwd: contractsRootDir,
+    stdio: "inherit",
+    env: {
+      ...process.env,
+      ...extraEnv,
+      PROTOCOL_CONTRACTS_ROOT: contractsRootDir,
+    },
   });
+  if (result.status !== 0) {
+    throw new Error(`protocol-ops failed: ${args.join(" ")}`);
+  }
+}
+
+function safeBundlesInDir(dir: string): Array<{ file: string; target: string }> {
+  const manifestPath = path.join(dir, "manifest.json");
+  if (fs.existsSync(manifestPath)) {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as {
+      bundles?: Array<{ index?: number; file?: string; target?: string }>;
+    };
+    return (manifest.bundles ?? [])
+      .filter((bundle): bundle is { index: number; file: string; target: string } => {
+        return typeof bundle.index === "number" && typeof bundle.file === "string" && typeof bundle.target === "string";
+      })
+      .sort((a, b) => a.index - b.index)
+      .map((bundle) => ({ file: path.join(dir, bundle.file), target: bundle.target }));
+  }
+
+  return fs
+    .readdirSync(dir)
+    .filter((file) => file.endsWith(".safe.json"))
+    .sort()
+    .map((file) => ({ file: path.join(dir, file), target: ANVIL_DEFAULT_ACCOUNT_ADDR }));
+}
+
+async function executeSafeBundles(outDir: string, rpcUrl: string): Promise<void> {
+  if (!fs.existsSync(outDir)) {
+    throw new Error(`Protocol-ops output directory does not exist: ${outDir}`);
+  }
+  const safeBundles = safeBundlesInDir(outDir);
+  if (safeBundles.length === 0) {
+    throw new Error(`No protocol-ops Safe bundles found in ${outDir}`);
+  }
+  const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+
+  for (const bundle of safeBundles) {
+    const safeFile = JSON.parse(fs.readFileSync(bundle.file, "utf8")) as {
+      transactions?: Array<{ to: string; value: string; data: string }>;
+    };
+    const transactions = safeFile.transactions ?? [];
+    if (transactions.length === 0) {
+      throw new Error(`Safe bundle has no transactions: ${bundle.file}`);
+    }
+
+    await provider.send("anvil_impersonateAccount", [bundle.target]);
+    await provider.send("anvil_setBalance", [bundle.target, "0x56BC75E2D63100000"]);
+    const signer = provider.getSigner(bundle.target);
+    try {
+      for (let i = 0; i < transactions.length; i++) {
+        const tx = await signer.sendTransaction({
+          to: transactions[i].to,
+          value: ethers.BigNumber.from(transactions[i].value),
+          data: transactions[i].data,
+          gasLimit: 30_000_000,
+        });
+        const receipt = await tx.wait();
+        if (receipt.status !== 1) {
+          const trace = await traceFailedTx(provider, receipt.transactionHash);
+          throw new Error(
+            `Safe bundle ${path.basename(bundle.file)} tx ${i + 1}/${transactions.length} reverted:\n${trace}`
+          );
+        }
+      }
+    } finally {
+      await provider.send("anvil_stopImpersonatingAccount", [bundle.target]);
+    }
+  }
+}
+
+function writeEcosystemYaml(filePath: string, bridgehubAddr: string, chainIds: number[]): void {
+  const chains = chainIds.map((chainId) => `  chain-${chainId}: ${chainId}`).join("\n");
+  fs.writeFileSync(
+    filePath,
+    [`bridgehub: ${bridgehubAddr}`, `deployer: ${ANVIL_DEFAULT_ACCOUNT_ADDR}`, "chains:", chains, ""].join("\n")
+  );
+}
+
+export async function runEcosystemUpgradeScripts(params: {
+  rpcUrl: string;
+  upgradeHarnessInputs: UpgradeHarnessInputs;
+  executeBundles?: boolean;
+}): Promise<void> {
+  const prepareOutDir = path.join(params.upgradeHarnessInputs.protocolOpsOutDir, "prepare");
+  fs.rmSync(prepareOutDir, { recursive: true, force: true });
+
+  runProtocolOps(
+    [
+      "ecosystem",
+      "upgrade-prepare",
+      "--ecosystem",
+      params.upgradeHarnessInputs.ecosystemYamlPath,
+      "--l1-rpc-url",
+      params.rpcUrl,
+      "--out",
+      prepareOutDir,
+      "--deployer-address",
+      ANVIL_DEFAULT_ACCOUNT_ADDR,
+      "--bytecodes-supplier-address",
+      params.upgradeHarnessInputs.bytecodesSupplierAddress,
+      "--rollup-da-manager-address",
+      params.upgradeHarnessInputs.rollupDaManagerAddress,
+      "--is-zk-sync-os",
+      String(params.upgradeHarnessInputs.isZKsyncOS),
+      "--create2-factory-salt",
+      params.upgradeHarnessInputs.create2FactorySalt,
+      "--upgrade-input-path",
+      params.upgradeHarnessInputs.upgradeInputArg,
+      "--upgrade-output-path",
+      params.upgradeHarnessInputs.ecosystemOutputArg,
+      "--governance-toml-out",
+      params.upgradeHarnessInputs.governanceTomlPath,
+      "--script-path",
+      ECOSYSTEM_UPGRADE_TEST_SCRIPT,
+      "--ctm-proxy",
+      params.upgradeHarnessInputs.ctmProxyAddress,
+      "--additional-args=--memory-limit=536870912",
+    ],
+    params.upgradeHarnessInputs.envVars
+  );
+
+  if (params.executeBundles) {
+    await executeSafeBundles(prepareOutDir, params.rpcUrl);
+  }
+}
+
+export async function runEcosystemGovernanceUpgrade(params: {
+  rpcUrl: string;
+  ecosystemYamlPath: string;
+  governanceTomlPath: string;
+  outDir: string;
+  executeBundles?: boolean;
+}): Promise<void> {
+  fs.rmSync(params.outDir, { recursive: true, force: true });
+
+  runProtocolOps([
+    "ecosystem",
+    "upgrade-governance",
+    "--ecosystem",
+    params.ecosystemYamlPath,
+    "--l1-rpc-url",
+    params.rpcUrl,
+    "--out",
+    params.outDir,
+    "--governance-toml",
+    params.governanceTomlPath,
+  ]);
+
+  if (params.executeBundles) {
+    await executeSafeBundles(params.outDir, params.rpcUrl);
+  }
 }
 
 // ── Per-chain upgrade + L2 relay ─────────────────────────────────────
 
-async function runChainUpgradesAndRelayL2(params: {
+export async function runChainUpgradesAndRelayL2(params: {
   l1Provider: ethers.providers.JsonRpcProvider;
   anvilManager: AnvilManager;
   bridgehubAddr: string;
@@ -294,15 +435,18 @@ async function runChainUpgradesAndRelayL2(params: {
   ctmAddr: string;
   upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>;
   isZKsyncOS: boolean;
+  ecosystemYamlPath: string;
+  protocolOpsOutDir: string;
 }): Promise<void> {
   const {
     l1Provider,
     anvilManager,
     bridgehubAddr,
     settlementLayerUpgradeAddr,
-    ctmAddr,
     upgradeChainAddresses,
     isZKsyncOS,
+    ecosystemYamlPath,
+    protocolOpsOutDir,
   } = params;
 
   const settlementLayerUpgrade = new ethers.Contract(
@@ -311,23 +455,34 @@ async function runChainUpgradesAndRelayL2(params: {
     l1Provider
   );
   const l1Chain = anvilManager.getL1Chain()!;
-  const broadcastPath = path.join(l1ContractsDir, "broadcast/ChainUpgrade_v31.s.sol/31337/run-latest.json");
 
   for (const chain of upgradeChainAddresses) {
     console.log(`\n── Chain ${chain.chainId}: running L1 upgrade + L2 relay ──`);
-    // Run the L1 chain upgrade forge script
-    await runForgeScript({
-      scriptPath: "deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol:ChainUpgrade_v31",
-      envVars: {},
-      rpcUrl: l1Chain.rpcUrl,
-      senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
-      projectRoot: l1ContractsDir,
-      sig: "run(address,uint256)",
-      args: `${ctmAddr} ${chain.chainId}`,
-    });
+    const chainOutDir = path.join(protocolOpsOutDir, `chain-${chain.chainId}`);
+    fs.rmSync(chainOutDir, { recursive: true, force: true });
 
-    // Decode the L2 upgrade tx from the broadcast
-    const originalUpgradeTxData = decodeLatestL2UpgradeTxData(broadcastPath);
+    runProtocolOps([
+      "chain",
+      "upgrade",
+      "--ecosystem",
+      ecosystemYamlPath,
+      "--chain",
+      `chain-${chain.chainId}`,
+      "--l1-rpc-url",
+      l1Chain.rpcUrl,
+      "--out",
+      chainOutDir,
+    ]);
+
+    const safeBundles = safeBundlesInDir(chainOutDir);
+    if (safeBundles.length !== 1) {
+      throw new Error(`Expected one chain-upgrade Safe bundle for chain ${chain.chainId}, found ${safeBundles.length}`);
+    }
+
+    await executeSafeBundles(chainOutDir, l1Chain.rpcUrl);
+
+    // Decode the L2 upgrade tx from the protocol-ops Safe bundle.
+    const originalUpgradeTxData = decodeLatestL2UpgradeTxData(safeBundles[0].file);
 
     // Rewrite the L2 upgrade tx with per-chain data via SettlementLayerV31Upgrade
     const rewrittenUpgradeTxData = await settlementLayerUpgrade.getL2UpgradeTxData(
@@ -508,7 +663,7 @@ async function deployL2Contracts(
   await l2Provider.send("anvil_setStorageAt", [
     L2_NATIVE_TOKEN_VAULT_ADDR,
     toSlot(NTV_L1_CHAIN_ID_SLOT),
-    ethers.utils.hexZeroPad(ethers.utils.hexlify(L1_CHAIN_ID), 32),
+    ethers.utils.hexZeroPad(ethers.utils.hexlify(runtimeConfig.l1ChainId), 32),
   ]);
   // NTV: set L2_TOKEN_PROXY_BYTECODE_HASH to a non-zero placeholder
   await l2Provider.send("anvil_setStorageAt", [
@@ -760,8 +915,8 @@ async function verifyL2UpgradeResult(l2Provider: ethers.providers.JsonRpcProvide
   const assetTracker = new ethers.Contract(L2_ASSET_TRACKER_ADDR, getAbi("L2AssetTracker"), l2Provider);
 
   const l1ChainId = await assetTracker.L1_CHAIN_ID();
-  if (!l1ChainId.eq(L1_CHAIN_ID)) {
-    throw new Error(`Chain ${chainId}: L2AssetTracker.L1_CHAIN_ID = ${l1ChainId}, expected ${L1_CHAIN_ID}`);
+  if (!l1ChainId.eq(runtimeConfig.l1ChainId)) {
+    throw new Error(`Chain ${chainId}: L2AssetTracker.L1_CHAIN_ID = ${l1ChainId}, expected ${runtimeConfig.l1ChainId}`);
   }
 
   const baseTokenAssetId = await assetTracker.BASE_TOKEN_ASSET_ID();
@@ -771,7 +926,7 @@ async function verifyL2UpgradeResult(l2Provider: ethers.providers.JsonRpcProvide
   }
 }
 
-async function verifyProtocolVersions(
+export async function verifyProtocolVersions(
   provider: ethers.providers.JsonRpcProvider,
   chains: Array<{ chainId: number; diamondProxy: string }>
 ): Promise<void> {
@@ -789,13 +944,15 @@ async function verifyProtocolVersions(
 
 // ── Governance calls ─────────────────────────────────────────────────
 
-function decodeGovernanceCalls(hexBytes: string): Array<{ target: string; value: ethers.BigNumber; data: string }> {
+export function decodeGovernanceCalls(
+  hexBytes: string
+): Array<{ target: string; value: ethers.BigNumber; data: string }> {
   const [calls] = ethers.utils.defaultAbiCoder.decode(["tuple(address,uint256,bytes)[]"], hexBytes);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return calls.map((call: any) => ({ target: call[0], value: call[1], data: call[2] }));
 }
 
-async function executeGovernanceCalls(
+export async function executeGovernanceCalls(
   provider: ethers.providers.JsonRpcProvider,
   governanceAddr: string,
   calls: Array<{ target: string; value: ethers.BigNumber; data: string }>,
@@ -879,20 +1036,37 @@ function replaceTomlBareValue(contents: string, key: string, value: string): str
   return pattern.test(contents) ? contents.replace(pattern, `$1${value}`) : `${key} = ${value}\n${contents}`;
 }
 
-function prepareUpgradeHarnessInputs(
+export function prepareUpgradeHarnessInputs(
   scenario: V31UpgradeScenario,
   state: {
     l1Addresses: { bridgehub: string; governance: string };
     ctmAddresses: { chainTypeManager: string };
     chainAddresses: Array<{ chainId: number }>;
   }
-): { envVars: Record<string, string>; ecosystemOutputPath: string; cleanup: () => void } {
+): {
+  envVars: Record<string, string>;
+  ecosystemOutputPath: string;
+  governanceTomlPath: string;
+  ecosystemYamlPath: string;
+  protocolOpsOutDir: string;
+  upgradeInputArg: string;
+  ecosystemOutputArg: string;
+  bytecodesSupplierAddress: string;
+  rollupDaManagerAddress: string;
+  create2FactorySalt: string;
+  isZKsyncOS: boolean;
+  ctmProxyAddress: string;
+  cleanup: () => void;
+} {
   const tempDir = path.join(anvilInteropDir, "outputs", `upgrade-harness-inputs-${scenario.label}`);
   fs.mkdirSync(tempDir, { recursive: true });
 
   const permanentValuesPath = path.join(tempDir, `${scenario.label}-permanent-values.toml`);
   const upgradeInputPath = path.join(tempDir, `${scenario.label}-to-v31-upgrade.toml`);
   const ecosystemOutputPath = path.join(tempDir, `${scenario.label}-v31-upgrade-ecosystem.toml`);
+  const governanceTomlPath = path.join(tempDir, `${scenario.label}-v31-governance.toml`);
+  const ecosystemYamlPath = path.join(tempDir, "ecosystem.yaml");
+  const protocolOpsOutDir = path.join(tempDir, "protocol-ops");
 
   const primaryChainId = state.chainAddresses[0]?.chainId;
   if (!primaryChainId) throw new Error(`No chains loaded for ${scenario.label}`);
@@ -910,6 +1084,21 @@ function prepareUpgradeHarnessInputs(
   upgradeInput = replaceTomlStringValue(upgradeInput, "owner_address", state.l1Addresses.governance);
   upgradeInput = replaceTomlBareValue(upgradeInput, "sample_chain_id", String(primaryChainId));
   fs.writeFileSync(upgradeInputPath, upgradeInput);
+  writeEcosystemYaml(
+    ecosystemYamlPath,
+    state.l1Addresses.bridgehub,
+    state.chainAddresses.map((chain) => chain.chainId)
+  );
+
+  const permanentValuesToml = parseToml(permanentValues) as {
+    ctm_contracts?: {
+      l1_bytecodes_supplier_addr?: string;
+      rollup_da_manager?: string;
+    };
+    permanent_contracts?: {
+      create2_factory_salt?: string;
+    };
+  };
 
   // stage3 reads a bridged-tokens config for legacy token migration.
   // In test environments there are no legacy bridged tokens, so provide an empty list.
@@ -924,6 +1113,17 @@ function prepareUpgradeHarnessInputs(
       UPGRADE_BRIDGED_TOKENS_INPUT_OVERRIDE: `/${path.relative(l1ContractsDir, bridgedTokensPath)}`,
     },
     ecosystemOutputPath,
+    governanceTomlPath,
+    ecosystemYamlPath,
+    protocolOpsOutDir,
+    upgradeInputArg: `/${path.relative(l1ContractsDir, upgradeInputPath)}`,
+    ecosystemOutputArg: `/${path.relative(l1ContractsDir, ecosystemOutputPath)}`,
+    bytecodesSupplierAddress:
+      permanentValuesToml.ctm_contracts?.l1_bytecodes_supplier_addr ?? ethers.constants.AddressZero,
+    rollupDaManagerAddress: permanentValuesToml.ctm_contracts?.rollup_da_manager ?? ethers.constants.AddressZero,
+    create2FactorySalt: permanentValuesToml.permanent_contracts?.create2_factory_salt ?? ethers.constants.HashZero,
+    isZKsyncOS: scenario.isZKsyncOS,
+    ctmProxyAddress: state.ctmAddresses.chainTypeManager,
     cleanup: () => fs.rmSync(tempDir, { recursive: true, force: true }),
   };
 }
@@ -971,7 +1171,7 @@ function selectUpgradeChains(
   });
 }
 
-function readNestedString(obj: Record<string, unknown>, path: string[], label: string): string {
+export function readNestedString(obj: Record<string, unknown>, path: string[], label: string): string {
   let current: unknown = obj;
   for (const key of path) {
     if (!current || typeof current !== "object" || !(key in current)) {
@@ -985,7 +1185,7 @@ function readNestedString(obj: Record<string, unknown>, path: string[], label: s
   return current;
 }
 
-function readEcosystemOutput(outputPath: string): Record<string, unknown> {
+export function readEcosystemOutput(outputPath: string): Record<string, unknown> {
   if (!fs.existsSync(outputPath)) {
     throw new Error(`Ecosystem output not found at ${outputPath}`);
   }

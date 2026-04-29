@@ -1,10 +1,40 @@
 use std::path::{Path, PathBuf};
 
-#[derive(PartialEq, Debug, Clone)]
-pub struct ForgeScriptParams {
+use ethers::contract::BaseContract;
+use lazy_static::lazy_static;
+
+use crate::abi_contracts::{
+    ADMIN_FUNCTIONS_CONTRACT, DEPLOY_CTM_CONTRACT, DEPLOY_GATEWAY_TRANSACTION_FILTERER_CONTRACT,
+    DEPLOY_L2_CONTRACTS_CONTRACT, DEPLOY_PAYMASTER_CONTRACT, ENABLE_EVM_EMULATOR_CONTRACT,
+    FINALIZE_CHAIN_INIT_CONTRACT, GATEWAY_UTILS_CONTRACT, GATEWAY_VOTE_PREPARATION_CONTRACT,
+    REGISTER_CHAIN_CONTRACT, REGISTER_CTM_CONTRACT, REGISTER_ON_ALL_CHAINS_CONTRACT,
+    SETUP_LEGACY_BRIDGE_CONTRACT,
+};
+
+pub const ADMIN_FUNCTIONS_SCRIPT_PATH: &str = "deploy-scripts/AdminFunctions.s.sol";
+pub const FINALIZE_CHAIN_INIT_SCRIPT_PATH: &str = "deploy-scripts/chain/FinalizeChainInit.s.sol";
+pub const ECOSYSTEM_UPGRADE_V31_SCRIPT_PATH: &str =
+    "deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol";
+pub const UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH: &str = "/upgrade-envs/v0.31.0-interopB/local.toml";
+pub const UPGRADE_V31_CORE_OUTPUT_PATH: &str = "/script-out/v31-upgrade-core.toml";
+pub const UPGRADE_V31_CTM_OUTPUT_PATH: &str = "/script-out/v31-upgrade-ctm.toml";
+pub const UPGRADE_V31_ECOSYSTEM_OUTPUT_PATH: &str = "/script-out/v31-upgrade-ecosystem.toml";
+pub const GATEWAY_UTILS_SCRIPT_TARGET_PATH: &str =
+    "deploy-scripts/gateway/GatewayUtils.s.sol:GatewayUtils";
+pub const DEPLOY_GATEWAY_TRANSACTION_FILTERER_SCRIPT_TARGET_PATH: &str =
+    "deploy-scripts/gateway/DeployGatewayTransactionFilterer.s.sol:DeployGatewayTransactionFilterer";
+pub const GATEWAY_VOTE_PREPARATION_SCRIPT_PATH: &str =
+    "deploy-scripts/gateway/GatewayVotePreparation.s.sol";
+
+#[derive(Debug, Clone, Copy)]
+pub struct FoundryScriptParams {
     input: &'static str,
     output: &'static str,
     script_path: &'static str,
+    ffi: bool,
+    rpc_url: bool,
+    gas_limit: Option<u64>,
+    abi: Option<&'static BaseContract>,
 }
 
 impl ForgeScriptParams {

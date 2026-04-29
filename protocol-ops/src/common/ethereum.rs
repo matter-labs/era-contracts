@@ -2,9 +2,8 @@ use std::sync::Arc;
 
 use anyhow::Context;
 use ethers::{
-    core::k256::ecdsa::SigningKey,
-    middleware::{Middleware as _, MiddlewareBuilder},
-    prelude::{Http, LocalWallet, Provider, Signer, SignerMiddleware},
+    middleware::Middleware as _,
+    prelude::{Http, Provider},
 };
 use tokio::task::block_in_place;
 
@@ -29,16 +28,4 @@ pub fn query_chain_id_sync(rpc_url: &str) -> anyhow::Result<u64> {
             .block_on(fut)?
     };
     Ok(id.as_u64())
-}
-
-pub fn create_ethers_client(
-    mut wallet: LocalWallet,
-    l1_rpc: String,
-    chain_id: Option<u64>,
-) -> anyhow::Result<SignerMiddleware<Provider<Http>, ethers::prelude::Wallet<SigningKey>>> {
-    if let Some(chain_id) = chain_id {
-        wallet = wallet.with_chain_id(chain_id);
-    }
-    let client = Provider::<Http>::try_from(l1_rpc)?.with_signer(wallet);
-    Ok(client)
 }

@@ -1,22 +1,21 @@
-use std::path::Path;
-
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::Address;
+use ethers::types::{Address, Bytes};
+use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::commands::output::write_output_if_requested;
+use crate::common::addresses::{DEFAULT_ZK_TOKEN_ASSET_ID, ZERO_ADDRESS, ZERO_BYTES32};
 use crate::common::paths;
 use crate::common::EcosystemChainArgs;
 use crate::common::SharedRunArgs;
-use crate::common::{
-    forge::{Forge, ForgeRunner, ForgeScriptArg},
-    logger,
-    wallets::Wallet,
+use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
+use crate::config::forge_interface::script_params::{
+    ADMIN_FUNCTIONS_INVOCATION, DEPLOY_GATEWAY_TRANSACTION_FILTERER_INVOCATION,
+    GATEWAY_UTILS_INVOCATION, GATEWAY_VOTE_PREPARATION_INVOCATION,
+    GATEWAY_VOTE_PREPARATION_SCRIPT_PATH,
 };
-
-use super::build_admin_functions_script;
 
 /// Convert a relative TOML path to the form expected by forge env vars (`/`-prefixed).
 fn forge_env_path(rel: &str) -> String {
@@ -34,28 +33,12 @@ pub(crate) async fn stage_deploy_filterer(
     bridgehub: Address,
     chain_id: u64,
 ) -> anyhow::Result<()> {
-    let contracts_path = paths::path_to_foundry_scripts();
-
-    let mut script_args = runner.forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: "deployAndSetOnChain(address,uint256)".to_string(),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args.add_arg(ForgeScriptArg::Broadcast);
-    script_args.add_arg(ForgeScriptArg::Ffi);
-    script_args
-        .additional_args
-        .extend([format!("{:#x}", bridgehub), chain_id.to_string()]);
-
-    let script = Forge::new(&contracts_path)
-        .script(
-            Path::new(
-                "deploy-scripts/gateway/DeployGatewayTransactionFilterer.s.sol:DeployGatewayTransactionFilterer",
-            ),
-            script_args,
-        )
+    let script = runner
+        .with_script_call(
+            &DEPLOY_GATEWAY_TRANSACTION_FILTERER_INVOCATION,
+            "deployAndSetOnChain",
+            (bridgehub, chain_id),
+        )?
         .with_wallet(sender);
 
     logger::step("Deploying gateway transaction filterer");
@@ -82,7 +65,6 @@ pub(crate) async fn stage_grant_whitelist(
     chain_id: u64,
     extra_grantees: &[Address],
 ) -> anyhow::Result<()> {
-    let contracts_path = paths::resolve_l1_contracts_path()?;
     // Always broadcast the admin call, including in `--simulate`. The simulate
     // fork is ephemeral, so broadcasting has no real-world side effect — but
     // the Safe bundle is built from forge's broadcast log, so the tx must be
@@ -97,8 +79,6 @@ pub(crate) async fn stage_grant_whitelist(
     // a real chain, we need to thread the ACR address through so the broadcast
     // goes out as `IAccessControlDefaultAdminRules(acr).defaultAdmin()`, which
     // is the account guaranteed to pass every selector's role check.
-    let should_send = "true".to_string();
-
     // Auto-resolve the CTM deployment tracker (STM tracker) from the bridgehub
     // and include it in the whitelist — it must be whitelisted on the gateway so
     // CTM registration can proceed during vote-prepare.
@@ -124,28 +104,13 @@ pub(crate) async fn stage_grant_whitelist(
         }
     }
 
-    // Encode grantees as a Solidity address[] literal: [addr1,addr2,...]
-    let grantees_str = format!(
-        "[{}]",
-        all_grantees
-            .iter()
-            .map(|a| format!("{a:#x}"))
-            .collect::<Vec<_>>()
-            .join(",")
-    );
-
-    let script = build_admin_functions_script(
-        &contracts_path,
-        runner,
-        "grantGatewayWhitelist(address,uint256,address[],bool)",
-        vec![
-            format!("{:#x}", bridgehub),
-            chain_id.to_string(),
-            grantees_str,
-            should_send,
-        ],
-    )?
-    .with_wallet(sender);
+    let script = runner
+        .with_script_call(
+            &ADMIN_FUNCTIONS_INVOCATION,
+            "grantGatewayWhitelist",
+            (bridgehub, chain_id, all_grantees.clone(), true),
+        )?
+        .with_wallet(sender);
 
     logger::step("Granting gateway whitelist");
     logger::info(format!("Gateway chain ID: {}", chain_id));
@@ -170,22 +135,8 @@ fn dump_force_deployments(runner: &mut ForgeRunner, ctm_proxy: Address) -> anyho
 
     let dump_toml_rel = "/script-out/force-deployments-dump.toml";
 
-    let mut script_args = runner.forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: "dumpForceDeployments(address)".to_string(),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args
-        .additional_args
-        .push(format!("{:#x}", ctm_proxy));
-
-    let script = Forge::new(&contracts_path)
-        .script(
-            Path::new("deploy-scripts/gateway/GatewayUtils.s.sol:GatewayUtils"),
-            script_args,
-        )
+    let script = runner
+        .with_script_call(&GATEWAY_UTILS_INVOCATION, "dumpForceDeployments", ctm_proxy)?
         .with_env("FORCE_DEPLOYMENTS_DUMP_TOML_REL_PATH", dump_toml_rel);
 
     logger::info(format!(
@@ -259,16 +210,19 @@ gateway_settlement_fee = {fee}
 force_deployments_data = "{fd}"
 
 # Not used by the gateway flow but required by the parent config parser (overridden from on-chain state)
-owner_address = "0x0000000000000000000000000000000000000000"
+owner_address = "{zero_address}"
 support_l2_legacy_shared_bridge_test = false
-zk_token_asset_id = "0x0000000000000000000000000000000000000000000000000000000000000001"
+zk_token_asset_id = "{default_zk_token_asset_id}"
 
 [contracts]
-create2_factory_salt = "0x0000000000000000000000000000000000000000000000000000000000000000"
-governance_security_council_address = "0x0000000000000000000000000000000000000000"
+create2_factory_salt = "{zero_bytes32}"
+governance_security_council_address = "{zero_address}"
 governance_min_delay = 0
 validator_timelock_execution_delay = 0
 "#,
+        zero_address = ZERO_ADDRESS,
+        default_zk_token_asset_id = DEFAULT_ZK_TOKEN_ASSET_ID,
+        zero_bytes32 = ZERO_BYTES32,
         refund = inputs.refund_recipient,
         testnet_verifier = {
             let v = crate::common::l1_contracts::resolve_is_testnet_verifier(
@@ -299,7 +253,7 @@ validator_timelock_execution_delay = 0
     let abs_path = contracts_path.join(generated_rel);
     std::fs::write(&abs_path, &toml_content)?;
 
-    let script_path = "deploy-scripts/gateway/GatewayVotePreparation.s.sol";
+    let script_path = GATEWAY_VOTE_PREPARATION_SCRIPT_PATH;
     let script_full_path = contracts_path.join(script_path);
     anyhow::ensure!(
         script_full_path.exists(),
@@ -307,25 +261,13 @@ validator_timelock_execution_delay = 0
         script_full_path.display()
     );
 
-    let mut script_args = runner.forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: "run(address,uint256)".to_string(),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args.add_arg(ForgeScriptArg::Broadcast);
-    script_args.add_arg(ForgeScriptArg::Ffi);
-    script_args.add_arg(ForgeScriptArg::GasLimit {
-        gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
-    });
-    script_args.additional_args.extend([
-        format!("{:#x}", bridgehub),
-        inputs.ctm_representative_chain_id.to_string(),
-    ]);
-
-    let script = Forge::new(&contracts_path)
-        .script(Path::new(script_path), script_args)
+    let script = runner
+        .with_script_call(
+            &GATEWAY_VOTE_PREPARATION_INVOCATION,
+            "run",
+            (bridgehub, inputs.ctm_representative_chain_id),
+        )?
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
         .with_env(
             "GATEWAY_VOTE_PREPARATION_INPUT",
             forge_env_path(generated_rel),
@@ -403,27 +345,18 @@ pub(crate) async fn stage_governance_execute(
         toml::from_str(&toml_content).context("Failed to parse vote preparation output TOML")?;
 
     let encoded_calls_hex = &output.governance_calls_to_execute;
+    let encoded_calls = Bytes::from(
+        hex::decode(encoded_calls_hex.trim_start_matches("0x"))
+            .context("invalid governance calls hex")?,
+    );
 
-    let script_path = "deploy-scripts/AdminFunctions.s.sol";
-    let mut script_args = runner.forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: "governanceExecuteCalls(bytes,address)".to_string(),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args.add_arg(ForgeScriptArg::Broadcast);
-    script_args.add_arg(ForgeScriptArg::Ffi);
-    script_args.add_arg(ForgeScriptArg::GasLimit {
-        gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
-    });
-    script_args.additional_args.extend([
-        format!("0x{}", encoded_calls_hex.trim_start_matches("0x")),
-        format!("{:#x}", governance_address),
-    ]);
-
-    let script = Forge::new(&contracts_path)
-        .script(Path::new(script_path), script_args)
+    let script = runner
+        .with_script_call(
+            &ADMIN_FUNCTIONS_INVOCATION,
+            "governanceExecuteCalls",
+            (encoded_calls, governance_address),
+        )?
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
         .with_wallet(sender);
 
     logger::step("Executing gateway governance calls");
@@ -448,7 +381,6 @@ pub(crate) async fn stage_revoke_whitelist(
     chain_id: u64,
     revoke_address: Address,
 ) -> anyhow::Result<()> {
-    let contracts_path = paths::resolve_l1_contracts_path()?;
     // See grant-whitelist for the rationale — always broadcast in simulate too
     // so the tx shows up in the bundle's --out / Safe file.
     //
@@ -457,20 +389,13 @@ pub(crate) async fn stage_revoke_whitelist(
     // `ChainAdmin.owner()`, which only works on chains without an ACR in
     // `activeRestrictions`. Thread the ACR address through for production
     // chains so the sender is the ACR's `defaultAdmin`.
-    let should_send = "true".to_string();
-
-    let script = build_admin_functions_script(
-        &contracts_path,
-        runner,
-        "revokeGatewayWhitelist(address,uint256,address,bool)",
-        vec![
-            format!("{:#x}", bridgehub),
-            chain_id.to_string(),
-            format!("{:#x}", revoke_address),
-            should_send,
-        ],
-    )?
-    .with_wallet(sender);
+    let script = runner
+        .with_script_call(
+            &ADMIN_FUNCTIONS_INVOCATION,
+            "revokeGatewayWhitelist",
+            (bridgehub, chain_id, revoke_address, true),
+        )?
+        .with_wallet(sender);
 
     logger::step("Revoking gateway whitelist");
     logger::info(format!("Revoking address: {:#x}", revoke_address));
