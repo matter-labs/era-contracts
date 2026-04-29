@@ -35,7 +35,8 @@ import {
     L2_NTV_BEACON_DEPLOYER_ADDR,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR
+    L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title CoreOnGatewayHelper
@@ -78,12 +79,6 @@ library CoreOnGatewayHelper {
 
     // ======================== Force deployments ========================
 
-    function getCreate2DerivedForceDeploymentAddr(bool _isZKsyncOS, CoreContract _c) internal view returns (address) {
-        // FIXME: add support for additional force deployments on ZKsyncOS in scripts.
-        require(!_isZKsyncOS, "Additional force deployments are not supported for ZKsyncOS scripts");
-        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getDeployedBytecodeHash(false, _c), hex"");
-    }
-
     /// @notice Build a force deployment entry for scripts that use additional Era force deployments.
     function getForceDeployment(
         bool _isZKsyncOS,
@@ -93,7 +88,7 @@ library CoreOnGatewayHelper {
         require(!_isZKsyncOS, "Additional force deployments are not supported for ZKsyncOS scripts");
         forceDeployment = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: getDeployedBytecodeHash(false, _c),
-            newAddress: getCreate2DerivedForceDeploymentAddr(_isZKsyncOS, _c),
+            newAddress: _resolveAddress(_c),
             callConstructor: false,
             value: 0,
             input: ""
@@ -217,6 +212,7 @@ library CoreOnGatewayHelper {
         if (_c == CoreContract.BridgedStandardERC20) return "BridgedStandardERC20";
         if (_c == CoreContract.DiamondProxy) return "DiamondProxy";
         if (_c == CoreContract.ProxyAdmin) return "ProxyAdmin";
+        if (_c == CoreContract.TransparentUpgradeableProxy) return "TransparentUpgradeableProxy";
 
         revert UnknownCoreContract();
     }
@@ -246,6 +242,9 @@ library CoreOnGatewayHelper {
     /// @notice Resolve a CoreContract enum to its canonical L2 address.
     /// @dev Only covers contracts with well-known constant addresses.
     function _resolveAddress(CoreContract _c) internal pure returns (address) {
+        if (_c == CoreContract.L2V29Upgrade || _c == CoreContract.L2V31Upgrade) {
+            return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
+        }
         if (_c == CoreContract.L2Bridgehub) return L2_BRIDGEHUB_ADDR;
         if (_c == CoreContract.L2AssetRouter) return L2_ASSET_ROUTER_ADDR;
         if (_c == CoreContract.L2NativeTokenVault) return L2_NATIVE_TOKEN_VAULT_ADDR;
