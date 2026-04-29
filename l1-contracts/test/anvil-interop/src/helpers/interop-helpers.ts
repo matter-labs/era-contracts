@@ -400,7 +400,7 @@ export async function getCallStatus(
  * Get the interop protocol fee from InteropCenter.
  */
 export async function getInteropProtocolFee(provider: providers.JsonRpcProvider): Promise<BigNumber> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("IInteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
   return interopCenter.interopProtocolFee();
 }
 
@@ -408,7 +408,7 @@ export async function getInteropProtocolFee(provider: providers.JsonRpcProvider)
  * Get the fixed ZK interop fee from InteropCenter.
  */
 export async function getZkInteropFee(provider: providers.JsonRpcProvider): Promise<BigNumber> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("IInteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
   return interopCenter.ZK_INTEROP_FEE();
 }
 
@@ -416,7 +416,7 @@ export async function getZkInteropFee(provider: providers.JsonRpcProvider): Prom
  * Get the configured ZK token asset ID from InteropCenter.
  */
 export async function getZkTokenAssetId(provider: providers.JsonRpcProvider): Promise<string> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("IInteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
   return interopCenter.ZK_TOKEN_ASSET_ID();
 }
 
@@ -424,7 +424,7 @@ export async function getZkTokenAssetId(provider: providers.JsonRpcProvider): Pr
  * Get the resolved ZK token address from InteropCenter.
  */
 export async function getZkTokenAddress(provider: providers.JsonRpcProvider): Promise<string> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("IInteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
   return interopCenter.getZKTokenAddress();
 }
 
@@ -432,7 +432,7 @@ export async function getZkTokenAddress(provider: providers.JsonRpcProvider): Pr
  * Get accumulated ZK fees for a coinbase address.
  */
 export async function getAccumulatedZkFees(provider: providers.JsonRpcProvider, coinbase: string): Promise<BigNumber> {
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("IInteropCenter"), provider);
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
   return interopCenter.accumulatedZKFees(coinbase);
 }
 
