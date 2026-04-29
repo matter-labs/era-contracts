@@ -25,6 +25,9 @@ interface IMigrator is IZKChainBase {
     /// @notice Unpauses deposits, used after the chain is initialized
     function unpauseDeposits() external;
 
+    /// @notice Unpauses deposits on Gateway after migration confirmation from L1.
+    function unpauseDepositsOnGateway() external;
+
     /// @dev Similar to IL1AssetHandler interface, used to send chains to another settlement layer.
     function forwardedBridgeBurn(
         address _settlementLayer,

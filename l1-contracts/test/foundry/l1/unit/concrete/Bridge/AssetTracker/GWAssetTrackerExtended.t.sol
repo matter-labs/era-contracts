@@ -713,6 +713,7 @@ contract GWAssetTrackerExtendedTest is Test {
             abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, CHAIN_ID),
             abi.encode(mockZKChain)
         );
+        vm.mockCall(mockZKChain, abi.encodeWithSelector(IMigrator.unpauseDepositsOnGateway.selector), abi.encode());
 
         // Confirm migration
         MigrationConfirmationData memory data = MigrationConfirmationData({
@@ -728,6 +729,7 @@ contract GWAssetTrackerExtendedTest is Test {
         uint256 balanceBefore = gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID);
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
+        vm.expectCall(mockZKChain, abi.encodeWithSelector(IMigrator.unpauseDepositsOnGateway.selector));
         gwAssetTracker.confirmMigrationOnGateway(data);
 
         // Gateway state changes for this flow happen at migration initiation, not confirmation.
