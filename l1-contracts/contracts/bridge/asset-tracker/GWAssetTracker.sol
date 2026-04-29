@@ -475,7 +475,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function _handleInteropCenterMessage(
         uint256 _chainId,
         bytes calldata _message
-    ) internal returns (uint256 chargeableCallCount) {
+    ) internal whenNotPaused returns (uint256 chargeableCallCount) {
         if (_message[0] != BUNDLE_IDENTIFIER) {
             // This should not be possible in V31. In V31 this will be a trigger.
             return 0;
@@ -523,7 +523,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// from pendingInteropBalance to chainBalance.
     /// @param _chainId The chain ID that is settling (destination chain of the interop bundle).
     /// @param _message The message data from InteropHandler.
-    function _handleInteropHandlerMessage(uint256 _chainId, bytes calldata _message) internal {
+    function _handleInteropHandlerMessage(uint256 _chainId, bytes calldata _message) internal whenNotPaused {
         bytes4 functionSignature = DataEncoding.getSelector(_message);
         require(
             functionSignature == IAssetTrackerDataEncoding.receiveInteropCallExecuted.selector,
