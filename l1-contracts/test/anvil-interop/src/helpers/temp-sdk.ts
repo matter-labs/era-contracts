@@ -1,14 +1,33 @@
+import { createViemClient, createViemSdk } from "@matterlabs/zksync-js/viem";
 import type { BytesLike, providers } from "ethers";
 import { Contract, ethers } from "ethers";
+import { createPublicClient, createWalletClient, http } from "viem";
+import type { Address, Chain, Hex } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import { getAbi } from "../core/contracts";
 import { L2_BRIDGEHUB_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR, L2_TO_L1_MESSENGER_ADDR } from "../core/const";
+import type { FinalizeWithdrawalParams } from "../core/types";
 
 const INTEROP_BUNDLE_ABI =
   "tuple(bytes1 version, uint256 sourceChainId, uint256 destinationChainId, bytes32 destinationBaseTokenAssetId, bytes32 interopBundleSalt, tuple(bytes1 version, bool shadowAccount, address to, address from, uint256 value, bytes data)[] calls, (bytes executionAddress, bytes unbundlerAddress, bool useFixedFee) bundleAttributes)";
 
 const DEFAULT_LIVE_INTEROP_PROOF_TYPE = "messageRoot";
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
+const PROOF_METADATA_HEX_LENGTH = 66;
+const PROOF_METADATA_PREFIX_HEX_LENGTH = 10;
+const PROOF_METADATA_TRAILING_ZERO_HEX_LENGTH = 56;
+const PROOF_METADATA_VERSION = 1;
+const LIVE_CHAIN_NATIVE_CURRENCY = { name: "Ether", symbol: "ETH", decimals: 18 } as const;
 const abiCoder = ethers.utils.defaultAbiCoder;
+
+export interface LiveZksyncSdkParams {
+  privateKey: string;
+  l1RpcUrl: string;
+  l1ChainId: number;
+  l2RpcUrl: string;
+  l2ChainId: number;
+  l2Name: string;
+}
 
 export interface LiveInteropProof {
   rawData: string;
@@ -64,7 +83,7 @@ interface LogProof {
   proof: string[];
 }
 
-interface FinalizeWithdrawalParams {
+interface LiveFinalizeWithdrawalParams {
   l1BatchNumber: number;
   l2MessageIndex: number;
   l2TxNumberInBlock: number;
@@ -72,6 +91,45 @@ interface FinalizeWithdrawalParams {
   message: string;
   sender: string;
   proof: string[];
+}
+
+export function asViemPrivateKey(privateKey: string, label = "private key"): Hex {
+  if (!ethers.utils.isHexString(privateKey, 32)) {
+    throw new Error(`${label} must be a 32-byte 0x-prefixed private key`);
+  }
+  return privateKey as Hex;
+}
+
+export function asViemAddress(address: string, label: string): Address {
+  if (!ethers.utils.isAddress(address)) {
+    throw new Error(`${label} must be an EVM address, got ${address}`);
+  }
+  return ethers.utils.getAddress(address) as Address;
+}
+
+export function makeLiveViemChain(chainId: number, name: string, rpcUrl: string): Chain {
+  return {
+    id: chainId,
+    name,
+    nativeCurrency: LIVE_CHAIN_NATIVE_CURRENCY,
+    rpcUrls: {
+      default: { http: [rpcUrl] },
+    },
+  };
+}
+
+export function createLiveZksyncSdk(params: LiveZksyncSdkParams) {
+  const account = privateKeyToAccount(asViemPrivateKey(params.privateKey));
+  const l1Chain = makeLiveViemChain(params.l1ChainId, "Live Interop L1", params.l1RpcUrl);
+  const l2Chain = makeLiveViemChain(params.l2ChainId, params.l2Name, params.l2RpcUrl);
+
+  const l1 = createPublicClient({ chain: l1Chain, transport: http(params.l1RpcUrl) });
+  const l2 = createPublicClient({ chain: l2Chain, transport: http(params.l2RpcUrl) });
+  const l1Wallet = createWalletClient({ account, chain: l1Chain, transport: http(params.l1RpcUrl) });
+  const l2Wallet = createWalletClient({ account, chain: l2Chain, transport: http(params.l2RpcUrl) });
+  const client = createViemClient({ l1, l2, l1Wallet, l2Wallet });
+
+  return { account, client, sdk: createViemSdk(client) };
 }
 
 export async function waitForLiveInteropProof(
@@ -86,7 +144,8 @@ export async function waitForLiveInteropProof(
   const receipt = await getZkReceipt(sourceProvider, txHash);
   await waitUntilBlockFinalized(sourceProvider, receipt.blockNumber, timeoutMs);
 
-  const bundleData = await getInteropBundleData(sourceProvider, receipt, index, timeoutMs);
+  const proofType = process.env.LIVE_INTEROP_PROOF_TYPE?.trim() || DEFAULT_LIVE_INTEROP_PROOF_TYPE;
+  const bundleData = await getInteropBundleData(sourceProvider, receipt, index, timeoutMs, proofType);
   await waitUntilBatchExecutedOnGateway(sourceChainId, bundleData.l1BatchNumber, timeoutMs);
   await waitForInteropRootNonZero(
     destProvider,
@@ -99,13 +158,36 @@ export async function waitForLiveInteropProof(
   };
 }
 
+export async function waitForLiveFinalizeWithdrawalParams(
+  provider: providers.JsonRpcProvider,
+  txHash: BytesLike,
+  chainId: number,
+  index = 0,
+  timeoutMs = DEFAULT_TIMEOUT_MS
+): Promise<FinalizeWithdrawalParams> {
+  const receipt = await getZkReceipt(provider, ethers.utils.hexlify(txHash));
+  await waitUntilBlockFinalized(provider, receipt.blockNumber, timeoutMs);
+  const response = await getFinalizeWithdrawalParams(provider, receipt, index, timeoutMs);
+
+  return {
+    chainId,
+    l2BatchNumber: response.l1BatchNumber,
+    l2MessageIndex: response.l2MessageIndex,
+    l2Sender: response.sender,
+    l2TxNumberInBatch: response.l2TxNumberInBlock,
+    message: response.message,
+    merkleProof: response.proof,
+  };
+}
+
 async function getInteropBundleData(
   provider: providers.JsonRpcProvider,
   receipt: ZkReceipt,
   index = 0,
-  timeoutMs = DEFAULT_TIMEOUT_MS
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  proofType?: string
 ): Promise<InteropBundleData> {
-  const response = await getFinalizeWithdrawalParams(provider, receipt, index, timeoutMs);
+  const response = await getFinalizeWithdrawalParams(provider, receipt, index, timeoutMs, proofType);
   const message = normalizeHex(response.message);
   const bundlePayload = stripBundleIdentifier(message);
   const decodedRequest = abiCoder.decode([INTEROP_BUNDLE_ABI], bundlePayload);
@@ -159,10 +241,11 @@ async function getFinalizeWithdrawalParams(
   provider: providers.JsonRpcProvider,
   receipt: ZkReceipt,
   index = 0,
-  timeoutMs = DEFAULT_TIMEOUT_MS
-): Promise<FinalizeWithdrawalParams> {
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  proofType?: string
+): Promise<LiveFinalizeWithdrawalParams> {
   const { log, l2ToL1LogIndex, l2TxNumberInBlock } = getWithdrawalLogData(receipt, index);
-  const proof = await getL2ToL1LogProof(provider, receipt.transactionHash, l2ToL1LogIndex, timeoutMs);
+  const proof = await getL2ToL1LogProof(provider, receipt.transactionHash, l2ToL1LogIndex, timeoutMs, proofType);
 
   const sender = ethers.utils.getAddress(ethers.utils.hexDataSlice(log.topics[1], 12));
   const message = abiCoder.decode(["bytes"], log.data)[0];
@@ -235,18 +318,29 @@ async function getL2ToL1LogProof(
   provider: providers.JsonRpcProvider,
   txHash: string,
   l2ToL1LogIndex: number,
-  timeoutMs: number
+  timeoutMs: number,
+  proofType?: string
 ): Promise<LogProof> {
   const start = Date.now();
-  const proofType = process.env.LIVE_INTEROP_PROOF_TYPE?.trim() || DEFAULT_LIVE_INTEROP_PROOF_TYPE;
-  const params = proofType === "default" ? [txHash, l2ToL1LogIndex] : [txHash, l2ToL1LogIndex, proofType];
+  const params = !proofType || proofType === "default" ? [txHash, l2ToL1LogIndex] : [txHash, l2ToL1LogIndex, proofType];
   let proof: LogProof | null = null;
+  let lastRetryableError: string | undefined;
 
   while (!proof) {
     if (Date.now() - start > timeoutMs) {
-      throw new Error(`Log proof not found for ${txHash} at L2->L1 log index ${l2ToL1LogIndex}`);
+      throw new Error(
+        `Log proof not found for ${txHash} at L2->L1 log index ${l2ToL1LogIndex}` +
+          (lastRetryableError ? `. Last retryable RPC error: ${lastRetryableError}` : "")
+      );
     }
-    proof = (await provider.send("zks_getL2ToL1LogProof", params)) as LogProof | null;
+    try {
+      proof = (await provider.send("zks_getL2ToL1LogProof", params)) as LogProof | null;
+    } catch (error) {
+      if (!isRetryableLogProofError(error)) {
+        throw error;
+      }
+      lastRetryableError = getRpcErrorMessage(error);
+    }
     if (proof) {
       return proof;
     }
@@ -254,6 +348,37 @@ async function getL2ToL1LogProof(
   }
 
   return proof;
+}
+
+function isRetryableLogProofError(error: unknown): boolean {
+  const message = getRpcErrorMessage(error).toLowerCase();
+  return message.includes("proof not yet available") || message.includes("unstable_getbatchbyblocknumber");
+}
+
+function getRpcErrorMessage(error: unknown): string {
+  const rpcError = error as {
+    body?: string;
+    error?: { message?: string };
+    message?: string;
+    reason?: string;
+  };
+  if (rpcError.error?.message) {
+    return rpcError.error.message;
+  }
+  if (rpcError.reason) {
+    return rpcError.reason;
+  }
+  if (rpcError.body) {
+    try {
+      const parsed = JSON.parse(rpcError.body) as { error?: { message?: string } };
+      if (parsed.error?.message) {
+        return parsed.error.message;
+      }
+    } catch {
+      return rpcError.body;
+    }
+  }
+  return rpcError.message || String(error);
 }
 
 async function waitUntilBlockFinalized(
@@ -336,8 +461,49 @@ async function waitForInteropRootNonZero(
 }
 
 function getGWBlockNumber(proof: string[]): number {
-  const gwProofIndex = 1 + parseInt(proof[0].slice(4, 6), 16) + 1 + parseInt(proof[0].slice(6, 8), 16);
-  return parseInt(proof[gwProofIndex].slice(2, 34), 16);
+  const settlementLayerProof = getSettlementLayerProofData(proof);
+  if (!settlementLayerProof) {
+    throw new Error("Proof does not contain settlement-layer batch data");
+  }
+  return settlementLayerProof.batchNumber;
+}
+
+function getSettlementLayerProofData(proof: string[]): { chainId: number; batchNumber: number } | undefined {
+  if (proof.length === 0) {
+    throw new Error("Cannot parse empty proof");
+  }
+
+  const metadata = normalizeHex(proof[0]);
+  const isMetadataProof =
+    metadata.length === PROOF_METADATA_HEX_LENGTH &&
+    metadata.slice(PROOF_METADATA_PREFIX_HEX_LENGTH) === "0".repeat(PROOF_METADATA_TRAILING_ZERO_HEX_LENGTH);
+  if (!isMetadataProof) {
+    return undefined;
+  }
+
+  const metadataVersion = parseInt(metadata.slice(2, 4), 16);
+  if (metadataVersion !== PROOF_METADATA_VERSION) {
+    throw new Error(`Unsupported proof metadata version ${metadataVersion}`);
+  }
+
+  const logLeafProofLen = parseInt(metadata.slice(4, 6), 16);
+  const batchLeafProofLen = parseInt(metadata.slice(6, 8), 16);
+  const finalProofNode = parseInt(metadata.slice(8, 10), 16) !== 0;
+  if (finalProofNode) {
+    return undefined;
+  }
+
+  const packedBatchInfoIndex = 1 + logLeafProofLen + 1 + batchLeafProofLen;
+  const settlementLayerChainIdIndex = packedBatchInfoIndex + 1;
+  if (proof.length <= settlementLayerChainIdIndex) {
+    throw new Error("Proof metadata points outside the proof array");
+  }
+
+  const packedBatchInfo = normalizeHex(proof[packedBatchInfoIndex]);
+  const batchNumber = ethers.BigNumber.from(`0x${packedBatchInfo.slice(2, 34)}`).toNumber();
+  const chainId = ethers.BigNumber.from(proof[settlementLayerChainIdIndex]).toNumber();
+
+  return { chainId, batchNumber };
 }
 
 function stripBundleIdentifier(message: string): string {

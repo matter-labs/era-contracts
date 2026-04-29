@@ -2,10 +2,6 @@ import * as fs from "fs";
 import * as path from "path";
 import * as zlib from "zlib";
 import { Contract, ContractFactory, Wallet, ethers, providers } from "ethers";
-import { createViemClient, createViemSdk } from "@matterlabs/zksync-js/viem";
-import { createPublicClient, createWalletClient, http } from "viem";
-import type { Address, Chain, Hex } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
 import type { AnvilManager } from "./daemons/anvil-manager";
 import { ForgeDeployer } from "./deployers/deployer";
 import { ChainRegistry } from "./deployers/chain-registry";
@@ -29,11 +25,11 @@ import { encodeNtvAssetId } from "./core/data-encoding";
 import { deployTestTokens } from "./helpers/deploy-test-token";
 import { depositERC20ToL2 } from "./helpers/l1-deposit-helper";
 import { registerAndMigrateTestTokens } from "./helpers/token-balance-migration-helper";
+import { asViemAddress, createLiveZksyncSdk } from "./helpers/temp-sdk";
 
 const ZERO_ADDRESS = ethers.constants.AddressZero;
 const LIVE_CHAIN_PORT_PLACEHOLDER = 0;
 const LIVE_TEST_TOKEN_DECIMALS = 18;
-const LIVE_CHAIN_NATIVE_CURRENCY = { name: "Ether", symbol: "ETH", decimals: 18 } as const;
 
 export interface StartChainOptions {
   blockTime?: number;
@@ -118,52 +114,6 @@ export class DeploymentRunner {
     return network.chainId;
   }
 
-  private asViemPrivateKey(privateKey: string): Hex {
-    if (!ethers.utils.isHexString(privateKey, 32)) {
-      throw new Error("LIVE_SOURCE_PRIVATE_KEY must be a 32-byte 0x-prefixed private key");
-    }
-    return privateKey as Hex;
-  }
-
-  private asViemAddress(address: string, label: string): Address {
-    if (!ethers.utils.isAddress(address)) {
-      throw new Error(`${label} must be an EVM address, got ${address}`);
-    }
-    return ethers.utils.getAddress(address) as Address;
-  }
-
-  private makeLiveViemChain(chainId: number, name: string, rpcUrl: string): Chain {
-    return {
-      id: chainId,
-      name,
-      nativeCurrency: LIVE_CHAIN_NATIVE_CURRENCY,
-      rpcUrls: {
-        default: { http: [rpcUrl] },
-      },
-    };
-  }
-
-  private createLiveZksyncSdk(params: {
-    privateKey: string;
-    l1RpcUrl: string;
-    l1ChainId: number;
-    l2RpcUrl: string;
-    l2ChainId: number;
-    l2Name: string;
-  }) {
-    const account = privateKeyToAccount(this.asViemPrivateKey(params.privateKey));
-    const l1Chain = this.makeLiveViemChain(params.l1ChainId, "Live Interop L1", params.l1RpcUrl);
-    const l2Chain = this.makeLiveViemChain(params.l2ChainId, params.l2Name, params.l2RpcUrl);
-
-    const l1 = createPublicClient({ chain: l1Chain, transport: http(params.l1RpcUrl) });
-    const l2 = createPublicClient({ chain: l2Chain, transport: http(params.l2RpcUrl) });
-    const l1Wallet = createWalletClient({ account, chain: l1Chain, transport: http(params.l1RpcUrl) });
-    const l2Wallet = createWalletClient({ account, chain: l2Chain, transport: http(params.l2RpcUrl) });
-    const client = createViemClient({ l1, l2, l1Wallet, l2Wallet });
-
-    return { account, client, sdk: createViemSdk(client) };
-  }
-
   private emptyLiveL1Addresses(params: {
     bridgehub: string;
     l1AssetRouter: string;
@@ -240,7 +190,7 @@ export class DeploymentRunner {
     const sourceAddress = sourceL1Wallet.address;
     const liveZkToken = await this.discoverLiveZkToken(chainARpcUrl, sourceAddress);
 
-    const chainALiveSdk = this.createLiveZksyncSdk({
+    const chainALiveSdk = createLiveZksyncSdk({
       privateKey,
       l1RpcUrl,
       l1ChainId,
@@ -274,7 +224,7 @@ export class DeploymentRunner {
       const mintTx = await token.mint(sourceAddress, mintAmount);
       await mintTx.wait();
 
-      const targetLiveSdk = this.createLiveZksyncSdk({
+      const targetLiveSdk = createLiveZksyncSdk({
         privateKey,
         l1RpcUrl,
         l1ChainId,
@@ -282,7 +232,7 @@ export class DeploymentRunner {
         l2ChainId: chainId,
         l2Name: `Live Interop Chain ${chainId}`,
       });
-      const l1TokenAddress = this.asViemAddress(token.address, "L1 test token");
+      const l1TokenAddress = asViemAddress(token.address, "L1 test token");
       const assetId = encodeNtvAssetId(l1ChainId, token.address);
       console.log(`  Depositing L1 test token ${token.address} to chain ${chainId}...`);
       const deposit = await targetLiveSdk.sdk.deposits.create({

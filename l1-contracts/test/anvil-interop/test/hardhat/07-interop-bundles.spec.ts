@@ -1,12 +1,15 @@
 import { expect } from "chai";
 import { BigNumber, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getChainIdsByRole, getL2Chain } from "../../src/core/utils";
+import { getChainDiamondProxy, getChainIdsByRole, getL2Chain } from "../../src/core/utils";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
+import { getAbi, getCreationBytecode } from "../../src/core/contracts";
 import {
   getInteropRecipientAddress,
   getInteropSecondaryRecipientAddress,
   getInteropTestAddress,
+  getInteropTestPrivateKey,
+  isLiveInteropMode,
 } from "../../src/core/accounts";
 import { INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
 import { encodeEvmAddress } from "../../src/helpers/erc7930";
@@ -41,12 +44,19 @@ import {
   customError,
   randomBigNumber,
 } from "../../src/helpers/balance-helpers";
+import {
+  migrateSpecificTokenBalanceToGW,
+  migrateTokenBalanceToGW,
+  registerTestTokenOnL2NTV,
+} from "../../src/helpers/token-balance-migration-helper";
 
 // Randomized per-test amount ranges (small enough for balance safety, large enough to detect)
 const BASE_TOKEN_MIN = ethers.utils.parseUnits("10", "gwei");
 const BASE_TOKEN_MAX = ethers.utils.parseUnits("1000", "gwei");
 const ERC20_TOKEN_MIN = BigNumber.from(100);
 const ERC20_TOKEN_MAX = BigNumber.from(10000);
+const ROUNDTRIP_TOKEN_MINT_AMOUNT = ethers.utils.parseUnits("1000", 18);
+const ROUNDTRIP_TOKEN_TRANSFER_AMOUNT = ethers.utils.parseUnits("1", 18);
 
 /**
  * 07 - Interop Bundles (sendBundle / executeBundle)
@@ -70,6 +80,10 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   let destChainId: number;
   let sourceProvider: ethers.providers.JsonRpcProvider;
   let destProvider: ethers.providers.JsonRpcProvider;
+  let l1RpcUrl: string | undefined;
+  let l1Provider: ethers.providers.JsonRpcProvider | undefined;
+  let gatewayChainId: number;
+  let gatewayRpcUrl: string | undefined;
 
   // Token-related values resolved per-chain
   let sourceTokenAddress: string;
@@ -94,6 +108,118 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     return interopFee;
   }
 
+  function requireBridgeContext(): {
+    l1RpcUrl: string;
+    l1Provider: ethers.providers.JsonRpcProvider;
+    gatewayRpcUrl: string;
+  } {
+    if (!l1RpcUrl || !l1Provider || !gatewayRpcUrl) {
+      throw new Error("Interop bridge context is not initialized");
+    }
+    return {
+      l1RpcUrl,
+      l1Provider,
+      gatewayRpcUrl,
+    };
+  }
+
+  async function deployL2NativeToken(
+    provider: ethers.providers.JsonRpcProvider,
+    chainId: number,
+    name: string,
+    symbol: string
+  ): Promise<string> {
+    const wallet = new ethers.Wallet(getInteropTestPrivateKey(), provider);
+    const factory = new ethers.ContractFactory(
+      getAbi("TestnetERC20Token"),
+      getCreationBytecode("TestnetERC20Token"),
+      wallet
+    );
+    const token = await factory.deploy(name, symbol, 18);
+    await token.deployed();
+
+    const mintTx = await token.mint(wallet.address, ROUNDTRIP_TOKEN_MINT_AMOUNT);
+    await mintTx.wait();
+    console.log(`   L2 native token deployed on chain ${chainId}: ${token.address}`);
+
+    return token.address;
+  }
+
+  async function migrateTokenToGateway(chainId: number, l2RpcUrl: string, tokenAddress: string): Promise<string> {
+    const context = requireBridgeContext();
+    if (!isLiveInteropMode()) {
+      const l2Provider = new ethers.providers.JsonRpcProvider(l2RpcUrl);
+      const gwProvider = new ethers.providers.JsonRpcProvider(context.gatewayRpcUrl);
+      const assetId = encodeNtvAssetId(chainId, tokenAddress);
+      await registerTestTokenOnL2NTV(l2Provider, tokenAddress, chainId);
+      await migrateTokenBalanceToGW({
+        l2Provider,
+        l1Provider: context.l1Provider,
+        gwProvider,
+        chainId,
+        assetId,
+        l1AssetTrackerAddr: state.l1Addresses!.l1AssetTracker,
+        gwDiamondProxyAddr: getChainDiamondProxy(state.chainAddresses!, gatewayChainId),
+        l2DiamondProxyAddr: getChainDiamondProxy(state.chainAddresses!, chainId),
+      });
+      return assetId;
+    }
+
+    const result = await migrateSpecificTokenBalanceToGW({
+      l1RpcUrl: context.l1RpcUrl,
+      l2RpcUrl,
+      gwRpcUrl: context.gatewayRpcUrl,
+      chainId,
+      tokenAddress,
+      l1NativeTokenVaultAddr: state.l1Addresses!.l1NativeTokenVault,
+    });
+    return result.assetId;
+  }
+
+  async function sendAndExecuteTokenInterop(params: {
+    sendProvider: ethers.providers.JsonRpcProvider;
+    receiveProvider: ethers.providers.JsonRpcProvider;
+    sourceChainId: number;
+    destinationChainId: number;
+    sourceTokenAddress: string;
+    assetId: string;
+    amount: BigNumber;
+    recipientAddress: string;
+    label: string;
+  }): Promise<string> {
+    await approveTokenForNtv(params.sendProvider, params.sourceTokenAddress, params.amount);
+    const fee = await getInteropProtocolFee(params.sendProvider);
+
+    const destTokenBefore = await getTokenAddressForAsset(params.receiveProvider, params.assetId);
+    const recipientBefore = await getTokenBalance(params.receiveProvider, destTokenBefore, params.recipientAddress);
+
+    const sendResult = await sendInteropBundle({
+      sourceProvider: params.sendProvider,
+      destinationChainId: params.destinationChainId,
+      callStarters: [
+        {
+          to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
+          data: getTokenTransferData(params.assetId, params.amount, params.recipientAddress),
+          callAttributes: [indirectCallAttr()],
+        },
+      ],
+      value: fee,
+    });
+
+    expect(sendResult.txHash, `${params.label}: tx hash should exist`).to.not.be.null;
+    const receipt = await executeBundle(params.receiveProvider, sendResult.bundleData, params.sourceChainId);
+    expect(receipt.status, `${params.label}: executeBundle tx should succeed`).to.equal(1);
+
+    const destTokenAfter = await getTokenAddressForAsset(params.receiveProvider, params.assetId);
+    const recipientAfter = await getTokenBalance(params.receiveProvider, destTokenAfter, params.recipientAddress);
+    expectBalanceDelta(recipientBefore, recipientAfter, params.amount, `${params.label}: recipient token`);
+    return destTokenAfter;
+  }
+
+  function sourceChainRpcUrl(): string {
+    return getL2Chain(state.chains!, sourceChainId).rpcUrl;
+  }
+
   before(async () => {
     state = runner.loadState();
     if (!state.chains || !state.l1Addresses || !state.chainAddresses || !state.testTokens) {
@@ -112,6 +238,26 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     const destChain = getL2Chain(state.chains!, destChainId);
     sourceProvider = new ethers.providers.JsonRpcProvider(sourceChain.rpcUrl);
     destProvider = new ethers.providers.JsonRpcProvider(destChain.rpcUrl);
+
+    const gatewayChainIds = getChainIdsByRole(state.chains.config, "gateway");
+    if (gatewayChainIds.length !== 1) {
+      throw new Error(`Expected exactly one gateway chain in interop state, got ${gatewayChainIds.length}`);
+    }
+    gatewayChainId = gatewayChainIds[0];
+    gatewayRpcUrl = getL2Chain(state.chains, gatewayChainId).rpcUrl;
+
+    if (isLiveInteropMode()) {
+      l1RpcUrl = process.env.LIVE_L1_RPC?.trim();
+      if (!l1RpcUrl) {
+        throw new Error("LIVE_L1_RPC is required when ANVIL_INTEROP_LIVE=1");
+      }
+    } else {
+      if (!state.chains.l1) {
+        throw new Error("L1 chain is required for local interop bridge tests");
+      }
+      l1RpcUrl = state.chains.l1.rpcUrl;
+    }
+    l1Provider = new ethers.providers.JsonRpcProvider(l1RpcUrl);
 
     sourceTokenAddress = state.testTokens![sourceChainId];
     sourceAssetId = getTestTokenAssetId(sourceChainId, sourceTokenAddress);
@@ -636,5 +782,42 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     );
 
     console.log("   [edge] Excess msg.value rejected");
+  });
+
+  it("can migrate a chain-A-native token to Gateway and round-trip it over interop", async function () {
+    const chainAToken = await deployL2NativeToken(
+      sourceProvider,
+      sourceChainId,
+      "Live Interop Chain A Native Token",
+      "LIA"
+    );
+    const chainAAssetId = await migrateTokenToGateway(sourceChainId, sourceChainRpcUrl(), chainAToken);
+    expect(chainAAssetId, "chain A native token assetId").to.equal(encodeNtvAssetId(sourceChainId, chainAToken));
+
+    const chainBToken = await sendAndExecuteTokenInterop({
+      sendProvider: sourceProvider,
+      receiveProvider: destProvider,
+      sourceChainId,
+      destinationChainId: destChainId,
+      sourceTokenAddress: chainAToken,
+      assetId: chainAAssetId,
+      amount: ROUNDTRIP_TOKEN_TRANSFER_AMOUNT,
+      recipientAddress: getInteropTestAddress(),
+      label: "chain A native token A->B interop",
+    });
+
+    await sendAndExecuteTokenInterop({
+      sendProvider: destProvider,
+      receiveProvider: sourceProvider,
+      sourceChainId: destChainId,
+      destinationChainId: sourceChainId,
+      sourceTokenAddress: chainBToken,
+      assetId: chainAAssetId,
+      amount: ROUNDTRIP_TOKEN_TRANSFER_AMOUNT,
+      recipientAddress: getInteropTestAddress(),
+      label: "chain A native token B->A interop",
+    });
+
+    console.log("   [roundtrip] Chain-A-native token migrated to Gateway and round-tripped over interop");
   });
 });
