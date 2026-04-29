@@ -3,10 +3,12 @@ use clap::Subcommand;
 use crate::{
     commands::ecosystem::init::EcosystemInitArgs,
     commands::ecosystem::upgrade::{UpgradeGovernanceArgs, UpgradePrepareArgs},
+    commands::ecosystem::verify_upgrade::VerifyUpgradeArgs,
 };
 
 pub(crate) mod init;
 pub(crate) mod upgrade;
+pub(crate) mod verify_upgrade;
 
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -22,6 +24,9 @@ pub enum EcosystemCommands {
     /// containing all three governance calls.
     #[command(name = "upgrade-governance")]
     UpgradeGovernance(UpgradeGovernanceArgs),
+    /// Verify ecosystem upgrade artifacts produced by upgrade-prepare.
+    #[command(name = "verify-upgrade")]
+    VerifyUpgrade(VerifyUpgradeArgs),
 }
 
 pub(crate) async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
@@ -29,5 +34,6 @@ pub(crate) async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
         EcosystemCommands::Init(args) => init::run(args).await,
         EcosystemCommands::UpgradePrepare(args) => upgrade::run_upgrade_prepare(args).await,
         EcosystemCommands::UpgradeGovernance(args) => upgrade::run_upgrade_governance(args).await,
+        EcosystemCommands::VerifyUpgrade(args) => verify_upgrade::run(args).await,
     }
 }

@@ -12,6 +12,7 @@ use clap::{Parser, Subcommand};
 mod common;
 mod config;
 mod types;
+mod upgrade_verification;
 
 pub mod abi;
 pub mod admin_functions;
