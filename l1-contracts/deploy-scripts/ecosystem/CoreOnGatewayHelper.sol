@@ -37,6 +37,7 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
     L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+    L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
     L2_VERSION_SPECIFIC_UPGRADER_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -335,6 +336,7 @@ library CoreOnGatewayHelper {
         if (_id == EraVmSystemContract.PubdataChunkPublisher) return address(0x8011);
         if (_id == EraVmSystemContract.Create2Factory) return address(0x10000);
         if (_id == EraVmSystemContract.SloadContract) return address(0x10006);
+        if (_id == EraVmSystemContract.SystemContractProxyAdmin) return L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR;
         revert UnknownEraVmSystemContract();
     }
 
@@ -370,6 +372,7 @@ library CoreOnGatewayHelper {
         if (_id == EraVmSystemContract.PubdataChunkPublisher) return "PubdataChunkPublisher";
         if (_id == EraVmSystemContract.Create2Factory) return "Create2Factory";
         if (_id == EraVmSystemContract.SloadContract) return "SloadContract";
+        if (_id == EraVmSystemContract.SystemContractProxyAdmin) return "SystemContractProxyAdmin";
         revert UnknownEraVmSystemContract();
     }
 

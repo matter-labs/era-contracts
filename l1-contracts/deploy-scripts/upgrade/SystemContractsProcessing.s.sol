@@ -46,8 +46,8 @@ struct SystemContract {
     bool isPrecompile; // Whether precompile or not
 }
 
-/// @dev The number of built-in contracts that reside within the "system-contracts" folder
-uint256 constant SYSTEM_CONTRACTS_COUNT = 30;
+/// @dev The number of built-in contracts that are handled as Era system force deployments.
+uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
 uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 13;
 /// @dev Runtime deployment preimages needed as factory dependencies but not force-deployed at fixed addresses.
@@ -138,6 +138,8 @@ library SystemContractsProcessing {
                 // L2BaseToken is now in l1-contracts as L2BaseTokenEra
                 if (Utils.compareStrings(systemContracts[i].codeName, "L2BaseToken")) {
                     result[i] = BytecodeUtils.readBytecodeL1(false, "L2BaseTokenEra.sol", "L2BaseTokenEra");
+                } else if (Utils.compareStrings(systemContracts[i].codeName, "SystemContractProxyAdmin")) {
+                    result[i] = ContractsBytecodesLib.getCreationCodeEra(systemContracts[i].codeName);
                 } else if (systemContracts[i].lang == Language.Solidity) {
                     result[i] = BytecodeUtils.readSystemContractsBytecode(systemContracts[i].codeName);
                 } else {

@@ -55,7 +55,8 @@ enum EraVmSystemContract {
     P256Verify,
     PubdataChunkPublisher,
     Create2Factory,
-    SloadContract
+    SloadContract,
+    SystemContractProxyAdmin
 }
 
 enum CoreContract {
