@@ -448,6 +448,31 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(isCTMRegistered);
     }
 
+    function test_removeChainTypeManager_cannotBeCalledByRandomAddress(
+        address _randomAddressWithoutTheCorrectInterface,
+        address _randomCaller
+    ) public {
+        vm.assume(_randomAddressWithoutTheCorrectInterface != address(0));
+        vm.assume(_randomCaller != bridgeOwner);
+
+        vm.prank(_randomCaller);
+        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        bridgehub.removeChainTypeManager(_randomAddressWithoutTheCorrectInterface);
+
+        vm.prank(bridgeOwner);
+        bridgehub.addChainTypeManager(_randomAddressWithoutTheCorrectInterface);
+        assertTrue(bridgehub.chainTypeManagerIsRegistered(_randomAddressWithoutTheCorrectInterface));
+
+        vm.prank(_randomCaller);
+        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        bridgehub.removeChainTypeManager(_randomAddressWithoutTheCorrectInterface);
+        assertTrue(bridgehub.chainTypeManagerIsRegistered(_randomAddressWithoutTheCorrectInterface));
+
+        vm.prank(bridgeOwner);
+        bridgehub.removeChainTypeManager(_randomAddressWithoutTheCorrectInterface);
+        assertFalse(bridgehub.chainTypeManagerIsRegistered(_randomAddressWithoutTheCorrectInterface));
+    }
+
     function test_addAssetId(address randomAddress) public {
         vm.startPrank(bridgeOwner);
         bridgehub.setAddresses(

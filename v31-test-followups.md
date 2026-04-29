@@ -1,6 +1,6 @@
 # v31 Test Coverage Follow-ups
 
-This report was produced while auditing `draft-v31` against `origin/main`.
+This report was produced while auditing PR #2173 against `origin/draft-v31`.
 
 ## Disabled or Skipped Tests
 
@@ -27,6 +27,11 @@ This report was produced while auditing `draft-v31` against `origin/main`.
 
 ## Deep-dive Decisions for Previously Disabled or Commented Tests
 
+### Restored coverage
+
+- `test_removeChainTypeManager_cannotBeCalledByRandomAddress` (`l1-contracts/test/foundry/l1/unit/concrete/Bridgehub/experimental_bridge.t.sol`): Restored as an active fuzz test because `removeChainTypeManager` still exists and still needs function-specific non-owner coverage.
+- `Should require that the next committed batch contains an upgrade tx hash log` (`l1-contracts/test/unit_tests/l2-upgrade.test.spec.ts`): Restored as an active test because a pending upgrade must force the next committed batch to include the expected upgrade transaction hash log.
+
 ### `system-contracts/test/Interop.spec.ts`
 
 - Decision: removed.
@@ -34,12 +39,25 @@ This report was produced while auditing `draft-v31` against `origin/main`.
 - Replacement coverage: active interop coverage exists in `l1-contracts/test/anvil-interop/test/hardhat` and the Foundry `L2Interop*` suites.
 - Confidence: 98%; keeping the skipped test would preserve noise rather than actionable coverage.
 
+Removed test cases:
+
+- `Interop tests` (`system-contracts/test/Interop.spec.ts`): Removed because the deleted suite was only a scratch interop harness; maintained interop coverage now lives in the Anvil interop and Foundry `L2Interop*` suites.
+- `successfully executed interop 1.5` (`system-contracts/test/Interop.spec.ts`): Removed because the active body had no stable protocol assertions and mainly preserved a commented captured payload.
+- `successfully executed interop` (`system-contracts/test/Interop.spec.ts`): Removed because the test was fully commented out, never executed, and only contained an old transaction-construction stub.
+- `successfully executed interop 2` (`system-contracts/test/Interop.spec.ts`): Removed because the skipped test only decoded and re-encoded a captured payload without asserting durable interop behavior.
+
 ### `l1-contracts/test/foundry/l2/integration/L2NativeTokenVaultBridgeBurnRegressionTest.t.sol`
 
 - Decision: removed.
 - Reason: the wrapper only skipped inherited tests in the zkfoundry L2 context. The inherited regression uses Foundry/stdstore and mocked system-contract behavior that is not appropriate for this runner.
 - Replacement coverage: the same regression scenarios execute actively in `l1-contracts/test/foundry/l1/integration/l2-tests-in-l1-context/L2NativeTokenVaultBridgeBurnRegressionL1Test.t.sol`.
 - Confidence: 98%; deleting the skip-only wrapper is better than carrying permanently skipped tests with duplicate active coverage elsewhere.
+
+Removed test cases:
+
+- `test_regression_bridgeBurnRegularBridgedTokenStillCallsBridgeBurn` (`l1-contracts/test/foundry/l2/integration/L2NativeTokenVaultBridgeBurnRegressionTest.t.sol`): Removed because this zkfoundry wrapper only called `vm.skip(true)`; active coverage is in `L2NativeTokenVaultBridgeBurnRegressionL1Test.t.sol`.
+- `test_regression_bridgeBurnBaseTokenAsBridgedTokenCallsBurnMsgValue` (`l1-contracts/test/foundry/l2/integration/L2NativeTokenVaultBridgeBurnRegressionTest.t.sol`): Removed because this zkfoundry wrapper only called `vm.skip(true)`; active coverage is in `L2NativeTokenVaultBridgeBurnRegressionL1Test.t.sol`.
+- `testFuzz_regression_bridgeBurnBaseTokenVariousAmounts` (`l1-contracts/test/foundry/l2/integration/L2NativeTokenVaultBridgeBurnRegressionTest.t.sol`): Removed because this zkfoundry wrapper only called `vm.skip(true)`; active coverage is in `L2NativeTokenVaultBridgeBurnRegressionL1Test.t.sol`.
 
 ### `l1-contracts/test/unit_tests/l2-upgrade.test.spec.ts` - missing upgrade tx hash log
 
@@ -55,6 +73,10 @@ This report was produced while auditing `draft-v31` against `origin/main`.
 - Replacement coverage: `Should deposit successfully legacy encoding` in the same file asserts ERC20 balance movement, and the Foundry L1SharedBridge/L1Nullifier suites cover the current bridge flow.
 - Confidence: 98%; re-enabling the stale block would add maintenance cost without materially increasing coverage.
 
+Removed test cases:
+
+- `Should deposit erc20 token successfully` (`l1-contracts/test/unit_tests/l1_shared_bridge_test.spec.ts`): Removed because it referenced stale `l1Weth` setup and is covered by active test `Should deposit successfully legacy encoding` in the same file.
+
 ### `l1-contracts/test/unit_tests/executor_proof.spec.ts` - commented rollup/validium fixed vectors
 
 - Decision: removed stale commented vectors and kept an active proof-public-input regression assertion.
@@ -62,15 +84,21 @@ This report was produced while auditing `draft-v31` against `origin/main`.
 - Replacement coverage: current commitment/log behavior is covered by `l1-contracts/test/foundry/l1/unit/concrete/BatchProcessing/ExecutorProof.t.sol`; this TypeScript suite now asserts the exposed `getBatchProofPublicInput` helper directly.
 - Confidence: 98%; restoring the commented vectors would require reintroducing obsolete harness APIs.
 
+Removed test cases:
+
+- `Test hashes (Rollup)` (`l1-contracts/test/unit_tests/executor_proof.spec.ts`): Replaced by active test `computes the expected proof public input from adjacent batch commitments`; the old executable body only checked a helper transaction receipt, while the commented commitment assertions referenced obsolete `ExecutorProvingTest` APIs.
+- `Test hashes (Validium)` (`l1-contracts/test/unit_tests/executor_proof.spec.ts`): Removed because it was fully commented out and referenced obsolete `ExecutorProvingTest.processL2Logs`, `createBatchCommitment`, and old `getBatchProofPublicInput` call shape.
+
 ## Removed Commented-out Test Blocks
 
-The v31 diff contained commented-out Solidity `function test...` blocks in:
+The v31 diff contained commented-out Solidity `function test...` blocks that were removed rather than left disabled:
 
-- `l1-contracts/test/foundry/l1/unit/concrete/Bridgehub/experimental_bridge.t.sol`
-- `l1-contracts/test/foundry/l1/unit/concrete/Bridges/L1SharedBridge/L1SharedBridgeBase.t.sol`
-- `l1-contracts/test/foundry/l1/unit/concrete/Bridges/L1SharedBridge/L1SharedBridgeFails.t.sol`
-
-These blocks were removed rather than left disabled. The covered behavior is represented by active tests in the Bridgehub, L1SharedBridge, L1Nullifier, and native-token-vault Foundry suites.
+- `test_removeChainTypeManager` (`l1-contracts/test/foundry/l1/unit/concrete/Bridgehub/experimental_bridge.t.sol`): Removed because success and not-registered behavior are covered by active tests `test_removeChainTypeManagerSuccess` and `test_RevertWhen_removeChainTypeManagerNotRegistered` in `BridgehubBase_Extended.t.sol`.
+- `test_safeTransferFundsFromSharedBridge_Erc` (`l1-contracts/test/foundry/l1/unit/concrete/Bridges/L1SharedBridge/L1SharedBridgeBase.t.sol`): Removed because `transferFundsFromSharedBridge` and `updateChainBalancesFromSharedBridge` no longer exist; current NTV/L1Nullifier balance movement is covered by active bridge and native-token-vault suites.
+- `test_safeTransferFundsFromSharedBridge_Eth` (`l1-contracts/test/foundry/l1/unit/concrete/Bridges/L1SharedBridge/L1SharedBridgeBase.t.sol`): Removed because the old shared-bridge pull API no longer exists; ETH migration/failure paths are covered through current L1Nullifier and NTV tests.
+- `test_transferFundsToSharedBridge_Eth_0_AmountTransferred` (`l1-contracts/test/foundry/l1/unit/concrete/Bridges/L1SharedBridge/L1SharedBridgeFails.t.sol`): Removed because the old `transferFundsFromSharedBridge` API is gone; zero-amount failed-deposit behavior is covered by active `test_claimFailedDeposit_amountZero`.
+- `test_transferFundsToSharedBridge_Erc_0_AmountTransferred` (`l1-contracts/test/foundry/l1/unit/concrete/Bridges/L1SharedBridge/L1SharedBridgeFails.t.sol`): Removed because the old `transferFundsFromSharedBridge` API and `ZeroAmountToTransfer` error are gone.
+- `test_transferFundsToSharedBridge_Erc_WrongAmountTransferred` (`l1-contracts/test/foundry/l1/unit/concrete/Bridges/L1SharedBridge/L1SharedBridgeFails.t.sol`): Removed because the old `transferFundsFromSharedBridge` API and `WrongAmountTransferred` error are gone.
 
 ## New Externally Available v31 Surface Coverage
 
@@ -90,15 +118,19 @@ No uncovered newly added external/public v31 function was identified in the audi
 
 ## Commands Run
 
-- `git fetch origin main draft-v31`
-- `git submodule update --init --recursive`
-- `yarn install --frozen-lockfile`
-- `cd da-contracts && yarn test:foundry`
-- `cd l1-contracts && yarn build:foundry`
-- `cd l1-contracts && yarn test:foundry`
-- `cd system-contracts && yarn build:foundry`
-- `cd l1-contracts && yarn test:zkfoundry`
-- `cd l1-contracts && yarn build` attempted; blocked by Hardhat `HH411` resolving `forge-std` from deploy scripts.
-- `yarn prettier --write ...`
-- `yarn lint:check`
-- Skipped-test scan with `rg` over `da-contracts/test`, `l1-contracts/test`, `l2-contracts/test`, `system-contracts/test`, and `system-contracts/bootloader/tests`.
+- `git fetch origin draft-v31`
+- `git fetch valera audit/v31-test-hygiene`
+- `git rev-parse HEAD`
+- `git merge-base HEAD origin/draft-v31`
+- `git diff --stat origin/draft-v31...HEAD`
+- `git diff origin/draft-v31...HEAD -- '*test*' '*.spec.ts' '*.t.sol' '*.md'`
+- Required skipped/commented-test `rg` scans over `l1-contracts`, `system-contracts`, and `da-contracts`.
+- `cd l1-contracts && forge test --ffi --match-path 'test/foundry/l1/unit/concrete/Bridgehub/experimental_bridge.t.sol' --match-test 'test_removeChainTypeManager_cannotBeCalledByRandomAddress'`: passed 1 test.
+- `cd da-contracts && yarn test:foundry`: passed 8 tests.
+- `cd l1-contracts && yarn test:foundry`: passed 2561 tests.
+- `cd system-contracts && yarn build:foundry`: blocked with upstream Foundry because `/root/.foundry/bin/forge` does not support `--zksync`.
+- Downloaded `foundry-zksync-v0.0.30` to `/tmp/foundry-zksync-v0.0.30`.
+- `cd system-contracts && PATH=/tmp/foundry-zksync-v0.0.30:$PATH yarn build:foundry`: passed.
+- `cd l1-contracts && PATH=/tmp/foundry-zksync-v0.0.30:$PATH yarn test:zkfoundry`: failed 12 L2 integration suites in `setUp()` with `EvmError: Revert` and `Invalid opcode, Not enough gas`; 8 tests passed before the failures.
+- `cd l1-contracts && PATH=/tmp/foundry-zksync-v0.0.30:$PATH forge test --zksync --match-path 'test/foundry/l2/integration/WETH.t.sol' --gas-limit 100000000000 -vvv`: reproduced the same `setUp()` failure after `Deploying L2 contracts`, so the zkfoundry failure is a local runner/setup issue unrelated to the restored L1 test or documentation changes.
+- `yarn lint:check`: passed.
