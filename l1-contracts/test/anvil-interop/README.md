@@ -107,7 +107,7 @@ Live environment variables:
 | `LIVE_CHAIN_A_RPC`                 | Required source-chain RPC; chain ID is discovered from this RPC        |
 | `LIVE_CHAIN_B_RPC`                 | Required destination-chain RPC; chain ID is discovered from this RPC   |
 | `LIVE_SOURCE_PRIVATE_KEY`          | Required source signer for setup and specs                             |
-| `LIVE_UNBUNDLER_PRIVATE_KEY`       | Required by spec `09`; must be distinct from `LIVE_SOURCE_PRIVATE_KEY` |
+| `LIVE_UNBUNDLER_PRIVATE_KEY`       | Required alternative signer, must be distinct from `LIVE_SOURCE_PRIVATE_KEY` |
 | `LIVE_RECIPIENT_ADDRESS`           | Optional token recipient; defaults to `LIVE_SOURCE_PRIVATE_KEY` wallet |
 | `LIVE_SECONDARY_RECIPIENT_ADDRESS` | Optional second token recipient; defaults to unbundler wallet          |
 | `LIVE_TEST_TOKEN_NAME`             | `Live Interop Test Token`                                              |
