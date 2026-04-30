@@ -692,7 +692,8 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     await expectRevert(
       () => simulateExecuteBundle(destProvider, sendResult.bundleData, sourceChainId),
       "replay executeBundle",
-      customError("InteropHandler", "BundleAlreadyProcessed(bytes32)")
+      customError("InteropHandler", "BundleAlreadyProcessed(bytes32)"),
+      destProvider
     );
 
     console.log("   [edge] Replay protection verified");
@@ -726,7 +727,8 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     await expectRevert(
       () => simulateExecuteBundle(destProvider, sendResult.bundleData, sourceChainId),
       "execute from wrong executionAddress",
-      customError("InteropHandler", "ExecutingNotAllowed(bytes32,bytes,bytes)")
+      customError("InteropHandler", "ExecutingNotAllowed(bytes32,bytes,bytes)"),
+      destProvider
     );
 
     console.log("   [edge] executionAddress enforcement verified");
@@ -778,7 +780,8 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
           value: excessValue,
         }),
       "excess msg.value",
-      customError("InteropCenter", "MsgValueMismatch(uint256,uint256)")
+      customError("InteropCenter", "MsgValueMismatch(uint256,uint256)"),
+      sourceProvider
     );
 
     console.log("   [edge] Excess msg.value rejected");

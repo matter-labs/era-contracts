@@ -232,7 +232,8 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses, getInteropUnbundlerPrivateKey()),
       "unbundle non-verified bundle",
-      customError("InteropHandler", "CanNotUnbundle(bytes32)")
+      customError("InteropHandler", "CanNotUnbundle(bytes32)"),
+      destProvider
     );
   });
 
@@ -267,7 +268,8 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses),
       "unbundle from wrong address",
-      customError("InteropHandler", "UnbundlingNotAllowed(bytes32,bytes,bytes)")
+      customError("InteropHandler", "UnbundlingNotAllowed(bytes32,bytes,bytes)"),
+      destProvider
     );
   });
 
@@ -371,7 +373,8 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses, getInteropUnbundlerPrivateKey()),
       "re-execute processed calls",
-      customError("InteropHandler", "CallNotExecutable(bytes32,uint256)")
+      customError("InteropHandler", "CallNotExecutable(bytes32,uint256)"),
+      destProvider
     );
   });
 
@@ -401,7 +404,8 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     await expectRevert(
       () => simulateUnbundleBundle(destProvider, bundleData, callStatuses, getInteropUnbundlerPrivateKey()),
       "execute a cancelled call",
-      customError("InteropHandler", "CallNotExecutable(bytes32,uint256)")
+      customError("InteropHandler", "CallNotExecutable(bytes32,uint256)"),
+      destProvider
     );
   });
 

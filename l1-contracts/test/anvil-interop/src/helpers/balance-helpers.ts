@@ -10,7 +10,7 @@ import type { ContractName } from "../core/contracts";
 import type { providers } from "ethers";
 import { BigNumber, Contract, ethers, Wallet } from "ethers";
 import { getAbi } from "../core/contracts";
-import { getInteropTestPrivateKey, isLiveInteropMode } from "../core/accounts";
+import { getInteropTestPrivateKey } from "../core/accounts";
 import { L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
 
 // ── Balance snapshot utilities ─────────────────────────────────
@@ -128,8 +128,9 @@ export function expectBalanceDelta(before: BigNumber, after: BigNumber, expected
 }
 
 interface EthersLikeError {
+  body?: string;
   data?: unknown;
-  error?: { data?: unknown };
+  error?: unknown;
   receipt?: { blockNumber?: number };
   transaction?: {
     data?: string;
@@ -167,12 +168,27 @@ function extractRevertData(err: unknown): string {
   if (typeof err !== "object" || err === null) return "";
 
   const errorWithData = err as EthersLikeError;
-  const nestedData = errorWithData.error?.data;
-  if (typeof nestedData === "string") return nestedData;
+  const nestedErrorData = extractRevertData(errorWithData.error);
+  if (nestedErrorData !== "" && nestedErrorData !== "0x") return nestedErrorData;
 
   const directData = errorWithData.data;
-  if (typeof directData === "string") return directData;
+  if (typeof directData === "string" && directData !== "" && directData !== "0x") return directData;
 
+  const nestedData = extractRevertData(directData);
+  if (nestedData !== "" && nestedData !== "0x") return nestedData;
+
+  if (errorWithData.body) {
+    try {
+      const bodyData = extractRevertData(JSON.parse(errorWithData.body));
+      if (bodyData !== "" && bodyData !== "0x") return bodyData;
+    } catch {
+      // Keep checking other fields below.
+    }
+  }
+
+  if (nestedErrorData) return nestedErrorData;
+  if (nestedData) return nestedData;
+  if (typeof directData === "string") return directData;
   return "";
 }
 
@@ -198,14 +214,6 @@ async function extractRevertDataFromCall(provider: providers.JsonRpcProvider, er
   return "";
 }
 
-function isLiveMissingRevertData(message: string, errorData: string): boolean {
-  return (
-    isLiveInteropMode() &&
-    (errorData === "" || errorData === "0x") &&
-    (message.includes("missing revert data") || message.includes("reverted without a reason string"))
-  );
-}
-
 /**
  * Assert that an async call reverts (throws).
  * Optionally match the error message / revert data against a selector or ABI-derived custom error.
@@ -226,13 +234,13 @@ export async function expectRevert(
       const hasReasonInMessage = msg.includes(matchValue);
       const errorWithData = typeof err === "object" && err !== null ? (err as EthersLikeError) : undefined;
       let errorData = extractRevertData(err);
-      if (!errorData && provider && errorWithData) {
-        errorData = await extractRevertDataFromCall(provider, errorWithData);
+      if ((errorData === "" || errorData === "0x") && provider && errorWithData) {
+        const recoveredData = await extractRevertDataFromCall(provider, errorWithData);
+        if (recoveredData) {
+          errorData = recoveredData;
+        }
       }
       const hasReasonInData = errorData.includes(matchValue);
-      if (!hasReasonInMessage && !hasReasonInData && isLiveMissingRevertData(msg, errorData)) {
-        return;
-      }
       expect(
         hasReasonInMessage || hasReasonInData,
         `${label}: revert reason mismatch — expected ${description} in message or data.\nMessage: ${msg.slice(0, 200)}\nData: ${String(errorData).slice(0, 200)}`
