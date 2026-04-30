@@ -80,6 +80,11 @@
         "internalType": "uint256"
       },
       {
+        "name": "gatewayRpcUrl",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
         "name": "l2TxHash",
         "type": "bytes32",
         "internalType": "bytes32"

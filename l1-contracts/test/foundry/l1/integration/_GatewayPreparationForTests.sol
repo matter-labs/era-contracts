@@ -12,6 +12,7 @@ import {DeployGatewayTransactionFilterer} from "deploy-scripts/gateway/DeployGat
 import {ChainInfoFromBridgehub, Utils} from "deploy-scripts/utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {AdminFunctions} from "deploy-scripts/AdminFunctions.s.sol";
+import {GetDiamondCutData} from "deploy-scripts/utils/GetDiamondCutData.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -133,11 +134,15 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
 
     function migrateChainToGateway(uint256 migratingChainId) public {
         AdminFunctions adminScript = new AdminFunctions();
-        adminScript.migrateChainToGateway(
+        (bytes memory gatewayDiamondCutData, ) = GetDiamondCutData.getDiamondCutAndForceDeployment(
+            gatewayCTMAddress
+        );
+        adminScript.migrateChainToGatewayWithCutData(
             _gatewayGovernanceConfig.bridgehubProxy,
             _getL1GasPrice(),
             migratingChainId,
             _gatewayGovernanceConfig.gatewayChainId,
+            gatewayDiamondCutData,
             msg.sender,
             true
         );

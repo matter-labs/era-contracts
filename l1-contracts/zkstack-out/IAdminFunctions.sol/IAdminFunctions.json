@@ -457,6 +457,11 @@
         "internalType": "uint256"
       },
       {
+        "name": "gatewayRpcUrl",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
         "name": "refundRecipient",
         "type": "address",
         "internalType": "address"

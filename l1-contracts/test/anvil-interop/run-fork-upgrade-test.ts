@@ -54,6 +54,7 @@ import {
   verifyProtocolVersions,
 } from "./src/helpers/v31-upgrade-test-runner";
 import type { V31UpgradeScenario } from "./src/helpers/v31-upgrade-test-runner";
+import { advanceL1TimePastUpgradeDeadline } from "./src/helpers/harness-shims";
 
 const anvilInteropDir = __dirname;
 const l1ContractsDir = path.resolve(__dirname, "../..");
@@ -204,6 +205,14 @@ async function main(): Promise<void> {
       throw new Error("No governance_calls section in ecosystem output");
     }
     await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(govCalls.stage0_calls), "Stage 0");
+
+    // Stage 0 starts the GovernanceUpgradeTimer; stage 1's first governance call
+    // is `checkDeadline()` which reverts unless `block.timestamp >= deadline`.
+    // On stage upgrades the configured `INITIAL_DELAY` is in the order of minutes
+    // (e.g. 1200s on Sepolia), and the harness can't wait wall-clock — fast-forward
+    // anvil time past the deadline so stage 1 can proceed.
+    await advanceL1TimePastUpgradeDeadline(l1Provider);
+
     await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(govCalls.stage1_calls), "Stage 1");
     await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(govCalls.stage2_calls), "Stage 2");
 

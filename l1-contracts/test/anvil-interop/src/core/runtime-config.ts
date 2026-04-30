@@ -1,4 +1,5 @@
-import anvilConfig from "../../config/anvil-config.json";
+import * as fs from "fs";
+import * as path from "path";
 
 /**
  * Single mutable knob bag for harness-runtime values that aren't known at module
@@ -10,9 +11,20 @@ import anvilConfig from "../../config/anvil-config.json";
  *
  * Defaults are sourced from `config/anvil-config.json` so the synthetic
  * harness's L1 chain id has a single source of truth (the same file
- * `AnvilManager` reads when starting the synthetic L1).
+ * `AnvilManager` reads when starting the synthetic L1). We read the JSON
+ * via `fs` rather than a TS `import` because the harness is loaded under
+ * multiple ts-node configurations (hardhat's vs the standalone runners) and
+ * the import resolver disagrees on the JSON default-export shape between
+ * them.
  */
 
+interface AnvilChainEntry {
+  chainId: number;
+  role: string;
+}
+
+const anvilConfigPath = path.resolve(__dirname, "../../config/anvil-config.json");
+const anvilConfig = JSON.parse(fs.readFileSync(anvilConfigPath, "utf-8")) as { chains: AnvilChainEntry[] };
 const l1DefaultChainId = anvilConfig.chains.find((c) => c.role === "l1")?.chainId;
 if (l1DefaultChainId == null) {
   throw new Error("anvil-config.json: no chain with role=l1 — runtimeConfig cannot determine default L1 chain id");

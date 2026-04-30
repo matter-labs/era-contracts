@@ -9,11 +9,6 @@
         "internalType": "struct IFinalizeChainInit.FinalizeChainInitParams",
         "components": [
           {
-            "name": "chainId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
             "name": "chainAdmin",
             "type": "address",
             "internalType": "address"
@@ -32,6 +27,11 @@
             "name": "bridgehub",
             "type": "address",
             "internalType": "address"
+          },
+          {
+            "name": "chainId",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
             "name": "l1DaValidator",
