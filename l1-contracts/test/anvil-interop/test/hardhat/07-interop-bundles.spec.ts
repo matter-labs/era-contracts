@@ -36,6 +36,7 @@ import {
   getNativeBalance,
   getTokenBalance,
   getTokenAddressForAsset,
+  getAssetIdForToken,
   approveToken,
   approveTokenForNtv,
   expectNativeSpend,
@@ -99,10 +100,6 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
   // DummyInteropRecipient contracts on destination chain (required for direct calls)
   let dummyRecipient1: string;
   let dummyRecipient2: string;
-
-  function getTestTokenAssetId(chainId: number, tokenAddress: string): string {
-    return state.testTokenAssetIds?.[chainId] || encodeNtvAssetId(chainId, tokenAddress);
-  }
 
   async function currentInteropFee(): Promise<BigNumber> {
     interopFee = await getInteropProtocolFee(sourceProvider);
@@ -261,7 +258,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     l1Provider = new ethers.providers.JsonRpcProvider(l1RpcUrl);
 
     sourceTokenAddress = state.testTokens![sourceChainId];
-    sourceAssetId = getTestTokenAssetId(sourceChainId, sourceTokenAddress);
+    sourceAssetId = await getAssetIdForToken(sourceProvider, sourceTokenAddress);
 
     // Query the per-call interop protocol fee
     interopFee = await getInteropProtocolFee(sourceProvider);

@@ -97,6 +97,18 @@ export async function getTokenAddressForAsset(provider: providers.JsonRpcProvide
   return vault.tokenAddress(assetId);
 }
 
+/**
+ * Look up the registered assetId for a given L2 token via L2NativeTokenVault.
+ */
+export async function getAssetIdForToken(provider: providers.JsonRpcProvider, tokenAddress: string): Promise<string> {
+  const vault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), provider);
+  const assetId: string = await vault.assetId(tokenAddress);
+  if (assetId === ethers.constants.HashZero) {
+    throw new Error(`Token ${tokenAddress} is not registered in L2NativeTokenVault`);
+  }
+  return assetId;
+}
+
 // ── Balance assertion helpers ──────────────────────────────────
 
 /**

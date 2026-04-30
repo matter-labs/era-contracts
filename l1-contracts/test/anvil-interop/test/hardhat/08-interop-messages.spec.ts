@@ -25,6 +25,7 @@ import {
   getNativeBalance,
   getTokenBalance,
   getTokenAddressForAsset,
+  getAssetIdForToken,
   approveToken,
   approveTokenForNtv,
   expectNativeSpend,
@@ -77,10 +78,6 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
   // DummyInteropRecipient on dest chain for base token (direct call) messages
   let dummyRecipient: string;
 
-  function getTestTokenAssetId(chainId: number, tokenAddress: string): string {
-    return state.testTokenAssetIds?.[chainId] || encodeNtvAssetId(chainId, tokenAddress);
-  }
-
   async function currentInteropFee(): Promise<BigNumber> {
     interopFee = await getInteropProtocolFee(sourceProvider);
     return interopFee;
@@ -110,7 +107,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     console.log(`   Fixed ZK interop fee: ${zkInteropFee.toString()}`);
 
     sourceTokenAddress = state.testTokens[sourceChainId];
-    sourceAssetId = getTestTokenAssetId(sourceChainId, sourceTokenAddress);
+    sourceAssetId = await getAssetIdForToken(sourceProvider, sourceTokenAddress);
     const zkTokenAssetId = state.zkToken?.assetId || (await getZkTokenAssetId(sourceProvider));
     if (zkTokenAssetId === ethers.constants.HashZero) {
       console.warn("   The ZK token has not yet been bridged to the source chain; fixed ZK fee tests will be skipped.");
@@ -426,7 +423,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       return;
     }
 
-    const bridgedAssetId = getTestTokenAssetId(destChainId, destTestToken);
+    const bridgedAssetId = await getAssetIdForToken(destProvider, destTestToken);
 
     // Resolve the bridged token address on the source chain
     const bridgedTokenOnSource = await getTokenAddressForAsset(sourceProvider, bridgedAssetId);

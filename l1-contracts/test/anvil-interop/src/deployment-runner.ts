@@ -202,7 +202,6 @@ export class DeploymentRunner {
     const liveAddresses = await chainALiveSdk.client.ensureAddresses();
 
     const testTokens: Record<number, string> = {};
-    const testTokenAssetIds: Record<number, string> = {};
 
     for (const [chainId, chainRpcUrl] of [[chainAId, chainARpcUrl]] as const) {
       const l1TokenFactory = new ContractFactory(
@@ -257,7 +256,6 @@ export class DeploymentRunner {
       }
 
       testTokens[chainId] = l2TokenAddress;
-      testTokenAssetIds[chainId] = assetId;
       console.log(`  Chain ${chainId} live test token: ${l2TokenAddress}`);
       console.log(`  Chain ${chainId} live test token assetId: ${assetId}`);
     }
@@ -296,7 +294,6 @@ export class DeploymentRunner {
       },
       chainAddresses: [],
       testTokens,
-      testTokenAssetIds,
     };
     if (liveZkToken) {
       liveState.zkToken = liveZkToken;

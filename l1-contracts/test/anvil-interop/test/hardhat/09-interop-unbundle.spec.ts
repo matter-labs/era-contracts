@@ -3,7 +3,6 @@ import { BigNumber, ethers, providers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { getChainIdsByRole, getL2Chain } from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
-import { encodeNtvAssetId } from "../../src/core/data-encoding";
 import {
   getInteropRecipientAddress,
   getInteropTestAddress,
@@ -45,6 +44,7 @@ import {
   getTokenBalance,
   approveTokenForNtv,
   getTokenAddressForAsset,
+  getAssetIdForToken,
   expectBalanceDelta,
   expectRevert,
   customError,
@@ -92,10 +92,6 @@ describe("09 - Interop Unbundle (failing calls)", function () {
   // Contract that always reverts (for failing call tests)
   let failingContract: string;
 
-  function getTestTokenAssetId(chainId: number, tokenAddress: string): string {
-    return state.testTokenAssetIds?.[chainId] || encodeNtvAssetId(chainId, tokenAddress);
-  }
-
   async function currentInteropFee(): Promise<BigNumber> {
     interopFee = await getInteropProtocolFee(sourceProvider);
     return interopFee;
@@ -120,7 +116,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     destProvider = new providers.JsonRpcProvider(destChain.rpcUrl);
 
     sourceTokenAddress = state.testTokens[sourceChainId];
-    sourceAssetId = getTestTokenAssetId(sourceChainId, sourceTokenAddress);
+    sourceAssetId = await getAssetIdForToken(sourceProvider, sourceTokenAddress);
 
     if (getInteropTestAddress().toLowerCase() === getInteropUnbundlerAddress().toLowerCase()) {
       throw new Error("Unbundle tests require a distinct unbundler private key");

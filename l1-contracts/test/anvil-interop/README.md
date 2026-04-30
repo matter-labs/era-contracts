@@ -77,9 +77,10 @@ You can also add `.only` to a `describe` or `it` block in the spec file to isola
 
 `ANVIL_INTEROP_LIVE=1` skips Anvil setup and cleanup, writes the normal test manifest at `outputs/live-state/chains.json`
 from live RPCs and env, and runs specs `07`, `08`, and `09` by default. This file is not simulated chain state; it is
-the small manifest the existing specs load for RPC URLs, chain roles, token addresses, and asset IDs. The live setup
+the small manifest the existing specs load for RPC URLs, chain roles, and token addresses. The live setup
 deploys a fresh L1 `TestnetERC20Token`, mints it to `LIVE_SOURCE_PRIVATE_KEY`, deposits it to Chain A through the
-`@matterlabs/zksync-js` viem adapter, and records the resulting L2 token address plus the L1-origin asset ID.
+`@matterlabs/zksync-js` viem adapter, and records the resulting L2 token address. Specs derive the token asset ID from
+`L2NativeTokenVault` at execution time.
 
 ```bash
 cd contracts/l1-contracts
