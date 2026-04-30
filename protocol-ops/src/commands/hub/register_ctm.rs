@@ -40,8 +40,7 @@ pub fn register_ctm(
         .with_calldata(&calldata)
         .with_rpc_url(runner.rpc_url.clone())
         .with_broadcast()
-        .with_slow()
-        .with_wallet(auth, runner.simulate);
+        .with_wallet(auth);
 
     logger::info("Registering CTM on Bridgehub...");
     runner.run(forge)?;

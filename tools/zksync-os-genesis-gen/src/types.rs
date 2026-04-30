@@ -27,7 +27,7 @@ pub struct InitialGenesisInput {
 
     /// Raw (already flattened) additional storage, kept for backward compatibility.
     /// Same format as before.
-    #[serde(skip)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub additional_storage_raw: Vec<(B256, B256)>,
 }
 

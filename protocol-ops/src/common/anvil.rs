@@ -5,6 +5,9 @@ use std::{
 };
 
 use anyhow::{bail, Context};
+use serde_json::json;
+
+use crate::common::ethereum::get_ethers_provider;
 
 /// A running anvil instance. Killed on drop.
 pub struct AnvilInstance {
@@ -32,9 +35,15 @@ impl Drop for AnvilInstance {
     }
 }
 
-/// Start anvil forking the given RPC URL with auto-impersonate enabled.
+/// Start anvil forking the given RPC URL with auto-impersonation enabled.
 ///
 /// Blocks until anvil prints its "Listening on" line, then returns the handle.
+///
+/// Auto-impersonation is on at startup because simulate-mode forge runs always
+/// use `--sender X --unlocked` (see `ForgeScript::with_wallet`) — the fork has
+/// to be willing to sign for arbitrary addresses for those runs to succeed.
+/// The fork is per-invocation and single-tenant, so always-on impersonation is
+/// fine here.
 pub fn start_anvil_fork(fork_url: &str) -> anyhow::Result<AnvilInstance> {
     let port = pick_unused_port()?;
 
@@ -45,6 +54,9 @@ pub fn start_anvil_fork(fork_url: &str) -> anyhow::Result<AnvilInstance> {
             "--port",
             &port.to_string(),
             "--auto-impersonate",
+            // Scripts like bridgehub multicalls can exceed the 30M default
+            // block gas limit; lift it so simulations don't spuriously OOG.
+            "--disable-block-gas-limit",
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -82,6 +94,26 @@ fn wait_for_ready(
         }
     }
     bail!("anvil exited before it was ready")
+}
+
+/// Give `address` a fat ETH balance on an anvil fork via `anvil_setBalance`.
+///
+/// Used to unblock auto-resolved senders that are contracts (e.g. Governance,
+/// the bridgehub admin Safe) or EOAs with insufficient ETH on the forked
+/// chain. Only safe against anvil — real L1 rejects the call.
+pub async fn set_balance(rpc_url: &str, address: ethers::types::Address) -> anyhow::Result<()> {
+    let provider = get_ethers_provider(rpc_url)?;
+    // 10 000 ETH is plenty for any deployment / multicall the Solidity
+    // scripts do. Raw hex-encoded u256 to match anvil's expected format.
+    const FUNDING_WEI_HEX: &str = "0x21e19e0c9bab2400000"; // 10_000 * 1e18
+    provider
+        .request::<_, serde_json::Value>(
+            "anvil_setBalance",
+            json!([format!("{address:#x}"), FUNDING_WEI_HEX]),
+        )
+        .await
+        .with_context(|| format!("anvil_setBalance({address:#x}) failed against {rpc_url}"))?;
+    Ok(())
 }
 
 /// Find an unused TCP port by binding to :0 and reading back the assigned port.

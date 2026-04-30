@@ -144,10 +144,10 @@ contract EcosystemUpgrade_v29 is Script, DefaultCTMUpgrade {
         );
     }
 
-    function getForceDeploymentContracts() internal pure override returns (CoreContract[] memory) {
-        CoreContract[] memory forceDeploymentContracts = new CoreContract[](1);
-        forceDeploymentContracts[0] = CoreContract.L2V29Upgrade;
-        return forceDeploymentContracts;
+    function getAdditionalForcedCoreContracts() internal pure override returns (CoreContract[] memory) {
+        CoreContract[] memory additionalForcedCoreContracts = new CoreContract[](1);
+        additionalForcedCoreContracts[0] = CoreContract.L2V29Upgrade;
+        return additionalForcedCoreContracts;
     }
 
     function getCreationCode(

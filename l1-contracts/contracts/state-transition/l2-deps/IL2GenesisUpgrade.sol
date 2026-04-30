@@ -20,6 +20,8 @@ struct ForceDeployment {
 // solhint-disable-next-line gas-struct-packing
 struct ZKChainSpecificForceDeploymentsData {
     address l2LegacySharedBridge;
+    /// @dev Deprecated: always address(0). Kept to avoid breaking the ABI encoding
+    /// used by the server (core/lib/types/src/abi.rs).
     address predeployedL2WethAddress;
     address baseTokenL1Address;
     /// @dev Some info about the base token, it is

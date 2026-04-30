@@ -7,6 +7,7 @@ import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
 
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
+import {GWAssetTrackerDev} from "contracts/dev-contracts/test/GWAssetTrackerDev.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -127,13 +128,7 @@ library L2UtilsBase {
             vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, l2ChainAssetHandler.code);
 
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
-                _args.l1ChainId,
-                _args.aliasedOwner,
-                L2_BRIDGEHUB_ADDR,
-                L2_ASSET_ROUTER_ADDR,
-                L2_MESSAGE_ROOT_ADDR
-            );
+            L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner);
         }
         {
             address interopHandler = address(new InteropHandler());
@@ -146,7 +141,7 @@ library L2UtilsBase {
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
             L2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(_args.l1ChainId, bytes32(0), false);
 
-            address gwAssetTrackerAddress = address(new GWAssetTracker());
+            address gwAssetTrackerAddress = address(new GWAssetTrackerDev());
             vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
             // Note: GWAssetTracker.initL2 is called later, after NTV is deployed,
             // because it fetches wrappedZKToken from NTV.WETH_TOKEN()
@@ -276,7 +271,7 @@ library L2UtilsBase {
 
                 // Agree to pay settlement fees for this chain
                 vm.prank(chainOperator);
-                GWAssetTracker(GW_ASSET_TRACKER_ADDR).agreeToPaySettlementFees(chainIds[i]);
+                GWAssetTracker(GW_ASSET_TRACKER_ADDR).setSettlementFeePayerAgreement(chainIds[i], true);
             }
         }
     }

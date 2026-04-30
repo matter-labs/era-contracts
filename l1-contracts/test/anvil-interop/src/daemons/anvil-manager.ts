@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import { providers } from "ethers";
 import * as fs from "fs";
 import * as path from "path";
@@ -12,6 +12,32 @@ export class AnvilManager {
   constructor() {
     const runSuffix = process.env.ANVIL_INTEROP_RUN_SUFFIX || "";
     this.pidFilePath = path.join(__dirname, `../../outputs/anvil-pids${runSuffix}.json`);
+  }
+
+  /**
+   * Kill any existing process listening on the given port.
+   * Prevents stale anvil instances (e.g. from KEEP_CHAINS=1) from poisoning a fresh run.
+   */
+  private killProcessOnPort(port: number): void {
+    try {
+      const output = execSync(`lsof -ti :${port}`, { encoding: "utf-8" }).trim();
+      if (output) {
+        const pids = output
+          .split("\n")
+          .map((p) => p.trim())
+          .filter(Boolean);
+        for (const pid of pids) {
+          try {
+            process.kill(Number(pid), "SIGKILL");
+          } catch {
+            // Process may have already exited
+          }
+        }
+        console.log(`   Killed stale process(es) on port ${port}: ${pids.join(", ")}`);
+      }
+    } catch {
+      // lsof exits non-zero when no process is found — that's fine
+    }
   }
 
   private resolveAnvilBinary(): string {
@@ -48,6 +74,9 @@ export class AnvilManager {
     const isL1 = role === "l1";
     const rpcUrl = `http://127.0.0.1:${port}`;
 
+    // Kill any stale process (e.g. from a previous KEEP_CHAINS run) on this port
+    this.killProcessOnPort(port);
+
     console.log(`🚀 Starting ${formatChainInfo(chainId, port, isL1)}...`);
     const anvilBinary = this.resolveAnvilBinary();
 
@@ -76,6 +105,12 @@ export class AnvilManager {
       "100000000", // Increase block gas limit to 100M to accommodate L2 genesis upgrade
       "--auto-impersonate", // Allow impersonating any address without signatures
     ];
+
+    // Enable step-level tracing when running in coverage mode.
+    // This is required for debug_traceTransaction to return non-empty structLogs.
+    if (process.env.ANVIL_COVERAGE_MODE === "1") {
+      args.push("--steps-tracing");
+    }
 
     if (effectiveBlockTime > 0) {
       args.push("--block-time", effectiveBlockTime.toString());

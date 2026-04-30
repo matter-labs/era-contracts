@@ -181,7 +181,7 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         require(upgradeConfig.ecosystemContractsDeployed, "Ecosystem contracts not deployed");
 
         // Important, this must come after the initializeExpectedL2Addresses
-        generateFixedForceDeploymentsData();
+        getFixedForceDeploymentsData();
         console.log("Generated fixed force deployments data");
         getChainCreationDiamondCutData(addresses.stateTransition);
         newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
@@ -259,7 +259,7 @@ contract EcosystemUpgrade_v30_zksync_os_blobs is Script, DefaultEcosystemUpgrade
         bytes memory upgradeImplData = abi.encodeCall(
             L2V30TestnetSystemProxiesUpgrade.upgrade,
             (
-                newlyGeneratedData.fixedForceDeploymentsData,
+                generatedData.forceDeploymentsData,
                 Utils.getZKOSBytecodeInfoForContract("SystemContractProxyAdmin.sol", "SystemContractProxyAdmin"),
                 Utils.getZKOSProxyUpgradeBytecodeInfo("L2ComplexUpgrader.sol", "L2ComplexUpgrader")
             )

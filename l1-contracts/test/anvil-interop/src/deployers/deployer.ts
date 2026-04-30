@@ -2,7 +2,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
 import type { CoreDeployedAddresses, CTMDeployedAddresses } from "../core/types";
-import { parseForgeScriptOutput, ensureDirectoryExists } from "../core/utils";
+import { ensureDirectoryExists, parseForgeScriptOutput, saveTomlConfig } from "../core/utils";
 import { ANVIL_DEFAULT_ACCOUNT_ADDR } from "../core/const";
 import { runForgeScript } from "../core/forge";
 import {
@@ -32,6 +32,18 @@ export class ForgeDeployer {
     this.projectRoot = path.resolve(__dirname, "../../../..");
     this.outputDir = path.join(__dirname, "../../outputs");
     ensureDirectoryExists(this.outputDir);
+  }
+
+  private prepareCtmConfig(zkTokenAssetId: string): string {
+    const baseConfigPath = path.join(this.projectRoot, ANVIL_INTEROP_CTM_DEPLOYMENT_CONFIG_RELATIVE);
+    const generatedConfigRelative = "/test/anvil-interop/outputs/ctm-deployment.generated.toml";
+    const generatedConfigPath = path.join(this.projectRoot, generatedConfigRelative);
+    const config = parseForgeScriptOutput(baseConfigPath);
+
+    config.zk_token_asset_id = zkTokenAssetId;
+    saveTomlConfig(generatedConfigPath, config);
+
+    return generatedConfigRelative;
   }
 
   async deployL1Core(): Promise<CoreDeployedAddresses> {
@@ -83,11 +95,12 @@ export class ForgeDeployer {
     };
   }
 
-  async deployCTM(bridgehubAddr: string): Promise<CTMDeployedAddresses> {
+  async deployCTM(bridgehubAddr: string, zkTokenAssetId: string): Promise<CTMDeployedAddresses> {
     console.log("📦 Deploying ChainTypeManager...");
 
+    const ctmConfigRelative = this.prepareCtmConfig(zkTokenAssetId);
     const envVars = {
-      CTM_CONFIG: ANVIL_INTEROP_CTM_DEPLOYMENT_CONFIG_RELATIVE,
+      CTM_CONFIG: ctmConfigRelative,
       CTM_OUTPUT: ANVIL_INTEROP_CTM_OUTPUT_RELATIVE,
       PERMANENT_VALUES_INPUT: ANVIL_INTEROP_PERMANENT_VALUES_RELATIVE,
     };
