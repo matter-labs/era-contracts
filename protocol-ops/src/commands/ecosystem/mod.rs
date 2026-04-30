@@ -11,6 +11,8 @@ use crate::{
 pub(crate) mod init;
 pub(crate) mod upgrade;
 pub(crate) mod upgrade_split;
+pub(crate) mod v31_upgrade_full;
+pub(crate) mod v31_upgrade_inner;
 
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]

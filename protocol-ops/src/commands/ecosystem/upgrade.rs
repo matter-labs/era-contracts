@@ -18,16 +18,18 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::{Address, Bytes, H256};
-use ethers::utils::hex;
+use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::abi_contracts::UPGRADE_V31_CONTRACT;
+use crate::commands::ecosystem::v31_upgrade_full::V31UpgradeFull;
+use crate::commands::ecosystem::v31_upgrade_inner::V31UpgradeInner;
 use crate::commands::output::write_output_if_requested;
 use crate::common::paths;
 use crate::common::SharedRunArgs;
-use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
+use crate::common::forge::ForgeRunner;
+use crate::common::logger;
 use crate::config::forge_interface::script_params::{
     ADMIN_FUNCTIONS_INVOCATION, ECOSYSTEM_UPGRADE_V31_SCRIPT_PATH, UPGRADE_V31_CORE_OUTPUT_PATH,
     UPGRADE_V31_CTM_OUTPUT_PATH, UPGRADE_V31_ECOSYSTEM_OUTPUT_PATH,
@@ -369,6 +371,10 @@ pub async fn run_upgrade_prepare(args: UpgradePrepareArgs) -> anyhow::Result<()>
     Ok(())
 }
 
+fn resolve_script_output_path(contracts_path: &Path, output_path: &str) -> PathBuf {
+    contracts_path.join(output_path.trim_start_matches('/'))
+}
+
 // ── upgrade-governance (stages 0 + 1 + 2 on one fork) ─────────────────────
 
 /// Run governance stages 0, 1, and 2 on the same anvil fork. Forge's
@@ -390,17 +396,16 @@ pub struct UpgradeGovernanceArgs {
     #[serde(flatten)]
     pub topology: crate::common::EcosystemArgs,
 
-    /// Path to the governance calls TOML written by `upgrade-prepare` via
-    /// `--governance-toml-out`. Contains the hex-encoded stage 0/1/2
-    /// calldata that `governanceExecuteCalls` replays.
-    #[clap(long)]
-    pub governance_toml: PathBuf,
-}
-
-#[derive(Serialize)]
-struct UpgradeGovernanceOutput {
-    stages: &'static str,
-    governance_address: String,
+    /// Path(s) to governance calls TOML(s) written by a prepare command via
+    /// `--governance-toml-out`. Each TOML contains hex-encoded stage 0/1/2
+    /// calldata. Pass `--governance-toml` once per TOML — typically once for
+    /// `core-upgrade-prepare` and once per `ctm-upgrade-prepare` invocation.
+    /// All stage-0 calls (across TOMLs in the order given) execute first, then
+    /// all stage-1 calls, then all stage-2 calls. Each `governanceExecuteCalls`
+    /// invocation lands in the same Safe bundle since the governance owner
+    /// signs every stage.
+    #[clap(long, num_args = 1..)]
+    pub governance_toml: Vec<PathBuf>,
 }
 
 pub async fn run_upgrade_governance(args: UpgradeGovernanceArgs) -> anyhow::Result<()> {
@@ -452,8 +457,6 @@ pub async fn run_upgrade_governance(args: UpgradeGovernanceArgs) -> anyhow::Resu
     }
     Ok(())
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────────
 
 fn resolve_l1_contracts_path(repo_root: &Path) -> anyhow::Result<PathBuf> {
     let direct = repo_root.join("l1-contracts");

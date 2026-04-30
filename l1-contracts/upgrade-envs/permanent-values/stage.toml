@@ -1,3 +1,9 @@
+# Real ZK token asset ID on stage: it's the Gateway chain's base-token asset ID
+# (queried via `bridgehub.baseTokenAssetId(<gateway chain id>)`). Stage's gateway
+# is chain 123, whose base token IS ZK — making this assetId the canonical
+# stage value rather than a synthetic placeholder.
+zk_token_asset_id = "0xd298ba94a7a3c1c54f54d9c2429bee8808de3dbfafe5e3c5bbf7c5dfe7a0f6a0"
+
 [permanent_contracts]
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 # this salt can be changed from run to run to. Todo: move this to input of script.

@@ -87,13 +87,16 @@ pub(crate) async fn stage_submit(
     bridgehub: Address,
     chain_id: u64,
     gateway_chain_id: u64,
+    gateway_rpc_url: String,
     l1_gas_price: u64,
     refund_recipient: Address,
 ) -> anyhow::Result<()> {
     let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
 
     // See pause-deposits for the rationale — always broadcast in simulate too
-    // so the tx shows up in the bundle's --out / Safe file.
+    // so the tx shows up in the bundle's --out / Safe file. The script
+    // fork-switches to `gateway_rpc_url` to read the gateway-side CTM's
+    // diamond cut data before constructing the migration message.
     let script = runner
         .with_script_call(
             &ADMIN_FUNCTIONS_INVOCATION,
@@ -103,6 +106,7 @@ pub(crate) async fn stage_submit(
                 l1_gas_price,
                 chain_id,
                 gateway_chain_id,
+                gateway_rpc_url,
                 refund_recipient,
                 true,
             ),
@@ -525,13 +529,19 @@ async fn get_finalize_params(
         "method": "eth_getTransactionReceipt",
         "params": [format!("{:#x}", tx_hash)]
     });
-    let receipt_resp: JsonRpcResponse<GatewayTransactionReceipt> = client
+    let receipt_raw: serde_json::Value = client
         .post(gateway_rpc_url)
         .json(&receipt_body)
         .send()
         .await?
         .json()
         .await?;
+    eprintln!(
+        "[debug get_finalize_params] raw receipt for {tx_hash:#x}: {}",
+        serde_json::to_string_pretty(&receipt_raw).unwrap_or_default()
+    );
+    let receipt_resp: JsonRpcResponse<GatewayTransactionReceipt> =
+        serde_json::from_value(receipt_raw)?;
     let receipt = receipt_resp
         .result
         .context("eth_getTransactionReceipt returned null")?;
@@ -561,13 +571,21 @@ async fn get_finalize_params(
         "method": "zks_getL2ToL1LogProof",
         "params": [format!("{:#x}", tx_hash), log_index]
     });
-    let proof_resp: JsonRpcResponse<L2ToL1LogProof> = client
+    let proof_raw: serde_json::Value = client
         .post(gateway_rpc_url)
         .json(&proof_body)
         .send()
         .await?
         .json()
         .await?;
+    eprintln!(
+        "[debug get_finalize_params] zks_getL2ToL1LogProof(tx={tx_hash:#x}, log_index={log_index}) → {}",
+        serde_json::to_string_pretty(&proof_raw).unwrap_or_default()
+    );
+    eprintln!(
+        "[debug get_finalize_params] tx_number_in_batch={tx_number_in_batch}, log_index={log_index}",
+    );
+    let proof_resp: JsonRpcResponse<L2ToL1LogProof> = serde_json::from_value(proof_raw)?;
     let proof = proof_resp
         .result
         .context("zks_getL2ToL1LogProof returned null")?;
@@ -633,6 +651,14 @@ pub struct Phase1SubmitArgs {
     #[clap(long)]
     pub gateway_chain_id: u64,
 
+    /// Gateway L2 RPC URL. The script fork-switches into the gateway L2
+    /// to read its CTM's diamond cut data (whose hash gateway L2 will
+    /// check at chain registration). Required because the gateway-side
+    /// CTM only exists on gateway L2 — its predicted CREATE2 address has
+    /// no code on L1.
+    #[clap(long)]
+    pub gateway_rpc_url: String,
+
     /// L1 gas price in wei for the L1->gateway-L2 priority tx.
     #[clap(long)]
     pub l1_gas_price: u64,
@@ -656,6 +682,7 @@ pub async fn run_phase1_submit(args: Phase1SubmitArgs) -> anyhow::Result<()> {
         bridgehub,
         chain_id,
         args.gateway_chain_id,
+        args.gateway_rpc_url.clone(),
         args.l1_gas_price,
         args.refund_recipient,
     )
@@ -725,7 +752,8 @@ pub struct Phase2FinalizeArgs {
     #[clap(long)]
     pub deployer_address: Address,
 
-    /// Gateway L2 RPC URL (for querying the withdrawal proof).
+    /// Gateway L2 RPC URL (for querying the withdrawal proof and for
+    /// the script's fork-switch to read the gateway CTM diamond cut data).
     #[clap(long)]
     pub gateway_rpc_url: String,
 
@@ -822,6 +850,7 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
 
     logger::step("Confirming L1->L2 transfer (finishMigrateChainToGateway)");
     {
+        let merkle_proof = crate::common::ethereum::parse_merkle_proof(&proof.merkle_proof)?;
         let script = runner
             .with_script_call(
                 &GATEWAY_UTILS_INVOCATION,
@@ -830,11 +859,12 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
                     bridgehub,
                     chain_id,
                     gateway_chain_id,
+                    args.gateway_rpc_url.clone(),
                     priority_op_hash,
                     proof.batch_number,
                     proof.l2_message_index,
                     proof.l2_tx_number_in_batch,
-                    proof.merkle_proof.clone(),
+                    merkle_proof,
                     1u8,
                 ),
             )?
