@@ -100,19 +100,19 @@ skipped with a warning.
 
 Live environment variables:
 
-| Variable                           | Default / Effect                                                       |
-| ---------------------------------- | ---------------------------------------------------------------------- |
-| `LIVE_L1_RPC`                      | Required L1 RPC for token deployment and L1->L2 deposits               |
-| `LIVE_GW_RPC`                      | Required Gateway RPC; chain ID is discovered from this RPC             |
-| `LIVE_CHAIN_A_RPC`                 | Required source-chain RPC; chain ID is discovered from this RPC        |
-| `LIVE_CHAIN_B_RPC`                 | Required destination-chain RPC; chain ID is discovered from this RPC   |
-| `LIVE_SOURCE_PRIVATE_KEY`          | Required source signer for setup and specs                             |
+| Variable                           | Default / Effect                                                             |
+| ---------------------------------- | ---------------------------------------------------------------------------- |
+| `LIVE_L1_RPC`                      | Required L1 RPC for token deployment and L1->L2 deposits                     |
+| `LIVE_GW_RPC`                      | Required Gateway RPC; chain ID is discovered from this RPC                   |
+| `LIVE_CHAIN_A_RPC`                 | Required source-chain RPC; chain ID is discovered from this RPC              |
+| `LIVE_CHAIN_B_RPC`                 | Required destination-chain RPC; chain ID is discovered from this RPC         |
+| `LIVE_SOURCE_PRIVATE_KEY`          | Required source signer for setup and specs                                   |
 | `LIVE_UNBUNDLER_PRIVATE_KEY`       | Required alternative signer, must be distinct from `LIVE_SOURCE_PRIVATE_KEY` |
-| `LIVE_RECIPIENT_ADDRESS`           | Optional token recipient; defaults to `LIVE_SOURCE_PRIVATE_KEY` wallet |
-| `LIVE_SECONDARY_RECIPIENT_ADDRESS` | Optional second token recipient; defaults to unbundler wallet          |
-| `LIVE_TEST_TOKEN_NAME`             | `Live Interop Test Token`                                              |
-| `LIVE_TEST_TOKEN_SYMBOL`           | `LIT`                                                                  |
-| `LIVE_TEST_TOKEN_AMOUNT`           | `1000`, with 18 decimals                                               |
+| `LIVE_RECIPIENT_ADDRESS`           | Optional token recipient; defaults to `LIVE_SOURCE_PRIVATE_KEY` wallet       |
+| `LIVE_SECONDARY_RECIPIENT_ADDRESS` | Optional second token recipient; defaults to unbundler wallet                |
+| `LIVE_TEST_TOKEN_NAME`             | `Live Interop Test Token`                                                    |
+| `LIVE_TEST_TOKEN_SYMBOL`           | `LIT`                                                                        |
+| `LIVE_TEST_TOKEN_AMOUNT`           | `1000`, with 18 decimals                                                     |
 
 ## Test Specs
 
