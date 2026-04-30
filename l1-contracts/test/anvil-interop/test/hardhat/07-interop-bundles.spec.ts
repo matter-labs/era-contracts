@@ -57,6 +57,7 @@ const ERC20_TOKEN_MIN = BigNumber.from(100);
 const ERC20_TOKEN_MAX = BigNumber.from(10000);
 const ROUNDTRIP_TOKEN_MINT_AMOUNT = ethers.utils.parseUnits("1000", 18);
 const ROUNDTRIP_TOKEN_TRANSFER_AMOUNT = ethers.utils.parseUnits("1", 18);
+const EXCESS_MSG_VALUE_DELTA = BigNumber.from(1);
 
 /**
  * 07 - Interop Bundles (sendBundle / executeBundle)
@@ -758,7 +759,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
     const interopFee = await currentInteropFee();
     const correctValue = interopFee.add(amount);
-    const excessValue = correctValue.add(ethers.utils.parseEther("1"));
+    const excessValue = correctValue.add(EXCESS_MSG_VALUE_DELTA);
 
     const callStarters: CallStarter[] = [
       {

@@ -9,6 +9,7 @@ import {
   getInteropTestAddress,
   getInteropUnbundlerAddress,
   getInteropUnbundlerPrivateKey,
+  isLiveInteropMode,
 } from "../../src/core/accounts";
 import {
   BundleStatus,
@@ -225,6 +226,13 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     });
   }
 
+  async function executeOrSimulateFailingBundle(sendResult: InteropSendResult): Promise<unknown> {
+    if (isLiveInteropMode()) {
+      return simulateExecuteBundle(destProvider, sendResult, sourceChainId);
+    }
+    return executeBundle(destProvider, sendResult.bundleData, sourceChainId);
+  }
+
   it("Cannot unbundle a non-verified bundle", async () => {
     const { bundleData } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
 
@@ -241,10 +249,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const { sendResult, bundleData, bundleHash } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
 
     // First, simulate atomic executeBundle - should revert because call 1 will fail.
-    await expectRevert(
-      () => simulateExecuteBundle(destProvider, sendResult, sourceChainId),
-      "executeBundle with failing call"
-    );
+    await expectRevert(() => executeOrSimulateFailingBundle(sendResult), "executeBundle with failing call");
 
     // Now call verifyBundle - should succeed
     const verifyReceipt = await verifyBundle(destProvider, bundleData, sourceChainId);
@@ -413,10 +418,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const { sendResult, bundleHash, baseAmount, tokenAmount } = await sendAndPrepareBundle({});
 
     // Simulate atomic executeBundle first - should revert (failing call).
-    await expectRevert(
-      () => simulateExecuteBundle(destProvider, sendResult, sourceChainId),
-      "executeBundle with failing call"
-    );
+    await expectRevert(() => executeOrSimulateFailingBundle(sendResult), "executeBundle with failing call");
 
     // Build the final call statuses: execute calls 0 and 2, cancel call 1
     const finalCallStatuses = [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed];
