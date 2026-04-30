@@ -6,10 +6,16 @@ use anyhow::Context;
 use clap::Parser;
 use ethers::middleware::Middleware;
 use ethers::types::{Address, BlockNumber, Bytes, TransactionRequest, H256, U256};
+use futures::future::try_join_all;
 use serde_json::Value;
 
 use ethers::providers::{Http, Provider};
 use ethers::signers::Signer;
+
+/// Maximum number of txs submitted + awaited concurrently per chunk.
+/// Bounds anvil RPC pressure (vs. firing all txs at once) without giving up
+/// most of the parallelism on bundles of typical size (15-30 txs).
+const MAX_INFLIGHT: usize = 10;
 
 use crate::common::logger;
 
@@ -93,65 +99,92 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
         .await
         .context("eth_getTransactionCount(pending)")?;
 
-    // Parse + sign + submit all txs concurrently.
-    let pending = try_join_all(safe_txs.iter().enumerate().map(|(idx, tx)| {
-        let client = &client;
-        async move {
-            let to: Address = tx
-                .get("to")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `to`"))?
-                .parse()
-                .with_context(|| format!("Safe tx #{idx} `to` is not a valid address"))?;
-            let data_hex = tx
-                .get("data")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `data`"))?;
-            let data = Bytes::from(
-                ethers::utils::hex::decode(data_hex.trim_start_matches("0x"))
-                    .with_context(|| format!("Safe tx #{idx} `data` is not valid hex"))?,
-            );
-            let value_str = tx
-                .get("value")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `value`"))?;
-            let value = parse_decimal_or_hex_u256(value_str)
-                .with_context(|| format!("Safe tx #{idx} `value` is not a valid number"))?;
+    // Submit + await in chunks of MAX_INFLIGHT. Within a chunk, all txs are
+    // signed/submitted/awaited concurrently; chunks run sequentially. This
+    // bounds anvil's RPC pressure (vs. firing every tx at once, which let a
+    // flood of concurrent receipt pollers saturate anvil and stall tx import)
+    // while keeping most of the parallelism on bundles of typical size.
+    let total = safe_txs.len();
+    let mut tx_hashes: Vec<H256> = Vec::with_capacity(total);
+    let mut receipts = Vec::with_capacity(total);
+    for (chunk_idx, chunk) in safe_txs.chunks(MAX_INFLIGHT).enumerate() {
+        let chunk_offset = chunk_idx * MAX_INFLIGHT;
+        eprintln!(
+            "execute-safe: chunk {}/{} ({} tx(s))",
+            chunk_idx + 1,
+            (total + MAX_INFLIGHT - 1) / MAX_INFLIGHT,
+            chunk.len(),
+        );
 
-            // Legacy (type-0) tx, pre-set gas/gas_price/nonce so ethers skips
-            // all three of `eth_estimateGas`, `eth_gasPrice`, and
-            // `eth_getTransactionCount` — each of those would serialize the
-            // bundle.
-            let req = TransactionRequest::new()
-                .from(from)
-                .to(to)
-                .data(data)
-                .value(value)
-                .chain_id(chain_id)
-                .gas(30_000_000u64)
-                .gas_price(1_000_000_000u64)
-                .nonce(base_nonce + idx);
+        let pending = try_join_all(chunk.iter().enumerate().map(|(within, tx)| {
+            let idx = chunk_offset + within;
+            let client = &client;
+            async move {
+                let to: Address = tx
+                    .get("to")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `to`"))?
+                    .parse()
+                    .with_context(|| format!("Safe tx #{idx} `to` is not a valid address"))?;
+                let data_hex = tx
+                    .get("data")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `data`"))?;
+                let data = Bytes::from(
+                    ethers::utils::hex::decode(data_hex.trim_start_matches("0x"))
+                        .with_context(|| format!("Safe tx #{idx} `data` is not valid hex"))?,
+                );
+                let value_str = tx
+                    .get("value")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `value`"))?;
+                let value = parse_decimal_or_hex_u256(value_str)
+                    .with_context(|| format!("Safe tx #{idx} `value` is not a valid number"))?;
 
-            client
-                .send_transaction(req, None)
-                .await
-                .with_context(|| format!("eth_sendTransaction for Safe tx #{idx} (to {to:#x})"))
-        }
-    }))
-    .await?;
+                let datalen = data.len();
+                let req = TransactionRequest::new()
+                    .from(from)
+                    .to(to)
+                    .data(data)
+                    .value(value)
+                    .chain_id(chain_id)
+                    .gas(30_000_000u64)
+                    .gas_price(1_000_000_000u64)
+                    .nonce(base_nonce + idx);
 
-    // Await all receipts concurrently.
-    let tx_hashes: Vec<H256> = pending.iter().map(|p| p.tx_hash()).collect();
-    let receipts = try_join_all(pending.into_iter().enumerate().map(|(idx, pending)| {
-        let tx_hash = tx_hashes[idx];
-        async move {
-            pending
-                .await
-                .with_context(|| format!("await receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?
-                .ok_or_else(|| anyhow::anyhow!("no receipt for Safe tx #{idx} (hash {tx_hash:#x})"))
-        }
-    }))
-    .await?;
+                eprintln!(
+                    "execute-safe: tx #{idx}/{total} → {to:#x} (datalen={datalen}) submitting..."
+                );
+                client
+                    .send_transaction(req, None)
+                    .await
+                    .with_context(|| format!("eth_sendTransaction for Safe tx #{idx} (to {to:#x})"))
+            }
+        }))
+        .await?;
+
+        let chunk_hashes: Vec<H256> = pending.iter().map(|p| p.tx_hash()).collect();
+        let chunk_receipts =
+            try_join_all(pending.into_iter().enumerate().map(|(within, pending)| {
+                let idx = chunk_offset + within;
+                let tx_hash = chunk_hashes[within];
+                async move {
+                    let receipt = pending
+                        .await
+                        .with_context(|| format!("await receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?
+                        .ok_or_else(|| anyhow::anyhow!("no receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?;
+                    eprintln!(
+                        "execute-safe: tx #{idx} mined in block {:?} status={:?}",
+                        receipt.block_number, receipt.status
+                    );
+                    Ok::<_, anyhow::Error>(receipt)
+                }
+            }))
+            .await?;
+
+        tx_hashes.extend(chunk_hashes);
+        receipts.extend(chunk_receipts);
+    }
 
     for (idx, receipt) in receipts.iter().enumerate() {
         let status = receipt.status.unwrap_or_default();

@@ -21,7 +21,7 @@ use crate::common::{
     wallets::Wallet,
     SharedRunArgs,
 };
-use crate::config::forge_interface::script_params::FoundryScriptParams;
+use crate::config::forge_interface::script_params::ForgeScriptParams;
 
 /// Result of a forge script execution containing the broadcast JSON payload.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -178,7 +178,7 @@ impl ForgeRunner {
         Ok(())
     }
 
-    pub fn script(&self, invocation: &FoundryScriptParams) -> ForgeScript {
+    pub fn script(&self, invocation: &ForgeScriptParams) -> ForgeScript {
         let mut forge = Forge::new(&self.foundry_scripts_path)
             .script(&invocation.script(), self.forge_args.clone());
 
@@ -197,7 +197,7 @@ impl ForgeRunner {
 
     pub fn with_script_call<T: Tokenize>(
         &self,
-        invocation: &FoundryScriptParams,
+        invocation: &ForgeScriptParams,
         function: &str,
         args: T,
     ) -> anyhow::Result<ForgeScript> {

@@ -18,22 +18,24 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::{Address, H256};
+use ethers::types::{Address, Bytes, H256};
+use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::abi_contracts::UPGRADE_V31_CONTRACT;
 use crate::commands::ecosystem::v31_upgrade_full::V31UpgradeFull;
-use crate::commands::ecosystem::v31_upgrade_inner::V31UpgradeInner;
+use crate::commands::ecosystem::v31_upgrade_inner::{V31PrepareInputs, V31UpgradeInner};
 use crate::commands::output::write_output_if_requested;
-use crate::common::paths;
-use crate::common::SharedRunArgs;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
+use crate::common::paths;
+use crate::common::wallets::Wallet;
+use crate::common::SharedRunArgs;
 use crate::config::forge_interface::script_params::{
-    ADMIN_FUNCTIONS_INVOCATION, ECOSYSTEM_UPGRADE_V31_SCRIPT_PATH, UPGRADE_V31_CORE_OUTPUT_PATH,
-    UPGRADE_V31_CTM_OUTPUT_PATH, UPGRADE_V31_ECOSYSTEM_OUTPUT_PATH,
-    UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH,
+    ADMIN_FUNCTIONS_INVOCATION, CORE_UPGRADE_V31_SCRIPT_PATH, CTM_UPGRADE_V31_SCRIPT_PATH,
+    ECOSYSTEM_UPGRADE_V31_SCRIPT_PATH, UPGRADE_V31_CORE_OUTPUT_PATH, UPGRADE_V31_CTM_OUTPUT_PATH,
+    UPGRADE_V31_ECOSYSTEM_OUTPUT_PATH, UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH,
 };
 
 // ── upgrade-prepare ───────────────────────────────────────────────────────
@@ -245,6 +247,32 @@ pub async fn run_upgrade_prepare(args: UpgradePrepareArgs) -> anyhow::Result<()>
         logger::info(format!("Governance (auto-resolved): {:#x}", resolved));
         resolved
     };
+    // Ensure governance owns each registered CTM before the upgrade prepare
+    // script runs. On stage/mainnet the zkOS CTM is initially owned by a
+    // deployer EOA, but the upgrade governance stage 1 calls (e.g. ProxyAdmin
+    // upgradeAndCall) assume governance ownership. Conditional helpers no-op
+    // when ownership is already correct. Each broadcast lands in
+    // `runner.runs()` and is later split per-sender into Safe bundles by
+    // `write_output_if_requested`, so the harness replays them on the main
+    // fork alongside the deployer's bundle.
+    // Broadcast the outer entry call as the deployer — always has a key,
+    // and the function does no permission-gated work itself; it only emits
+    // inner `vm.startBroadcast(<owner>)` bundles where ownership actually
+    // needs transferring (stage/mainnet). On a fixture where ownership is
+    // already correct the only tx recorded is this outer entry call, which
+    // the deployer can sign.
+    runner
+        .run(
+            runner
+                .with_script_call(
+                    &ADMIN_FUNCTIONS_INVOCATION,
+                    "ensureCtmsAndProxyAdminsOwnedByGovernance",
+                    (bridgehub, governance),
+                )?
+                .with_wallet(&deployer),
+        )
+        .context("ensureCtmsAndProxyAdminsOwnedByGovernance")?;
+
     let create2_salt = args.create2_factory_salt.unwrap_or_else(H256::random);
 
     let upgrade_input = contracts_path.join(args.upgrade_input_path.trim_start_matches('/'));
@@ -253,10 +281,15 @@ pub async fn run_upgrade_prepare(args: UpgradePrepareArgs) -> anyhow::Result<()>
     }
 
     // Remove existing script outputs so we only read fresh results from this run.
-    let script_out = contracts_path.join("script-out");
-    let _ = fs::remove_file(script_out.join("v31-upgrade-core.toml"));
-    let _ = fs::remove_file(script_out.join("v31-upgrade-ecosystem.toml"));
-    let _ = fs::remove_file(script_out.join("v31-upgrade-ctm.toml"));
+    // The `UPGRADE_V31_*_OUTPUT_PATH` constants are absolute-style (`/script-out/...`)
+    // because Solidity scripts consume them that way; on the filesystem we resolve
+    // them against the l1-contracts root via `trim_start_matches('/')`, NOT against
+    // `contracts_path/script-out/`, which would double the `script-out/` segment.
+    let _ = fs::remove_file(contracts_path.join(UPGRADE_V31_CORE_OUTPUT_PATH.trim_start_matches('/')));
+    let _ = fs::remove_file(
+        contracts_path.join(UPGRADE_V31_ECOSYSTEM_OUTPUT_PATH.trim_start_matches('/')),
+    );
+    let _ = fs::remove_file(contracts_path.join(UPGRADE_V31_CTM_OUTPUT_PATH.trim_start_matches('/')));
 
     // The Solidity `initL2` hook on InteropCenter (triggered during the L2 upgrade tx)
     // rejects a zero ZK token asset ID, so we resolve a per-network value from the
@@ -264,38 +297,28 @@ pub async fn run_upgrade_prepare(args: UpgradePrepareArgs) -> anyhow::Result<()>
     let l1_network = crate::types::L1Network::from_l1_rpc(&runner.rpc_url)?;
     let zk_token_asset_id = l1_network.zk_token_asset_id();
 
-    let mut script_args = args.shared.forge_args.clone();
-    // The Solidity function takes an EcosystemUpgradeParams struct, which is ABI-encoded as a tuple.
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: "noGovernancePrepare((address,address,address,address,bool,bytes32,string,string,address,bytes32))".to_string(),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args.add_arg(ForgeScriptArg::Broadcast);
-    script_args.add_arg(ForgeScriptArg::Ffi);
-    script_args.add_arg(ForgeScriptArg::GasLimit {
-        gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
-    });
-    // Struct fields are passed as a single tuple argument in parentheses.
-    let params_tuple = format!(
-        "({:#x},{:#x},{:#x},{:#x},{},{:#x},{},{},{:#x},{:#x})",
-        bridgehub,
-        ctm,
-        bytecodes_supplier,
-        rollup_da_manager,
-        is_zk_sync_os,
-        create2_salt,
-        args.upgrade_input_path,
-        args.upgrade_output_path,
-        governance,
-        zk_token_asset_id,
-    );
-    script_args.additional_args.push(params_tuple);
-
-    let script = Forge::new(&contracts_path)
-        .script(Path::new(script_path), script_args)
-        .with_wallet(&sender);
+    let script = runner
+        .script_path_from_root(&contracts_path, Path::new(script_path))
+        .with_contract_call(
+            &UPGRADE_V31_CONTRACT,
+            "noGovernancePrepare",
+            ((
+                bridgehub,
+                ctm,
+                bytecodes_supplier,
+                rollup_da_manager,
+                is_zk_sync_os,
+                create2_salt,
+                args.upgrade_input_path.clone(),
+                args.upgrade_output_path.clone(),
+                governance,
+                zk_token_asset_id,
+            ),),
+        )?
+        .with_broadcast()
+        .with_ffi()
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+        .with_wallet(&deployer);
 
     logger::step("Running ecosystem upgrade-prepare");
     logger::info(format!("RPC URL: {}", runner.rpc_url));
@@ -305,9 +328,9 @@ pub async fn run_upgrade_prepare(args: UpgradePrepareArgs) -> anyhow::Result<()>
         .context("Failed to execute forge script for upgrade-prepare")?;
 
     // Read TOML files written by the script; parse to JSON.
-    let core_path = script_out.join("v31-upgrade-core.toml");
-    let ecosystem_path = script_out.join("v31-upgrade-ecosystem.toml");
-    let ctm_path = script_out.join("v31-upgrade-ctm.toml");
+    let core_path = contracts_path.join(UPGRADE_V31_CORE_OUTPUT_PATH.trim_start_matches('/'));
+    let ecosystem_path = resolve_script_output_path(&contracts_path, &args.upgrade_output_path);
+    let ctm_path = contracts_path.join(UPGRADE_V31_CTM_OUTPUT_PATH.trim_start_matches('/'));
 
     let core_toml = fs::read_to_string(&core_path)
         .with_context(|| format!("Failed to read {}", core_path.display()))?;
@@ -408,6 +431,12 @@ pub struct UpgradeGovernanceArgs {
     pub governance_toml: Vec<PathBuf>,
 }
 
+#[derive(Serialize)]
+struct UpgradeGovernanceOutput {
+    stages: &'static str,
+    governance_address: String,
+}
+
 pub async fn run_upgrade_governance(args: UpgradeGovernanceArgs) -> anyhow::Result<()> {
     let bridgehub = args.topology.resolve()?.bridgehub;
     let mut runner = ForgeRunner::new(&args.shared)?;
@@ -417,26 +446,20 @@ pub async fn run_upgrade_governance(args: UpgradeGovernanceArgs) -> anyhow::Resu
     let sender = runner.prepare_governance_owner(bridgehub).await?;
 
     let contracts_path = resolve_l1_contracts_path(&paths::contracts_root())?;
-    let governance_toml = Some(args.governance_toml.as_path());
+    let toml_refs: Vec<&Path> = args.governance_toml.iter().map(|p| p.as_path()).collect();
 
-    let mut governance_addr = Address::zero();
-    for stage in 0..=2u8 {
-        governance_addr = stage_governance_execute(
-            &mut runner,
-            &sender,
-            &contracts_path,
-            &args.shared.forge_args,
-            governance_toml,
-            bridgehub,
-            stage,
-        )
-        .await
-        .with_context(|| format!("governance stage {stage}"))?;
-    }
+    let governance_address = replay_governance_stages(
+        &mut runner,
+        &sender,
+        &contracts_path,
+        bridgehub,
+        toml_refs.as_slice(),
+    )
+    .await?;
 
     let out_payload = UpgradeGovernanceOutput {
         stages: "0,1,2",
-        governance_address: format!("{:#x}", governance_addr),
+        governance_address: format!("{:#x}", governance_address),
     };
     write_output_if_requested(
         "ecosystem.upgrade-governance",
@@ -458,7 +481,132 @@ pub async fn run_upgrade_governance(args: UpgradeGovernanceArgs) -> anyhow::Resu
     Ok(())
 }
 
-fn resolve_l1_contracts_path(repo_root: &Path) -> anyhow::Result<PathBuf> {
+// ── governance replay (used by `run_upgrade_governance`) ──────────────────
+
+#[derive(Debug, Deserialize)]
+struct GovernanceCalls {
+    stage0_calls: String,
+    stage1_calls: String,
+    stage2_calls: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct EcosystemUpgradeOutput {
+    governance_calls: GovernanceCalls,
+}
+
+/// Replay stage 0/1/2 governance calls from one or more prepared TOMLs.
+///
+/// All stage-0 calls (across the TOMLs in the order given) execute first,
+/// then all stage-1, then all stage-2. Each `governanceExecuteCalls`
+/// invocation is signed by `sender` (the governance owner) so they merge
+/// into one governance Safe bundle. Returns the resolved governance contract
+/// address for diagnostics.
+///
+/// When `governance_tomls` is empty, falls back to the canonical
+/// `script-out/...` path written by the legacy monolithic prepare flow.
+pub async fn replay_governance_stages(
+    runner: &mut ForgeRunner,
+    sender: &Wallet,
+    contracts_path: &Path,
+    bridgehub: Address,
+    governance_tomls: &[&Path],
+) -> anyhow::Result<Address> {
+    let mut governance_addr = Address::zero();
+    for stage in 0..=2u8 {
+        if governance_tomls.is_empty() {
+            governance_addr =
+                stage_governance_execute(runner, sender, contracts_path, None, bridgehub, stage)
+                    .await
+                    .with_context(|| format!("governance stage {stage} (default TOML)"))?;
+        } else {
+            for toml_path in governance_tomls {
+                governance_addr = stage_governance_execute(
+                    runner,
+                    sender,
+                    contracts_path,
+                    Some(*toml_path),
+                    bridgehub,
+                    stage,
+                )
+                .await
+                .with_context(|| format!("governance stage {stage} ({})", toml_path.display()))?;
+            }
+        }
+    }
+    Ok(governance_addr)
+}
+
+fn read_governance_stage_calls(
+    contracts_path: &Path,
+    governance_toml: Option<&Path>,
+    stage: u8,
+) -> anyhow::Result<String> {
+    let default_path =
+        contracts_path.join(UPGRADE_V31_ECOSYSTEM_OUTPUT_PATH.trim_start_matches('/'));
+    let output_path = governance_toml.unwrap_or(&default_path);
+    let toml_content = fs::read_to_string(output_path).with_context(|| {
+        format!(
+            "Failed to read ecosystem upgrade TOML: {}",
+            output_path.display()
+        )
+    })?;
+    let upgrade_output: EcosystemUpgradeOutput =
+        toml::from_str(&toml_content).context("Failed to parse ecosystem upgrade TOML")?;
+    Ok(match stage {
+        0 => upgrade_output.governance_calls.stage0_calls,
+        1 => upgrade_output.governance_calls.stage1_calls,
+        2 => upgrade_output.governance_calls.stage2_calls,
+        _ => anyhow::bail!("Invalid stage: {}. Must be 0, 1, or 2", stage),
+    })
+}
+
+async fn stage_governance_execute(
+    runner: &mut ForgeRunner,
+    sender: &Wallet,
+    contracts_path: &Path,
+    governance_toml: Option<&Path>,
+    bridgehub: Address,
+    stage: u8,
+) -> anyhow::Result<Address> {
+    let encoded_calls_hex = read_governance_stage_calls(contracts_path, governance_toml, stage)?;
+
+    let governance_addr =
+        crate::common::l1_contracts::resolve_governance(&runner.rpc_url, bridgehub)
+            .await
+            .context("Failed to auto-resolve governance address from bridgehub")?;
+    logger::info(format!(
+        "Governance (auto-resolved): {:#x}",
+        governance_addr
+    ));
+
+    let script = runner
+        .with_script_call(
+            &ADMIN_FUNCTIONS_INVOCATION,
+            "governanceExecuteCalls",
+            (
+                Bytes::from(
+                    hex::decode(encoded_calls_hex.trim_start_matches("0x"))
+                        .context("invalid governance calls hex")?,
+                ),
+                governance_addr,
+            ),
+        )?
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
+        .with_wallet(sender);
+
+    logger::step(format!("Running governance stage {}", stage));
+    logger::info(format!("Governance address: {:#x}", governance_addr));
+
+    runner.run(script).with_context(|| {
+        format!("Failed to execute forge script for governance stage {stage}")
+    })?;
+
+    logger::success(format!("Governance stage {} completed", stage));
+    Ok(governance_addr)
+}
+
+pub fn resolve_l1_contracts_path(repo_root: &Path) -> anyhow::Result<PathBuf> {
     let direct = repo_root.join("l1-contracts");
     if direct.exists() {
         return Ok(direct);
@@ -477,101 +625,138 @@ fn resolve_l1_contracts_path(repo_root: &Path) -> anyhow::Result<PathBuf> {
     )
 }
 
-#[derive(Debug, Deserialize)]
-struct GovernanceCalls {
-    stage0_calls: String,
-    stage1_calls: String,
-    stage2_calls: String,
+// ── upgrade-prepare-all (split-flow orchestrator) ──────────────────────────
+
+/// Unified split-flow prepare. Runs `CoreUpgrade_v31.noGovernancePrepare` once
+/// and `CTMUpgrade_v31.noGovernancePrepare` once per `--ctm-proxy`, all on a
+/// single anvil fork so deployer broadcasts merge into one Safe bundle. The
+/// downstream `upgrade-governance` consumes the per-step TOMLs (passed as
+/// `--governance-toml` once each).
+#[derive(Debug, Clone, Serialize, Deserialize, Parser)]
+pub struct UpgradePrepareAllArgs {
+    #[clap(flatten)]
+    #[serde(flatten)]
+    pub shared: SharedRunArgs,
+
+    #[clap(flatten)]
+    #[serde(flatten)]
+    pub topology: crate::common::EcosystemArgs,
+
+    #[clap(long)]
+    pub deployer_address: Address,
+
+    /// Target CTMs to upgrade. Pass once per CTM (e.g. ZKsyncOS CTM and EraVM
+    /// CTM on stage). Each must already have at least one registered chain so
+    /// rollup-DA-manager auto-resolution works.
+    #[clap(long = "ctm-proxy", num_args = 1..)]
+    pub ctm_proxies: Vec<Address>,
+
+    #[clap(long)]
+    pub create2_factory_salt: Option<H256>,
+
+    #[clap(
+        long,
+        default_value = UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH,
+        hide = true
+    )]
+    pub upgrade_input_path: String,
+
+    /// Override the core-prepare output TOML path (relative to l1-contracts
+    /// root). Defaults to the canonical `script-out/v31-upgrade-core.toml`.
+    #[clap(long, default_value = UPGRADE_V31_CORE_OUTPUT_PATH, hide = true)]
+    pub core_output_path: String,
+
+    #[clap(long, default_value = CORE_UPGRADE_V31_SCRIPT_PATH, hide = true)]
+    pub core_script_path: String,
+
+    #[clap(long, default_value = CTM_UPGRADE_V31_SCRIPT_PATH, hide = true)]
+    pub ctm_script_path: String,
 }
 
-#[derive(Debug, Deserialize)]
-struct EcosystemUpgradeOutput {
-    governance_calls: GovernanceCalls,
+#[derive(Serialize)]
+struct UpgradePrepareAllOutput {
+    core_governance_toml: String,
+    ctm_governance_tomls: Vec<CtmGovernanceTomlEntry>,
 }
 
-/// Load the `stage{N}_calls` hex blob from the prepared ecosystem-upgrade
-/// TOML (defaults to the canonical `script-out/...` location if no explicit
-/// path is given).
-fn read_governance_stage_calls(
-    contracts_path: &Path,
-    governance_toml: Option<&Path>,
-    stage: u8,
-) -> anyhow::Result<String> {
-    let default_path = contracts_path.join("script-out/v31-upgrade-ecosystem.toml");
-    let output_path = governance_toml.unwrap_or(&default_path);
-    let toml_content = fs::read_to_string(output_path).with_context(|| {
-        format!(
-            "Failed to read ecosystem upgrade TOML: {}",
-            output_path.display()
-        )
-    })?;
-    let upgrade_output: EcosystemUpgradeOutput =
-        toml::from_str(&toml_content).context("Failed to parse ecosystem upgrade TOML")?;
-    let encoded_calls_hex = match stage {
-        0 => upgrade_output.governance_calls.stage0_calls,
-        1 => upgrade_output.governance_calls.stage1_calls,
-        2 => upgrade_output.governance_calls.stage2_calls,
-        _ => anyhow::bail!("Invalid stage: {}. Must be 0, 1, or 2", stage),
+#[derive(Serialize)]
+struct CtmGovernanceTomlEntry {
+    ctm_proxy: String,
+    governance_toml: String,
+}
+
+pub async fn run_upgrade_prepare_all(args: UpgradePrepareAllArgs) -> anyhow::Result<()> {
+    if args.ctm_proxies.is_empty() {
+        anyhow::bail!("at least one --ctm-proxy must be provided");
+    }
+
+    let bridgehub = args.topology.resolve()?.bridgehub;
+    let mut runner = ForgeRunner::new(&args.shared)?;
+    let deployer = runner.prepare_sender(args.deployer_address).await?;
+
+    let contracts_path = resolve_l1_contracts_path(&paths::contracts_root())?;
+
+    let inputs = V31PrepareInputs {
+        ctm_proxies: args.ctm_proxies.clone(),
+        create2_factory_salt: args.create2_factory_salt,
+        upgrade_input_path: args.upgrade_input_path.clone(),
+        core_output_path: args.core_output_path.clone(),
+        core_script_path: args.core_script_path.clone(),
+        ctm_script_path: args.ctm_script_path.clone(),
     };
-    Ok(encoded_calls_hex)
+    let full = V31UpgradeFull::new(V31UpgradeInner::new(&contracts_path, bridgehub));
+    let prepared = full.prepare(&mut runner, &deployer, &inputs).await?;
+
+    // Copy each emitted TOML into `out_dir/governance-tomls/` so callers can
+    // pass them back into `upgrade-governance` as `--governance-toml` args.
+    let governance_tomls_dir = args.shared.out.clone().map(|d| d.join("governance-tomls"));
+    let core_governance_toml = if let Some(dir) = &governance_tomls_dir {
+        let dst = dir.join("v31-upgrade-core.toml");
+        copy_governance_toml(&prepared.core_toml, &dst)?;
+        dst
+    } else {
+        prepared.core_toml.clone()
+    };
+    let mut ctm_governance_tomls: Vec<CtmGovernanceTomlEntry> =
+        Vec::with_capacity(prepared.ctm_tomls.len());
+    for (ctm, src) in &prepared.ctm_tomls {
+        let dst = if let Some(dir) = &governance_tomls_dir {
+            let target = dir.join(format!("v31-upgrade-ctm-{ctm:#x}.toml"));
+            copy_governance_toml(src, &target)?;
+            target
+        } else {
+            src.clone()
+        };
+        ctm_governance_tomls.push(CtmGovernanceTomlEntry {
+            ctm_proxy: format!("{ctm:#x}"),
+            governance_toml: dst.display().to_string(),
+        });
+    }
+
+    let out_payload = UpgradePrepareAllOutput {
+        core_governance_toml: core_governance_toml.display().to_string(),
+        ctm_governance_tomls,
+    };
+    write_output_if_requested(
+        "ecosystem.upgrade-prepare-all",
+        &args.shared,
+        &runner,
+        &serde_json::json!({}),
+        &out_payload,
+    )
+    .await?;
+
+    logger::success("upgrade-prepare-all completed");
+    Ok(())
 }
 
-/// Execute one `governanceExecuteCalls` invocation against an existing
-/// `runner`. Called three times back-to-back from `run_upgrade_governance`
-/// (once per stage 0/1/2) so the emitted Safe bundle contains all three.
-async fn stage_governance_execute(
-    runner: &mut ForgeRunner,
-    sender: &Wallet,
-    contracts_path: &Path,
-    forge_args: &crate::common::forge::ForgeScriptArgs,
-    governance_toml: Option<&Path>,
-    bridgehub: Address,
-    stage: u8,
-) -> anyhow::Result<Address> {
-    let encoded_calls_hex = read_governance_stage_calls(contracts_path, governance_toml, stage)?;
-
-    let governance_addr =
-        crate::common::l1_contracts::resolve_governance(&runner.rpc_url, bridgehub)
-            .await
-            .context("Failed to auto-resolve governance address from bridgehub")?;
-    logger::info(format!(
-        "Governance (auto-resolved): {:#x}",
-        governance_addr
-    ));
-
-    let script_path = "deploy-scripts/AdminFunctions.s.sol";
-    let mut script_args = forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: "governanceExecuteCalls(bytes,address)".to_string(),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args.add_arg(ForgeScriptArg::Broadcast);
-    script_args.add_arg(ForgeScriptArg::Ffi);
-    script_args.add_arg(ForgeScriptArg::GasLimit {
-        gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
-    });
-    script_args.additional_args.extend([
-        format!("0x{}", encoded_calls_hex.trim_start_matches("0x")),
-        format!("{:#x}", governance_addr),
-    ]);
-
-    let script = Forge::new(contracts_path)
-        .script(Path::new(script_path), script_args)
-        .with_wallet(sender);
-
-    logger::step(format!("Running governance stage {}", stage));
-    logger::info(format!("Governance address: {:#x}", governance_addr));
-    logger::info(format!("RPC URL: {}", runner.rpc_url));
-
-    runner.run(script).with_context(|| {
-        format!(
-            "Failed to execute forge script for governance stage {}",
-            stage
-        )
-    })?;
-
-    logger::success(format!("Governance stage {} completed", stage));
-    Ok(governance_addr)
+fn copy_governance_toml(src: &Path, dst: &Path) -> anyhow::Result<()> {
+    if let Some(parent) = dst.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::copy(src, dst)
+        .with_context(|| format!("Failed to copy governance TOML to {}", dst.display()))?;
+    logger::info(format!("Governance TOML written to: {}", dst.display()));
+    Ok(())
 }
+
