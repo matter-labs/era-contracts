@@ -5,11 +5,13 @@ import { createPublicClient, createWalletClient, http } from "viem";
 import type { Address, Chain, Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { getAbi } from "../core/contracts";
-import { L2_BRIDGEHUB_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR, L2_TO_L1_MESSENGER_ADDR } from "../core/const";
+import {
+  INTEROP_BUNDLE_TUPLE_TYPE,
+  L2_BRIDGEHUB_ADDR,
+  L2_INTEROP_ROOT_STORAGE_ADDR,
+  L2_TO_L1_MESSENGER_ADDR,
+} from "../core/const";
 import type { FinalizeWithdrawalParams } from "../core/types";
-
-const INTEROP_BUNDLE_ABI =
-  "tuple(bytes1 version, uint256 sourceChainId, uint256 destinationChainId, bytes32 destinationBaseTokenAssetId, bytes32 interopBundleSalt, tuple(bytes1 version, bool shadowAccount, address to, address from, uint256 value, bytes data)[] calls, (bytes executionAddress, bytes unbundlerAddress, bool useFixedFee) bundleAttributes)";
 
 const DEFAULT_LIVE_INTEROP_PROOF_TYPE = "messageRoot";
 const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000;
@@ -190,7 +192,7 @@ async function getInteropBundleData(
   const response = await getFinalizeWithdrawalParams(provider, receipt, index, timeoutMs, proofType);
   const message = normalizeHex(response.message);
   const bundlePayload = stripBundleIdentifier(message);
-  const decodedRequest = abiCoder.decode([INTEROP_BUNDLE_ABI], bundlePayload);
+  const decodedRequest = abiCoder.decode([INTEROP_BUNDLE_TUPLE_TYPE], bundlePayload);
   const decodedBundle = decodedRequest[0];
 
   const calls = [];
@@ -205,22 +207,18 @@ async function getInteropBundleData(
     });
   }
 
-  const xl2Input = {
-    version: decodedBundle[0],
-    sourceChainId: decodedBundle[1],
-    destinationChainId: decodedBundle[2],
-    destinationBaseTokenAssetId: decodedBundle[3],
-    interopBundleSalt: decodedBundle[4],
-    calls,
-    bundleAttributes: {
-      executionAddress: decodedBundle[6][0],
-      unbundlerAddress: decodedBundle[6][1],
-      useFixedFee: decodedBundle[6][2],
-    },
-  };
+  const normalizedBundle = [
+    decodedBundle[0],
+    decodedBundle[1],
+    decodedBundle[2],
+    decodedBundle[3],
+    decodedBundle[4],
+    calls.map((call) => [call.version, call.shadowAccount, call.to, call.from, call.value, call.data]),
+    [decodedBundle[6][0], decodedBundle[6][1], decodedBundle[6][2]],
+  ];
 
   const chainId = (await provider.getNetwork()).chainId;
-  const rawData = abiCoder.encode([INTEROP_BUNDLE_ABI], [xl2Input]);
+  const rawData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [normalizedBundle]);
   const proofDecoded: MessageInclusionProof = {
     chainId,
     l1BatchNumber: response.l1BatchNumber,
