@@ -99,14 +99,13 @@ impl ForgeScriptParams {
     }
 }
 
-pub const DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION: ForgeScriptParams =
-    ForgeScriptParams::new(
-        "script-config/config-deploy-l1.toml",
-        "script-out/output-deploy-l1.toml",
-        "deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol",
-    )
-    .with_ffi()
-    .with_rpc_url();
+pub const DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
+    "script-config/config-deploy-l1.toml",
+    "script-out/output-deploy-l1.toml",
+    "deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol",
+)
+.with_ffi()
+.with_rpc_url();
 
 lazy_static! {
     pub static ref DEPLOY_CTM_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
@@ -199,13 +198,12 @@ lazy_static! {
     .with_abi(&ENABLE_EVM_EMULATOR_CONTRACT)
     .with_ffi()
     .with_rpc_url();
-    pub static ref REGISTER_ON_ALL_CHAINS_INVOCATION: ForgeScriptParams =
-        ForgeScriptParams::new(
-            "script-config/register-on-all-chains.toml",
-            "script-out/output-register-on-all-chains.toml",
-            "deploy-scripts/ecosystem/RegisterOnAllChains.s.sol",
-        )
-        .with_abi(&REGISTER_ON_ALL_CHAINS_CONTRACT)
-        .with_ffi()
-        .with_rpc_url();
+    pub static ref REGISTER_ON_ALL_CHAINS_INVOCATION: ForgeScriptParams = ForgeScriptParams::new(
+        "script-config/register-on-all-chains.toml",
+        "script-out/output-register-on-all-chains.toml",
+        "deploy-scripts/ecosystem/RegisterOnAllChains.s.sol",
+    )
+    .with_abi(&REGISTER_ON_ALL_CHAINS_CONTRACT)
+    .with_ffi()
+    .with_rpc_url();
 }

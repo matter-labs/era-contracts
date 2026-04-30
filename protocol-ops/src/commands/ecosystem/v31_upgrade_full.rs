@@ -50,9 +50,11 @@ impl<'a> V31UpgradeFull<'a> {
         runner: &mut ForgeRunner,
         deployer: &Wallet,
     ) -> anyhow::Result<()> {
-        let governance =
-            crate::common::l1_contracts::resolve_governance(&runner.rpc_url, self.inner.bridgehub())
-                .await?;
+        let governance = crate::common::l1_contracts::resolve_governance(
+            &runner.rpc_url,
+            self.inner.bridgehub(),
+        )
+        .await?;
         runner.run(
             runner
                 .with_script_call(

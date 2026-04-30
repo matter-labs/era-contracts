@@ -285,11 +285,13 @@ pub async fn run_upgrade_prepare(args: UpgradePrepareArgs) -> anyhow::Result<()>
     // because Solidity scripts consume them that way; on the filesystem we resolve
     // them against the l1-contracts root via `trim_start_matches('/')`, NOT against
     // `contracts_path/script-out/`, which would double the `script-out/` segment.
-    let _ = fs::remove_file(contracts_path.join(UPGRADE_V31_CORE_OUTPUT_PATH.trim_start_matches('/')));
+    let _ =
+        fs::remove_file(contracts_path.join(UPGRADE_V31_CORE_OUTPUT_PATH.trim_start_matches('/')));
     let _ = fs::remove_file(
         contracts_path.join(UPGRADE_V31_ECOSYSTEM_OUTPUT_PATH.trim_start_matches('/')),
     );
-    let _ = fs::remove_file(contracts_path.join(UPGRADE_V31_CTM_OUTPUT_PATH.trim_start_matches('/')));
+    let _ =
+        fs::remove_file(contracts_path.join(UPGRADE_V31_CTM_OUTPUT_PATH.trim_start_matches('/')));
 
     // The Solidity `initL2` hook on InteropCenter (triggered during the L2 upgrade tx)
     // rejects a zero ZK token asset ID, so we resolve a per-network value from the
@@ -598,9 +600,9 @@ async fn stage_governance_execute(
     logger::step(format!("Running governance stage {}", stage));
     logger::info(format!("Governance address: {:#x}", governance_addr));
 
-    runner.run(script).with_context(|| {
-        format!("Failed to execute forge script for governance stage {stage}")
-    })?;
+    runner
+        .run(script)
+        .with_context(|| format!("Failed to execute forge script for governance stage {stage}"))?;
 
     logger::success(format!("Governance stage {} completed", stage));
     Ok(governance_addr)
@@ -759,4 +761,3 @@ fn copy_governance_toml(src: &Path, dst: &Path) -> anyhow::Result<()> {
     logger::info(format!("Governance TOML written to: {}", dst.display()));
     Ok(())
 }
-

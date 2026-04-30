@@ -112,7 +112,7 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
         eprintln!(
             "execute-safe: chunk {}/{} ({} tx(s))",
             chunk_idx + 1,
-            (total + MAX_INFLIGHT - 1) / MAX_INFLIGHT,
+            total.div_ceil(MAX_INFLIGHT),
             chunk.len(),
         );
 
@@ -171,8 +171,12 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
                 async move {
                     let receipt = pending
                         .await
-                        .with_context(|| format!("await receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?
-                        .ok_or_else(|| anyhow::anyhow!("no receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?;
+                        .with_context(|| {
+                            format!("await receipt for Safe tx #{idx} (hash {tx_hash:#x})")
+                        })?
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("no receipt for Safe tx #{idx} (hash {tx_hash:#x})")
+                        })?;
                     eprintln!(
                         "execute-safe: tx #{idx} mined in block {:?} status={:?}",
                         receipt.block_number, receipt.status

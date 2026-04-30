@@ -43,9 +43,7 @@ pub(crate) async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
     match args {
         EcosystemCommands::Init(args) => init::run(args).await,
         EcosystemCommands::UpgradePrepare(args) => upgrade::run_upgrade_prepare(args).await,
-        EcosystemCommands::UpgradePrepareAll(args) => {
-            upgrade::run_upgrade_prepare_all(args).await
-        }
+        EcosystemCommands::UpgradePrepareAll(args) => upgrade::run_upgrade_prepare_all(args).await,
         EcosystemCommands::UpgradeGovernance(args) => upgrade::run_upgrade_governance(args).await,
     }
 }

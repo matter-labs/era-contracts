@@ -134,9 +134,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
 
     function migrateChainToGateway(uint256 migratingChainId) public {
         AdminFunctions adminScript = new AdminFunctions();
-        (bytes memory gatewayDiamondCutData, ) = GetDiamondCutData.getDiamondCutAndForceDeployment(
-            gatewayCTMAddress
-        );
+        (bytes memory gatewayDiamondCutData, ) = GetDiamondCutData.getDiamondCutAndForceDeployment(gatewayCTMAddress);
         adminScript.migrateChainToGatewayWithCutData(
             _gatewayGovernanceConfig.bridgehubProxy,
             _getL1GasPrice(),
