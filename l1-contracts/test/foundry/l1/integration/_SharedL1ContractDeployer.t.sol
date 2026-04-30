@@ -104,7 +104,6 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         );
         _acceptOwnershipCore();
         _acceptOwnershipCTM();
-        _setEraBatch();
 
         addresses.bridgehubOwnerAddress = addresses.bridgehub.owner();
     }

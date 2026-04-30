@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
-import {RAND_ADDRESS} from "test/foundry/TestConstants.sol"; 
+import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
 
 /// @notice Unit tests for UnsafeBytes library
 contract UnsafeBytesTest is Test {

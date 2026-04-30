@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
-import {RAND_ADDRESS} from "test/foundry/TestConstants.sol"; 
+import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
 
 /// @notice Helper contract to test InteroperableAddress library with calldata functions
 contract InteroperableAddressHelper {

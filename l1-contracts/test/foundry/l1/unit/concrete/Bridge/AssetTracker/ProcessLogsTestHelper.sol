@@ -27,7 +27,7 @@ import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/Dynamic
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 import {GWAssetTrackerTestHelper} from "./GWAssetTracker.t.sol";
-import {RAND_ADDRESS} from "test/foundry/TestConstants.sol"; 
+import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
 
 /// @title ProcessLogsTestHelper
 /// @notice Reusable helpers for composing L2 logs, InteropBundle messages, and ProcessLogsInput structs in tests.
