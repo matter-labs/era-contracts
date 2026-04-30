@@ -123,6 +123,7 @@ interface IAdminFunctions {
         uint256 l1GasPrice,
         uint256 l2ChainId,
         uint256 gatewayChainId,
+        string calldata gatewayRpcUrl,
         address refundRecipient,
         bool shouldSend
     ) external;

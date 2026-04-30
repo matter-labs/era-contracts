@@ -2,6 +2,8 @@
 pragma solidity ^0.8.21;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
 import {IAdminFunctions} from "contracts/script-interfaces/IAdminFunctions.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
@@ -27,7 +29,8 @@ import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayT
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
-import {BridgehubBurnCTMAssetData} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
@@ -709,6 +712,13 @@ contract AdminFunctions is Script, IAdminFunctions {
         uint256 l1GasPrice;
         uint256 l2ChainId;
         uint256 gatewayChainId;
+        // Gateway L2 RPC URL — the inner resolves diamond cut data by
+        // fork-switching to gateway L2 (the gateway-side CTM only exists
+        // there). Empty string means "caller has pre-resolved bytes" and
+        // `gatewayDiamondCutData` is used instead — used by the foundry
+        // test fixture where the CTM is on the same chain.
+        string gatewayRpcUrl;
+        bytes gatewayDiamondCutData;
         address refundRecipient;
         bool _shouldSend;
     }
@@ -738,9 +748,12 @@ contract AdminFunctions is Script, IAdminFunctions {
                 return;
             }
 
-            address gatewayCtm = L1Bridgehub(data.bridgehub).chainTypeManager(data.gatewayChainId);
-            (bytes memory gatewayDiamondCutData, ) = GetDiamondCutData.getDiamondCutAndForceDeployment(gatewayCtm);
-
+            // If caller passed an RPC URL, fork-switch to gateway L2 and
+            // resolve the diamond cut data there. Otherwise, use the
+            // pre-resolved bytes the caller supplied.
+            bytes memory gatewayDiamondCutData = bytes(data.gatewayRpcUrl).length > 0
+                ? GetDiamondCutData.readFromGateway(data.gatewayRpcUrl, chainAssetId)
+                : data.gatewayDiamondCutData;
             bytes memory bridgehubData = abi.encode(
                 BridgehubBurnCTMAssetData({
                     chainId: data.l2ChainId,
@@ -769,11 +782,16 @@ contract AdminFunctions is Script, IAdminFunctions {
         saveAndSendAdminTx(l2ChainInfo.admin, calls, data._shouldSend);
     }
 
+    /// @notice Production entrypoint: fork-switches into the gateway L2 RPC
+    /// to read its CTM diamond cut data, then continues the L1 simulation.
+    /// The gateway-side CTM only exists on gateway L2 — its predicted
+    /// CREATE2 address has no code on L1, so we must read it from L2.
     function migrateChainToGateway(
         address bridgehub,
         uint256 l1GasPrice,
         uint256 l2ChainId,
         uint256 gatewayChainId,
+        string calldata gatewayRpcUrl,
         address refundRecipient,
         bool _shouldSend
     ) public {
@@ -783,6 +801,34 @@ contract AdminFunctions is Script, IAdminFunctions {
                 l1GasPrice: l1GasPrice,
                 l2ChainId: l2ChainId,
                 gatewayChainId: gatewayChainId,
+                gatewayRpcUrl: gatewayRpcUrl,
+                gatewayDiamondCutData: hex"",
+                refundRecipient: refundRecipient,
+                _shouldSend: _shouldSend
+            })
+        );
+    }
+
+    /// @notice Foundry-internal overload: caller already has the gateway
+    /// CTM's diamond cut data (e.g. tests where the CTM is deployed on the
+    /// same anvil instance and no fork-switch is needed).
+    function migrateChainToGatewayWithCutData(
+        address bridgehub,
+        uint256 l1GasPrice,
+        uint256 l2ChainId,
+        uint256 gatewayChainId,
+        bytes calldata gatewayDiamondCutData,
+        address refundRecipient,
+        bool _shouldSend
+    ) public {
+        _migrateChainToGatewayInner(
+            MigrateChainToGatewayParams({
+                bridgehub: bridgehub,
+                l1GasPrice: l1GasPrice,
+                l2ChainId: l2ChainId,
+                gatewayChainId: gatewayChainId,
+                gatewayRpcUrl: "",
+                gatewayDiamondCutData: gatewayDiamondCutData,
                 refundRecipient: refundRecipient,
                 _shouldSend: _shouldSend
             })

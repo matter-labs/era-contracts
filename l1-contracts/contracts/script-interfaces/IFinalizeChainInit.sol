@@ -9,11 +9,11 @@ import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 interface IFinalizeChainInit {
     // solhint-disable-next-line gas-struct-packing
     struct FinalizeChainInitParams {
-        uint256 chainId;
         address chainAdmin;
         address accessControlRestriction;
         address diamondProxy;
         address bridgehub;
+        uint256 chainId;
         address l1DaValidator;
         address tokenMultiplierSetter;
         L2DACommitmentScheme l2DaCommitmentScheme;

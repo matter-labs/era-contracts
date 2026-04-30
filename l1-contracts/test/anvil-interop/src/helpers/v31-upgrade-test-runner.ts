@@ -36,7 +36,7 @@ import {
 } from "../core/const";
 import { getAbi, getBytecode, getCreationBytecode, LEGACY_ADMIN_ABI } from "../core/contracts";
 import type { ContractName } from "../core/contracts";
-import { transferOwnable2Step } from "./harness-shims";
+import { forceBatchExecutedEqualsCommitted, transferOwnable2Step } from "./harness-shims";
 import { impersonateAndRun } from "../core/utils";
 import { runtimeConfig } from "../core/runtime-config";
 import type { ChainRole } from "../core/types";
@@ -460,6 +460,12 @@ export async function runChainUpgradesAndRelayL2(params: {
     console.log(`\n── Chain ${chain.chainId}: running L1 upgrade + L2 relay ──`);
     const chainOutDir = path.join(protocolOpsOutDir, `chain-${chain.chainId}`);
     fs.rmSync(chainOutDir, { recursive: true, force: true });
+
+    // `SettlementLayerV31UpgradeBase.upgrade` requires `totalBatchesCommitted ==
+    // totalBatchesExecuted`. On a forked chain that has uncommitted-but-pending
+    // batches at fork time, copy committed onto executed to model the
+    // "all batches executed" prerequisite without running the executor.
+    await forceBatchExecutedEqualsCommitted(l1Provider, chain.diamondProxy);
 
     runProtocolOps([
       "chain",

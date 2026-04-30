@@ -6,7 +6,6 @@ use anyhow::Context;
 use clap::Parser;
 use ethers::middleware::Middleware;
 use ethers::types::{Address, BlockNumber, Bytes, TransactionRequest, H256, U256};
-use futures::future::try_join_all;
 use serde_json::Value;
 
 use ethers::providers::{Http, Provider};

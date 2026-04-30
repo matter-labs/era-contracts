@@ -29,10 +29,26 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
+import {CoreUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
 
 /// FIXME currently we accept ownership as part of stage1, but in fact we should do it as part of stage0.
 /// @notice Script used for v31 upgrade flow
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
+    /// @notice Single-call entry point invoked by the protocol-ops CLI.
+    ///         Mirrors `EcosystemUpgrade_v31.noGovernancePrepare` but only runs the
+    ///         ecosystem-wide core deploys; CTM deploys are handled by `CTMUpgrade_v31`.
+    function noGovernancePrepare(CoreUpgradeParams memory _params) public {
+        initializeWithArgs(
+            _params.bridgehubProxyAddress,
+            _params.isZKsyncOS,
+            _params.create2FactorySalt,
+            _params.upgradeInputPath,
+            _params.outputPath
+        );
+        prepareEcosystemUpgrade();
+        prepareDefaultGovernanceCalls();
+    }
+
     function deployNewEcosystemContractsL1() public virtual override {
         deployNewEcosystemContractsL1NoConnections();
         // Configure AssetTracker connections after deployment

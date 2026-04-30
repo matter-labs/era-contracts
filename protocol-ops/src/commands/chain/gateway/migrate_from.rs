@@ -505,6 +505,7 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
 
     // Step 4: call finishMigrateChainFromGateway via forge (deployer key).
     logger::step("Finalizing migration on L1 (finishMigrateChainFromGateway)");
+    let merkle_proof = crate::common::ethereum::parse_merkle_proof(&withdrawal.merkle_proof)?;
     let script = runner
         .with_script_call(
             &GATEWAY_UTILS_INVOCATION,
@@ -517,7 +518,7 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
                 withdrawal.l2_message_index,
                 withdrawal.l2_tx_number_in_batch,
                 Bytes::from(withdrawal.message.0.to_vec()),
-                withdrawal.merkle_proof.clone(),
+                merkle_proof,
             ),
         )?
         .with_ffi()

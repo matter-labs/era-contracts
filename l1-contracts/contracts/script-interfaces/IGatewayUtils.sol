@@ -11,6 +11,7 @@ interface IGatewayUtils {
         address bridgehubAddr,
         uint256 migratingChainId,
         uint256 gatewayChainId,
+        string calldata gatewayRpcUrl,
         bytes32 l2TxHash,
         uint256 l2BatchNumber,
         uint256 l2MessageIndex,

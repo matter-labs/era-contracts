@@ -243,11 +243,11 @@ pub async fn chain_init(
                 &FINALIZE_CHAIN_INIT_INVOCATION,
                 "finalizeChainInit",
                 ((
-                    ethers::types::U256::from(input.chain_params.chain_id.as_u64()),
                     chain_admin,
                     register_output.access_control_restriction_addr,
                     diamond_proxy,
                     input.bridgehub,
+                    ethers::types::U256::from(input.chain_params.chain_id.as_u64()),
                     input.l1_da_validator,
                     token_multiplier_setter,
                     commitment_scheme as u8,
@@ -259,9 +259,11 @@ pub async fn chain_init(
             .with_wallet(owner),
     )?;
 
-    // TODO: for now, just replicating logic from `zkstack`, but not all of these are
-    // priority txs, so we need to fix this + skip steps irrelevant for ZKSync OS.
-    if !input.skip_priority_txs {
+    // The Era-style L2 contract bootstrap (EVM emulator enable, paymaster,
+    // ConsensusRegistry/Multicall3/TimestampAsserter/etc.) is irrelevant on
+    // ZKsync-OS chains: those L2 contracts are Era-specific and the helpers
+    // read ZK-format bytecode from `zkout/`. Skip the whole block for OS.
+    if !input.skip_priority_txs && !input.vm_type.is_zksync_os() {
         // Enable EVM emulator (if requested)
         if input.evm_emulator {
             logger::step("Enabling EVM emulator...");

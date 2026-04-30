@@ -16,12 +16,33 @@ import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisFo
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
+import {CTMUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
 import {EraForceDeploymentsLib} from "../default-upgrade/EraForceDeploymentsLib.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 
 /// @notice Script used for v31 upgrade flow
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
+    /// @notice Single-call entry point invoked by the protocol-ops CLI.
+    ///         One invocation per CTM (e.g. ZKsyncOS, EraVM) — combined with a separate
+    ///         `CoreUpgrade_v31.noGovernancePrepare` run on the same anvil session, this
+    ///         replaces the monolithic `EcosystemUpgrade_v31.noGovernancePrepare` flow.
+    function noGovernancePrepare(CTMUpgradeParams memory _params) public {
+        initializeWithArgs(
+            _params.ctmProxy,
+            _params.bytecodesSupplier,
+            _params.isZKsyncOS,
+            _params.rollupDAManager,
+            _params.create2FactorySalt,
+            _params.upgradeInputPath,
+            _params.outputPath,
+            _params.governance,
+            _params.zkTokenAssetId
+        );
+        prepareCTMUpgrade();
+        prepareDefaultGovernanceCalls();
+    }
+
     /// @notice Deploy everything that should be deployed
     function deployNewCTMContracts() public virtual override {
         (ctmAddresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();

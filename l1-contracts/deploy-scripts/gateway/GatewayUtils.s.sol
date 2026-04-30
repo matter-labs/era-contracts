@@ -4,12 +4,17 @@ pragma solidity 0.8.28;
 // solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {IGatewayUtils} from "contracts/script-interfaces/IGatewayUtils.sol";
 
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 
-import {BridgehubBurnCTMAssetData} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {BridgehubBurnCTMAssetData, IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -28,6 +33,11 @@ contract GatewayUtils is Script, IGatewayUtils {
         address bridgehubAddr;
         uint256 migratingChainId;
         uint256 gatewayChainId;
+        // Gateway L2 RPC URL — the inner resolves the diamond cut data by
+        // fork-switching into gateway L2 (the gateway-side CTM only exists
+        // there). Resolving inside the inner keeps the public entrypoint's
+        // local variable count low (avoids stack-too-deep).
+        string gatewayRpcUrl;
         bytes32 l2TxHash;
         uint256 l2BatchNumber;
         uint256 l2MessageIndex;
@@ -40,6 +50,7 @@ contract GatewayUtils is Script, IGatewayUtils {
         address bridgehubAddr,
         uint256 migratingChainId,
         uint256 gatewayChainId,
+        string calldata gatewayRpcUrl,
         bytes32 l2TxHash,
         uint256 l2BatchNumber,
         uint256 l2MessageIndex,
@@ -52,6 +63,7 @@ contract GatewayUtils is Script, IGatewayUtils {
                 bridgehubAddr: bridgehubAddr,
                 migratingChainId: migratingChainId,
                 gatewayChainId: gatewayChainId,
+                gatewayRpcUrl: gatewayRpcUrl,
                 l2TxHash: l2TxHash,
                 l2BatchNumber: l2BatchNumber,
                 l2MessageIndex: l2MessageIndex,
@@ -71,9 +83,7 @@ contract GatewayUtils is Script, IGatewayUtils {
 
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(data.migratingChainId);
         address chainAdmin = IZKChain(bridgehub.getZKChain(data.migratingChainId)).getAdmin();
-        address gatewayCtm = bridgehub.chainTypeManager(data.gatewayChainId);
-        (bytes memory gatewayDiamondCutData, ) = GetDiamondCutData.getDiamondCutAndForceDeployment(gatewayCtm);
-
+        bytes memory gatewayDiamondCutData = GetDiamondCutData.readFromGateway(data.gatewayRpcUrl, assetId);
         bytes memory transferData = abi.encode(
             BridgehubBurnCTMAssetData({
                 chainId: data.migratingChainId,
