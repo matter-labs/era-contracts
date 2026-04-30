@@ -234,7 +234,6 @@ async function main(): Promise<void> {
       ctmAddr: chainTypeManager,
       upgradeChainAddresses,
       isZKsyncOS: scenario.isZKsyncOS,
-      ecosystemYamlPath: upgradeHarnessInputs.ecosystemYamlPath,
       protocolOpsOutDir: path.join(upgradeHarnessInputs.protocolOpsOutDir, "chains"),
     });
 

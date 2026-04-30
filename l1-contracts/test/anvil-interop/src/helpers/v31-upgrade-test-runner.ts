@@ -135,7 +135,7 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     console.log("\n── Replaying governance upgrade bundles ──");
     await runEcosystemGovernanceUpgrade({
       rpcUrl: l1Chain.rpcUrl,
-      ecosystemYamlPath: upgradeHarnessInputs.ecosystemYamlPath,
+      bridgehubAddress: upgradeHarnessInputs.bridgehubAddress,
       governanceTomlPath: upgradeHarnessInputs.governanceTomlPath,
       outDir: path.join(upgradeHarnessInputs.protocolOpsOutDir, "governance"),
       executeBundles: true,
@@ -166,7 +166,6 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       ctmAddr: ctmAddresses.chainTypeManager,
       upgradeChainAddresses,
       isZKsyncOS: scenario.isZKsyncOS,
-      ecosystemYamlPath: upgradeHarnessInputs.ecosystemYamlPath,
       protocolOpsOutDir: path.join(upgradeHarnessInputs.protocolOpsOutDir, "chains"),
     });
 
@@ -342,13 +341,6 @@ async function executeSafeBundles(outDir: string, rpcUrl: string): Promise<void>
   }
 }
 
-function writeEcosystemYaml(filePath: string, bridgehubAddr: string, chainIds: number[]): void {
-  const chains = chainIds.map((chainId) => `  chain-${chainId}: ${chainId}`).join("\n");
-  fs.writeFileSync(
-    filePath,
-    [`bridgehub: ${bridgehubAddr}`, `deployer: ${ANVIL_DEFAULT_ACCOUNT_ADDR}`, "chains:", chains, ""].join("\n")
-  );
-}
 
 export async function runEcosystemUpgradeScripts(params: {
   rpcUrl: string;
@@ -362,8 +354,8 @@ export async function runEcosystemUpgradeScripts(params: {
     [
       "ecosystem",
       "upgrade-prepare",
-      "--ecosystem",
-      params.upgradeHarnessInputs.ecosystemYamlPath,
+      "--bridgehub",
+      params.upgradeHarnessInputs.bridgehubAddress,
       "--l1-rpc-url",
       params.rpcUrl,
       "--out",
@@ -400,7 +392,7 @@ export async function runEcosystemUpgradeScripts(params: {
 
 export async function runEcosystemGovernanceUpgrade(params: {
   rpcUrl: string;
-  ecosystemYamlPath: string;
+  bridgehubAddress: string;
   governanceTomlPath: string;
   outDir: string;
   executeBundles?: boolean;
@@ -410,8 +402,8 @@ export async function runEcosystemGovernanceUpgrade(params: {
   runProtocolOps([
     "ecosystem",
     "upgrade-governance",
-    "--ecosystem",
-    params.ecosystemYamlPath,
+    "--bridgehub",
+    params.bridgehubAddress,
     "--l1-rpc-url",
     params.rpcUrl,
     "--out",
@@ -435,7 +427,6 @@ export async function runChainUpgradesAndRelayL2(params: {
   ctmAddr: string;
   upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>;
   isZKsyncOS: boolean;
-  ecosystemYamlPath: string;
   protocolOpsOutDir: string;
 }): Promise<void> {
   const {
@@ -445,7 +436,6 @@ export async function runChainUpgradesAndRelayL2(params: {
     settlementLayerUpgradeAddr,
     upgradeChainAddresses,
     isZKsyncOS,
-    ecosystemYamlPath,
     protocolOpsOutDir,
   } = params;
 
@@ -470,10 +460,10 @@ export async function runChainUpgradesAndRelayL2(params: {
     runProtocolOps([
       "chain",
       "upgrade",
-      "--ecosystem",
-      ecosystemYamlPath,
-      "--chain",
-      `chain-${chain.chainId}`,
+      "--bridgehub",
+      bridgehubAddr,
+      "--chain-id",
+      String(chain.chainId),
       "--l1-rpc-url",
       l1Chain.rpcUrl,
       "--out",
@@ -1053,7 +1043,7 @@ export function prepareUpgradeHarnessInputs(
   envVars: Record<string, string>;
   ecosystemOutputPath: string;
   governanceTomlPath: string;
-  ecosystemYamlPath: string;
+  bridgehubAddress: string;
   protocolOpsOutDir: string;
   upgradeInputArg: string;
   ecosystemOutputArg: string;
@@ -1071,7 +1061,6 @@ export function prepareUpgradeHarnessInputs(
   const upgradeInputPath = path.join(tempDir, `${scenario.label}-to-v31-upgrade.toml`);
   const ecosystemOutputPath = path.join(tempDir, `${scenario.label}-v31-upgrade-ecosystem.toml`);
   const governanceTomlPath = path.join(tempDir, `${scenario.label}-v31-governance.toml`);
-  const ecosystemYamlPath = path.join(tempDir, "ecosystem.yaml");
   const protocolOpsOutDir = path.join(tempDir, "protocol-ops");
 
   const primaryChainId = state.chainAddresses[0]?.chainId;
@@ -1090,11 +1079,6 @@ export function prepareUpgradeHarnessInputs(
   upgradeInput = replaceTomlStringValue(upgradeInput, "owner_address", state.l1Addresses.governance);
   upgradeInput = replaceTomlBareValue(upgradeInput, "sample_chain_id", String(primaryChainId));
   fs.writeFileSync(upgradeInputPath, upgradeInput);
-  writeEcosystemYaml(
-    ecosystemYamlPath,
-    state.l1Addresses.bridgehub,
-    state.chainAddresses.map((chain) => chain.chainId)
-  );
 
   const permanentValuesToml = parseToml(permanentValues) as {
     ctm_contracts?: {
@@ -1120,7 +1104,7 @@ export function prepareUpgradeHarnessInputs(
     },
     ecosystemOutputPath,
     governanceTomlPath,
-    ecosystemYamlPath,
+    bridgehubAddress: state.l1Addresses.bridgehub,
     protocolOpsOutDir,
     upgradeInputArg: `/${path.relative(l1ContractsDir, upgradeInputPath)}`,
     ecosystemOutputArg: `/${path.relative(l1ContractsDir, ecosystemOutputPath)}`,

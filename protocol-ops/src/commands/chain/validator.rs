@@ -48,16 +48,16 @@ pub async fn run_remove(args: ChainValidatorArgs) -> anyhow::Result<()> {
 }
 
 async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
-    let (eco, chain_id) = args.topology.resolve()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     // Sender is always the chain admin — that's the only address whose
     // simulation authors a ChainAdmin.multicall with the intended semantics.
-    let sender = runner.prepare_chain_admin(eco.bridgehub, chain_id).await?;
+    let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
     let admin_address = sender.address;
     let validator_timelock = crate::common::l1_contracts::resolve_validator_timelock(
         &runner.rpc_url,
-        eco.bridgehub,
+        bridgehub,
         chain_id,
     )
     .await

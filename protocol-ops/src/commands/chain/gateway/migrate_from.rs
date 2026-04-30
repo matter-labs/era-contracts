@@ -175,7 +175,7 @@ pub async fn run(cmd: MigrateFromCommands) -> anyhow::Result<()> {
 // ── Phase 0: pause-deposits + notify-server ───────────────────────────────
 
 pub async fn run_phase0_pause_deposits(args: Phase0PauseDepositsArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     // Pause-deposits is shared with the to-gateway flow: it's the same L1
@@ -200,7 +200,7 @@ pub async fn run_phase0_pause_deposits(args: Phase0PauseDepositsArgs) -> anyhow:
 // ── Phase 1: submit ───────────────────────────────────────────────────────
 
 pub async fn run_phase1_submit(args: Phase1SubmitArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     let gateway_chain_id = stage_submit_from(
@@ -233,7 +233,7 @@ pub async fn run_phase1_submit(args: Phase1SubmitArgs) -> anyhow::Result<()> {
 pub async fn run_phase3_set_da_validator_pair(
     args: Phase3SetDaValidatorPairArgs,
 ) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     stage_set_da_validator_pair_from(
@@ -408,7 +408,7 @@ pub(crate) async fn stage_set_da_validator_pair_from(
 // `InvalidProof()`.
 
 pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     // Resolve the gateway chain ID off real L1 BEFORE creating the forge
     // runner. With `--simulate`, `ForgeRunner::new` forks L1 via anvil at a
     // single block height; any L1 state change after the fork is created is

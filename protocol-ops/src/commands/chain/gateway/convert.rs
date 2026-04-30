@@ -458,7 +458,7 @@ pub struct ConvertArgs {
 }
 
 pub async fn run_convert(args: ConvertArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
     // Stages 1 + 2: chain admin owner.
     let admin_sender = runner

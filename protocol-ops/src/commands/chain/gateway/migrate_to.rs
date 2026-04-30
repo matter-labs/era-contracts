@@ -669,7 +669,7 @@ pub struct Phase1SubmitArgs {
 }
 
 pub async fn run_phase1_submit(args: Phase1SubmitArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     // Both stages share one anvil fork — forge's broadcast log appends in
@@ -716,7 +716,7 @@ pub struct Phase0PauseDepositsArgs {
 }
 
 pub async fn run_phase0_pause_deposits(args: Phase0PauseDepositsArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     stage_pause_deposits(&mut runner, bridgehub, chain_id)
@@ -772,7 +772,7 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
     // `InvalidProof()`. That's why the body is inlined here instead of
     // factored into a reusable `stage_finalize` helper shared with other
     // phases.
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let gateway_chain_id = crate::common::l1_contracts::resolve_settlement_layer(
         &args.shared.l1_rpc_url,
         bridgehub,
@@ -938,7 +938,7 @@ pub struct Phase3ValidatorsArgs {
 }
 
 pub async fn run_phase3_validators(args: Phase3ValidatorsArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     let enable_inputs = EnableValidatorsInputs {

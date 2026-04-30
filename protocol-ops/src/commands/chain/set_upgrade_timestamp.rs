@@ -40,13 +40,13 @@ pub struct ChainSetUpgradeTimestampArgs {
 }
 
 pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
-    let (eco, chain_id) = args.topology.resolve()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
     let new_protocol_version = parse_u256_arg(&args.new_protocol_version)?;
     let upgrade_timestamp = parse_u256_arg(&args.upgrade_timestamp)?;
 
     // Sender is always the chain admin.
-    let sender = runner.prepare_chain_admin(eco.bridgehub, chain_id).await?;
+    let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
     let admin_address = sender.address;
 
     let forge = runner

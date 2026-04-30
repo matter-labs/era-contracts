@@ -132,7 +132,7 @@ struct UpgradePrepareOutput<'a> {
 }
 
 pub async fn run_upgrade_prepare(args: UpgradePrepareArgs) -> anyhow::Result<()> {
-    let bridgehub = args.topology.resolve()?.bridgehub;
+    let bridgehub = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
     let deployer = runner.prepare_sender(args.deployer_address).await?;
 
@@ -440,7 +440,7 @@ struct UpgradeGovernanceOutput {
 }
 
 pub async fn run_upgrade_governance(args: UpgradeGovernanceArgs) -> anyhow::Result<()> {
-    let bridgehub = args.topology.resolve()?.bridgehub;
+    let bridgehub = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     // All three governance stages are signed by the Governance contract's
@@ -692,7 +692,7 @@ pub async fn run_upgrade_prepare_all(args: UpgradePrepareAllArgs) -> anyhow::Res
         anyhow::bail!("at least one --ctm-proxy must be provided");
     }
 
-    let bridgehub = args.topology.resolve()?.bridgehub;
+    let bridgehub = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
     let deployer = runner.prepare_sender(args.deployer_address).await?;
 
