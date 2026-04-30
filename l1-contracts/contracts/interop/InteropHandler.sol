@@ -5,11 +5,11 @@ pragma solidity ^0.8.24;
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 
 import {
-    L2_BRIDGEHUB,
     L2_BASE_TOKEN_HOLDER,
     L2_INTEROP_CENTER_ADDR,
     L2_NATIVE_TOKEN_VAULT,
     L2_MESSAGE_VERIFICATION,
+    L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     L2_COMPLEX_UPGRADER_ADDR
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
@@ -80,7 +80,15 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         // Interop claiming requires the chain to settle on Gateway so that GWAssetTracker can process
         // the execution confirmation and move balances from pendingInteropBalance to chainBalance.
-        require(L2_BRIDGEHUB.settlementLayer(block.chainid) != L1_CHAIN_ID, CannotClaimInteropOnL1Settlement());
+        // We read the chain's current settlement layer from `SystemContext` (kept in sync with each
+        // batch's bootloader-driven `setSettlementLayerChainId` call); the analogous mapping on the
+        // chain's own `L2Bridgehub` is only written for chains that *settle on this Bridgehub*
+        // (i.e. populated on L1's L1Bridgehub and on a Gateway's L2Bridgehub for the chains it
+        // hosts), and is never written on a chain's own L2Bridgehub for itself.
+        require(
+            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
+            CannotClaimInteropOnL1Settlement()
+        );
 
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
@@ -160,7 +168,11 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     function unbundleBundle(bytes memory _bundle, CallStatus[] calldata _providedCallStatus) public {
         // Interop claiming requires the chain to settle on Gateway so that GWAssetTracker can process
         // the execution confirmation and move balances from pendingInteropBalance to chainBalance.
-        require(L2_BRIDGEHUB.settlementLayer(block.chainid) != L1_CHAIN_ID, CannotClaimInteropOnL1Settlement());
+        // See `executeBundle` for why this reads `SystemContext` rather than `L2_BRIDGEHUB`.
+        require(
+            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID,
+            CannotClaimInteropOnL1Settlement()
+        );
 
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle);
