@@ -27,6 +27,7 @@ import {DynamicIncrementalMerkleMemory} from "contracts/common/libraries/Dynamic
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 import {GWAssetTrackerTestHelper} from "./GWAssetTracker.t.sol";
+import {RAND_ADDRESS} from "test/foundry/TestConstants.sol"; 
 
 /// @title ProcessLogsTestHelper
 /// @notice Reusable helpers for composing L2 logs, InteropBundle messages, and ProcessLogsInput structs in tests.
@@ -102,7 +103,7 @@ library ProcessLogsTestHelper {
             calls[i] = InteropCall({
                 version: INTEROP_CALL_VERSION,
                 shadowAccount: false,
-                to: address(0xdead),
+                to: RAND_ADDRESS,
                 from: address(1), // Not L2_ASSET_ROUTER_ADDR => asset processing skipped
                 value: _valuePerCall,
                 data: ""
@@ -211,7 +212,7 @@ library ProcessLogsTestHelper {
             abi.encode("TT"),
             abi.encode(uint8(18))
         );
-        return DataEncoding.encodeBridgeMintData(address(0), address(0xdead), _originToken, _amount, erc20Metadata);
+        return DataEncoding.encodeBridgeMintData(address(0), RAND_ADDRESS, _originToken, _amount, erc20Metadata);
     }
 
     /// @notice Builds asset-router interop call data: finalizeDeposit(fromChainId, assetId, transferData).
@@ -322,7 +323,7 @@ library ProcessLogsTestHelper {
                 InteropCall({
                     version: INTEROP_CALL_VERSION,
                     shadowAccount: false,
-                    to: address(0xdead),
+                    to: RAND_ADDRESS,
                     from: address(1),
                     value: _baseTokenValue,
                     data: ""

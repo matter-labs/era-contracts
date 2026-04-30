@@ -125,14 +125,6 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         vm.stopPrank();
     }
 
-    function _setEraBatch() private {
-        // TODO(EVM-1391): Dead fn in practice
-        vm.startPrank(addresses.sharedBridge.owner());
-        // sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(1);
-        // sharedBridge.setEraPostDiamondUpgradeFirstBatch(1);
-        vm.stopPrank();
-    }
-
     function _registerNewToken(address _tokenAddress) internal {
         bytes32 tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _tokenAddress);
         if (!addresses.bridgehub.assetIdIsRegistered(tokenAssetId)) {

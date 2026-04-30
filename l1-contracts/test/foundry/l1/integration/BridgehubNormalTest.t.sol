@@ -25,15 +25,7 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
     using stdStorage for StdStorage;
 
     function prepare() public {
-        // TODO(EVM-1391): Justify commented code
-        // _generateUserAddresses();
-
         _deployL1Contracts();
-        // _deployTokens();
-        // _registerNewTokens(tokens);
-
-        // _deployEra();
-        // _deployZKChain(ETH_TOKEN_ADDRESS);
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));

@@ -89,7 +89,6 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     }
 
     function prepare() public {
-        // TODO(EVM-1391): Justify commented code
         _generateUserAddresses();
 
         _deployL1Contracts();
@@ -100,15 +99,11 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         acceptPendingAdmin(gatewayChainId);
         vm.warp(block.timestamp + 1);
 
-        // _deployZKChain(tokens[1]);
-        // _deployZKChain(tokens[1]);
-
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
             l2ContractAddresses.push(contractAddress);
 
             _addL2ChainContract(zkChainIds[i], contractAddress);
-            // _registerL2SharedBridge(zkChainIds[i], contractAddress);
         }
 
         _initializeGatewayScript();
@@ -135,9 +130,6 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
                 })
             )
         );
-
-        // vm.deal(msg.sender, 100000000000000000000000000000000000);
-        // vm.deal(bridgehub, 100000000000000000000000000000000000);
     }
 
     // This is a method to simplify porting the tests for now.

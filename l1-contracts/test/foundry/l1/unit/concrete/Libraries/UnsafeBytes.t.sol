@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {UnsafeBytes} from "contracts/common/libraries/UnsafeBytes.sol";
+import {RAND_ADDRESS} from "test/foundry/TestConstants.sol"; 
 
 /// @notice Unit tests for UnsafeBytes library
 contract UnsafeBytesTest is Test {
@@ -68,12 +69,12 @@ contract UnsafeBytesTest is Test {
     function test_readAddress_atOffset() public pure {
         bytes memory data = abi.encodePacked(
             uint32(0xAAAAAAAA), // 4 bytes
-            address(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF)
+            RAND_ADDRESS
         );
 
         (address result, uint256 offset) = UnsafeBytes.readAddress(data, 4);
 
-        assertEq(result, address(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF));
+        assertEq(result, RAND_ADDRESS);
         assertEq(offset, 24);
     }
 
@@ -205,7 +206,7 @@ contract UnsafeBytesTest is Test {
         // Build a complex data structure
         bytes memory data = abi.encodePacked(
             uint32(0x11223344),
-            address(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF),
+            RAND_ADDRESS,
             uint256(9999),
             bytes32(keccak256("hello"))
         );
@@ -220,7 +221,7 @@ contract UnsafeBytesTest is Test {
         assertEq(val32, 0x11223344);
 
         (addr, offset) = UnsafeBytes.readAddress(data, offset);
-        assertEq(addr, address(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF));
+        assertEq(addr, RAND_ADDRESS);
 
         (val256, offset) = UnsafeBytes.readUint256(data, offset);
         assertEq(val256, 9999);
