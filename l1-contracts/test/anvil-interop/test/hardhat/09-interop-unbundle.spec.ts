@@ -22,6 +22,7 @@ import { encodeEvmAddress } from "../../src/helpers/erc7930";
 import {
   sendInteropBundle,
   executeBundle,
+  simulateExecuteBundle,
   simulateUnbundleBundle,
   verifyBundle,
   unbundleBundle,
@@ -236,10 +237,13 @@ describe("09 - Interop Unbundle (failing calls)", function () {
   });
 
   it("Can verify a bundle", async () => {
-    const { bundleData, bundleHash } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
+    const { sendResult, bundleData, bundleHash } = await sendAndPrepareBundle({ withUnbundlerAddress: true });
 
-    // First, try atomic executeBundle - should revert because call 1 will fail
-    await expectRevert(() => executeBundle(destProvider, bundleData, sourceChainId), "executeBundle with failing call");
+    // First, simulate atomic executeBundle - should revert because call 1 will fail.
+    await expectRevert(
+      () => simulateExecuteBundle(destProvider, sendResult, sourceChainId),
+      "executeBundle with failing call"
+    );
 
     // Now call verifyBundle - should succeed
     const verifyReceipt = await verifyBundle(destProvider, bundleData, sourceChainId);
@@ -402,10 +406,13 @@ describe("09 - Interop Unbundle (failing calls)", function () {
   });
 
   it("Can send an unbundling bundle from the source chain", async () => {
-    const { sendResult, bundleData, bundleHash, baseAmount, tokenAmount } = await sendAndPrepareBundle({});
+    const { sendResult, bundleHash, baseAmount, tokenAmount } = await sendAndPrepareBundle({});
 
-    // Try atomic executeBundle first - should revert (failing call)
-    await expectRevert(() => executeBundle(destProvider, bundleData, sourceChainId), "executeBundle with failing call");
+    // Simulate atomic executeBundle first - should revert (failing call).
+    await expectRevert(
+      () => simulateExecuteBundle(destProvider, sendResult, sourceChainId),
+      "executeBundle with failing call"
+    );
 
     // Build the final call statuses: execute calls 0 and 2, cancel call 1
     const finalCallStatuses = [CallStatus.Executed, CallStatus.Cancelled, CallStatus.Executed];
