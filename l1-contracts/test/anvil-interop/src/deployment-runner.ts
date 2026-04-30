@@ -55,7 +55,8 @@ export class DeploymentRunner {
 
   constructor(baseDir: string = __dirname + "/..") {
     const runSuffix = process.env.ANVIL_INTEROP_RUN_SUFFIX || "";
-    this.stateDir = path.join(baseDir, `outputs/state${runSuffix}`);
+    const stateDirName = isLiveInteropMode() ? "live-state" : "state";
+    this.stateDir = path.join(baseDir, `outputs/${stateDirName}${runSuffix}`);
     this.configDir = path.join(baseDir, "config");
     this.configPath = path.join(this.configDir, "anvil-config.json");
     fs.mkdirSync(this.stateDir, { recursive: true });
