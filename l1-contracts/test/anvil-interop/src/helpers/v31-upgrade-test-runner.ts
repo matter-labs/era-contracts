@@ -341,7 +341,6 @@ async function executeSafeBundles(outDir: string, rpcUrl: string): Promise<void>
   }
 }
 
-
 export async function runEcosystemUpgradeScripts(params: {
   rpcUrl: string;
   upgradeHarnessInputs: UpgradeHarnessInputs;
