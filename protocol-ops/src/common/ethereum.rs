@@ -12,7 +12,7 @@ use tokio::task::block_in_place;
 /// Convert a hex-string Merkle proof (as returned by JSON-RPC `zks_*` proof
 /// methods) into the `Vec<H256>` form ethers tokenizes as `bytes32[]`. Pass
 /// `Vec<String>` directly into `with_script_call(...)` and ethers encodes it
-/// as `string[]`, which is silently mis-encoded against the contract ABI.
+/// as `string[]`, which is silently encoded incorrectly against the contract ABI.
 pub fn parse_merkle_proof<S: AsRef<str>>(proof: &[S]) -> anyhow::Result<Vec<H256>> {
     proof
         .iter()
