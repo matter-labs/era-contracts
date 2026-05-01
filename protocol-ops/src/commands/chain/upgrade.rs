@@ -49,9 +49,16 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
         crate::common::l1_contracts::resolve_zk_chain(&runner.rpc_url, eco.bridgehub, chain_id)
             .await
             .context("resolving chain diamond proxy from L1")?;
-    // Sender is always the chain admin.
-    let sender = runner.prepare_chain_admin(eco.bridgehub, chain_id).await?;
-    let admin_address = sender.address;
+    let admin_address =
+        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, eco.bridgehub, chain_id)
+            .await
+            .context("resolving chain admin from L1")?;
+    // The Solidity script executes via ChainAdmin, but broadcasts from the
+    // ChainAdmin owner internally. Use that owner as Forge's sender so Foundry
+    // tracks the correct nonce on the anvil fork.
+    let sender = runner
+        .prepare_chain_admin_owner(eco.bridgehub, chain_id)
+        .await?;
 
     let script_path = Path::new("deploy-scripts/AdminFunctions.s.sol");
     let script_full_path = runner.foundry_scripts_path.join(script_path);
