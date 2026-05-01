@@ -134,7 +134,11 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
 
     function migrateChainToGateway(uint256 migratingChainId) public {
         AdminFunctions adminScript = new AdminFunctions();
-        (bytes memory gatewayDiamondCutData, ) = GetDiamondCutData.getDiamondCutAndForceDeployment(gatewayCTMAddress);
+        // `skipLogs = true`: under `forge test` no fork URL is active, so
+        // `eth_getLogs` would revert. The test harness preloads
+        // `gatewayDiamondCutData` from TOML during `initializeConfig`, so we
+        // can pass the cached value directly to `migrateChainToGatewayWithCutData`.
+        GetDiamondCutData.getDiamondCutAndForceDeployment(gatewayCTMAddress, true);
         adminScript.migrateChainToGatewayWithCutData(
             _gatewayGovernanceConfig.bridgehubProxy,
             _getL1GasPrice(),

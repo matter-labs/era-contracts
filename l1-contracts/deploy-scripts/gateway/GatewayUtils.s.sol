@@ -142,7 +142,7 @@ contract GatewayUtils is Script, IGatewayUtils {
     /// used to build the `gateway-vote-preparation` input. Set env `FORCE_DEPLOYMENTS_DUMP_TOML_REL_PATH`
     /// to a path relative to project root (e.g. `/script-out/force-deployments-dump.toml`).
     function dumpForceDeployments(address _ctm) external {
-        (, bytes memory forceDeploymentsData) = GetDiamondCutData.getDiamondCutAndForceDeployment(_ctm);
+        (, bytes memory forceDeploymentsData) = GetDiamondCutData.getDiamondCutAndForceDeployment(_ctm, false);
 
         string memory root = vm.projectRoot();
         string memory rel = vm.envString("FORCE_DEPLOYMENTS_DUMP_TOML_REL_PATH");

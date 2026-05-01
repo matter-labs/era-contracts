@@ -91,9 +91,19 @@ library GetDiamondCutData {
         vm.selectFork(prevForkId);
     }
 
+    /// @notice Read chain creation params from the CTM via `eth_getLogs`.
+    /// @param  ctm        Target CTM proxy.
+    /// @param  skipLogs   When true, returns `("", "")` without touching
+    ///                    `eth_getLogs`. Use from `forge test` contexts where
+    ///                    no fork URL is active and the caller already has the
+    ///                    diamond-cut data cached (e.g. preloaded from TOML).
     function getDiamondCutAndForceDeployment(
-        address ctm
+        address ctm,
+        bool skipLogs
     ) external returns (bytes memory diamondCutData, bytes memory forceDeploymentsData) {
+        if (skipLogs) {
+            return ("", "");
+        }
         return _getDiamondCutAndForceDeployment(ctm);
     }
 
