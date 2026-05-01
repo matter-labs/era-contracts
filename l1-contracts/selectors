@@ -5894,7 +5894,7 @@ IGatewayUtils
 |----------+--------------------------------------------------------------------------------------------------------------+------------|
 | Function | finishMigrateChainFromGateway(address,uint256,uint256,uint256,uint256,uint16,bytes,bytes32[])                | 0x4e0c04a1 |
 |----------+--------------------------------------------------------------------------------------------------------------+------------|
-| Function | finishMigrateChainToGateway((address,uint256,uint256,string,bytes32,uint256,uint256,uint16,bytes32[],uint8)) | 0x79daa34c |
+| Function | finishMigrateChainToGateway((address,uint16,uint8,bytes32,uint256,uint256,uint256,uint256,string,bytes32[])) | 0x47d932b5 |
 ╰----------+--------------------------------------------------------------------------------------------------------------+------------╯
 
 IGatewayVotePreparation

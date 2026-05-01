@@ -88,6 +88,21 @@
             "internalType": "address"
           },
           {
+            "name": "l2TxNumberInBatch",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "txStatus",
+            "type": "uint8",
+            "internalType": "enum TxStatus"
+          },
+          {
+            "name": "l2TxHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
             "name": "migratingChainId",
             "type": "uint256",
             "internalType": "uint256"
@@ -96,16 +111,6 @@
             "name": "gatewayChainId",
             "type": "uint256",
             "internalType": "uint256"
-          },
-          {
-            "name": "gatewayRpcUrl",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "l2TxHash",
-            "type": "bytes32",
-            "internalType": "bytes32"
           },
           {
             "name": "l2BatchNumber",
@@ -118,19 +123,14 @@
             "internalType": "uint256"
           },
           {
-            "name": "l2TxNumberInBatch",
-            "type": "uint16",
-            "internalType": "uint16"
+            "name": "gatewayRpcUrl",
+            "type": "string",
+            "internalType": "string"
           },
           {
             "name": "merkleProof",
             "type": "bytes32[]",
             "internalType": "bytes32[]"
-          },
-          {
-            "name": "txStatus",
-            "type": "uint8",
-            "internalType": "enum TxStatus"
           }
         ]
       }

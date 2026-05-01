@@ -8,15 +8,15 @@ import {TxStatus} from "../../contracts/common/Messaging.sol";
 /// without the optimizer / viaIR (e.g. under `forge coverage`).
 struct FinishMigrateChainToGatewayParams {
     address bridgehubAddr;
+    uint16 l2TxNumberInBatch;
+    TxStatus txStatus;
+    bytes32 l2TxHash;
     uint256 migratingChainId;
     uint256 gatewayChainId;
-    string gatewayRpcUrl;
-    bytes32 l2TxHash;
     uint256 l2BatchNumber;
     uint256 l2MessageIndex;
-    uint16 l2TxNumberInBatch;
+    string gatewayRpcUrl;
     bytes32[] merkleProof;
-    TxStatus txStatus;
 }
 
 /// @title IGatewayUtils

@@ -857,15 +857,15 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
                 "finishMigrateChainToGateway",
                 ((
                     bridgehub,
+                    proof.l2_tx_number_in_batch,
+                    1u8,
+                    priority_op_hash,
                     chain_id,
                     gateway_chain_id,
-                    args.gateway_rpc_url.clone(),
-                    priority_op_hash,
                     proof.batch_number,
                     proof.l2_message_index,
-                    proof.l2_tx_number_in_batch,
+                    args.gateway_rpc_url.clone(),
                     merkle_proof,
-                    1u8,
                 ),),
             )?
             .with_ffi()
