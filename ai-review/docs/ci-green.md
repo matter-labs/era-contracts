@@ -158,7 +158,50 @@ cargo fmt --check          # CI runs without --check; locally use --check first 
 cargo clippy --all-targets -- -D warnings
 ```
 
-CI also runs `codespell` and `crate-ci/typos`. If they fire, the offending word is in the diagnostic — fix it (or add it to `.codespellrc` / `_typos.toml` only if it's a genuine domain word that should be allowed everywhere, not a typo).
+CI also runs `codespell` and `crate-ci/typos` as separate jobs (see `.github/workflows/lint.yaml`). They are easy to forget locally because neither is wired into `yarn lint:check`. Both must pass independently.
+
+**Important: filter out submodule paths locally.** CI's `actions/checkout@v6` runs without `submodules: true`, so it never sees the contents of `lib/`, `l1-contracts/lib/`, `system-contracts/lib/`, etc. Locally those directories are populated and produce hundreds of false-positive errors that CI doesn't see. Use `typos`'s native `--exclude` (do **not** pipe `git ls-files | xargs typos` — file paths with spaces in submodule audits will silently break the pipeline before scanning starts):
+
+```bash
+# typos — exclude submodule paths to match CI's view
+typos . \
+  --exclude 'lib/**' \
+  --exclude 'l1-contracts/lib/**' \
+  --exclude 'system-contracts/lib/**' \
+  --exclude 'l2-contracts/lib/**' \
+  --exclude 'da-contracts/lib/**'
+
+# codespell — `skip` already supports comma-separated paths
+codespell . \
+  --skip='_typos.toml,*.json,*.lock,*.html,*.map,target,node_modules,venv,dist,report,yarn-error.log,lib,l1-contracts/lib,system-contracts/lib,l2-contracts/lib,da-contracts/lib'
+
+# Quick "did *I* introduce a typo" check: only run on what your branch changed
+git diff --name-only main -- ':!lib' ':!*/lib/*' | xargs -d'\n' typos
+```
+
+Sanity-check the filter is right: a clean run on the current branch should print **0** errors. If your numbers are in the hundreds you're seeing submodule noise — fix the filter, don't fix the code.
+
+A real-world catch: `typos` splits hyphenated words. A prefix like the three letters "m-i-s" with a dash, then `encoded` (the kind of phrasing you get when adding a hyphenated negation to a verb), tokenizes to two words and the prefix is flagged because it matches a known short typo. Either rephrase the comment to use the verb form (e.g. "encoded incorrectly") or whitelist that prefix in `_typos.toml` under `[default.extend-words]`. Other hyphenated forms (`pre-state`, `co-located`) can fire similarly when the prefix isn't on `typos`'s known-prefix list.
+
+Install once locally:
+
+```bash
+# typos (Rust binary) — brew is easiest on macOS
+brew install typos-cli
+cargo install typos-cli                        # newest, requires recent rustc
+cargo install typos-cli --version 1.42.3       # last version that builds on rustc 1.87
+
+# codespell (Python)
+brew install codespell
+pip install codespell
+```
+
+When a real domain word fires:
+
+- For `typos`: add to `[default.extend-words]` in `_typos.toml` (key = lowercased typo, value = canonical replacement; use `word = "word"` to whitelist the word itself).
+- For `codespell`: add to `.codespellrc` under `ignore-words-list = ...` (comma-separated).
+
+Don't whitelist actual misspellings — fix them. cSpell warnings shown in the IDE are a separate VS Code extension and **do not run in CI**; ignore those unless `typos` or `codespell` agrees.
 
 ## 3. Selectors
 

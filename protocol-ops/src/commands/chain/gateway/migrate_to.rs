@@ -855,7 +855,7 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
             .with_script_call(
                 &GATEWAY_UTILS_INVOCATION,
                 "finishMigrateChainToGateway",
-                (
+                ((
                     bridgehub,
                     chain_id,
                     gateway_chain_id,
@@ -866,7 +866,7 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
                     proof.l2_tx_number_in_batch,
                     merkle_proof,
                     1u8,
-                ),
+                ),),
             )?
             .with_ffi()
             .with_wallet(&sender);

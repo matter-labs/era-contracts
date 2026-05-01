@@ -8,7 +8,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {IGatewayUtils} from "contracts/script-interfaces/IGatewayUtils.sol";
+import {IGatewayUtils, FinishMigrateChainToGatewayParams} from "contracts/script-interfaces/IGatewayUtils.sol";
 
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
@@ -29,54 +29,11 @@ import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayUtils is Script, IGatewayUtils {
-    struct FinishMigrateChainToGatewayParams {
-        address bridgehubAddr;
-        uint256 migratingChainId;
-        uint256 gatewayChainId;
-        // Gateway L2 RPC URL — the inner resolves the diamond cut data by
-        // fork-switching into gateway L2 (the gateway-side CTM only exists
-        // there). Resolving inside the inner keeps the public entrypoint's
-        // local variable count low (avoids stack-too-deep).
-        string gatewayRpcUrl;
-        bytes32 l2TxHash;
-        uint256 l2BatchNumber;
-        uint256 l2MessageIndex;
-        uint16 l2TxNumberInBatch;
-        bytes32[] merkleProof;
-        TxStatus txStatus;
+    function finishMigrateChainToGateway(FinishMigrateChainToGatewayParams calldata params) external {
+        _finishMigrateChainToGatewayInner(params);
     }
 
-    function finishMigrateChainToGateway(
-        address bridgehubAddr,
-        uint256 migratingChainId,
-        uint256 gatewayChainId,
-        string calldata gatewayRpcUrl,
-        bytes32 l2TxHash,
-        uint256 l2BatchNumber,
-        uint256 l2MessageIndex,
-        uint16 l2TxNumberInBatch,
-        bytes32[] calldata merkleProof,
-        TxStatus txStatus
-    ) public {
-        _finishMigrateChainToGatewayInner(
-            FinishMigrateChainToGatewayParams({
-                bridgehubAddr: bridgehubAddr,
-                migratingChainId: migratingChainId,
-                gatewayChainId: gatewayChainId,
-                gatewayRpcUrl: gatewayRpcUrl,
-                l2TxHash: l2TxHash,
-                l2BatchNumber: l2BatchNumber,
-                l2MessageIndex: l2MessageIndex,
-                l2TxNumberInBatch: l2TxNumberInBatch,
-                merkleProof: merkleProof,
-                txStatus: txStatus
-            })
-        );
-    }
-
-    // Using struct for input to avoid stack too deep errors
-    // The outer function does not expect it as input rightaway for easier encoding in zkstack Rust.
-    function _finishMigrateChainToGatewayInner(FinishMigrateChainToGatewayParams memory data) private {
+    function _finishMigrateChainToGatewayInner(FinishMigrateChainToGatewayParams calldata data) private {
         IL1Bridgehub bridgehub = IL1Bridgehub(data.bridgehubAddr);
         address assetRouter = address(bridgehub.assetRouter());
         IL1Nullifier l1Nullifier = L1AssetRouter(assetRouter).L1_NULLIFIER();
