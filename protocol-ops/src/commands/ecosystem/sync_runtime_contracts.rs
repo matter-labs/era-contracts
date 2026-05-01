@@ -3,7 +3,7 @@
 //! Propagates post-upgrade addresses from `ecosystem upgrade-prepare`'s
 //! output TOML into a zkstack workspace's runtime contract configs. Replaces
 //! the per-deployment `update-permanent-values.sh`-style sed glue that
-//! downstream upgrade harnesses were carrying.
+//! consumers (era-cacher, OS test rig) were carrying.
 //!
 //! Currently only `l1_bytecodes_supplier_addr` changes during a v31 Era
 //! upgrade. If future upgrades change additional runtime fields, extend
