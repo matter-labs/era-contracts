@@ -36,12 +36,4 @@ contract PrivateInteropHandler is InteropHandler {
         InteropBundle memory interopBundle = abi.decode(_bundle, (InteropBundle));
         return abi.encodePacked(PRIVATE_BUNDLE_IDENTIFIER, keccak256(_bundle), uint256(interopBundle.calls.length));
     }
-
-    /// @notice Skip proof verification for private interop on pre-v31 chains.
-    /// @dev On chains without L2_MESSAGE_VERIFICATION, the standard verification reverts.
-    /// Private interop handlers deployed as user-space contracts trust the executor to provide valid bundles.
-    function _verifyBundle(bytes memory, MessageInclusionProof memory, bytes32 _bundleHash) internal override {
-        bundleStatus[_bundleHash] = BundleStatus.Verified;
-        emit BundleVerified(_bundleHash);
-    }
 }
