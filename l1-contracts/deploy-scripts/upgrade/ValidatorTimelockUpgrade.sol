@@ -25,7 +25,6 @@ contract ValidatorTimelockUpgrade is Script, Create2FactoryUtils {
     }
 
     function runInner(address ctm) internal returns (Call[] memory calls) {
-        instantiateCreate2Factory();
         ZKsyncOSChainTypeManager chainTypeManager = ZKsyncOSChainTypeManager(ctm);
         console.logAddress(msg.sender);
         address validatorTimelock = chainTypeManager.validatorTimelockPostV29();

@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {Utils} from "deploy-scripts/utils/Utils.sol";
+import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
 import {SystemContractsCaller} from "contracts/common/l2-helpers/SystemContractsCaller.sol";
 import {
     L2_ACCOUNT_CODE_STORAGE_ADDR,
@@ -86,12 +87,12 @@ contract TestAcrossRecoveryUpgrade is V31AcrossRecovery {
                 evmImplementation: _evmImpl,
                 zkevmRecoveryImplementation: _zkevmRecoveryImpl,
                 zkevmRecoveryImplConstructorParams: LensSpokePoolConstructorParams({
-                    _wrappedNativeTokenAddress: address(0),
-                    _circleUSDC: address(0),
-                    _zkUSDCBridge: address(0),
-                    _cctpTokenMessenger: address(0),
-                    _depositQuoteTimeBuffer: 0,
-                    _fillDeadlineBuffer: 0
+                    wrappedNativeTokenAddress: address(0),
+                    circleUSDC: address(0),
+                    zkUSDCBridge: address(0),
+                    cctpTokenMessenger: address(0),
+                    depositQuoteTimeBuffer: 0,
+                    fillDeadlineBuffer: 0
                 })
             });
     }
@@ -115,10 +116,14 @@ contract V31AcrossRecoveryUnitTest is Test {
 
         // Read the EVM bytecode of MockUUPSImplementation (from `out/`, not `zkout/`).
         // This is the same contract, but compiled to standard EVM bytecode.
-        bytes memory evmBytecode = Utils.readFoundryBytecodeL1("MockUUPSImplementation.sol", "MockUUPSImplementation");
+        bytes memory evmBytecode = BytecodeUtils.readBytecodeL1(
+            true,
+            "MockUUPSImplementation.sol",
+            "MockUUPSImplementation"
+        );
 
         // Etch the ContractDeployer system contract (not present by default in zkfoundry unit tests).
-        bytes memory contractDeployerBytecode = Utils.readSystemContractsBytecode("ContractDeployer");
+        bytes memory contractDeployerBytecode = BytecodeUtils.readSystemContractsBytecode("ContractDeployer");
         vm.etch(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, contractDeployerBytecode);
 
         // Ensure EVM bytecode deployment is allowed on this chain.
@@ -143,11 +148,12 @@ contract V31AcrossRecoveryUnitTest is Test {
         assertFalse(success, "proxy should be broken after upgrading to EVM implementation");
 
         // Etch the AccountCodeStorage system contract (needed by V31AcrossRecovery to read bytecode hashes).
-        bytes memory accountCodeStorageBytecode = Utils.readSystemContractsBytecode("AccountCodeStorage");
+        bytes memory accountCodeStorageBytecode = BytecodeUtils.readSystemContractsBytecode("AccountCodeStorage");
         vm.etch(L2_ACCOUNT_CODE_STORAGE_ADDR, accountCodeStorageBytecode);
 
         // Etch the L2ComplexUpgrader system contract.
-        bytes memory complexUpgraderBytecode = Utils.readZKFoundryBytecodeL1(
+        bytes memory complexUpgraderBytecode = BytecodeUtils.readBytecodeL1(
+            false,
             "L2ComplexUpgrader.sol",
             "L2ComplexUpgrader"
         );
@@ -160,12 +166,12 @@ contract V31AcrossRecoveryUnitTest is Test {
                 evmImplementation: brokenImplementation,
                 zkevmRecoveryImplementation: correctImplementation,
                 zkevmRecoveryImplConstructorParams: LensSpokePoolConstructorParams({
-                    _wrappedNativeTokenAddress: address(0),
-                    _circleUSDC: address(0),
-                    _zkUSDCBridge: address(0),
-                    _cctpTokenMessenger: address(0),
-                    _depositQuoteTimeBuffer: 0,
-                    _fillDeadlineBuffer: 0
+                    wrappedNativeTokenAddress: address(0),
+                    circleUSDC: address(0),
+                    zkUSDCBridge: address(0),
+                    cctpTokenMessenger: address(0),
+                    depositQuoteTimeBuffer: 0,
+                    fillDeadlineBuffer: 0
                 })
             })
         );

@@ -22,7 +22,7 @@ library FullMerkleMemory {
 
     error InvalidMaxLeafNumber(uint256 _maxLeafNumber);
 
-    function createTree(FullTree memory self, uint256 _maxLeafNumber) internal view {
+    function createTree(FullTree memory self, uint256 _maxLeafNumber) internal pure {
         if (_maxLeafNumber == 0) {
             revert InvalidMaxLeafNumber(0);
         }
@@ -62,7 +62,7 @@ library FullMerkleMemory {
      * empty leaves. It should be a value that is not expected to be part of the tree.
      * @param zero The zero value to be used in the tree.
      */
-    function setup(FullTree memory self, bytes32 zero) internal view returns (bytes32 initialRoot) {
+    function setup(FullTree memory self, bytes32 zero) internal pure returns (bytes32 initialRoot) {
         self._zeros[0] = zero;
         bytes32 currentZero = zero;
 
@@ -84,7 +84,7 @@ library FullMerkleMemory {
      * @dev Push a new leaf to the tree.
      * @param _leaf The leaf to be added to the tree.
      */
-    function pushNewLeaf(FullTree memory self, bytes32 _leaf) internal view returns (bytes32 newRoot) {
+    function pushNewLeaf(FullTree memory self, bytes32 _leaf) internal pure returns (bytes32 newRoot) {
         // Check capacity before proceeding using natural array bounds
         if (self._leafNumber >= self._nodes[0].length) {
             revert MerkleWrongIndex(self._leafNumber, self._nodes[0].length);
@@ -125,7 +125,7 @@ library FullMerkleMemory {
      * @param _index The index of the leaf to be updated.
      * @param _itemHash The new hash of the leaf.
      */
-    function updateLeaf(FullTree memory self, uint256 _index, bytes32 _itemHash) internal view returns (bytes32) {
+    function updateLeaf(FullTree memory self, uint256 _index, bytes32 _itemHash) internal pure returns (bytes32) {
         uint256 maxNodeNumber = self._leafNumber - 1;
         if (_index > maxNodeNumber) {
             revert MerkleWrongIndex(_index, maxNodeNumber);
@@ -158,7 +158,7 @@ library FullMerkleMemory {
      * @dev Updated all leaves in the tree.
      * @param _newLeaves The new leaves to be added to the tree.
      */
-    function updateAllLeaves(FullTree memory self, bytes32[] memory _newLeaves) internal view returns (bytes32) {
+    function updateAllLeaves(FullTree memory self, bytes32[] memory _newLeaves) internal pure returns (bytes32) {
         if (_newLeaves.length != self._leafNumber) {
             revert MerkleWrongLength(_newLeaves.length, self._leafNumber);
         }
@@ -174,7 +174,7 @@ library FullMerkleMemory {
         FullTree memory self,
         uint256 _height,
         bytes32[] memory _newNodes
-    ) internal view returns (bytes32) {
+    ) internal pure returns (bytes32) {
         if (_height == self._height) {
             self._nodes[_height][0] = _newNodes[0];
             return _newNodes[0];
@@ -200,7 +200,7 @@ library FullMerkleMemory {
     /**
      * @dev Returns the root of the tree.
      */
-    function root(FullTree memory self) internal view returns (bytes32) {
+    function root(FullTree memory self) internal pure returns (bytes32) {
         // Return zero value for empty trees like FullMerkle
         if (self._leafNumber == 0) {
             return self._zeros[0];

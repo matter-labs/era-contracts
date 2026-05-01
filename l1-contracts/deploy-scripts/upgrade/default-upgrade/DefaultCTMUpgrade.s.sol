@@ -10,37 +10,29 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "../../utils/Utils.sol";
-import {
-    StateTransitionDeployedAddresses,
-    ChainCreationParamsConfig,
-    StateTransitionDeployedAddresses,
-    StateTransitionDeployedAddresses,
-    ZkChainAddresses
-} from "../../utils/Types.sol";
+import {StateTransitionDeployedAddresses, ChainCreationParamsConfig, ZkChainAddresses} from "../../utils/Types.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
+import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ContractsBytecodesLib} from "../../utils/bytecode/ContractsBytecodesLib.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
 
-import {SystemContractsProcessing} from "../SystemContractsProcessing.s.sol";
-import {BytecodePublisher} from "../../utils/bytecode/BytecodePublisher.s.sol";
+import {BytecodePublisher, PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+import {CoreContract} from "../../ecosystem/CoreContract.sol";
+import {CoreOnGatewayHelper} from "../../ecosystem/CoreOnGatewayHelper.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {GovernanceUpgradeTimer} from "contracts/upgrades/GovernanceUpgradeTimer.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
@@ -50,6 +42,7 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
+import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
 /// @notice Script used for default CTM upgrade flow. Should be run after Ecosystem upgrade
@@ -80,7 +73,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     // solhint-disable-next-line gas-struct-packing
     struct NewlyGeneratedData {
-        bytes fixedForceDeploymentsData;
         bytes diamondCutData;
         bytes upgradeCutData;
     }
@@ -98,11 +90,14 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     struct PermanentCTMConfig {
-        address create2FactoryAddr;
         bytes32 create2FactorySalt;
         address ctmProxy;
         address bytecodesSupplier;
         bool isZKsyncOS;
+        /// @dev ZK token asset ID, used by `InteropCenter.initL2` for fixed-fee bundles.
+        ///      MUST be non-zero — `InteropCenter.initL2` reverts otherwise, which would abort the
+        ///      L2 upgrade transaction.
+        bytes32 zkTokenAssetId;
     }
 
     // The output of the script
@@ -119,31 +114,35 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     ZkChainAddresses internal upToDateZkChain;
     L1Bridgehub internal bridgehub;
 
-    uint256[] internal factoryDepsHashes;
-    mapping(bytes32 => bool) internal isHashInFactoryDeps;
+    PublishFactoryDepsResult internal factoryDepsResult;
 
-    function initialize(
-        string memory permanentValuesInputPath,
+    function initializeWithArgs(
+        address ctmProxy,
+        address bytecodesSupplier,
+        bool isZKsyncOS,
+        address rollupDAManager,
+        bytes32 create2FactorySalt,
         string memory newConfigPath,
-        string memory _outputPath
+        string memory _outputPath,
+        address governance,
+        bytes32 zkTokenAssetId
     ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
-        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
-        initializeConfigFromFile(permanentValuesInputPath, newConfigPath);
-        instantiateCreate2Factory();
+        initializeConfigFromArgs(
+            ctmProxy,
+            bytecodesSupplier,
+            isZKsyncOS,
+            rollupDAManager,
+            create2FactorySalt,
+            newConfigPath,
+            governance,
+            zkTokenAssetId
+        );
 
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
         upgradeConfig.initialized = true;
-    }
-
-    function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual override returns (bool) {
-        // For ZKsync OS, factory deps are handled differently, so skip the check
-        if (config.isZKsyncOS) {
-            return true;
-        }
-        return isHashInFactoryDeps[bytecodeHash];
     }
 
     function initializeConfig(
@@ -152,13 +151,22 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         // Optional
         address governance
     ) public {
-        _initCreate2FactoryParams(permanentConfig.create2FactoryAddr, permanentConfig.create2FactorySalt);
+        // Only override the salt when explicitly provided (non-zero).
+        // When zero, the script falls back to the CREATE2_FACTORY_SALT env var or built-in default.
+        if (permanentConfig.create2FactorySalt != bytes32(0)) {
+            setCreate2Salt(permanentConfig.create2FactorySalt);
+        }
         config.l1ChainId = block.chainid;
         newConfig.ctm = permanentConfig.ctmProxy;
 
         // Pass bytecodesSupplier to introspection - will overwrite incorrect V29 value
         setAddressesBasedOnCTM(permanentConfig.bytecodesSupplier);
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
+        // Must be non-zero: `InteropCenter.initL2` (invoked via `_initializeV31Contracts`) reverts
+        // on a zero asset ID, which would abort the L2 upgrade transaction. Catch the
+        // misconfiguration here so the preparation script fails loudly instead of on L2.
+        require(permanentConfig.zkTokenAssetId != bytes32(0), "zkTokenAssetId must be non-zero");
+        config.zkTokenAssetId = permanentConfig.zkTokenAssetId;
         config.contracts.chainCreationParams = chainCreationParams;
 
         if (governance != address(0)) {
@@ -173,52 +181,41 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         config.contracts.validatorTimelockExecutionDelay = IValidatorTimelock(
             ctmAddresses.stateTransition.proxies.validatorTimelock
         ).executionDelay();
-        (bool ok, bytes memory data) = ctmAddresses.stateTransition.verifiers.verifier.staticcall(
-            abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
-        );
-        config.testnetVerifier = ok;
+        // FIXME: need to provide the params as the input for the function, since
+        // on mainnet testnetVerifier must be false. Right now the introspection is not available
+        // due to the previous version being v29.
+        // TODO: restore introspection when L1 state is regenerated with ZKsyncOSTestnetVerifier.IS_TESTNET_VERIFIER
+        // (bool ok, bytes memory data) = ctmAddresses.stateTransition.verifiers.verifier.staticcall(
+        //     abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
+        // );
+        // config.testnetVerifier = ok;
+        config.testnetVerifier = true;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
     }
 
-    function initializePermanentConfig(
-        string memory permanentValuesInputPath
-    ) internal virtual returns (PermanentCTMConfig memory permanentConfig) {
-        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
-
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
-
-        address ctm = permanentValuesToml.readAddress("$.ctm_contracts.ctm_proxy_addr");
-        address bytecodesSupplier = permanentValuesToml.readAddress("$.ctm_contracts.l1_bytecodes_supplier_addr");
-
-        // TODO can we discover it?. Try to get it from the chain
-        bool isZKsyncOS;
-        if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {
-            isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
-        }
-
-        permanentConfig = PermanentCTMConfig({
-            ctmProxy: ctm,
-            bytecodesSupplier: bytecodesSupplier,
-            isZKsyncOS: isZKsyncOS,
-            create2FactoryAddr: create2FactoryAddr,
-            create2FactorySalt: create2FactorySalt
-        });
-    }
-
-    function initializeConfigFromFile(
-        string memory permanentValuesInputPath,
-        string memory newConfigPath
+    function initializeConfigFromArgs(
+        address ctmProxy,
+        address bytecodesSupplier,
+        bool isZKsyncOS,
+        address rollupDAManager,
+        bytes32 create2FactorySalt,
+        string memory newConfigPath,
+        address governance,
+        bytes32 zkTokenAssetId
     ) internal virtual {
-        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
         string memory toml = vm.readFile(newConfigPath);
 
-        PermanentCTMConfig memory permanentConfig = initializePermanentConfig(permanentValuesInputPath);
-        // Set config.isZKsyncOS BEFORE calling getChainCreationParamsConfig, because
-        // getChainCreationParamsConfig calls ChainCreationParamsLib.getChainCreationParams
-        // which reads from config.isZKsyncOS
-        config.isZKsyncOS = permanentConfig.isZKsyncOS;
+        PermanentCTMConfig memory permanentConfig = PermanentCTMConfig({
+            ctmProxy: ctmProxy,
+            bytecodesSupplier: bytecodesSupplier,
+            isZKsyncOS: isZKsyncOS,
+            create2FactorySalt: create2FactorySalt,
+            zkTokenAssetId: zkTokenAssetId
+        });
+        // Set config.isZKsyncOS before getChainCreationParamsConfig.
+        config.isZKsyncOS = isZKsyncOS;
         ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
-            chainCreationParamsPath(permanentConfig.isZKsyncOS)
+            Utils.genesisConfigPath(isZKsyncOS)
         );
 
         // Optional override for v29 introspection selection
@@ -227,18 +224,15 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             newConfig.useV29IntrospectionOverride = toml.readBool("$.use_v29_introspection");
         }
 
-        initializeConfig(chainCreationParams, permanentConfig, address(0));
+        initializeConfig(chainCreationParams, permanentConfig, governance);
 
         // Read governance upgrade timer initial delay from config
         if (toml.keyExists("$.governance_upgrade_timer_initial_delay")) {
             newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
         }
 
-        // Read rollup DA manager from permanent config if it exists
-        if (permanentValuesToml.keyExists("$.ctm_contracts.rollup_da_manager")) {
-            ctmAddresses.stateTransition.rollupDAManager = permanentValuesToml.readAddress(
-                "$.ctm_contracts.rollup_da_manager"
-            );
+        if (rollupDAManager != address(0)) {
+            ctmAddresses.daAddresses.daContracts.rollupDAManager = rollupDAManager;
         }
     }
 
@@ -279,7 +273,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         //        require(upgradeConfig.ecosystemContractsDeployed, "Ecosystem contracts not deployed");
 
         // Important, this must come after the initializeExpectedL2Addresses
-        generateFixedForceDeploymentsData();
+        getFixedForceDeploymentsData();
         console.log("Generated fixed force deployments data");
         Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(ctmAddresses.stateTransition);
         // TODO probably don't need to assign it to diamondCutData
@@ -296,32 +290,16 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function generateUpgradeCutDataFromLocalConfig(
-        StateTransitionDeployedAddresses memory stateTransition
+        StateTransitionDeployedAddresses memory _stateTransition
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         upgradeCutData = generateUpgradeCutData(
-            stateTransition,
+            _stateTransition,
             config.contracts.chainCreationParams,
             config.l1ChainId,
             config.ownerAddress,
-            factoryDepsHashes,
-            upToDateZkChain.zkChainProxy,
-            config.isZKsyncOS
+            factoryDepsResult,
+            upToDateZkChain.zkChainProxy
         );
-    }
-
-    /// @notice E2e upgrade generation
-    function run() public virtual override {
-        initialize(
-            vm.envString("PERMANENT_VALUES_INPUT"),
-            vm.envString("UPGRADE_CTM_INPUT"),
-            vm.envString("UPGRADE_CTM_OUTPUT")
-        );
-        prepareCTMUpgrade();
-
-        prepareDefaultGovernanceCalls();
-        prepareDefaultCTMAdminCalls();
-
-        prepareDefaultTestUpgradeCalls();
     }
 
     function getOwnerAddress() public virtual returns (address) {
@@ -367,7 +345,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
                     newChainAssetId,
                     5,
                     msg.sender,
-                    abi.encode(newlyGeneratedData.diamondCutData, newlyGeneratedData.fixedForceDeploymentsData),
+                    abi.encode(newlyGeneratedData.diamondCutData, generatedData.forceDeploymentsData),
                     new bytes[](0)
                 )
             )
@@ -408,7 +386,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         if (eraChainAddress != address(0)) {
             // ERA chain exists, discover its addresses
             discoveredEraZkChain = AddressIntrospector.getZkChainAddresses(IZKChain(eraChainAddress));
-            ctmAddresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
+            ctmAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredEraZkChain.l1DAValidator;
         } else {
             // ERA chain doesn't exist yet (fresh deployment), use up-to-date addresses
             console.log("ERA chain not found in bridgehub, using up-to-date addresses");
@@ -424,102 +402,17 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         );
     }
 
-    function generateFixedForceDeploymentsData() internal virtual {
-        FixedForceDeploymentsData memory forceDeploymentsData = prepareFixedForceDeploymentsData();
-
-        newlyGeneratedData.fixedForceDeploymentsData = abi.encode(forceDeploymentsData);
-        generatedData.forceDeploymentsData = abi.encode(forceDeploymentsData);
-        upgradeConfig.fixedForceDeploymentsDataGenerated = true;
-    }
-
-    function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
-        if (config.isZKsyncOS) {
-            // TODO: for now, we do not provide any factory deps for zksync os
-            return factoryDeps;
+    function getFixedForceDeploymentsData() internal override returns (FixedForceDeploymentsData memory data) {
+        if (upgradeConfig.fixedForceDeploymentsDataGenerated) {
+            return abi.decode(generatedData.forceDeploymentsData, (FixedForceDeploymentsData));
         }
 
-        bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
-
-        string[] memory additionalForceDeployments = getAdditionalDependenciesNames();
-
-        bytes[] memory additionalDependencies = new bytes[](4 + additionalForceDeployments.length); // Deps after Gateway upgrade
-        additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
-        additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-        additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
-        additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ProxyAdmin");
-
-        for (uint256 i; i < additionalForceDeployments.length; i++) {
-            additionalDependencies[4 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
-        }
-
-        factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, additionalDependencies);
-        factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
-    }
-
-    function prepareFixedForceDeploymentsData() public virtual returns (FixedForceDeploymentsData memory data) {
         require(config.ownerAddress != address(0), "owner not set");
 
-        data = FixedForceDeploymentsData({
-            l1ChainId: config.l1ChainId,
-            eraChainId: config.eraChainId,
-            gatewayChainId: config.gatewayChainId,
-            l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: getUpgradeBytecodeHash("BeaconProxy"),
-            aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
-            maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: getUpgradeBytecodeInfo("L2Bridgehub"),
-            l2AssetRouterBytecodeInfo: getUpgradeBytecodeInfo("L2AssetRouter"),
-            l2NtvBytecodeInfo: getUpgradeBytecodeInfo(
-                "L2NativeTokenVault",
-                "L2NativeTokenVaultZKOS.sol",
-                "L2NativeTokenVaultZKOS"
-            ),
-            messageRootBytecodeInfo: getUpgradeBytecodeInfo("L2MessageRoot"),
-            chainAssetHandlerBytecodeInfo: getUpgradeBytecodeInfo("L2ChainAssetHandler"),
-            beaconDeployerInfo: getUpgradeBytecodeInfo("UpgradeableBeaconDeployer"),
-            baseTokenHolderBytecodeInfo: getUpgradeBytecodeInfo("BaseTokenHolder"),
-            interopCenterBytecodeInfo: getUpgradeBytecodeInfo("InteropCenter"),
-            interopHandlerBytecodeInfo: getUpgradeBytecodeInfo("InteropHandler"),
-            assetTrackerBytecodeInfo: getUpgradeBytecodeInfo("L2AssetTracker"),
-            l2SharedBridgeLegacyImpl: address(0),
-            l2BridgedStandardERC20Impl: address(0),
-            aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
-                coreAddresses.bridgehub.proxies.chainRegistrationSender
-            ),
-            // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
-            dangerousTestOnlyForcedBeacon: address(0),
-            zkTokenAssetId: config.zkTokenAssetId
-        });
-    }
-
-    function getUpgradeBytecodeInfo(string memory contractName) internal returns (bytes memory) {
-        return getUpgradeBytecodeInfo(contractName, string.concat(contractName, ".sol"), contractName);
-    }
-
-    function getUpgradeBytecodeInfo(
-        string memory eraContractName,
-        string memory zksyncOSFileName,
-        string memory zksyncOSContractName
-    ) internal returns (bytes memory) {
-        if (config.isZKsyncOS) {
-            return Utils.getZKOSProxyUpgradeBytecodeInfo(zksyncOSFileName, zksyncOSContractName);
-        }
-        return abi.encode(getL2BytecodeHash(eraContractName));
-    }
-
-    function getUpgradeBytecodeHash(string memory contractName) internal view returns (bytes32) {
-        return getUpgradeBytecodeHash(string.concat(contractName, ".sol"), contractName, contractName);
-    }
-
-    function getUpgradeBytecodeHash(
-        string memory zksyncOSFileName,
-        string memory zksyncOSContractName,
-        string memory eraContractName
-    ) internal view returns (bytes32) {
-        if (config.isZKsyncOS) {
-            return keccak256(Utils.readFoundryDeployedBytecodeL1(zksyncOSFileName, zksyncOSContractName));
-        }
-        return getL2BytecodeHash(eraContractName);
+        data = _buildForceDeploymentsData(config.ownerAddress, address(0));
+        bytes memory encodedData = abi.encode(data);
+        generatedData.forceDeploymentsData = encodedData;
+        upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
 
     function getUpgradeAddedFacetCuts(
@@ -537,51 +430,48 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     }
 
     function publishBytecodes() public virtual {
-        if (config.isZKsyncOS) {
-            // TODO: for now, we do not provide any factory deps for zksync os
-            return;
-        }
+        bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
+            config.isZKsyncOS,
+            getAdditionalForcedCoreContracts()
+        );
+        BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
-        bytes[] memory allDeps = getFullListOfFactoryDependencies();
-        uint256[] memory factoryDeps = new uint256[](allDeps.length);
-        require(factoryDeps.length <= 64, "Too many deps");
-
-        BytecodePublisher.publishEraBytecodesInBatches(
-            BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier),
+        PublishFactoryDepsResult memory result = BytecodePublisher.publishAndProcessFactoryDeps(
+            config.isZKsyncOS,
+            supplier,
             allDeps
         );
 
-        for (uint256 i = 0; i < allDeps.length; i++) {
-            bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(allDeps[i]);
-            factoryDeps[i] = uint256(bytecodeHash);
-            isHashInFactoryDeps[bytecodeHash] = true;
+        // Era-only invariant: factoryDepsHashes[0..3] == (bootloader,
+        // defaultAA, evmEmulator). ZKsyncOS has none of these concepts —
+        // `chainCreationParams.{bootloader,defaultAA,evmEmulator}Hash` are
+        // zero and the factoryDepsHashes describe a different, smaller set
+        // of contracts, so indexing [1]/[2] would go out of bounds.
+        if (!config.isZKsyncOS && result.factoryDepsHashes.length > 0) {
+            console.logBytes32(config.contracts.chainCreationParams.bootloaderHash);
+            console.log(result.factoryDepsHashes[0]);
+            console.logBytes32(config.contracts.chainCreationParams.defaultAAHash);
+            console.log(result.factoryDepsHashes[1]);
+            console.logBytes32(config.contracts.chainCreationParams.evmEmulatorHash);
+            console.log(result.factoryDepsHashes[2]);
+
+            if (!skipFactoryDepsCheck) {
+                require(
+                    bytes32(result.factoryDepsHashes[0]) == config.contracts.chainCreationParams.bootloaderHash,
+                    "bootloader hash factory dep mismatch"
+                );
+                require(
+                    bytes32(result.factoryDepsHashes[1]) == config.contracts.chainCreationParams.defaultAAHash,
+                    "default aa hash factory dep mismatch"
+                );
+                require(
+                    bytes32(result.factoryDepsHashes[2]) == config.contracts.chainCreationParams.evmEmulatorHash,
+                    "EVM emulator hash factory dep mismatch"
+                );
+            }
         }
 
-        console.logBytes32(config.contracts.chainCreationParams.bootloaderHash);
-        console.log(factoryDeps[0]);
-        console.logBytes32(config.contracts.chainCreationParams.defaultAAHash);
-        console.log(factoryDeps[1]);
-        console.logBytes32(config.contracts.chainCreationParams.evmEmulatorHash);
-        console.log(factoryDeps[2]);
-
-        if (!skipFactoryDepsCheck) {
-            // Double check for consistency:
-            require(
-                bytes32(factoryDeps[0]) == config.contracts.chainCreationParams.bootloaderHash,
-                "bootloader hash factory dep mismatch"
-            );
-            require(
-                bytes32(factoryDeps[1]) == config.contracts.chainCreationParams.defaultAAHash,
-                "default aa hash factory dep mismatch"
-            );
-            require(
-                bytes32(factoryDeps[2]) == config.contracts.chainCreationParams.evmEmulatorHash,
-                "EVM emulator hash factory dep mismatch"
-            );
-        }
-
-        factoryDepsHashes = factoryDeps;
-
+        factoryDepsResult = result;
         upgradeConfig.factoryDepsPublished = true;
     }
 
@@ -725,7 +615,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // Just retrieved it from the contract
         uint256 previousProtocolVersion = getOldProtocolVersion();
-        uint256 deadline = getOldProtocolDeadline();
+        uint256 deadline = UpgradeHelperLib.getOldProtocolDeadline();
         uint256 newProtocolVersion = getNewProtocolVersion();
         Diamond.DiamondCutData memory upgradeCut = abi.decode(
             newlyGeneratedData.upgradeCutData,
@@ -880,7 +770,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         //     target: nonDisoverable.rollupDAManager,
         //     data: abi.encodeCall(
         //         RollupDAManager.updateDAPair,
-        //         (ctmAddresses.stateTransition.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true)
+        //         (ctmAddresses.stateTransition.daAddresses.daContracts.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
         //     ),
         //     value: 0
         // });
@@ -918,32 +808,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         admin = getBridgehubAdmin();
         calls = new Call[](1);
         calls[0] = prepareCreateNewChainCall(555)[0];
-    }
-
-    function getL2BytecodeHash(string memory contractName) public view virtual override returns (bytes32) {
-        // ZKsyncOS chains use FixedForceDeploymentsData (built in DeployCTM) instead of
-        // Era-style ForceDeployment[] arrays, so this function should never be called.
-        // Revert loudly to prevent silent use of wrong bytecode hashes.
-        require(!config.isZKsyncOS, "getL2BytecodeHash must not be called for ZKsyncOS chains");
-        return super.getL2BytecodeHash(contractName);
-    }
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        if (!isZKBytecode) {
-            if (compareStrings(contractName, "DiamondProxy")) {
-                return type(DiamondProxy).creationCode;
-            } else if (compareStrings(contractName, "DefaultUpgrade")) {
-                return type(DefaultUpgrade).creationCode;
-            } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
-                return type(GovernanceUpgradeTimer).creationCode;
-            } else if (compareStrings(contractName, "UpgradeStageValidator")) {
-                return type(UpgradeStageValidator).creationCode;
-            }
-        }
-        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function deployUpgradeStageValidator() internal {
@@ -1031,7 +895,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         );
         vm.serializeAddress("deployed_addresses", "rollup_l1_da_validator_addr", discoveredEraZkChain.l1DAValidator);
         vm.serializeAddress("deployed_addresses", "validium_l1_da_validator_addr", address(0));
-        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", ctmAddresses.stateTransition.rollupDAManager);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "l1_rollup_da_manager",
+            ctmAddresses.daAddresses.daContracts.rollupDAManager
+        );
         vm.serializeAddress("deployed_addresses", "upgrade_stage_validator", upgradeAddresses.upgradeStageValidator);
 
         string memory deployedAddresses = vm.serializeAddress(
@@ -1042,11 +910,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // Serialize generated upgrade data
         vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
-        vm.serializeBytes(
-            "contracts_newConfig",
-            "force_deployments_data",
-            newlyGeneratedData.fixedForceDeploymentsData
-        );
+        vm.serializeBytes("contracts_newConfig", "force_deployments_data", generatedData.forceDeploymentsData);
 
         // Serialize protocol version info (needed for upgrade)
         vm.serializeUint("contracts_newConfig", "new_protocol_version", getNewProtocolVersion());
@@ -1077,6 +941,25 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         require(upgradeConfig.upgradeCutPrepared, "upgrade cut data not prepared");
         return newlyGeneratedData.upgradeCutData;
     }
+
+    /// @dev Test-only: inject pre-computed upgrade cut data to avoid recomputing (memory optimization).
+    function setChainUpgradeDiamondCutData_TestOnly(bytes memory _data) public {
+        newlyGeneratedData.upgradeCutData = _data;
+        upgradeConfig.upgradeCutPrepared = true;
+    }
+
+    /// @dev Test-only: inject pre-computed fixed force deployments data.
+    function setFixedForceDeploymentsData_TestOnly(bytes memory _data) public {
+        generatedData.forceDeploymentsData = _data;
+        upgradeConfig.fixedForceDeploymentsDataGenerated = true;
+    }
+
+    /// @notice Returns the encoded FixedForceDeploymentsData bytes.
+    function getEncodedFixedForceDeploymentsData() public view returns (bytes memory) {
+        require(upgradeConfig.fixedForceDeploymentsDataGenerated, "force deployments data not generated");
+        return generatedData.forceDeploymentsData;
+    }
+
     ////////////////////////////// Misc utils /////////////////////////////////
 
     // add this to be excluded from coverage report

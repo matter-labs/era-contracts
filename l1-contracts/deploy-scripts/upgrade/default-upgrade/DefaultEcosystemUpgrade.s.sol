@@ -11,6 +11,7 @@ import {DefaultCoreUpgrade} from "./DefaultCoreUpgrade.s.sol";
 import {DefaultCTMUpgrade} from "./DefaultCTMUpgrade.s.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 import {BridgehubAddresses, CTMDeployedAddresses, CoreDeployedAddresses} from "../../utils/Types.sol";
+import {EcosystemUpgradeParams} from "./UpgradeParams.sol";
 
 /// @notice Unified script that runs both ecosystem core upgrade and CTM upgrade
 /// @dev This script combines DefaultCoreUpgrade and DefaultCTMUpgrade, running them in sequence
@@ -64,18 +65,13 @@ contract DefaultEcosystemUpgrade is Script {
         }
     }
 
-    /// @notice Initialize both core and CTM upgrades
-    function initialize(
-        string memory permanentValuesInputPath,
-        string memory _upgradeInputPath,
-        string memory _ecosystemOutputPath
-    ) public virtual {
+    function initializeWithArgs(EcosystemUpgradeParams memory _params) public virtual {
         string memory root = vm.projectRoot();
-        ecosystemOutputPath = string.concat(root, _ecosystemOutputPath);
-        upgradeInputPath = _upgradeInputPath;
+        ecosystemOutputPath = string.concat(root, _params.ecosystemOutputPath);
+        upgradeInputPath = _params.upgradeInputPath;
 
         // Get output paths (these return relative paths)
-        string memory _coreOutputPath = getCoreOutputPath(_ecosystemOutputPath);
+        string memory _coreOutputPath = getCoreOutputPath(_params.ecosystemOutputPath);
         string memory _ctmOutputPath = getCTMOutputPath();
 
         // Store full paths for later use
@@ -84,16 +80,32 @@ contract DefaultEcosystemUpgrade is Script {
 
         // Initialize core upgrade with its own output path
         coreUpgrade = createCoreUpgrade();
-        coreUpgrade.initialize(permanentValuesInputPath, _upgradeInputPath, _coreOutputPath);
+        coreUpgrade.initializeWithArgs(
+            _params.bridgehubProxyAddress,
+            _params.isZKsyncOS,
+            _params.create2FactorySalt,
+            _params.upgradeInputPath,
+            _coreOutputPath
+        );
         _coreInitialized = true;
 
         // Initialize CTM upgrade with its own output path
         ctmUpgrade = createCTMUpgrade();
-        ctmUpgrade.initialize(permanentValuesInputPath, _upgradeInputPath, _ctmOutputPath);
+        ctmUpgrade.initializeWithArgs(
+            _params.ctmProxy,
+            _params.bytecodesSupplier,
+            _params.isZKsyncOS,
+            _params.rollupDAManager,
+            _params.create2FactorySalt,
+            _params.upgradeInputPath,
+            _ctmOutputPath,
+            _params.governance,
+            _params.zkTokenAssetId
+        );
         _ctmInitialized = true;
 
         // Configure optional output sections based on upgrade config (default: false)
-        string memory upgradeToml = vm.readFile(string.concat(root, _upgradeInputPath));
+        string memory upgradeToml = vm.readFile(string.concat(root, _params.upgradeInputPath));
         if (upgradeToml.keyExists("$.include_state_transition_in_ecosystem_output")) {
             includeStateTransitionInEcosystemOutput = upgradeToml.readBool(
                 "$.include_state_transition_in_ecosystem_output"
@@ -106,7 +118,7 @@ contract DefaultEcosystemUpgrade is Script {
         }
 
         // Allow subclasses to override protocol version for local testing
-        overrideProtocolVersionForLocalTesting(_upgradeInputPath);
+        overrideProtocolVersionForLocalTesting(_params.upgradeInputPath);
     }
 
     /// @notice Override this in test environments to set protocol version from config instead of genesis
@@ -301,16 +313,5 @@ contract DefaultEcosystemUpgrade is Script {
         console.log("Stage 0 calls:", stage0Calls.length);
         console.log("Stage 1 calls:", stage1Calls.length);
         console.log("Stage 2 calls:", stage2Calls.length);
-    }
-
-    /// @notice E2e upgrade generation
-    function run() public virtual {
-        initialize(
-            vm.envString("PERMANENT_VALUES_INPUT"),
-            vm.envString("UPGRADE_INPUT"),
-            vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
-        );
-        prepareEcosystemUpgrade();
-        prepareDefaultGovernanceCalls();
     }
 }

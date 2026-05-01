@@ -122,19 +122,16 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         // solhint-disable-next-line func-named-parameters
         updateL2(
             _l1ChainId,
+            _aliasedOwner,
             _l2TokenProxyBytecodeHash,
             _legacySharedBridge,
             _wethToken,
             _baseTokenBridgingData,
             _baseTokenMetadata
         );
-        if (_aliasedOwner == address(0)) {
-            revert EmptyAddress();
-        }
         if (_bridgedTokenBeacon == address(0)) {
             revert EmptyAddress();
         }
-        _transferOwnership(_aliasedOwner);
         bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
         emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
     }
@@ -151,6 +148,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @dev This function is used to initialize the new implementation of L2NativeTokenVault on existing chains during
     /// the upgrade.
     /// @param _l1ChainId The chain id of L1.
+    /// @param _aliasedOwner The expected owner. If the current owner is different (e.g. a temporary
+    ///        multisig on a chain that predates decentralized governance), it will be reset.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
     /// @param _wethToken The address of the WETH token.
@@ -158,6 +157,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @param _baseTokenMetadata The metadata of the base token.
     function updateL2(
         uint256 _l1ChainId,
+        address _aliasedOwner,
         bytes32 _l2TokenProxyBytecodeHash,
         address _legacySharedBridge,
         address _wethToken,
@@ -189,6 +189,12 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         require(_l2TokenProxyBytecodeHash != bytes32(0), EmptyBytes32());
 
         L2_TOKEN_PROXY_BYTECODE_HASH = _l2TokenProxyBytecodeHash;
+
+        // Ensure the owner matches the expected governance.
+        if (owner() != _aliasedOwner) {
+            require(_aliasedOwner != address(0), EmptyAddress());
+            _transferOwnership(_aliasedOwner);
+        }
     }
 
     function _assetTracker() internal view virtual override returns (IAssetTrackerBase) {

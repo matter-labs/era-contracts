@@ -48,10 +48,9 @@ import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol"
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC7786Recipient {
-    /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
-    /// the old version where it was an immutable.
-    IL2Bridgehub public BRIDGE_HUB;
+    /// @dev Deprecated: previously stored the L2 Bridgehub. Now the address is resolved via
+    /// `_bridgehub()` → `L2_BRIDGEHUB_ADDR` constant. Kept as an empty slot to preserve storage layout.
+    IL2Bridgehub private __DEPRECATED_BRIDGE_HUB;
 
     /// @dev Chain ID of L1 for bridging reasons.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
@@ -221,12 +220,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
     ) public reentrancyGuardInitializer onlyUpgrader {
-        BRIDGE_HUB = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
         _disableInitializers();
         // solhint-disable-next-line func-named-parameters
-        updateL2(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, _baseTokenAssetId);
+        updateL2(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, _baseTokenAssetId, _aliasedOwner);
         _setAssetHandler(_baseTokenAssetId, _nativeTokenVaultAddr());
-        _transferOwnership(_aliasedOwner);
     }
 
     /// @notice Updates the contract.
@@ -237,12 +234,15 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// @param _l1AssetRouter The address of the L1 asset router.
     /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
     /// @param _baseTokenAssetId The asset id of the base token.
+    /// @param _aliasedOwner The expected owner. If the current owner is different (e.g. a temporary
+    ///        multisig on a chain that predates decentralized governance), it will be reset.
     function updateL2(
         uint256 _l1ChainId,
         uint256 _eraChainId,
         IL1AssetRouter _l1AssetRouter,
         IL2SharedBridgeLegacy _legacySharedBridge,
-        bytes32 _baseTokenAssetId
+        bytes32 _baseTokenAssetId,
+        address _aliasedOwner
     ) public onlyUpgrader {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         require(address(_l1AssetRouter) != address(0), EmptyAddress());
@@ -250,6 +250,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         L1_ASSET_ROUTER = _l1AssetRouter;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         ERA_CHAIN_ID = _eraChainId;
+        // Ensure the owner matches the expected governance. Pre-v31 ZKsync OS testnets ran with a
+        // temporary multisig owner; we reset it here so every chain ends up with the same
+        // (aliased L1 governance) owner after v31.
+        if (owner() != _aliasedOwner) {
+            _transferOwnership(_aliasedOwner);
+        }
     }
 
     /// @inheritdoc IL2AssetRouter

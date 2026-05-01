@@ -22,7 +22,7 @@ import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ADDRESS_ONE, Utils} from "../utils/Utils.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
-import {PermanentValuesHelper} from "../utils/PermanentValuesHelper.sol";
+import {Create2FactoryUtils} from "../utils/deploy/Create2FactoryUtils.s.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AddressIntrospector} from "../utils/AddressIntrospector.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
@@ -38,7 +38,6 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {Create2AndTransfer} from "../utils/deploy/Create2AndTransfer.sol";
 import {
     ZkChainAddresses,
     StateTransitionDeployedAddresses,
@@ -48,7 +47,7 @@ import {
 import {IRegisterZKChain, RegisterZKChainConfig} from "contracts/script-interfaces/IRegisterZKChain.sol";
 import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 
-contract RegisterZKChainScript is Script, IRegisterZKChain {
+contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
     using stdToml for string;
 
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewZKChain(uint256,address)");
@@ -110,8 +109,6 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         string memory ctmToml = vm.readFile(ctmPath);
         bytes memory _forceDeploymentsData = ctmToml.readBytes("$.contracts_config.force_deployments_data");
         bytes memory _diamondCutData = ctmToml.readBytes("$.contracts_config.diamond_cut_data");
-        address _create2FactoryAddress = ctmToml.readAddress("$.contracts.create2_factory_addr");
-        bytes32 _create2Salt = ctmToml.readBytes32("$.contracts.create2_factory_salt");
 
         // Read on-chain addresses once (same for all chains)
         initializeConfigFromOnChain(_chainTypeManagerProxy);
@@ -119,8 +116,6 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         // Set shared config (loop-invariant)
         config.forceDeploymentsData = _forceDeploymentsData;
         config.diamondCutData = _diamondCutData;
-        config.create2FactoryAddress = _create2FactoryAddress;
-        config.create2Salt = _create2Salt;
 
         for (uint256 i = 0; i < _chainIds.length; i++) {
             console.log("Deploying ZKChain", _chainIds[i]);
@@ -166,6 +161,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         configureZkSyncStateTransition();
         setPendingAdmin();
 
+        // FIXME: add guards that this functionality is available only for Era chains.
         if (config.initializeLegacyBridge) {
             unpauseDeposits();
             deployLegacySharedBridge();
@@ -223,10 +219,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         config.l1Erc20Bridge = coreAddresses.bridges.proxies.erc20Bridge;
         config.l1SharedBridgeProxy = coreAddresses.bridges.proxies.l1AssetRouter;
 
-        // Read create2 factory values from permanent values file
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = PermanentValuesHelper.getPermanentValues(vm);
-        config.create2FactoryAddress = create2FactoryAddr;
-        config.create2Salt = create2FactorySalt;
+        (config.create2FactoryAddress, config.create2Salt) = getCreate2FactoryParams();
 
         if (vm.keyExistsToml(toml, "$.chain.allow_evm_emulator")) {
             config.allowEvmEmulator = toml.readBool("$.chain.allow_evm_emulator");
@@ -250,8 +243,6 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         string memory toml = vm.readFile(path);
         config.forceDeploymentsData = toml.readBytes("$.contracts_config.force_deployments_data");
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
-        config.create2FactoryAddress = toml.readAddress("$.contracts.create2_factory_addr");
-        config.create2Salt = toml.readBytes32("$.contracts.create2_factory_salt");
         path = string.concat(root, vm.envString("ZK_CHAIN_CONFIG"));
         initializeConfig(path, chainTypeManagerProxy, chainChainId);
     }
@@ -346,11 +337,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
             config.governanceSecurityCouncilAddress,
             config.governanceMinDelay
         );
-        address governance = Utils.deployViaCreate2(
-            abi.encodePacked(type(Governance).creationCode, input),
-            config.create2Salt,
-            config.create2FactoryAddress
-        );
+        address governance = deployViaCreate2(abi.encodePacked(type(Governance).creationCode, input));
         console.log("Governance deployed at:", governance);
         output.governance = governance;
     }
@@ -364,10 +351,8 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
     }
 
     function deployChainAdminOwnable() internal returns (address chainAdmin, address accessControlRestriction) {
-        chainAdmin = Utils.deployViaCreate2(
-            abi.encodePacked(type(ChainAdminOwnable).creationCode, abi.encode(config.ownerAddress, address(0))),
-            config.create2Salt,
-            config.create2FactoryAddress
+        chainAdmin = deployViaCreate2(
+            abi.encodePacked(type(ChainAdminOwnable).creationCode, abi.encode(config.ownerAddress, address(0)))
         );
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
@@ -382,21 +367,15 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         returns (address chainAdmin, address accessControlRestriction)
     {
         bytes memory input = abi.encode(0, config.ownerAddress);
-        accessControlRestriction = Utils.deployViaCreate2(
-            abi.encodePacked(type(AccessControlRestriction).creationCode, input),
-            config.create2Salt,
-            config.create2FactoryAddress
+        accessControlRestriction = deployViaCreate2(
+            abi.encodePacked(type(AccessControlRestriction).creationCode, input)
         );
 
         address[] memory restrictions = new address[](1);
         restrictions[0] = accessControlRestriction;
 
         input = abi.encode(restrictions);
-        chainAdmin = Utils.deployViaCreate2(
-            abi.encodePacked(type(ChainAdmin).creationCode, input),
-            config.create2Salt,
-            config.create2FactoryAddress
-        );
+        chainAdmin = deployViaCreate2(abi.encodePacked(type(ChainAdmin).creationCode, input));
     }
 
     function registerZKChain() internal {
@@ -439,10 +418,10 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
 
         vm.startBroadcast(getDeployerAddress());
 
-        // Add committer role to the first two addresses (commit operators)
-
-        // We give all roles to the committer, the reason is because the separate prover/executer roles
-        // are only provided in ZKsync OS, while on Era all of them are filled by committer.
+        // Eth-path operator (ZKsync Era): precommit / revert / upgrader. When dedicated ZKsync OS prove
+        // and execute operators are set, they receive PROVER / EXECUTOR instead (see below).
+        bool zkSyncOsValidatorSplit = config.validatorSenderOperatorProve != address(0) &&
+            config.validatorSenderOperatorExecute != address(0);
         validatorTimelock.addValidatorRoles(
             chainAddress,
             config.validatorSenderOperatorEth,
@@ -450,8 +429,8 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
                 rotatePrecommitterRole: true,
                 rotateCommitterRole: false,
                 rotateReverterRole: true,
-                rotateProverRole: true,
-                rotateExecutorRole: true,
+                rotateProverRole: !zkSyncOsValidatorSplit,
+                rotateExecutorRole: !zkSyncOsValidatorSplit,
                 rotateUpgraderRole: true
             })
         );
@@ -469,8 +448,8 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
             })
         );
 
-        // Add prover role to the third address, only if set
-        if (config.validatorSenderOperatorProve != address(0)) {
+        // ZKsync OS split: dedicated prove / execute operators.
+        if (zkSyncOsValidatorSplit) {
             validatorTimelock.addValidatorRoles(
                 chainAddress,
                 config.validatorSenderOperatorProve,
@@ -483,10 +462,6 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
                     rotateUpgraderRole: false
                 })
             );
-        }
-
-        // Add executor role to the fourth address, only if set
-        if (config.validatorSenderOperatorExecute != address(0)) {
             validatorTimelock.addValidatorRoles(
                 chainAddress,
                 config.validatorSenderOperatorExecute,
@@ -542,20 +517,16 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
     }
 
     function deployChainProxyAddress() internal {
-        bytes memory input = abi.encode(type(ProxyAdmin).creationCode, config.create2Salt, output.chainAdmin);
-        bytes memory encoded = abi.encodePacked(type(Create2AndTransfer).creationCode, input);
-        address create2AndTransfer = Utils.deployViaCreate2(encoded, config.create2Salt, config.create2FactoryAddress);
+        address proxyAdmin = create2WithDeterministicOwner(type(ProxyAdmin).creationCode, output.chainAdmin);
 
-        address proxyAdmin = vm.computeCreate2Address(config.create2Salt, keccak256(encoded), create2AndTransfer);
-
-        console.log("Transparent Proxy Admin deployed at:", address(proxyAdmin));
-        output.chainProxyAdmin = address(proxyAdmin);
+        console.log("Transparent Proxy Admin deployed at:", proxyAdmin);
+        output.chainProxyAdmin = proxyAdmin;
     }
 
     function deployLegacySharedBridge() internal {
         bytes[] memory emptyDeps = new bytes[](0);
         address legacyBridgeImplAddr = Utils.deployThroughL1Deterministic({
-            bytecode: ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacyDev"),
+            bytecode: ContractsBytecodesLib.getCreationCodeEra("L2SharedBridgeLegacyDev"),
             constructorargs: hex"",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -566,7 +537,7 @@ contract RegisterZKChainScript is Script, IRegisterZKChain {
         });
 
         output.l2LegacySharedBridge = Utils.deployThroughL1Deterministic({
-            bytecode: ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
+            bytecode: ContractsBytecodesLib.getCreationCodeEra("TransparentUpgradeableProxy"),
             constructorargs: L2LegacySharedBridgeTestHelper.getLegacySharedBridgeProxyConstructorParams(
                 legacyBridgeImplAddr,
                 config.l1Erc20Bridge,

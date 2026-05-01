@@ -41,7 +41,8 @@ on:
       - "yarn.lock"
 
 jobs:
-  # Fast job: uses pre-generated chain states from the repo, no contract compilation needed.
+  # Fast job: uses pre-generated chain states from the repo.
+  # We still compile DummyInteropRecipient so deploy bytecode is available in out/.
   integration-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -52,7 +53,7 @@ jobs:
         with:
           submodules: true
 
-      - name: Install Foundry (for Anvil only, no compilation needed)
+      - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.5.1
@@ -65,6 +66,10 @@ jobs:
 
       - name: Install dependencies
         run: yarn
+
+      - name: Build DummyInteropRecipient artifact
+        working-directory: l1-contracts
+        run: forge build contracts/dev-contracts/test/DummyInteropRecipient.sol
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
@@ -82,8 +87,9 @@ jobs:
 
       - name: Cleanup
         if: always()
+        working-directory: l1-contracts/test/anvil-interop
         run: |
-          pkill -9 anvil 2>/dev/null || true
+          bash cleanup.sh
 
   # V29 → V31 upgrade test: loads v29 chain states, runs the v31 ecosystem upgrade,
   # executes governance calls, and verifies protocol version is updated.
@@ -97,10 +103,13 @@ jobs:
         with:
           submodules: true
 
-      - name: Install Foundry (includes Anvil + forge for compilation)
+      - name: Install Foundry (for Anvil)
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: v1.5.1
+
+      - name: Install foundry-zksync (for forge --zksync)
+        uses: ./.github/actions/install-zksync-foundry
 
       - name: Use Node.js
         uses: actions/setup-node@v4
@@ -114,9 +123,11 @@ jobs:
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
 
+      - name: Build system-contracts artifacts
+        run: yarn sc build:foundry
+
       - name: Build l1-contracts artifacts
-        working-directory: l1-contracts
-        run: forge build --optimizer-runs 200
+        run: yarn l1 build:foundry
 
       - name: Install anvil-interop dependencies
         working-directory: l1-contracts/test/anvil-interop
@@ -130,8 +141,63 @@ jobs:
 
       - name: Cleanup
         if: always()
+        working-directory: l1-contracts/test/anvil-interop
         run: |
-          pkill -9 anvil 2>/dev/null || true
+          bash cleanup.sh
+
+  # V30 → V31 upgrade test: loads v30 ZKsync OS chain states, runs the v31 ecosystem upgrade,
+  # executes governance calls, and verifies protocol version is updated.
+  v30-to-v31-upgrade-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Foundry (for Anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Install foundry-zksync (for forge --zksync)
+        uses: ./.github/actions/install-zksync-foundry
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Build da-contracts artifacts
+        run: yarn da build:foundry
+
+      - name: Build system-contracts artifacts
+        run: yarn sc build:foundry
+
+      - name: Build l1-contracts artifacts
+        run: yarn l1 build:foundry
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      - name: Run V30 to V31 upgrade test
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          echo "Running V30 -> V31 upgrade test..."
+          yarn ts-node run-v30-to-v31-upgrade-test.ts
+
+      - name: Cleanup
+        if: always()
+        working-directory: l1-contracts/test/anvil-interop
+        run: |
+          bash cleanup.sh
 
   # TODO: Re-enable after merging to main. The 'Regenerate Anvil Interop Chain States'
   # workflow_dispatch workflow needs to be on main before it can be triggered from the UI/CLI.
@@ -200,5 +266,6 @@ jobs:
 
       - name: Cleanup
         if: always()
+        working-directory: l1-contracts/test/anvil-interop
         run: |
-          pkill -9 anvil 2>/dev/null || true
+          bash cleanup.sh

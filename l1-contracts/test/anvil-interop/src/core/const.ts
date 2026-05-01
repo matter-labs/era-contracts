@@ -7,7 +7,7 @@ export const LEGACY_SHARED_BRIDGE_PLACEHOLDER = "0x00000000000000000000000000000
 export const SYSTEM_CONTEXT_ADDR = "0x000000000000000000000000000000000000800b";
 export const L2_TO_L1_MESSENGER_ADDR = "0x0000000000000000000000000000000000008008";
 export const L2_BASE_TOKEN_ADDR = "0x000000000000000000000000000000000000800a";
-export const CONTRACT_DEPLOYER_ADDR = "0x0000000000000000000000000000000000008006";
+export const L2_CONTRACT_DEPLOYER_ADDR = "0x0000000000000000000000000000000000008006";
 export const L2_FORCE_DEPLOYER_ADDR = "0x0000000000000000000000000000000000008007";
 export const L2_COMPLEX_UPGRADER_ADDR = "0x000000000000000000000000000000000000800f";
 export const L2_GENESIS_UPGRADE_ADDR = "0x0000000000000000000000000000000000010001";
@@ -17,6 +17,7 @@ export const L2_ASSET_ROUTER_ADDR = "0x0000000000000000000000000000000000010003"
 export const L2_NATIVE_TOKEN_VAULT_ADDR = "0x0000000000000000000000000000000000010004";
 export const L2_MESSAGE_ROOT_ADDR = "0x0000000000000000000000000000000000010005";
 export const L2_WRAPPED_BASE_TOKEN_IMPL_ADDR = "0x0000000000000000000000000000000000010007";
+export const L2_INTEROP_ROOT_STORAGE_ADDR = "0x0000000000000000000000000000000000010008";
 export const L2_MESSAGE_VERIFICATION_ADDR = "0x0000000000000000000000000000000000010009";
 export const L2_CHAIN_ASSET_HANDLER_ADDR = "0x000000000000000000000000000000000001000a";
 export const L2_NTV_BEACON_DEPLOYER_ADDR = "0x000000000000000000000000000000000001000b";
@@ -74,6 +75,12 @@ export const CHAIN_ID_LEAF_PADDING = "0x39bc69363bb9e26cf14240de4e22569e95cf175c
 // L2 bootloader address (used for failed deposit logs)
 export const L2_BOOTLOADER_ADDR = "0x0000000000000000000000000000000000008001";
 
+// NTV (L2NativeTokenVault) storage slot numbers.
+// Obtained via: forge inspect L2NativeTokenVault storageLayout
+export const NTV_WETH_TOKEN_SLOT = 251;
+export const NTV_L1_CHAIN_ID_SLOT = 253;
+export const NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT = 255;
+
 // Event signatures
 // GenesisUpgrade(address indexed, L2CanonicalTransaction, uint256 indexed, bytes[])
 export const GENESIS_UPGRADE_EVENT_SIG =
@@ -89,3 +96,26 @@ export const ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE =
 // WritePriorityOpParams ABI tuple type for raw decoding NewPriorityRequest events
 export const WRITE_PRIORITY_OP_PARAMS_ABI_TYPE =
   "tuple(uint256,uint256,uint256,uint256,uint256,uint256,uint256,bytes,bytes,uint256[],bytes,bytes)";
+
+// Anvil account #2 — used as a secondary distinct recipient
+export const ANVIL_ACCOUNT2_ADDR = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
+// Anvil account #2 private key
+export const ANVIL_ACCOUNT2_PRIVATE_KEY = "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a";
+
+// ── Interop enums (mirror Solidity Messaging.sol) ──────────────
+
+export enum BundleStatus {
+  Unreceived = 0,
+  Verified = 1,
+  FullyExecuted = 2,
+  Unbundled = 3,
+}
+
+export enum CallStatus {
+  Unprocessed = 0,
+  Executed = 1,
+  Cancelled = 2,
+}
+
+// Selector for a non-existent function: someVeryUnfortunateCall()
+export const FAILING_CALL_CALLDATA = "0x00056d83";

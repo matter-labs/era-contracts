@@ -49,19 +49,17 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
-    function initialize(
-        string memory permanentValuesInputPath,
+    function initializeWithArgs(
+        address bridgehubProxyAddress,
+        bool isZKsyncOS,
+        bytes32 create2FactorySalt,
         string memory upgradeInputPath,
         string memory _outputPath
     ) public virtual {
         string memory root = vm.projectRoot();
-        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
         upgradeInputPath = string.concat(root, upgradeInputPath);
-        console.log("permanentValuesInputPath", permanentValuesInputPath);
-        console.log("root", root);
 
-        initializeConfig(permanentValuesInputPath, upgradeInputPath);
-        instantiateCreate2Factory();
+        initializeConfigWithArgs(bridgehubProxyAddress, isZKsyncOS, create2FactorySalt, upgradeInputPath);
 
         upgradeConfig.outputPath = string.concat(root, _outputPath);
         upgradeConfig.initialized = true;
@@ -77,17 +75,6 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice Deploy everything that should be deployed
     function deployNewEcosystemContractsL1() public virtual {}
-
-    /// @notice E2e upgrade generation
-    function run() public virtual {
-        initialize(
-            vm.envString("PERMANENT_VALUES_INPUT"),
-            vm.envString("UPGRADE_INPUT"),
-            vm.envString("UPGRADE_ECOSYSTEM_OUTPUT")
-        );
-        prepareEcosystemUpgrade();
-        prepareDefaultGovernanceCalls();
-    }
 
     function getOwnerAddress() public virtual returns (address) {
         return config.ownerAddress;
@@ -120,16 +107,21 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         return coreAddresses;
     }
 
-    function initializeConfig(string memory permanentValuesInputPath, string memory upgradeInputPath) public virtual {
-        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
+    function initializeConfigWithArgs(
+        address bridgehubProxyAddress,
+        bool isZKsyncOS,
+        bytes32 create2FactorySalt,
+        string memory upgradeInputPath
+    ) public virtual {
         string memory upgradeToml = vm.readFile(upgradeInputPath);
 
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
-        _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
+        // Only override the salt when explicitly provided (non-zero).
+        // When zero, the script falls back to the CREATE2_FACTORY_SALT env var or built-in default.
+        if (create2FactorySalt != bytes32(0)) {
+            setCreate2Salt(create2FactorySalt);
+        }
 
-        // Read isZKsyncOS flag from permanent values (required)
-        require(permanentValuesToml.keyExists("$.is_zk_sync_os"), "is_zk_sync_os flag is required in permanent values");
-        additionalConfig.isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
+        additionalConfig.isZKsyncOS = isZKsyncOS;
 
         // Optional override for v29 introspection selection
         if (upgradeToml.keyExists("$.use_v29_introspection")) {
@@ -140,9 +132,7 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         // Protocol version comes from genesis config
         additionalConfig.newProtocolVersion = loadProtocolVersionFromGenesis();
 
-        coreAddresses.bridgehub.proxies.bridgehub = permanentValuesToml.readAddress(
-            "$.core_contracts.bridgehub_proxy_addr"
-        );
+        coreAddresses.bridgehub.proxies.bridgehub = bridgehubProxyAddress;
         require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehub_proxy_addr is zero");
         setAddressesBasedOnBridgehub();
         initializeL1CoreUtilsConfig();
@@ -472,10 +462,8 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
     // add this to be excluded from coverage report
 
     /// @notice Load protocol version from genesis config
-    /// @dev Reads from Era or ZKsync OS genesis based on config.isZKsyncOS flag
     function loadProtocolVersionFromGenesis() internal virtual returns (uint256) {
-        string memory genesisFilename = additionalConfig.isZKsyncOS ? "zksync-os/latest.json" : "era/latest.json";
-        string memory genesisPath = string.concat(vm.projectRoot(), "/../configs/genesis/", genesisFilename);
+        string memory genesisPath = Utils.genesisConfigPath(additionalConfig.isZKsyncOS);
         return
             ChainCreationParamsLib
                 .getChainCreationParams(genesisPath, additionalConfig.isZKsyncOS)

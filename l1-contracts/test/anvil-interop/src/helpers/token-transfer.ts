@@ -3,43 +3,16 @@ import { DeploymentRunner } from "../deployment-runner";
 import type { MultiChainTokenTransferParams, MultiChainTokenTransferResult } from "../core/types";
 import type { PrivateInteropAddresses } from "./private-interop-deployer";
 import { getAbi } from "../core/contracts";
-import {
-  ANVIL_DEFAULT_PRIVATE_KEY,
-  DEFAULT_TX_GAS_LIMIT,
-  INTEROP_BUNDLE_TUPLE_TYPE,
-  INTEROP_CENTER_ADDR,
-  INTEROP_SEND_BUNDLE_GAS_LIMIT,
-  L2_ASSET_ROUTER_ADDR,
-  L2_INTEROP_HANDLER_ADDR,
-  L2_NATIVE_TOKEN_VAULT_ADDR,
-} from "../core/const";
+import { encodeEvmAddress } from "./erc7930";
+import { indirectCallAttr, interopCallValueAttr, sendInteropBundle, executeBundle } from "./interop-helpers";
+import { ANVIL_DEFAULT_PRIVATE_KEY, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
 import { encodeNtvAssetId, encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
-import { buildMockInteropProof } from "../core/utils";
 import { createBalanceTrackerFromState } from "./balance-tracker";
 
 type Logger = (line: string) => void;
 
 export interface ExecuteTokenTransferOptions extends MultiChainTokenTransferParams {
   logger?: Logger;
-}
-
-/**
- * Encode a chain ID in ERC-7930 format (EVM chain without address)
- */
-function encodeEvmChain(chainId: number): string {
-  let chainIdHex = chainId.toString(16);
-  if (chainIdHex.length % 2 !== 0) chainIdHex = `0${chainIdHex}`;
-  const chainRefBytes = ethers.utils.arrayify(`0x${chainIdHex}`);
-  const chainRefLen = chainRefBytes.length;
-  return ethers.utils.hexlify(new Uint8Array([0x00, 0x01, 0x00, 0x00, chainRefLen, ...chainRefBytes, 0x00]));
-}
-
-/**
- * Encode an address in ERC-7930 format (EVM address without chain reference)
- */
-function encodeEvmAddress(address: string): string {
-  const addrBytes = ethers.utils.arrayify(address);
-  return ethers.utils.hexlify(new Uint8Array([0x00, 0x01, 0x00, 0x00, 0x00, 0x14, ...addrBytes]));
 }
 
 function defaultLogger(line: string): void {
@@ -77,11 +50,9 @@ export async function executeTokenTransfer(
   const sourceProvider = new providers.JsonRpcProvider(sourceChain.rpcUrl);
   const targetProvider = new providers.JsonRpcProvider(targetChain.rpcUrl);
   const sourceWallet = new Wallet(privateKey, sourceProvider);
-  const targetWallet = new Wallet(privateKey, targetProvider);
   const tracker = createBalanceTrackerFromState(state);
 
   const sourceToken = new Contract(sourceTokenAddr, getAbi("TestnetERC20Token"), sourceWallet);
-  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), sourceWallet);
   const sourceVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), sourceProvider);
   const targetVault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), targetProvider);
 
@@ -116,7 +87,6 @@ export async function executeTokenTransfer(
     log(`\n✅ L2NativeTokenVault already approved for ${amount} TEST tokens`);
   }
 
-  const abiCoder = ethers.utils.defaultAbiCoder;
   const assetId = encodeNtvAssetId(sourceChainId, sourceTokenAddr);
   log(`\n🔑 Asset ID: ${assetId}`);
 
@@ -137,7 +107,7 @@ export async function executeTokenTransfer(
   const destinationBalanceBefore =
     destinationTokenBefore === ethers.constants.AddressZero
       ? BigNumber.from(0)
-      : await tracker.getL2TokenBalance(targetChainId, destinationTokenBefore, targetWallet.address);
+      : await tracker.getL2TokenBalance(targetChainId, destinationTokenBefore, sourceWallet.address);
 
   const transferData = encodeBridgeBurnData(amountWei, sourceWallet.address, sourceTokenAddr);
   const depositData = encodeAssetRouterBridgehubDepositData(assetId, transferData);
@@ -148,68 +118,35 @@ export async function executeTokenTransfer(
   log(`   Recipient: ${sourceWallet.address}`);
   log(`   Amount: ${amountWei.toString()}`);
 
-  const destinationChainIdBytes = encodeEvmChain(targetChainId);
   const targetAddressBytes = encodeEvmAddress(L2_ASSET_ROUTER_ADDR);
-  const indirectCallSelector = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("indirectCall(uint256)")).slice(0, 10);
-  const interopCallValueSelector = ethers.utils
-    .keccak256(ethers.utils.toUtf8Bytes("interopCallValue(uint256)"))
-    .slice(0, 10);
-  const indirectCallAttribute = indirectCallSelector + abiCoder.encode(["uint256"], [0]).slice(2);
-  const interopCallValueAttribute = interopCallValueSelector + abiCoder.encode(["uint256"], [0]).slice(2);
-
   const callStarter = {
     to: targetAddressBytes,
     data: depositData,
-    callAttributes: [indirectCallAttribute, interopCallValueAttribute],
+    callAttributes: [indirectCallAttr(), interopCallValueAttr(BigNumber.from(0))],
   };
 
   log(`\n⏱️  [${elapsed()}] Sending token transfer via InteropCenter...`);
-  log(`   InteropCenter: ${INTEROP_CENTER_ADDR}`);
   log(`   Target: L2AssetRouter at ${L2_ASSET_ROUTER_ADDR}`);
 
-  const sourceTx = await interopCenter.sendBundle(destinationChainIdBytes, [callStarter], [], {
-    gasLimit: INTEROP_SEND_BUNDLE_GAS_LIMIT,
-    value: 0,
+  const sendResult = await sendInteropBundle({
+    sourceProvider,
+    destinationChainId: targetChainId,
+    callStarters: [callStarter],
+    // Protocol fee defaults to 0 in the test environment (InteropCenter constructor default).
+    // If the fee is ever set to non-zero, this value must include it.
+    value: BigNumber.from(0),
   });
-  log(`\n   Transaction sent: cast run ${sourceTx.hash} -r ${sourceChain.rpcUrl}`);
-  const sourceReceipt = await sourceTx.wait();
-  log(`   ✅ Transaction confirmed in block ${sourceReceipt?.blockNumber} [${elapsed()}]`);
-
-  let interopBundle: unknown = null;
-  if (sourceReceipt?.logs) {
-    for (const logEntry of sourceReceipt.logs) {
-      try {
-        const parsed = interopCenter.interface.parseLog({
-          topics: logEntry.topics as string[],
-          data: logEntry.data,
-        });
-        if (parsed && parsed.name === "InteropBundleSent") {
-          interopBundle = parsed.args["interopBundle"];
-          break;
-        }
-      } catch {
-        // Ignore non-InteropCenter logs
-      }
-    }
-  }
-  if (!interopBundle) {
-    throw new Error("InteropBundleSent event not found in source transaction receipt");
-  }
+  log(`\n   Transaction sent: cast run ${sendResult.txHash} -r ${sourceChain.rpcUrl}`);
+  log(`   ✅ Transaction confirmed in block ${sendResult.receipt.blockNumber} [${elapsed()}]`);
 
   let targetTxHash: string | null = null;
 
   {
     log(`⏱️  [${elapsed()}] Executing bundle directly on destination chain via L2InteropHandler...`);
-    const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), targetWallet);
-
-    const mockProof = buildMockInteropProof(sourceChainId);
-
-    const bundleData = abiCoder.encode([INTEROP_BUNDLE_TUPLE_TYPE], [interopBundle]);
     try {
-      const executeTx = await interopHandler.executeBundle(bundleData, mockProof, { gasLimit: DEFAULT_TX_GAS_LIMIT });
-      await executeTx.wait();
-      targetTxHash = executeTx.hash;
-      log(`   ✅ executeBundle tx: cast run ${executeTx.hash} -r ${targetChain.rpcUrl}`);
+      const receipt = await executeBundle(targetProvider, sendResult.bundleData, sourceChainId);
+      targetTxHash = receipt.transactionHash;
+      log(`   ✅ executeBundle tx: cast run ${receipt.transactionHash} -r ${targetChain.rpcUrl}`);
     } catch (error: unknown) {
       const message = (error as Error)?.message || String(error);
       log(`   ⚠️ executeBundle failed: ${message}`);
@@ -227,13 +164,13 @@ export async function executeTokenTransfer(
   const destinationBalanceAfter =
     destinationToken === ethers.constants.AddressZero
       ? BigNumber.from(0)
-      : await tracker.getL2TokenBalance(targetChainId, destinationToken, targetWallet.address);
+      : await tracker.getL2TokenBalance(targetChainId, destinationToken, sourceWallet.address);
 
   log(`Target Chain: ${targetChainId}`);
   log(`Target Tx:    ${targetTxHash || "not found yet (relay may still be pending)"}`);
   log("");
   log("Trace commands:");
-  log(`  cast run ${sourceTx.hash} -r ${sourceChain.rpcUrl}`);
+  log(`  cast run ${sendResult.txHash} -r ${sourceChain.rpcUrl}`);
   if (targetTxHash) {
     log(`  cast run ${targetTxHash} -r ${targetChain.rpcUrl}`);
   }
@@ -254,7 +191,7 @@ export async function executeTokenTransfer(
     sourceBalanceAfter: sourceBalanceAfter.toString(),
     destinationBalanceBefore: destinationBalanceBefore.toString(),
     destinationBalanceAfter: destinationBalanceAfter.toString(),
-    sourceTxHash: sourceTx.hash,
+    sourceTxHash: sendResult.txHash,
     targetTxHash,
   };
 }

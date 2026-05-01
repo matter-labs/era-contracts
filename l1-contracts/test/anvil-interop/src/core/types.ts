@@ -85,6 +85,8 @@ export interface AnvilChainConfig {
   port: number;
   role: ChainRole;
   settlement?: SettlementType;
+  /** L1 base token address, or "custom" to deploy a fresh ERC20. Defaults to ETH_TOKEN_ADDRESS if omitted. */
+  baseToken?: string;
 }
 
 export interface AnvilConfig {
@@ -124,6 +126,12 @@ export interface DeploymentState {
   chainAddresses?: ChainAddresses[];
   testTokens?: Record<number, string>;
   privateInteropAddresses?: Record<number, PrivateInteropAddresses>;
+  /** L1 address of the custom ERC20 base token, keyed by chain ID. */
+  customBaseTokens?: Record<number, string>;
+  zkToken?: {
+    l1Address: string;
+    assetId: string;
+  };
 }
 
 export interface MultiChainTokenTransferParams {

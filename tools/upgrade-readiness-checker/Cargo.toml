@@ -1,0 +1,29 @@
+[package]
+name = "upgrade-readiness-checker"
+version = "0.1.0"
+edition = "2021"
+description = "Checks whether a ZKsync chain's pending protocol upgrade is ready to be finalized on L1."
+
+[dependencies]
+alloy = { version = "1.0", default-features = false, features = [
+    "contract",
+    "provider-http",
+    "rpc-types",
+    "sol-types",
+    "serde",
+    "std",
+    "eips",
+    "network",
+    "reqwest",
+] }
+anyhow = "1"
+clap = { version = "4.5", features = ["derive", "env"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Standalone: do not join any surrounding workspace.
+[workspace]

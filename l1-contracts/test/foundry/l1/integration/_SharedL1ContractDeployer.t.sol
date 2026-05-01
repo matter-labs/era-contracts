@@ -121,7 +121,7 @@ contract L1ContractDeployer is UtilsCallMockerTest {
     function _acceptOwnershipCTM() private {
         vm.startPrank(IOwnable(address(addresses.chainTypeManager)).pendingOwner());
         IOwnable(address(addresses.chainTypeManager)).acceptOwnership();
-        IOwnable(address(ctmAddresses.daAddresses.rollupDAManager)).acceptOwnership();
+        IOwnable(address(ctmAddresses.daAddresses.daContracts.rollupDAManager)).acceptOwnership();
         vm.stopPrank();
     }
 
