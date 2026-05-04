@@ -88,8 +88,8 @@ abstract contract L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
         // Payload with a non-finalizeDeposit selector so the L251 selector check is the deterministic next failure.
         bytes memory payload = abi.encodeWithSelector(
             bogusSelector,
-            block.chainid + 1,
-            bytes32(uint256(1)),
+            block.chainid + 1, // originChainId (different from L1 and current chain)
+            bytes32(uint256(1)), // assetId
             abi.encode(address(0), address(this), address(0), uint256(1000), bytes(""))
         );
 

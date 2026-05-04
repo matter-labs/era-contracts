@@ -72,7 +72,16 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         finalizeDepositWithCustomCommitment(abi.encode(commitment));
 
         address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
-        assertFalse(GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
+        GettersFacet getters = GettersFacet(diamondProxy);
+
+        assertFalse(getters.isPriorityQueueActive(), "Priority queue must not be active");
+
+        // Verify the priority tree state was carried over from the commitment.
+        // PriorityTree.initFromCommitment copies startIndex / unprocessedIndex / _nextLeafIndex directly,
+        // so getTotalPriorityTxs() (== startIndex + _nextLeafIndex) equals 101 + 102.
+        assertEq(getters.getPriorityTreeStartIndex(), 101, "priority tree startIndex must be 101");
+        assertEq(getters.getTotalPriorityTxs(), 101 + 102, "totalPriorityTxs must equal startIndex + nextLeafIndex");
+        assertTrue(getters.getPriorityTreeRoot() != bytes32(0), "priority tree root must be set after migration");
     }
 
     function test_forwardToL2OnGateway_L2() public {
@@ -82,7 +91,13 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
         assertTrue(diamondProxy != address(0), "Diamond proxy should be deployed");
 
-        vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
+        // Snapshot priority-tree state on the destination diamond so the post-call asserts can
+        // verify the forward queued a priority op (rather than only that the call did not revert).
+        // Done before vm.prank so the view calls do not consume it.
+        GettersFacet getters = GettersFacet(diamondProxy);
+        uint256 priorityCountBefore = getters.getTotalPriorityTxs();
+        uint256 queueSizeBefore = getters.getPriorityQueueSize();
+
         vm.mockCall(
             L2_CHAIN_ASSET_HANDLER_ADDR,
             abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
@@ -98,11 +113,21 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             originToken: address(0)
         });
 
-        // Call the function - if it doesn't revert, the forward was successful
+        vm.recordLogs();
+        vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
         l2InteropCenter.forwardTransactionOnGatewayWithBalanceChange(mintChainId, bytes32(0), 0, balanceChange);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Verify the chain is still accessible after forwarding
-        assertTrue(l2Bridgehub.getZKChain(mintChainId) != address(0), "Chain should still be registered after forward");
+        // Verify both Mailbox events fired on the destination diamond for the forwarded priority tx.
+        logs.requireOneFrom("NewPriorityRequestId(uint256,bytes32)", diamondProxy);
+        logs.requireOneFrom("NewRelayedPriorityTransaction(uint256,bytes32,uint64)", diamondProxy);
+
+        // Verify the priority queue depth on the destination diamond grew by exactly one.
+        assertEq(getters.getTotalPriorityTxs(), priorityCountBefore + 1, "totalPriorityTxs must increment by 1");
+        assertEq(getters.getPriorityQueueSize(), queueSizeBefore + 1, "priorityQueueSize must increment by 1");
+
+        // Verify the chain is still registered on this layer after the forward.
+        assertEq(l2Bridgehub.getZKChain(mintChainId), diamondProxy, "Chain registration must be unchanged after forward");
     }
 
     function test_withdrawFromGateway() public {
@@ -120,6 +145,10 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             ctmData: abi.encode(newAdmin, config.contracts.diamondCutData),
             chainData: abi.encode(chainTypeManager.protocolVersion())
         });
+
+        // Snapshot migrationNumber so the post-call assert can verify it advances by exactly one.
+        uint256 migrationNumberBefore = IChainAssetHandlerBase(L2_CHAIN_ASSET_HANDLER_ADDR).migrationNumber(mintChainId);
+
         vm.prank(ownerWallet);
         vm.mockCall(
             address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
@@ -131,8 +160,12 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         l2AssetRouter.withdraw(ctmAssetId, abi.encode(data));
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // Verify WithdrawalInitiatedAssetRouter event was emitted with correct params
-        Vm.Log memory withdrawalLog = logs.requireOne("WithdrawalInitiatedAssetRouter(uint256,address,bytes32,bytes)");
+        // Verify WithdrawalInitiatedAssetRouter event content. The event has 2 indexed params
+        // (l2Sender, assetId); chainId and assetData live in the data field.
+        Vm.Log memory withdrawalLog = logs.requireOneFrom(
+            "WithdrawalInitiatedAssetRouter(uint256,address,bytes32,bytes)",
+            L2_ASSET_ROUTER_ADDR
+        );
         assertEq(
             withdrawalLog.topics[1],
             bytes32(uint256(uint160(ownerWallet))),
@@ -143,6 +176,29 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             ctmAssetId,
             "WithdrawalInitiatedAssetRouter: assetId should match ctmAssetId"
         );
+        (uint256 emittedChainId, bytes memory emittedAssetData) = abi.decode(withdrawalLog.data, (uint256, bytes));
+        assertEq(emittedChainId, L1_CHAIN_ID, "WithdrawalInitiatedAssetRouter: destination chain must be L1");
+        assertEq(
+            keccak256(emittedAssetData),
+            keccak256(abi.encode(data)),
+            "WithdrawalInitiatedAssetRouter: assetData must match the encoded BurnCTMAssetData input"
+        );
+
+        // Verify the chain-asset-handler MigrationStarted event. 3 indexed params
+        // (chainId, assetId, settlementLayerChainId); migrationNumber lives in the data field.
+        Vm.Log memory migrationLog = logs.requireOneFrom(
+            "MigrationStarted(uint256,uint256,bytes32,uint256)",
+            L2_CHAIN_ASSET_HANDLER_ADDR
+        );
+        assertEq(uint256(migrationLog.topics[1]), mintChainId, "MigrationStarted: chainId mismatch");
+        assertEq(migrationLog.topics[2], ctmAssetId, "MigrationStarted: assetId mismatch");
+
+        // Verify migrationNumber on the chain-asset-handler advanced by exactly one.
+        uint256 migrationNumberAfter = IChainAssetHandlerBase(L2_CHAIN_ASSET_HANDLER_ADDR).migrationNumber(mintChainId);
+        assertEq(migrationNumberAfter, migrationNumberBefore + 1, "migrationNumber must increment by 1");
+
+        // Verify the chain registration is preserved on this settlement layer until the migration is finalized elsewhere.
+        assertEq(l2Bridgehub.getZKChain(mintChainId), diamondProxyBefore, "Chain registration must be unchanged after withdraw");
     }
 
     function test_finalizeDepositWithRealChainData() public {

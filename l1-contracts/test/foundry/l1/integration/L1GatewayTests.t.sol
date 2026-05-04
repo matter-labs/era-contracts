@@ -62,7 +62,7 @@ import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
-import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestsConstants.sol";
+import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 
 contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     using LogFinder for Vm.Log[];

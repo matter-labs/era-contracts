@@ -397,6 +397,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
         uint256 amount = 300;
         uint256 l1ChainId = 1;
+        uint256 mockedTotalSupply = 1000;
 
         stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
         stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(l1ChainId);
@@ -409,7 +410,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         vm.mockCall(
             address(L2_BASE_TOKEN_SYSTEM_CONTRACT),
             abi.encodeWithSelector(IERC20.totalSupply.selector),
-            abi.encode(1000)
+            abi.encode(mockedTotalSupply)
         );
 
         // Mock currentSettlementLayerChainId to return L1 (not in gateway mode)
@@ -419,15 +420,34 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             abi.encode(l1ChainId)
         );
 
+        L2AssetTracker tracker = L2AssetTracker(L2_ASSET_TRACKER_ADDR);
         uint256 depositsBefore = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
+        uint256 chainBalanceBefore = tracker.chainBalance(block.chainid, baseTokenAssetId);
+        assertFalse(tracker.isAssetRegistered(baseTokenAssetId), "Asset should not be registered before call");
 
         // Call as L2BaseToken (the Era flow: L2BaseTokenEra.mint() → asset tracker)
         vm.prank(address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, amount);
 
-        // Verify totalSuccessfulDepositsFromL1 increased by amount
+        // ---- Outcome assertions ----
+
+        // chainBalance: base token's origin is L1, so the block.chainid branch in
+        // _handleFinalizeBridgingOnL2Inner is not taken; the balance must remain unchanged.
+        assertEq(
+            tracker.chainBalance(block.chainid, baseTokenAssetId),
+            chainBalanceBefore,
+            "Chain balance should remain unchanged for foreign-origin base token"
+        );
+
+        // totalSuccessfulDepositsFromL1: incremented by amount (fromChainId == L1, settlement layer == L1).
         uint256 depositsAfter = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
         assertEq(depositsAfter - depositsBefore, amount, "totalSuccessfulDepositsFromL1 should increase by amount");
+
+        // _registerLegacyTokenIfNeeded was triggered on first contact: registration + supply snapshot set.
+        assertTrue(tracker.isAssetRegistered(baseTokenAssetId), "Asset should be registered after call");
+        (bool isSaved, uint256 savedAmount) = tracker.totalPreV31TotalSupply(baseTokenAssetId);
+        assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
+        assertEq(savedAmount, mockedTotalSupply, "totalPreV31TotalSupply.amount should equal mocked totalSupply");
     }
 
     /// @notice A random address must not be able to call handleFinalizeBaseTokenBridgingOnL2.

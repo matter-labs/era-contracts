@@ -42,7 +42,7 @@ import {IL1MessageRoot} from "contracts/core/message-root/IL1MessageRoot.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
-import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestsConstants.sol";
+import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
 
 contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
