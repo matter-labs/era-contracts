@@ -20,6 +20,8 @@ import {UpgradeIntegrationTestBase} from "./UpgradeTestShared.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/message-root/IMessageRoot.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 /// @notice Test-only CTM upgrade that mocks large bytecode reads to avoid MemoryOOG
 contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
@@ -56,7 +58,7 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
     }
 }
 
-/// @notice Test-only Core upgrade that skips prlematic governance calls
+/// @notice Test-only Core upgrade that skips problematic governance calls
 contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
     /// @notice Override to skip setAssetTracker call (requires NTV ownership in test)
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
@@ -96,6 +98,7 @@ contract UpgradeIntegrationTest_Local is
     ZKChainDeployer,
     TokenDeployer
 {
+
     /// @notice Override to use mocked ecosystem upgrade that uses mocked CTM upgrade
     function createEcosystemUpgrade() internal override returns (EcosystemUpgrade_v31) {
         return new EcosystemUpgrade_v31_Test();
@@ -170,7 +173,16 @@ contract UpgradeIntegrationTest_Local is
     }
 
     function test_DefaultUpgrade_Local() public {
-        /// we do the whole test in the setup, since it is very ram heavy.
-        require(true, "test passed");
+        // Heavy execution and event assertions live in setUp -> internalTest()
+        // (RAM constraint). This body validates persisted state outcomes.
+        address ctm = ctmUpgrade.getCTMAddress();
+        address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
+
+        assertEq(IChainTypeManager(ctm).protocolVersion(), _expectedNewVersion, "CTM protocolVersion not bumped");
+        assertEq(IGetters(_eraDiamond).getProtocolVersion(), _expectedNewVersion, "Era chain not upgraded");
+
+        assertTrue(_newChainDiamond != address(0), "New chain ID not registered");
+        assertEq(IGetters(_newChainDiamond).getProtocolVersion(), _expectedNewVersion, "New chain wrong version");
+        assertTrue(IBridgehubBase(bridgehub).baseTokenAssetId(NEW_CHAIN_ID) != bytes32(0), "New chain missing baseTokenAssetId");
     }
 }
