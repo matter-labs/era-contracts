@@ -224,9 +224,7 @@ library L2GenesisForceDeploymentsHelper {
             (ZKChainSpecificForceDeploymentsData)
         );
 
-        // Keep SystemContractProxyAdmin initialized on both chain types for consistency.
-        // Era chains force-deploy system contracts directly and do not use the proxy-admin
-        // upgrade path; ZKsyncOS chains use SystemContractProxy instances and rely on it.
+        // Initialize SystemContractProxyAdmin on both chain types; see _setupProxyAdmin for the per-VM rationale.
         _setupProxyAdmin();
 
         // The aliased L1 governance address is used as the owner for all L2 contracts.
@@ -263,8 +261,17 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function _setupProxyAdmin() private {
-        // For ZKsyncOS chains, system contracts are upgraded through SystemContractProxy instances.
-        // The proxy admin must exist and be owned by the ComplexUpgrader while the upgrade runs.
+        // Run on both Era and ZKsyncOS so post-upgrade state is symmetric across chain types.
+        //
+        // On ZKsyncOS the proxy admin is on the upgrade critical path: system contracts are
+        // upgraded via SystemContractProxy instances it manages, and ComplexUpgrader (this
+        // contract during the delegate-call) must own it while the upgrade runs.
+        //
+        // On Era system contracts are force-deployed directly to fixed addresses, so the
+        // proxy admin is not used during the upgrade itself. We still populate it here for
+        // consistency. The Era v31 upgrade force-deploys SystemContractProxyAdmin as part of
+        // its system-contracts list (see SYSTEM_CONTRACTS_COUNT in SystemContractsProcessing),
+        // so the address has code by the time we reach the .owner() call below.
         if (SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).owner() != address(this)) {
             SystemContractProxyAdmin(L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR).forceSetOwner(address(this));
         }
