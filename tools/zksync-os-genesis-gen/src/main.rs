@@ -33,7 +33,9 @@ fn update_local_genesis() -> anyhow::Result<Genesis> {
     let mut genesis: Genesis = serde_json::from_str(
         &std::fs::read_to_string(PATH_TO_LOCAL_GENESIS).expect("Failed to read local genesis file"),
     )?;
+    let additional_storage_raw = genesis.initial_genesis.additional_storage_raw.clone();
     genesis.initial_genesis = InitialGenesisInput::local();
+    genesis.initial_genesis.additional_storage_raw = additional_storage_raw;
     genesis.genesis_root = build_genesis_root_hash(&genesis.initial_genesis)?;
     Ok(genesis)
 }

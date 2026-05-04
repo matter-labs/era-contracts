@@ -913,7 +913,6 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         _registerNewTokens(tokens);
 
         _deployEra();
-        // _deployZKChain(ETH_TOKEN_ADDRESS); // TODO(EVM-1391): Justify commented code
         _deployZKChain(tokens[0]);
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {

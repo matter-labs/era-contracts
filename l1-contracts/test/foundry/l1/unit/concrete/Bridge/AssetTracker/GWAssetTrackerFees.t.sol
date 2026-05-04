@@ -6,6 +6,8 @@ import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
+import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAssetHandler.sol";
+import {L2MessageRoot} from "contracts/core/message-root/L2MessageRoot.sol";
 
 import {
     L2_BRIDGEHUB_ADDR,
@@ -74,12 +76,21 @@ contract GWAssetTrackerFeesTest is Test {
         mockZKChain = makeAddr("mockZKChain");
         mockAssetRouter = makeAddr("mockAssetRouter");
 
-        // Mock the L2 contract addresses
+        // Etch real bytecode for contracts that tests interact with directly, and simple
+        // mock code for the rest.
         vm.etch(L2_BRIDGEHUB_ADDR, address(mockBridgehub).code);
-        vm.etch(L2_MESSAGE_ROOT_ADDR, address(mockMessageRoot).code);
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, address(mockNativeTokenVault).code);
-        vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, address(mockChainAssetHandler).code);
         vm.etch(L2_ASSET_ROUTER_ADDR, address(mockAssetRouter).code);
+
+        // L2MessageRoot: real bytecode + init so getEmptyMultichainBatchRoot works.
+        vm.etch(L2_MESSAGE_ROOT_ADDR, type(L2MessageRoot).runtimeCode);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(1, 0);
+
+        // L2ChainAssetHandler: real bytecode + init.
+        vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, type(L2ChainAssetHandler).runtimeCode);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(1, address(this));
 
         // Mock the WETH_TOKEN() call on NativeTokenVault to return our test token
         vm.mockCall(
@@ -289,98 +300,98 @@ contract GWAssetTrackerFeesTest is Test {
                     SETTLEMENT FEE PAYER AGREEMENT
     //////////////////////////////////////////////////////////////*/
 
-    function test_agreeToPaySettlementFees() public {
+    function test_setSettlementFeePayerAgreement_Enable() public {
         address payer = makeAddr("payer");
 
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
     }
 
-    function test_agreeToPaySettlementFees_EmitsEvent() public {
+    function test_setSettlementFeePayerAgreement_Enable_EmitsEvent() public {
         address payer = makeAddr("payer");
 
         vm.expectEmit(true, true, false, true);
         emit SettlementFeePayerAgreementUpdated(payer, CHAIN_ID, true);
 
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
     }
 
-    function test_agreeToPaySettlementFees_MultipleChains() public {
+    function test_setSettlementFeePayerAgreement_Enable_MultipleChains() public {
         address payer = makeAddr("payer");
 
         vm.startPrank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
-        gwAssetTracker.agreeToPaySettlementFees(OTHER_CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
+        gwAssetTracker.setSettlementFeePayerAgreement(OTHER_CHAIN_ID, true);
         vm.stopPrank();
 
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, OTHER_CHAIN_ID));
     }
 
-    function test_agreeToPaySettlementFees_Idempotent() public {
+    function test_setSettlementFeePayerAgreement_Enable_Idempotent() public {
         address payer = makeAddr("payer");
 
         vm.startPrank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID); // Call again
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true); // Call again
         vm.stopPrank();
 
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
     }
 
-    function test_revokeSettlementFeePayerAgreement() public {
+    function test_setSettlementFeePayerAgreement_Disable() public {
         address payer = makeAddr("payer");
 
         // First agree
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
 
         // Then revoke
         vm.prank(payer);
-        gwAssetTracker.revokeSettlementFeePayerAgreement(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, false);
         assertFalse(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
     }
 
-    function test_revokeSettlementFeePayerAgreement_EmitsEvent() public {
+    function test_setSettlementFeePayerAgreement_Disable_EmitsEvent() public {
         address payer = makeAddr("payer");
 
         // First agree
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         vm.expectEmit(true, true, false, true);
         emit SettlementFeePayerAgreementUpdated(payer, CHAIN_ID, false);
 
         vm.prank(payer);
-        gwAssetTracker.revokeSettlementFeePayerAgreement(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, false);
     }
 
-    function test_revokeSettlementFeePayerAgreement_OnlyAffectsSpecificChain() public {
+    function test_setSettlementFeePayerAgreement_Disable_OnlyAffectsSpecificChain() public {
         address payer = makeAddr("payer");
 
         // Agree for both chains
         vm.startPrank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
-        gwAssetTracker.agreeToPaySettlementFees(OTHER_CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
+        gwAssetTracker.setSettlementFeePayerAgreement(OTHER_CHAIN_ID, true);
 
         // Revoke for one chain
-        gwAssetTracker.revokeSettlementFeePayerAgreement(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, false);
         vm.stopPrank();
 
         assertFalse(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, OTHER_CHAIN_ID));
     }
 
-    function test_revokeSettlementFeePayerAgreement_NeverAgreed() public {
+    function test_setSettlementFeePayerAgreement_Disable_NeverAgreed() public {
         address payer = makeAddr("payer");
 
         // Revoking without ever agreeing should not revert
         vm.prank(payer);
-        gwAssetTracker.revokeSettlementFeePayerAgreement(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, false);
 
         assertFalse(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
     }
@@ -409,7 +420,7 @@ contract GWAssetTrackerFeesTest is Test {
 
         // Only payer1 agrees
         vm.prank(payer1);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer1, CHAIN_ID));
         assertFalse(gwAssetTracker.settlementFeePayerAgreement(payer2, CHAIN_ID));
@@ -421,7 +432,7 @@ contract GWAssetTrackerFeesTest is Test {
 
         // Attacker cannot make payer agree
         vm.prank(attacker);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         // Only attacker is recorded as agreed, not payer
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(attacker, CHAIN_ID));
@@ -441,7 +452,7 @@ contract GWAssetTrackerFeesTest is Test {
 
         address payer = makeAddr("unagreedPayer");
 
-        // Payer has NOT called agreeToPaySettlementFees
+        // Payer has NOT opted in to pay settlement fees
         assertFalse(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
 
         // Build input first (makes external calls), then expect revert on processLogsAndMessages
@@ -461,12 +472,12 @@ contract GWAssetTrackerFeesTest is Test {
 
         // Payer agrees
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
         assertTrue(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
 
         // Payer revokes
         vm.prank(payer);
-        gwAssetTracker.revokeSettlementFeePayerAgreement(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, false);
         assertFalse(gwAssetTracker.settlementFeePayerAgreement(payer, CHAIN_ID));
 
         // Build input first, then expect revert
@@ -486,7 +497,7 @@ contract GWAssetTrackerFeesTest is Test {
 
         // Payer agrees
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         // Payer has enough balance but insufficient allowance
         wrappedZKToken.mint(payer, 100 ether);
@@ -510,7 +521,7 @@ contract GWAssetTrackerFeesTest is Test {
 
         // Payer agrees
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         // Payer has approval but not enough balance
         wrappedZKToken.mint(payer, 1 ether); // Only 1 ether, but 5 * 1 ether = 5 ether needed
@@ -551,7 +562,7 @@ contract GWAssetTrackerFeesTest is Test {
         address payer = makeAddr("exactPayer");
 
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         uint256 mintAmount = 100 ether;
         wrappedZKToken.mint(payer, mintAmount);
@@ -633,7 +644,7 @@ contract GWAssetTrackerFeesTest is Test {
         address payer = makeAddr("multiPayer");
 
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         wrappedZKToken.mint(payer, 100 ether);
         vm.prank(payer);
@@ -666,7 +677,7 @@ contract GWAssetTrackerFeesTest is Test {
         address payer = makeAddr("multiBundlePayer");
 
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         wrappedZKToken.mint(payer, 100 ether);
         vm.prank(payer);
@@ -707,7 +718,7 @@ contract GWAssetTrackerFeesTest is Test {
         address payer = makeAddr("mixedPayer");
 
         vm.prank(payer);
-        gwAssetTracker.agreeToPaySettlementFees(CHAIN_ID);
+        gwAssetTracker.setSettlementFeePayerAgreement(CHAIN_ID, true);
 
         wrappedZKToken.mint(payer, 100 ether);
         vm.prank(payer);

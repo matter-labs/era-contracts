@@ -20,6 +20,7 @@ import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {ConfirmTransferResultData, TxStatus} from "contracts/common/Messaging.sol";
+import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayUtils is Script, IGatewayUtils {
@@ -126,5 +127,19 @@ contract GatewayUtils is Script, IGatewayUtils {
                 merkleProof: merkleProof
             })
         );
+    }
+
+    /// @notice Writes CTM `forceDeploymentsData` (from `NewChainCreationParams` logs) to a TOML fragment
+    /// used to build the `gateway-vote-preparation` input. Set env `FORCE_DEPLOYMENTS_DUMP_TOML_REL_PATH`
+    /// to a path relative to project root (e.g. `/script-out/force-deployments-dump.toml`).
+    function dumpForceDeployments(address _ctm) external {
+        (, bytes memory forceDeploymentsData) = GetDiamondCutData.getDiamondCutAndForceDeployment(_ctm);
+
+        string memory root = vm.projectRoot();
+        string memory rel = vm.envString("FORCE_DEPLOYMENTS_DUMP_TOML_REL_PATH");
+        string memory path = string.concat(root, rel);
+
+        string memory toml = vm.serializeBytes("root", "force_deployments_data", forceDeploymentsData);
+        vm.writeToml(toml, path);
     }
 }

@@ -44,6 +44,7 @@ import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
+import {GWAssetTrackerDev} from "contracts/dev-contracts/test/GWAssetTrackerDev.sol";
 // import {InteropAccount} from "contracts/interop/InteropAccount.sol";
 import {L2Bridgehub} from "contracts/core/bridgehub/L2Bridgehub.sol";
 
@@ -160,13 +161,7 @@ library L2Utils {
         forceDeployWithoutConstructor("L2ChainAssetHandler", L2_CHAIN_ASSET_HANDLER_ADDR);
         L2ChainAssetHandler chainAssetHandler = L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        chainAssetHandler.initL2(
-            _args.l1ChainId,
-            _args.aliasedOwner,
-            L2_BRIDGEHUB_ADDR,
-            L2_ASSET_ROUTER_ADDR,
-            L2_MESSAGE_ROOT_ADDR
-        );
+        chainAssetHandler.initL2(_args.l1ChainId, _args.aliasedOwner);
     }
 
     function forceDeployL2MessageVerification(SystemContractsArgs memory _args) internal {
@@ -213,9 +208,9 @@ library L2Utils {
     }
 
     function forceDeployGWAssetTracker(SystemContractsArgs memory _args) internal {
-        new GWAssetTracker();
+        new GWAssetTrackerDev();
 
-        forceDeployWithoutConstructor("GWAssetTracker", GW_ASSET_TRACKER_ADDR);
+        forceDeployWithoutConstructor("GWAssetTrackerDev", GW_ASSET_TRACKER_ADDR);
     }
 
     /// @notice Deploys the L2AssetRouter contract.

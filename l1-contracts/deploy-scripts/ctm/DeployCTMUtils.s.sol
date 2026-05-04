@@ -62,7 +62,8 @@ import {
 import {CTMContract, CTMCoreDeploymentConfig, DeployCTML1OrGateway} from "./DeployCTML1OrGateway.sol";
 
 import {CTMDeployedAddresses} from "../utils/Types.sol";
-import {SettlementLayerV31Upgrade} from "contracts/upgrades/SettlementLayerV31Upgrade.sol";
+import {EraSettlementLayerV31Upgrade} from "contracts/upgrades/EraSettlementLayerV31Upgrade.sol";
+import {ZKsyncOSSettlementLayerV31Upgrade} from "contracts/upgrades/ZKsyncOSSettlementLayerV31Upgrade.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -122,11 +123,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         return Utils.genesisConfigPath(_isZKsyncOS);
     }
 
-    function initializeConfig(
-        string memory configPath,
-        string memory permanentValuesPath,
-        address bridgehub
-    ) internal virtual {
+    function initializeConfig(string memory configPath, address bridgehub) internal virtual {
         string memory toml = vm.readFile(configPath);
 
         config.l1ChainId = block.chainid;
@@ -326,7 +323,10 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "SettlementLayerV31Upgrade")) {
+        } else if (
+            compareStrings(contractName, "EraSettlementLayerV31Upgrade") ||
+            compareStrings(contractName, "ZKsyncOSSettlementLayerV31Upgrade")
+        ) {
             return abi.encode();
         } else if (compareStrings(contractName, "Governance")) {
             return
@@ -356,9 +356,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "L1AssetTracker")) {
             return
                 abi.encode(
-                    config.l1ChainId,
                     coreAddresses.bridgehub.proxies.bridgehub,
-                    coreAddresses.bridges.proxies.l1AssetRouter,
                     coreAddresses.bridges.proxies.l1NativeTokenVault,
                     coreAddresses.bridgehub.proxies.messageRoot
                 );
@@ -376,7 +374,7 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getCTMCoreDeploymentConfig(Config memory _config) internal view returns (CTMCoreDeploymentConfig memory) {
         return
             CTMCoreDeploymentConfig({
-                isZKsyncOS: config.isZKsyncOS,
+                isZKsyncOS: _config.isZKsyncOS,
                 testnetVerifier: _config.testnetVerifier,
                 eraChainId: _config.eraChainId,
                 l1ChainId: _config.l1ChainId,

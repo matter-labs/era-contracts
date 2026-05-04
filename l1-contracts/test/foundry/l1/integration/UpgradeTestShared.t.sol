@@ -92,7 +92,9 @@ contract UpgradeIntegrationTestBase is Test {
                 create2FactorySalt: bytes32(0),
                 upgradeInputPath: ECOSYSTEM_UPGRADE_INPUT,
                 ecosystemOutputPath: ECOSYSTEM_OUTPUT,
-                governance: governance
+                governance: governance,
+                // Dummy asset ID is fine for these tests — fixed-ZK-fee bundles are not exercised.
+                zkTokenAssetId: bytes32(uint256(1))
             })
         );
         console.log("setupUpgrade: Deploying new ecosystem contracts");

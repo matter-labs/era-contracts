@@ -2,6 +2,7 @@ use std::path::Path;
 
 use anyhow::Context;
 use clap::Parser;
+use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::output::write_output_if_requested;
@@ -9,20 +10,24 @@ use crate::common::forge::{Forge, ForgeRunner, ForgeScriptArg};
 use crate::common::logger;
 use crate::common::SharedRunArgs;
 
+/// Chain-level CTM upgrade, prepare-only.
+///
+/// Drives `AdminFunctions.s.sol::upgradeChainFromCTM(chain, admin, acr)`
+/// against a forked anvil (auto-impersonation), emits a Gnosis Safe
+/// Transaction Builder JSON bundle via `--out`, and never
+/// broadcasts. Replay the bundle via `protocol-ops dev execute-safe` (or any
+/// Safe-bundle-aware executor) to apply it.
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct ChainUpgradeArgs {
-    /// Chain diamond proxy address
-    #[clap(long)]
-    pub chain_address: String,
-    /// Chain admin address
-    #[clap(long)]
-    pub admin_address: String,
-    /// AccessControlRestriction contract address
-    #[clap(long)]
-    pub access_control_restriction: String,
-    /// Skip broadcasting transactions
-    #[clap(long, default_value_t = false)]
-    pub skip_broadcast: bool,
+    #[clap(flatten)]
+    #[serde(flatten)]
+    pub topology: crate::common::EcosystemChainArgs,
+
+    /// AccessControlRestriction contract address. Defaults to `0x0…0` for
+    /// Ownable ChainAdmin deployments; pass explicitly when the chain uses
+    /// an ACR.
+    #[clap(long, default_value = "0x0000000000000000000000000000000000000000")]
+    pub access_control_restriction: Address,
 
     #[clap(flatten)]
     #[serde(flatten)]
@@ -31,23 +36,23 @@ pub struct ChainUpgradeArgs {
 
 #[derive(Serialize)]
 struct ChainUpgradeOutputPayload {
-    chain_address: String,
-    admin_address: String,
-    access_control_restriction: String,
-    skip_broadcast: bool,
+    chain_address: Address,
+    admin_address: Address,
+    access_control_restriction: Address,
 }
 
 pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
-    let private_key = args
-        .shared
-        .private_key
-        .ok_or_else(|| anyhow::anyhow!("--private-key is required"))?;
+    let (eco, chain_id) = args.topology.resolve()?;
+    let mut runner = ForgeRunner::new(&args.shared)?;
 
-    let mut runner = ForgeRunner::new(
-        args.shared.simulate,
-        &args.shared.l1_rpc_url,
-        args.shared.forge_args.clone(),
-    )?;
+    let chain_address =
+        crate::common::l1_contracts::resolve_zk_chain(&runner.rpc_url, eco.bridgehub, chain_id)
+            .await
+            .context("resolving chain diamond proxy from L1")?;
+    // Sender is always the chain admin.
+    let sender = runner.prepare_chain_admin(eco.bridgehub, chain_id).await?;
+    let admin_address = sender.address;
+
     let script_path = Path::new("deploy-scripts/AdminFunctions.s.sol");
     let script_full_path = runner.foundry_scripts_path.join(script_path);
     if !script_full_path.exists() {
@@ -63,31 +68,32 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
     });
     script_args.add_arg(ForgeScriptArg::Ffi);
     script_args.add_arg(ForgeScriptArg::GasLimit {
-        gas_limit: 1000000000000,
+        gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
     });
-    script_args.add_arg(ForgeScriptArg::PrivateKey {
-        private_key: format!("{:#x}", private_key),
-    });
-    if !args.skip_broadcast {
-        script_args.add_arg(ForgeScriptArg::Broadcast);
-    }
+    // `--broadcast` against the anvil fork. In this mode the
+    // target RPC is the anvil fork, so "broadcast" produces no real-chain
+    // effect — it just records the tx in forge's run file so protocol-ops can
+    // extract it into the Safe bundle. Without this the Safe output would be
+    // empty.
+    script_args.add_arg(ForgeScriptArg::Broadcast);
     script_args.additional_args.extend([
-        args.chain_address.clone(),
-        args.admin_address.clone(),
-        args.access_control_restriction.clone(),
+        format!("{:#x}", chain_address),
+        format!("{:#x}", admin_address),
+        format!("{:#x}", args.access_control_restriction),
     ]);
 
-    let forge = Forge::new(&runner.foundry_scripts_path).script(script_path, script_args);
+    let forge = Forge::new(&runner.foundry_scripts_path)
+        .script(script_path, script_args)
+        .with_wallet(&sender);
 
-    logger::step("Running chain upgrade via AdminFunctions.s.sol");
-    logger::info(format!("Chain address: {}", args.chain_address));
-    logger::info(format!("Admin address: {}", args.admin_address));
+    logger::step("Preparing chain upgrade Safe bundle via AdminFunctions.s.sol (simulation)");
+    logger::info(format!("Chain address: {:#x}", chain_address));
+    logger::info(format!("Admin address: {:#x}", admin_address));
     logger::info(format!(
-        "Access control restriction: {}",
+        "Access control restriction: {:#x}",
         args.access_control_restriction
     ));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
-    logger::info(format!("Broadcast: {}", !args.skip_broadcast));
 
     runner
         .run(forge)
@@ -95,19 +101,19 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
 
     let empty_input = serde_json::json!({});
     let out_payload = ChainUpgradeOutputPayload {
-        chain_address: args.chain_address.clone(),
-        admin_address: args.admin_address.clone(),
-        access_control_restriction: args.access_control_restriction.clone(),
-        skip_broadcast: args.skip_broadcast,
+        chain_address,
+        admin_address,
+        access_control_restriction: args.access_control_restriction,
     };
     write_output_if_requested(
         "chain.upgrade",
-        args.shared.out_path.as_deref(),
+        &args.shared,
         &runner,
         &empty_input,
         &out_payload,
-    )?;
+    )
+    .await?;
 
-    logger::success("Chain upgrade completed");
+    logger::success("Chain upgrade prepared");
     Ok(())
 }

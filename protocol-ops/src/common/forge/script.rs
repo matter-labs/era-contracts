@@ -53,8 +53,13 @@ impl ForgeScript {
     }
 
     /// Add the broadcast flag to the forge script command.
+    ///
+    /// Also adds `--slow`: forge waits for each tx to be confirmed before
+    /// sending the next, which is required for correctness against the anvil
+    /// fork.
     pub fn with_broadcast(mut self) -> Self {
         self.args.add_arg(ForgeScriptArg::Broadcast);
+        self.args.add_arg(ForgeScriptArg::Slow);
         self
     }
 
@@ -82,30 +87,19 @@ impl ForgeScript {
         self
     }
 
-    /// Makes sure a transaction is sent, only after its previous one has been confirmed and succeeded.
-    pub fn with_slow(mut self) -> Self {
-        self.args.add_arg(ForgeScriptArg::Slow);
-        self
-    }
-
     /// Add an environment variable that will be set when running the script.
     pub fn with_env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.envs.push((key.into(), value.into()));
         self
     }
 
-    /// Apply wallet authentication.
-    ///
-    /// If `simulate` is true or the wallet has no private key, uses `--sender --unlocked`
-    /// (anvil auto-impersonation or unlocked node). Otherwise uses `--private-key`.
-    pub fn with_wallet(self, wallet: &Wallet, simulate: bool) -> Self {
-        if simulate || wallet.private_key.is_none() {
-            self.with_sender(format!("{:#x}", wallet.address))
-                .with_unlocked()
-        } else {
-            let pk = wallet.private_key_h256().unwrap();
-            self.with_private_key(pk)
-        }
+    /// Apply wallet authentication against the anvil fork: always uses
+    /// `--sender --unlocked` so forge impersonates the wallet's address via
+    /// anvil auto-impersonation. Any private key on the wallet is ignored —
+    /// protocol-ops never broadcasts against real L1.
+    pub fn with_wallet(self, wallet: &Wallet) -> Self {
+        self.with_sender(format!("{:#x}", wallet.address))
+            .with_unlocked()
     }
 
     /// Adds the private key of the deployer account.
@@ -117,16 +111,17 @@ impl ForgeScript {
     }
 
     // Do not start the script if balance is not enough
-    pub fn private_key(&self) -> Option<LocalWallet> {
-        self.args.args.iter().find_map(|a| {
+    pub fn private_key(&self) -> anyhow::Result<Option<LocalWallet>> {
+        for a in &self.args.args {
             if let ForgeScriptArg::PrivateKey { private_key } = a {
-                let key = H256::from_str(private_key).unwrap();
-                let key = LocalWallet::from_bytes(key.as_bytes()).unwrap();
-                Some(key)
-            } else {
-                None
+                let key = H256::from_str(private_key)
+                    .map_err(|e| anyhow::anyhow!("invalid private key hex: {e}"))?;
+                let wallet = LocalWallet::from_bytes(key.as_bytes())
+                    .map_err(|e| anyhow::anyhow!("invalid private key: {e}"))?;
+                return Ok(Some(wallet));
             }
-        })
+        }
+        Ok(None)
     }
 
     pub fn rpc_url(&self) -> Option<String> {
@@ -156,15 +151,15 @@ impl ForgeScript {
             .any(|a| matches!(a, ForgeScriptArg::Broadcast))
     }
 
-    pub fn address(&self) -> Option<Address> {
-        self.private_key().map(|k| k.address())
+    pub fn address(&self) -> anyhow::Result<Option<Address>> {
+        Ok(self.private_key()?.map(|k| k.address()))
     }
 
     pub async fn get_the_balance(&self) -> anyhow::Result<Option<U256>> {
         let Some(rpc_url) = self.rpc_url() else {
             return Ok(None);
         };
-        let Some(private_key) = self.private_key() else {
+        let Some(private_key) = self.private_key()? else {
             return Ok(None);
         };
         let client = create_ethers_client(private_key, rpc_url, None)?;

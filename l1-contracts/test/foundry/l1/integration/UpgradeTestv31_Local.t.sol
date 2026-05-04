@@ -9,7 +9,10 @@ import {EcosystemUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/Ecosy
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
+import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../../../deploy-scripts/utils/Types.sol";
+import {PublishFactoryDepsResult} from "../../../../deploy-scripts/utils/bytecode/BytecodePublisher.s.sol";
 import {Test} from "forge-std/Test.sol";
 import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
@@ -49,12 +52,33 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
         upgradeConfig.factoryDepsPublished = true;
     }
 
-    /// @notice Override to skip reading all system contract bytecodes which causes MemoryOOG.
-    function buildUpgradeForceDeployments(
+    /// @notice Override to skip bytecode-heavy force deployment generation in getProposedUpgrade.
+    /// The base implementation reads all zkout bytecodes, causing MemoryOOG.
+    /// We return an empty upgrade instead.
+    function getProposedUpgrade(
+        StateTransitionDeployedAddresses memory stateTransition,
+        ChainCreationParamsConfig memory chainCreationParams,
         uint256,
-        address
-    ) internal override returns (IL2ContractDeployer.ForceDeployment[] memory) {
-        return new IL2ContractDeployer.ForceDeployment[](0);
+        address,
+        PublishFactoryDepsResult memory _factoryDepsResult,
+        uint256 protocolUpgradeNonce
+    ) public override returns (ProposedUpgrade memory proposedUpgrade) {
+        proposedUpgrade = ProposedUpgrade({
+            l2ProtocolUpgradeTx: composeUpgradeTx(
+                new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
+                _factoryDepsResult,
+                protocolUpgradeNonce
+            ),
+            bootloaderHash: chainCreationParams.bootloaderHash,
+            defaultAccountHash: chainCreationParams.defaultAAHash,
+            evmEmulatorHash: chainCreationParams.evmEmulatorHash,
+            verifier: address(0),
+            verifierParams: ProposedUpgradeLib.emptyVerifierParams(),
+            l1ContractsUpgradeCalldata: new bytes(0),
+            postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
+            upgradeTimestamp: 0,
+            newProtocolVersion: chainCreationParams.latestProtocolVersion
+        });
     }
 }
 

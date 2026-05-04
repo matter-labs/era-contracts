@@ -1,4 +1,8 @@
-use crate::common::{forge::ForgeRunner, wallets::Wallet};
+use crate::common::{
+    forge::{Forge, ForgeRunner},
+    traits::{ReadConfig, SaveConfig},
+    wallets::Wallet,
+};
 use crate::config::forge_interface::{
     deploy_ecosystem::{
         input::{DeployL1Config, InitialDeploymentConfig},
@@ -14,7 +18,6 @@ pub struct DeployInput {
     pub owner: Address,
     pub era_chain_id: u64,
     pub with_legacy_bridge: bool,
-    pub create2_factory_addr: Option<Address>,
     pub create2_factory_salt: Option<H256>,
 }
 
@@ -26,9 +29,6 @@ pub fn deploy(
 ) -> anyhow::Result<DeployL1CoreContractsOutput> {
     let mut initial_config = InitialDeploymentConfig::default();
 
-    if let Some(addr) = input.create2_factory_addr {
-        initial_config.create2_factory_addr = Some(addr);
-    }
     if let Some(salt) = input.create2_factory_salt {
         initial_config.create2_factory_salt = salt;
     }
@@ -40,9 +40,27 @@ pub fn deploy(
         input.with_legacy_bridge,
     );
 
-    runner.run_script(
-        &DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS,
-        &deploy_config,
-        auth,
-    )
+    let input_path =
+        DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS.input(&runner.foundry_scripts_path);
+    deploy_config.save(&runner.shell, &input_path)?;
+
+    let forge = Forge::new(&runner.foundry_scripts_path)
+        .script(
+            &DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS.script(),
+            runner.forge_args.clone(),
+        )
+        .with_ffi()
+        .with_rpc_url(runner.rpc_url.clone())
+        .with_broadcast()
+        .with_wallet(auth)
+        .with_env(
+            "CREATE2_FACTORY_SALT",
+            format!("{:#x}", initial_config.create2_factory_salt),
+        );
+
+    runner.run(forge)?;
+
+    let output_path =
+        DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS.output(&runner.foundry_scripts_path);
+    DeployL1CoreContractsOutput::read(&runner.shell, output_path)
 }

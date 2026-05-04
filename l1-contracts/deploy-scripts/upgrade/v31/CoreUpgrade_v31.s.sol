@@ -34,6 +34,14 @@ import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 /// @notice Script used for v31 upgrade flow
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
     function deployNewEcosystemContractsL1() public virtual override {
+        deployNewEcosystemContractsL1NoConnections();
+        // Configure AssetTracker connections after deployment
+        updateContractConnections();
+    }
+
+    /// @notice Deploy contracts only (no side effects like setAddresses / transferOwnership).
+    /// @dev Used by the test harness for idempotent re-runs where connections are already set up.
+    function deployNewEcosystemContractsL1NoConnections() public virtual {
         coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
         coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
         coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
@@ -52,9 +60,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
             "ChainRegistrationSender",
             false
         );
-        // deploySimpleContract("L1ChainTypeManager", false);
-        // Configure AssetTracker connections after deployment
-        updateContractConnections();
     }
 
     /// @notice Configure contract connections after deployment
@@ -94,10 +99,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
         bool isZKBytecode
     ) internal view override returns (bytes memory) {
         return super.getCreationCalldata(contractName, isZKBytecode);
-    }
-
-    function deployUsedUpgradeContract() internal returns (address) {
-        return deploySimpleContract("SettlementLayerV31Upgrade", false);
     }
 
     /// @notice Override to properly set deployerAddress in upgrade context
@@ -148,8 +149,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
         console.log("Accepting AssetTracker ownership and setting in NativeTokenVault");
         console.log("NTV address:", ntvProxy);
         console.log("AssetTracker address:", assetTrackerProxy);
-        // console.log()
-
         // Note: AssetTracker.setAddresses() was already called during deployment
         // in updateContractConnections(), and ownership was transferred to governance.
         // Now governance needs to accept the ownership transfer.

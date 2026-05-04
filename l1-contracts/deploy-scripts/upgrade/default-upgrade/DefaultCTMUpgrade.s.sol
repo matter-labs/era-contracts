@@ -23,14 +23,12 @@ import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeploy
 
 import {Governance} from "contracts/governance/Governance.sol";
 
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {CTMDeployedAddresses} from "../../ctm/DeployCTMUtils.s.sol";
 
-import {Utils} from "../../utils/Utils.sol";
 import {BytecodePublisher, PublishFactoryDepsResult} from "../../utils/bytecode/BytecodePublisher.s.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
@@ -44,6 +42,7 @@ import {IValidatorTimelock} from "contracts/state-transition/validators/interfac
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
+import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
 /// @notice Script used for default CTM upgrade flow. Should be run after Ecosystem upgrade
@@ -74,7 +73,6 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
     // solhint-disable-next-line gas-struct-packing
     struct NewlyGeneratedData {
-        bytes fixedForceDeploymentsData;
         bytes diamondCutData;
         bytes upgradeCutData;
     }
@@ -96,6 +94,10 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         address ctmProxy;
         address bytecodesSupplier;
         bool isZKsyncOS;
+        /// @dev ZK token asset ID, used by `InteropCenter.initL2` for fixed-fee bundles.
+        ///      MUST be non-zero — `InteropCenter.initL2` reverts otherwise, which would abort the
+        ///      L2 upgrade transaction.
+        bytes32 zkTokenAssetId;
     }
 
     // The output of the script
@@ -122,7 +124,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         bytes32 create2FactorySalt,
         string memory newConfigPath,
         string memory _outputPath,
-        address governance
+        address governance,
+        bytes32 zkTokenAssetId
     ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
@@ -133,7 +136,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             rollupDAManager,
             create2FactorySalt,
             newConfigPath,
-            governance
+            governance,
+            zkTokenAssetId
         );
 
         console.log("Initialized config from %s", newConfigPath);
@@ -158,6 +162,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         // Pass bytecodesSupplier to introspection - will overwrite incorrect V29 value
         setAddressesBasedOnCTM(permanentConfig.bytecodesSupplier);
         config.isZKsyncOS = permanentConfig.isZKsyncOS;
+        // Must be non-zero: `InteropCenter.initL2` (invoked via `_initializeV31Contracts`) reverts
+        // on a zero asset ID, which would abort the L2 upgrade transaction. Catch the
+        // misconfiguration here so the preparation script fails loudly instead of on L2.
+        require(permanentConfig.zkTokenAssetId != bytes32(0), "zkTokenAssetId must be non-zero");
+        config.zkTokenAssetId = permanentConfig.zkTokenAssetId;
         config.contracts.chainCreationParams = chainCreationParams;
 
         if (governance != address(0)) {
@@ -191,7 +200,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         address rollupDAManager,
         bytes32 create2FactorySalt,
         string memory newConfigPath,
-        address governance
+        address governance,
+        bytes32 zkTokenAssetId
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
@@ -199,7 +209,8 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             ctmProxy: ctmProxy,
             bytecodesSupplier: bytecodesSupplier,
             isZKsyncOS: isZKsyncOS,
-            create2FactorySalt: create2FactorySalt
+            create2FactorySalt: create2FactorySalt,
+            zkTokenAssetId: zkTokenAssetId
         });
         // Set config.isZKsyncOS before getChainCreationParamsConfig.
         config.isZKsyncOS = isZKsyncOS;
@@ -262,7 +273,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         //        require(upgradeConfig.ecosystemContractsDeployed, "Ecosystem contracts not deployed");
 
         // Important, this must come after the initializeExpectedL2Addresses
-        generateFixedForceDeploymentsData();
+        getFixedForceDeploymentsData();
         console.log("Generated fixed force deployments data");
         Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(ctmAddresses.stateTransition);
         // TODO probably don't need to assign it to diamondCutData
@@ -334,7 +345,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
                     newChainAssetId,
                     5,
                     msg.sender,
-                    abi.encode(newlyGeneratedData.diamondCutData, newlyGeneratedData.fixedForceDeploymentsData),
+                    abi.encode(newlyGeneratedData.diamondCutData, generatedData.forceDeploymentsData),
                     new bytes[](0)
                 )
             )
@@ -391,67 +402,17 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         );
     }
 
-    function generateFixedForceDeploymentsData() internal virtual {
-        FixedForceDeploymentsData memory forceDeploymentsData = prepareFixedForceDeploymentsData();
+    function getFixedForceDeploymentsData() internal override returns (FixedForceDeploymentsData memory data) {
+        if (upgradeConfig.fixedForceDeploymentsDataGenerated) {
+            return abi.decode(generatedData.forceDeploymentsData, (FixedForceDeploymentsData));
+        }
 
-        newlyGeneratedData.fixedForceDeploymentsData = abi.encode(forceDeploymentsData);
-        generatedData.forceDeploymentsData = abi.encode(forceDeploymentsData);
-        upgradeConfig.fixedForceDeploymentsDataGenerated = true;
-    }
-
-    function prepareFixedForceDeploymentsData() public virtual returns (FixedForceDeploymentsData memory data) {
         require(config.ownerAddress != address(0), "owner not set");
 
-        data = FixedForceDeploymentsData({
-            l1ChainId: config.l1ChainId,
-            eraChainId: config.eraChainId,
-            gatewayChainId: config.gatewayChainId,
-            l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
-            l2TokenProxyBytecodeHash: CoreOnGatewayHelper.getDeployedBytecodeHash(
-                config.isZKsyncOS,
-                CoreContract.BeaconProxy
-            ),
-            aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
-            maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2Bridgehub),
-            l2AssetRouterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.L2AssetRouter
-            ),
-            l2NtvBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2NativeTokenVault),
-            messageRootBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(config.isZKsyncOS, CoreContract.L2MessageRoot),
-            chainAssetHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.L2ChainAssetHandler
-            ),
-            beaconDeployerInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.UpgradeableBeaconDeployer
-            ),
-            baseTokenHolderBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.BaseTokenHolder
-            ),
-            interopCenterBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.InteropCenter
-            ),
-            interopHandlerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.InteropHandler
-            ),
-            assetTrackerBytecodeInfo: CoreOnGatewayHelper.getBytecodeInfo(
-                config.isZKsyncOS,
-                CoreContract.L2AssetTracker
-            ),
-            l2SharedBridgeLegacyImpl: address(0),
-            l2BridgedStandardERC20Impl: address(0),
-            aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
-                coreAddresses.bridgehub.proxies.chainRegistrationSender
-            ),
-            dangerousTestOnlyForcedBeacon: address(0),
-            zkTokenAssetId: config.zkTokenAssetId
-        });
+        data = _buildForceDeploymentsData(config.ownerAddress, address(0));
+        bytes memory encodedData = abi.encode(data);
+        generatedData.forceDeploymentsData = encodedData;
+        upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
 
     function getUpgradeAddedFacetCuts(
@@ -471,7 +432,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     function publishBytecodes() public virtual {
         bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
             config.isZKsyncOS,
-            getAdditionalDependencyContracts()
+            getAdditionalForcedCoreContracts()
         );
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 
@@ -481,7 +442,12 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             allDeps
         );
 
-        if (result.factoryDepsHashes.length > 0) {
+        // Era-only invariant: factoryDepsHashes[0..3] == (bootloader,
+        // defaultAA, evmEmulator). ZKsyncOS has none of these concepts —
+        // `chainCreationParams.{bootloader,defaultAA,evmEmulator}Hash` are
+        // zero and the factoryDepsHashes describe a different, smaller set
+        // of contracts, so indexing [1]/[2] would go out of bounds.
+        if (!config.isZKsyncOS && result.factoryDepsHashes.length > 0) {
             console.logBytes32(config.contracts.chainCreationParams.bootloaderHash);
             console.log(result.factoryDepsHashes[0]);
             console.logBytes32(config.contracts.chainCreationParams.defaultAAHash);
@@ -649,7 +615,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // Just retrieved it from the contract
         uint256 previousProtocolVersion = getOldProtocolVersion();
-        uint256 deadline = getOldProtocolDeadline();
+        uint256 deadline = UpgradeHelperLib.getOldProtocolDeadline();
         uint256 newProtocolVersion = getNewProtocolVersion();
         Diamond.DiamondCutData memory upgradeCut = abi.decode(
             newlyGeneratedData.upgradeCutData,
@@ -944,11 +910,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
 
         // Serialize generated upgrade data
         vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
-        vm.serializeBytes(
-            "contracts_newConfig",
-            "force_deployments_data",
-            newlyGeneratedData.fixedForceDeploymentsData
-        );
+        vm.serializeBytes("contracts_newConfig", "force_deployments_data", generatedData.forceDeploymentsData);
 
         // Serialize protocol version info (needed for upgrade)
         vm.serializeUint("contracts_newConfig", "new_protocol_version", getNewProtocolVersion());
@@ -979,6 +941,25 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
         require(upgradeConfig.upgradeCutPrepared, "upgrade cut data not prepared");
         return newlyGeneratedData.upgradeCutData;
     }
+
+    /// @dev Test-only: inject pre-computed upgrade cut data to avoid recomputing (memory optimization).
+    function setChainUpgradeDiamondCutData_TestOnly(bytes memory _data) public {
+        newlyGeneratedData.upgradeCutData = _data;
+        upgradeConfig.upgradeCutPrepared = true;
+    }
+
+    /// @dev Test-only: inject pre-computed fixed force deployments data.
+    function setFixedForceDeploymentsData_TestOnly(bytes memory _data) public {
+        generatedData.forceDeploymentsData = _data;
+        upgradeConfig.fixedForceDeploymentsDataGenerated = true;
+    }
+
+    /// @notice Returns the encoded FixedForceDeploymentsData bytes.
+    function getEncodedFixedForceDeploymentsData() public view returns (bytes memory) {
+        require(upgradeConfig.fixedForceDeploymentsDataGenerated, "force deployments data not generated");
+        return generatedData.forceDeploymentsData;
+    }
+
     ////////////////////////////// Misc utils /////////////////////////////////
 
     // add this to be excluded from coverage report

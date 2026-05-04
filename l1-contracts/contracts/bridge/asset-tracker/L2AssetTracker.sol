@@ -134,7 +134,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 _l1ChainId,
         bytes32 _baseTokenAssetId,
         bool _needBaseTokenTotalSupplyBackfill
-    ) external onlyUpgrader {
+    ) external reentrancyGuardInitializer onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         needBaseTokenTotalSupplyBackfill = _needBaseTokenTotalSupplyBackfill;

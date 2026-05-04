@@ -1,0 +1,76 @@
+name: "Gateway Convert Calldata"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - stage
+          - stage-interop-tests
+          - sepolia
+          - mainnet
+      protocol_ops_tag:
+        description: "protocol-ops Docker image tag"
+        required: true
+        type: string
+      l1_rpc_url:
+        description: "L1 RPC URL"
+        required: true
+        type: string
+      chain_name:
+        description: "Chain name of the gateway to convert (key in ecosystem.yaml)"
+        required: true
+        type: string
+        default: "gateway"
+      gateway_deployer:
+        description: "EOA whitelisted during vote-prepare (also refund recipient, revoked at end)"
+        required: true
+        type: string
+      ctm_representative_chain_id:
+        description: "Chain ID of an existing chain under this CTM (for config introspection)"
+        required: true
+        type: string
+      gateway_settlement_fee:
+        description: "Settlement fee charged by the gateway (wei)"
+        required: false
+        type: string
+        default: "1000000000"
+
+permissions:
+  contents: read
+
+jobs:
+  gateway-convert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ENV_DIR: environments/${{ inputs.environment }}
+      WORK_DIR: ${{ github.workspace }}/protocol-ops-workdir
+      EXTRA_MOUNTS: ${{ github.workspace }}/environments/${{ inputs.environment }}:/contracts/env
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run chain gateway convert (all 5 stages on one fork)
+        run: |
+          mkdir -p "$WORK_DIR"
+          bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
+            chain gateway convert \
+            --l1-rpc-url                 "${{ inputs.l1_rpc_url }}" \
+            --ecosystem                   /contracts/env/ecosystem.yaml \
+            --chain                       "${{ inputs.chain_name }}" \
+            --gateway-deployer            "${{ inputs.gateway_deployer }}" \
+            --ctm-representative-chain-id "${{ inputs.ctm_representative_chain_id }}" \
+            --gateway-settlement-fee      "${{ inputs.gateway_settlement_fee }}" \
+            --out       /contracts/work/session/safe
+
+      - name: Upload Safe bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: safe-bundles-gateway-convert-${{ inputs.chain_name }}-${{ inputs.environment }}
+          path: ${{ env.WORK_DIR }}/safe/
+          if-no-files-found: error
+          retention-days: 30

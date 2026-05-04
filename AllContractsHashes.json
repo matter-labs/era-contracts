@@ -1120,6 +1120,16 @@
     "evmDeployedBytecodeLength": 13085
   },
   {
+    "contractName": "l1-contracts/EraSettlementLayerV31Upgrade",
+    "zkBytecodeHash": "0x01000573b9bca9aa3c7cab30a1da233377b4660ea58d111a7e462ffa0d93c01e",
+    "zkBytecodePath": "/l1-contracts/zkout/EraSettlementLayerV31Upgrade.sol/EraSettlementLayerV31Upgrade.json",
+    "evmBytecodeHash": "0x52e83915070ee78836a93d9b081423cbd60623adc26372626bb72255caf0e44a",
+    "evmBytecodePath": "/l1-contracts/out/EraSettlementLayerV31Upgrade.sol/EraSettlementLayerV31Upgrade.json",
+    "evmDeployedBytecodeHash": "0xa6c60041234c557491b416c4015d87fff2158cd9a6e19c72c2e7878881064547",
+    "evmDeployedBytecodeBlakeHash": "0xa9f45a2dd528b27adaef38ad6ed70f4dac04cfc0489ff8e68b95682d47def1aa",
+    "evmDeployedBytecodeLength": 12858
+  },
+  {
     "contractName": "l1-contracts/EraTestnetVerifier",
     "zkBytecodeHash": "0x010000c778f81c89e5bf9cdfc583065b6cd01694dc8d34f82e7ac641a27af1d6",
     "zkBytecodePath": "/l1-contracts/zkout/EraTestnetVerifier.sol/EraTestnetVerifier.json",
@@ -1638,6 +1648,16 @@
     "evmDeployedBytecodeHash": "0x9eb234e7c9886d6bf2dc22b3dbd46c9f9600c2fca3b11393e2ba567ee207323c",
     "evmDeployedBytecodeBlakeHash": "0x24d20c0dc4ecd9f059ecc3b67277049567a0d21e35105a2664d4ef5605326530",
     "evmDeployedBytecodeLength": 19803
+  },
+  {
+    "contractName": "l1-contracts/L2UpgradeTxLib",
+    "zkBytecodeHash": "0x0100000746c5f1fc56c8548ea43d0da6c589382e096120de82f49f3ca36248f0",
+    "zkBytecodePath": "/l1-contracts/zkout/L2UpgradeTxLib.sol/L2UpgradeTxLib.json",
+    "evmBytecodeHash": "0xc1d795a2ed4847ccc13714fef89299d28052f2b5ce47a122b1f4a376f3671d68",
+    "evmBytecodePath": "/l1-contracts/out/L2UpgradeTxLib.sol/L2UpgradeTxLib.json",
+    "evmDeployedBytecodeHash": "0xb0728b152faeff82a783111b6e68ba93d965e0879787a33de4a0ea85862666f2",
+    "evmDeployedBytecodeBlakeHash": "0x5ac41478dcfe46d71f9d8209cb9fcba8804afbe72464bd5b41fbf4c8574d9ced",
+    "evmDeployedBytecodeLength": 85
   },
   {
     "contractName": "l1-contracts/L2V30TestnetSystemProxiesUpgrade",
@@ -2290,6 +2310,16 @@
     "evmDeployedBytecodeLength": 4615
   },
   {
+    "contractName": "l1-contracts/ZKsyncOSSettlementLayerV31Upgrade",
+    "zkBytecodeHash": "0x0100056fedd42e8c6e5e2202c74cfa88dbb6502eea3e27dd5551cc78cc2609c7",
+    "zkBytecodePath": "/l1-contracts/zkout/ZKsyncOSSettlementLayerV31Upgrade.sol/ZKsyncOSSettlementLayerV31Upgrade.json",
+    "evmBytecodeHash": "0x8f21aa2114ca51fc9fba15055533045e34869557e0284f5a6a01d972a0f2c26c",
+    "evmBytecodePath": "/l1-contracts/out/ZKsyncOSSettlementLayerV31Upgrade.sol/ZKsyncOSSettlementLayerV31Upgrade.json",
+    "evmDeployedBytecodeHash": "0xc4d84990efd0320fbddb7b9d99c9ac8fc4700c639f4124b93ac2a6b3bef3ac1f",
+    "evmDeployedBytecodeBlakeHash": "0x5cca90126bb7350d3380073ca03a82137af8d4f1af0efa0541470ffce3bc3ac8",
+    "evmDeployedBytecodeLength": 12812
+  },
+  {
     "contractName": "l1-contracts/ZKsyncOSTestnetVerifier",
     "zkBytecodeHash": "0x010001cd4e09aeaa93bb2ed294630cf382f87d23118209f2f506827210554676",
     "zkBytecodePath": "/l1-contracts/zkout/ZKsyncOSTestnetVerifier.sol/ZKsyncOSTestnetVerifier.json",
@@ -2401,11 +2431,11 @@
   },
   {
     "contractName": "da-contracts/EIP7702Checker",
-    "evmBytecodeHash": "0x4951de1b3867f83fbae3527da8cbb95d980305a99981256795fcb71e799b1466",
+    "evmBytecodeHash": "0xf4723db60afb243e9f5adb97374e0c305eec20955dbae0a755650a56f6d6c5f2",
     "evmBytecodePath": "/da-contracts/out/EIP7702Checker.sol/EIP7702Checker.json",
-    "evmDeployedBytecodeHash": "0x4ae5416b1c43803e1f327a8ca262e353b1b65e688c34f4c3e53236f4d31a6155",
-    "evmDeployedBytecodeBlakeHash": "0xb13f461cbd53a6fd3adbfc99c840f28c9224758cca10e92867826d214a1fb9ce",
-    "evmDeployedBytecodeLength": 472,
+    "evmDeployedBytecodeHash": "0x1178e7f5edd7832ca13e191bdcd950393f2fa203a4d057dfa744887da21dd606",
+    "evmDeployedBytecodeBlakeHash": "0x262ab74e8982064476e80289913b3dc89df901997cb6f3ad14351bc146d3ac03",
+    "evmDeployedBytecodeLength": 479,
     "zkBytecodeHash": null,
     "zkBytecodePath": null
   },

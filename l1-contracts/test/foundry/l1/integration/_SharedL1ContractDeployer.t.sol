@@ -104,7 +104,6 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         );
         _acceptOwnershipCore();
         _acceptOwnershipCTM();
-        _setEraBatch();
 
         addresses.bridgehubOwnerAddress = addresses.bridgehub.owner();
     }
@@ -122,14 +121,6 @@ contract L1ContractDeployer is UtilsCallMockerTest {
         vm.startPrank(IOwnable(address(addresses.chainTypeManager)).pendingOwner());
         IOwnable(address(addresses.chainTypeManager)).acceptOwnership();
         IOwnable(address(ctmAddresses.daAddresses.daContracts.rollupDAManager)).acceptOwnership();
-        vm.stopPrank();
-    }
-
-    function _setEraBatch() private {
-        // TODO(EVM-1391): Dead fn in practice
-        vm.startPrank(addresses.sharedBridge.owner());
-        // sharedBridge.setEraPostLegacyBridgeUpgradeFirstBatch(1);
-        // sharedBridge.setEraPostDiamondUpgradeFirstBatch(1);
         vm.stopPrank();
     }
 
