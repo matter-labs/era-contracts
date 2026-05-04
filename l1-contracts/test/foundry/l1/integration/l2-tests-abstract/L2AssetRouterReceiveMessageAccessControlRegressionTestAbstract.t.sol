@@ -15,6 +15,8 @@ import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
+import {Unauthorized, InvalidSelector} from "contracts/common/L1ContractErrors.sol";
+
 /// @title L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
 /// @notice Regression tests for the receiveMessage access control fix in L2AssetRouter
 abstract contract L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract is Test, SharedL2ContractDeployer {
@@ -73,36 +75,29 @@ abstract contract L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
         }
     }
 
-    /// @notice Test that receiveMessage does not revert when called by InteropHandler
-    /// @dev Verifies the legitimate path still works - InteropHandler can call receiveMessage
+    /// @notice Test that receiveMessage does not revert with Unauthorized when called by InteropHandler
+    /// @dev We craft a payload with a deliberately wrong selector. Reaching the InvalidSelector
+    ///      revert at L2AssetRouter.receiveMessage:251 is causally downstream of:
+    ///        - the onlyL2InteropHandler gate at line 226, and
+    ///        - the secondary sender-address Unauthorized check at line 244.
+    ///      Therefore an InvalidSelector revert proves the access-control gate is open for InteropHandler.
     function test_regression_receiveMessageAllowedForInteropHandler() public {
-        // Note: This test verifies that the InteropHandler CAN call receiveMessage.
-        // The actual execution may still fail due to other validations (sender address, payload format, etc.)
-        // but it should NOT fail with Unauthorized error.
+        bytes4 bogusSelector = bytes4(0xdeadbeef);
 
+        // Sender bytes that pass the L244 check: senderChainId != L1_CHAIN_ID and senderAddress == address(this).
+        bytes memory sender = InteroperableAddress.formatEvmV1(block.chainid + 1, L2_ASSET_ROUTER_ADDR);
+
+        // Payload with a non-finalizeDeposit selector so the L251 selector check is the deterministic next failure.
         bytes memory payload = abi.encodeWithSelector(
-            AssetRouterBase.finalizeDeposit.selector,
-            block.chainid + 1, // originChainId (different from L1 and current chain)
-            bytes32(uint256(1)), // assetId
+            bogusSelector,
+            block.chainid + 1,
+            bytes32(uint256(1)),
             abi.encode(address(0), address(this), address(0), uint256(1000), bytes(""))
         );
 
-        // Sender must be L2AssetRouter on another L2 chain (not L1)
-        bytes memory sender = InteroperableAddress.formatEvmV1(block.chainid + 1, L2_ASSET_ROUTER_ADDR);
-
-        // InteropHandler calls receiveMessage - should not revert with Unauthorized
         vm.prank(L2_INTEROP_HANDLER_ADDR);
-
-        // The call might revert for other reasons (e.g., asset not registered, invalid data),
-        // but it should NOT revert with Unauthorized
-        // We use a try-catch to verify the error is NOT Unauthorized
-        try IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage(bytes32(0), sender, payload) {
-            // If it succeeds, that's fine
-        } catch (bytes memory reason) {
-            // Check that it's not an Unauthorized error
-            bytes4 errorSelector = bytes4(reason);
-            assertTrue(errorSelector != Unauthorized.selector, "InteropHandler should not get Unauthorized error");
-        }
+        vm.expectRevert(abi.encodeWithSelector(InvalidSelector.selector, bogusSelector));
+        IERC7786Recipient(L2_ASSET_ROUTER_ADDR).receiveMessage(bytes32(0), sender, payload);
     }
 
     /// @notice Test that a contract trying to impersonate InteropHandler still fails
