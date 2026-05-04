@@ -127,7 +127,11 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         assertEq(getters.getPriorityQueueSize(), queueSizeBefore + 1, "priorityQueueSize must increment by 1");
 
         // Verify the chain is still registered on this layer after the forward.
-        assertEq(l2Bridgehub.getZKChain(mintChainId), diamondProxy, "Chain registration must be unchanged after forward");
+        assertEq(
+            l2Bridgehub.getZKChain(mintChainId),
+            diamondProxy,
+            "Chain registration must be unchanged after forward"
+        );
     }
 
     function test_withdrawFromGateway() public {
@@ -147,7 +151,9 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         });
 
         // Snapshot migrationNumber so the post-call assert can verify it advances by exactly one.
-        uint256 migrationNumberBefore = IChainAssetHandlerBase(L2_CHAIN_ASSET_HANDLER_ADDR).migrationNumber(mintChainId);
+        uint256 migrationNumberBefore = IChainAssetHandlerBase(L2_CHAIN_ASSET_HANDLER_ADDR).migrationNumber(
+            mintChainId
+        );
 
         vm.prank(ownerWallet);
         vm.mockCall(
@@ -198,7 +204,11 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         assertEq(migrationNumberAfter, migrationNumberBefore + 1, "migrationNumber must increment by 1");
 
         // Verify the chain registration is preserved on this settlement layer until the migration is finalized elsewhere.
-        assertEq(l2Bridgehub.getZKChain(mintChainId), diamondProxyBefore, "Chain registration must be unchanged after withdraw");
+        assertEq(
+            l2Bridgehub.getZKChain(mintChainId),
+            diamondProxyBefore,
+            "Chain registration must be unchanged after withdraw"
+        );
     }
 
     function test_finalizeDepositWithRealChainData() public {

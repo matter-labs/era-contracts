@@ -98,7 +98,6 @@ contract UpgradeIntegrationTest_Local is
     ZKChainDeployer,
     TokenDeployer
 {
-
     /// @notice Override to use mocked ecosystem upgrade that uses mocked CTM upgrade
     function createEcosystemUpgrade() internal override returns (EcosystemUpgrade_v31) {
         return new EcosystemUpgrade_v31_Test();
@@ -191,7 +190,11 @@ contract UpgradeIntegrationTest_Local is
         assertEq(IGetters(_newChainDiamond).getChainId(), NEW_CHAIN_ID, "New diamond points at wrong chainId");
         assertEq(IGetters(_newChainDiamond).getProtocolVersion(), _expectedNewVersion, "New chain wrong version");
         assertEq(IBridgehubBase(bridgehub).chainTypeManager(NEW_CHAIN_ID), ctm, "New chain not linked to CTM");
-        assertEq(IChainTypeManager(ctm).getChainAdmin(NEW_CHAIN_ID), _expectedNewChainAdmin, "New chain admin mismatch");
+        assertEq(
+            IChainTypeManager(ctm).getChainAdmin(NEW_CHAIN_ID),
+            _expectedNewChainAdmin,
+            "New chain admin mismatch"
+        );
 
         // Base-token asset id matches the era one (the mock at chainId=0 in setUp propagates it on creation)
         assertEq(
@@ -222,5 +225,5 @@ contract UpgradeIntegrationTest_Local is
             IBridgehubBase(bridgehub).assetIdIsRegistered(_expectedBaseTokenAssetId),
             "Base token assetId not registered"
         );
-    }    
+    }
 }

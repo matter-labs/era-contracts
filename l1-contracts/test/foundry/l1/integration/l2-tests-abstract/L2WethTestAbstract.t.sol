@@ -105,7 +105,6 @@ abstract contract L2WethTestAbstract is Test, SharedL2ContractDeployer {
     }
 }
 
-
 /* Coverage improvement suggestions
   Happy-path
 

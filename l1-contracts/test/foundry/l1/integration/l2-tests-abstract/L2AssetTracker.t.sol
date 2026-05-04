@@ -176,17 +176,9 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             );
             for (uint256 k = 0; k < feeLogs.length; k++) {
                 if (uint256(feeLogs[k].topics[1]) != testData[i].chainId) continue;
-                assertEq(
-                    address(uint160(uint256(feeLogs[k].topics[2]))),
-                    zkChainAddr,
-                    "fee event payer mismatch"
-                );
+                assertEq(address(uint160(uint256(feeLogs[k].topics[2]))), zkChainAddr, "fee event payer mismatch");
                 (uint256 amount, uint256 callCount) = abi.decode(feeLogs[k].data, (uint256, uint256));
-                assertEq(
-                    amount,
-                    GW_ASSET_TRACKER.gatewaySettlementFee() * callCount,
-                    "fee amount != fee * callCount"
-                );
+                assertEq(amount, GW_ASSET_TRACKER.gatewaySettlementFee() * callCount, "fee amount != fee * callCount");
                 expectedFeeTotal += amount;
             }
         }
@@ -225,7 +217,6 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             .with_key(assetId)
             .checked_write(balance);
     }
-
 
     function test_registerLegacyToken_nativeToken() public {
         bytes32 assetId = keccak256("test_asset_id");
@@ -267,7 +258,11 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
 
         // chainBalance: native branch sets it to MAX_TOKEN_BALANCE - ntvBalance.
         uint256 expectedBalance = MAX_TOKEN_BALANCE - ntvBalance;
-        assertEq(tracker.chainBalance(block.chainid, assetId), expectedBalance, "Chain balance should be correctly migrated");
+        assertEq(
+            tracker.chainBalance(block.chainid, assetId),
+            expectedBalance,
+            "Chain balance should be correctly migrated"
+        );
 
         // isAssetRegistered: flipped to true at the end of _registerLegacyToken.
         assertTrue(tracker.isAssetRegistered(assetId), "Asset should be registered after call");
@@ -600,11 +595,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             L2_ASSET_TRACKER_ADDR
         );
         assertEq(migrationLog.topics[1], assetId, "Event assetId mismatch");
-        assertEq(
-            abi.decode(migrationLog.data, (uint256)),
-            block.chainid,
-            "Event chainId mismatch"
-        );
+        assertEq(abi.decode(migrationLog.data, (uint256)), block.chainid, "Event chainId mismatch");
 
         // initiateL1ToGatewayMigrationOnL2 does NOT itself update assetMigrationNumber
         // (that happens later via confirmMigrationOnL2 from L1). Verify it stays at the pre-call value.

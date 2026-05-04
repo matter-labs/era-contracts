@@ -29,9 +29,8 @@ contract UpgradeIntegrationTestBase is Test {
     using LogFinder for Vm.Log[];
 
     uint256 internal constant NEW_CHAIN_ID = 555;
-    
+
     uint256 chainId;
-    
 
     EcosystemUpgrade_v31 ecosystemUpgrade;
     CTMUpgrade_v31 ctmUpgrade;
@@ -47,12 +46,12 @@ contract UpgradeIntegrationTestBase is Test {
     string public CHAIN_OUTPUT;
 
     //Instance state used by the validating test body.
-    uint256  internal _expectedNewVersion;
-    address  internal _eraDiamond;
-    address  internal _newChainDiamond;
-    bytes32  internal _expectedUpgradeCutHash;
-    address  internal _expectedNewChainAdmin;
-    bytes32  internal _expectedBaseTokenAssetId;
+    uint256 internal _expectedNewVersion;
+    address internal _eraDiamond;
+    address internal _newChainDiamond;
+    bytes32 internal _expectedUpgradeCutHash;
+    address internal _expectedNewChainAdmin;
+    bytes32 internal _expectedBaseTokenAssetId;
 
     function setupUpgrade(bool skipFactoryDepsCheck) public virtual {
         console.log("setupUpgrade: Creating EcosystemUpgrade_v31");
@@ -130,14 +129,14 @@ contract UpgradeIntegrationTestBase is Test {
         ctmUpgrade = CTMUpgrade_v31(address(ecosystemUpgrade.getCTMUpgrade()));
         console.log("internalTest: Preparing combined ecosystem governance calls (includes CTM)");
         (
-        Call[] memory upgradeStage0Calls,
-        Call[] memory upgradeStage1Calls,
-        Call[] memory upgradeStage2Calls
+            Call[] memory upgradeStage0Calls,
+            Call[] memory upgradeStage1Calls,
+            Call[] memory upgradeStage2Calls
         ) = ecosystemUpgrade.prepareDefaultGovernanceCalls();
 
         // Cached for migration-pause outcome checks across stages 0..2.
         address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
-        address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();        
+        address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
 
         // Note: ecosystemUpgrade.prepareDefaultGovernanceCalls() already combines both
         // core and CTM governance calls, so we don't need to call ctmUpgrade separately
@@ -153,7 +152,7 @@ contract UpgradeIntegrationTestBase is Test {
         console.log("Starting upgrade stage 2 (combined ecosystem + CTM)!");
         governanceMulticall(ecosystemUpgrade.getOwnerAddress(), upgradeStage2Calls);
         // Stage 2 must unpause migrations on L1 (DefaultCoreUpgrade.prepareUnpauseGatewayMigrationsCall).
-        assertFalse(IChainAssetHandlerBase(chainAssetHandler).migrationPaused(), "Stage 2 should unpause migrations");        
+        assertFalse(IChainAssetHandlerBase(chainAssetHandler).migrationPaused(), "Stage 2 should unpause migrations");
 
         console.log("Ecosystem upgrade is prepared, now all the chains have to upgrade to the new version");
 
@@ -209,7 +208,7 @@ contract UpgradeIntegrationTestBase is Test {
             IChainTypeManager(ctmUpgrade.getCTMAddress()).upgradeCutHash(ctmUpgrade.getOldProtocolVersion()),
             _expectedUpgradeCutHash,
             "Cut hash storage mismatch"
-        );   
+        );
 
         // NewProtocolVersionVerifier: both fields are indexed.
         Vm.Log memory npvv = ecosystemLogs.requireOneFrom(
@@ -236,7 +235,7 @@ contract UpgradeIntegrationTestBase is Test {
         // NewZKChain: both fields are indexed. Cross-check the emitted diamond against the registered one.
         Vm.Log memory nzkEv = chainOpsLogs.requireOneFrom("NewZKChain(uint256,address)", ctmUpgrade.getCTMAddress());
         assertEq(uint256(nzkEv.topics[1]), NEW_CHAIN_ID, "NewZKChain wrong chainId");
-        assertEq(address(uint160(uint256(nzkEv.topics[2]))), _newChainDiamond, "NewZKChain diamond mismatch");      
+        assertEq(address(uint160(uint256(nzkEv.topics[2]))), _newChainDiamond, "NewZKChain diamond mismatch");
 
         // TODO: here we should include tests that deposits work for upgraded chains
         // including era specific deposit/withdraw functions
