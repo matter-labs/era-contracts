@@ -6,6 +6,7 @@
  * ERC-7786 attribute encoding and contract deployment utilities.
  */
 
+import { expect } from "chai";
 import type { providers, BigNumber } from "ethers";
 import { Contract, ethers, Wallet } from "ethers";
 import { getAbi, getCreationBytecode } from "../core/contracts";
@@ -15,12 +16,14 @@ import {
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
   INTEROP_SEND_BUNDLE_GAS_LIMIT,
+  L2_ASSET_ROUTER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
 } from "../core/const";
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
 import { buildMockInteropProof } from "../core/utils";
 import { encodeEvmChain, encodeEvmAddress } from "./erc7930";
 import { waitForLiveInteropProof } from "./temp-sdk";
+import { approveTokenForNtv, expectBalanceDelta, getTokenAddressForAsset, getTokenBalance } from "./balance-helpers";
 
 const abiCoder = ethers.utils.defaultAbiCoder;
 const sendResultsByBundleData = new Map<string, InteropSendResult>();
@@ -66,6 +69,48 @@ export function useFixedFeeAttr(useFixedFee: boolean): string {
 export function getTokenTransferData(assetId: string, amount: BigNumber, recipientAddress: string): string {
   const transferData = encodeBridgeBurnData(amount, recipientAddress, ethers.constants.AddressZero);
   return encodeAssetRouterBridgehubDepositData(assetId, transferData);
+}
+
+export interface SendAndExecuteTokenInteropParams {
+  sendProvider: providers.JsonRpcProvider;
+  receiveProvider: providers.JsonRpcProvider;
+  sourceChainId: number;
+  destinationChainId: number;
+  sourceTokenAddress: string;
+  assetId: string;
+  amount: BigNumber;
+  recipientAddress: string;
+  label: string;
+}
+
+export async function sendAndExecuteTokenInterop(params: SendAndExecuteTokenInteropParams): Promise<string> {
+  await approveTokenForNtv(params.sendProvider, params.sourceTokenAddress, params.amount);
+  const fee = await getInteropProtocolFee(params.sendProvider);
+
+  const destTokenBefore = await getTokenAddressForAsset(params.receiveProvider, params.assetId);
+  const recipientBefore = await getTokenBalance(params.receiveProvider, destTokenBefore, params.recipientAddress);
+
+  const sendResult = await sendInteropBundle({
+    sourceProvider: params.sendProvider,
+    destinationChainId: params.destinationChainId,
+    callStarters: [
+      {
+        to: encodeEvmAddress(L2_ASSET_ROUTER_ADDR),
+        data: getTokenTransferData(params.assetId, params.amount, params.recipientAddress),
+        callAttributes: [indirectCallAttr()],
+      },
+    ],
+    value: fee,
+  });
+
+  expect(sendResult.txHash, `${params.label}: tx hash should exist`).to.not.be.null;
+  const receipt = await executeBundle(params.receiveProvider, sendResult, params.sourceChainId);
+  expect(receipt.status, `${params.label}: executeBundle tx should succeed`).to.equal(1);
+
+  const destTokenAfter = await getTokenAddressForAsset(params.receiveProvider, params.assetId);
+  const recipientAfter = await getTokenBalance(params.receiveProvider, destTokenAfter, params.recipientAddress);
+  expectBalanceDelta(recipientBefore, recipientAfter, params.amount, `${params.label}: recipient token`);
+  return destTokenAfter;
 }
 
 // ── InteropCenter.sendBundle wrapper ───────────────────────────

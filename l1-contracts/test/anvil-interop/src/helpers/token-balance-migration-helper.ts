@@ -12,10 +12,11 @@ import {
   assertContractDeployed,
   buildFinalizeWithdrawalParams,
   extractAndRelayNewPriorityRequests,
+  getChainDiamondProxy,
 } from "../core/utils";
 import { encodeNtvAssetId } from "../core/data-encoding";
 import type { ChainAddresses } from "../core/types";
-import { getInteropSourcePrivateKey } from "../core/accounts";
+import { getInteropSourcePrivateKey, isLiveInteropMode } from "../core/accounts";
 import { waitForLiveFinalizeWithdrawalParams } from "./temp-sdk";
 
 const TBM_L1_RECEIVE_GAS_LIMIT = 10_000_000;
@@ -50,6 +51,19 @@ export interface TokenBalanceMigrationResult {
   l2TxHash?: string;
   l1TxHash?: string;
   alreadyMigrated: boolean;
+}
+
+export interface MigrateTokenToGatewayParams {
+  chainId: number;
+  l2RpcUrl: string;
+  tokenAddress: string;
+  l1RpcUrl: string;
+  l1Provider: providers.JsonRpcProvider;
+  gwRpcUrl: string;
+  l1NativeTokenVaultAddr: string;
+  l1AssetTrackerAddr: string;
+  chainAddresses: ChainAddresses[];
+  gatewayChainId: number;
 }
 
 /**
@@ -249,6 +263,37 @@ export async function migrateSpecificTokenBalanceToGW(
     l1TxHash: l1Receipt.transactionHash,
     alreadyMigrated: false,
   };
+}
+
+export async function migrateTokenToGateway(params: MigrateTokenToGatewayParams): Promise<string> {
+  if (!isLiveInteropMode()) {
+    const l2Provider = new providers.JsonRpcProvider(params.l2RpcUrl);
+    const gwProvider = new providers.JsonRpcProvider(params.gwRpcUrl);
+    const assetId = encodeNtvAssetId(params.chainId, params.tokenAddress);
+
+    await registerTestTokenOnL2NTV(l2Provider, params.tokenAddress, params.chainId);
+    await migrateTokenBalanceToGW({
+      l2Provider,
+      l1Provider: params.l1Provider,
+      gwProvider,
+      chainId: params.chainId,
+      assetId,
+      l1AssetTrackerAddr: params.l1AssetTrackerAddr,
+      gwDiamondProxyAddr: getChainDiamondProxy(params.chainAddresses, params.gatewayChainId),
+      l2DiamondProxyAddr: getChainDiamondProxy(params.chainAddresses, params.chainId),
+    });
+    return assetId;
+  }
+
+  const result = await migrateSpecificTokenBalanceToGW({
+    l1RpcUrl: params.l1RpcUrl,
+    l2RpcUrl: params.l2RpcUrl,
+    gwRpcUrl: params.gwRpcUrl,
+    chainId: params.chainId,
+    tokenAddress: params.tokenAddress,
+    l1NativeTokenVaultAddr: params.l1NativeTokenVaultAddr,
+  });
+  return result.assetId;
 }
 
 async function resolveSpecificTokenAssetId(params: {
