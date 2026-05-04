@@ -36,6 +36,9 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
 import {L2UtilsBase} from "../l2-tests-in-l1-context/L2UtilsBase.sol";
 
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
+
 abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
 
@@ -373,8 +376,8 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
 
     /// @notice A random address must not be able to call handleFinalizeBaseTokenBridgingOnL2.
     function test_handleFinalizeBaseTokenBridgingOnL2_revertUnauthorized() public {
-        vm.prank(address(0xDEAD));
-        vm.expectRevert();
+        vm.prank(RAND_ADDRESS);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, RAND_ADDRESS));
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(1, 100);
     }
 
@@ -435,8 +438,8 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
 
     /// @notice Verifies that only the ComplexUpgrader can call registerBaseTokenDuringUpgrade.
     function test_registerBaseTokenDuringUpgrade_revertUnauthorized() public {
-        vm.prank(address(0xDEAD));
-        vm.expectRevert();
+        vm.prank(RAND_ADDRESS);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, RAND_ADDRESS));
         L2_ASSET_TRACKER.registerBaseTokenDuringUpgrade();
     }
 

@@ -84,7 +84,7 @@ abstract contract L2WethTestAbstract is Test, SharedL2ContractDeployer {
     }
 
     function test_revertWhenWithdrawingMoreThanBalance() public {
-        vm.expectRevert();
+        vm.expectRevert("ERC20: burn amount exceeds balance");
         weth.withdraw(1);
     }
 

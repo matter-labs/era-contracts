@@ -40,8 +40,11 @@ import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrack
 import {BalanceChange} from "contracts/common/Messaging.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 
+import {LogFinder} from "test-utils/LogFinder.sol";
+
 abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
+    using LogFinder for Vm.Log[];
 
     function _pauseDeposits(uint256 _chainId) public {
         pauseDepositsBeforeInitiatingMigration(L2_BRIDGEHUB_ADDR, _chainId);
@@ -51,11 +54,11 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
 
     function test_gatewayShouldFinalizeDeposit() public {
         finalizeDeposit();
-        require(l2Bridgehub.ctmAssetIdFromAddress(address(chainTypeManager)) == ctmAssetId, "ctmAssetId mismatch");
-        require(l2Bridgehub.ctmAssetIdFromChainId(mintChainId) == ctmAssetId, "ctmAssetIdFromChainId mismatch");
+        assertEq(l2Bridgehub.ctmAssetIdFromAddress(address(chainTypeManager)), ctmAssetId, "ctmAssetId mismatch");
+        assertEq(l2Bridgehub.ctmAssetIdFromChainId(mintChainId), ctmAssetId, "ctmAssetIdFromChainId mismatch");
 
         address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
-        require(!GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
+        assertFalse(GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
     }
 
     function test_gatewayNonEmptyPriorityQueueMigration() public {
@@ -69,7 +72,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         finalizeDepositWithCustomCommitment(abi.encode(commitment));
 
         address diamondProxy = l2Bridgehub.getZKChain(mintChainId);
-        require(!GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
+        assertFalse(GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
     }
 
     function test_forwardToL2OnGateway_L2() public {
@@ -112,7 +115,6 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         clearPriorityQueue(address(coreAddresses.bridgehub.proxies.bridgehub), mintChainId);
         _pauseDeposits(mintChainId);
         address newAdmin = makeAddr("newAdmin");
-        bytes memory newDiamondCut = abi.encode();
         BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
             chainId: mintChainId,
             ctmData: abi.encode(newAdmin, config.contracts.diamondCutData),
@@ -125,19 +127,22 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             abi.encode(bytes(""))
         );
 
-        // Record logs to verify events were emitted during withdrawal
         vm.recordLogs();
-
-        // The withdraw function should execute without reverting
         l2AssetRouter.withdraw(ctmAssetId, abi.encode(data));
-
-        // Verify logs were emitted during withdrawal (indicates L1 message was sent)
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        assertTrue(logs.length > 0, "Withdrawal should emit events when sending message to L1");
 
-        // Verify the withdrawal was for the correct chain and asset
-        assertTrue(data.chainId == mintChainId, "Withdrawal data should reference the correct chain");
-        assertTrue(ctmAssetId != bytes32(0), "CTM asset ID should be valid");
+        // Verify WithdrawalInitiatedAssetRouter event was emitted with correct params
+        Vm.Log memory withdrawalLog = logs.requireOne("WithdrawalInitiatedAssetRouter(uint256,address,bytes32,bytes)");
+        assertEq(
+            withdrawalLog.topics[1],
+            bytes32(uint256(uint160(ownerWallet))),
+            "WithdrawalInitiatedAssetRouter: l2Sender should be ownerWallet"
+        );
+        assertEq(
+            withdrawalLog.topics[2],
+            ctmAssetId,
+            "WithdrawalInitiatedAssetRouter: assetId should match ctmAssetId"
+        );
     }
 
     function test_finalizeDepositWithRealChainData() public {
