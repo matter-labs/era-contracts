@@ -10,8 +10,8 @@ use crate::common::forge::ForgeScriptArgs;
 /// Every prepare-shape command runs against a forked anvil fork of
 /// `--l1-rpc-url` and emits a directory of Safe Transaction Builder bundles
 /// (plus a `manifest.json` with debug metadata) via `--out`; protocol-ops
-/// itself never broadcasts. Broadcasting is done by `dev execute-safe`, which
-/// declares its own private-key arg.
+/// itself broadcasts only when `--execute` is set; otherwise broadcasting is
+/// done by `dev execute-safe`, which declares its own private-key arg.
 ///
 /// Intentionally does **not** include `--private-key` *or* `--sender`. Every
 /// prepare-shape command auto-resolves its simulation caller from L1 state

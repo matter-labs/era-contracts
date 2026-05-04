@@ -20,10 +20,10 @@ pub struct EcosystemInitArgs {
     #[clap(long, help_heading = "Signers")]
     pub owner: Option<Address>,
 
-    /// Deployer EOA address. Bootstrap is prepare-only: protocol-ops emits a
-    /// directory of Safe bundles via `--out`; the deployer applies them with
-    /// `dev execute-safe` (or any Safe-bundle-aware executor). No key is
-    /// handed to protocol-ops.
+    /// Deployer EOA address. Bootstrap emits a directory of Safe bundles via
+    /// `--out`; the deployer applies them with `--execute`, `dev execute-safe`,
+    /// or any Safe-bundle-aware executor. No key is handed to the Forge
+    /// simulation step.
     #[clap(long, help_heading = "Signers")]
     pub deployer_address: Address,
 

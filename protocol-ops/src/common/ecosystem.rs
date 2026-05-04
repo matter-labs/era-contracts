@@ -181,7 +181,9 @@ impl EcosystemArgs {
             (None, Some(d)) => Ecosystem::from_zkstack_dir(d),
             // clap's conflicts_with + required_unless_present forbid the
             // (Some, Some) and (None, None) cases.
-            _ => anyhow::bail!("exactly one of --ecosystem or --zkstack-config-dir must be provided"),
+            _ => {
+                anyhow::bail!("exactly one of --ecosystem or --zkstack-config-dir must be provided")
+            }
         }
     }
 }

@@ -33,7 +33,9 @@ const PER_TX_GAS_LIMIT_CAP: u64 = 20_000_000;
 ///   bundle in a manifest emitted by a prepare-shape command, looking up
 ///   each bundle's signer in `wallets.yaml` by target address. Used to
 ///   apply a full `ecosystem upgrade-prepare` / `upgrade-governance` /
-///   `chain upgrade` output without per-bundle key management.
+///   `chain upgrade` output without each caller reimplementing the same
+///   per-bundle signer dispatch loop in shell. The same manifest execution
+///   path also powers prepare commands' `--execute` mode.
 ///
 /// Safe TX Builder JSON does not carry the broadcasting Safe address — in the
 /// real product it is implicit from "the Safe currently loaded in the UI". For

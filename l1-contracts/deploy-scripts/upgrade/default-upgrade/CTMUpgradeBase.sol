@@ -184,6 +184,11 @@ abstract contract CTMUpgradeBase is DeployCTMScript {
         internal
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
     {
+        // Keep the VM-specific hooks separate: ZKsyncOS callers return the
+        // final universal records because they choose upgrade type and bytecode
+        // info per entry; Era callers return CoreContract IDs so the same list
+        // can be converted to Era force deployments and reused for factory-dep
+        // publication below.
         if (config.isZKsyncOS) {
             return getAdditionalZKsyncOSForceDeployments();
         }
