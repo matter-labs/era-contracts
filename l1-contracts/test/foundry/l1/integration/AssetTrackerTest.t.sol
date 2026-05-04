@@ -105,14 +105,6 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         _deployTokens();
         _registerNewTokens(tokens);
 
-        // _deployEra();
-        // _deployZKChain(ETH_TOKEN_ADDRESS);
-        // _deployZKChain(ETH_TOKEN_ADDRESS);
-        // _deployZKChain(tokens[0]);
-        // _deployZKChain(tokens[0]);
-        // _deployZKChain(tokens[1]);
-        // _deployZKChain(tokens[1]);
-
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
             l2ContractAddresses.push(contractAddress);
@@ -155,9 +147,6 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         prepare();
         tokenAddress = tokens[1];
         assetId = DataEncoding.encodeNTVAssetId(block.chainid, tokenAddress);
-
-        // 0x13b704bded2382d6e555a218f4d57330c8d624337c03a7aa1779d78f557b4126;
-        // the below does not work for some reason:
     }
 
     function getChainBalanceLocation(bytes32 _assetId, uint256 _chainId) internal pure returns (bytes32) {
@@ -183,18 +172,6 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     }
 
     function test_migrationL1ToGateway() public {
-        // vm.chainId(eraZKChainId);
-        // vm.mockCall(
-        //     L2_NATIVE_TOKEN_VAULT_ADDR,
-        //     abi.encodeWithSelector(L2_NATIVE_TOKEN_VAULT.tokenAddress.selector),
-        //     abi.encode(tokenAddress)
-        // );
-        // vm.mockCall(
-        //     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-        //     abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-        //     abi.encode(bytes32(0))
-        // );
-        // assetTracker.initiateL1ToGatewayMigrationOnL2(assetId);
         L1ToGatewayTokenBalanceMigrationData memory data = L1ToGatewayTokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             originToken: tokenAddress,

@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {InteroperableAddress} from "contracts/vendor/draft-InteroperableAddress.sol";
+import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
 
 /// @notice Helper contract to test InteroperableAddress library with calldata functions
 contract InteroperableAddressHelper {
@@ -328,7 +329,7 @@ contract InteroperableAddressTest is Test {
 
     function test_roundtrip_formatAndParseEvmV1() public pure {
         uint256 originalChainId = 137;
-        address originalAddr = address(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF);
+        address originalAddr = RAND_ADDRESS;
 
         bytes memory formatted = InteroperableAddress.formatEvmV1(originalChainId, originalAddr);
         (uint256 parsedChainId, address parsedAddr) = formatted.parseEvmV1();
@@ -348,7 +349,7 @@ contract InteroperableAddressTest is Test {
     }
 
     function test_roundtrip_formatAndParseEvmV1_onlyAddress() public pure {
-        address originalAddr = address(0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF);
+        address originalAddr = RAND_ADDRESS;
 
         bytes memory formatted = InteroperableAddress.formatEvmV1(originalAddr);
         (uint256 parsedChainId, address parsedAddr) = formatted.parseEvmV1();
