@@ -17,6 +17,7 @@ import {
     L2_BOOTLOADER_ADDRESS,
     L2_BRIDGEHUB,
     L2_COMPLEX_UPGRADER_ADDR,
+    L2_MESSAGE_ROOT,
     L2_MESSAGE_ROOT_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
@@ -38,136 +39,166 @@ import {L2UtilsBase} from "../l2-tests-in-l1-context/L2UtilsBase.sol";
 
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
+import {LogFinder} from "../utils/LogFinder.sol";
+
 abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
+    using LogFinder for Vm.Log[];
 
-    function test_processLogsAndMessages() public {
-        finalizeDepositWithChainId(271);
-        finalizeDepositWithChainId(260);
+      function test_processLogsAndMessages() public {
+          finalizeDepositWithChainId(271);
+          finalizeDepositWithChainId(260);
 
-        vm.chainId(GATEWAY_CHAIN_ID);
+          vm.chainId(GATEWAY_CHAIN_ID);
 
-        // Set up token balances for chain operators to pay settlement fees
-        uint256[] memory chainIds = new uint256[](2);
-        chainIds[0] = 271;
-        chainIds[1] = 260;
-        L2UtilsBase.setupTokenBalancesForChainOperators(chainIds);
+          // Set up token balances for chain operators to pay settlement fees
+          uint256[] memory chainIds = new uint256[](2);
+          chainIds[0] = 271;
+          chainIds[1] = 260;
+          L2UtilsBase.setupTokenBalancesForChainOperators(chainIds);
 
-        bytes[] memory input2 = L2AssetTrackerData.getData2();
-        for (uint256 i = 0; i < input2.length; i++) {
-            this.printProcess(abi.decode(input2[i], (ProcessLogsInput)));
-            return;
-        }
+          ProcessLogsInput[] memory testData = L2AssetTrackerData.getData();
 
-        ProcessLogsInput[] memory testData = L2AssetTrackerData.getData();
+          // Add the required previous batch roots for batches 1-4
+          // The test is trying to add batch 5, so we need batches 1-4 to exist first
+          bytes32 dummyBatchRoot = keccak256("dummy_batch_root");
+          for (uint256 i = 1; i <= 4; i++) {
+              stdstore
+                  .target(address(L2_MESSAGE_ROOT_ADDR))
+                  .sig("chainBatchRoots(uint256,uint256)")
+                  .with_key(271)
+                  .with_key(i)
+                  .checked_write(bytes32(uint256(dummyBatchRoot) + i));
+          }
 
-        // Verify test data is not empty
-        assertTrue(testData.length > 0, "Test data should not be empty");
+          // Snapshot fee-token balance before the loop to verify cross-iteration fee accounting.
+          IERC20 zkToken = GW_ASSET_TRACKER.wrappedZKToken();
+          uint256 feeBalanceBefore = zkToken.balanceOf(GW_ASSET_TRACKER_ADDR);
+          uint256 expectedFeeTotal;
 
-        // Add the required previous batch roots for batches 1-4
-        // The test is trying to add batch 5, so we need batches 1-4 to exist first
-        bytes32 dummyBatchRoot = keccak256("dummy_batch_root");
-        for (uint256 i = 1; i <= 4; i++) {
-            stdstore
-                .target(address(L2_MESSAGE_ROOT_ADDR))
-                .sig("chainBatchRoots(uint256,uint256)")
-                .with_key(271)
-                .with_key(i)
-                .checked_write(bytes32(uint256(dummyBatchRoot) + i));
-        }
+          for (uint256 i = 0; i < testData.length; i++) {
+              // Set the current batch number to 4 so that batch 5 can be added next
+              if (testData[i].batchNumber > 0) {
+                  stdstore
+                      .target(address(L2_MESSAGE_ROOT_ADDR))
+                      .sig("currentChainBatchNumber(uint256)")
+                      .with_key(testData[i].chainId)
+                      .checked_write(testData[i].batchNumber - 1);
+              }
 
-        uint256 successCount = 0;
+              storeChainBalance(
+                  testData[i].chainId,
+                  0x444c07697a6b15219c574dcc0ee09b479f6171009a6afd65b93e6f028cfa031b,
+                  100
+              );
+              storeChainBalance(
+                  testData[i].chainId,
+                  0xa6203e30497f83b9f5f056745b6ff94f7e22d88bacea03d4dd4393d66217a86f,
+                  100
+              );
+              storeChainBalance(
+                  testData[i].chainId,
+                  0x8592bf3100a24d737aba8ba9895f6801b9ec30200dc016dd8369f3171cbd1921,
+                  100
+              );
+              storeChainBalance(
+                  testData[i].chainId,
+                  0xb615cd4917043452e354e4797dc23e4d6106663f7a37249d54f5996dd2347710,
+                  100
+              );
+              storeChainBalance(
+                  testData[i].chainId,
+                  0xb1f317b7effffcd4e3cf53784ae442ecc4e835c532aaf0e60a046fa8efb96e85,
+                  100
+              );
+              storeChainBalance(
+                  testData[i].chainId,
+                  0xb5eab7cc8c9114c3115a034b49b3d87b0b352aa88c2a9d5ff7339cde105aa44c,
+                  100
+              );
 
-        for (uint256 i = 0; i < testData.length; i++) {
-            console.log("Processing test data index", i, "for chainId", testData[i].chainId);
-            // Verify each test data entry has valid chain ID
-            assertTrue(testData[i].chainId > 0, "Chain ID should be positive");
+              stdstore
+                  .target(address(L2_CHAIN_ASSET_HANDLER))
+                  .sig("migrationNumber(uint256)")
+                  .with_key(271)
+                  .checked_write(uint256(1));
 
-            // Set the current batch number to 4 so that batch 5 can be added next
-            if (testData[i].batchNumber > 0) {
-                stdstore
-                    .target(address(L2_MESSAGE_ROOT_ADDR))
-                    .sig("currentChainBatchNumber(uint256)")
-                    .with_key(testData[i].chainId)
-                    .checked_write(testData[i].batchNumber - 1);
-            }
+              bytes32[] memory txHashes = getTxHashes(testData[i]);
 
-            storeChainBalance(
-                testData[i].chainId,
-                0x444c07697a6b15219c574dcc0ee09b479f6171009a6afd65b93e6f028cfa031b,
-                100
-            );
-            storeChainBalance(
-                testData[i].chainId,
-                0xa6203e30497f83b9f5f056745b6ff94f7e22d88bacea03d4dd4393d66217a86f,
-                100
-            );
-            storeChainBalance(
-                testData[i].chainId,
-                0x8592bf3100a24d737aba8ba9895f6801b9ec30200dc016dd8369f3171cbd1921,
-                100
-            );
-            storeChainBalance(
-                testData[i].chainId,
-                0xb615cd4917043452e354e4797dc23e4d6106663f7a37249d54f5996dd2347710,
-                100
-            );
-            storeChainBalance(
-                testData[i].chainId,
-                0xb1f317b7effffcd4e3cf53784ae442ecc4e835c532aaf0e60a046fa8efb96e85,
-                100
-            );
-            storeChainBalance(
-                testData[i].chainId,
-                0xb5eab7cc8c9114c3115a034b49b3d87b0b352aa88c2a9d5ff7339cde105aa44c,
-                100
-            );
+              // Loop over l1TxHashes in testData[i] and for each mark balanceChange version number as 1
+              // Note: balanceChange is internal, so we calculate storage slot manually
+              // balanceChange is at slot 155 in GWAssetTracker
+              for (uint256 j = 0; j < txHashes.length; j++) {
+                  // Calculate storage slot: keccak256(txHash, keccak256(chainId, 155))
+                  bytes32 innerSlot = keccak256(abi.encode(testData[i].chainId, uint256(155)));
+                  bytes32 structSlot = keccak256(abi.encode(txHashes[j], innerSlot));
+                  // Write 1 to the version field (first byte of the struct)
+                  vm.store(address(GW_ASSET_TRACKER), structSlot, bytes32(uint256(1)));
+              }
 
-            stdstore
-                .target(address(L2_CHAIN_ASSET_HANDLER))
-                .sig("migrationNumber(uint256)")
-                .with_key(271)
-                .checked_write(uint256(1));
+              // Get the ZKChain address for this chain - this will be the caller and the settlement fee payer
+              address zkChainAddr = L2_BRIDGEHUB.getZKChain(testData[i].chainId);
 
-            bytes32[] memory txHashes = getTxHashes(testData[i]);
+              // Update settlementFeePayer to be the ZKChain address (which has tokens and approval)
+              testData[i].settlementFeePayer = zkChainAddr;
 
-            // Loop over l1TxHashes in testData[i] and for each mark balanceChange version number as 1
-            // Note: balanceChange is internal, so we calculate storage slot manually
-            // balanceChange is at slot 155 in GWAssetTracker
-            for (uint256 j = 0; j < txHashes.length; j++) {
-                // Calculate storage slot: keccak256(txHash, keccak256(chainId, 155))
-                bytes32 innerSlot = keccak256(abi.encode(testData[i].chainId, uint256(155)));
-                bytes32 structSlot = keccak256(abi.encode(txHashes[j], innerSlot));
-                // Write 1 to the version field (first byte of the struct)
-                vm.store(address(GW_ASSET_TRACKER), structSlot, bytes32(uint256(1)));
-            }
+              // Re-arm log capture so event assertions are scoped to this iteration's call.
+              vm.recordLogs();
 
-            console.log("About to call processLogsAndMessages for index", i);
+              vm.prank(zkChainAddr);
+              (bool success, bytes memory data) = GW_ASSET_TRACKER_ADDR.call(
+                  abi.encodeCall(GW_ASSET_TRACKER.processLogsAndMessages, testData[i])
+              );
 
-            // Get the ZKChain address for this chain - this will be the caller and the settlement fee payer
-            address zkChainAddr = L2_BRIDGEHUB.getZKChain(testData[i].chainId);
+              if (!success) {
+                  assembly {
+                      revert(add(data, 0x20), mload(data))
+                  }
+              }
+              assertTrue(success, string.concat("processLogsAndMessages should succeed for iteration ", vm.toString(i)));
 
-            // Update settlementFeePayer to be the ZKChain address (which has tokens and approval)
-            testData[i].settlementFeePayer = zkChainAddr;
+              // ---- Outcome assertions ----
+              Vm.Log[] memory iterLogs = vm.getRecordedLogs();
 
-            vm.prank(zkChainAddr);
+              // Persistence: the chain batch root for this batch must now be stored.
+              assertEq(
+                  L2_MESSAGE_ROOT.chainBatchRoots(testData[i].chainId, testData[i].batchNumber),
+                  testData[i].chainBatchRoot,
+                  "chainBatchRoot not persisted"
+              );
 
-            (bool success, bytes memory data) = GW_ASSET_TRACKER_ADDR.call(
-                abi.encodeCall(GW_ASSET_TRACKER.processLogsAndMessages, testData[i])
-            );
+              // Settlement-fee event: when emitted for this chain, decode and check internal
+              // consistency (amount == fee * callCount) and accumulate the expected total
+              // for the cross-iteration balance check below.
+              Vm.Log[] memory feeLogs = iterLogs.findAllFrom(
+                  "GatewaySettlementFeesCollected(uint256,address,uint256,uint256)",
+                  GW_ASSET_TRACKER_ADDR
+              );
+              for (uint256 k = 0; k < feeLogs.length; k++) {
+                  if (uint256(feeLogs[k].topics[1]) != testData[i].chainId) continue;
+                  assertEq(
+                      address(uint160(uint256(feeLogs[k].topics[2]))),
+                      zkChainAddr,
+                      "fee event payer mismatch"
+                  );
+                  (uint256 amount, uint256 callCount) = abi.decode(feeLogs[k].data, (uint256, uint256));
+                  assertEq(
+                      amount,
+                      GW_ASSET_TRACKER.gatewaySettlementFee() * callCount,
+                      "fee amount != fee * callCount"
+                  );
+                  expectedFeeTotal += amount;
+              }
+          }
 
-            if (!success) {
-                assembly {
-                    revert(add(data, 0x20), mload(data))
-                }
-            }
-            assertTrue(success, string.concat("processLogsAndMessages should succeed for iteration ", vm.toString(i)));
-            successCount++;
-            console.log("success", i);
-        }
-
-        assertEq(successCount, testData.length, "All processLogsAndMessages calls should succeed");
-    }
+          // Cross-iteration invariant: wrappedZKToken held by the asset tracker must have grown
+          // by exactly the sum of fees reported in GatewaySettlementFeesCollected events.
+          assertEq(
+              zkToken.balanceOf(GW_ASSET_TRACKER_ADDR) - feeBalanceBefore,
+              expectedFeeTotal,
+              "wrappedZKToken delta != sum of fee events"
+          );
+      }
 
     function getTxHashes(ProcessLogsInput memory input) public returns (bytes32[] memory) {
         bytes32[] memory txHashes = new bytes32[](input.logs.length);
@@ -195,9 +226,6 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             .checked_write(balance);
     }
 
-    function printProcess(ProcessLogsInput memory) public {
-        /// its just here so that the ProcessLogsInput is printed in console
-    }
 
     function test_registerLegacyToken_nativeToken() public {
         bytes32 assetId = keccak256("test_asset_id");
