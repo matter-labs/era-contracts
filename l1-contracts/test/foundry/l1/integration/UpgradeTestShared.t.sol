@@ -22,6 +22,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {LogFinder} from "./utils/LogFinder.sol";
 
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 contract UpgradeIntegrationTestBase is Test {
     using stdToml for string;
@@ -45,10 +46,13 @@ contract UpgradeIntegrationTestBase is Test {
     string public CHAIN_INPUT;
     string public CHAIN_OUTPUT;
 
-    // New: instance state used by the validating test body.
+    //Instance state used by the validating test body.
     uint256  internal _expectedNewVersion;
     address  internal _eraDiamond;
     address  internal _newChainDiamond;
+    bytes32  internal _expectedUpgradeCutHash;
+    address  internal _expectedNewChainAdmin;
+    bytes32  internal _expectedBaseTokenAssetId;
 
     function setupUpgrade(bool skipFactoryDepsCheck) public virtual {
         console.log("setupUpgrade: Creating EcosystemUpgrade_v31");
@@ -189,19 +193,50 @@ contract UpgradeIntegrationTestBase is Test {
             "NewProtocolVersion(uint256,uint256)",
             ctmUpgrade.getCTMAddress()
         );
+        assertEq(uint256(npv.topics[1]), ctmUpgrade.getOldProtocolVersion(), "CTM old version mismatch");
         assertEq(uint256(npv.topics[2]), ctmUpgrade.getNewProtocolVersion(), "CTM new version mismatch");
-        ecosystemLogs.requireAtLeast("NewUpgradeCutHash(uint256,bytes32)", 1);
+
+        // NewUpgradeCutHash: both fields are indexed -> protocolVersion in topics[1], cutHash in topics[2].
+        // Cut data is stored under the OLD (FROM) version key in setUpgradeDiamondCutInner,
+        // so the event's topics[1] is the old version, not the new one.
+        Vm.Log memory nuch = ecosystemLogs.requireOneFrom(
+            "NewUpgradeCutHash(uint256,bytes32)",
+            ctmUpgrade.getCTMAddress()
+        );
+        assertEq(uint256(nuch.topics[1]), ctmUpgrade.getOldProtocolVersion(), "Cut hash protocol version mismatch");
+        _expectedUpgradeCutHash = nuch.topics[2];
+        assertEq(
+            IChainTypeManager(ctmUpgrade.getCTMAddress()).upgradeCutHash(ctmUpgrade.getOldProtocolVersion()),
+            _expectedUpgradeCutHash,
+            "Cut hash storage mismatch"
+        );   
+
+        // NewProtocolVersionVerifier: both fields are indexed.
+        Vm.Log memory npvv = ecosystemLogs.requireOneFrom(
+            "NewProtocolVersionVerifier(uint256,address)",
+            ctmUpgrade.getCTMAddress()
+        );
+        assertEq(uint256(npvv.topics[1]), ctmUpgrade.getNewProtocolVersion(), "Verifier protocol version mismatch");
 
         // Chain-op events
         chainOpsLogs.requireAtLeast("DiamondCut((address,uint8,bool,bytes4[])[],address,bytes)", 1);
+
+        // NewChain: only chainId and chainGovernance are indexed; chainTypeManager is in data.
         Vm.Log memory ncEv = chainOpsLogs.requireOneFrom("NewChain(uint256,address,address)", bridgehub);
         assertEq(uint256(ncEv.topics[1]), NEW_CHAIN_ID, "NewChain wrong chainId");
-        chainOpsLogs.requireOneFrom("NewZKChain(uint256,address)", ctmUpgrade.getCTMAddress());
+        _expectedNewChainAdmin = address(uint160(uint256(ncEv.topics[2])));
+        assertEq(_expectedNewChainAdmin, ctmUpgrade.getBridgehubAdmin(), "NewChain admin mismatch");
+        assertEq(abi.decode(ncEv.data, (address)), ctmUpgrade.getCTMAddress(), "NewChain CTM mismatch");
 
         // ---- Snapshot primitives for state-level asserts in the test body ----
         _expectedNewVersion = ctmUpgrade.getNewProtocolVersion();
         _eraDiamond = IBridgehubBase(bridgehub).getZKChain(chainId);
-        _newChainDiamond = IBridgehubBase(bridgehub).getZKChain(NEW_CHAIN_ID);        
+        _newChainDiamond = IBridgehubBase(bridgehub).getZKChain(NEW_CHAIN_ID);
+
+        // NewZKChain: both fields are indexed. Cross-check the emitted diamond against the registered one.
+        Vm.Log memory nzkEv = chainOpsLogs.requireOneFrom("NewZKChain(uint256,address)", ctmUpgrade.getCTMAddress());
+        assertEq(uint256(nzkEv.topics[1]), NEW_CHAIN_ID, "NewZKChain wrong chainId");
+        assertEq(address(uint160(uint256(nzkEv.topics[2]))), _newChainDiamond, "NewZKChain diamond mismatch");      
 
         // TODO: here we should include tests that deposits work for upgraded chains
         // including era specific deposit/withdraw functions
