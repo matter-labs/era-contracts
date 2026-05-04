@@ -225,3 +225,47 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         assertTrue(handlerAddress != address(0), "Asset handler should be configured");
     }
 }
+
+/* Coverage improvement suggestions
+
+  Happy-path
+
+  1. test_forwardToL2OnGateway_L2_withRealBalanceChange — sibling to the existing all-zero version, but with assetId/amount/baseTokenAmount
+  populated. Currently the asset-tracker chain-balance arithmetic at GWAssetTracker._handleChainBalanceIncreaseOnGateway (~L284) is exercised but
+  with zeros, so the actual chainBalance += amount increment goes uncovered. Snapshot chainBalance(mintChainId, assetId) and assert it grew by
+  amount. Pairs with the patched zero-amount test.
+  2. test_gatewayMultipleChainMigrations — migrate two distinct chains via two finalizeDeposit calls on the same gateway fixture. Assert both
+  diamond proxies registered, both ctmAssetIdFromChainId correct, neither priority queue active. Catches cross-contamination regressions.
+
+  Unhappy-path (covers F-051 plus directly-related gaps)
+
+  3. test_finalizeDeposit_revertWhen_zeroAmount — F-051 (zero-amount). Construct a BridgehubMintCTMAssetData with the zero/invalid leaf, call
+  l2AssetRouter.finalizeDeposit (or whichever the gateway-side helper exposes), expect the appropriate revert. Confirm the revert selector, not just
+   "reverted".
+  4. test_finalizeDeposit_revertWhen_invalidChainId — F-051 (invalid chain). Pass a chainId that the bridgehub does not know; expect the
+  chain-not-registered / chain-id-mismatch revert.
+  5. test_finalizeDeposit_revertWhen_mismatchedAssetId — F-051 (mismatched asset). Encode BridgehubMintCTMAssetData with a chainId whose
+  ctmAssetIdFromChainId does not match the asset id passed to finalizeDeposit. Expect the asset-id-mismatch revert.
+  6. test_forwardToL2OnGateway_L2_revertWhen_callerIsNotRelaySender — drop the vm.prank(SETTLEMENT_LAYER_RELAY_SENDER), expect the access-control
+  revert. The current happy path proves the relay-sender works; nothing locks down that *non-*relay-senders are blocked.
+  7. test_withdrawFromGateway_revertWhen_priorityQueueNotCleared — skip clearPriorityQueue, run the rest of the setup, expect the
+  migration-with-pending-priority-ops revert. The current happy test relies on the precondition silently; we want the negative side wired in.
+  8. test_withdrawFromGateway_revertWhen_migrationsNotPaused — skip _pauseDeposits, expect the not-paused revert. Same reasoning.
+  9. test_withdrawFromGateway_revertWhen_callerNotChainAdmin — prank from a non-admin instead of ownerWallet, expect the chain-admin access-control
+  revert from inside the chain-asset-handler's bridgeBurn.
+
+  Edge cases
+
+  10. test_gatewayNonEmptyPriorityQueueMigration_zeroNextLeaf — keep startIndex = 101 but set nextLeafIndex = 0 (queue is empty but tree has been
+  used historically). Asserts the migration tolerates getPriorityQueueSize() == 0 while getTotalPriorityTxs() == 101.
+  11. test_forwardToL2OnGateway_L2_repeatedForwardsAccumulate — call forwardTransactionOnGatewayWithBalanceChange three times; assert
+  getTotalPriorityTxs() increased by exactly 3 and three pairs of Mailbox events fired. Covers idempotency / monotonic-counter assumptions.
+
+  Adversarial
+
+  12. test_forwardToL2OnGateway_L2_revertOnStaleMigrationNumber — drop the migrationNumber mock so the real handler sees a stale/zero migration,
+  expect the migration-mismatch revert. Pairs with (6).
+  13. test_withdrawFromGateway_revertOnReplay — call the patched test_withdrawFromGateway flow, then invoke l2AssetRouter.withdraw again with the
+  same data; expect a revert (chain already mid-migration). Locks the no-double-withdraw invariant.
+
+*/
