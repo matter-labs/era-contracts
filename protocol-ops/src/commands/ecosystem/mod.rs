@@ -2,9 +2,7 @@ use clap::Subcommand;
 
 use crate::{
     commands::ecosystem::init::EcosystemInitArgs,
-    commands::ecosystem::upgrade::{
-        UpgradeGovernanceArgs, UpgradePrepareAllArgs, UpgradePrepareArgs,
-    },
+    commands::ecosystem::upgrade::{UpgradeGovernanceArgs, UpgradePrepareAllArgs},
 };
 
 pub(crate) mod init;
@@ -17,13 +15,6 @@ pub(crate) mod v31_upgrade_inner;
 pub enum EcosystemCommands {
     /// Initialize ecosystem
     Init(EcosystemInitArgs),
-    /// Legacy monolithic prepare: deploys core + one CTM in a single forge
-    /// invocation via `EcosystemUpgrade_v31`. Retained because the v31 fork
-    /// test in `l1-contracts/test/anvil-interop/` still drives this flow via
-    /// a memory-trimmed test subclass. New ecosystems should use
-    /// `upgrade-prepare-all`.
-    #[command(name = "upgrade-prepare")]
-    UpgradePrepare(UpgradePrepareArgs),
     /// Split-flow prepare: runs `CoreUpgrade_v31.noGovernancePrepare` once
     /// and `CTMUpgrade_v31.noGovernancePrepare` once per `--ctm-proxy`, all
     /// on a single anvil fork. Emits one combined deployer Safe bundle and
@@ -42,7 +33,6 @@ pub enum EcosystemCommands {
 pub(crate) async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
     match args {
         EcosystemCommands::Init(args) => init::run(args).await,
-        EcosystemCommands::UpgradePrepare(args) => upgrade::run_upgrade_prepare(args).await,
         EcosystemCommands::UpgradePrepareAll(args) => upgrade::run_upgrade_prepare_all(args).await,
         EcosystemCommands::UpgradeGovernance(args) => upgrade::run_upgrade_governance(args).await,
     }

@@ -56,8 +56,12 @@ const UPGRADE_TYPE_ZKOS_UNSAFE_FORCE_DEPLOY = 2;
 const anvilInteropDir = path.resolve(__dirname, "../..");
 const l1ContractsDir = path.resolve(anvilInteropDir, "../..");
 const contractsRootDir = path.resolve(l1ContractsDir, "..");
-const ECOSYSTEM_UPGRADE_TEST_SCRIPT =
-  "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:EcosystemUpgradeV31ForTests";
+// Memory-trimmed test variants of CoreUpgrade_v31 / CTMUpgrade_v31 used as
+// `--core-script-path` / `--ctm-script-path` overrides for `upgrade-prepare-all`.
+// Stage 3 still runs as a direct `forge script` invocation (no protocol-ops command),
+// against the same Core test variant which provides a no-arg `stage3()` wrapper.
+const CORE_UPGRADE_TEST_SCRIPT = "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:CoreUpgradeV31ForTests";
+const CTM_UPGRADE_TEST_SCRIPT = "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:CTMUpgradeV31ForTests";
 
 // Function selectors for the ComplexUpgrader entry points.
 // Used to decode the final L2 upgrade tx data (output of getL2UpgradeTxData).
@@ -131,17 +135,30 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       executeBundles: true,
     });
 
+    // `upgrade-prepare-all` writes per-step governance TOMLs into
+    // `<out>/governance-tomls/`. Pass them all to `upgrade-governance` so the
+    // resulting Safe bundle contains stage-0/1/2 calls from core + every CTM.
+    const prepareGovernanceTomlsDir = path.join(upgradeHarnessInputs.protocolOpsOutDir, "prepare", "governance-tomls");
+    const governanceTomlPaths = fs.existsSync(prepareGovernanceTomlsDir)
+      ? fs
+          .readdirSync(prepareGovernanceTomlsDir)
+          .filter((f) => f.endsWith(".toml"))
+          .sort()
+          .map((f) => path.join(prepareGovernanceTomlsDir, f))
+      : [];
+    if (governanceTomlPaths.length === 0) {
+      throw new Error(`No governance TOMLs emitted by upgrade-prepare-all in ${prepareGovernanceTomlsDir}`);
+    }
+
     // ── Execute governance calls (stages 0-2) via protocol-ops bundle ──
     console.log("\n── Replaying governance upgrade bundles ──");
     await runEcosystemGovernanceUpgrade({
       rpcUrl: l1Chain.rpcUrl,
       bridgehubAddress: upgradeHarnessInputs.bridgehubAddress,
-      governanceTomlPath: upgradeHarnessInputs.governanceTomlPath,
+      governanceTomlPaths,
       outDir: path.join(upgradeHarnessInputs.protocolOpsOutDir, "governance"),
       executeBundles: true,
     });
-
-    const outputToml = readEcosystemOutput(upgradeHarnessInputs.ecosystemOutputPath);
 
     // ── Prepare diamond state for chain upgrades ──
     if (scenario.clearGenesisUpgradeTxHash) {
@@ -153,8 +170,19 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       await seedBatchCounters(l1Provider, upgradeChainAddresses);
     }
     // ── Run per-chain upgrades (L1) and relay to L2 ──
+    // `default_upgrade_addr` now lives in the per-CTM output TOML written by
+    // `CTMUpgradeV31ForTests.saveOutput`. With one CTM, that's the single ctm
+    // toml in `governance-tomls/`. (The legacy "ecosystem combined output" no
+    // longer exists; orchestration was removed.)
+    const ctmTomlPath = path.join(
+      upgradeHarnessInputs.protocolOpsOutDir,
+      "prepare",
+      "governance-tomls",
+      `v31-upgrade-ctm-${upgradeHarnessInputs.ctmProxyAddress.toLowerCase()}.toml`
+    );
+    const ctmOutputToml = readEcosystemOutput(ctmTomlPath);
     const settlementLayerUpgradeAddr = readNestedString(
-      outputToml,
+      ctmOutputToml,
       ["state_transition", "default_upgrade_addr"],
       "SettlementLayerV31Upgrade address"
     );
@@ -172,7 +200,7 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
     // ── Stage 3: post-governance migration ──
     console.log("\n── Running stage3 post-governance migration ──");
     await runForgeScript({
-      scriptPath: ECOSYSTEM_UPGRADE_TEST_SCRIPT,
+      scriptPath: CORE_UPGRADE_TEST_SCRIPT,
       envVars: upgradeHarnessInputs.envVars,
       rpcUrl: l1Chain.rpcUrl,
       senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
@@ -349,10 +377,13 @@ export async function runEcosystemUpgradeScripts(params: {
   const prepareOutDir = path.join(params.upgradeHarnessInputs.protocolOpsOutDir, "prepare");
   fs.rmSync(prepareOutDir, { recursive: true, force: true });
 
+  // Pre-v31 ecosystems don't have `ctm.isZKsyncOS()` / bytecodes-supplier /
+  // rollup-DA-manager getters, so we pass the values from the snapshot config
+  // explicitly. On v31+ these would be auto-resolved.
   runProtocolOps(
     [
       "ecosystem",
-      "upgrade-prepare",
+      "upgrade-prepare-all",
       "--bridgehub",
       params.upgradeHarnessInputs.bridgehubAddress,
       "--l1-rpc-url",
@@ -361,6 +392,8 @@ export async function runEcosystemUpgradeScripts(params: {
       prepareOutDir,
       "--deployer-address",
       ANVIL_DEFAULT_ACCOUNT_ADDR,
+      "--ctm-proxy",
+      params.upgradeHarnessInputs.ctmProxyAddress,
       "--bytecodes-supplier-address",
       params.upgradeHarnessInputs.bytecodesSupplierAddress,
       "--rollup-da-manager-address",
@@ -371,14 +404,10 @@ export async function runEcosystemUpgradeScripts(params: {
       params.upgradeHarnessInputs.create2FactorySalt,
       "--upgrade-input-path",
       params.upgradeHarnessInputs.upgradeInputArg,
-      "--upgrade-output-path",
-      params.upgradeHarnessInputs.ecosystemOutputArg,
-      "--governance-toml-out",
-      params.upgradeHarnessInputs.governanceTomlPath,
-      "--script-path",
-      ECOSYSTEM_UPGRADE_TEST_SCRIPT,
-      "--ctm-proxy",
-      params.upgradeHarnessInputs.ctmProxyAddress,
+      "--core-script-path",
+      CORE_UPGRADE_TEST_SCRIPT,
+      "--ctm-script-path",
+      CTM_UPGRADE_TEST_SCRIPT,
       "--additional-args=--memory-limit=536870912",
     ],
     params.upgradeHarnessInputs.envVars
@@ -392,13 +421,18 @@ export async function runEcosystemUpgradeScripts(params: {
 export async function runEcosystemGovernanceUpgrade(params: {
   rpcUrl: string;
   bridgehubAddress: string;
-  governanceTomlPath: string;
+  /// One or more governance TOMLs (one for the core prepare + one per CTM prepare).
+  /// `upgrade-governance` orders calls by stage across all TOMLs and emits one bundle.
+  governanceTomlPaths: string[];
   outDir: string;
   executeBundles?: boolean;
 }): Promise<void> {
+  if (params.governanceTomlPaths.length === 0) {
+    throw new Error("runEcosystemGovernanceUpgrade requires at least one governance TOML");
+  }
   fs.rmSync(params.outDir, { recursive: true, force: true });
 
-  runProtocolOps([
+  const args: string[] = [
     "ecosystem",
     "upgrade-governance",
     "--bridgehub",
@@ -407,9 +441,11 @@ export async function runEcosystemGovernanceUpgrade(params: {
     params.rpcUrl,
     "--out",
     params.outDir,
-    "--governance-toml",
-    params.governanceTomlPath,
-  ]);
+  ];
+  for (const toml of params.governanceTomlPaths) {
+    args.push("--governance-toml", toml);
+  }
+  runProtocolOps(args);
 
   if (params.executeBundles) {
     await executeSafeBundles(params.outDir, params.rpcUrl);

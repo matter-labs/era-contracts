@@ -198,13 +198,34 @@ async function main(): Promise<void> {
     // `Governance.sol` — so protocol-ops' `resolve_governance_owner` (which does a two-level
     // `Ownable.owner()` hop) reverts. With `anvil --auto-impersonate` we can just send the
     // governance txs AS the handler address directly, which is what `executeGovernanceCalls` does.
+    //
+    // `upgrade-prepare-all` writes one TOML per script (core + per-CTM) into
+    // `<out>/governance-tomls/`. We replay stages by re-emitting all stage-0 calls
+    // across TOMLs, then all stage-1, then all stage-2 — matches protocol-ops'
+    // `replay_governance_stages` ordering.
     console.log(`\n=== Step 6: Executing governance calls (${elapsed()}) ===\n`);
-    const outputToml = readEcosystemOutput(upgradeHarnessInputs.ecosystemOutputPath);
-    const govCalls = outputToml.governance_calls as Record<string, string> | undefined;
-    if (!govCalls) {
-      throw new Error("No governance_calls section in ecosystem output");
+    const govTomlsDir = path.join(upgradeHarnessInputs.protocolOpsOutDir, "prepare", "governance-tomls");
+    const govTomls = fs.existsSync(govTomlsDir)
+      ? fs
+          .readdirSync(govTomlsDir)
+          .filter((f) => f.endsWith(".toml"))
+          .sort()
+          .map((f) => readEcosystemOutput(path.join(govTomlsDir, f)))
+      : [];
+    if (govTomls.length === 0) {
+      throw new Error(`No governance TOMLs emitted by upgrade-prepare-all in ${govTomlsDir}`);
     }
-    await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(govCalls.stage0_calls), "Stage 0");
+    const stageKeys = ["stage0_calls", "stage1_calls", "stage2_calls"] as const;
+    const stagesByToml = govTomls.map((toml) => {
+      const calls = toml.governance_calls as Record<string, string> | undefined;
+      if (!calls) {
+        throw new Error("Governance TOML missing governance_calls section");
+      }
+      return calls;
+    });
+    for (const calls of stagesByToml) {
+      await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(calls.stage0_calls), "Stage 0");
+    }
 
     // Stage 0 starts the GovernanceUpgradeTimer; stage 1's first governance call
     // is `checkDeadline()` which reverts unless `block.timestamp >= deadline`.
@@ -213,16 +234,24 @@ async function main(): Promise<void> {
     // anvil time past the deadline so stage 1 can proceed.
     await advanceL1TimePastUpgradeDeadline(l1Provider);
 
-    await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(govCalls.stage1_calls), "Stage 1");
-    await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(govCalls.stage2_calls), "Stage 2");
+    for (const calls of stagesByToml) {
+      await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(calls.stage1_calls), "Stage 1");
+    }
+    for (const calls of stagesByToml) {
+      await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(calls.stage2_calls), "Stage 2");
+    }
+    void stageKeys; // silence linter for unused import-style typing aid
 
     // NOTE: we intentionally skip clearGenesisUpgradeTxHash / seedBatchCounters that the
     // synthetic-state runner does — real forked chain state already has correct values for both.
 
     // ── Step 7: Per-chain ChainUpgrade_v31 + L2 relay ────────────
     console.log(`\n=== Step 7: Per-chain ChainUpgrade_v31 + L2 relay (${elapsed()}) ===\n`);
+    // `default_upgrade_addr` is in the per-CTM output TOML (one CTM in this fork test).
+    const ctmTomlPath = path.join(govTomlsDir, `v31-upgrade-ctm-${chainTypeManager.toLowerCase()}.toml`);
+    const ctmOutputToml = readEcosystemOutput(ctmTomlPath);
     const settlementLayerUpgradeAddr = readNestedString(
-      outputToml,
+      ctmOutputToml,
       ["state_transition", "default_upgrade_addr"],
       "SettlementLayerV31Upgrade address"
     );
@@ -240,7 +269,7 @@ async function main(): Promise<void> {
     // ── Step 8: Stage 3 post-governance migration ────────────────
     console.log(`\n=== Step 8: Running stage3 (${elapsed()}) ===\n`);
     await runForgeScript({
-      scriptPath: "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:EcosystemUpgradeV31ForTests",
+      scriptPath: "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:CoreUpgradeV31ForTests",
       envVars: upgradeHarnessInputs.envVars,
       rpcUrl: l1Chain.rpcUrl,
       senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,

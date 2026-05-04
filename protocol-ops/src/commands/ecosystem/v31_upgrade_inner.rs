@@ -39,6 +39,17 @@ pub struct V31PrepareInputs {
     pub core_script_path: String,
     /// `CTMUpgrade_v31` script path (relative to `l1-contracts/`).
     pub ctm_script_path: String,
+    /// Override for `isZKsyncOS`. The default behavior auto-resolves via
+    /// `ctm.isZKsyncOS()`, which is a v31+ getter — pre-v31 ecosystems must
+    /// pass this explicitly because the getter doesn't exist on the older CTM.
+    pub is_zk_sync_os_override: Option<bool>,
+    /// Override for the bytecodes supplier address. Auto-resolved from CTM on
+    /// v31+ ecosystems; pre-v31 callers must pass it explicitly.
+    pub bytecodes_supplier_override: Option<Address>,
+    /// Override for the rollup DA manager address. Auto-resolved from a
+    /// representative ZK chain on v31+ ecosystems; pre-v31 callers must
+    /// pass it explicitly.
+    pub rollup_da_manager_override: Option<Address>,
 }
 
 /// Output of the prepare phase: the TOMLs each forge invocation wrote, in
@@ -110,18 +121,31 @@ impl<'a> V31UpgradeInner<'a> {
         ensure_script_exists(self.contracts_path, &inputs.core_script_path)?;
 
         // CTM is needed only to resolve `isZKsyncOS` — Core itself is
-        // CTM-agnostic. Pick the first registered CTM as a witness.
-        let any_ctm =
-            crate::common::l1_contracts::discover_ctm_proxy(&runner.rpc_url, self.bridgehub)
-                .await
-                .context("Failed to discover any CTM on bridgehub")?;
-        let is_zk_sync_os =
-            crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, any_ctm)
+        // CTM-agnostic. Pick the first registered CTM as a witness, or skip
+        // entirely if the caller supplied an explicit override (required on
+        // pre-v31 ecosystems where the `ctm.isZKsyncOS()` getter does not exist).
+        let is_zk_sync_os = match inputs.is_zk_sync_os_override {
+            Some(v) => {
+                logger::info(format!("ZKsync OS (override): {v}"));
+                v
+            }
+            None => {
+                let any_ctm =
+                    crate::common::l1_contracts::discover_ctm_proxy(&runner.rpc_url, self.bridgehub)
+                        .await
+                        .context("Failed to discover any CTM on bridgehub")?;
+                let resolved = crate::common::l1_contracts::resolve_is_zksync_os(
+                    &runner.rpc_url,
+                    any_ctm,
+                )
                 .await
                 .context("Failed to resolve isZKsyncOS from CTM")?;
-        logger::info(format!(
-            "ZKsync OS (auto-resolved via CTM {any_ctm:#x}): {is_zk_sync_os}"
-        ));
+                logger::info(format!(
+                    "ZKsync OS (auto-resolved via CTM {any_ctm:#x}): {resolved}"
+                ));
+                resolved
+            }
+        };
 
         let upgrade_input = self
             .contracts_path
@@ -206,35 +230,66 @@ impl<'a> V31UpgradeInner<'a> {
             "CTM proxy: {ctm_proxy:#x} (representative chain {representative_chain})"
         ));
 
-        let bytecodes_supplier =
-            crate::common::l1_contracts::resolve_bytecodes_supplier(&runner.rpc_url, ctm_proxy)
+        let bytecodes_supplier = match inputs.bytecodes_supplier_override {
+            Some(addr) => {
+                logger::info(format!("Bytecodes supplier (override): {addr:#x}"));
+                addr
+            }
+            None => {
+                let resolved = crate::common::l1_contracts::resolve_bytecodes_supplier(
+                    &runner.rpc_url,
+                    ctm_proxy,
+                )
                 .await
                 .context("Failed to auto-resolve bytecodes supplier from CTM")?;
-        logger::info(format!(
-            "Bytecodes supplier (auto-resolved): {bytecodes_supplier:#x}"
-        ));
+                logger::info(format!("Bytecodes supplier (auto-resolved): {resolved:#x}"));
+                resolved
+            }
+        };
 
-        let is_zk_sync_os =
-            crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
+        let is_zk_sync_os = match inputs.is_zk_sync_os_override {
+            Some(v) => {
+                logger::info(format!("ZKsync OS (override): {v}"));
+                v
+            }
+            None => {
+                let resolved = crate::common::l1_contracts::resolve_is_zksync_os(
+                    &runner.rpc_url,
+                    ctm_proxy,
+                )
                 .await
                 .context("Failed to resolve isZKsyncOS from CTM")?;
-        logger::info(format!("ZKsync OS (auto-resolved): {is_zk_sync_os}"));
+                logger::info(format!("ZKsync OS (auto-resolved): {resolved}"));
+                resolved
+            }
+        };
 
-        let zk_chain = crate::common::l1_contracts::resolve_zk_chain(
-            &runner.rpc_url,
-            self.bridgehub,
-            representative_chain,
-        )
-        .await
-        .context("Failed to resolve ZK chain diamond proxy from bridgehub")?;
-        let rollup_da_manager =
-            crate::common::l1_contracts::resolve_rollup_da_manager(&runner.rpc_url, zk_chain)
+        let rollup_da_manager = match inputs.rollup_da_manager_override {
+            Some(addr) => {
+                logger::info(format!("RollupDAManager (override): {addr:#x}"));
+                addr
+            }
+            None => {
+                let zk_chain = crate::common::l1_contracts::resolve_zk_chain(
+                    &runner.rpc_url,
+                    self.bridgehub,
+                    representative_chain,
+                )
+                .await
+                .context("Failed to resolve ZK chain diamond proxy from bridgehub")?;
+                let resolved = crate::common::l1_contracts::resolve_rollup_da_manager(
+                    &runner.rpc_url,
+                    zk_chain,
+                )
                 .await
                 .context("Failed to auto-resolve RollupDAManager from ZK chain")?;
-        logger::info(format!(
-            "RollupDAManager (auto-resolved via chain {representative_chain}): \
-             {rollup_da_manager:#x}"
-        ));
+                logger::info(format!(
+                    "RollupDAManager (auto-resolved via chain {representative_chain}): \
+                     {resolved:#x}"
+                ));
+                resolved
+            }
+        };
 
         let governance =
             crate::common::l1_contracts::resolve_governance(&runner.rpc_url, self.bridgehub)

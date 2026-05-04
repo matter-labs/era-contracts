@@ -162,12 +162,6 @@ abigen!(
 );
 
 abigen!(
-    IUpgradeV31Abi,
-    "../l1-contracts/zkstack-out/IUpgradeV31.sol/IUpgradeV31.json",
-    event_derives(serde::Deserialize, serde::Serialize)
-);
-
-abigen!(
     ICoreUpgradeV31Abi,
     "../l1-contracts/zkstack-out/IUpgradeV31.sol/ICoreUpgradeV31.json",
     event_derives(serde::Deserialize, serde::Serialize)

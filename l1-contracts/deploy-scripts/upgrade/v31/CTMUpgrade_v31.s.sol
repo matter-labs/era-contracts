@@ -24,9 +24,9 @@ import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.
 /// @notice Script used for v31 upgrade flow
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     /// @notice Single-call entry point invoked by the protocol-ops CLI.
-    ///         One invocation per CTM (e.g. ZKsyncOS, EraVM) — combined with a separate
-    ///         `CoreUpgrade_v31.noGovernancePrepare` run on the same anvil session, this
-    ///         replaces the monolithic `EcosystemUpgrade_v31.noGovernancePrepare` flow.
+    ///         One invocation per CTM (e.g. ZKsyncOS, EraVM); combined with a separate
+    ///         `CoreUpgrade_v31.noGovernancePrepare` run on the same anvil session by
+    ///         `protocol-ops ecosystem upgrade-prepare-all`.
     function noGovernancePrepare(CTMUpgradeParams memory _params) public {
         initializeWithArgs(
             _params.ctmProxy,

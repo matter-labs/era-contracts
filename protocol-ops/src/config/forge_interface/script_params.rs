@@ -13,14 +13,10 @@ use crate::abi_contracts::{
 
 pub const ADMIN_FUNCTIONS_SCRIPT_PATH: &str = "deploy-scripts/AdminFunctions.s.sol";
 pub const FINALIZE_CHAIN_INIT_SCRIPT_PATH: &str = "deploy-scripts/chain/FinalizeChainInit.s.sol";
-pub const ECOSYSTEM_UPGRADE_V31_SCRIPT_PATH: &str =
-    "deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol";
 pub const CORE_UPGRADE_V31_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
 pub const CTM_UPGRADE_V31_SCRIPT_PATH: &str = "deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 pub const UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH: &str = "/upgrade-envs/v0.31.0-interopB/local.toml";
 pub const UPGRADE_V31_CORE_OUTPUT_PATH: &str = "/script-out/v31-upgrade-core.toml";
-pub const UPGRADE_V31_CTM_OUTPUT_PATH: &str = "/script-out/v31-upgrade-ctm.toml";
-pub const UPGRADE_V31_ECOSYSTEM_OUTPUT_PATH: &str = "/script-out/v31-upgrade-ecosystem.toml";
 pub const GATEWAY_UTILS_SCRIPT_TARGET_PATH: &str =
     "deploy-scripts/gateway/GatewayUtils.s.sol:GatewayUtils";
 pub const DEPLOY_GATEWAY_TRANSACTION_FILTERER_SCRIPT_TARGET_PATH: &str =

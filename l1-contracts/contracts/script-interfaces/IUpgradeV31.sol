@@ -2,21 +2,14 @@
 
 pragma solidity 0.8.28;
 
-import {
-    EcosystemUpgradeParams,
-    CoreUpgradeParams,
-    CTMUpgradeParams
-} from "deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
+import {CoreUpgradeParams, CTMUpgradeParams} from "deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IUpgradeV31 {
-    function noGovernancePrepare(EcosystemUpgradeParams memory _params) external;
-}
-
 /// @notice Standalone core ecosystem upgrade entry point.
-///         Pairs with `ICTMUpgradeV31` so the protocol-ops orchestrator can split the
-///         monolithic ecosystem upgrade into separate Core + per-CTM forge invocations.
+///         Pairs with `ICTMUpgradeV31`. The legacy single-shot ecosystem
+///         orchestrator was removed; protocol-ops now drives Core + per-CTM
+///         forge invocations directly via `upgrade-prepare-all`.
 interface ICoreUpgradeV31 {
     function noGovernancePrepare(CoreUpgradeParams memory _params) external;
 }
