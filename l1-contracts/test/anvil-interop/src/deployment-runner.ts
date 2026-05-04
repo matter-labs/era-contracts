@@ -20,7 +20,7 @@ import type {
 import { getChainIdsByRole, timeIt } from "./core/utils";
 import { getAbi, getCreationBytecode } from "./core/contracts";
 import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS, INTEROP_CENTER_ADDR } from "./core/const";
-import { getInteropTestPrivateKey, isLiveInteropMode } from "./core/accounts";
+import { getInteropSourcePrivateKey, isLiveInteropMode } from "./core/accounts";
 import { encodeNtvAssetId } from "./core/data-encoding";
 import { deployTestTokens } from "./helpers/deploy-test-token";
 import { depositERC20ToL2 } from "./helpers/l1-deposit-helper";
@@ -183,7 +183,7 @@ export class DeploymentRunner {
     ]);
 
     const l1RpcUrl = this.getRequiredEnv("LIVE_L1_RPC");
-    const privateKey = getInteropTestPrivateKey();
+    const privateKey = getInteropSourcePrivateKey();
 
     const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
     const l1ChainId = (await l1Provider.getNetwork()).chainId;

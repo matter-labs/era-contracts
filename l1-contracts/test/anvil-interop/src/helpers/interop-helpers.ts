@@ -9,7 +9,7 @@
 import type { providers, BigNumber } from "ethers";
 import { Contract, ethers, Wallet } from "ethers";
 import { getAbi, getCreationBytecode } from "../core/contracts";
-import { getInteropTestPrivateKey, isLiveInteropMode } from "../core/accounts";
+import { getInteropSourcePrivateKey, isLiveInteropMode } from "../core/accounts";
 import {
   DEFAULT_TX_GAS_LIMIT,
   INTEROP_BUNDLE_TUPLE_TYPE,
@@ -103,7 +103,7 @@ export interface InteropSendResult {
  * Returns the tx receipt and the extracted InteropBundle struct.
  */
 export async function sendInteropBundle(options: SendBundleOptions): Promise<InteropSendResult> {
-  const wallet = new Wallet(getInteropTestPrivateKey(), options.sourceProvider);
+  const wallet = new Wallet(getInteropSourcePrivateKey(), options.sourceProvider);
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
   const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
@@ -157,7 +157,7 @@ export async function sendInteropBundle(options: SendBundleOptions): Promise<Int
  * Simulate InteropCenter.sendBundle via callStatic to capture revert data without sending a tx.
  */
 export async function simulateInteropBundle(options: SendBundleOptions): Promise<void> {
-  const wallet = new Wallet(getInteropTestPrivateKey(), options.sourceProvider);
+  const wallet = new Wallet(getInteropSourcePrivateKey(), options.sourceProvider);
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
   const destinationChainIdBytes = encodeEvmChain(options.destinationChainId);
@@ -188,7 +188,7 @@ export interface SendMessageOptions {
  * Returns the tx receipt and the extracted InteropBundle struct (sendMessage wraps into a bundle).
  */
 export async function sendInteropMessage(options: SendMessageOptions): Promise<InteropSendResult> {
-  const wallet = new Wallet(getInteropTestPrivateKey(), options.sourceProvider);
+  const wallet = new Wallet(getInteropSourcePrivateKey(), options.sourceProvider);
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), wallet);
 
   const tx = await interopCenter.sendMessage(options.recipient, options.payload, options.attributes, {
@@ -280,7 +280,7 @@ export async function executeBundle(
   sourceChainId: number,
   gasLimit?: number
 ): Promise<ethers.providers.TransactionReceipt> {
-  const wallet = new Wallet(getInteropTestPrivateKey(), destProvider);
+  const wallet = new Wallet(getInteropSourcePrivateKey(), destProvider);
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
@@ -299,7 +299,7 @@ export async function simulateExecuteBundle(
   sourceChainId: number,
   gasLimit?: number
 ): Promise<void> {
-  const wallet = new Wallet(getInteropTestPrivateKey(), destProvider);
+  const wallet = new Wallet(getInteropSourcePrivateKey(), destProvider);
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
@@ -318,7 +318,7 @@ export async function verifyBundle(
   sourceChainId: number,
   signerKey?: string
 ): Promise<ethers.providers.TransactionReceipt> {
-  const wallet = new Wallet(signerKey || getInteropTestPrivateKey(), destProvider);
+  const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), destProvider);
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
   const { bundleData, proof } = await getInteropExecutionData(destProvider, bundleInput, sourceChainId);
 
@@ -352,7 +352,7 @@ export async function unbundleBundle(
   callStatuses: number[],
   signerKey?: string
 ): Promise<ethers.providers.TransactionReceipt> {
-  const wallet = new Wallet(signerKey || getInteropTestPrivateKey(), destProvider);
+  const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), destProvider);
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
 
   const tx = await interopHandler.unbundleBundle(bundleData, callStatuses, { gasLimit: DEFAULT_TX_GAS_LIMIT });
@@ -368,7 +368,7 @@ export async function simulateUnbundleBundle(
   callStatuses: number[],
   signerKey?: string
 ): Promise<void> {
-  const wallet = new Wallet(signerKey || getInteropTestPrivateKey(), destProvider);
+  const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), destProvider);
   const interopHandler = new Contract(L2_INTEROP_HANDLER_ADDR, getAbi("InteropHandler"), wallet);
 
   await interopHandler.callStatic.unbundleBundle(bundleData, callStatuses, { gasLimit: DEFAULT_TX_GAS_LIMIT });
@@ -446,7 +446,7 @@ export async function deployDummyInteropRecipient(
   provider: providers.JsonRpcProvider,
   signerKey?: string
 ): Promise<string> {
-  const wallet = new Wallet(signerKey || getInteropTestPrivateKey(), provider);
+  const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), provider);
   const factory = new ethers.ContractFactory(
     getAbi("DummyInteropRecipient"),
     getCreationBytecode("DummyInteropRecipient"),
@@ -468,7 +468,7 @@ export async function deployRevertingContract(
   provider: providers.JsonRpcProvider,
   signerKey?: string
 ): Promise<string> {
-  const wallet = new Wallet(signerKey || getInteropTestPrivateKey(), provider);
+  const wallet = new Wallet(signerKey || getInteropSourcePrivateKey(), provider);
   // Init code that returns 0x60006000fd as the deployed runtime code
   // PUSH5 0x60006000fd PUSH1 0x00 MSTORE PUSH1 0x05 PUSH1 0x1b RETURN
   const initCode = "0x6460006000fd6000526005601bf3";

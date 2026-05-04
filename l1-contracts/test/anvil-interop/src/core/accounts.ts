@@ -18,10 +18,6 @@ function getRequiredLiveEnv(name: string): string {
   return value;
 }
 
-export function getInteropTestPrivateKey(): string {
-  return getInteropSourcePrivateKey();
-}
-
 export function getInteropSourcePrivateKey(): string {
   if (isLiveInteropMode()) {
     return getRequiredLiveEnv("LIVE_SOURCE_PRIVATE_KEY");
@@ -29,12 +25,8 @@ export function getInteropSourcePrivateKey(): string {
   return process.env.ANVIL_INTEROP_PRIVATE_KEY?.trim() || ANVIL_DEFAULT_PRIVATE_KEY;
 }
 
-export function getInteropTestAddress(): string {
-  return getInteropSourceAddress();
-}
-
 export function getInteropSourceAddress(): string {
-  return new Wallet(getInteropTestPrivateKey()).address;
+  return new Wallet(getInteropSourcePrivateKey()).address;
 }
 
 export function getInteropUnbundlerPrivateKey(): string {

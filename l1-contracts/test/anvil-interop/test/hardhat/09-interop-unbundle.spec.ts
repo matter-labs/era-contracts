@@ -5,7 +5,7 @@ import { getChainIdsByRole, getL2Chain } from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
 import {
   getInteropRecipientAddress,
-  getInteropTestAddress,
+  getInteropSourceAddress,
   getInteropUnbundlerAddress,
   getInteropUnbundlerPrivateKey,
   isLiveInteropMode,
@@ -118,7 +118,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     sourceTokenAddress = state.testTokens[sourceChainId];
     sourceAssetId = await getAssetIdForToken(sourceProvider, sourceTokenAddress);
 
-    if (getInteropTestAddress().toLowerCase() === getInteropUnbundlerAddress().toLowerCase()) {
+    if (getInteropSourceAddress().toLowerCase() === getInteropUnbundlerAddress().toLowerCase()) {
       throw new Error("Unbundle tests require a distinct unbundler private key");
     }
 
@@ -183,7 +183,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const interopFee = await currentInteropFee();
     const valuePerBundle = baseAmount.add(interopFee.mul(callStarters.length));
 
-    const bundleAttributes = [executionAddressAttr(getInteropTestAddress())];
+    const bundleAttributes = [executionAddressAttr(getInteropSourceAddress())];
     if (opts.withUnbundlerAddress) {
       bundleAttributes.push(unbundlerAddressAttr(getInteropUnbundlerAddress()));
     }
@@ -449,7 +449,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
       },
     ];
 
-    const metaBundleAttributes = [executionAddressAttr(getInteropTestAddress())];
+    const metaBundleAttributes = [executionAddressAttr(getInteropSourceAddress())];
 
     // Resolve destination token address
     let destTokenAddress = await getTokenAddressForAsset(destProvider, sourceAssetId);

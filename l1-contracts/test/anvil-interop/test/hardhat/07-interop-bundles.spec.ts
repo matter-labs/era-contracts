@@ -7,8 +7,8 @@ import { getAbi, getCreationBytecode } from "../../src/core/contracts";
 import {
   getInteropRecipientAddress,
   getInteropSecondaryRecipientAddress,
-  getInteropTestAddress,
-  getInteropTestPrivateKey,
+  getInteropSourceAddress,
+  getInteropSourcePrivateKey,
   isLiveInteropMode,
 } from "../../src/core/accounts";
 import { INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
@@ -127,7 +127,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     name: string,
     symbol: string
   ): Promise<string> {
-    const wallet = new ethers.Wallet(getInteropTestPrivateKey(), provider);
+    const wallet = new ethers.Wallet(getInteropSourcePrivateKey(), provider);
     const factory = new ethers.ContractFactory(
       getAbi("TestnetERC20Token"),
       getCreationBytecode("TestnetERC20Token"),
@@ -283,7 +283,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
         expect(interopZkTokenAddress, "InteropCenter should resolve the seeded ZK token").to.equal(
           sourceZkTokenAddress
         );
-        const zkBalance = await getTokenBalance(sourceProvider, sourceZkTokenAddress, getInteropTestAddress());
+        const zkBalance = await getTokenBalance(sourceProvider, sourceZkTokenAddress, getInteropSourceAddress());
         if (zkBalance.isZero()) {
           console.warn("   ZK token balance is zero; fixed ZK fee tests will be skipped.");
         } else {
@@ -312,7 +312,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       },
     ];
 
-    const bundleAttributes = [executionAddressAttr(getInteropTestAddress())];
+    const bundleAttributes = [executionAddressAttr(getInteropSourceAddress())];
 
     const balBefore = await captureBalance(sourceProvider);
 
@@ -352,7 +352,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     }
 
     const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
-    const bundleAttributes = [executionAddressAttr(getInteropTestAddress()), useFixedFeeAttr(true)];
+    const bundleAttributes = [executionAddressAttr(getInteropSourceAddress()), useFixedFeeAttr(true)];
     const callStarters: CallStarter[] = [
       {
         to: encodeEvmAddress(dummyRecipient1),
@@ -361,7 +361,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       },
     ];
 
-    const zkBalance = await getTokenBalance(sourceProvider, sourceZkTokenAddress, getInteropTestAddress());
+    const zkBalance = await getTokenBalance(sourceProvider, sourceZkTokenAddress, getInteropSourceAddress());
     expect(
       zkBalance.gte(zkInteropFee),
       `single direct call fixed fee: sender ZK token balance ${zkBalance.toString()} is below required fee ${zkInteropFee.toString()}`
@@ -472,7 +472,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       },
     ];
 
-    const bundleAttributes = [executionAddressAttr(getInteropTestAddress())];
+    const bundleAttributes = [executionAddressAttr(getInteropSourceAddress())];
 
     const balBefore = await captureBalance(sourceProvider);
 
@@ -612,7 +612,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       },
     ];
 
-    const bundleAttributes = [executionAddressAttr(getInteropTestAddress())];
+    const bundleAttributes = [executionAddressAttr(getInteropSourceAddress())];
 
     const balBefore = await captureBalance(sourceProvider, sourceTokenAddress);
 
@@ -672,7 +672,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       },
     ];
 
-    const bundleAttributes = [executionAddressAttr(getInteropTestAddress())];
+    const bundleAttributes = [executionAddressAttr(getInteropSourceAddress())];
 
     const sendResult = await sendInteropBundle({
       sourceProvider,
@@ -734,7 +734,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
 
   it("accepts a bundle with zero calls", async () => {
     // The protocol allows empty bundles — they can be sent, verified, and executed.
-    const bundleAttributes = [executionAddressAttr(getInteropTestAddress())];
+    const bundleAttributes = [executionAddressAttr(getInteropSourceAddress())];
 
     const sendResult = await sendInteropBundle({
       sourceProvider,
@@ -766,7 +766,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       },
     ];
 
-    const bundleAttributes = [executionAddressAttr(getInteropTestAddress())];
+    const bundleAttributes = [executionAddressAttr(getInteropSourceAddress())];
 
     await expectRevert(
       () =>
@@ -803,7 +803,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       sourceTokenAddress: chainAToken,
       assetId: chainAAssetId,
       amount: ROUNDTRIP_TOKEN_TRANSFER_AMOUNT,
-      recipientAddress: getInteropTestAddress(),
+      recipientAddress: getInteropSourceAddress(),
       label: "chain A native token A->B interop",
     });
 
@@ -815,7 +815,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       sourceTokenAddress: chainBToken,
       assetId: chainAAssetId,
       amount: ROUNDTRIP_TOKEN_TRANSFER_AMOUNT,
-      recipientAddress: getInteropTestAddress(),
+      recipientAddress: getInteropSourceAddress(),
       label: "chain A native token B->A interop",
     });
 

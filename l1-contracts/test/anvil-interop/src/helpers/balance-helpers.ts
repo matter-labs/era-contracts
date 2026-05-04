@@ -10,7 +10,7 @@ import type { ContractName } from "../core/contracts";
 import type { providers } from "ethers";
 import { BigNumber, Contract, ethers, Wallet } from "ethers";
 import { getAbi } from "../core/contracts";
-import { getInteropTestPrivateKey } from "../core/accounts";
+import { getInteropSourcePrivateKey } from "../core/accounts";
 import { L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
 
 // ── Balance snapshot utilities ─────────────────────────────────
@@ -28,7 +28,7 @@ export async function captureBalance(
   provider: providers.JsonRpcProvider,
   tokenAddress?: string
 ): Promise<BalanceSnapshot> {
-  const wallet = new Wallet(getInteropTestPrivateKey(), provider);
+  const wallet = new Wallet(getInteropSourcePrivateKey(), provider);
   const native = await provider.getBalance(wallet.address);
 
   let token: BigNumber | undefined;
@@ -72,7 +72,7 @@ export async function approveToken(
   spender: string,
   amount: BigNumber
 ): Promise<void> {
-  const wallet = new Wallet(getInteropTestPrivateKey(), provider);
+  const wallet = new Wallet(getInteropSourcePrivateKey(), provider);
   const erc20 = new Contract(tokenAddress, getAbi("TestnetERC20Token"), wallet);
   const approveTx = await erc20.approve(spender, amount);
   await approveTx.wait();

@@ -4,7 +4,7 @@ import { ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { getChainIdsByRole, getL2Chain } from "../../src/core/utils";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
-import { getInteropRecipientAddress, getInteropTestAddress } from "../../src/core/accounts";
+import { getInteropRecipientAddress, getInteropSourceAddress } from "../../src/core/accounts";
 import { ETH_TOKEN_ADDRESS, INTEROP_CENTER_ADDR, L1_CHAIN_ID, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
 import { encodeEvmChainAddress } from "../../src/helpers/erc7930";
 import {
@@ -125,7 +125,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
         expect(interopZkTokenAddress, "InteropCenter should resolve the seeded ZK token").to.equal(
           sourceZkTokenAddress
         );
-        const zkBalance = await getTokenBalance(sourceProvider, sourceZkTokenAddress, getInteropTestAddress());
+        const zkBalance = await getTokenBalance(sourceProvider, sourceZkTokenAddress, getInteropSourceAddress());
         if (zkBalance.isZero()) {
           console.warn("   ZK token balance is zero; fixed ZK fee tests will be skipped.");
         } else {
@@ -201,7 +201,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     const payload = "0x";
     const attributes = [interopCallValueAttr(amount), useFixedFeeAttr(true)];
 
-    const zkBalance = await getTokenBalance(sourceProvider, sourceZkTokenAddress, getInteropTestAddress());
+    const zkBalance = await getTokenBalance(sourceProvider, sourceZkTokenAddress, getInteropSourceAddress());
     expect(
       zkBalance.gte(zkInteropFee),
       `fixed-fee base token message: sender ZK token balance ${zkBalance.toString()} is below required fee ${zkInteropFee.toString()}`
@@ -438,7 +438,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     }
 
     const bridgedAmount = ethers.utils.parseUnits("2", 18);
-    const bridgedBalance = await getTokenBalance(sourceProvider, bridgedTokenOnSource, getInteropTestAddress());
+    const bridgedBalance = await getTokenBalance(sourceProvider, bridgedTokenOnSource, getInteropSourceAddress());
 
     if (bridgedBalance.lt(bridgedAmount)) {
       console.log(`   Insufficient bridged token balance: have ${bridgedBalance}, need ${bridgedAmount}; skipping`);
@@ -454,7 +454,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
 
     await approveTokenForNtv(sourceProvider, bridgedTokenOnSource, bridgedAmount);
 
-    const balBefore = await getTokenBalance(sourceProvider, bridgedTokenOnSource, getInteropTestAddress());
+    const balBefore = await getTokenBalance(sourceProvider, bridgedTokenOnSource, getInteropSourceAddress());
 
     const result = await sendInteropMessage({
       sourceProvider,
@@ -467,7 +467,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     expect(result.txHash).to.be.a("string").and.not.equal("");
     expect(result.interopBundle).to.not.be.null;
 
-    const balAfter = await getTokenBalance(sourceProvider, bridgedTokenOnSource, getInteropTestAddress());
+    const balAfter = await getTokenBalance(sourceProvider, bridgedTokenOnSource, getInteropSourceAddress());
     expect(
       balAfter.eq(balBefore.sub(bridgedAmount)),
       "bridged ERC20 message: sender token should decrease by bridgedAmount"

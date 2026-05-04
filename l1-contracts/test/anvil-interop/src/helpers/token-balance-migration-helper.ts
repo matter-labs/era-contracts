@@ -15,7 +15,7 @@ import {
 } from "../core/utils";
 import { encodeNtvAssetId } from "../core/data-encoding";
 import type { ChainAddresses } from "../core/types";
-import { getInteropTestPrivateKey } from "../core/accounts";
+import { getInteropSourcePrivateKey } from "../core/accounts";
 import { waitForLiveFinalizeWithdrawalParams } from "./temp-sdk";
 
 const TBM_L1_RECEIVE_GAS_LIMIT = 10_000_000;
@@ -161,7 +161,7 @@ export async function migrateSpecificTokenBalanceToGW(
 ): Promise<TokenBalanceMigrationResult> {
   const log = params.logger || console.log;
   const timeoutMs = params.timeoutMs ?? DEFAULT_TBM_TIMEOUT_MS;
-  const privateKey = params.privateKey || getInteropTestPrivateKey();
+  const privateKey = params.privateKey || getInteropSourcePrivateKey();
   const l2Provider = new providers.JsonRpcProvider(params.l2RpcUrl);
   const l1Provider = new providers.JsonRpcProvider(params.l1RpcUrl);
   const l2Wallet = new Wallet(privateKey, l2Provider);
