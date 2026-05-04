@@ -72,15 +72,6 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         additionalEraForcedCoreContracts[0] = CoreContract.L2V31Upgrade;
     }
 
-    function getAdditionalFactoryDependencyContracts()
-        internal
-        override
-        returns (CoreContract[] memory additionalDependencyContracts)
-    {
-        additionalDependencyContracts = new CoreContract[](1);
-        additionalDependencyContracts[0] = CoreContract.L2V31Upgrade;
-    }
-
     function getL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual override returns (address, bytes memory) {

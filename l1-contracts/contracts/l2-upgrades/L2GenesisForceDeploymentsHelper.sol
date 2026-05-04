@@ -224,9 +224,10 @@ library L2GenesisForceDeploymentsHelper {
             (ZKChainSpecificForceDeploymentsData)
         );
 
-        if (_isZKsyncOS) {
-            _setupProxyAdmin();
-        }
+        // Keep SystemContractProxyAdmin initialized on both chain types for consistency.
+        // Era chains force-deploy system contracts directly and do not use the proxy-admin
+        // upgrade path; ZKsyncOS chains use SystemContractProxy instances and rely on it.
+        _setupProxyAdmin();
 
         // The aliased L1 governance address is used as the owner for all L2 contracts.
         // Validate it once here rather than at every individual initL2/updateL2 call site.

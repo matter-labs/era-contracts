@@ -144,8 +144,8 @@ library CoreOnGatewayHelper {
         bool _isZKsyncOS
     ) private pure returns (CoreContract[] memory dependencyContracts) {
         if (_isZKsyncOS) {
-            // Reuse the canonical "other built-in" list — the same contracts
-            // `buildZKsyncOSForceDeployments` force-deploys on L2 at upgrade
+            // Reuse the canonical fixed-address core contract list - the same contract
+            // IDs `getBaseZKsyncOSForceDeployments` upgrades on L2 at upgrade
             // time. Every bytecode hash the upgrade tx's force-deploy path
             // queries must appear in the tx's `factory_deps`, otherwise the
             // server has no way to know which `EVMBytecodePublished` events
@@ -154,13 +154,14 @@ library CoreOnGatewayHelper {
             //
             // Plus `UpgradeableBeaconDeployer`, which
             // `FixedForceDeploymentsData.beaconDeployerInfo` references but
-            // which isn't part of `getOtherBuiltinCoreContracts()`.
-            CoreContract[] memory builtins = SystemContractsProcessing.getOtherBuiltinCoreContracts();
-            dependencyContracts = new CoreContract[](builtins.length + 1);
-            for (uint256 i = 0; i < builtins.length; i++) {
-                dependencyContracts[i] = builtins[i];
+            // which is not one of the fixed-address core contracts.
+            CoreContract[] memory fixedAddressCoreContracts =
+                SystemContractsProcessing.getFixedAddressCoreContracts();
+            dependencyContracts = new CoreContract[](fixedAddressCoreContracts.length + 1);
+            for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
+                dependencyContracts[i] = fixedAddressCoreContracts[i];
             }
-            dependencyContracts[builtins.length] = CoreContract.UpgradeableBeaconDeployer;
+            dependencyContracts[fixedAddressCoreContracts.length] = CoreContract.UpgradeableBeaconDeployer;
             return dependencyContracts;
         }
 
