@@ -104,3 +104,45 @@ abstract contract L2WethTestAbstract is Test, SharedL2ContractDeployer {
         weth.bridgeBurn(address(1), 1);
     }
 }
+
+
+/* Coverage improvement suggestions
+  Happy-path
+
+  1. test_emitsDepositEvent — assert Deposit(address indexed dst, uint256 wad) (and Transfer(address(0), dst, wad) if the WETH inherits ERC20 mint
+  events) via vm.expectEmit on weth.deposit{value: amount}(). Today none of the deposit tests verify event emissions; only post-state balances. Same
+   gap on the withdraw side (Withdrawal event).
+  2. test_totalSupplyTracksDepositsAndWithdrawals — sequence: snapshot totalSupply() → deposit → assert +amount → withdraw → assert returns to
+  baseline. Catches "balance updated, totalSupply not" regressions which are a classic WETH foot-gun.
+  3. test_sequentialDepositsAccumulate — call deposit{value: a}() then deposit{value: b}() from the same sender; assert balanceOf(sender) == a + b.
+  Pins the additive update path against silent overwrites.
+
+  Unhappy-path
+
+  4. test_revertWhenDepositingToZeroAddress — call weth.depositTo{value: amount}(address(0)). Standard OZ ERC20 reverts on mint to zero; lock the
+  behavior here.
+  5. test_revertWhenWithdrawingToZeroAddress — call weth.withdrawTo(address(0), amount). Either reverts on the ETH transfer or silently burns;
+  whichever the design chose, pin it.
+  6. test_revertWhenCallingBridgeBurnFromAuthorizedRouter — symmetric to test_revertWhenCallingBridgeMint (L91-95) but for bridgeBurn. Currently
+  only the unauthorized-caller revert (test_revertWhenCallingBridgeBurnDirectly) is tested. If bridgeBurn from L2_ASSET_ROUTER_ADDR reverts with
+  BridgeMintNotImplemented-equivalent, lock it; if it succeeds, that's a different finding worth surfacing.
+  7. test_revertWhenDepositingZeroValue — call weth.deposit{value: 0}(). Decide intent: silent no-op (typical WETH9) or revert. Today neither is
+  locked.
+
+  Edge cases
+
+  8. test_withdrawZero — call weth.withdraw(0). Pin whether it's a no-op or emits a zero-value Withdrawal event.
+  9. test_depositOneWei — boundary at value = 1; assert balanceOf == 1 and totalSupply == 1.
+  10. test_withdrawAllAfterMultipleDeposits — deposit twice, withdraw the sum, assert balance and totalSupply are zero. Cross-checks accumulation
+  against drain.
+
+  Adversarial
+
+  11. test_withdrawTo_reentrancyOnRecipient — deploy a recipient contract whose receive() payable calls back into weth.withdraw(...) for the same
+  sender. Verify the second call either reverts (already-zero balance) or completes safely. Classic WETH reentrancy seam — pinning it documents the
+  intended behavior.
+  12. test_depositTo_recipientCannotFrontrunBalance — sender calls weth.depositTo{value: a}(receiver); before the call settles in the test scope,
+  snapshot weth.balanceOf(receiver) from a different observer to confirm there's no transient state observable. Pure paranoia / invariant lock;
+  lowest priority.
+
+*/
