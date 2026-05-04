@@ -54,8 +54,8 @@ uint256 constant FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 13;
 /// @dev Era runtime creation bytecodes published as factory deps but not force-deployed.
 uint256 constant RUNTIME_ONLY_FACTORY_DEPS_COUNT = 2;
 /// @dev Era factory deps: fixed-address core contracts plus runtime-only proxy creation bytecodes.
-uint256 constant ERA_FACTORY_DEPENDENCY_CONTRACTS_COUNT =
-    FIXED_ADDRESS_CORE_CONTRACTS_COUNT + RUNTIME_ONLY_FACTORY_DEPS_COUNT;
+uint256 constant ERA_FACTORY_DEPENDENCY_CONTRACTS_COUNT = FIXED_ADDRESS_CORE_CONTRACTS_COUNT +
+    RUNTIME_ONLY_FACTORY_DEPS_COUNT;
 /// @dev System contracts (0x800x) with l1-contracts EVM bytecodes for ZKsyncOS proxy upgrades.
 uint256 constant ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT = 3;
 
@@ -316,8 +316,8 @@ library SystemContractsProcessing {
         uint256 l1ChainId,
         address owner
     ) internal view returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
-        IL2ContractDeployer.ForceDeployment[] memory fixedAddressCoreForceDeployments =
-            getEraFixedAddressCoreContractForceDeployments(l1ChainId, owner);
+        IL2ContractDeployer.ForceDeployment[]
+            memory fixedAddressCoreForceDeployments = getEraFixedAddressCoreContractForceDeployments(l1ChainId, owner);
         IL2ContractDeployer.ForceDeployment[] memory systemForceDeployments = getSystemContractsForceDeployments();
 
         forceDeployments = mergeForceDeployments(systemForceDeployments, fixedAddressCoreForceDeployments);
@@ -359,7 +359,10 @@ library SystemContractsProcessing {
         bytes[] memory systemBytecodes = getSystemContractsBytecodes();
         bytes[] memory eraFactoryDependencyBytecodes = getEraFactoryDependencyBytecodes();
 
-        factoryDeps = mergeBytesArrays(mergeBytesArrays(basicBytecodes, systemBytecodes), eraFactoryDependencyBytecodes);
+        factoryDeps = mergeBytesArrays(
+            mergeBytesArrays(basicBytecodes, systemBytecodes),
+            eraFactoryDependencyBytecodes
+        );
     }
 
     /// @notice Build the base ZKsyncOS force deployment array.

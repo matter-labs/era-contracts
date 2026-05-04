@@ -155,8 +155,7 @@ library CoreOnGatewayHelper {
             // Plus `UpgradeableBeaconDeployer`, which
             // `FixedForceDeploymentsData.beaconDeployerInfo` references but
             // which is not one of the fixed-address core contracts.
-            CoreContract[] memory fixedAddressCoreContracts =
-                SystemContractsProcessing.getFixedAddressCoreContracts();
+            CoreContract[] memory fixedAddressCoreContracts = SystemContractsProcessing.getFixedAddressCoreContracts();
             dependencyContracts = new CoreContract[](fixedAddressCoreContracts.length + 1);
             for (uint256 i = 0; i < fixedAddressCoreContracts.length; i++) {
                 dependencyContracts[i] = fixedAddressCoreContracts[i];

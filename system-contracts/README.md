@@ -133,7 +133,6 @@ Typically, one test case corresponds to one main function call, possibly with ad
 Therefore, considering all the information above, we can say that it's almost unit tests over external functions.
 Many examples can be found in [test](test).
 
-
 ## Update Process
 
 System contracts handle core functionalities and play a critical role in maintaining the integrity of our protocol. To
