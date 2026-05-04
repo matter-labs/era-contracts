@@ -1,6 +1,206 @@
 [
   {
     "type": "function",
+    "name": "IS_SCRIPT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "deployNewEcosystemContractsL1",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getCTMUpgrade",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract DefaultCTMUpgrade"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getDiscoveredBridgehub",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct BridgehubAddresses",
+        "components": [
+          {
+            "name": "proxies",
+            "type": "tuple",
+            "internalType": "struct BridgehubContracts",
+            "components": [
+              {
+                "name": "bridgehub",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "messageRoot",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "ctmDeploymentTracker",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "chainAssetHandler",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "chainRegistrationSender",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "assetTracker",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
+          },
+          {
+            "name": "implementations",
+            "type": "tuple",
+            "internalType": "struct BridgehubContracts",
+            "components": [
+              {
+                "name": "bridgehub",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "messageRoot",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "ctmDeploymentTracker",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "chainAssetHandler",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "chainRegistrationSender",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "assetTracker",
+                "type": "address",
+                "internalType": "address"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getOwnerAddress",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "initializeWithArgs",
+    "inputs": [
+      {
+        "name": "_params",
+        "type": "tuple",
+        "internalType": "struct EcosystemUpgradeParams",
+        "components": [
+          {
+            "name": "bridgehubProxyAddress",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "ctmProxy",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "bytecodesSupplier",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "rollupDAManager",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "isZKsyncOS",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "create2FactorySalt",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "upgradeInputPath",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "ecosystemOutputPath",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "governance",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "zkTokenAssetId",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "noGovernancePrepare",
     "inputs": [
       {
@@ -59,6 +259,100 @@
             "internalType": "bytes32"
           }
         ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "prepareDefaultGovernanceCalls",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "stage0Calls",
+        "type": "tuple[]",
+        "internalType": "struct Call[]",
+        "components": [
+          {
+            "name": "target",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      },
+      {
+        "name": "stage1Calls",
+        "type": "tuple[]",
+        "internalType": "struct Call[]",
+        "components": [
+          {
+            "name": "target",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      },
+      {
+        "name": "stage2Calls",
+        "type": "tuple[]",
+        "internalType": "struct Call[]",
+        "components": [
+          {
+            "name": "target",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "value",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "prepareEcosystemUpgrade",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "stage3",
+    "inputs": [
+      {
+        "name": "bridgehubProxy",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
