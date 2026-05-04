@@ -3,7 +3,7 @@
 use std::str::FromStr;
 
 use crate::upgrade_verification::{
-    artifacts::PreparedUpgradeArtifacts, verifiers::VerificationResult,
+    artifacts::EcosystemUpgradeArtifact, verifiers::VerificationResult,
 };
 
 pub(crate) mod elements;
@@ -28,7 +28,7 @@ pub(crate) fn get_expected_old_protocol_version() -> ProtocolVersion {
 }
 
 pub(crate) async fn verify(
-    _artifacts: &PreparedUpgradeArtifacts,
+    _artifact: &EcosystemUpgradeArtifact,
     _l1_rpc_url: &str,
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
