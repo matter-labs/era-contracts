@@ -64,10 +64,8 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         url: runner.rpc_url.clone(),
     });
     script_args.add_arg(ForgeScriptArg::Ffi);
-    // `--broadcast` against the anvil fork. In this mode the
-    // target RPC is the anvil fork, so "broadcast" produces no real-chain
-    // effect — it just records the tx in forge's run file so protocol-ops can
-    // extract it into the Safe bundle.
+    // Broadcast against the anvil fork so Forge records txs into its run
+    // file — protocol-ops extracts those into the Safe bundle.
     script_args.add_arg(ForgeScriptArg::Broadcast);
     script_args.additional_args.extend([
         format!("{:#x}", admin_address),

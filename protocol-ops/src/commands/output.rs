@@ -110,12 +110,26 @@ where
             !shared.wallets_yaml.is_empty(),
             "--execute requires at least one --wallets-yaml"
         );
-        execute_safe::execute_manifest(
+        let result = execute_safe::execute_manifest(
             &bundle_dir.join("manifest.json"),
             &shared.wallets_yaml,
             &shared.l1_rpc_url,
         )
-        .await?;
+        .await;
+
+        if let Err(ref e) = result {
+            // Preserve the tmp dir on failure so the operator can inspect
+            // the prepared bundles for debugging.
+            if let Some(tmp) = tmp_dir {
+                let kept = tmp.keep();
+                logger::warn(format!(
+                    "--execute failed; bundles preserved at: {}",
+                    kept.display()
+                ));
+                logger::warn(format!("Error: {e:#}"));
+            }
+            return result;
+        }
     }
 
     // Drop tmp_dir last so the bundle stays around until dispatch completes.

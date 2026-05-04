@@ -77,11 +77,8 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
     script_args.add_arg(ForgeScriptArg::GasLimit {
         gas_limit: crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT,
     });
-    // `--broadcast` against the anvil fork. In this mode the
-    // target RPC is the anvil fork, so "broadcast" produces no real-chain
-    // effect — it just records the tx in forge's run file so protocol-ops can
-    // extract it into the Safe bundle. Without this the Safe output would be
-    // empty.
+    // Broadcast against the anvil fork so Forge records txs into its run
+    // file — protocol-ops extracts those into the Safe bundle.
     script_args.add_arg(ForgeScriptArg::Broadcast);
     script_args.additional_args.extend([
         format!("{:#x}", chain_address),

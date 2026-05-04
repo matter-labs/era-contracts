@@ -113,6 +113,9 @@ fn read_yaml_address(path: &Path, dotted_path: &[&str]) -> anyhow::Result<Addres
 /// than `configs/general.yaml`, because the latter only has `l2_chain_id`
 /// nested inside specific config sections, while the manifest exposes it
 /// as a top-level `chain_id` field.
+///
+/// Note: `DirEntry::file_type()` does not follow symlinks — symlinked
+/// chain directories are silently skipped.
 fn read_zkstack_chains(chains_dir: &Path) -> anyhow::Result<BTreeMap<String, u64>> {
     let mut chains = BTreeMap::new();
     let entries = std::fs::read_dir(chains_dir)
@@ -178,7 +181,7 @@ impl EcosystemArgs {
             (None, Some(d)) => Ecosystem::from_zkstack_dir(d),
             // clap's conflicts_with + required_unless_present forbid the
             // (Some, Some) and (None, None) cases.
-            _ => unreachable!("clap rejects neither/both --ecosystem and --zkstack-config-dir"),
+            _ => anyhow::bail!("exactly one of --ecosystem or --zkstack-config-dir must be provided"),
         }
     }
 }

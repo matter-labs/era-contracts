@@ -106,7 +106,7 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
         // clap's conflicts_with + required_unless_present prevents the
         // (None, None) and (Some, Some) cases.
         _ => {
-            unreachable!("clap should reject both/neither --safe-file and --manifest at parse time")
+            anyhow::bail!("exactly one of --safe-file or --manifest must be provided")
         }
     }
 }
@@ -259,9 +259,8 @@ async fn execute_one_bundle(
         // Estimate gas per tx so we don't trip node-side `gas limit too
         // high` rejections (reth caps tx gas at the current elastic block
         // gas limit, ~30M on a quiet local chain). Apply
-        // `GAS_ESTIMATE_BUFFER_BPS` headroom and bail if the result
-        // exceeds `PER_TX_GAS_LIMIT_CAP` — silently shipping past the cap
-        // would just OOG on-chain after a successful estimate.
+        // `GAS_ESTIMATE_BUFFER_BPS` headroom, clamped to
+        // `PER_TX_GAS_LIMIT_CAP` to stay below the block gas limit.
         let estimate_req: ethers::types::transaction::eip2718::TypedTransaction =
             TransactionRequest::new()
                 .from(from)
@@ -275,12 +274,7 @@ async fn execute_one_bundle(
             .with_context(|| format!("eth_estimateGas for Safe tx #{idx} (to {to:#x})"))?;
         let buffered =
             estimated.saturating_mul(U256::from(GAS_ESTIMATE_BUFFER_BPS)) / U256::from(10_000);
-        anyhow::ensure!(
-            buffered <= U256::from(PER_TX_GAS_LIMIT_CAP),
-            "Safe tx #{idx} (to {to:#x}) gas estimate {estimated} \
-             ({buffered} buffered) exceeds PER_TX_GAS_LIMIT_CAP {PER_TX_GAS_LIMIT_CAP}; \
-             refusing to submit since the cap would OOG on-chain"
-        );
+        let gas_limit = std::cmp::min(buffered, U256::from(PER_TX_GAS_LIMIT_CAP));
 
         let req = TransactionRequest::new()
             .from(from)
@@ -288,7 +282,7 @@ async fn execute_one_bundle(
             .data(data)
             .value(value)
             .chain_id(chain_id)
-            .gas(buffered)
+            .gas(gas_limit)
             .gas_price(1_000_000_000u64)
             .nonce(base_nonce + idx);
 
@@ -400,6 +394,11 @@ fn parse_wallets_yaml_files(paths: &[PathBuf]) -> anyhow::Result<HashMap<Address
 /// map. Supports both the OS test-repo two-level layout
 /// (`<section>.<role>: { address, private_key }`) and the zkstack
 /// one-level layout (`<role>: { address, private_key }`).
+///
+/// Note: the recursive walker matches any YAML mapping with both
+/// `address` and `private_key` string fields; it has no path awareness.
+/// Duplicate addresses within a single file are silently overwritten
+/// (last-writer-wins).
 fn parse_wallets_yaml(path: &Path) -> anyhow::Result<HashMap<Address, LocalWallet>> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("Failed to read wallets.yaml: {}", path.display()))?;

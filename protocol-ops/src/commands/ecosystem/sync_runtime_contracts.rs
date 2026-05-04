@@ -119,9 +119,15 @@ fn lookup_toml_string(value: &toml::Value, path: &[&str]) -> Option<String> {
 }
 
 /// Replace the value of the first line whose stripped-leading-whitespace
-/// content begins with `<field>:`. Preserves indentation, comments, and
-/// the rest of the file. Mirrors the per-line `sed -i` patching that
-/// downstream consumers had been doing in shell.
+/// content begins with `<field>:`. Preserves indentation and the rest of
+/// the file.
+///
+/// Limitations (acceptable for the current single-field use case):
+/// - Only the **first** occurrence of the field is patched; duplicates
+///   under other YAML sections are left stale.
+/// - Trailing inline comments on the patched line are dropped.
+/// If more fields are added to `SYNCED_FIELDS`, consider moving to a
+/// YAML-parse-modify-write approach.
 fn patch_yaml_field(path: &Path, field: &str, new_value: &str) -> anyhow::Result<()> {
     let content =
         std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;

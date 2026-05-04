@@ -44,12 +44,6 @@ pub struct ChainSetDaValidatorPairArgs {
     #[clap(long, value_enum)]
     pub l2_da_commitment_scheme: L2DACommitmentScheme,
 
-    /// AccessControlRestriction contract address. Defaults to `0x0…0` for
-    /// Ownable ChainAdmin deployments; pass explicitly when the chain uses
-    /// an ACR.
-    #[clap(long, default_value = "0x0000000000000000000000000000000000000000")]
-    pub access_control_restriction: Address,
-
     #[clap(flatten)]
     #[serde(flatten)]
     pub shared: SharedRunArgs,
@@ -61,7 +55,6 @@ struct ChainSetDaValidatorPairOutputPayload {
     admin_address: Address,
     l1_da_validator: Address,
     l2_da_commitment_scheme: L2DACommitmentScheme,
-    access_control_restriction: Address,
 }
 
 pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
@@ -93,19 +86,11 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
         url: runner.rpc_url.clone(),
     });
     script_args.add_arg(ForgeScriptArg::Ffi);
-    // `--broadcast` against the anvil fork. In this mode the target RPC is
-    // the anvil fork, so "broadcast" produces no real-chain effect — it
-    // just records the tx in forge's run file so protocol-ops can extract
-    // it into the Safe bundle. Without this the Safe output would be empty.
+    // Broadcast against the anvil fork so Forge records txs into its run
+    // file — protocol-ops extracts those into the Safe bundle.
     script_args.add_arg(ForgeScriptArg::Broadcast);
-    // Pass `_shouldSend = true` so `setDAValidatorPair` actually invokes
-    // `Utils.adminExecuteCalls` against the anvil fork. That call's
-    // broadcast records are what protocol-ops extracts into the Safe
-    // bundle; with `_shouldSend = false` the script writes its TOML output
-    // but never broadcasts, leaving the Safe bundle empty. The RPC is the
-    // anvil fork (not real L1), so this "broadcast" has no mainnet effect —
-    // the actual on-chain send happens later when the emitted Safe bundle
-    // is replayed via `dev execute-safe`.
+    // `_shouldSend = true` so the script actually invokes
+    // `Utils.adminExecuteCalls` and produces broadcast records.
     script_args.additional_args.extend([
         format!("{:#x}", eco.bridgehub),
         chain_id.to_string(),
@@ -129,10 +114,6 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
         "L2 DA commitment scheme: {} ({})",
         args.l2_da_commitment_scheme, args.l2_da_commitment_scheme as u8,
     ));
-    logger::info(format!(
-        "Access control restriction: {:#x}",
-        args.access_control_restriction
-    ));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
 
     runner
@@ -145,7 +126,6 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
         admin_address,
         l1_da_validator: args.l1_da_validator,
         l2_da_commitment_scheme: args.l2_da_commitment_scheme,
-        access_control_restriction: args.access_control_restriction,
     };
     write_output_if_requested(
         "chain.set-da-validator-pair",
