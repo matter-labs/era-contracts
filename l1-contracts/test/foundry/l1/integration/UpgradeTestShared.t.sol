@@ -218,8 +218,8 @@ contract UpgradeIntegrationTestBase is Test {
         for (uint256 i = 0; i < calls.length; i++) {
             Call memory call = calls[i];
 
-            (bool success, bytes memory data) = payable(call.target).call{value: call.value}(call.data);
-            require(success, "Multicall failed");
+            (bool success, ) = payable(call.target).call{value: call.value}(call.data);
+            assertTrue(success, "Multicall failed");
         }
 
         vm.stopBroadcast();
