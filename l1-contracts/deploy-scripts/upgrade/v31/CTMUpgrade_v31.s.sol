@@ -5,10 +5,7 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {
-    L2_COMPLEX_UPGRADER_ADDR,
-    L2_VERSION_SPECIFIC_UPGRADER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {Utils} from "../../utils/Utils.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
@@ -16,7 +13,6 @@ import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisFo
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
-import {EraForceDeploymentsLib} from "../default-upgrade/EraForceDeploymentsLib.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 
@@ -111,14 +107,12 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     function getEraL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal virtual override returns (address, bytes memory) {
-        bytes memory l2UpgradeCalldata = getV31L2UpgradeCalldata();
-
-        bytes memory complexUpgraderCalldata = abi.encodeCall(
-            IComplexUpgrader.forceDeployAndUpgrade,
-            (EraForceDeploymentsLib.unwrap(_deployments), L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
-        );
-
-        return (address(L2_COMPLEX_UPGRADER_ADDR), complexUpgraderCalldata);
+        return
+            getComplexUpgraderTargetAndData(
+                _deployments,
+                L2_VERSION_SPECIFIC_UPGRADER_ADDR,
+                getV31L2UpgradeCalldata()
+            );
     }
 
     /// @notice V31-specific: include L2V31Upgrade as an additional ZKsyncOS force deployment.
@@ -147,13 +141,6 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade");
         address delegateTo = L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo);
 
-        bytes memory l2UpgradeCalldata = getV31L2UpgradeCalldata();
-
-        bytes memory complexUpgraderCalldata = abi.encodeCall(
-            IComplexUpgrader.forceDeployAndUpgradeUniversal,
-            (_deployments, delegateTo, l2UpgradeCalldata)
-        );
-
-        return (address(L2_COMPLEX_UPGRADER_ADDR), complexUpgraderCalldata);
+        return getComplexUpgraderTargetAndData(_deployments, delegateTo, getV31L2UpgradeCalldata());
     }
 }

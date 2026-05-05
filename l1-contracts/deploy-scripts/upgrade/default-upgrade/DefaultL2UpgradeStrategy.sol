@@ -24,35 +24,24 @@ abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
         uint256 _l1ChainId,
         address _ownerAddress
     ) internal virtual override returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
-        if (config.isZKsyncOS) {
-            return getZKsyncOSUniversalForceDeployments();
-        }
-
-        return getEraUniversalForceDeployments(_l1ChainId, _ownerAddress);
-    }
-
-    function getEraUniversalForceDeployments(
-        uint256 _l1ChainId,
-        address _ownerAddress
-    ) internal virtual returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
         return
             SystemContractsProcessing.mergeUniversalForceDeployments(
-                EraForceDeploymentsLib.wrap(
-                    SystemContractsProcessing.getBaseForceDeployments(_l1ChainId, _ownerAddress)
-                ),
+                getBaseUniversalForceDeployments(_l1ChainId, _ownerAddress),
                 getAdditionalUniversalForceDeployments()
             );
     }
 
-    function getZKsyncOSUniversalForceDeployments()
-        internal
-        virtual
-        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
-    {
+    function getBaseUniversalForceDeployments(
+        uint256 _l1ChainId,
+        address _ownerAddress
+    ) internal virtual returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments) {
+        if (config.isZKsyncOS) {
+            return SystemContractsProcessing.getBaseZKsyncOSForceDeployments();
+        }
+
         return
-            SystemContractsProcessing.mergeUniversalForceDeployments(
-                SystemContractsProcessing.getBaseZKsyncOSForceDeployments(),
-                getAdditionalUniversalForceDeployments()
+            EraForceDeploymentsLib.wrap(
+                SystemContractsProcessing.getBaseForceDeployments(_l1ChainId, _ownerAddress)
             );
     }
 
@@ -68,6 +57,27 @@ abstract contract DefaultL2UpgradeStrategy is CTMUpgradeBase {
 
     function getUpgradeTxType() internal virtual override returns (uint256) {
         return UpgradeHelperLib.getUpgradeTxType(config.isZKsyncOS);
+    }
+
+    function getComplexUpgraderTargetAndData(
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments,
+        address _delegateTo,
+        bytes memory _upgradeCalldata
+    ) internal view returns (address, bytes memory) {
+        bytes memory complexUpgraderCalldata;
+        if (config.isZKsyncOS) {
+            complexUpgraderCalldata = abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgradeUniversal,
+                (_deployments, _delegateTo, _upgradeCalldata)
+            );
+        } else {
+            complexUpgraderCalldata = abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgrade,
+                (EraForceDeploymentsLib.unwrap(_deployments), _delegateTo, _upgradeCalldata)
+            );
+        }
+
+        return (address(L2_COMPLEX_UPGRADER_ADDR), complexUpgraderCalldata);
     }
 
     /// @notice Get Era L2 upgrade target and data.

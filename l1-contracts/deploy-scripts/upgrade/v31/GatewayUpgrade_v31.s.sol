@@ -5,15 +5,11 @@ pragma solidity 0.8.28;
 
 import {Script} from "forge-std/Script.sol";
 
-import {
-    L2_COMPLEX_UPGRADER_ADDR,
-    L2_VERSION_SPECIFIC_UPGRADER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
-import {EraForceDeploymentsLib} from "../default-upgrade/EraForceDeploymentsLib.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {DefaultGatewayUpgrade} from "../default-upgrade/DefaultGatewayUpgrade.s.sol";
 
@@ -56,26 +52,22 @@ contract GatewayUpgrade_v31 is Script, DefaultGatewayUpgrade {
     function getEraL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal view override returns (address, bytes memory) {
-        bytes memory l2V31UpgradeCalldata = getV31L2UpgradeCalldata();
-
-        bytes memory complexUpgraderCalldata = abi.encodeCall(
-            IComplexUpgrader.forceDeployAndUpgrade,
-            (EraForceDeploymentsLib.unwrap(_deployments), L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2V31UpgradeCalldata)
-        );
-
-        return (address(L2_COMPLEX_UPGRADER_ADDR), complexUpgraderCalldata);
+        return
+            getComplexUpgraderTargetAndData(
+                _deployments,
+                L2_VERSION_SPECIFIC_UPGRADER_ADDR,
+                getV31L2UpgradeCalldata()
+            );
     }
 
     function getZKsyncOSL2UpgradeTargetAndData(
         IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
     ) internal view override returns (address, bytes memory) {
-        bytes memory l2V31UpgradeCalldata = getV31L2UpgradeCalldata();
-
-        bytes memory complexUpgraderCalldata = abi.encodeCall(
-            IComplexUpgrader.forceDeployAndUpgradeUniversal,
-            (_deployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2V31UpgradeCalldata)
-        );
-
-        return (address(L2_COMPLEX_UPGRADER_ADDR), complexUpgraderCalldata);
+        return
+            getComplexUpgraderTargetAndData(
+                _deployments,
+                L2_VERSION_SPECIFIC_UPGRADER_ADDR,
+                getV31L2UpgradeCalldata()
+            );
     }
 }
