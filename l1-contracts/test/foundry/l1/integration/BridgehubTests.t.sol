@@ -34,13 +34,14 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
-    uint256 constant TEST_USERS_COUNT = 10;
+import {LogFinder} from "test-utils/LogFinder.sol";
 
-    bytes32 constant NEW_PRIORITY_REQUEST_HASH =
-        keccak256(
-            "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])"
-        );
+import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
+
+contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+    using LogFinder for Vm.Log[];
+
+    uint256 constant TEST_USERS_COUNT = 10;
 
     enum RequestType {
         DIRECT,
@@ -234,25 +235,21 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
     }
 
     // gets event from logs
-    function _getNewPriorityQueueFromLogs(Vm.Log[] memory logs) internal returns (NewPriorityRequest memory request) {
-        for (uint256 i = 0; i < logs.length; i++) {
-            Vm.Log memory log = logs[i];
+    function _getNewPriorityQueueFromLogs(
+        Vm.Log[] memory logs
+    ) internal pure returns (NewPriorityRequest memory request) {
+        Vm.Log memory log = logs.requireOne(NEW_PRIORITY_REQUEST_SIGNATURE);
 
-            if (log.topics[0] == NEW_PRIORITY_REQUEST_HASH) {
-                (
-                    request.txId,
-                    request.txHash,
-                    request.expirationTimestamp,
-                    request.transaction,
-                    request.factoryDeps
-                ) = abi.decode(log.data, (uint256, bytes32, uint64, L2CanonicalTransaction, bytes[]));
-            }
-        }
+        (request.txId, request.txHash, request.expirationTimestamp, request.transaction, request.factoryDeps) = abi
+            .decode(log.data, (uint256, bytes32, uint64, L2CanonicalTransaction, bytes[]));
     }
 
-    // deposits ERC20 token to the ZK chain where base token is ETH
-    // this function use requestL2TransactionTwoBridges function from shared bridge.
-    // tokenAddress should be any ERC20 token, excluding ETH
+    /// @notice Deposits an ERC20 token to a ZK chain that uses ETH as its base token,
+    /// using the TwoBridges path.
+    /// @dev ETH is sent as `msg.value` to cover the base token gas cost (`mintValue`).
+    /// The ERC20 token is transferred via the second bridge by approving the shared bridge
+    /// and encoding the token address and amount in `secondBridgeCalldata`.
+    /// Updates per-user, per-chain, and global deposit tracking for both ETH and the ERC20.
     function depositERC20ToEthChain(uint256 l2Value, address tokenAddress) private useGivenToken(tokenAddress) {
         uint256 gasPrice = 10000000;
         vm.txGasPrice(gasPrice);
@@ -271,6 +268,9 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         currentToken.mint(currentUser, l2Value);
         currentToken.approve(address(addresses.sharedBridge), l2Value);
 
+        uint256 userEthBefore = currentUser.balance;
+        uint256 userTokenBefore = currentToken.balanceOf(currentUser);
+
         bytes memory secondBridgeCallData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
         L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
             _chainId: currentChainId,
@@ -288,8 +288,35 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
-        assertNotEq(resultantHash, bytes32(0));
-        assertNotEq(request.txHash, bytes32(0));
+        // Verify return value and tx hash
+        assertNotEq(resultantHash, bytes32(0), "Resultant hash should not be zero");
+        assertNotEq(request.txHash, bytes32(0), "Priority tx hash should not be zero");
+
+        // Verify balances
+        // ETH consumed for base token gas
+        assertEq(currentUser.balance, userEthBefore - mintValue, "User ETH should decrease by mintValue");
+        // ERC20 consumed for the second bridge deposit
+        assertEq(
+            currentToken.balanceOf(currentUser),
+            userTokenBefore - l2Value,
+            "User ERC20 should decrease by l2Value"
+        );
+
+        // Verify tx fields
+        assertEq(request.transaction.reserved[0], mintValue, "Mint value should match");
+
+        // Verify BridgehubDepositBaseTokenInitiated event emission (ETH base token)
+        Vm.Log memory baseTokenLog = logs.requireOne(
+            "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
+        );
+        assertEq(uint256(baseTokenLog.topics[1]), currentChainId, "Base token deposit event chainId mismatch");
+
+        // Verify BridgehubDepositInitiated event emission (ERC20 second bridge)
+        Vm.Log memory depositInitiatedLog = logs.requireOne(
+            "BridgehubDepositInitiated(uint256,bytes32,address,bytes32,bytes)"
+        );
+        assertEq(uint256(depositInitiatedLog.topics[1]), currentChainId, "Deposit initiated event chainId mismatch");
+
         _handleRequestByMockL2Contract(request, RequestType.TWO_BRIDGES);
 
         depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += mintValue;
@@ -302,8 +329,11 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         l2ValuesSum[currentTokenAddress] += l2Value;
     }
 
-    // deposits ETH token to chain where base token is some ERC20
-    // modifier prevents you from using some other token as base
+    /// @notice Deposits ETH to a ZK chain that uses an ERC20 as its base token,
+    /// using the TwoBridges path.
+    /// @dev The ERC20 base token is minted and approved for `mintValue` (gas costs).
+    /// ETH is sent as `secondBridgeValue` via `msg.value`. This is a dual-token flow:
+    /// ERC20 pays for L2 gas, ETH is the actual deposit value.
     function depositEthToERC20Chain(uint256 l2Value) private useBaseToken {
         uint256 gasPrice = 10000000;
         vm.txGasPrice(gasPrice);
@@ -320,6 +350,9 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         uint256 mintValue = minRequiredGas;
         currentToken.mint(currentUser, mintValue);
         currentToken.approve(address(addresses.sharedBridge), mintValue);
+
+        uint256 userEthBefore = currentUser.balance;
+        uint256 userTokenBefore = currentToken.balanceOf(currentUser);
 
         bytes memory secondBridgeCallData = abi.encode(ETH_TOKEN_ADDRESS, uint256(0), chainContracts[currentChainId]);
         L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
@@ -338,8 +371,35 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
-        assertNotEq(resultantHash, bytes32(0));
-        assertNotEq(request.txHash, bytes32(0));
+        // Verify return value and tx hash
+        assertNotEq(resultantHash, bytes32(0), "Resultant hash should not be zero");
+        assertNotEq(request.txHash, bytes32(0), "Priority tx hash should not be zero");
+
+        // Verify balances
+        // ETH consumed via secondBridgeValue
+        assertEq(currentUser.balance, userEthBefore - l2Value, "User ETH should decrease by l2Value");
+        // ERC20 base token consumed for gas (mintValue)
+        assertEq(
+            currentToken.balanceOf(currentUser),
+            userTokenBefore - mintValue,
+            "User ERC20 base token should decrease by mintValue"
+        );
+
+        // Verify tx fields
+        assertEq(request.transaction.reserved[0], mintValue, "Mint value should match");
+
+        // Verify BridgehubDepositBaseTokenInitiated event emission (ERC20 base token)
+        Vm.Log memory baseTokenLog = logs.requireOne(
+            "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
+        );
+        assertEq(uint256(baseTokenLog.topics[1]), currentChainId, "Base token deposit event chainId mismatch");
+
+        // Verify BridgehubDepositInitiated event emission (ETH second bridge)
+        Vm.Log memory depositInitiatedLog = logs.requireOne(
+            "BridgehubDepositInitiated(uint256,bytes32,address,bytes32,bytes)"
+        );
+        assertEq(uint256(depositInitiatedLog.topics[1]), currentChainId, "Deposit initiated event chainId mismatch");
+
         _handleRequestByMockL2Contract(request, RequestType.TWO_BRIDGES);
 
         depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += l2Value;
@@ -352,9 +412,12 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         tokenSumDeposit[currentTokenAddress] += mintValue;
     }
 
-    // deposits ERC20 to token with base being also ERC20
-    // there are no modifiers so watch out, baseTokenAddress should be base of ZK chain
-    // currentToken should be different from base
+    /// @notice Deposits an ERC20 token to a ZK chain that also uses an ERC20 as its base token,
+    /// using the TwoBridges path.
+    /// @dev Two separate ERC20 tokens are involved: the base token (for gas via `mintValue`)
+    /// and the deposit token (for the L2 value via `secondBridgeCalldata`). Both are minted
+    /// and approved independently. No ETH is sent with the call.
+    /// Caller is responsible for ensuring `currentToken` differs from `baseTokenAddress`.
     function depositERC20ToERC20Chain(uint256 l2Value, address baseTokenAddress) private {
         uint256 gasPrice = 10000000;
         vm.txGasPrice(gasPrice);
@@ -376,6 +439,9 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         currentToken.mint(currentUser, l2Value);
         currentToken.approve(address(addresses.sharedBridge), l2Value);
 
+        uint256 userBaseBefore = baseToken.balanceOf(currentUser);
+        uint256 userTokenBefore = currentToken.balanceOf(currentUser);
+
         bytes memory secondBridgeCallData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
         L2TransactionRequestTwoBridgesOuter memory requestTx = _createL2TransactionRequestTwoBridges({
             _chainId: currentChainId,
@@ -393,8 +459,44 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
-        assertNotEq(resultantHash, bytes32(0));
-        assertNotEq(request.txHash, bytes32(0));
+        // Verify return value and tx hash
+        assertNotEq(resultantHash, bytes32(0), "Resultant hash should not be zero");
+        assertNotEq(request.txHash, bytes32(0), "Priority tx hash should not be zero");
+
+        // Verify balances
+        assertEq(
+            baseToken.balanceOf(currentUser),
+            userBaseBefore - mintValue,
+            "User base token should decrease by mintValue"
+        );
+        assertEq(
+            currentToken.balanceOf(currentUser),
+            userTokenBefore - l2Value,
+            "User deposit token should decrease by l2Value"
+        );
+
+        // Verify tx fields
+        assertEq(request.transaction.reserved[0], mintValue, "Mint value should match");
+
+        {
+            // Code block to avoid stack too deep
+            // Verify BridgehubDepositBaseTokenInitiated event emission (ERC20 base)
+            Vm.Log memory baseTokenLog = logs.requireOne(
+                "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
+            );
+            assertEq(uint256(baseTokenLog.topics[1]), currentChainId, "Base token deposit event chainId mismatch");
+
+            // Verify BridgehubDepositInitiated event emission (ERC20 second bridge)
+            Vm.Log memory depositInitiatedLog = logs.requireOne(
+                "BridgehubDepositInitiated(uint256,bytes32,address,bytes32,bytes)"
+            );
+            assertEq(
+                uint256(depositInitiatedLog.topics[1]),
+                currentChainId,
+                "Deposit initiated event chainId mismatch"
+            );
+        }
+
         _handleRequestByMockL2Contract(request, RequestType.TWO_BRIDGES);
 
         depositsUsers[currentUser][baseTokenAddress] += mintValue;
@@ -407,12 +509,14 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         l2ValuesSum[currentTokenAddress] += l2Value;
     }
 
-    // deposits ETH to ZK chain where base is ETH
+    /// @notice Deposits ETH to a ZK chain that uses ETH as its base token, using the Direct path.
+    /// @dev The full `mintValue` (l2Value + gas) is sent as `msg.value` via
+    /// `requestL2TransactionDirect`. The user is dealt exactly `mintValue` in ETH beforehand.
     function depositEthBase(uint256 l2Value) private {
         uint256 gasPrice = 10000000;
         vm.txGasPrice(gasPrice);
 
-        uint256 l2GasLimit = 1000000; // reverts with 8
+        uint256 l2GasLimit = 1000000;
         uint256 minRequiredGas = _getMinRequiredGasPriceForChain(
             currentChainId,
             gasPrice,
@@ -422,6 +526,8 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         uint256 mintValue = l2Value + minRequiredGas;
         vm.deal(currentUser, mintValue);
+
+        uint256 userEthBefore = currentUser.balance;
 
         bytes memory callData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
         L2TransactionRequestDirect memory txRequest = _createL2TransactionRequestDirect({
@@ -439,8 +545,28 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
-        assertNotEq(resultantHash, bytes32(0));
-        assertNotEq(request.txHash, bytes32(0));
+        // Verify return value and tx hash
+        assertNotEq(resultantHash, bytes32(0), "Resultant hash should not be zero");
+        assertNotEq(request.txHash, bytes32(0), "Priority tx hash should not be zero");
+
+        // Verify balances
+        assertEq(currentUser.balance, userEthBefore - mintValue, "User ETH should decrease by mintValue");
+
+        // Verify tx fields
+        assertEq(
+            address(uint160(request.transaction.to)),
+            chainContracts[currentChainId],
+            "L2 contract should match chain's registered contract"
+        );
+        assertEq(request.transaction.value, l2Value, "L2 value should match");
+        assertEq(request.transaction.reserved[0], mintValue, "Mint value should match");
+
+        // Verify BridgehubDepositBaseTokenInitiated event emission
+        Vm.Log memory depositLog = logs.requireOne(
+            "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
+        );
+        assertEq(uint256(depositLog.topics[1]), currentChainId, "Deposit event chainId mismatch");
+
         _handleRequestByMockL2Contract(request, RequestType.DIRECT);
 
         depositsUsers[currentUser][ETH_TOKEN_ADDRESS] += mintValue;
@@ -449,7 +575,10 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         l2ValuesSum[ETH_TOKEN_ADDRESS] += l2Value;
     }
 
-    // deposits base ERC20 token to the bridge
+    /// @notice Deposits an ERC20 base token to its own ZK chain using the Direct path.
+    /// @dev The ERC20 base token is minted and approved for `mintValue` (l2Value + gas).
+    /// No ETH is sent with the Direct call since the base token is ERC20. A small amount
+    /// of ETH is dealt to the user for L1 gas only (`vm.deal(currentUser, gasPrice)`).
     function depositERC20Base(uint256 l2Value) private useBaseToken {
         uint256 gasPrice = 10000000;
         vm.txGasPrice(gasPrice);
@@ -467,6 +596,9 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         currentToken.mint(currentUser, mintValue);
         currentToken.approve(address(addresses.sharedBridge), mintValue);
 
+        uint256 userTokenBefore = currentToken.balanceOf(currentUser);
+        uint256 userEthBefore = currentUser.balance;
+
         bytes memory callData = abi.encode(currentTokenAddress, l2Value, chainContracts[currentChainId]);
         L2TransactionRequestDirect memory txRequest = _createL2TransactionRequestDirect({
             _chainId: currentChainId,
@@ -483,8 +615,34 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
-        assertNotEq(resultantHash, bytes32(0));
-        assertNotEq(request.txHash, bytes32(0));
+        // Verify return value and tx hash
+        assertNotEq(resultantHash, bytes32(0), "Resultant hash should not be zero");
+        assertNotEq(request.txHash, bytes32(0), "Priority tx hash should not be zero");
+
+        // Verify balances
+        assertEq(
+            currentToken.balanceOf(currentUser),
+            userTokenBefore - mintValue,
+            "User ERC20 balance should decrease by mintValue"
+        );
+        // No ETH should be consumed (ERC20 base token chain, no {value} sent)
+        assertEq(currentUser.balance, userEthBefore, "User ETH balance should remain unchanged");
+
+        // Verify tx fields
+        assertEq(
+            address(uint160(request.transaction.to)),
+            chainContracts[currentChainId],
+            "L2 contract should match chain's registered contract"
+        );
+        assertEq(request.transaction.value, l2Value, "L2 value should match");
+        assertEq(request.transaction.reserved[0], mintValue, "Mint value should match");
+
+        // Verify BridgehubDepositBaseTokenInitiated event emission
+        Vm.Log memory depositLog = logs.requireOne(
+            "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
+        );
+        assertEq(uint256(depositLog.topics[1]), currentChainId, "Deposit event chainId mismatch");
+
         _handleRequestByMockL2Contract(request, RequestType.DIRECT);
 
         depositsUsers[currentUser][currentTokenAddress] += mintValue;
@@ -493,6 +651,13 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         l2ValuesSum[currentTokenAddress] += l2Value;
     }
 
+    /// @notice Finalizes an ERC20 token withdrawal from L2 to L1 via the shared bridge.
+    /// @dev Constructs an L2-to-L1 message with `IL1ERC20Bridge.finalizeWithdrawal` selector,
+    /// mocks the L2 message inclusion proof on the bridgehub, then calls
+    /// `sharedBridge.finalizeWithdrawal`. The `isWithdrawalFinalized` flag is force-set to
+    /// false via `stdstore` before the call to allow repeated invocations with the same params.
+    /// Mock justification: L2 proof verification is mocked because L2 batch commitments and
+    /// merkle trees are unavailable in this L1-only integration test environment.
     function withdrawERC20Token(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {
         uint256 l2BatchNumber = uint256(uint160(makeAddr("l2BatchNumber")));
         uint256 l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
@@ -501,7 +666,8 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
         uint256 beforeChainBalance = addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
-        uint256 beforeBalance = currentToken.balanceOf(address(addresses.sharedBridge));
+        uint256 beforeBridgeBalance = currentToken.balanceOf(address(addresses.sharedBridge));
+        uint256 beforeUserBalance = currentToken.balanceOf(currentUser);
 
         if (beforeChainBalance < amountToWithdraw) {
             vm.expectRevert("L1AR: not enough funds 2");
@@ -536,6 +702,7 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             abi.encode(true)
         );
 
+        vm.recordLogs();
         addresses.sharedBridge.finalizeWithdrawal({
             _chainId: currentChainId,
             _l2BatchNumber: l2BatchNumber,
@@ -545,16 +712,45 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             _merkleProof: merkleProof
         });
 
-        // check if the balance was updated correctly
-        if (beforeChainBalance > amountToWithdraw) {
-            assertEq(
-                beforeChainBalance - addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
-                amountToWithdraw
-            );
-            assertEq(beforeBalance - currentToken.balanceOf(address(addresses.sharedBridge)), amountToWithdraw);
-        }
+        // If we reach here, the withdrawal succeeded — assert outcomes unconditionally
+        // Chain balance decreased by withdrawal amount
+        assertEq(
+            beforeChainBalance - addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
+            amountToWithdraw,
+            "Chain balance should decrease by withdrawal amount"
+        );
+
+        // Bridge token balance decreased
+        assertEq(
+            beforeBridgeBalance - currentToken.balanceOf(address(addresses.sharedBridge)),
+            amountToWithdraw,
+            "Bridge token balance should decrease by withdrawal amount"
+        );
+
+        // Recipient received tokens
+        assertEq(
+            currentToken.balanceOf(currentUser) - beforeUserBalance,
+            amountToWithdraw,
+            "User should receive withdrawn tokens"
+        );
+
+        // Withdrawal marked as finalized (replay protection)
+        assertTrue(
+            addresses.l1Nullifier.isWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex),
+            "Withdrawal should be marked as finalized"
+        );
+
+        // Verify DepositFinalizedAssetRouter event emission
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        Vm.Log memory finalizedLog = logs.requireOne("DepositFinalizedAssetRouter(uint256,bytes32,bytes)");
+        assertEq(uint256(finalizedLog.topics[1]), currentChainId, "DepositFinalizedAssetRouter chainId mismatch");
     }
 
+    /// @notice Finalizes an ETH withdrawal from L2 to L1 via the shared bridge.
+    /// @dev Same flow as `withdrawERC20Token` but uses `IMailboxLegacy.finalizeEthWithdrawal`
+    /// selector and asserts ETH balances instead of ERC20 balances.
+    /// Mock justification: L2 proof verification is mocked because L2 batch commitments and
+    /// merkle trees are unavailable in this L1-only integration test environment.
     function withdrawETHToken(uint256 amountToWithdraw, address tokenAddress) private useGivenToken(tokenAddress) {
         uint256 l2BatchNumber = uint256(uint160(makeAddr("l2BatchNumber")));
         uint256 l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
@@ -563,7 +759,8 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
 
         _setSharedBridgeIsWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex, false);
         uint256 beforeChainBalance = addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress);
-        uint256 beforeBalance = address(addresses.sharedBridge).balance;
+        uint256 beforeBridgeBalance = address(addresses.sharedBridge).balance;
+        uint256 beforeUserBalance = currentUser.balance;
 
         if (beforeChainBalance < amountToWithdraw) {
             vm.expectRevert("L1AR: not enough funds 2");
@@ -596,6 +793,7 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             abi.encode(true)
         );
 
+        vm.recordLogs();
         addresses.sharedBridge.finalizeWithdrawal({
             _chainId: currentChainId,
             _l2BatchNumber: l2BatchNumber,
@@ -604,17 +802,34 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             _message: message,
             _merkleProof: merkleProof
         });
+        Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        // check if the balance was updated correctly
-        if (beforeChainBalance > amountToWithdraw) {
-            assertEq(
-                beforeChainBalance - addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
-                amountToWithdraw
-            );
-            assertEq(beforeBalance - address(addresses.sharedBridge).balance, amountToWithdraw);
-        }
+        // If we reach here, the withdrawal succeeded — assert outcomes unconditionally
+        assertEq(
+            beforeChainBalance - addresses.l1Nullifier.chainBalance(currentChainId, currentTokenAddress),
+            amountToWithdraw,
+            "Chain balance should decrease by withdrawal amount"
+        );
+        assertEq(
+            beforeBridgeBalance - address(addresses.sharedBridge).balance,
+            amountToWithdraw,
+            "Bridge ETH balance should decrease by withdrawal amount"
+        );
+        assertEq(currentUser.balance - beforeUserBalance, amountToWithdraw, "User should receive withdrawn ETH");
+        assertTrue(
+            addresses.l1Nullifier.isWithdrawalFinalized(currentChainId, l2BatchNumber, l2MessageIndex),
+            "Withdrawal should be marked as finalized"
+        );
+
+        // Verify DepositFinalizedAssetRouter event emission
+        Vm.Log memory finalizedLog = logs.requireOne("DepositFinalizedAssetRouter(uint256,bytes32,bytes)");
+        assertEq(uint256(finalizedLog.topics[1]), currentChainId, "DepositFinalizedAssetRouter chainId mismatch");
     }
 
+    /// @notice Routes an ETH deposit to the correct internal handler based on the selected
+    /// chain's base token.
+    /// @dev If the chain's base token is ETH, uses the Direct path (`depositEthBase`).
+    /// If the chain's base token is ERC20, uses the TwoBridges path (`depositEthToERC20Chain`).
     function depositEthToBridgeSuccess(
         uint256 userIndexSeed,
         uint256 chainIndexSeed,
@@ -627,6 +842,12 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         }
     }
 
+    /// @notice Routes an ERC20 deposit to the correct internal handler based on the selected
+    /// chain's base token and the deposit token.
+    /// @dev Three cases:
+    ///   - ETH-base chain: uses `depositERC20ToEthChain` (TwoBridges, ETH for gas + ERC20 deposit)
+    ///   - ERC20-base chain, deposit token == base token: uses `depositERC20Base` (Direct)
+    ///   - ERC20-base chain, deposit token != base token: uses `depositERC20ToERC20Chain` (TwoBridges)
     function depositERC20ToBridgeSuccess(
         uint256 userIndexSeed,
         uint256 chainIndexSeed,
@@ -646,6 +867,9 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         }
     }
 
+    /// @notice Routes a withdrawal to the correct internal handler based on the selected
+    /// chain's base token.
+    /// @dev If base token is ERC20, calls `withdrawERC20Token`. If ETH, calls `withdrawETHToken`.
     function withdrawSuccess(
         uint256 userIndexSeed,
         uint256 chainIndexSeed,
@@ -660,6 +884,8 @@ contract BridgehubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
         }
     }
 
+    /// @notice Returns an array of addresses that should be excluded from invariant testing
+    /// target selection.
     function getAddressesToExclude() public returns (address[] memory) {
         addressesToExclude.push(addresses.bridgehubProxyAddress);
         addressesToExclude.push(address(addresses.sharedBridge));

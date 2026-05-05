@@ -60,7 +60,13 @@ import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainA
 import {IMessageRootBase, IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 import {OnlyFailureStatusAllowed} from "contracts/bridge/L1BridgeContractErrors.sol";
 
+import {LogFinder} from "test-utils/LogFinder.sol";
+
+import {NEW_PRIORITY_REQUEST_SIGNATURE} from "test/foundry/TestConstants.sol";
+
 contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
+    using LogFinder for Vm.Log[];
+
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -151,7 +157,10 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     //
     function test_registerGateway() public {
         // Verify gateway is not whitelisted before setup
-        bool isWhitelistedBefore = addresses.bridgehub.whitelistedSettlementLayers(gatewayChainId);
+        assertFalse(
+            addresses.bridgehub.whitelistedSettlementLayers(gatewayChainId),
+            "Gateway should not be whitelisted before setup"
+        );
 
         // Expect SettlementLayerRegistered event from Bridgehub
         vm.expectEmit(true, true, true, true, address(addresses.bridgehub));
@@ -169,7 +178,6 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         assertTrue(filterer != address(0), "Transaction filterer should be deployed for gateway chain");
     }
 
-    //
     function test_moveChainToGateway() public {
         _setUpGatewayWithFilterer();
 
@@ -196,6 +204,17 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             IL1ChainAssetHandler(chainAssetHandler).isMigrationInProgress(migratingChainId),
             "Migration should be in progress"
         );
+
+        // Verify migration number is incremented
+        assertEq(
+            IChainAssetHandlerBase(chainAssetHandler).migrationNumber(migratingChainId),
+            1,
+            "Migration number should be 1 after initiating migration"
+        );
+
+        // Deposits paused on the migrating chain
+        uint256 pausedDepositsTimestamp = uint256(vm.load(address(migratingChain), pausedDepositsTimestampSlot));
+        assertTrue(pausedDepositsTimestamp != 0, "Deposits should be paused after initiating migration");
     }
 
     function test_l2Registration() public {
@@ -209,15 +228,29 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             "Chain should be migrated to gateway"
         );
 
+        vm.recordLogs();
         gatewayScript.fullGatewayRegistration();
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        // Verify the governance calls succeeded and L2 transactions were queued.
+        logs.requireAtLeast(NEW_PRIORITY_REQUEST_SIGNATURE, 1);
 
         // Verify registration completed by checking chain is still properly configured
-        address zkChainAddress = addresses.bridgehub.getZKChain(migratingChainId);
-        assertTrue(zkChainAddress != address(0), "ZK chain should still be registered after L2 registration");
-
-        // Verify base token asset ID is still set
-        bytes32 baseTokenAssetId = addresses.bridgehub.baseTokenAssetId(migratingChainId);
-        assertTrue(baseTokenAssetId != bytes32(0), "Base token asset ID should be set after registration");
+        assertEq(
+            addresses.bridgehub.getZKChain(migratingChainId),
+            address(migratingChain),
+            "ZK chain address should be unchanged after L2 registration"
+        );
+        assertEq(
+            addresses.bridgehub.baseTokenAssetId(migratingChainId),
+            eraConfig.baseTokenAssetId,
+            "Base token asset ID should be unchanged after L2 registration"
+        );
+        assertEq(
+            addresses.bridgehub.settlementLayer(migratingChainId),
+            gatewayChainId,
+            "Settlement layer should still be gateway after L2 registration"
+        );
     }
 
     function test_requestL2TransactionDirect() public {
@@ -232,26 +265,40 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             "Chain should be settled on gateway"
         );
 
-        IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
-        uint256 expectedValue = 1000000000000000000000;
+        uint256 expectedValue = 1000 ether;
         L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
             migratingChainId,
             expectedValue,
-            0,
-            72000000,
-            800,
+            0, // l2Value
+            72000000, // l2GasLimit
+            800, // l2GasPerPubdataByteLimit
             "0x"
         );
 
+        uint256 senderBalanceBefore = address(this).balance;
+
         vm.recordLogs();
         bytes32 canonicalTxHash = addresses.bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Verify transaction was created
-        assertTrue(canonicalTxHash != bytes32(0), "Canonical tx hash should not be zero");
+        assertNotEq(canonicalTxHash, bytes32(0), "Canonical tx hash should not be zero");
 
-        // Verify logs were emitted
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        assertTrue(logs.length > 0, "Transaction should emit logs");
+        // Verify balances
+        assertEq(
+            senderBalanceBefore - address(this).balance,
+            expectedValue,
+            "Sender ETH should decrease by expectedValue"
+        );
+
+        // Verify BridgehubDepositBaseTokenInitiated event emission
+        Vm.Log memory baseTokenLog = logs.requireOne(
+            "BridgehubDepositBaseTokenInitiated(uint256,address,bytes32,uint256)"
+        );
+        assertEq(uint256(baseTokenLog.topics[1]), migratingChainId, "Base token deposit event chainId mismatch");
+
+        // Verify NewPriorityRequest event emission (transaction queued on gateway)
+        logs.requireAtLeast(NEW_PRIORITY_REQUEST_SIGNATURE, 1);
     }
 
     function test_recoverFromFailedChainMigration() public {
@@ -263,6 +310,11 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         assertTrue(
             IL1ChainAssetHandler(chainAssetHandler).isMigrationInProgress(migratingChainId),
             "Migration should be in progress before recovery"
+        );
+        assertEq(
+            IChainAssetHandlerBase(chainAssetHandler).migrationNumber(migratingChainId),
+            1,
+            "Migration number should be 1 before recovery"
         );
 
         _confirmMigration(TxStatus.Failure);
@@ -286,11 +338,23 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             0,
             "Migration number should be 0 after failed migration"
         );
+
+        // Verify diamond proxy settlement layer was cleared
+        assertEq(
+            IGetters(address(migratingChain)).getSettlementLayer(),
+            address(0),
+            "Diamond proxy settlement layer should be cleared after failed migration"
+        );
     }
 
     function test_finishMigrateBackChain() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
+        // Note: forward migration is not confirmed via _confirmMigration — migrateBackChain()
+        // simulates the L2 gateway side directly by switching vm.chainId and mocking proofs.
+        // As a result, some L1-side state (isMigrationInProgress, settlementLayer == block.chainid)
+        // is not fully resolved — those transitions only happen via bridgeConfirmTransferResult,
+        // which this test path skips.
 
         migrateBackChain();
 
@@ -300,6 +364,13 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         // Verify the chain contract is properly deployed at a non-zero address
         assertTrue(address(migratingChainContract).code.length > 0, "Chain contract should have deployed code");
+
+        // Verify settlement layer is no longer the gateway.
+        // Note: cannot assert == block.chainid because the simulated migration-back executes
+        // under vm.chainId(migratingChainId), so the recorded settlement layer is migratingChainId,
+        // not L1's block.chainid.
+        uint256 settlementLayer = addresses.bridgehub.settlementLayer(migratingChainId);
+        assertTrue(settlementLayer != gatewayChainId, "Settlement layer should not be gateway after migration back");
 
         // Verify base token asset ID is correctly set in bridgehub
         bytes32 expectedBaseTokenAssetId = eraConfig.baseTokenAssetId;
@@ -327,7 +398,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
     function migrateBackChain() public {
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
-        IZKChain migratingChain = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
+        IZKChain migratingChainContract = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
         bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
 
         vm.startBroadcast(Ownable(address(addresses.bridgehub)).owner());
@@ -339,6 +410,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         uint256 currentChainId = block.chainid;
         // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
         vm.chainId(migratingChainId);
+
         vm.mockCall(
             address(ecosystemAddresses.bridgehub.proxies.messageRoot),
             abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
@@ -354,11 +426,13 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
             abi.encode(addresses.chainTypeManager.protocolVersion())
         );
+
         TokenBridgingData memory baseTokenBridgingData = TokenBridgingData({
             assetId: baseTokenAssetId,
             originToken: makeAddr("baseTokenOrigin"),
             originChainId: currentChainId
         });
+
         vm.expectCall(
             GW_ASSET_TRACKER_ADDR,
             abi.encodeCall(IGWAssetTracker.registerBaseTokenOnGateway, (baseTokenBridgingData))
@@ -371,7 +445,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(migratingChainId);
 
-        bytes memory chainData = abi.encode(IMigrator(address(migratingChain)).prepareChainCommitment());
+        bytes memory chainData = abi.encode(IMigrator(address(migratingChainContract)).prepareChainCommitment());
         bytes memory ctmData = abi.encode(
             baseTokenAssetId,
             msg.sender,
@@ -384,10 +458,11 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,
-            // +1 since during migrating back we the passed migration number gets incremented by 1 in the Gateway's ChainAssetHandler
+            // +1 since during migrating back the passed migration number gets incremented by 1 in the Gateway's ChainAssetHandler
             migrationNumber: IChainAssetHandlerBase(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
                 .migrationNumber(migratingChainId) + 1
         });
+
         bytes memory bridgehubMintData = abi.encode(data);
         bytes memory message = abi.encodePacked(
             AssetRouterBase.finalizeDeposit.selector,
@@ -410,11 +485,20 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
         vm.chainId(currentChainId);
 
-        assertEq(addresses.bridgehub.baseTokenAssetId(migratingChainId), baseTokenAssetId);
-        IZKChain migratingChainContract = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
-        assertEq(migratingChainContract.getBaseTokenAssetId(), baseTokenAssetId);
+        assertEq(
+            addresses.bridgehub.baseTokenAssetId(migratingChainId),
+            baseTokenAssetId,
+            "Base token asset ID should be preserved after migration back"
+        );
 
-        // After migrating back, the settlement layer should no longer be the gateway
+        IZKChain migratedChain = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
+        assertEq(
+            migratedChain.getBaseTokenAssetId(),
+            baseTokenAssetId,
+            "Chain's base token asset ID should match bridgehub"
+        );
+
+        // After migrating back, the settlement layer should not be gateway
         uint256 settlementLayer = addresses.bridgehub.settlementLayer(migratingChainId);
         assertTrue(settlementLayer != gatewayChainId, "Settlement layer should not be gateway after migration back");
     }
@@ -472,16 +556,31 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         vm.startBroadcast(migratingChain.getAdmin());
         migratingChain.upgradeChainFromVersion(address(migratingChain), currentProtocolVersion, diamondCut);
         vm.stopBroadcast();
+
+        // Verify protocol version was updated
+        assertEq(
+            migratingChain.getProtocolVersion(),
+            newProtocolVersion,
+            "Protocol version should be updated after upgrade"
+        );
+
+        // Verify the version components are correct
+        (uint32 newMajor, uint32 newMinor, uint32 newPatch) = SemVer.unpackSemVer(
+            uint96(migratingChain.getProtocolVersion())
+        );
+        assertEq(newMajor, major, "Major version should be unchanged");
+        assertEq(newMinor, minor + 1, "Minor version should be incremented");
+        assertEq(newPatch, patch, "Patch version should be unchanged");
     }
 
-    function test_proveL2LogsInclusionFromData() public {
+    function test_revertWhen_finalizeDepositWithInvalidProof() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
-        IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
 
+        // TODO(EVM-1332): Comment on what is this blob explicitly
         bytes
-            memory data = hex"74beea820000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000010f000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000010003000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000002e49c884fd1000000000000000000000000000000000000000000000000000000000000010f93d0008af83c021d815bd4e76d7297c69d7f4cc4cf0b8892f7f74f6e33e11829000000000000000000000000c71d126d294a5d2e4002a62d0017b7109f18ade9000000000000000000000000c71d126d294a5d2e4002a62d0017b7109f18ade900000000000000000000000058dc094d71c4c3740bc1ef43d46b58717fa3595a000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000001c101000000000000000000000000000000000000000000000000000000000000000900000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000457425443000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000045742544300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c0101030000000000000000000000000000000000000000000000000000000000e4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf7594400000000000000000000000000000000000000000000000000000000000000079ba301ae10c10e68bffcc2b466aac46d7c7cd6f87eb055e4d43897f303c7a03a21b22cb4099a976636357d5d1f46deeb36f60ec6557eef0da85abaa8222c8c018dba9883941a824d6545029e626b54bd10404b2b8fff432a39ad36d9a36fe3d6000000000000000000000000000000110000000000000000000000000000000500000000000000000000000000000000000000000000000000000000000001fa0103000100000000000000000000000000000000000000000000000000000000f84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f82823d18b4879c426cf1cb583e1102d9d7f4a5a3a2d01e3f7cc6d042de25409fef1178cf3cbada927540027845a799eab8cf1d788869a9cc11c0f3ebfec198ff347";
-        address eraAddress = bridgehub.getZKChain(migratingChainId);
+            memory data = hex"74beea820000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000010f00000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000300000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000e000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000002e49c884fd1000000000000000000000000000000000000000000000000000000000000010f93d0008af83c021d815bd4e76d7297c69d7f4cc4cf0b8892f7f74f6e33e11829000000000000000000000000c71d126d294a5d2e4002a62d0017b7109f18ade9000000000000000000000000c71d126d294a5d2e4002a62d0017b7109f18ade90000000000000000000000058dc094d71c4c3740bc1ef43d46b58717fa3595a000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000001c101000000000000000000000000000000000000000000000000000000000000000900000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000457425443000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000045742544300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c0101030000000000000000000000000000000000000000000000000000000000e4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf7594400000000000000000000000000000000000000000000000000000000000000079ba301ae10c10e68bffcc2b466aac46d7c7cd6f87eb055e4d43897f303c7a03a21b22cb4099a976636357d5d1f46deeb36f60ec6557eef0da85abaa8222c8c018dba9883941a824d6545029e626b54bd10404b2b8fff432a39ad36d9a36fe3d60000000000000000000000000000001100000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000001fa0103000100000000000000000000000000000000000000000000000000000000f84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f82823d18b4879c426cf1cb583e1102d9d7f4a5a3a2d01e3f7cc6d042de25409fef1178cf3cbada927540027845a799eab8cf1d788869a9cc11c0f3ebfec198ff347";
+
         vm.expectRevert(abi.encodeWithSelector(InvalidProof.selector));
         address(addresses.l1Nullifier).call(data);
     }
@@ -491,7 +590,6 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         MerkleProofData memory merkleProofData = _getMerkleProofData();
 
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
-        address chainAssetHandler = address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler);
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         address zkChain = addresses.bridgehub.getZKChain(migratingChainId);
         address chainAdmin = IZKChain(zkChain).getAdmin();
@@ -529,13 +627,14 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         address alice = makeAddr("alice");
         uint256 amount = 1 ether;
         bytes memory transferData = abi.encode(amount, alice, ETH_TOKEN_ADDRESS);
-        //bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         bytes32 txDataHash = keccak256(
             bytes.concat(NEW_ENCODING_VERSION, abi.encode(alice, ETH_TOKEN_ASSET_ID, transferData))
         );
+
         _setDepositHappened(migratingChainId, merkleProofData.l2TxHash, txDataHash);
-        require(
-            addresses.l1Nullifier.depositHappened(migratingChainId, merkleProofData.l2TxHash) == txDataHash,
+        assertEq(
+            addresses.l1Nullifier.depositHappened(migratingChainId, merkleProofData.l2TxHash),
+            txDataHash,
             "Deposit not set"
         );
 

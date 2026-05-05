@@ -77,23 +77,6 @@ library LogFinder {
         return log;
     }
 
-    /// @notice Asserts that exactly `expectedCount` logs match the given event signature.
-    /// @dev Reverts if the number of matching logs differs from `expectedCount`.
-    ///      Reverts with the event signature and `: unexpected log count` as the reason.
-    /// @param logs The recorded logs array from `vm.getRecordedLogs()`.
-    /// @param eventSignature The canonical event signature string,
-    ///        e.g. `"Transfer(address,address,uint256)"`.
-    /// @param expectedCount The exact number of matching logs expected.
-    /// @return matchedLogs An array of all matching `Vm.Log` entries.
-    function requireCount(
-        Vm.Log[] memory logs,
-        string memory eventSignature,
-        uint256 expectedCount
-    ) internal pure returns (Vm.Log[] memory matchedLogs) {
-        matchedLogs = findAll(logs, eventSignature);
-        require(matchedLogs.length == expectedCount, string.concat(eventSignature, ": unexpected log count"));
-    }
-
     /// @notice Asserts that at least `minCount` logs match the given event signature.
     /// @dev Reverts if the number of matching logs is less than `minCount`.
     ///      Reverts with the event signature and `: insufficient log count` as the reason.
