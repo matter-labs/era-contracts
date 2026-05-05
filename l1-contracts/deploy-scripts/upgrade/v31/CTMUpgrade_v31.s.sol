@@ -63,49 +63,60 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         return deploySimpleContract(contractName, false);
     }
 
-    function getAdditionalEraForcedCoreContracts()
+    function getV31AdditionalFactoryDependencyContracts()
         internal
-        override
-        returns (CoreContract[] memory additionalEraForcedCoreContracts)
+        pure
+        returns (CoreContract[] memory additionalDependencyContracts)
     {
-        additionalEraForcedCoreContracts = new CoreContract[](1);
-        additionalEraForcedCoreContracts[0] = CoreContract.L2V31Upgrade;
+        additionalDependencyContracts = new CoreContract[](1);
+        additionalDependencyContracts[0] = CoreContract.L2V31Upgrade;
     }
 
-    function getL2UpgradeTargetAndData(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
-    ) internal virtual override returns (address, bytes memory) {
+    function getAdditionalFactoryDependencyContracts()
+        internal
+        override
+        returns (CoreContract[] memory additionalDependencyContracts)
+    {
+        return getV31AdditionalFactoryDependencyContracts();
+    }
+
+    function getAdditionalUniversalForceDeployments()
+        internal
+        override
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
+    {
+        if (config.isZKsyncOS) {
+            return getV31AdditionalZKsyncOSUniversalForceDeployments();
+        }
+
+        return buildEraUniversalForceDeployments(getV31AdditionalFactoryDependencyContracts());
+    }
+
+    function getV31L2UpgradeCalldata() internal returns (bytes memory) {
         // The fixedForceDeploymentsData is ecosystem-wide (same for all chains).
         // The additionalForceDeploymentsData placeholder is rewritten per-chain by
         // SettlementLayerV31UpgradeBase._buildL2V31UpgradeCalldata at upgrade time.
-        bytes memory l2UpgradeCalldata = abi.encodeCall(
-            IL2V31Upgrade.upgrade,
-            // additionalForceDeploymentsData ("") is rewritten per-chain by SettlementLayerV31UpgradeBase
-            (
-                config.isZKsyncOS,
-                coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
-                generatedData.forceDeploymentsData,
-                ""
-            )
-        );
+        return
+            abi.encodeCall(
+                IL2V31Upgrade.upgrade,
+                (
+                    config.isZKsyncOS,
+                    coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
+                    generatedData.forceDeploymentsData,
+                    ""
+                )
+            );
+    }
 
-        bytes memory complexUpgraderCalldata;
-        if (config.isZKsyncOS) {
-            // For ZKsyncOS, the delegateTo address is a derived address (not the constant
-            // L2_VERSION_SPECIFIC_UPGRADER_ADDR) to avoid overwriting existing bytecode.
-            // Must match the newAddress in getAdditionalZKsyncOSForceDeployments.
-            bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade");
-            address delegateTo = L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo);
-            complexUpgraderCalldata = abi.encodeCall(
-                IComplexUpgrader.forceDeployAndUpgradeUniversal,
-                (_deployments, delegateTo, l2UpgradeCalldata)
-            );
-        } else {
-            complexUpgraderCalldata = abi.encodeCall(
-                IComplexUpgrader.forceDeployAndUpgrade,
-                (EraForceDeploymentsLib.unwrap(_deployments), L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
-            );
-        }
+    function getEraL2UpgradeTargetAndData(
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
+    ) internal virtual override returns (address, bytes memory) {
+        bytes memory l2UpgradeCalldata = getV31L2UpgradeCalldata();
+
+        bytes memory complexUpgraderCalldata = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgrade,
+            (EraForceDeploymentsLib.unwrap(_deployments), L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
+        );
 
         return (address(L2_COMPLEX_UPGRADER_ADDR), complexUpgraderCalldata);
     }
@@ -114,9 +125,8 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     /// @dev L2V31Upgrade is deployed as a standalone contract at the derived random address used as
     /// the delegate target in `forceDeployAndUpgradeUniversal`, so it uses `ZKsyncOSUnsafeForceDeployment`
     /// rather than `ZKsyncOSSystemProxyUpgrade`.
-    function getAdditionalZKsyncOSForceDeployments()
+    function getV31AdditionalZKsyncOSUniversalForceDeployments()
         internal
-        override
         returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
     {
         bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade");
@@ -126,5 +136,24 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             deployedBytecodeInfo: bytecodeInfo,
             newAddress: L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo)
         });
+    }
+
+    function getZKsyncOSL2UpgradeTargetAndData(
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
+    ) internal virtual override returns (address, bytes memory) {
+        // For ZKsyncOS, the delegateTo address is a derived address (not the constant
+        // L2_VERSION_SPECIFIC_UPGRADER_ADDR) to avoid overwriting existing bytecode.
+        // Must match the newAddress in getV31AdditionalZKsyncOSUniversalForceDeployments.
+        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade");
+        address delegateTo = L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo);
+
+        bytes memory l2UpgradeCalldata = getV31L2UpgradeCalldata();
+
+        bytes memory complexUpgraderCalldata = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgradeUniversal,
+            (_deployments, delegateTo, l2UpgradeCalldata)
+        );
+
+        return (address(L2_COMPLEX_UPGRADER_ADDR), complexUpgraderCalldata);
     }
 }
