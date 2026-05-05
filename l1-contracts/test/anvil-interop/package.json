@@ -26,11 +26,13 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "ethers": "5.7.2"
+    "@matterlabs/zksync-js": "0.0.17",
+    "ethers": "5.7.2",
+    "viem": "2.48.4"
   },
   "devDependencies": {
     "@types/node": "^20.11.19",
-    "typescript": "^5.3.3",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
   }
 }
