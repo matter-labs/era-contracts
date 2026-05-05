@@ -47,6 +47,9 @@ import {L2ChainAssetHandler} from "contracts/core/chain-asset-handler/L2ChainAss
 
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
+import {Vm} from "forge-std/Vm.sol";
+import {LogFinder} from "test-utils/LogFinder.sol";
+
 interface IPausable {
     function pause() external;
     function unpause() external;
@@ -54,6 +57,7 @@ interface IPausable {
 
 contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
+    using LogFinder for Vm.Log[];
 
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
@@ -119,8 +123,8 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
     }
 
     function test_pauseMigration_byOwner() public {
-        address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
-            .owner();
+        address handler = address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler);
+        address owner = Ownable2StepUpgradeable(handler).owner();
 
         // Verify owner is valid
         assertTrue(owner != address(0), "Owner should be a valid address");
@@ -129,41 +133,53 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         assertFalse(
             IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
             "Migration should not be paused initially"
-        );
+        ); 
 
+        vm.recordLogs();
         vm.prank(owner);
-        IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).pauseMigration();
+        IChainAssetHandlerBase(handler).pauseMigration();
+        Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Verify migration is paused
         assertTrue(
             IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
             "Migration should be paused after calling pauseMigration"
         );
+
+        // Verify event was emitted
+        Vm.Log memory pauseLog = logs.requireOneFrom("PausedMigration(address)", handler);
+        assertEq(pauseLog.topics[1], bytes32(uint256(uint160(owner))), "PausedMigration pauser mismatch");
     }
 
     function test_unpauseMigration_byOwner() public {
-        address owner = Ownable2StepUpgradeable(address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler))
-            .owner();
+        address handler = address(ecosystemAddresses.bridgehub.proxies.chainAssetHandler);
+        address owner = Ownable2StepUpgradeable(handler).owner();
 
         // First pause migration
         vm.prank(owner);
-        IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).pauseMigration();
+        IChainAssetHandlerBase(handler).pauseMigration();
 
         // Verify migration is paused
         assertTrue(
-            IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
+            IChainAssetHandlerBase(handler).migrationPaused(),
             "Migration should be paused before unpause"
         );
 
         // Now unpause migration
+        vm.recordLogs();
         vm.prank(owner);
-        IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).unpauseMigration();
+        IChainAssetHandlerBase(handler).unpauseMigration();
+        Vm.Log[] memory logs = vm.getRecordedLogs();
 
         // Verify migration is no longer paused
         assertFalse(
             IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
             "Migration should not be paused after calling unpauseMigration"
         );
+
+        // Verify event was emitted
+        Vm.Log memory pauseLog = logs.requireOneFrom("UnpausedMigration(address)", handler);
+        assertEq(pauseLog.topics[1], bytes32(uint256(uint160(owner))), "UnpausedMigration pauser mismatch");
     }
 
     function test_pause_byOwner() public {
