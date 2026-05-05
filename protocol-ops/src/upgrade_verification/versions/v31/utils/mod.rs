@@ -1,7 +1,7 @@
 use std::{
     fs::{self, File},
     io::Write,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use alloy::{
@@ -16,6 +16,27 @@ pub mod facet_cut_set;
 pub mod fee_param_verifier;
 pub mod network_verifier;
 
+pub fn repo_relative_path(relative_path: impl AsRef<Path>) -> PathBuf {
+    let relative_path = relative_path.as_ref();
+    if relative_path.is_absolute() {
+        return relative_path.to_path_buf();
+    }
+
+    if let Ok(current_dir) = std::env::current_dir() {
+        for ancestor in current_dir.ancestors() {
+            let candidate = ancestor.join(relative_path);
+            if candidate.exists() {
+                return candidate;
+            }
+        }
+    }
+
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("protocol-ops must be a direct child of the repository root")
+        .join(relative_path)
+}
+
 pub async fn get_contents_from_github(commit: &str, repo: &str, file_path: &str) -> String {
     let url = format!(
         "https://raw.githubusercontent.com/{repo}/{}/{file_path}",
@@ -25,11 +46,7 @@ pub async fn get_contents_from_github(commit: &str, repo: &str, file_path: &str)
     let cache_path = Path::new("cache");
     fs::create_dir_all(cache_path).expect("Failed to create cache directory");
 
-    let cache_file_path = cache_path.join(format!(
-        "{}-{}.json",
-        Path::new(file_path).file_name().unwrap().to_str().unwrap(),
-        commit
-    ));
+    let cache_file_path = cache_path.join(github_cache_file_name(repo, commit, file_path));
 
     if !cache_file_path.exists() {
         let response = reqwest::get(url).await.unwrap();
@@ -40,6 +57,19 @@ pub async fn get_contents_from_github(commit: &str, repo: &str, file_path: &str)
     }
 
     fs::read_to_string(&cache_file_path).expect("Failed to read cache file")
+}
+
+fn github_cache_file_name(repo: &str, commit: &str, file_path: &str) -> String {
+    format!("{repo}-{commit}-{file_path}")
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }
 
 pub fn compute_create2_address_zk(

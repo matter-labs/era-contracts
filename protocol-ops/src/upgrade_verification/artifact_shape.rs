@@ -155,6 +155,12 @@ mod tests {
         let toml = r#"
                         chain_upgrade_diamond_cut = "0x1234"
 
+                        [contracts_config]
+                        diamond_cut_data = "0xabcd"
+                        force_deployments_data = "0x1234"
+                        old_protocol_version = 1
+                        new_protocol_version = 2
+
                         [governance_calls]
                         stage0_calls = "0x00"
                         stage1_calls = "0x0102"
@@ -175,6 +181,8 @@ mod tests {
                         [contracts_config]
                         diamond_cut_data = "0xabcd"
                         force_deployments_data = "0x1234"
+                        old_protocol_version = 1
+                        new_protocol_version = 2
 
                         [deployed_addresses]
                         chain_admin = "0x0000000000000000000000000000000000000002"
@@ -196,6 +204,12 @@ mod tests {
         let toml = r#"
                         chain_upgrade_diamond_cut = "0x1234"
 
+                        [contracts_config]
+                        diamond_cut_data = "0xabcd"
+                        force_deployments_data = "0x1234"
+                        old_protocol_version = 1
+                        new_protocol_version = 2
+
                         [governance_calls]
                         stage0_calls = "0x00"
                         stage1_calls = "0x0102"
@@ -216,6 +230,27 @@ mod tests {
             .unwrap()
             .to_string();
         let governance_call_value = value.get("governance_calls").unwrap();
+        let contracts_config_value = value.get("contracts_config").unwrap();
+        let contracts_config = crate::upgrade_verification::artifacts::ContractsConfig {
+            diamond_cut_data: contracts_config_value
+                .get("diamond_cut_data")
+                .and_then(toml::Value::as_str)
+                .unwrap()
+                .to_string(),
+            force_deployments_data: contracts_config_value
+                .get("force_deployments_data")
+                .and_then(toml::Value::as_str)
+                .unwrap()
+                .to_string(),
+            old_protocol_version: contracts_config_value
+                .get("old_protocol_version")
+                .and_then(toml::Value::as_integer)
+                .unwrap() as u64,
+            new_protocol_version: contracts_config_value
+                .get("new_protocol_version")
+                .and_then(toml::Value::as_integer)
+                .unwrap() as u64,
+        };
         let governance_calls = crate::upgrade_verification::artifacts::GovernanceCalls {
             stage0_calls: governance_call_value
                 .get("stage0_calls")
@@ -237,6 +272,7 @@ mod tests {
         EcosystemUpgradeArtifact {
             value,
             chain_upgrade_diamond_cut,
+            contracts_config,
             governance_calls,
         }
     }

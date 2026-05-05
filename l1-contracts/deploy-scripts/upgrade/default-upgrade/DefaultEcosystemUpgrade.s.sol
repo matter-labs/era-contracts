@@ -200,6 +200,11 @@ contract DefaultEcosystemUpgrade is Script {
         );
         vm.serializeAddress(
             "state_transition",
+            "chain_type_manager_proxy",
+            ctmAddresses.stateTransition.proxies.chainTypeManager
+        );
+        vm.serializeAddress(
+            "state_transition",
             "state_transition_implementation_addr",
             ctmAddresses.stateTransition.implementations.chainTypeManager
         );

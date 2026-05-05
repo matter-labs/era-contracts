@@ -4,6 +4,7 @@ use alloy::primitives::{keccak256, Address, FixedBytes, TxHash, U256};
 use alloy::providers::{Provider, RootProvider};
 use alloy::sol;
 use alloy::sol_types::SolCall;
+use anyhow::Context;
 use std::collections::HashMap;
 use Bridgehub::requestL2TransactionDirectCall;
 
@@ -99,6 +100,21 @@ pub struct NetworkVerifier {
 }
 
 impl NetworkVerifier {
+    pub fn new_v31(l1_rpc: String) -> anyhow::Result<Self> {
+        let l1_provider = RootProvider::new_http(l1_rpc.parse().context("invalid L1 RPC URL")?);
+        let gw_provider = l1_provider.clone();
+
+        Ok(Self {
+            l1_provider,
+            l2_chain_id: 0,
+            l1_chain_id: 0,
+            gateway_chain_id: 0,
+            gw_provider,
+            create2_constructor_params: HashMap::new(),
+            create2_known_bytecodes: HashMap::new(),
+        })
+    }
+
     pub async fn new(
         l1_rpc: String,
         l2_chain_id: u64,

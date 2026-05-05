@@ -9,15 +9,19 @@ use alloy::{
 use colored::Colorize;
 use serde::Deserialize;
 use std::fmt::{self, Display};
+use std::fs;
 use std::panic::Location;
 
-use crate::upgrade_verification::versions::v31::{
-    utils::{
-        address_from_short_hex, address_verifier::AddressVerifier,
-        bytecode_verifier::BytecodeVerifier, fee_param_verifier::FeeParamVerifier,
-        get_contents_from_github, network_verifier::NetworkVerifier,
+use crate::upgrade_verification::{
+    artifacts::EcosystemUpgradeArtifact,
+    versions::v31::{
+        utils::{
+            address_from_short_hex, address_verifier::AddressVerifier,
+            bytecode_verifier::BytecodeVerifier, fee_param_verifier::FeeParamVerifier,
+            get_contents_from_github, network_verifier::NetworkVerifier, repo_relative_path,
+        },
+        UpgradeOutput,
     },
-    UpgradeOutput,
 };
 
 sol! {
@@ -36,7 +40,53 @@ pub(crate) struct Verifiers {
     pub gateway_bridgehub_address: Address,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum GenesisConfigKind {
+    Era,
+    ZksyncOs,
+}
+
+impl GenesisConfigKind {
+    fn local_path(self) -> &'static str {
+        match self {
+            Self::Era => "configs/genesis/era/latest.json",
+            Self::ZksyncOs => "configs/genesis/zksync-os/latest.json",
+        }
+    }
+}
+
 impl Verifiers {
+    /// Creates a v31 verifier context from the single ecosystem TOML.
+    ///
+    /// This keeps the copied PUVT shape intact: as more v31 parity checks are
+    /// restored, the placeholder verifier fields below should be replaced with
+    /// their real RPC / reference-data initialization.
+    pub async fn new_v31(
+        artifact: &EcosystemUpgradeArtifact,
+        l1_rpc: impl Into<String>,
+        contracts_commit: Option<&str>,
+        genesis_config_kind: GenesisConfigKind,
+    ) -> anyhow::Result<Self> {
+        let bridgehub_address = AddressVerifier::address_from_artifact(
+            artifact,
+            &["deployed_addresses", "bridgehub", "bridgehub_proxy_addr"],
+        )?;
+        let bytecode_verifier = BytecodeVerifier::init_v31(contracts_commit).await?;
+        let network_verifier = NetworkVerifier::new_v31(l1_rpc.into())?;
+        let address_verifier = AddressVerifier::new_v31_from_artifact(artifact)?;
+
+        Ok(Self {
+            testnet_contracts: false,
+            bridgehub_address,
+            address_verifier,
+            bytecode_verifier,
+            network_verifier,
+            genesis_config: GenesisConfig::init_v31(genesis_config_kind, contracts_commit).await?,
+            fee_param_verifier: FeeParamVerifier::empty(),
+            gateway_bridgehub_address: address_from_short_hex("10002"),
+        })
+    }
+
     /// Creates a new `Verifiers` instance.
     pub async fn new(
         testnet_contracts: bool,
@@ -117,11 +167,40 @@ impl Verifiers {
 #[derive(Debug, Deserialize)]
 pub struct GenesisConfig {
     pub genesis_root: String,
-    pub genesis_rollup_leaf_index: u64,
-    pub genesis_batch_commitment: String,
+    #[serde(default)]
+    pub genesis_rollup_leaf_index: Option<u64>,
+    #[serde(default)]
+    pub genesis_batch_commitment: Option<String>,
 }
 
 impl GenesisConfig {
+    pub async fn init_v31(
+        kind: GenesisConfigKind,
+        contracts_commit: Option<&str>,
+    ) -> anyhow::Result<Self> {
+        if let Some(contracts_commit) = contracts_commit {
+            return Self::init_v31_from_github(kind, contracts_commit).await;
+        }
+
+        Self::init_v31_from_local(kind)
+    }
+
+    fn init_v31_from_local(kind: GenesisConfigKind) -> anyhow::Result<Self> {
+        let path = repo_relative_path(kind.local_path());
+        let data = fs::read_to_string(&path)
+            .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
+        serde_json::from_str(&data)
+            .map_err(|e| anyhow::anyhow!("failed to parse {}: {e}", path.display()))
+    }
+
+    async fn init_v31_from_github(kind: GenesisConfigKind, commit: &str) -> anyhow::Result<Self> {
+        let path = kind.local_path();
+        let data = get_contents_from_github(commit, "matter-labs/era-contracts", path).await;
+        serde_json::from_str(&data).map_err(|e| {
+            anyhow::anyhow!("failed to parse {path} from matter-labs/era-contracts@{commit}: {e}")
+        })
+    }
+
     /// Initializes the genesis configuration from a file on GitHub.
     pub async fn init_from_github(commit: &str) -> anyhow::Result<Self> {
         println!("init from github {}", commit);

@@ -7,6 +7,7 @@ use serde::Deserialize;
 pub(crate) struct EcosystemUpgradeArtifact {
     pub(crate) value: toml::Value,
     pub(crate) chain_upgrade_diamond_cut: String,
+    pub(crate) contracts_config: ContractsConfig,
     pub(crate) governance_calls: GovernanceCalls,
 }
 
@@ -26,6 +27,7 @@ impl EcosystemUpgradeArtifact {
         Ok(Self {
             value,
             chain_upgrade_diamond_cut: fields.chain_upgrade_diamond_cut,
+            contracts_config: fields.contracts_config,
             governance_calls: fields.governance_calls,
         })
     }
@@ -34,7 +36,16 @@ impl EcosystemUpgradeArtifact {
 #[derive(Debug, Deserialize)]
 struct EcosystemUpgradeArtifactFields {
     chain_upgrade_diamond_cut: String,
+    contracts_config: ContractsConfig,
     governance_calls: GovernanceCalls,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct ContractsConfig {
+    pub(crate) diamond_cut_data: String,
+    pub(crate) force_deployments_data: String,
+    pub(crate) new_protocol_version: u64,
+    pub(crate) old_protocol_version: u64,
 }
 
 #[derive(Debug, Deserialize)]

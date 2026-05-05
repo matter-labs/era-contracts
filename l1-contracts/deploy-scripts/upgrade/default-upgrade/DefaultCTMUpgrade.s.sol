@@ -837,6 +837,11 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
             "chain_type_manager_implementation_addr",
             ctmAddresses.stateTransition.implementations.chainTypeManager
         );
+        vm.serializeAddress(
+            "state_transition",
+            "chain_type_manager_proxy",
+            ctmAddresses.stateTransition.proxies.chainTypeManager
+        );
         // Also save as state_transition_implementation_addr for backwards compatibility with zkstack CLI
         vm.serializeAddress(
             "state_transition",

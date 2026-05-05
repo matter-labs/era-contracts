@@ -239,12 +239,6 @@ impl UpgradeOutput {
             .await
             .context("checking facets")?;
 
-        let (gw_facets_to_remove, gw_facets_to_add) = self
-            .deployed_addresses
-            .get_expected_facet_cuts(verifiers, result, true)
-            .await
-            .context("checking gw facets")?;
-
         result
             .expect_deployed_bytecode(verifiers, &self.create2_factory_addr, "Create2Factory")
             .await;
@@ -253,15 +247,7 @@ impl UpgradeOutput {
             calls: CallList::parse(&self.governance_calls.governance_stage0_calls),
         };
 
-        stage0
-            .verify(
-                verifiers,
-                result,
-                self.gateway_chain_id,
-                self.priority_txs_l2_gas_limit,
-            )
-            .await
-            .context("stage0")?;
+        stage0.verify(verifiers, result).context("stage0")?;
 
         let stage1 = GovernanceStage1Calls {
             calls: CallList::parse(&self.governance_calls.governance_stage1_calls),
@@ -269,28 +255,14 @@ impl UpgradeOutput {
 
         let l1_expected_upgrade_facets =
             l1_facets_to_remove.merge(l1_facets_to_add.clone()).clone();
-
-        let gw_expected_upgrade_facets =
-            gw_facets_to_remove.merge(gw_facets_to_add.clone()).clone();
-
-        let (
-            l1_expected_chain_creation_data,
-            l1_expected_force_deployments,
-            gw_expected_chain_creation_data,
-            gw_expected_force_deployments,
-        ) = stage1
+        let (l1_expected_chain_creation_data, l1_expected_force_deployments) = stage1
             .verify(
                 verifiers,
                 result,
-                self.gateway_chain_id,
-                self.priority_txs_l2_gas_limit,
                 l1_facets_to_add.clone(),
-                gw_facets_to_add.clone(),
-                &self.deployed_addresses,
-                l1_expected_upgrade_facets.clone(),
+                l1_expected_upgrade_facets,
                 &self.chain_upgrade_diamond_cut,
-                gw_expected_upgrade_facets.clone(),
-                &self.gateway.upgrade_cut_data,
+                self.deployed_addresses.l1_bytecodes_supplier_addr,
             )
             .await
             .context("stage1")?;
@@ -299,15 +271,7 @@ impl UpgradeOutput {
             calls: CallList::parse(&self.governance_calls.governance_stage2_calls),
         };
 
-        stage2
-            .verify(
-                verifiers,
-                result,
-                self.gateway_chain_id,
-                self.priority_txs_l2_gas_limit,
-            )
-            .await
-            .context("stage2")?;
+        stage2.verify(verifiers, result).context("stage2")?;
 
         self.contracts_config
             .verify(
@@ -315,18 +279,6 @@ impl UpgradeOutput {
                 result,
                 l1_expected_chain_creation_data,
                 l1_expected_force_deployments,
-            )
-            .await;
-
-        let mut config = self.contracts_config.clone();
-        config.diamond_cut_data = self.gateway.diamond_cut_data.clone();
-
-        config
-            .verify(
-                verifiers,
-                result,
-                gw_expected_chain_creation_data,
-                gw_expected_force_deployments,
             )
             .await;
 

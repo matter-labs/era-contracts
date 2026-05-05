@@ -1,11 +1,13 @@
 use alloy::hex::{self, FromHex};
 use alloy::primitives::{keccak256, Address, Bytes, FixedBytes};
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
 
 use super::{
     address_from_short_hex, compute_create2_address_zk, compute_hash_with_arguments,
-    get_contents_from_github,
+    get_contents_from_github, repo_relative_path,
 };
 
 pub struct BytecodeVerifier {
@@ -20,6 +22,19 @@ pub struct BytecodeVerifier {
 }
 
 impl BytecodeVerifier {
+    pub async fn init_v31(contracts_commit: Option<&str>) -> anyhow::Result<Self> {
+        if let Some(contracts_commit) = contracts_commit {
+            return Ok(Self::init_from_github(contracts_commit).await);
+        }
+
+        Self::init_from_local()
+    }
+
+    pub fn init_from_local() -> anyhow::Result<Self> {
+        let contract_hashes = ContractHashes::init_from_local()?;
+        Ok(Self::from_contract_hashes(contract_hashes))
+    }
+
     /// Tries to parse `maybe_bytecode` as init code by testing 0 to 9 arguments.
     ///
     /// On success, returns a tuple of the contract file name and the extra argument
@@ -136,12 +151,16 @@ impl BytecodeVerifier {
 
     /// Initializes the verifier from contract hashes obtained from GitHub.
     pub async fn init_from_github(commit: &str) -> Self {
+        let contract_hashes = ContractHashes::init_from_github(commit).await;
+        Self::from_contract_hashes(contract_hashes)
+    }
+
+    fn from_contract_hashes(contract_hashes: ContractHashes) -> Self {
         let mut init_bytecode_file_by_hash = HashMap::new();
         let mut deployed_bytecode_file_by_hash = HashMap::new();
         let mut bytecode_file_to_zkhash = HashMap::new();
         let mut zk_bytecode_file_by_hash = HashMap::new();
 
-        let contract_hashes = ContractHashes::init_from_github(commit).await;
         for contract in contract_hashes.hashes {
             if let Some(ref hash) = contract.evm_bytecode_hash {
                 let decoded = hex::decode(hash).unwrap_or_else(|_| {
@@ -235,6 +254,25 @@ pub struct ContractHashes {
 }
 
 impl ContractHashes {
+    pub fn init_from_local() -> anyhow::Result<Self> {
+        const LOCAL_CONTRACT_HASHES_PATH: &str = "AllContractsHashes.json";
+
+        let path = repo_relative_path(LOCAL_CONTRACT_HASHES_PATH);
+        let contents = fs::read_to_string(&path).with_context(|| {
+            format!(
+                "failed to read {}; run `yarn calculate-hashes:fix` or \
+                 `npx ts-node scripts/calculate-hashes.ts` from the repository root, or pass \
+                 `--contracts-commit` to fetch AllContractsHashes.json from GitHub",
+                path.display()
+            )
+        })?;
+
+        Ok(Self {
+            hashes: serde_json::from_str(&contents)
+                .context("failed to parse local AllContractsHashes.json")?,
+        })
+    }
+
     /// Initializes the contract hashes by fetching and parsing the JSON from GitHub.
     pub async fn init_from_github(commit: &str) -> Self {
         let contents = Self::get_contents(commit).await;

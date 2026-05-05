@@ -1,11 +1,13 @@
 use std::path::PathBuf;
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 
 use crate::{
     common::logger,
     upgrade_verification::{
-        artifact_shape, artifacts::EcosystemUpgradeArtifact, verifiers::VerificationResult,
+        artifact_shape,
+        artifacts::EcosystemUpgradeArtifact,
+        verifiers::{GenesisConfigKind, VerificationResult},
     },
 };
 
@@ -23,12 +25,42 @@ pub struct VerifyUpgradeArgs {
     /// Path to the v31 ecosystem upgrade TOML produced by `upgrade-prepare`.
     #[clap(long)]
     pub ecosystem_toml: PathBuf,
+
+    /// Optional era-contracts commit to load AllContractsHashes.json from GitHub.
+    /// If omitted, AllContractsHashes.json is read from the repository root.
+    #[clap(long)]
+    pub contracts_commit: Option<String>,
+
+    /// Which local v31 genesis config to load.
+    #[clap(long, value_enum, default_value_t = VerifyUpgradeGenesisConfig::Era)]
+    pub genesis_config: VerifyUpgradeGenesisConfig,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum VerifyUpgradeGenesisConfig {
+    Era,
+    ZksyncOs,
+}
+
+impl From<VerifyUpgradeGenesisConfig> for GenesisConfigKind {
+    fn from(value: VerifyUpgradeGenesisConfig) -> Self {
+        match value {
+            VerifyUpgradeGenesisConfig::Era => Self::Era,
+            VerifyUpgradeGenesisConfig::ZksyncOs => Self::ZksyncOs,
+        }
+    }
 }
 
 pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     logger::step("Verifying ecosystem upgrade artifacts");
     logger::info(format!("Ecosystem TOML: {}", args.ecosystem_toml.display()));
     logger::info(format!("L1 RPC URL: {}", args.l1_rpc_url));
+    logger::info(format!("Genesis config: {:?}", args.genesis_config));
+    if let Some(contracts_commit) = &args.contracts_commit {
+        logger::info(format!("Contracts commit: {contracts_commit}"));
+    } else {
+        logger::info("Contracts hashes: local repository AllContractsHashes.json");
+    }
 
     let artifact = EcosystemUpgradeArtifact::read(&args.ecosystem_toml)?;
     artifact_shape::verify(&artifact)?;
@@ -38,6 +70,8 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     let verification_result = crate::upgrade_verification::versions::v31::verify(
         &artifact,
         &args.l1_rpc_url,
+        args.contracts_commit.as_deref(),
+        args.genesis_config.into(),
         &mut result,
     )
     .await;

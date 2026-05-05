@@ -1,4 +1,4 @@
-use alloy::{hex, sol, sol_types::SolValue};
+use alloy::{hex, primitives::U256, sol, sol_types::SolValue};
 use std::collections::VecDeque;
 
 use crate::upgrade_verification::verifiers::{VerificationResult, Verifiers};
@@ -84,17 +84,24 @@ fn expect_simple_call(
         )
     })?;
 
-    let address_from_call = verifiers
+    let expected_target = verifiers
         .address_verifier
-        .address_to_name
-        .get(&call.target)
-        .map(String::as_str)
-        .unwrap_or_else(|| "Unknown");
+        .name_to_address
+        .get(target)
+        .ok_or_else(|| format!("Expected call target {} is not known", target))?;
 
-    if target != address_from_call {
+    if &call.target != expected_target {
+        let actual_target = verifiers.address_verifier.name_or_unknown(&call.target);
         return Err(format!(
             "Expected call to: {} with data: {} not found - instead the call is to {}",
-            target, method_name, address_from_call
+            target, method_name, actual_target
+        ));
+    }
+
+    if call.value != U256::ZERO {
+        return Err(format!(
+            "Expected call to {} with {} to have zero value, but got {}",
+            target, method_name, call.value
         ));
     }
 

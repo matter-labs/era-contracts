@@ -47,7 +47,8 @@ sol! {
         DiamondCutData diamondCut,
         uint256 oldProtocolVersion,
         uint256 oldProtocolVersionDeadline,
-        uint256 newProtocolVersion
+        uint256 newProtocolVersion,
+        address verifier
     );
 
     #[derive(Debug)]

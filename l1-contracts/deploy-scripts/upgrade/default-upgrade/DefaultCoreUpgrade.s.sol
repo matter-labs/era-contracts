@@ -199,6 +199,19 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             "chain_asset_handler_proxy_addr",
             coreAddresses.bridgehub.proxies.chainAssetHandler
         );
+        if (coreAddresses.bridgehub.proxies.assetTracker != address(0)) {
+            require(coreAddresses.bridgehub.implementations.assetTracker != address(0), "assetTrackerImpl is zero");
+            vm.serializeAddress(
+                "bridgehub",
+                "l1_asset_tracker_implementation_addr",
+                coreAddresses.bridgehub.implementations.assetTracker
+            );
+            vm.serializeAddress(
+                "bridgehub",
+                "l1_asset_tracker_proxy_addr",
+                coreAddresses.bridgehub.proxies.assetTracker
+            );
+        }
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", coreAddresses.bridgehub.proxies.messageRoot);
         string memory bridgehubSerialized = vm.serializeAddress(
             "bridgehub",

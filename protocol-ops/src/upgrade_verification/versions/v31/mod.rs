@@ -3,14 +3,17 @@
 use std::str::FromStr;
 
 use crate::upgrade_verification::{
-    artifacts::EcosystemUpgradeArtifact, verifiers::VerificationResult,
+    artifacts::EcosystemUpgradeArtifact,
+    verifiers::{GenesisConfigKind, VerificationResult, Verifiers},
 };
 
 pub(crate) mod elements;
 pub(crate) mod utils;
 
-use elements::protocol_version::ProtocolVersion;
 pub(crate) use elements::UpgradeOutput;
+use elements::{
+    governance_stage_calls::verify_governance_stage_calls, protocol_version::ProtocolVersion,
+};
 
 pub(crate) const EXPECTED_NEW_PROTOCOL_VERSION_STR: &str = "0.31.0";
 // v31 supports chains upgrading from v29 or v30; this is only for copied PUVT scaffolding
@@ -28,15 +31,21 @@ pub(crate) fn get_expected_old_protocol_version() -> ProtocolVersion {
 }
 
 pub(crate) async fn verify(
-    _artifact: &EcosystemUpgradeArtifact,
-    _l1_rpc_url: &str,
+    artifact: &EcosystemUpgradeArtifact,
+    l1_rpc_url: &str,
+    contracts_commit: Option<&str>,
+    genesis_config_kind: GenesisConfigKind,
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
     result.print_info("== Config verification ==");
+    let verifiers =
+        Verifiers::new_v31(artifact, l1_rpc_url, contracts_commit, genesis_config_kind).await?;
+    result.report_ok(&format!(
+        "v31 verifier context loaded with {} named addresses",
+        verifiers.address_verifier.name_to_address.len()
+    ));
 
-    // The next steps in this module should mirror PUVT's `UpgradeOutput::verify`:
-    // decode stage calls, verify stage ordering/selectors, decode setNewVersionUpgrade,
-    // and validate the embedded L2 upgrade transaction.
+    verify_governance_stage_calls(artifact, &verifiers, result)?;
 
     Ok(())
 }

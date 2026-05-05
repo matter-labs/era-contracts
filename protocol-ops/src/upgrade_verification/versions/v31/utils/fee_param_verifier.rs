@@ -30,6 +30,19 @@ fn expand_to_word(slice: &[u8]) -> Vec<u8> {
 }
 
 impl FeeParamVerifier {
+    pub fn empty() -> Self {
+        Self {
+            fee_params: FeeParams {
+                pubdataPricingMode: PubdataPricingMode::Rollup,
+                batchOverheadL1Gas: 0,
+                maxPubdataPerBatch: 0,
+                maxL2GasPerBatch: 0,
+                priorityTxMaxPubdata: 0,
+                minimalL2GasPrice: 0,
+            },
+        }
+    }
+
     pub async fn safe_init(
         bridgehub_addr: &Address,
         network_verifier: &NetworkVerifier,
