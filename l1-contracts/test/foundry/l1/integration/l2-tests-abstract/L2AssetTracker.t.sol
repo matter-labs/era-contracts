@@ -161,7 +161,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             // ---- Outcome assertions ----
             Vm.Log[] memory iterLogs = vm.getRecordedLogs();
 
-            // Persistence: the chain batch root for this batch must now be stored.
+            // Verify the chain batch root for this batch is now stored.
             assertEq(
                 L2_MESSAGE_ROOT.chainBatchRoots(testData[i].chainId, testData[i].batchNumber),
                 testData[i].chainBatchRoot,
@@ -257,7 +257,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
 
         // ---- Outcome assertions ----
 
-        // chainBalance: native branch sets it to MAX_TOKEN_BALANCE - ntvBalance.
+        // Verify chainBalance is set to MAX_TOKEN_BALANCE - ntvBalance (native branch)
         uint256 expectedBalance = MAX_TOKEN_BALANCE - ntvBalance;
         assertEq(
             tracker.chainBalance(block.chainid, assetId),
@@ -265,10 +265,10 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             "Chain balance should be correctly migrated"
         );
 
-        // isAssetRegistered: flipped to true at the end of _registerLegacyToken.
+        // Verify isAssetRegistered flipped to true at the end of _registerLegacyToken.
         assertTrue(tracker.isAssetRegistered(assetId), "Asset should be registered after call");
 
-        // totalPreV31TotalSupply: native branch saves {isSaved: true, amount: chainTotalSupply}
+        // Verify totalPreV31TotalSupply: native branch saves {isSaved: true, amount: chainTotalSupply}
         // where chainTotalSupply equals the freshly written chainBalance.
         (bool isSaved, uint256 amount) = tracker.totalPreV31TotalSupply(assetId);
         assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
@@ -616,46 +616,3 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         assertEq(amount, totalSupply, "totalPreV31TotalSupply.amount should match token totalSupply");
     }
 }
-
-/* Additional cases suggested
-  Happy-path
-
-  1. test_registerLegacyToken_foreignToken — direct sibling to the existing native-token test, exercises the originChainId != block.chainid branch
-  of _registerLegacyToken (L2AssetTracker.sol:349–355). Asserts totalPreV31TotalSupply.amount == IERC20.totalSupply() (not the MAX_TOKEN_BALANCE -
-  ntvBalance formula) and chainBalance left untouched. Currently this branch is only exercised indirectly through
-  test_handleFinalizeBridgingOnL2_requiresTokenRegistration.
-  2. test_initiateL1ToGatewayMigrationOnL2_earlyReturnWhenAlreadyMigrated — set chainMigrationNumber == savedAssetMigrationNumber so the function
-  returns at L2AssetTracker.sol:426–428. Assert: no L1ToGatewayMigrationInitiated event emitted (vm.recordLogs + LogFinder.findAllFrom(...).length
-  == 0), assetMigrationNumber unchanged, and crucially that _sendL1ToGatewayMigrationDataToL1 was not invoked. Locks the early-return invariant.
-  3. test_confirmMigrationOnL2_setsAssetMigrationNumber — the L2 side of the migration completion is currently never directly tested in this file;
-  only its precondition. Prank as the service-transaction sender, call confirmMigrationOnL2, assert assetMigrationNumber[block.chainid][assetId]
-  flips to the supplied value.
-
-  Unhappy-path
-
-  4. test_initiateL1ToGatewayMigrationOnL2_revertWhen_settlementLayerIsL1 — mock currentSettlementLayerChainId() == L1_CHAIN_ID, expect
-  OnlyGatewaySettlementLayer.selector. Pins L2AssetTracker.sol:408–411.
-  5. test_initiateL1ToGatewayMigrationOnL2_revertWhen_baseTokenBackfillRequired — set needBaseTokenTotalSupplyBackfill = true, expect
-  BaseTokenTotalSupplyBackfillRequired.selector. Pins L2AssetTracker.sol:417–419.
-  6. test_handleFinalizeBaseTokenBridgingOnL2_revertWhen_baseTokenAssetIdZero — leave BASE_TOKEN_ASSET_ID = bytes32(0) (pre-genesis state), call
-  with amount > 0, expect MissingBaseTokenAssetId.selector. Pins L2AssetTracker.sol:384–388.
-  7. test_confirmMigrationOnL2_revertWhen_callerNotServiceTx — prank from a random address, expect the onlyServiceTransactionSender revert.
-  Currently no negative test for this entry point.
-
-  Edge cases
-
-  8. test_handleFinalizeBaseTokenBridgingOnL2_zeroAmountIsNoop — call with amount = 0, assert no state change (chainBalance,
-  totalSuccessfulDepositsFromL1, isAssetRegistered all unchanged) and no event. Pins the if (_amount == 0) return; shortcut at
-  L2AssetTracker.sol:381–383.
-  9. test_registerLegacyToken_idempotent — call registerLegacyToken(assetId) twice; second call must early-return at L2AssetTracker.sol:194–196.
-  Snapshot all storage between the two calls and assert byte-for-byte identical.
-
-  Adversarial
-
-  10. test_initiateL1ToGatewayMigrationOnL2_replay — call twice in succession. The second call should not emit a second
-  L1ToGatewayMigrationInitiated (because state is now consistent with chainMigrationNumber). Bound the protocol's "replay produces silent no-op"
-  invariant.
-  11. test_processLogsAndMessages_revertWhen_callerIsNotZKChain — heavy fixture is shared across the existing happy-path test, but none of the
-  negative paths for processLogsAndMessages are tested. Prank as a non-ZKChain caller, expect the appropriate access-control revert (verify the
-  exact selector against GWAssetTracker.processLogsAndMessages's caller check).
-*/

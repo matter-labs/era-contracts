@@ -178,16 +178,6 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         assertTrue(filterer != address(0), "Transaction filterer should be deployed for gateway chain");
     }
 
-    //@check  Should other unhappy and edge case tests live here?
-    // Unhappy
-    // - Call setSettlementLayerStatus directly from a random address.
-    // - Chain's settlement layer is set to something other than L1
-    // - Attempt to whitelist a chain ID that was never registered in the bridgehub.
-    // Edge cases
-    // - Deregister a previously registered chain
-    // - Register the same chain twice
-
-    //
     function test_moveChainToGateway() public {
         _setUpGatewayWithFilterer();
 

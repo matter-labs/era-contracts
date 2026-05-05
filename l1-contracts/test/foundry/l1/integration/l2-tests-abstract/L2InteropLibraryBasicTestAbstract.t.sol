@@ -130,36 +130,3 @@ abstract contract L2InteropLibraryBasicTestAbstract is L2InteropTestUtils {
         assertEq(returnedHash, bytes32(uint256(1)), "sendMessage must forward sendToL1's mocked return value");
     }
 }
-
-/* Coverage improvement suggestions
-
-  Happy-path
-
-  1. test_sendDirectCallViaLibrary_withCallData — the existing test_requestSendCallViaLibrary uses simpleCall() with no args. Add a sibling that
-  passes calldata containing function args + factoryDeps, then verifies the MessageSent.payload round-trips byte-for-byte. Catches "library
-  serialises calldata wrong" regressions specific to ABI tail handling.
-  2. test_sendMessageToL1ViaLibrary_largeMessage — call InteropLibrary.sendMessage with a >1 KiB message; same vm.expectCall shape as the patched
-  test. Locks the calldata-encoding path against gas/ABI surprises at non-trivial sizes.
-
-  Unhappy-path
-
-  3. test_sendTokenViaLibrary_revertWhen_zeroAmount — call InteropLibrary.sendToken(..., 0, ...), expect the underlying revert (whichever the
-  asset-router / NTV throws for zero-amount transfers). Today the test uses 100 and never exercises the boundary.
-  4. test_sendTokenViaLibrary_revertWhen_uninitializedToken — call without first running initializeTokenByDeposit; verify the library propagates the
-   asset-not-registered revert. Locks behavior against silent fallthrough.
-  5. test_sendDirectCallViaLibrary_revertWhen_executorIsZero — pass address(0) as EXECUTION_ADDRESS; expect the InteropCenter's argument-validation
-  revert.
-
-  Edge cases
-
-  6. test_sendMessageToL1ViaLibrary_emptyMessage — call with bytes(""). Decide intent: if the messenger accepts empty, assert the dispatch shape
-  with vm.expectCall(... abi.encodeCall(... ("")); if it should revert, lock the revert. Today the test only uses "testing interop".
-  7. test_sendDirectCallViaLibrary_attrsCount — the existing test asserts attrs.length == 3. Pin the contents of the attribute slots (e.g., the
-  merged execution / unbundler addresses encoded in attrs[0..2]) so silent attribute reordering or omission is caught.
-
-  Adversarial
-
-  8. test_sendTokenViaLibrary_revertOnRecipientAliasing — pass address(this) as the recipient with EXECUTION_ADDRESS resolving to a different alias;
-   verify the library does not silently overwrite recipient. Mostly defensive; unlikely to fire but cheap.
-
-*/

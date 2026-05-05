@@ -118,22 +118,6 @@ abstract contract L2AssetRouterReceiveMessageAccessControlRegressionTestAbstract
     }
 }
 
-/* Code/case coverage improvement suggestions:
-  Unhappy-path
-  1. test_regression_receiveMessageRevertsWhen_PayloadTooShort — call from L2_INTEROP_HANDLER_ADDR with payload.length <= 4 and
-  vm.expectRevert(PayloadTooShort.selector). Pins the L248 check; complementary to the existing InvalidSelector-based test.
-  2. test_regression_receiveMessageRevertsWhen_SenderChainIsL1 — craft sender with senderChainId == L1_CHAIN_ID, expect Unauthorized(senderAddress)
-  from L244. Locks down the secondary Unauthorized check (currently only the gate-level Unauthorized at L226 is exercised).
-  3. test_regression_receiveMessageRevertsWhen_SenderAddressNotSelf — craft sender with senderAddress != L2_ASSET_ROUTER_ADDR, expect
-  Unauthorized(senderAddress) from L244. Same line, different branch.
-  4. test_regression_receiveMessageRevertsWhen_ExecutedPayloadFails — valid selector but malformed inner args so address(this).call(payload) returns
-   false, expect ExecuteMessageFailed.selector. Pins L255.
-
-  Edge cases (best-effort)
-  5. test_regression_receiveMessageRevertsWhen_SenderBytesMalformed — pass sender that fails InteroperableAddress.parseEvmV1Calldata (e.g., wrong
-  length / version byte). Confirms parse errors surface as reverts before access-state checks corrupt anything
-*/
-
 /// @notice Malicious contract that attempts to call receiveMessage
 contract MaliciousInteropCaller {
     function tryCallReceiveMessage(address assetRouter, bytes memory sender, bytes memory payload) external {
