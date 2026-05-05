@@ -137,7 +137,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         assertFalse(
             IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
             "Migration should not be paused initially"
-        ); 
+        );
 
         vm.recordLogs();
         vm.prank(owner);
@@ -164,10 +164,7 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
         IChainAssetHandlerBase(handler).pauseMigration();
 
         // Verify migration is paused
-        assertTrue(
-            IChainAssetHandlerBase(handler).migrationPaused(),
-            "Migration should be paused before unpause"
-        );
+        assertTrue(IChainAssetHandlerBase(handler).migrationPaused(), "Migration should be paused before unpause");
 
         // Now unpause migration
         vm.recordLogs();
