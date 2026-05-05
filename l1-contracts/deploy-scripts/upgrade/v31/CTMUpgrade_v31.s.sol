@@ -40,10 +40,8 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // The constructor will receive the new BytecodesSupplier proxy address
         // Select the correct ChainTypeManager based on chain type (Era vs ZKsyncOS)
         // FIXME we never actually use deploySimpleContract or deploy TUPP with anything else than false. We need to clean this code.
-        (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(
-            config.isZKsyncOS,
-            CTMContract.ChainTypeManager
-        );
+        (, string memory ctmContractName) =
+            DeployCTML1OrGateway.resolve(config.isZKsyncOS, CTMContract.ChainTypeManager);
         console.log("Deploying ChainTypeManager:", ctmContractName);
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
 
@@ -52,9 +50,8 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
     /// @notice Override to deploy the correct v31 upgrade contract based on chain type.
     function deployUsedUpgradeContract() internal virtual override returns (address) {
-        string memory contractName = config.isZKsyncOS
-            ? "ZKsyncOSSettlementLayerV31Upgrade"
-            : "EraSettlementLayerV31Upgrade";
+        string memory contractName =
+            config.isZKsyncOS ? "ZKsyncOSSettlementLayerV31Upgrade" : "EraSettlementLayerV31Upgrade";
         console.log("Deploying", contractName);
         return deploySimpleContract(contractName, false);
     }
@@ -92,27 +89,26 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // The fixedForceDeploymentsData is ecosystem-wide (same for all chains).
         // The additionalForceDeploymentsData placeholder is rewritten per-chain by
         // SettlementLayerV31UpgradeBase._buildL2V31UpgradeCalldata at upgrade time.
-        return
-            abi.encodeCall(
-                IL2V31Upgrade.upgrade,
-                (
-                    config.isZKsyncOS,
-                    coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
-                    generatedData.forceDeploymentsData,
-                    ""
-                )
-            );
+        return abi.encodeCall(
+            IL2V31Upgrade.upgrade,
+            (
+                config.isZKsyncOS,
+                coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
+                generatedData.forceDeploymentsData,
+                ""
+            )
+        );
     }
 
-    function getEraL2UpgradeTargetAndData(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
-    ) internal virtual override returns (address, bytes memory) {
-        return
-            getComplexUpgraderTargetAndData(
-                _deployments,
-                L2_VERSION_SPECIFIC_UPGRADER_ADDR,
-                getV31L2UpgradeCalldata()
-            );
+    function getEraL2UpgradeTargetAndData(IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments)
+        internal
+        virtual
+        override
+        returns (address, bytes memory)
+    {
+        return getComplexUpgraderTargetAndData(
+            _deployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, getV31L2UpgradeCalldata()
+        );
     }
 
     /// @notice V31-specific: include L2V31Upgrade as an additional ZKsyncOS force deployment.
@@ -132,9 +128,12 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         });
     }
 
-    function getZKsyncOSL2UpgradeTargetAndData(
-        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
-    ) internal virtual override returns (address, bytes memory) {
+    function getZKsyncOSL2UpgradeTargetAndData(IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments)
+        internal
+        virtual
+        override
+        returns (address, bytes memory)
+    {
         // For ZKsyncOS, the delegateTo address is a derived address (not the constant
         // L2_VERSION_SPECIFIC_UPGRADER_ADDR) to avoid overwriting existing bytecode.
         // Must match the newAddress in getV31AdditionalZKsyncOSUniversalForceDeployments.
