@@ -8,10 +8,38 @@ import {
   buildInteropCallExecutedLogs,
   callProcessLogsAndMessages,
   getGWChainBalance,
-  getGWPendingInteropBalance,
 } from "../../src/helpers/process-logs-helper";
-import { extractInteropBundle, getChainIdByRole, getChainIdsByRole, getL2Chain } from "../../src/core/utils";
-import { encodeNtvAssetId } from "../../src/core/data-encoding";
+import { migrateTokenBalanceToGW } from "../../src/helpers/token-balance-migration-helper";
+import { getAbi } from "../../src/core/contracts";
+import { L2_NATIVE_TOKEN_VAULT_ADDR } from "../../src/core/const";
+import { getChainIdByRole, getChainIdsByRole, getL2Chain, getChainDiamondProxy } from "../../src/core/utils";
+
+/**
+ * Extract the InteropBundle struct from the source transaction receipt.
+ * Parses the InteropBundleSent event emitted by InteropCenter.
+ */
+async function extractInteropBundle(
+  rpcUrl: string,
+  txHash: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
+  const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+  const receipt = await provider.getTransactionReceipt(txHash);
+  const iface = new ethers.utils.Interface(getAbi("InteropCenter"));
+
+  for (const logEntry of receipt.logs) {
+    try {
+      const parsed = iface.parseLog({ topics: logEntry.topics, data: logEntry.data });
+      if (parsed.name === "InteropBundleSent") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (parsed.args as any).interopBundle;
+      }
+    } catch {
+      // Not an InteropCenter log
+    }
+  }
+  throw new Error(`InteropBundleSent event not found in tx ${txHash}`);
+}
 
 describe("06 - Gateway Interop (GW-settled chains)", function () {
   this.timeout(0);
@@ -32,7 +60,7 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
 
   /**
    * Helper: execute a token transfer and then process the interop bundle log
-   * via processLogsAndMessages on the gateway, verifying GW tracker accounting.
+   * via processLogsAndMessages on the gateway, verifying chainBalance changes.
    */
   async function transferAndProcessLogs(params: {
     sourceChainId: number;
@@ -45,7 +73,12 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
     const gwProvider = new ethers.providers.JsonRpcProvider(gwChain.rpcUrl);
 
     const sourceToken = params.sourceTokenAddress || state.testTokens![sourceChainId];
-    const assetId = encodeNtvAssetId(sourceChainId, sourceToken);
+    const assetId = ethers.utils.keccak256(
+      ethers.utils.defaultAbiCoder.encode(
+        ["uint256", "address", "address"],
+        [sourceChainId, L2_NATIVE_TOKEN_VAULT_ADDR, sourceToken]
+      )
+    );
 
     const result = await executeTokenTransfer({
       sourceChainId,
@@ -70,17 +103,34 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
       interopBundle,
     });
 
-    // TBM is done at setup stage; source chain should already have sufficient GW balance
+    // Establish the source chain's balance via TBM if needed
+    const amountBN = BigNumber.from(result.amountWei);
+    const currentSrcBalance = await getGWChainBalance(gwProvider, sourceChainId, assetId);
+    if (currentSrcBalance.lt(amountBN)) {
+      const l1Provider = new ethers.providers.JsonRpcProvider(state.chains!.l1!.rpcUrl);
+      const srcChain = getL2Chain(state.chains!, sourceChainId);
+      const l2Provider = new ethers.providers.JsonRpcProvider(srcChain.rpcUrl);
+      const gwDiamondProxy = getChainDiamondProxy(state.chainAddresses!, gwChainId);
+      const l2DiamondProxy = getChainDiamondProxy(state.chainAddresses!, sourceChainId);
+
+      await migrateTokenBalanceToGW({
+        l2Provider,
+        l1Provider,
+        gwProvider,
+        chainId: sourceChainId,
+        assetId,
+        l1AssetTrackerAddr: state.l1Addresses!.l1AssetTracker,
+        gwDiamondProxyAddr: gwDiamondProxy,
+        l2DiamondProxyAddr: l2DiamondProxy,
+        logger: (line) => console.log(line),
+      });
+    }
 
     const srcGwBalanceBefore = await getGWChainBalance(gwProvider, sourceChainId, assetId);
     const dstGwBalanceBefore = await getGWChainBalance(gwProvider, targetChainId, assetId);
-    const dstPendingInteropBefore = await getGWPendingInteropBalance(gwProvider, targetChainId, assetId);
 
     console.log(`   GWAssetTracker.chainBalance[${sourceChainId}][assetId] before: ${srcGwBalanceBefore}`);
     console.log(`   GWAssetTracker.chainBalance[${targetChainId}][assetId] before: ${dstGwBalanceBefore}`);
-    console.log(
-      `   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] before: ${dstPendingInteropBefore}`
-    );
 
     const processResult = await callProcessLogsAndMessages({
       gwProvider,
@@ -93,55 +143,15 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
 
     expect(processResult.txHash).to.not.be.null;
 
-    const srcGwBalanceAfter = await getGWChainBalance(gwProvider, sourceChainId, assetId);
-    const dstGwBalanceAfter = await getGWChainBalance(gwProvider, targetChainId, assetId);
-    const dstPendingInteropAfter = await getGWPendingInteropBalance(gwProvider, targetChainId, assetId);
-
-    console.log(`   GWAssetTracker.chainBalance[${sourceChainId}][assetId] after: ${srcGwBalanceAfter}`);
-    console.log(`   GWAssetTracker.chainBalance[${targetChainId}][assetId] after: ${dstGwBalanceAfter}`);
-    console.log(`   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] after: ${dstPendingInteropAfter}`);
-
-    const amountWei = BigNumber.from(result.amountWei);
-
-    const srcDelta = srcGwBalanceBefore.sub(srcGwBalanceAfter);
-    expect(
-      srcDelta.eq(amountWei),
-      `GWAssetTracker.chainBalance[${sourceChainId}][assetId] should decrease by ${amountWei}, got ${srcDelta}`
-    ).to.equal(true);
-
-    const dstChainBalanceDelta = dstGwBalanceAfter.sub(dstGwBalanceBefore);
-    const dstPendingInteropDelta = dstPendingInteropAfter.sub(dstPendingInteropBefore);
-    expect(
-      dstChainBalanceDelta.isZero(),
-      `GWAssetTracker.chainBalance[${targetChainId}][assetId] should not change before execution confirmation, got ${dstChainBalanceDelta}`
-    ).to.equal(true);
-    expect(
-      dstPendingInteropDelta.eq(amountWei),
-      `GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] should increase by ${amountWei}, got ${dstPendingInteropDelta}`
-    ).to.equal(true);
-
-    // ── Step 2: Process execution confirmation from the destination chain ──
-    // When executeBundle ran on the destination chain, InteropHandler sent L2→L1
-    // messages (one per call) confirming execution. Processing these on the GW
-    // converts pendingInteropBalance → chainBalance for the destination chain.
-
+    // Process the destination chain's interopCallExecuted logs.
+    // The merged InteropHandler now sends L2→L1 messages via _sendCallExecutedMessage
+    // for each executed call. GWAssetTracker needs these to credit the destination chain balance.
     const { logs: executedLogs, messages: executedMessages } = buildInteropCallExecutedLogs({
       startTxNumberInBatch: 0,
       interopBundle,
     });
 
-    const dstPendingBeforeConfirm = await getGWPendingInteropBalance(gwProvider, targetChainId, assetId);
-    const dstChainBalBeforeConfirm = await getGWChainBalance(gwProvider, targetChainId, assetId);
-
-    console.log(`   --- Execution confirmation (destination chain ${targetChainId} → GW) ---`);
-    console.log(
-      `   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] before confirm: ${dstPendingBeforeConfirm}`
-    );
-    console.log(
-      `   GWAssetTracker.chainBalance[${targetChainId}][assetId] before confirm: ${dstChainBalBeforeConfirm}`
-    );
-
-    const confirmResult = await callProcessLogsAndMessages({
+    const destProcessResult = await callProcessLogsAndMessages({
       gwProvider,
       gwRpcUrl: gwChain.rpcUrl,
       chainId: targetChainId,
@@ -150,26 +160,31 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
       logger: (line) => console.log(line),
     });
 
-    expect(confirmResult.txHash).to.not.be.null;
+    expect(destProcessResult.txHash).to.not.be.null;
 
-    const dstPendingAfterConfirm = await getGWPendingInteropBalance(gwProvider, targetChainId, assetId);
-    const dstChainBalAfterConfirm = await getGWChainBalance(gwProvider, targetChainId, assetId);
+    const srcGwBalanceAfter = await getGWChainBalance(gwProvider, sourceChainId, assetId);
+    const dstGwBalanceAfter = await getGWChainBalance(gwProvider, targetChainId, assetId);
 
-    console.log(
-      `   GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] after confirm: ${dstPendingAfterConfirm}`
-    );
-    console.log(`   GWAssetTracker.chainBalance[${targetChainId}][assetId] after confirm: ${dstChainBalAfterConfirm}`);
+    console.log(`   GWAssetTracker.chainBalance[${sourceChainId}][assetId] after: ${srcGwBalanceAfter}`);
+    console.log(`   GWAssetTracker.chainBalance[${targetChainId}][assetId] after: ${dstGwBalanceAfter}`);
 
-    const pendingDecrease = dstPendingBeforeConfirm.sub(dstPendingAfterConfirm);
-    const chainBalIncrease = dstChainBalAfterConfirm.sub(dstChainBalBeforeConfirm);
-    expect(
-      pendingDecrease.eq(amountWei),
-      `GWAssetTracker.pendingInteropBalance[${targetChainId}][assetId] should decrease by ${amountWei} after confirm, got ${pendingDecrease}`
-    ).to.equal(true);
-    expect(
-      chainBalIncrease.eq(amountWei),
-      `GWAssetTracker.chainBalance[${targetChainId}][assetId] should increase by ${amountWei} after confirm, got ${chainBalIncrease}`
-    ).to.equal(true);
+    const amountWei = BigNumber.from(result.amountWei);
+
+    if (sourceChainId !== 1) {
+      const srcDelta = srcGwBalanceBefore.sub(srcGwBalanceAfter);
+      expect(
+        srcDelta.eq(amountWei),
+        `GWAssetTracker.chainBalance[${sourceChainId}][assetId] should decrease by ${amountWei}, got ${srcDelta}`
+      ).to.equal(true);
+    }
+
+    if (targetChainId !== 1) {
+      const dstDelta = dstGwBalanceAfter.sub(dstGwBalanceBefore);
+      expect(
+        dstDelta.eq(amountWei),
+        `GWAssetTracker.chainBalance[${targetChainId}][assetId] should increase by ${amountWei}, got ${dstDelta}`
+      ).to.equal(true);
+    }
 
     return result;
   }
@@ -191,4 +206,8 @@ describe("06 - Gateway Interop (GW-settled chains)", function () {
       sourceTokenAddress: state.testTokens![gwSettledChainIds[1]],
     });
   });
+
+  // NOTE: Transfers to the gateway chain are no longer supported because
+  // the gateway settles on L1 and InteropHandler now requires
+  // settlementLayer(chainId) != L1_CHAIN_ID (CannotClaimInteropOnL1Settlement).
 });

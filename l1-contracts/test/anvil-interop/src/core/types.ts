@@ -111,12 +111,21 @@ export interface ChainInfo {
   config: AnvilChainConfig[];
 }
 
+export interface PrivateInteropAddresses {
+  assetTracker: string;
+  ntv: string;
+  assetRouter: string;
+  interopCenter: string;
+  interopHandler: string;
+}
+
 export interface DeploymentState {
   chains?: ChainInfo;
   l1Addresses?: CoreDeployedAddresses;
   ctmAddresses?: CTMDeployedAddresses;
   chainAddresses?: ChainAddresses[];
   testTokens?: Record<number, string>;
+  privateInteropAddresses?: Record<number, PrivateInteropAddresses>;
   /** L1 address of the custom ERC20 base token, keyed by chain ID. */
   customBaseTokens?: Record<number, string>;
   zkToken?: {

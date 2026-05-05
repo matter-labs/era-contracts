@@ -2,6 +2,7 @@
 export const L1_CHAIN_ID = 31337;
 
 export const ETH_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000001";
+export const LEGACY_SHARED_BRIDGE_PLACEHOLDER = "0x0000000000000000000000000000000000000002";
 
 export const SYSTEM_CONTEXT_ADDR = "0x000000000000000000000000000000000000800b";
 export const L2_TO_L1_MESSENGER_ADDR = "0x0000000000000000000000000000000000008008";
@@ -44,12 +45,15 @@ export const ANVIL_RECIPIENT_ADDR = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
 // 100 ETH in hex — used to fund impersonated accounts
 export const ANVIL_FUND_BALANCE = "0x56BC75E2D63100000";
 
+export const SERVICE_TX_SENDER_ADDR = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
+
 // Default gas limits for test transactions
 export const INTEROP_SEND_BUNDLE_GAS_LIMIT = 500_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
 
 export const INTEROP_BUNDLE_TUPLE_TYPE =
   "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool))";
+export const INTEROP_BUNDLE_SENT_TOPIC = "0x593b2515b718ee761cd2a586d8613d22833a452122cfb7692ebabd538d57d3ff";
 
 // AddressAliasHelper offset: uint160(0x1111000000000000000000000000000000001111)
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
@@ -85,6 +89,13 @@ export const NEW_PRIORITY_REQUEST_EVENT_SIG =
   "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])";
 export const L1_MESSAGE_SENT_EVENT_SIG = "L1MessageSent(address,bytes32,bytes)";
 export const FINALIZE_DEPOSIT_SIG = "finalizeDeposit(uint256,bytes32,bytes)";
+
+export const ZK_CHAIN_SPECIFIC_FORCE_DEPLOYMENTS_DATA_TUPLE_TYPE =
+  "tuple(address l2LegacySharedBridge, address predeployedL2WethAddress, address baseTokenL1Address, tuple(string name, string symbol, uint256 decimals) baseTokenMetadata, tuple(bytes32 assetId, uint256 originChainId, address originToken) baseTokenBridgingData)";
+
+// WritePriorityOpParams ABI tuple type for raw decoding NewPriorityRequest events
+export const WRITE_PRIORITY_OP_PARAMS_ABI_TYPE =
+  "tuple(uint256,uint256,uint256,uint256,uint256,uint256,uint256,bytes,bytes,uint256[],bytes,bytes)";
 
 // Anvil account #2 — used as a secondary distinct recipient
 export const ANVIL_ACCOUNT2_ADDR = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";

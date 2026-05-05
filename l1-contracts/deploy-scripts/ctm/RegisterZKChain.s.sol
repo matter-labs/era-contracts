@@ -120,6 +120,7 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
         for (uint256 i = 0; i < _chainIds.length; i++) {
             console.log("Deploying ZKChain", _chainIds[i]);
 
+
             // Read per-chain config
             string memory chainConfigPath = string.concat(
                 root,

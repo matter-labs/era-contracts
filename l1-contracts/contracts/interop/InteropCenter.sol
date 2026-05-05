@@ -57,6 +57,7 @@ import {InteropDataEncoding} from "./InteropDataEncoding.sol";
 import {InteroperableAddress} from "../vendor/draft-InteroperableAddress.sol";
 import {IL2CrossChainSender} from "../bridge/interfaces/IL2CrossChainSender.sol";
 import {IAssetRouterShared} from "../bridge/asset-router/IAssetRouterShared.sol";
+import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
 
 /// @dev Default fixed fee for interop calls: 10 ZK tokens.
 /// This is intentionally set sufficiently higher than the intended gateway settlement fee
@@ -128,6 +129,16 @@ contract InteropCenter is
         _;
     }
 
+    /// @notice Returns the asset router address. Virtual to allow override in private interop.
+    function _assetRouterAddr() internal view virtual returns (address) {
+        return L2_ASSET_ROUTER_ADDR;
+    }
+
+    /// @notice Returns the native token vault. Virtual to allow override in private interop.
+    function _nativeTokenVault() internal view virtual returns (IL2NativeTokenVault) {
+        return IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT);
+    }
+
     /// @inheritdoc IInteropCenter
     function getZKTokenAddress() public view returns (address) {
         // Check cached token first
@@ -136,7 +147,7 @@ contract InteropCenter is
         }
 
         // Try to resolve from asset ID
-        return L2_NATIVE_TOKEN_VAULT.tokenAddress(ZK_TOKEN_ASSET_ID);
+        return _nativeTokenVault().tokenAddress(ZK_TOKEN_ASSET_ID);
     }
 
     /// @notice Resolves ZK token address from asset ID with caching.
@@ -352,7 +363,7 @@ contract InteropCenter is
         bool _useFixedFee,
         uint256 _callCount
     ) internal {
-        bytes32 thisChainBaseTokenAssetId = L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
+        bytes32 thisChainBaseTokenAssetId = _nativeTokenVault().BASE_TOKEN_ASSET_ID();
 
         // Calculate protocol fee - only charge base token fee if not using fixed ZK fees.
         // Fee is charged per-call.
@@ -374,7 +385,7 @@ contract InteropCenter is
 
             // Handle cross-chain token deposit for different base tokens
             if (_totalBurnedCallsValue > 0) {
-                IAssetRouterShared(L2_ASSET_ROUTER_ADDR).bridgehubDepositBaseToken(
+                IAssetRouterShared(_assetRouterAddr()).bridgehubDepositBaseToken(
                     _destinationChainId,
                     _destinationBaseTokenAssetId,
                     msg.sender,
@@ -403,11 +414,10 @@ contract InteropCenter is
         BundleAttributes memory _bundleAttributes,
         bytes[][] memory _originalCallAttributes
     ) internal returns (bytes32 bundleHash) {
-        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
+        _validateGatewayMode();
 
         // Form an InteropBundle.
-        bytes32 destinationBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
-        require(destinationBaseTokenAssetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
+        bytes32 destinationBaseTokenAssetId = _getDestinationBaseTokenAssetId(_destinationChainId);
         InteropBundle memory bundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
             sourceChainId: block.chainid,
@@ -428,6 +438,7 @@ contract InteropCenter is
         // Fill the formed InteropBundle with calls.
         uint256 callStartersLength = _callStarters.length;
         for (uint256 i = 0; i < callStartersLength; ++i) {
+            _validateCallStarterValue(_callStarters[i].callAttributes.interopCallValue);
             InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId, msg.sender);
             bundle.calls[i] = interopCall;
             totalBurnedCallsValue += _callStarters[i].callAttributes.interopCallValue;
@@ -448,25 +459,20 @@ contract InteropCenter is
         }
 
         // Ensure that tokens required for bundle execution were received.
-        // solhint-disable-next-line
-        _ensureCorrectTotalValue(
-            bundle.destinationChainId,
-            bundle.destinationBaseTokenAssetId,
-            totalBurnedCallsValue,
-            totalIndirectCallsValue,
-            _bundleAttributes.useFixedFee,
-            callStartersLength
-        );
+        _handleValueCollection({
+            _destinationChainId: bundle.destinationChainId,
+            _destinationBaseTokenAssetId: bundle.destinationBaseTokenAssetId,
+            _totalBurnedCallsValue: totalBurnedCallsValue,
+            _totalIndirectCallsValue: totalIndirectCallsValue,
+            _useFixedFee: _bundleAttributes.useFixedFee,
+            _callCount: callStartersLength
+        });
 
-        bytes32 msgHash;
-        /// To avoid stack too deep error
-        {
-            bytes memory interopBundleBytes = abi.encode(bundle);
+        bytes memory interopBundleBytes = abi.encode(bundle);
+        bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
 
-            // Send the message corresponding to the relevant InteropBundle to L1.
-            msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes));
-            bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
-        }
+        // Send the L2→L1 message for the bundle.
+        bytes32 msgHash = _sendBundleToL1(interopBundleBytes, bundle.calls.length);
 
         _emitMessageSent({
             _calls: bundle.calls,
@@ -478,6 +484,52 @@ contract InteropCenter is
 
         // Emit event stating that the bundle was sent out successfully.
         emit InteropBundleSent(msgHash, bundleHash, bundle);
+    }
+
+    /// @notice Validates that we're in gateway mode. Override in private interop for pre-v31 chains.
+    function _validateGatewayMode() internal view virtual {
+        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
+    }
+
+    /// @notice Returns the base token asset ID for the destination chain. Override for pre-v31 chains.
+    function _getDestinationBaseTokenAssetId(uint256 _destinationChainId) internal view virtual returns (bytes32) {
+        bytes32 assetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
+        require(assetId != bytes32(0), DestinationChainNotRegistered(_destinationChainId));
+        return assetId;
+    }
+
+    /// @notice Validates a single call starter's interopCallValue. Override in private interop to reject value > 0.
+    function _validateCallStarterValue(uint256 /* _interopCallValue */) internal virtual {
+        // Public interop allows any value — no validation needed.
+    }
+
+    /// @notice Handles base-token value collection for the bundle. Override in private interop to skip.
+    function _handleValueCollection(
+        uint256 _destinationChainId,
+        bytes32 _destinationBaseTokenAssetId,
+        uint256 _totalBurnedCallsValue,
+        uint256 _totalIndirectCallsValue,
+        bool _useFixedFee,
+        uint256 _callCount
+    ) internal virtual {
+        // solhint-disable-next-line
+        _ensureCorrectTotalValue(
+            _destinationChainId,
+            _destinationBaseTokenAssetId,
+            _totalBurnedCallsValue,
+            _totalIndirectCallsValue,
+            _useFixedFee,
+            _callCount
+        );
+    }
+
+    /// @notice Sends the bundle message to L1. Override in private interop to send hash-only format.
+    /// @return msgHash The hash returned by the L2→L1 messenger.
+    function _sendBundleToL1(
+        bytes memory _interopBundleBytes,
+        uint256 /* _callCount */
+    ) internal virtual returns (bytes32 msgHash) {
+        msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, _interopBundleBytes));
     }
 
     /// @notice Emits ERC-7786 MessageSent events for each call in a bundle.
@@ -533,7 +585,7 @@ contract InteropCenter is
             (, address actualCallRecipient) = InteroperableAddress.parseEvmV1(actualCallStarter.to);
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
-                shadowAccount: false,
+                shadowAccount: _callStarter.callAttributes.shadowAccount,
                 to: actualCallRecipient,
                 data: actualCallStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
@@ -542,7 +594,7 @@ contract InteropCenter is
         } else {
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
-                shadowAccount: false,
+                shadowAccount: _callStarter.callAttributes.shadowAccount,
                 to: recipientAddress,
                 data: _callStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
@@ -647,6 +699,15 @@ contract InteropCenter is
                 // Decode the boolean parameter using AttributesDecoder
                 bool useFixed = AttributesDecoder.decodeBool(_attributes[i]);
                 bundleAttributes.useFixedFee = useFixed;
+            } else if (selector == IERC7786Attributes.shadowAccount.selector) {
+                require(!attributeUsed[5], AttributeAlreadySet(selector));
+                require(
+                    _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
+                );
+                attributeUsed[5] = true;
+                callAttributes.shadowAccount = true;
             } else {
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
@@ -676,7 +737,8 @@ contract InteropCenter is
                 IERC7786Attributes.indirectCall.selector,
                 IERC7786Attributes.executionAddress.selector,
                 IERC7786Attributes.unbundlerAddress.selector,
-                IERC7786Attributes.useFixedFee.selector
+                IERC7786Attributes.useFixedFee.selector,
+                IERC7786Attributes.shadowAccount.selector
             ];
     }
 

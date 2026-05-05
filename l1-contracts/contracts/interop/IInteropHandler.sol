@@ -13,6 +13,12 @@ interface IInteropHandler {
 
     event CallProcessed(bytes32 indexed bundleHash, uint256 indexed callIndex, CallStatus status);
 
+    event ShadowAccountDeployed(
+        address indexed shadowAccount,
+        uint256 indexed ownerChainId,
+        address indexed ownerAddress
+    );
+
     /// @notice Executes a full bundle atomically.
     /// @dev Reverts if any call fails, or if bundle has been processed already.
     /// @param _bundle ABI-encoded InteropBundle to execute.
@@ -45,4 +51,10 @@ interface IInteropHandler {
     /// @notice Initializes the reentrancy guard.
     /// @param _l1ChainId The chain ID of L1.
     function initL2(uint256 _l1ChainId) external;
+
+    /// @notice Computes the deterministic address of a shadow account for a given owner.
+    /// @param _ownerChainId The chain ID of the owner.
+    /// @param _ownerAddress The EVM address of the owner on the source chain.
+    /// @return The address where the shadow account is/will be deployed.
+    function getShadowAccountAddress(uint256 _ownerChainId, address _ownerAddress) external view returns (address);
 }

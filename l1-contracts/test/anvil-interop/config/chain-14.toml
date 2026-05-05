@@ -2,7 +2,7 @@ owner_address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 
 [chain]
 chain_chain_id = 14
-base_token_addr = "0xf953b3A269d80e3eB0F2947630Da976B896A8C5b"
+base_token_addr = "0x0000000000000000000000000000000000000001"
 bridgehub_create_new_chain_salt = 14000000
 validium_mode = false
 base_token_gas_price_multiplier_nominator = 1

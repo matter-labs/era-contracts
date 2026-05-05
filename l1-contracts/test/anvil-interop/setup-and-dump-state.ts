@@ -36,6 +36,7 @@ async function main(): Promise<void> {
 
     const stateAfterSetup = runner.loadState();
     const testTokens = stateAfterSetup.testTokens;
+    const privateInteropAddresses = stateAfterSetup.privateInteropAddresses;
     const customBaseTokens = stateAfterSetup.customBaseTokens;
     const zkToken = stateAfterSetup.zkToken;
 
@@ -43,7 +44,15 @@ async function main(): Promise<void> {
     await runner.dumpAllStates(anvilManager, stateDir);
 
     // Save addresses alongside the chain states
-    const addresses = { l1Addresses, ctmAddresses, chainAddresses, testTokens, customBaseTokens, zkToken };
+    const addresses = {
+      l1Addresses,
+      ctmAddresses,
+      chainAddresses,
+      testTokens,
+      privateInteropAddresses,
+      customBaseTokens,
+      zkToken,
+    };
     fs.writeFileSync(path.join(stateDir, "addresses.json"), JSON.stringify(addresses, null, 2));
     console.log(`Addresses saved to ${path.join(stateDir, "addresses.json")}`);
 

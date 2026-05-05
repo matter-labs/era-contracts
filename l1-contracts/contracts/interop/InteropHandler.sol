@@ -13,7 +13,9 @@ import {
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     L2_COMPLEX_UPGRADER_ADDR
 } from "../common/l2-helpers/L2ContractInterfaces.sol";
+import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
+import {ShadowAccount, ShadowAccountCall, ShadowAccountCallType} from "./ShadowAccount.sol";
 import {
     BUNDLE_IDENTIFIER,
     INTEROP_BUNDLE_VERSION,
@@ -43,7 +45,8 @@ import {
     WrongDestinationBaseTokenAssetId,
     WrongSourceChainId,
     InvalidInteropBundleVersion,
-    InvalidInteropCallVersion
+    InvalidInteropCallVersion,
+    ShadowAccountDeploymentFailed
 } from "./InteropErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
 import {IAssetTrackerDataEncoding} from "../bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
@@ -69,6 +72,16 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             revert Unauthorized(msg.sender);
         }
         _;
+    }
+
+    /// @notice Returns the interop center address. Virtual to allow override in private interop.
+    function _interopCenterAddr() internal view virtual returns (address) {
+        return L2_INTEROP_CENTER_ADDR;
+    }
+
+    /// @notice Returns the native token vault. Virtual to allow override in private interop.
+    function _nativeTokenVault() internal view virtual returns (IL2NativeTokenVault) {
+        return L2_NATIVE_TOKEN_VAULT;
     }
 
     /// @inheritdoc IInteropHandler
@@ -295,13 +308,26 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
                 // Transfer base tokens from the BaseTokenHolder instead of minting.
                 L2_BASE_TOKEN_HOLDER.give(address(this), interopCall.value, _sourceChainId);
             }
-            // slither-disable-next-line arbitrary-send-eth
-            bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({
-                receiveId: keccak256(abi.encodePacked(_bundleHash, i)),
-                sender: InteroperableAddress.formatEvmV1(_sourceChainId, interopCall.from),
-                payload: interopCall.data
-            }); // attributes are not supported yet
-            require(selector == IERC7786Recipient.receiveMessage.selector, InvalidSelector(selector));
+
+            if (interopCall.shadowAccount) {
+                // Execute via shadow account - deploy if needed and call the target
+                _executeViaShadowAccount({
+                    _ownerChainId: _sourceChainId,
+                    _ownerAddress: interopCall.from,
+                    _to: interopCall.to,
+                    _value: interopCall.value,
+                    _data: interopCall.data
+                });
+            } else {
+                // Normal execution via receiveMessage
+                // slither-disable-next-line arbitrary-send-eth
+                bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({
+                    receiveId: keccak256(abi.encodePacked(_bundleHash, i)),
+                    sender: InteroperableAddress.formatEvmV1(_sourceChainId, interopCall.from),
+                    payload: interopCall.data
+                }); // attributes are not supported yet
+                require(selector == IERC7786Recipient.receiveMessage.selector, InvalidSelector(selector));
+            }
 
             // Notify GWAssetTracker of this successfully executed call so it can move the call's balances
             // from pendingInteropBalance to chainBalance during the next settlement.
@@ -314,18 +340,23 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @param _proof Proof for the message that corresponds to the bundle that is to be verified.
     /// @param _bundleHash Hash corresponding to the bundle that is to be verified.
     /// That message gets sent to L1 by origin chain in InteropCenter contract, and is picked up and included in receiving chain by sequencer.
-    function _verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bytes32 _bundleHash) internal {
+    function _verifyBundle(
+        bytes memory _bundle,
+        MessageInclusionProof memory _proof,
+        bytes32 _bundleHash
+    ) internal virtual {
         // Verify that the message came from the legitimate InteropCenter.
         // It is expected that all allowed messages have gone through the GWAssetTracker which
         // ensured that if the `L2_INTEROP_CENTER_ADDR` is the sender of the message, then the message
         // corresponds to a bundle with the valid balance changes.
+        address interopCenter = _interopCenterAddr();
         require(
-            _proof.message.sender == L2_INTEROP_CENTER_ADDR,
-            UnauthorizedMessageSender(L2_INTEROP_CENTER_ADDR, _proof.message.sender)
+            _proof.message.sender == interopCenter,
+            UnauthorizedMessageSender(interopCenter, _proof.message.sender)
         );
 
-        // Substitute provided message data with data corresponding to the bundle currently being verified.
-        _proof.message.data = bytes.concat(BUNDLE_IDENTIFIER, _bundle);
+        // Substitute provided message data with format-specific data.
+        _proof.message.data = _getBundleMessageData(_bundle);
 
         bool isIncluded = L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared({
             _chainId: _proof.chainId,
@@ -341,6 +372,11 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
         // Emit event stating that the bundle was verified.
         emit BundleVerified(_bundleHash);
+    }
+
+    /// @notice Returns the message data for bundle verification. Override for private interop format.
+    function _getBundleMessageData(bytes memory _bundle) internal view virtual returns (bytes memory) {
+        return bytes.concat(BUNDLE_IDENTIFIER, _bundle);
     }
 
     /// @notice The sole purpose of this function is to serve as a rescue mechanism in case the sender is a contract,
@@ -469,7 +505,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         );
 
         // Verify that the destination base token asset ID of the bundle is equal to the base token asset ID of the chain
-        bytes32 baseTokenAssetId = L2_NATIVE_TOKEN_VAULT.BASE_TOKEN_ASSET_ID();
+        bytes32 baseTokenAssetId = _nativeTokenVault().BASE_TOKEN_ASSET_ID();
         require(
             interopBundle.destinationBaseTokenAssetId == baseTokenAssetId,
             WrongDestinationBaseTokenAssetId(bundleHash, baseTokenAssetId, interopBundle.destinationBaseTokenAssetId)
@@ -483,5 +519,79 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         if (msg.sender != address(L2_BASE_TOKEN_HOLDER)) {
             revert Unauthorized(msg.sender);
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        Shadow Account Functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Executes a call via the sender's shadow account on this chain.
+    /// @dev Deploys the shadow account if it doesn't exist yet. Wraps the original InteropCall's
+    /// `to`, `value`, and `data` into a ShadowAccountCall[] payload and delivers it via
+    /// receiveMessage — so the sender just sets `shadowAccount: true` and specifies the target
+    /// in the normal `to` field, without having to encode anything special in `data`.
+    function _executeViaShadowAccount(
+        uint256 _ownerChainId,
+        address _ownerAddress,
+        address _to,
+        uint256 _value,
+        bytes memory _data
+    ) internal {
+        address shadowAccountAddr = _getOrDeployShadowAccount(_ownerChainId, _ownerAddress);
+        bytes memory senderAddress = InteroperableAddress.formatEvmV1(_ownerChainId, _ownerAddress);
+
+        // Wrap the original call into a single-element ShadowAccountCall[]
+        ShadowAccountCall[] memory calls = new ShadowAccountCall[](1);
+        calls[0] = ShadowAccountCall({callType: ShadowAccountCallType.Call, target: _to, value: _value, data: _data});
+
+        // slither-disable-next-line arbitrary-send-eth
+        bytes4 selector = IERC7786Recipient(shadowAccountAddr).receiveMessage{value: _value}({
+            receiveId: bytes32(0),
+            sender: senderAddress,
+            payload: abi.encode(calls)
+        });
+        require(selector == IERC7786Recipient.receiveMessage.selector, InvalidSelector(selector));
+    }
+
+    /// @notice Gets or deploys a shadow account for the given owner.
+    function _getOrDeployShadowAccount(
+        uint256 _ownerChainId,
+        address _ownerAddress
+    ) internal returns (address shadowAccountAddr) {
+        shadowAccountAddr = _computeShadowAccountAddress(_ownerChainId, _ownerAddress);
+
+        if (shadowAccountAddr.code.length > 0) {
+            return shadowAccountAddr;
+        }
+
+        bytes memory fullOwnerAddress = InteroperableAddress.formatEvmV1(_ownerChainId, _ownerAddress);
+        ShadowAccount account = new ShadowAccount{salt: bytes32(0)}(fullOwnerAddress);
+
+        require(address(account) != address(0), ShadowAccountDeploymentFailed());
+
+        emit ShadowAccountDeployed(address(account), _ownerChainId, _ownerAddress);
+    }
+
+    /// @notice Computes the deterministic address of a shadow account for a given owner.
+    /// @param _ownerChainId The chain ID of the owner.
+    /// @param _ownerAddress The EVM address of the owner on the source chain.
+    /// @return The address where the shadow account is/will be deployed.
+    function getShadowAccountAddress(uint256 _ownerChainId, address _ownerAddress) external view returns (address) {
+        return _computeShadowAccountAddress(_ownerChainId, _ownerAddress);
+    }
+
+    /// @notice Internal function to compute the expected shadow account address.
+    function _computeShadowAccountAddress(
+        uint256 _ownerChainId,
+        address _ownerAddress
+    ) internal view returns (address) {
+        bytes memory fullOwnerAddress = InteroperableAddress.formatEvmV1(_ownerChainId, _ownerAddress);
+        bytes memory bytecode = abi.encodePacked(type(ShadowAccount).creationCode, abi.encode(fullOwnerAddress));
+        bytes32 bytecodeHash = keccak256(bytecode);
+
+        return
+            address(
+                uint160(uint256(keccak256(abi.encodePacked(bytes1(0xff), address(this), bytes32(0x0), bytecodeHash))))
+            );
     }
 }

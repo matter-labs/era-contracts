@@ -17,7 +17,7 @@ import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "../../core/br
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {InteropCallStarter} from "../../common/Messaging.sol";
+import {InteropCallStarter, InteropRoute} from "../../common/Messaging.sol";
 import {
     L2_BRIDGEHUB_ADDR,
     L2_COMPLEX_UPGRADER_ADDR,
@@ -37,6 +37,7 @@ import {
     TokenNotLegacy,
     Unauthorized
 } from "../../common/L1ContractErrors.sol";
+import {InteropRouteMismatch} from "../../interop/InteropErrors.sol";
 import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "../../vendor/draft-InteroperableAddress.sol";
@@ -76,9 +77,68 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// the old version where it was an immutable.
     bytes32 public BASE_TOKEN_ASSET_ID;
 
+    /// @notice Tracks interop route (public vs private) per asset, preventing mixing.
+    mapping(bytes32 assetId => InteropRoute) public assetInteropRoute;
+
     /// @notice Returns the bridgehub contract.
     function _bridgehub() internal view virtual override returns (IBridgehubBase) {
         return IBridgehubBase(L2_BRIDGEHUB_ADDR);
+    }
+
+    /// @notice Returns the native token vault address. Virtual for private interop override.
+    function _nativeTokenVaultAddr() internal view virtual returns (address) {
+        return L2_NATIVE_TOKEN_VAULT_ADDR;
+    }
+
+    /// @notice Returns the interop center address. Virtual for private interop override.
+    function _interopCenterAddr() internal view virtual returns (address) {
+        return L2_INTEROP_CENTER_ADDR;
+    }
+
+    /// @notice Returns the interop handler address. Virtual for private interop override.
+    function _interopHandlerAddr() internal view virtual returns (address) {
+        return L2_INTEROP_HANDLER_ADDR;
+    }
+
+    /// @notice Returns the expected interop route for this router (Public for base, Private for subclass).
+    function _expectedInteropRoute() internal pure virtual returns (InteropRoute) {
+        return InteropRoute.Public;
+    }
+
+    /// @notice Validates that an interop message sender is an authorized AssetRouter counterpart.
+    /// @dev By default, only accepts messages from the same address (all system AssetRouters share one address).
+    /// Override in PrivateL2AssetRouter to accept registered remote routers.
+    function _validateAssetRouterCounterpart(uint256 _senderChainId, address _senderAddress) internal view virtual {
+        require((_senderChainId != L1_CHAIN_ID && _senderAddress == address(this)), Unauthorized(_senderAddress));
+    }
+
+    /// @notice Enforces that an asset uses a consistent interop route.
+    function _enforceRoute(bytes32 _assetId) internal {
+        InteropRoute expected = _expectedInteropRoute();
+        InteropRoute current = assetInteropRoute[_assetId];
+        if (current == InteropRoute.Unset) {
+            assetInteropRoute[_assetId] = expected;
+        } else {
+            require(current == expected, InteropRouteMismatch(_assetId, uint8(current), uint8(expected)));
+        }
+    }
+
+    /// @notice Extracts assetId from deposit data and enforces route consistency.
+    /// @dev Deposit data format: version byte (1) + abi.encode(bytes32 assetId, bytes transferData)
+    function _enforceRouteFromDepositData(bytes calldata _data) internal {
+        if (_data.length >= 33) {
+            (bytes32 assetId, ) = abi.decode(_data[1:], (bytes32, bytes));
+            _enforceRoute(assetId);
+        }
+    }
+
+    /// @notice Extracts assetId from finalizeDeposit payload and enforces route consistency.
+    /// @dev finalizeDeposit(uint256, bytes32, bytes) — assetId is at offset 4+32=36, length 32
+    function _enforceRouteFromFinalizeDeposit(bytes calldata _payload) internal {
+        if (_payload.length >= 68) {
+            bytes32 assetId = abi.decode(_payload[36:68], (bytes32));
+            _enforceRoute(assetId);
+        }
     }
 
     /// @notice Checks that the message sender is the L1 Asset Router.
@@ -120,19 +180,19 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     }
 
     modifier onlyNTV() {
-        require(msg.sender == L2_NATIVE_TOKEN_VAULT_ADDR, Unauthorized(msg.sender));
+        require(msg.sender == _nativeTokenVaultAddr(), Unauthorized(msg.sender));
         _;
     }
 
     /// @notice Checks that the message sender is the interop center.
     modifier onlyL2InteropCenter() {
-        require(msg.sender == L2_INTEROP_CENTER_ADDR, Unauthorized(msg.sender));
+        require(msg.sender == _interopCenterAddr(), Unauthorized(msg.sender));
         _;
     }
 
     /// @notice Checks that the message sender is the interop handler.
     modifier onlyL2InteropHandler() {
-        require(msg.sender == L2_INTEROP_HANDLER_ADDR, Unauthorized(msg.sender));
+        require(msg.sender == _interopHandlerAddr(), Unauthorized(msg.sender));
         _;
     }
 
@@ -163,7 +223,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _disableInitializers();
         // solhint-disable-next-line func-named-parameters
         updateL2(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, _baseTokenAssetId, _aliasedOwner);
-        _setAssetHandler(_baseTokenAssetId, L2_NATIVE_TOKEN_VAULT_ADDR);
+        _setAssetHandler(_baseTokenAssetId, _nativeTokenVaultAddr());
     }
 
     /// @notice Updates the contract.
@@ -212,13 +272,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         bytes32 _assetRegistrationData,
         address _assetHandlerAddress
     ) external override {
-        _setAssetHandlerAddressThisChain(L2_NATIVE_TOKEN_VAULT_ADDR, _assetRegistrationData, _assetHandlerAddress);
+        _setAssetHandlerAddressThisChain(_nativeTokenVaultAddr(), _assetRegistrationData, _assetHandlerAddress);
     }
 
     function setLegacyTokenAssetHandler(bytes32 _assetId) external override onlyNTV {
         // Note, that it is an asset handler, but not asset deployment tracker,
         // which is located on L1.
-        _setAssetHandler(_assetId, L2_NATIVE_TOKEN_VAULT_ADDR);
+        _setAssetHandler(_assetId, _nativeTokenVaultAddr());
     }
 
     /// @notice Executes cross-chain interop messages following ERC-7786 standard
@@ -247,7 +307,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
 
         (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
 
-        require((senderChainId != L1_CHAIN_ID && senderAddress == address(this)), Unauthorized(senderAddress));
+        _validateAssetRouterCounterpart(senderChainId, senderAddress);
 
         // The payload must contain a valid finalizeDeposit selector to ensure only legitimate
         // bridge operations are executed. This prevents arbitrary function calls through the interop system.
@@ -256,6 +316,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             bytes4(payload[0:4]) == AssetRouterBase.finalizeDeposit.selector,
             InvalidSelector(bytes4(payload[0:4]))
         );
+
+        _enforceRouteFromFinalizeDeposit(payload);
 
         (bool success, ) = address(this).call{value: msg.value}(payload);
         require(success, ExecuteMessageFailed());
@@ -289,7 +351,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         bytes calldata _transferData
     ) public payable override onlyAssetRouterCounterpartOrSelf(_originChainId) nonReentrant {
         require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));
-        _finalizeDeposit(_originChainId, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
+        _finalizeDeposit(_originChainId, _assetId, _transferData, _nativeTokenVaultAddr());
 
         emit DepositFinalizedAssetRouter(_originChainId, _assetId, _transferData);
     }
@@ -314,12 +376,16 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         // - L2B AssetRouter receives via executeMessage() with sender=address(this)
         //   (L2AssetRouter address is equal on all ZKsync chains)
 
+        address ntvAddr = _nativeTokenVaultAddr();
+
+        _enforceRouteFromDepositData(_data);
+
         L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
             _chainId: _chainId,
             _originalCaller: _originalCaller,
             _value: _value,
             _data: _data,
-            _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
+            _nativeTokenVault: ntvAddr
         });
 
         // The _value parameter represents the amount being bridged and is encoded
@@ -349,7 +415,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
 
     /// @inheritdoc AssetRouterBase
     function _ensureTokenRegisteredWithNTV(address _token) internal override returns (bytes32 assetId) {
-        assetId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).ensureTokenIsRegistered(_token);
+        assetId = IL2NativeTokenVault(_nativeTokenVaultAddr()).ensureTokenIsRegistered(_token);
     }
 
     /// @param _assetId The asset id of the withdrawn asset
@@ -370,7 +436,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             _originalCaller: _sender,
             _transferData: _assetData,
             _passValue: false,
-            _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
+            _nativeTokenVault: _nativeTokenVaultAddr()
         });
 
         bytes memory message;
@@ -379,9 +445,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             // slither-disable-next-line unused-return
             txHash = L2ContractHelper.sendMessageToL1(message);
         } else {
-            address l1Token = IBridgedStandardToken(
-                IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).tokenAddress(_assetId)
-            ).originToken();
+            address l1Token = IBridgedStandardToken(IL2NativeTokenVault(_nativeTokenVaultAddr()).tokenAddress(_assetId))
+                .originToken();
             require(l1Token != address(0), AssetIdNotSupported(_assetId));
             // slither-disable-next-line unused-return
             (uint256 amount, address l1Receiver, ) = DataEncoding.decodeBridgeBurnData(_assetData);
@@ -505,11 +570,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// @param _l2Token The address of token on L2.
     /// @return The address of token on L1.
     function l1TokenAddress(address _l2Token) public view returns (address) {
-        bytes32 assetId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).assetId(_l2Token);
+        bytes32 assetId = IL2NativeTokenVault(_nativeTokenVaultAddr()).assetId(_l2Token);
         if (assetId == bytes32(0)) {
             return address(0);
         }
-        uint256 originChainId = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).originChainId(assetId);
+        uint256 originChainId = IL2NativeTokenVault(_nativeTokenVaultAddr()).originChainId(assetId);
         if (originChainId != L1_CHAIN_ID) {
             return address(0);
         }
@@ -524,7 +589,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// @param _l1Token The address of token on L1.
     /// @return Address of an L2 token counterpart
     function l2TokenAddress(address _l1Token) public view returns (address) {
-        IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(_nativeTokenVaultAddr());
         address currentlyDeployedAddress = l2NativeTokenVault.l2TokenAddress(_l1Token);
 
         if (currentlyDeployedAddress != address(0)) {
