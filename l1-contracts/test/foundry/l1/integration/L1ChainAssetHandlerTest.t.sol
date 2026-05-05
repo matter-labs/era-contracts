@@ -139,8 +139,6 @@ contract L1ChainAssetHandlerTest is L1ContractDeployer, ZKChainDeployer, TokenDe
             IChainAssetHandlerBase(ecosystemAddresses.bridgehub.proxies.chainAssetHandler).migrationPaused(),
             "Migration should be paused after calling pauseMigration"
         );
-
-        //@check Is there a reason for CAH.pauseMigration() and CAH.unpauseMigration() to not emit events
     }
 
     function test_unpauseMigration_byOwner() public {
