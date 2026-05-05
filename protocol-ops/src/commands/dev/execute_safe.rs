@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -21,21 +20,9 @@ const GAS_ESTIMATE_BUFFER_BPS: u64 = 12_500;
 /// or exceed the block limit (which reth rejects with `gas limit too high`).
 const PER_TX_GAS_LIMIT_CAP: u64 = 20_000_000;
 
-/// Execute Gnosis Safe Transaction Builder JSON bundle(s).
-///
-/// Two modes:
-///
-/// - `--safe-file <FILE> --private-key <KEY>`: replay a single bundle under
-///   one signer. Used by ad-hoc operators or downstream tooling that holds
-///   the key out-of-band.
-///
-/// - `--manifest <DIR/manifest.json> --wallets-yaml <WALLETS>`: replay every
-///   bundle in a manifest emitted by a prepare-shape command, looking up
-///   each bundle's signer in `wallets.yaml` by target address. Used to
-///   apply a full `ecosystem upgrade-prepare` / `upgrade-governance` /
-///   `chain upgrade` output without each caller reimplementing the same
-///   per-bundle signer dispatch loop in shell. The same manifest execution
-///   path also powers prepare commands' `--execute` mode.
+/// Execute a Gnosis Safe Transaction Builder JSON bundle: parse the
+/// `transactions` array, sign each call locally under `--private-key`, and
+/// submit via `eth_sendRawTransaction`.
 ///
 /// Safe TX Builder JSON does not carry the broadcasting Safe address — in the
 /// real product it is implicit from "the Safe currently loaded in the UI". For
@@ -48,131 +35,30 @@ const PER_TX_GAS_LIMIT_CAP: u64 = 20_000_000;
 /// paid ~1-2s of forge startup before the first tx hit the wire. Bundles
 /// with N txs now run in N round-trips of (estimateGas, sendTx,
 /// awaitReceipt) sequentially.
+///
+/// Multi-bundle outputs (emitted by prepare-shape commands as
+/// `<dir>/manifest.json`) are dispatched by the *caller*: read the manifest's
+/// `bundles[]`, look up the matching signer per `bundles[].target` from
+/// whatever wallet source the caller has, and invoke this command once per
+/// bundle.
 #[derive(Debug, Clone, Parser)]
 pub struct DevExecuteSafeArgs {
-    /// Path to a single Gnosis Safe Transaction Builder JSON file.
-    /// Mutually exclusive with `--manifest`.
-    #[clap(
-        long,
-        conflicts_with = "manifest",
-        required_unless_present = "manifest"
-    )]
-    pub safe_file: Option<PathBuf>,
-
-    /// Path to a `manifest.json` emitted by a prepare-shape protocol-ops
-    /// command (e.g. `ecosystem upgrade-prepare`). Iterates the manifest's
-    /// `bundles[]`, looks up each bundle's signer in `--wallets-yaml` by
-    /// target address, and replays each bundle sequentially. Mutually
-    /// exclusive with `--safe-file`.
-    #[clap(long, conflicts_with = "safe_file", requires = "wallets_yaml")]
-    pub manifest: Option<PathBuf>,
+    /// Path to a Gnosis Safe Transaction Builder JSON file.
+    #[clap(long)]
+    pub safe_file: PathBuf,
 
     /// L1 RPC URL.
     #[clap(long, default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
 
     /// Private key whose address is used as the broadcaster for every tx in
-    /// the bundle. Required with `--safe-file`. Mutually exclusive with
-    /// `--wallets-yaml`.
-    #[clap(long, conflicts_with = "wallets_yaml")]
-    pub private_key: Option<String>,
-
-    /// Path(s) to wallets.yaml. When `--manifest` is given, used to look
-    /// up signer private keys by target address. The file may follow
-    /// either the two-level `<section>.<role>` layout (matter-labs OS test
-    /// repo) or the one-level `<role>` layout (zkstack); any leaf with
-    /// both `address` and `private_key` fields is treated as a wallet
-    /// entry. May be specified multiple times — entries from all supplied
-    /// files are merged into a single address→wallet lookup. Mutually
-    /// exclusive with `--private-key`.
-    #[clap(long, conflicts_with = "private_key")]
-    pub wallets_yaml: Vec<PathBuf>,
+    /// the bundle.
+    #[clap(long)]
+    pub private_key: String,
 }
 
 pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
-    match (&args.safe_file, &args.manifest) {
-        (Some(safe_file), None) => {
-            let pk = args
-                .private_key
-                .as_deref()
-                .context("--private-key is required with --safe-file")?;
-            execute_one_bundle(safe_file, &args.l1_rpc_url, pk).await
-        }
-        (None, Some(manifest_path)) => {
-            anyhow::ensure!(
-                !args.wallets_yaml.is_empty(),
-                "--wallets-yaml is required with --manifest"
-            );
-            execute_manifest(manifest_path, &args.wallets_yaml, &args.l1_rpc_url).await
-        }
-        // clap's conflicts_with + required_unless_present prevents the
-        // (None, None) and (Some, Some) cases.
-        _ => {
-            anyhow::bail!("exactly one of --safe-file or --manifest must be provided")
-        }
-    }
-}
-
-/// Replay every bundle in `manifest.json`, dispatching by target address to
-/// the matching signer wallet in any of the supplied wallets.yaml files.
-pub async fn execute_manifest(
-    manifest_path: &Path,
-    wallets_yaml_paths: &[PathBuf],
-    l1_rpc_url: &str,
-) -> anyhow::Result<()> {
-    logger::step(format!("Execute manifest: {}", manifest_path.display()));
-
-    let manifest = parse_manifest(manifest_path)?;
-    let wallets = parse_wallets_yaml_files(wallets_yaml_paths)?;
-    let manifest_dir = manifest_path
-        .parent()
-        .unwrap_or_else(|| Path::new("."))
-        .to_path_buf();
-
-    if manifest.bundles.is_empty() {
-        anyhow::bail!(
-            "manifest {} has empty `bundles` array; nothing to execute",
-            manifest_path.display()
-        );
-    }
-
-    for bundle in &manifest.bundles {
-        let target = bundle.target;
-        let wallet = wallets.get(&target).with_context(|| {
-            format!(
-                "no signer for Safe bundle target {:#x} (bundle {}: {}); \
-                 supplied wallets.yaml: {}",
-                target,
-                bundle.index,
-                bundle.file,
-                wallets_yaml_paths
-                    .iter()
-                    .map(|p| p.display().to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )
-        })?;
-        let bundle_path = manifest_dir.join(&bundle.file);
-        let pk_hex = format!(
-            "0x{}",
-            ethers::utils::hex::encode(wallet.signer().to_bytes())
-        );
-        logger::info(format!(
-            "Bundle {} of {}: {} (target {:#x}, {} txs)",
-            bundle.index,
-            manifest.bundles.len(),
-            bundle.file,
-            target,
-            bundle.tx_count,
-        ));
-        execute_one_bundle(&bundle_path, l1_rpc_url, &pk_hex).await?;
-    }
-
-    logger::success(format!(
-        "Manifest executed: {} bundle(s)",
-        manifest.bundles.len()
-    ));
-    Ok(())
+    execute_one_bundle(&args.safe_file, &args.l1_rpc_url, &args.private_key).await
 }
 
 /// Replay a single Safe bundle file under one signer.
@@ -305,165 +191,6 @@ async fn execute_one_bundle(
     }
 
     logger::success("Safe file executed");
-    Ok(())
-}
-
-/// Subset of `manifest.json` we need to dispatch bundles. The full schema
-/// (including `metadata`, `signer` name, etc.) is emitted by
-/// `commands/output.rs::write_output_if_requested`.
-#[derive(Debug)]
-struct ManifestForExecute {
-    bundles: Vec<ManifestBundle>,
-}
-
-#[derive(Debug)]
-struct ManifestBundle {
-    index: u64,
-    file: String,
-    target: Address,
-    tx_count: u64,
-}
-
-fn parse_manifest(path: &Path) -> anyhow::Result<ManifestForExecute> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read manifest: {}", path.display()))?;
-    let root: Value = serde_json::from_str(&content)
-        .with_context(|| format!("Failed to parse manifest as JSON: {}", path.display()))?;
-    let bundles_raw = root
-        .get("bundles")
-        .and_then(|v| v.as_array())
-        .ok_or_else(|| anyhow::anyhow!("manifest {} missing `bundles` array", path.display()))?;
-    let mut bundles = Vec::with_capacity(bundles_raw.len());
-    for (i, bundle) in bundles_raw.iter().enumerate() {
-        let index = bundle
-            .get("index")
-            .and_then(|v| v.as_u64())
-            .ok_or_else(|| anyhow::anyhow!("manifest bundle #{i} missing `index`"))?;
-        let file = bundle
-            .get("file")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("manifest bundle #{i} missing `file`"))?
-            .to_string();
-        let target_str = bundle
-            .get("target")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("manifest bundle #{i} missing `target`"))?;
-        let target: Address = target_str
-            .parse()
-            .with_context(|| format!("manifest bundle #{i} target is not a valid address"))?;
-        let tx_count = bundle.get("tx_count").and_then(|v| v.as_u64()).unwrap_or(0);
-        bundles.push(ManifestBundle {
-            index,
-            file,
-            target,
-            tx_count,
-        });
-    }
-    Ok(ManifestForExecute { bundles })
-}
-
-/// Merge wallets from multiple wallets.yaml files into one
-/// `address → wallet` map. Bails if two files declare the same address
-/// with different keys.
-fn parse_wallets_yaml_files(paths: &[PathBuf]) -> anyhow::Result<HashMap<Address, LocalWallet>> {
-    let mut merged: HashMap<Address, LocalWallet> = HashMap::new();
-    for path in paths {
-        let from_this_file = parse_wallets_yaml(path)?;
-        for (addr, wallet) in from_this_file {
-            if let Some(prev) = merged.get(&addr) {
-                anyhow::ensure!(
-                    prev.signer().to_bytes() == wallet.signer().to_bytes(),
-                    "address {:#x} appears in multiple wallets.yaml files with \
-                     conflicting private keys",
-                    addr
-                );
-            }
-            merged.insert(addr, wallet);
-        }
-    }
-    if merged.is_empty() {
-        let names: Vec<_> = paths.iter().map(|p| p.display().to_string()).collect();
-        anyhow::bail!(
-            "no wallet entries (`address` + `private_key`) found in any of: {}",
-            names.join(", ")
-        );
-    }
-    Ok(merged)
-}
-
-/// Walk a wallets.yaml tree (any depth) and collect every leaf node that
-/// has both `address` and `private_key` fields into an `address → wallet`
-/// map. Supports both the OS test-repo two-level layout
-/// (`<section>.<role>: { address, private_key }`) and the zkstack
-/// one-level layout (`<role>: { address, private_key }`).
-///
-/// Note: the recursive walker matches any YAML mapping with both
-/// `address` and `private_key` string fields; it has no path awareness.
-/// Duplicate addresses within a single file are silently overwritten
-/// (last-writer-wins).
-fn parse_wallets_yaml(path: &Path) -> anyhow::Result<HashMap<Address, LocalWallet>> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read wallets.yaml: {}", path.display()))?;
-    let root: serde_yaml::Value = serde_yaml::from_str(&content)
-        .with_context(|| format!("Failed to parse wallets.yaml as YAML: {}", path.display()))?;
-    let mut map = HashMap::new();
-    walk_for_wallets(&root, &mut map, path)?;
-    Ok(map)
-}
-
-fn walk_for_wallets(
-    v: &serde_yaml::Value,
-    map: &mut HashMap<Address, LocalWallet>,
-    path: &Path,
-) -> anyhow::Result<()> {
-    let Some(mapping) = v.as_mapping() else {
-        return Ok(());
-    };
-
-    let addr_field = mapping
-        .get(serde_yaml::Value::String("address".into()))
-        .and_then(|v| v.as_str());
-    let pk_field = mapping
-        .get(serde_yaml::Value::String("private_key".into()))
-        .and_then(|v| v.as_str());
-
-    if let (Some(addr_str), Some(pk_str)) = (addr_field, pk_field) {
-        // Leaf wallet entry — parse, validate, insert. Don't recurse.
-        let addr: Address = addr_str.parse().with_context(|| {
-            format!(
-                "wallets.yaml {}: `address` field {:?} is not a valid address",
-                path.display(),
-                addr_str
-            )
-        })?;
-        let pk: H256 = H256::from_str(pk_str).with_context(|| {
-            format!(
-                "wallets.yaml {}: `private_key` field is not a valid 0x-prefixed hex H256",
-                path.display()
-            )
-        })?;
-        let wallet = LocalWallet::from_bytes(pk.as_bytes()).with_context(|| {
-            format!(
-                "wallets.yaml {}: `private_key` for {:#x} is not a valid signer",
-                path.display(),
-                addr
-            )
-        })?;
-        anyhow::ensure!(
-            wallet.address() == addr,
-            "wallets.yaml {}: address {:#x} does not match private key (derives {:#x})",
-            path.display(),
-            addr,
-            wallet.address(),
-        );
-        map.insert(addr, wallet);
-        return Ok(());
-    }
-
-    // Not a leaf — recurse into children.
-    for (_, child) in mapping {
-        walk_for_wallets(child, map, path)?;
-    }
     Ok(())
 }
 

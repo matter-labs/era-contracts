@@ -13,11 +13,10 @@ use crate::common::SharedRunArgs;
 /// Chain-level CTM upgrade.
 ///
 /// Drives `AdminFunctions.s.sol::upgradeChainFromCTM(chain, admin, acr)`
-/// against a forked anvil (auto-impersonation), emits a Gnosis Safe
-/// Transaction Builder JSON bundle via `--out`, and can optionally dispatch it
-/// in-process via `--execute`. If prepared without `--execute`, replay the
-/// bundle via `protocol-ops dev execute-safe` (or any Safe-bundle-aware
-/// executor) to apply it.
+/// against a forked anvil (auto-impersonation) and emits a Gnosis Safe
+/// Transaction Builder JSON bundle via `--out`. Replay the bundle via
+/// `protocol-ops dev execute-safe` (or any Safe-bundle-aware executor) to
+/// apply it.
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct ChainUpgradeArgs {
     #[clap(flatten)]

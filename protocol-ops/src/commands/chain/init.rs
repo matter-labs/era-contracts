@@ -85,8 +85,8 @@ pub struct ChainInitArgs {
     pub owner: Option<Address>,
 
     /// Deployer EOA address. Bootstrap emits a directory of Safe bundles via
-    /// `--out`; the deployer applies them with `--execute`, `dev execute-safe`,
-    /// or any Safe-bundle-aware executor.
+    /// `--out`; the deployer applies them with `dev execute-safe` or any
+    /// Safe-bundle-aware executor.
     #[clap(long, help_heading = "Signers")]
     pub deployer_address: Address,
 

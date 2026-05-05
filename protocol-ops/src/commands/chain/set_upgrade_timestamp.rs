@@ -13,9 +13,8 @@ use crate::common::SharedRunArgs;
 /// Set chain-upgrade timestamp.
 ///
 /// Drives `AdminFunctions.s.sol::adminScheduleUpgrade(admin, acr, version, ts)`
-/// against a forked anvil, emits a Gnosis Safe Transaction Builder JSON bundle
-/// via `--out`, and can optionally dispatch it in-process via `--execute`.
-/// If prepared without `--execute`, apply the bundle via
+/// against a forked anvil and emits a Gnosis Safe Transaction Builder JSON
+/// bundle via `--out`. Apply the bundle separately via
 /// `protocol-ops dev execute-safe` (or any Safe-bundle-aware executor).
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct ChainSetUpgradeTimestampArgs {

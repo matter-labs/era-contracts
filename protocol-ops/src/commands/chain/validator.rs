@@ -25,8 +25,7 @@ lazy_static! {
 /// Runs `AdminFunctions.s.sol::updateValidator` in the simulation + Safe-bundle
 /// emission mode that every other admin-action command in protocol-ops uses.
 /// No `--private-key` on this command. It emits a Safe Transaction Builder JSON
-/// bundle via `--out`, and can optionally dispatch it in-process via
-/// `--execute`. Otherwise, the ops engineer (or the integration test harness)
+/// bundle via `--out`. The ops engineer (or the integration test harness)
 /// replays it via `protocol-ops dev execute-safe`, a Gnosis Safe UI, or any
 /// other bundle executor.
 ///

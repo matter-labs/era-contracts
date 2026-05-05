@@ -9,9 +9,11 @@ use crate::common::forge::ForgeScriptArgs;
 ///
 /// Every prepare-shape command runs against a forked anvil fork of
 /// `--l1-rpc-url` and emits a directory of Safe Transaction Builder bundles
-/// (plus a `manifest.json` with debug metadata) via `--out`; protocol-ops
-/// itself broadcasts only when `--execute` is set; otherwise broadcasting is
-/// done by `dev execute-safe`, which declares its own private-key arg.
+/// (plus a `manifest.json` with debug metadata) via `--out`. Bundles are
+/// applied separately via `dev execute-safe --safe-file --private-key` (or
+/// any Safe-bundle-aware executor); consumers that need to dispatch a
+/// multi-bundle manifest iterate `bundles[]` themselves and pick the matching
+/// signer per `bundles[].target`.
 ///
 /// Intentionally does **not** include `--private-key` *or* `--sender`. Every
 /// prepare-shape command auto-resolves its simulation caller from L1 state
@@ -35,22 +37,6 @@ pub struct SharedRunArgs {
     /// metadata entry to `manifest.json`.
     #[clap(long, help_heading = "Output")]
     pub out: Option<PathBuf>,
-
-    /// Path to wallets.yaml. May be specified multiple times — entries from
-    /// every supplied file are merged. Used both for Safe bundle manifest
-    /// annotation (each bundle's `signer` field gets a human-readable name
-    /// like "ecosystem.deployer") and, when `--execute` is set, for in-process
-    /// bundle dispatch (signing the txs).
-    #[clap(long, help_heading = "Output")]
-    pub wallets_yaml: Vec<PathBuf>,
-
-    /// Dispatch the prepared Safe bundle in this same invocation, instead of
-    /// writing to `--out` for separate `dev execute-safe` replay. Requires at
-    /// least one `--wallets-yaml`. The bundle is written to `--out` if given,
-    /// otherwise to a freshly-allocated tmp dir that is removed after a
-    /// successful dispatch.
-    #[clap(long, help_heading = "Execution")]
-    pub execute: bool,
 
     #[clap(flatten)]
     #[serde(flatten)]

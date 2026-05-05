@@ -14,11 +14,10 @@ use crate::types::L2DACommitmentScheme;
 /// Set the DA validator pair for an L1-settling chain.
 ///
 /// Drives `AdminFunctions.s.sol::setDAValidatorPair(bridgehub, chainId,
-/// l1DaValidator, l2DaCommitmentScheme, false)` against a forked anvil,
-/// emits a Gnosis Safe Transaction Builder JSON bundle via `--out`, and can
-/// optionally dispatch it in-process via `--execute`. If prepared without
-/// `--execute`, replay the bundle via `protocol-ops dev execute-safe` (or any
-/// Safe-bundle-aware executor) to apply it.
+/// l1DaValidator, l2DaCommitmentScheme, false)` against a forked anvil and
+/// emits a Gnosis Safe Transaction Builder JSON bundle via `--out`. Replay
+/// the bundle via `protocol-ops dev execute-safe` (or any Safe-bundle-aware
+/// executor) to apply it.
 ///
 /// Use case: post chain upgrade (e.g. v29 → v31), where the upgrade itself
 /// resets the chain's L1 DA validator and the operator must re-set it
