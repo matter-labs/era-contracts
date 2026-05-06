@@ -108,8 +108,6 @@ error KeccakShouldStartWorkingAgain();
 error L2BlockAndBatchTimestampMismatch(uint128 l2BlockTimestamp, uint128 currentBatchTimestamp);
 // 0x543f4c07
 error L2BlockNumberZero();
-// 0xd2324131
-error LegacyBridgeNotProxy();
 // 0x43e266b0
 error MalformedBytecode(BytecodeError);
 // 0x9bb54c35
