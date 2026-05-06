@@ -62,12 +62,10 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
     let chain_ids: Vec<u64> = if let Some(id) = args.chain_id {
         vec![id]
     } else {
-        let ids = crate::common::l1_contracts::resolve_all_chain_ids(
-            &args.shared.l1_rpc_url,
-            bridgehub,
-        )
-        .await
-        .context("listing chains for chain-upgrade loop")?;
+        let ids =
+            crate::common::l1_contracts::resolve_all_chain_ids(&args.shared.l1_rpc_url, bridgehub)
+                .await
+                .context("listing chains for chain-upgrade loop")?;
         if ids.is_empty() {
             anyhow::bail!("no registered chains found on bridgehub {bridgehub:#x}");
         }
@@ -98,14 +96,9 @@ pub async fn run(args: ChainUpgradeArgs) -> anyhow::Result<()> {
             shared.out = Some(base.join(cid.to_string()));
         }
 
-        run_one(
-            bridgehub,
-            cid,
-            args.access_control_restriction,
-            &shared,
-        )
-        .await
-        .with_context(|| format!("chain {cid} upgrade"))?;
+        run_one(bridgehub, cid, args.access_control_restriction, &shared)
+            .await
+            .with_context(|| format!("chain {cid} upgrade"))?;
     }
 
     Ok(())
@@ -131,11 +124,7 @@ async fn run_one(
         .with_script_call(
             &ADMIN_FUNCTIONS_INVOCATION,
             "upgradeChainFromCTM",
-            (
-                chain_address,
-                admin_address,
-                access_control_restriction,
-            ),
+            (chain_address, admin_address, access_control_restriction),
         )?
         .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
         // `--broadcast` against the anvil fork. In this mode the
@@ -166,14 +155,7 @@ async fn run_one(
         admin_address,
         access_control_restriction,
     };
-    write_output_if_requested(
-        "chain.upgrade",
-        shared,
-        &runner,
-        &empty_input,
-        &out_payload,
-    )
-    .await?;
+    write_output_if_requested("chain.upgrade", shared, &runner, &empty_input, &out_payload).await?;
 
     logger::success(format!("Chain {chain_id} upgrade prepared"));
     Ok(())

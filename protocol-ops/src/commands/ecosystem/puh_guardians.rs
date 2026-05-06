@@ -101,10 +101,9 @@ pub async fn deploy_puh_guardians(
     deployer: &Wallet,
     inputs: &PuhGuardiansInputs<'_>,
 ) -> anyhow::Result<PuhGuardiansOutcome> {
-    let era_chain_id = inputs
-        .env
-        .and_then(|c| c.era_chain_id())
-        .ok_or_else(|| anyhow::anyhow!("--env must supply era_chain_id for PUH/Guardians redeploy"))?;
+    let era_chain_id = inputs.env.and_then(|c| c.era_chain_id()).ok_or_else(|| {
+        anyhow::anyhow!("--env must supply era_chain_id for PUH/Guardians redeploy")
+    })?;
     let create2_factory = inputs
         .create2_factory_override
         .or_else(|| inputs.env.and_then(|c| c.create2_factory()))
@@ -179,12 +178,12 @@ pub async fn deploy_puh_guardians(
         // FOUNDRY_PROFILE=anvil-interop (era-contracts side), forge would
         // refuse to load the zk-governance side. Pin to default.
         .with_env("FOUNDRY_PROFILE", "default")
-        .with_env("PREV_PROTOCOL_UPGRADE_HANDLER", &format!("{:#x}", puh_proxy))
-        .with_env("CHAIN_ASSET_HANDLER", &format!("{:#x}", chain_asset_handler))
-        .with_env("CREATE2_FACTORY", &format!("{:#x}", create2_factory))
-        .with_env("CREATE2_SALT_PUH", &format!("{:#x}", puh_salt))
-        .with_env("CREATE2_SALT_GUARDIANS", &format!("{:#x}", guardians_salt))
-        .with_env("ERA_CHAIN_ID", &era_chain_id.to_string())
+        .with_env("PREV_PROTOCOL_UPGRADE_HANDLER", format!("{:#x}", puh_proxy))
+        .with_env("CHAIN_ASSET_HANDLER", format!("{:#x}", chain_asset_handler))
+        .with_env("CREATE2_FACTORY", format!("{:#x}", create2_factory))
+        .with_env("CREATE2_SALT_PUH", format!("{:#x}", puh_salt))
+        .with_env("CREATE2_SALT_GUARDIANS", format!("{:#x}", guardians_salt))
+        .with_env("ERA_CHAIN_ID", era_chain_id.to_string())
         .with_env(
             "DEPLOY_OUTPUT_TOML",
             deploy_output_toml.to_string_lossy().into_owned(),

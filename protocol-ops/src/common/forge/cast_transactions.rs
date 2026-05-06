@@ -166,7 +166,10 @@ pub(crate) fn run_payload_to_cast_transactions(
         // `public` library function under `deploy-scripts/`). They have no
         // production role and shouldn't end up in the Safe bundle. See
         // `SCRIPT_LIB_SOURCE_PREFIX`.
-        let tx_type = tx.get("transactionType").and_then(|v| v.as_str()).unwrap_or("");
+        let tx_type = tx
+            .get("transactionType")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         if tx_type == "CREATE2" || tx_type == "CREATE" {
             if let Some(name) = tx.get("contractName").and_then(|v| v.as_str()) {
                 if script_libs.contains(name) {

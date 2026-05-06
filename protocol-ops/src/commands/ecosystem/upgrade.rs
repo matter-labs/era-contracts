@@ -40,7 +40,6 @@ use crate::config::forge_interface::script_params::{
     UPGRADE_V31_CORE_OUTPUT_PATH, UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH,
 };
 
-
 // ── upgrade-governance (stages 0 + 1 + 2 on one fork) ─────────────────────
 
 /// Run governance stages 0, 1, and 2 on the same anvil fork. Forge's
@@ -517,8 +516,9 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     if let Some(ref cfg) = env_cfg {
         // Default --out to upgrade-envs/v0.31.0-interopB/output/<env>/protocol-ops/prepare/
         if args.shared.out.is_none() {
-            args.shared.out =
-                Some(crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)?.join("prepare"));
+            args.shared.out = Some(
+                crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)?.join("prepare"),
+            );
         }
         // Default --deployer-address to the env's owner_address.
         if args.deployer_address.is_none() {
@@ -620,9 +620,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         .as_ref()
         .map(|c| c.governance_kind())
         .unwrap_or_default();
-    let puh_outcome = if governance_kind
-        == crate::common::env_config::GovernanceKind::Puh
-    {
+    let puh_outcome = if governance_kind == crate::common::env_config::GovernanceKind::Puh {
         Some(
             crate::commands::ecosystem::puh_guardians::deploy_puh_guardians(
                 &mut runner,
@@ -675,9 +673,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     let out_payload = UpgradePrepareAllOutput {
         core_governance_toml: prepared.core_toml.display().to_string(),
         ctm_governance_tomls,
-        merged_governance_toml: merged_governance
-            .as_ref()
-            .map(|p| p.display().to_string()),
+        merged_governance_toml: merged_governance.as_ref().map(|p| p.display().to_string()),
         puh_proxy: puh_outcome
             .as_ref()
             .map(|o| format!("{:#x}", o.puh_proxy))
@@ -770,7 +766,10 @@ fn write_merged_governance_toml(
     );
     fs::write(dst, body)
         .with_context(|| format!("Failed to write merged governance TOML: {}", dst.display()))?;
-    logger::info(format!("Merged governance TOML written to: {}", dst.display()));
+    logger::info(format!(
+        "Merged governance TOML written to: {}",
+        dst.display()
+    ));
     Ok(())
 }
 

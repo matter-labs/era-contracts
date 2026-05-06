@@ -37,9 +37,10 @@ impl EcosystemArgs {
         if let Some(addr) = self.bridgehub {
             return Ok(addr);
         }
-        let env = self.env.as_deref().ok_or_else(|| {
-            anyhow::anyhow!("--bridgehub or --env must be supplied")
-        })?;
+        let env = self
+            .env
+            .as_deref()
+            .ok_or_else(|| anyhow::anyhow!("--bridgehub or --env must be supplied"))?;
         let cfg = EnvConfig::load(env)?;
         Ok(cfg.bridgehub())
     }

@@ -139,16 +139,16 @@ impl<'a> V31UpgradeInner<'a> {
                 v
             }
             None => {
-                let any_ctm =
-                    crate::common::l1_contracts::discover_ctm_proxy(&runner.rpc_url, self.bridgehub)
-                        .await
-                        .context("Failed to discover any CTM on bridgehub")?;
-                let resolved = crate::common::l1_contracts::resolve_is_zksync_os(
+                let any_ctm = crate::common::l1_contracts::discover_ctm_proxy(
                     &runner.rpc_url,
-                    any_ctm,
+                    self.bridgehub,
                 )
                 .await
-                .context("Failed to resolve isZKsyncOS from CTM")?;
+                .context("Failed to discover any CTM on bridgehub")?;
+                let resolved =
+                    crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, any_ctm)
+                        .await
+                        .context("Failed to resolve isZKsyncOS from CTM")?;
                 logger::info(format!(
                     "ZKsync OS (auto-resolved via CTM {any_ctm:#x}): {resolved}"
                 ));
@@ -264,12 +264,10 @@ impl<'a> V31UpgradeInner<'a> {
                 v
             }
             None => {
-                let resolved = crate::common::l1_contracts::resolve_is_zksync_os(
-                    &runner.rpc_url,
-                    ctm_proxy,
-                )
-                .await
-                .context("Failed to resolve isZKsyncOS from CTM")?;
+                let resolved =
+                    crate::common::l1_contracts::resolve_is_zksync_os(&runner.rpc_url, ctm_proxy)
+                        .await
+                        .context("Failed to resolve isZKsyncOS from CTM")?;
                 logger::info(format!("ZKsync OS (auto-resolved): {resolved}"));
                 resolved
             }

@@ -59,7 +59,9 @@ pub async fn run(mut args: Stage3Args) -> anyhow::Result<()> {
         }
     }
     let sender_address = args.sender.ok_or_else(|| {
-        anyhow::anyhow!("--sender (or --env <name> with owner_address in the v31 input TOML) is required")
+        anyhow::anyhow!(
+            "--sender (or --env <name> with owner_address in the v31 input TOML) is required"
+        )
     })?;
 
     let bridgehub = args.topology.resolve()?;
