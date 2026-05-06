@@ -388,11 +388,13 @@ abstract contract ChainAssetHandlerBase is
     /// @notice Pauses migration functions.
     function pauseMigration() external onlyOwner {
         migrationPaused = true;
+        emit PausedMigration(_msgSender());
     }
 
     /// @notice Unpauses migration functions.
     function unpauseMigration() external onlyOwner {
         migrationPaused = false;
+        emit UnpausedMigration(_msgSender());
     }
 
     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
