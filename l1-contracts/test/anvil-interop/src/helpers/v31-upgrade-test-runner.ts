@@ -603,14 +603,7 @@ export async function runChainUpgradesPerCtm(params: {
   /// L2 relay (which requires an L2 fork). Default `false`.
   skipL2Relay?: boolean;
 }): Promise<void> {
-  const {
-    l1Provider,
-    anvilManager,
-    bridgehubAddr,
-    upgradeChainAddresses,
-    protocolOpsOutDir,
-    skipL2Relay,
-  } = params;
+  const { l1Provider, anvilManager, bridgehubAddr, upgradeChainAddresses, protocolOpsOutDir, skipL2Relay } = params;
 
   const bridgehub = new ethers.Contract(bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
 
@@ -627,9 +620,7 @@ export async function runChainUpgradesPerCtm(params: {
   }
 
   for (const [ctmAddr, chains] of groups) {
-    console.log(
-      `\n── CTM ${ctmAddr}: running chain-upgrades for ${chains.length} chain(s) ──`
-    );
+    console.log(`\n── CTM ${ctmAddr}: running chain-upgrades for ${chains.length} chain(s) ──`);
 
     if (skipL2Relay) {
       // L1-only path: just emit + execute the per-chain Safe bundle. No
@@ -659,16 +650,9 @@ export async function runChainUpgradesPerCtm(params: {
 
     // Full path: read per-CTM toml for the settlement-layer-upgrade addr
     // + isZKsyncOS flag, then delegate to the existing single-CTM helper.
-    const ctmTomlPath = path.join(
-      contractsRootDir,
-      "l1-contracts",
-      "script-out",
-      `v31-upgrade-ctm-${ctmAddr}.toml`
-    );
+    const ctmTomlPath = path.join(contractsRootDir, "l1-contracts", "script-out", `v31-upgrade-ctm-${ctmAddr}.toml`);
     if (!fs.existsSync(ctmTomlPath)) {
-      throw new Error(
-        `Missing per-CTM prepare output ${ctmTomlPath}. Did upgrade-prepare-all run for this CTM?`
-      );
+      throw new Error(`Missing per-CTM prepare output ${ctmTomlPath}. Did upgrade-prepare-all run for this CTM?`);
     }
     const ctmOutputToml = readEcosystemOutput(ctmTomlPath);
     const settlementLayerUpgradeAddr = readNestedString(

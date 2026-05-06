@@ -64,9 +64,7 @@ function loadL2RpcMap(configDir: string): Map<number, string> {
         // The file used to hold a plain-text URL list and may still be that
         // way locally. Don't hard-fail loading the harness config — log + skip.
         console.warn(
-          `[fork-config] ${configPath} is not valid JSON, ignoring: ${
-            err instanceof Error ? err.message : String(err)
-          }`
+          `[fork-config] ${configPath} is not valid JSON, ignoring: ${err instanceof Error ? err.message : String(err)}`
         );
         return result;
       }
