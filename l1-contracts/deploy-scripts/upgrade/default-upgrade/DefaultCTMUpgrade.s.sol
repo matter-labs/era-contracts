@@ -857,6 +857,16 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             ctmAddresses.stateTransition.facets.executorFacet
         );
         vm.serializeAddress("state_transition", "getters_facet_addr", ctmAddresses.stateTransition.facets.gettersFacet);
+        vm.serializeAddress(
+            "state_transition",
+            "migrator_facet_addr",
+            ctmAddresses.stateTransition.facets.migratorFacet
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "committer_facet_addr",
+            ctmAddresses.stateTransition.facets.committerFacet
+        );
         vm.serializeAddress("state_transition", "diamond_init_addr", ctmAddresses.stateTransition.facets.diamondInit);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress(

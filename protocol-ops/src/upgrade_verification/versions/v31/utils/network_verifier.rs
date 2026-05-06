@@ -56,6 +56,8 @@ sol! {
     contract ChainTypeManager {
         function getHyperchain(uint256 _chainId) public view returns (address);
         address public validatorTimelock;
+        function protocolVersion() external view returns (uint256);
+        function isZKsyncOS() external view returns (bool);
     }
 
     function create2AndTransferParams(bytes memory bytecode, bytes32 salt, address owner);
@@ -255,6 +257,42 @@ impl NetworkVerifier {
 
     pub fn get_gw_provider(&self) -> RootProvider {
         self.gw_provider.clone()
+    }
+
+    pub async fn try_get_l1_chain_id(&self) -> anyhow::Result<u64> {
+        self.l1_provider
+            .get_chain_id()
+            .await
+            .context("failed to fetch L1 chain id")
+    }
+
+    pub async fn try_get_ctm_protocol_version(&self, ctm_addr: Address) -> anyhow::Result<U256> {
+        let ctm = ChainTypeManager::new(ctm_addr, self.l1_provider.clone());
+        ctm.protocolVersion()
+            .call()
+            .await
+            .context("failed to fetch CTM protocolVersion")
+    }
+
+    pub async fn try_get_ctm_is_zksync_os(&self, ctm_addr: Address) -> anyhow::Result<bool> {
+        let ctm = ChainTypeManager::new(ctm_addr, self.l1_provider.clone());
+        ctm.isZKsyncOS()
+            .call()
+            .await
+            .context("failed to fetch CTM isZKsyncOS")
+    }
+
+    pub async fn try_get_chain_diamond_from_bridgehub(
+        &self,
+        bridgehub_addr: Address,
+        chain_id: U256,
+    ) -> anyhow::Result<Address> {
+        let bridgehub = Bridgehub::new(bridgehub_addr, self.l1_provider.clone());
+        bridgehub
+            .getZKChain(chain_id)
+            .call()
+            .await
+            .context("failed to fetch chain diamond from Bridgehub")
     }
 
     pub async fn get_proxy_admin(&self, addr: Address) -> Address {

@@ -38,6 +38,7 @@ pub(crate) struct Verifiers {
     pub genesis_config: GenesisConfig,
     pub fee_param_verifier: FeeParamVerifier,
     pub gateway_bridgehub_address: Address,
+    pub representative_era_chain_id: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -65,6 +66,7 @@ impl Verifiers {
         artifact: &EcosystemUpgradeArtifact,
         l1_rpc: impl Into<String>,
         contracts_commit: Option<&str>,
+        representative_era_chain_id: Option<u64>,
         genesis_config_kind: GenesisConfigKind,
     ) -> anyhow::Result<Self> {
         let bridgehub_address = AddressVerifier::address_from_artifact(
@@ -84,6 +86,7 @@ impl Verifiers {
             genesis_config: GenesisConfig::init_v31(genesis_config_kind, contracts_commit).await?,
             fee_param_verifier: FeeParamVerifier::empty(),
             gateway_bridgehub_address: address_from_short_hex("10002"),
+            representative_era_chain_id,
         })
     }
 
@@ -140,6 +143,7 @@ impl Verifiers {
                 .expect("Failed to init"),
             fee_param_verifier,
             gateway_bridgehub_address: address_from_short_hex("10002"),
+            representative_era_chain_id: Some(era_chain_id),
         }
     }
 

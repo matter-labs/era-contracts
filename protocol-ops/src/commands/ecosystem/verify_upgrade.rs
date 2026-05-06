@@ -31,6 +31,14 @@ pub struct VerifyUpgradeArgs {
     #[clap(long)]
     pub contracts_commit: Option<String>,
 
+    /// Existing ZK chain id used for live chain-specific checks.
+    ///
+    /// This mirrors the legacy PUVT `--era-chain-id` argument: the L1 RPC is
+    /// used to read Bridgehub/diamond state, while this id selects which chain's
+    /// diamond to inspect.
+    #[clap(long, alias = "chain-id")]
+    pub era_chain_id: Option<u64>,
+
     /// Which local v31 genesis config to load.
     #[clap(long, value_enum, default_value_t = VerifyUpgradeGenesisConfig::Era)]
     pub genesis_config: VerifyUpgradeGenesisConfig,
@@ -61,6 +69,9 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     } else {
         logger::info("Contracts hashes: local repository AllContractsHashes.json");
     }
+    if let Some(era_chain_id) = args.era_chain_id {
+        logger::info(format!("Representative ZK chain ID: {era_chain_id}"));
+    }
 
     let artifact = EcosystemUpgradeArtifact::read(&args.ecosystem_toml)?;
     artifact_shape::verify(&artifact)?;
@@ -71,6 +82,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         &artifact,
         &args.l1_rpc_url,
         args.contracts_commit.as_deref(),
+        args.era_chain_id,
         args.genesis_config.into(),
         &mut result,
     )

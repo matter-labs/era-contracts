@@ -183,7 +183,7 @@ struct BasicFacetInfo {
     is_freezable: bool,
 }
 
-const EXPECTED_FACETS: [BasicFacetInfo; 4] = [
+const EXPECTED_FACETS: [BasicFacetInfo; 6] = [
     BasicFacetInfo {
         name: "admin_facet",
         is_freezable: false,
@@ -200,9 +200,17 @@ const EXPECTED_FACETS: [BasicFacetInfo; 4] = [
         name: "executor_facet",
         is_freezable: true,
     },
+    BasicFacetInfo {
+        name: "migrator_facet",
+        is_freezable: false,
+    },
+    BasicFacetInfo {
+        name: "committer_facet",
+        is_freezable: true,
+    },
 ];
 
-const EXPECTED_GATEWAY_FACETS: [BasicFacetInfo; 4] = [
+const EXPECTED_GATEWAY_FACETS: [BasicFacetInfo; 6] = [
     BasicFacetInfo {
         name: "gateway_admin_facet_addr",
         is_freezable: false,
@@ -217,6 +225,14 @@ const EXPECTED_GATEWAY_FACETS: [BasicFacetInfo; 4] = [
     },
     BasicFacetInfo {
         name: "gateway_executor_facet_addr",
+        is_freezable: true,
+    },
+    BasicFacetInfo {
+        name: "gateway_migrator_facet_addr",
+        is_freezable: false,
+    },
+    BasicFacetInfo {
+        name: "gateway_committer_facet_addr",
         is_freezable: true,
     },
 ];
@@ -264,6 +280,8 @@ pub struct StateTransition {
     pub genesis_upgrade_addr: Address,
     pub getters_facet_addr: Address,
     pub mailbox_facet_addr: Address,
+    pub migrator_facet_addr: Address,
+    pub committer_facet_addr: Address,
     pub state_transition_implementation_addr: Address,
     pub verifier_addr: Address,
     pub verifier_fflonk_addr: Address,
@@ -316,6 +334,8 @@ impl StateTransition {
         address_verifier.add_address(self.genesis_upgrade_addr, "genesis_upgrade_addr");
         address_verifier.add_address(self.getters_facet_addr, "getters_facet");
         address_verifier.add_address(self.mailbox_facet_addr, "mailbox_facet");
+        address_verifier.add_address(self.migrator_facet_addr, "migrator_facet");
+        address_verifier.add_address(self.committer_facet_addr, "committer_facet");
         address_verifier.add_address(
             self.state_transition_implementation_addr,
             "state_transition_implementation_addr",

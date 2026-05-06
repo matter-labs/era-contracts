@@ -93,6 +93,21 @@ const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
         &["state_transition", "chain_type_manager_proxy_addr"],
         "chain_type_manager_proxy",
     ),
+    (&["state_transition", "admin_facet_addr"], "admin_facet"),
+    (
+        &["state_transition", "executor_facet_addr"],
+        "executor_facet",
+    ),
+    (&["state_transition", "getters_facet_addr"], "getters_facet"),
+    (&["state_transition", "mailbox_facet_addr"], "mailbox_facet"),
+    (
+        &["state_transition", "migrator_facet_addr"],
+        "migrator_facet",
+    ),
+    (
+        &["state_transition", "committer_facet_addr"],
+        "committer_facet",
+    ),
     (&["state_transition", "diamond_init_addr"], "diamond_init"),
     (&["state_transition", "verifier_addr"], "verifier"),
 ];
@@ -231,6 +246,14 @@ impl AddressVerifier {
         result.add_address(
             config.gateway.gateway_state_transition.mailbox_facet_addr,
             "gateway_mailbox_facet_addr",
+        );
+        result.add_address(
+            config.gateway.gateway_state_transition.migrator_facet_addr,
+            "gateway_migrator_facet_addr"
+        );
+        result.add_address(
+            config.gateway.gateway_state_transition.committer_facet_addr,
+            "gateway_committer_facet_addr"
         );
         result.add_address(
             config.gateway.gateway_state_transition.verifier_addr,

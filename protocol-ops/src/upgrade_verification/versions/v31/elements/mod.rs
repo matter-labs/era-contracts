@@ -98,6 +98,8 @@ pub(crate) struct GatewayStateTransition {
     pub default_upgrade_addr: Address,
     pub getters_facet_addr: Address,
     pub mailbox_facet_addr: Address,
+    pub migrator_facet_addr: Address,
+    pub committer_facet_addr: Address,
     pub verifier_addr: Address,
     pub verifier_fflonk_addr: Address,
     pub verifier_plonk_addr: Address,

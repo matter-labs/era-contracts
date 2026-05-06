@@ -14,11 +14,13 @@ use super::super::{
 };
 use alloy::{
     hex,
-    primitives::{Address, FixedBytes, U256},
+    primitives::{Address, U256},
+    providers::Provider,
     sol,
     sol_types::{SolCall, SolValue},
 };
 use anyhow::Context;
+use std::collections::HashSet;
 
 pub struct GovernanceStage0Calls {
     pub calls: CallList,
@@ -70,9 +72,20 @@ sol! {
     }
 
     function setChainCreationParams(ChainCreationParams calldata _chainCreationParams);
+
+    #[derive(Debug)]
+    struct CurrentFacet {
+        address addr;
+        bytes4[] selectors;
+    }
+
+    #[sol(rpc)]
+    contract GettersFacet {
+        function facets() external view returns (CurrentFacet[] memory);
+    }
 }
 
-pub(crate) fn verify_governance_stage_calls(
+pub(crate) async fn verify_governance_stage_calls(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
@@ -85,7 +98,7 @@ pub(crate) fn verify_governance_stage_calls(
     let stage1 = GovernanceStage1Calls {
         calls: CallList::parse(&artifact.governance_calls.stage1_calls),
     };
-    stage1.verify_artifact(artifact, verifiers, result)?;
+    stage1.verify_artifact(artifact, verifiers, result).await?;
 
     let stage2 = GovernanceStage2Calls {
         calls: CallList::parse(&artifact.governance_calls.stage2_calls),
@@ -96,7 +109,7 @@ pub(crate) fn verify_governance_stage_calls(
 }
 
 impl GovernanceStage1Calls {
-    pub(crate) fn verify_artifact(
+    pub(crate) async fn verify_artifact(
         &self,
         artifact: &EcosystemUpgradeArtifact,
         verifiers: &Verifiers,
@@ -104,6 +117,7 @@ impl GovernanceStage1Calls {
     ) -> anyhow::Result<()> {
         self.verify_call_shape(verifiers, result)?;
         self.verify_artifact_payloads(artifact, verifiers, result)
+            .await
     }
 
     fn verify_call_shape(
@@ -189,7 +203,7 @@ impl GovernanceStage1Calls {
         Ok(())
     }
 
-    fn verify_artifact_payloads(
+    async fn verify_artifact_payloads(
         &self,
         artifact: &EcosystemUpgradeArtifact,
         verifiers: &Verifiers,
@@ -282,7 +296,8 @@ impl GovernanceStage1Calls {
             artifact,
             verifiers,
             result,
-        )?;
+        )
+        .await?;
 
         if errors > 0 {
             anyhow::bail!("{} errors", errors);
@@ -585,7 +600,7 @@ fn verify_set_chain_creation_params_payload(
     errors
 }
 
-fn verify_set_new_version_upgrade_payload(
+async fn verify_set_new_version_upgrade_payload(
     calls: &CallList,
     index: usize,
     artifact: &EcosystemUpgradeArtifact,
@@ -619,6 +634,34 @@ fn verify_set_new_version_upgrade_payload(
             decoded_old_protocol_version
         ));
         errors += 1;
+    }
+
+    if let Some(ctm_addr) = verifiers
+        .address_verifier
+        .name_to_address
+        .get("chain_type_manager_proxy")
+    {
+        match verifiers
+            .network_verifier
+            .try_get_ctm_protocol_version(*ctm_addr)
+            .await
+        {
+            Ok(onchain_old_protocol_version)
+                if onchain_old_protocol_version == data.oldProtocolVersion =>
+            {
+                result.report_ok("setNewVersionUpgrade old protocol version matches on-chain CTM");
+            }
+            Ok(onchain_old_protocol_version) => {
+                result.report_error(&format!(
+                    "setNewVersionUpgrade old protocol version mismatch: on-chain CTM is {}, calldata uses {}",
+                    onchain_old_protocol_version, data.oldProtocolVersion
+                ));
+                errors += 1;
+            }
+            Err(err) => result.report_warn(&format!(
+                "Skipping on-chain CTM protocolVersion check; RPC unavailable or contract call failed: {err}"
+            )),
+        }
     }
 
     if data.oldProtocolVersionDeadline != U256::MAX {
@@ -659,64 +702,243 @@ fn verify_set_new_version_upgrade_payload(
         &diamond_cut.initAddress,
         "default_upgrade",
     );
+
+    errors +=
+        verify_v31_upgrade_facet_cuts(&diamond_cut.facetCuts, artifact, verifiers, result).await?;
     errors += verify_default_upgrade_payload(
         &diamond_cut.initCalldata,
         artifact_new_protocol_version,
+        &artifact.contracts_config.force_deployments_data,
+        verifiers,
         result,
-    )?;
+    )
+    .await?;
 
     Ok(errors)
 }
 
-fn verify_default_upgrade_payload(
+async fn verify_default_upgrade_payload(
     init_calldata: &[u8],
     expected_new_protocol_version: U256,
+    expected_fixed_force_deployments_data: &str,
+    verifiers: &Verifiers,
     result: &mut VerificationResult,
 ) -> anyhow::Result<usize> {
     let upgrade = set_new_version_upgrade::upgradeCall::abi_decode(init_calldata)
         .context("decoding DefaultUpgrade.upgrade calldata")?;
-    let proposed_upgrade = upgrade._proposedUpgrade;
-    let mut errors = 0;
+    upgrade
+        ._proposedUpgrade
+        .verify_v31_template(
+            verifiers,
+            result,
+            expected_new_protocol_version,
+            expected_fixed_force_deployments_data,
+        )
+        .await
+}
 
-    if proposed_upgrade.newProtocolVersion != expected_new_protocol_version {
-        result.report_error(&format!(
-            "ProposedUpgrade new protocol version mismatch: expected {}, got {}",
-            expected_new_protocol_version, proposed_upgrade.newProtocolVersion
-        ));
-        errors += 1;
+async fn verify_v31_upgrade_facet_cuts(
+    facet_cuts: &[set_new_version_upgrade::FacetCut],
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> anyhow::Result<usize> {
+    let initial_error_count = result.errors;
+    let proposed_facet_cuts = proposed_upgrade_facet_cut_set(facet_cuts, result);
+
+    match expected_v31_upgrade_facet_cuts(artifact, verifiers, result).await? {
+        Some(expected_facet_cuts) if proposed_facet_cuts == expected_facet_cuts => {
+            result.report_ok("Chain upgrade facet cuts match current diamond and new facets");
+        }
+        Some(expected_facet_cuts) => {
+            result.report_error(&format!(
+                "Invalid chain upgrade facet cuts. Expected: {:#?}\nReceived: {:#?}",
+                expected_facet_cuts, proposed_facet_cuts
+            ));
+        }
+        None if verifiers.representative_era_chain_id.is_none() => {
+            result.report_warn(
+                "Skipped exact chain upgrade facet-cut reconstruction; pass --era-chain-id to inspect a live chain diamond",
+            );
+        }
+        None => {}
     }
 
-    if proposed_upgrade.verifier != Address::ZERO {
-        result.report_error(&format!(
-            "ProposedUpgrade verifier must be zero, got {}",
-            proposed_upgrade.verifier
-        ));
-        errors += 1;
-    }
+    Ok((result.errors - initial_error_count) as usize)
+}
 
-    let zero_hash = FixedBytes::<32>::ZERO;
-    if proposed_upgrade.verifierParams.recursionNodeLevelVkHash != zero_hash
-        || proposed_upgrade.verifierParams.recursionLeafLevelVkHash != zero_hash
-        || proposed_upgrade.verifierParams.recursionCircuitsSetVksHash != zero_hash
+fn proposed_upgrade_facet_cut_set(
+    facet_cuts: &[set_new_version_upgrade::FacetCut],
+    result: &mut VerificationResult,
+) -> FacetCutSet {
+    let mut used_add = false;
+    let mut proposed_facet_cuts = FacetCutSet::new();
+    for facet in facet_cuts {
+        let action = match facet.action {
+            set_new_version_upgrade::Action::Add => {
+                used_add = true;
+                facet_cut_set::Action::Add
+            }
+            set_new_version_upgrade::Action::Remove => {
+                if used_add {
+                    result.report_error(
+                        "Remove action is unexpected after Add in upgrade diamond cut",
+                    );
+                }
+                if facet.facet != Address::ZERO {
+                    result.report_error(&format!(
+                        "Remove action must use zero facet address, got {}",
+                        facet.facet
+                    ));
+                }
+                facet_cut_set::Action::Remove
+            }
+            set_new_version_upgrade::Action::Replace => {
+                result.report_error("Replace action is unexpected in upgrade diamond cut");
+                continue;
+            }
+            set_new_version_upgrade::Action::__Invalid => {
+                result.report_error("Invalid action in upgrade diamond cut");
+                continue;
+            }
+        };
+
+        proposed_facet_cuts.add_facet(FacetInfo {
+            facet: facet.facet,
+            action,
+            is_freezable: facet.isFreezable,
+            selectors: facet.selectors.iter().map(|x| x.0).collect(),
+        });
+    }
+    proposed_facet_cuts
+}
+
+async fn expected_v31_upgrade_facet_cuts(
+    _artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> anyhow::Result<Option<FacetCutSet>> {
+    let Some(era_chain_id) = verifiers.representative_era_chain_id else {
+        return Ok(None);
+    };
+
+    let chain_diamond = match verifiers
+        .network_verifier
+        .try_get_chain_diamond_from_bridgehub(verifiers.bridgehub_address, U256::from(era_chain_id))
+        .await
     {
-        result.report_error("ProposedUpgrade verifier params must be empty");
-        errors += 1;
+        Ok(address) if address != Address::ZERO => address,
+        Ok(_) => {
+            result.report_error(&format!(
+                "Bridgehub returned zero chain diamond for provided --era-chain-id {era_chain_id}"
+            ));
+            return Ok(None);
+        }
+        Err(err) => {
+            result.report_error(&format!(
+                "Cannot fetch current chain diamond for --era-chain-id {era_chain_id}: {err}"
+            ));
+            return Ok(None);
+        }
+    };
+
+    let current_facets =
+        match GettersFacet::new(chain_diamond, verifiers.network_verifier.get_l1_provider())
+            .facets()
+            .call()
+            .await
+        {
+            Ok(facets) => facets,
+            Err(err) => {
+                result.report_error(&format!(
+                    "Cannot fetch current diamond facets from {}: {err}",
+                    chain_diamond
+                ));
+                return Ok(None);
+            }
+        };
+
+    let mut facets_to_remove = FacetCutSet::new();
+    for facet in current_facets {
+        facets_to_remove.add_facet(FacetInfo {
+            facet: Address::ZERO,
+            is_freezable: false,
+            action: facet_cut_set::Action::Remove,
+            selectors: facet.selectors.iter().map(|x| x.0).collect(),
+        });
     }
 
-    if !proposed_upgrade.l1ContractsUpgradeCalldata.is_empty() {
-        result.report_error("ProposedUpgrade l1ContractsUpgradeCalldata must be empty for v31");
-        errors += 1;
+    let mut facets_to_add = FacetCutSet::new();
+    for (facet_name, is_freezable) in EXPECTED_V31_UPGRADE_FACETS {
+        let Some(facet_address) = verifiers.address_verifier.name_to_address.get(facet_name) else {
+            result.report_error(&format!(
+                "Missing address for expected upgrade facet {}",
+                facet_name
+            ));
+            continue;
+        };
+
+        let bytecode = match verifiers
+            .network_verifier
+            .get_l1_provider()
+            .get_code_at(*facet_address)
+            .await
+        {
+            Ok(bytecode) if !bytecode.is_empty() => bytecode,
+            Ok(_) => {
+                result.report_error(&format!(
+                    "No bytecode at expected facet {} ({})",
+                    facet_name, facet_address
+                ));
+                return Ok(None);
+            }
+            Err(err) => {
+                result.report_error(&format!(
+                    "Cannot fetch bytecode for expected facet {} ({}): {err}",
+                    facet_name, facet_address
+                ));
+                return Ok(None);
+            }
+        };
+
+        let selectors = facet_selectors_from_bytecode(&bytecode);
+        if selectors.is_empty() {
+            result.report_error(&format!(
+                "Cannot derive selectors from expected facet {} ({})",
+                facet_name, facet_address
+            ));
+            return Ok(None);
+        }
+
+        facets_to_add.add_facet(FacetInfo {
+            facet: *facet_address,
+            action: facet_cut_set::Action::Add,
+            is_freezable,
+            selectors,
+        });
     }
 
-    if !proposed_upgrade.postUpgradeCalldata.is_empty() {
-        result.report_error("ProposedUpgrade postUpgradeCalldata must be empty for v31");
-        errors += 1;
-    }
+    Ok(Some(facets_to_remove.merge(facets_to_add)))
+}
 
-    if errors == 0 {
-        result.report_ok("DefaultUpgrade payload has expected v31 static fields");
-    }
-    Ok(errors)
+const EXPECTED_V31_UPGRADE_FACETS: [(&str, bool); 6] = [
+    ("admin_facet", false),
+    ("getters_facet", false),
+    ("mailbox_facet", true),
+    ("executor_facet", true),
+    ("migrator_facet", false),
+    ("committer_facet", true),
+];
+
+fn facet_selectors_from_bytecode(bytecode: &[u8]) -> HashSet<[u8; 4]> {
+    evmole::contract_info(evmole::ContractInfoArgs::new(bytecode).with_selectors())
+        .functions
+        .unwrap_or_default()
+        .into_iter()
+        .map(|function| function.selector)
+        // Exclude getName(); this is included for tooling only and is not part of the diamond cut.
+        .filter(|selector| selector != &[0x17, 0xd7, 0xde, 0x7c])
+        .collect()
 }
 
 fn expect_named_address(

@@ -34,18 +34,25 @@ pub(crate) async fn verify(
     artifact: &EcosystemUpgradeArtifact,
     l1_rpc_url: &str,
     contracts_commit: Option<&str>,
+    era_chain_id: Option<u64>,
     genesis_config_kind: GenesisConfigKind,
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
     result.print_info("== Config verification ==");
-    let verifiers =
-        Verifiers::new_v31(artifact, l1_rpc_url, contracts_commit, genesis_config_kind).await?;
+    let verifiers = Verifiers::new_v31(
+        artifact,
+        l1_rpc_url,
+        contracts_commit,
+        era_chain_id,
+        genesis_config_kind,
+    )
+    .await?;
     result.report_ok(&format!(
         "v31 verifier context loaded with {} named addresses",
         verifiers.address_verifier.name_to_address.len()
     ));
 
-    verify_governance_stage_calls(artifact, &verifiers, result)?;
+    verify_governance_stage_calls(artifact, &verifiers, result).await?;
 
     Ok(())
 }

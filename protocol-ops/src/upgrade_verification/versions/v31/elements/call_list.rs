@@ -77,6 +77,11 @@ fn expect_simple_call(
     target: &str,
     method_name: &str,
 ) -> Result<String, String> {
+    let (target, target_is_optional) = target
+        .strip_prefix('?')
+        .map(|target| (target, true))
+        .unwrap_or((target, false));
+
     let call = call.ok_or_else(|| {
         format!(
             "Expected call to: {} with data: {} not found",
@@ -84,18 +89,17 @@ fn expect_simple_call(
         )
     })?;
 
-    let expected_target = verifiers
-        .address_verifier
-        .name_to_address
-        .get(target)
-        .ok_or_else(|| format!("Expected call target {} is not known", target))?;
-
-    if &call.target != expected_target {
-        let actual_target = verifiers.address_verifier.name_or_unknown(&call.target);
-        return Err(format!(
-            "Expected call to: {} with data: {} not found - instead the call is to {}",
-            target, method_name, actual_target
-        ));
+    match verifiers.address_verifier.name_to_address.get(target) {
+        Some(expected_target) if &call.target != expected_target => {
+            let actual_target = verifiers.address_verifier.name_or_unknown(&call.target);
+            return Err(format!(
+                "Expected call to: {} with data: {} not found - instead the call is to {}",
+                target, method_name, actual_target
+            ));
+        }
+        Some(_) => {}
+        None if target_is_optional => {}
+        None => return Err(format!("Expected call target {} is not known", target)),
     }
 
     if call.value != U256::ZERO {
@@ -119,5 +123,17 @@ fn expect_simple_call(
         ));
     }
 
-    Ok(format!("Called {} with {}", target, method_name))
+    if target_is_optional
+        && !verifiers
+            .address_verifier
+            .name_to_address
+            .contains_key(target)
+    {
+        Ok(format!(
+            "Called {} with {} at {}",
+            target, method_name, call.target
+        ))
+    } else {
+        Ok(format!("Called {} with {}", target, method_name))
+    }
 }
