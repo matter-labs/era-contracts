@@ -410,6 +410,8 @@ error SystemLogsSizeTooBig();
 error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
 // 0x7a4902ad
 error TimerAlreadyStarted();
+// 0xf511412f
+error TimerNotStarted();
 // 0x2d50c33b
 error TimestampError();
 // 0xa51fa558
