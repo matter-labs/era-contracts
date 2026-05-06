@@ -457,16 +457,18 @@ abstract contract NativeTokenVaultBase is
         address _originalCaller
     ) internal {
         // Note, that in order to track `totalPreV31TotalSupply` correctly in L2AssetTracker,
-        // we have to call it before any balance changes will be performed.
-        _handleBridgeToChain(_chainId, _assetId, _depositAmount);
-
+        // we have to call _handleBridgeToChain before any balance changes will be performed.
         if (_assetId == _baseTokenAssetId()) {
             require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
             if (_isBridgedToken) {
                 // Send tokens to BaseTokenHolder and notify L2AssetTracker via burnAndStartBridging
                 L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: msg.value}(_chainId);
+            } else {
+                /// This is  only the case on L1, on L2 the base token is always bridged.
+                _handleBridgeToChain(_chainId, _assetId, _depositAmount);
             }
         } else {
+            _handleBridgeToChain(_chainId, _assetId, _depositAmount);
             require(msg.value == 0, NonEmptyMsgValue());
             if (_isBridgedToken) {
                 IBridgedStandardToken(_tokenAddress).bridgeBurn(_originalCaller, _depositAmount);
