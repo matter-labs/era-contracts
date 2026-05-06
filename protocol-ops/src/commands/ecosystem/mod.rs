@@ -33,12 +33,14 @@ use clap::Subcommand;
 
 use crate::{
     commands::ecosystem::init::EcosystemInitArgs,
+    commands::ecosystem::simulator::GovernanceTomlToSimulatorArgs,
     commands::ecosystem::stage3::Stage3Args,
     commands::ecosystem::upgrade::{ListCtmsArgs, UpgradeGovernanceArgs, UpgradePrepareAllArgs},
 };
 
 pub(crate) mod init;
 pub(crate) mod puh_guardians;
+pub(crate) mod simulator;
 pub(crate) mod stage3;
 pub(crate) mod upgrade;
 pub(crate) mod v31_upgrade_full;
@@ -72,6 +74,9 @@ pub enum EcosystemCommands {
     /// discover the Atlas CTM address without having to look it up by hand.
     #[command(name = "list-ctms")]
     ListCtms(ListCtmsArgs),
+    /// Convert a protocol-ops governance TOML into transaction-simulator JSON.
+    #[command(name = "governance-toml-to-simulator")]
+    GovernanceTomlToSimulator(GovernanceTomlToSimulatorArgs),
 }
 
 pub(crate) async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
@@ -81,5 +86,6 @@ pub(crate) async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
         EcosystemCommands::UpgradeGovernance(args) => upgrade::run_upgrade_governance(args).await,
         EcosystemCommands::Stage3(args) => stage3::run(args).await,
         EcosystemCommands::ListCtms(args) => upgrade::run_list_ctms(args).await,
+        EcosystemCommands::GovernanceTomlToSimulator(args) => simulator::run(args).await,
     }
 }
