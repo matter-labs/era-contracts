@@ -117,6 +117,28 @@ pub async fn resolve_all_chain_ids(
     Ok(ids.iter().map(|id| id.as_u64()).collect())
 }
 
+/// Enumerate every CTM proxy currently registered under `bridgehub` by
+/// iterating its `getAllZKChainChainIDs()` and looking up each chain's
+/// `chainTypeManager`. Returns deduped addresses in first-seen order, with
+/// the first chain that uses each as a witness (handy for downstream
+/// auto-resolution of rollup-DA-manager).
+pub async fn discover_all_ctms(
+    l1_rpc_url: &str,
+    bridgehub: Address,
+) -> anyhow::Result<Vec<(Address, u64)>> {
+    let chain_ids = resolve_all_chain_ids(l1_rpc_url, bridgehub).await?;
+    let mut out: Vec<(Address, u64)> = Vec::new();
+    for cid in chain_ids {
+        let ctm = resolve_ctm_proxy(l1_rpc_url, bridgehub, cid)
+            .await
+            .with_context(|| format!("resolving CTM for chain {cid}"))?;
+        if !out.iter().any(|(a, _)| *a == ctm) {
+            out.push((ctm, cid));
+        }
+    }
+    Ok(out)
+}
+
 /// Resolve `ctm.L1_BYTECODES_SUPPLIER()` → bytecodes supplier address.
 pub async fn resolve_bytecodes_supplier(
     l1_rpc_url: &str,

@@ -25,10 +25,25 @@ use crate::common::{forge::ForgeRunner, logger};
 
 // ── inputs / outputs ───────────────────────────────────────────────────────
 
+/// Per-CTM inputs. One entry per `--ctm-proxy` (or per `[[ctm]]` row in a
+/// `--ctm-config` TOML). All overrides are optional: when `None`, prepare_ctm
+/// auto-resolves via on-chain getters (works on v31+ ecosystems; pre-v31
+/// ecosystems must pass them explicitly because the getters don't exist).
+pub struct CtmInputs {
+    /// CTM proxy address.
+    pub proxy: Address,
+    /// Override for `isZKsyncOS`. Required on pre-v31 ecosystems.
+    pub is_zk_sync_os: Option<bool>,
+    /// Override for the bytecodes supplier address. Required on pre-v31.
+    pub bytecodes_supplier: Option<Address>,
+    /// Override for the rollup DA manager address. Required on pre-v31.
+    pub rollup_da_manager: Option<Address>,
+}
+
 /// Inputs to the prepare phase. The CLI handler builds this from clap args.
 pub struct V31PrepareInputs {
     /// Target CTMs. One forge invocation per entry.
-    pub ctm_proxies: Vec<Address>,
+    pub ctms: Vec<CtmInputs>,
     /// Optional CREATE2 salt; random if `None`.
     pub create2_factory_salt: Option<H256>,
     /// Upgrade config TOML path relative to `l1-contracts/`.
@@ -39,17 +54,11 @@ pub struct V31PrepareInputs {
     pub core_script_path: String,
     /// `CTMUpgrade_v31` script path (relative to `l1-contracts/`).
     pub ctm_script_path: String,
-    /// Override for `isZKsyncOS`. The default behavior auto-resolves via
-    /// `ctm.isZKsyncOS()`, which is a v31+ getter — pre-v31 ecosystems must
-    /// pass this explicitly because the getter doesn't exist on the older CTM.
-    pub is_zk_sync_os_override: Option<bool>,
-    /// Override for the bytecodes supplier address. Auto-resolved from CTM on
-    /// v31+ ecosystems; pre-v31 callers must pass it explicitly.
-    pub bytecodes_supplier_override: Option<Address>,
-    /// Override for the rollup DA manager address. Auto-resolved from a
-    /// representative ZK chain on v31+ ecosystems; pre-v31 callers must
-    /// pass it explicitly.
-    pub rollup_da_manager_override: Option<Address>,
+    /// Override for `isZKsyncOS` used by the CORE prepare (separate from
+    /// per-CTM overrides because Core itself is CTM-agnostic but the script
+    /// signature still needs the flag). When `None`, auto-resolved from any
+    /// registered CTM via `ctm.isZKsyncOS()` (v31+ getter).
+    pub core_is_zk_sync_os_override: Option<bool>,
 }
 
 /// Output of the prepare phase: the TOMLs each forge invocation wrote, in
@@ -88,8 +97,8 @@ impl<'a> V31UpgradeInner<'a> {
         deployer: &Wallet,
         inputs: &V31PrepareInputs,
     ) -> anyhow::Result<V31PrepareOutput> {
-        if inputs.ctm_proxies.is_empty() {
-            anyhow::bail!("V31UpgradeInner::prepare requires at least one CTM proxy");
+        if inputs.ctms.is_empty() {
+            anyhow::bail!("V31UpgradeInner::prepare requires at least one CTM");
         }
 
         let core_toml = self
@@ -97,13 +106,13 @@ impl<'a> V31UpgradeInner<'a> {
             .await
             .context("core prepare")?;
 
-        let mut ctm_tomls = Vec::with_capacity(inputs.ctm_proxies.len());
-        for ctm in &inputs.ctm_proxies {
+        let mut ctm_tomls = Vec::with_capacity(inputs.ctms.len());
+        for ctm in &inputs.ctms {
             let path = self
-                .prepare_ctm(runner, deployer, inputs, *ctm)
+                .prepare_ctm(runner, deployer, inputs, ctm)
                 .await
-                .with_context(|| format!("ctm prepare ({:#x})", ctm))?;
-            ctm_tomls.push((*ctm, path));
+                .with_context(|| format!("ctm prepare ({:#x})", ctm.proxy))?;
+            ctm_tomls.push((ctm.proxy, path));
         }
 
         Ok(V31PrepareOutput {
@@ -124,7 +133,7 @@ impl<'a> V31UpgradeInner<'a> {
         // CTM-agnostic. Pick the first registered CTM as a witness, or skip
         // entirely if the caller supplied an explicit override (required on
         // pre-v31 ecosystems where the `ctm.isZKsyncOS()` getter does not exist).
-        let is_zk_sync_os = match inputs.is_zk_sync_os_override {
+        let is_zk_sync_os = match inputs.core_is_zk_sync_os_override {
             Some(v) => {
                 logger::info(format!("ZKsync OS (override): {v}"));
                 v
@@ -195,9 +204,11 @@ impl<'a> V31UpgradeInner<'a> {
         runner: &mut ForgeRunner,
         deployer: &Wallet,
         inputs: &V31PrepareInputs,
-        ctm_proxy: Address,
+        ctm: &CtmInputs,
     ) -> anyhow::Result<PathBuf> {
         ensure_script_exists(self.contracts_path, &inputs.ctm_script_path)?;
+
+        let ctm_proxy = ctm.proxy;
 
         // Find a chain on this CTM as a witness for rollup-DA-manager auto-
         // resolution.
@@ -230,7 +241,7 @@ impl<'a> V31UpgradeInner<'a> {
             "CTM proxy: {ctm_proxy:#x} (representative chain {representative_chain})"
         ));
 
-        let bytecodes_supplier = match inputs.bytecodes_supplier_override {
+        let bytecodes_supplier = match ctm.bytecodes_supplier {
             Some(addr) => {
                 logger::info(format!("Bytecodes supplier (override): {addr:#x}"));
                 addr
@@ -247,7 +258,7 @@ impl<'a> V31UpgradeInner<'a> {
             }
         };
 
-        let is_zk_sync_os = match inputs.is_zk_sync_os_override {
+        let is_zk_sync_os = match ctm.is_zk_sync_os {
             Some(v) => {
                 logger::info(format!("ZKsync OS (override): {v}"));
                 v
@@ -264,7 +275,7 @@ impl<'a> V31UpgradeInner<'a> {
             }
         };
 
-        let rollup_da_manager = match inputs.rollup_da_manager_override {
+        let rollup_da_manager = match ctm.rollup_da_manager {
             Some(addr) => {
                 logger::info(format!("RollupDAManager (override): {addr:#x}"));
                 addr
