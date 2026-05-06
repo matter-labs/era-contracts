@@ -46,6 +46,7 @@ import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {
     BatchNumberMismatch,
+    BatchTimestampGreaterThanLastL2BlockTimestamp,
     CanOnlyProcessOneBatch,
     EmptyPrecommitData,
     HashMismatch,
@@ -464,6 +465,9 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         if (_newBatch.lastBlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
             revert L2TimestampTooBig();
         }
+        if (_newBatch.firstBlockTimestamp > _newBatch.lastBlockTimestamp) {
+            revert BatchTimestampGreaterThanLastL2BlockTimestamp();
+        }
         if (_newBatch.chainId != s.chainId) {
             revert IncorrectBatchChainId(_newBatch.chainId, s.chainId);
         }
@@ -585,8 +589,12 @@ contract CommitterFacet is ZKChainBase, ICommitter {
         uint256 lastL2BlockTimestamp = _packedBatchAndL2BlockTimestamp & PACKED_L2_BLOCK_TIMESTAMP_MASK;
         // All L2 blocks have timestamps within the range of [batchTimestamp, lastL2BlockTimestamp].
         // So here we need to only double check that:
+        // - The timestamp range is valid.
         // - The timestamp of the batch is not too small.
         // - The timestamp of the last L2 block is not too big.
+        if (batchTimestamp > lastL2BlockTimestamp) {
+            revert BatchTimestampGreaterThanLastL2BlockTimestamp();
+        }
         // New batch timestamp is too small
         if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > batchTimestamp) {
             revert TimeNotReached(batchTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
