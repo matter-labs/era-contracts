@@ -32,6 +32,7 @@ import {ChainCreationParamsConfig} from "deploy-scripts/utils/Types.sol";
 import {DeployCTMUtils} from "deploy-scripts/ctm/DeployCTMUtils.s.sol";
 import {Utils} from "deploy-scripts/utils/Utils.sol";
 import {BytecodeUtils} from "deploy-scripts/utils/bytecode/BytecodeUtils.s.sol";
+import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 
 contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2ContractL2Deployer {
     uint256 constant CHAIN_ID = 270;
@@ -119,6 +120,7 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
         );
     }
 
+    //@check This doesn´t run with the current "yarn l1 test:foundry"
     function test_SuccessfulGenesisUpgrade() public {
         bytes memory genesisUpgradeCalldata = abi.encodeWithSelector(
             IL2GenesisUpgrade.genesisUpgrade.selector,
@@ -129,12 +131,22 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
             additionalForceDeploymentsData
         );
 
+        // Verify pre-state: chainId is not yet set to CHAIN_ID. genesisUpgrade is what
+        // populates it via ISystemContext.setChainId (L2GenesisUpgrade.sol:38).
+        ISystemContext systemContext = ISystemContext(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR);
+        assertNotEq(systemContext.chainId(), CHAIN_ID, "chainId should not equal CHAIN_ID before genesisUpgrade");
+
         vm.expectEmit(true, false, false, true, L2_COMPLEX_UPGRADER_ADDR);
         emit IL2GenesisUpgrade.UpgradeComplete(CHAIN_ID);
 
         vm.prank(L2_FORCE_DEPLOYER_ADDR);
         L2ComplexUpgrader(L2_COMPLEX_UPGRADER_ADDR).upgrade(L2_GENESIS_UPGRADE_ADDR, genesisUpgradeCalldata);
+
+        // Verify post-state: setChainId(_chainId) was applied on the system context.
+        // This is the documented persisted outcome of genesisUpgrade for non-ZKsyncOS chains.
+        assertEq(systemContext.chainId(), CHAIN_ID, "chainId must equal CHAIN_ID after genesisUpgrade");
     }
+
     function _readL1(ContractName memory c) internal view returns (bytes memory) {
         return BytecodeUtils.readBytecodeL1(false, c.file, c.name);
     }
