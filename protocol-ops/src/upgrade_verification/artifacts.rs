@@ -46,6 +46,8 @@ pub(crate) struct ContractsConfig {
     pub(crate) force_deployments_data: String,
     pub(crate) new_protocol_version: u64,
     pub(crate) old_protocol_version: u64,
+    pub(crate) governance_upgrade_timer_initial_delay: u64,
+    pub(crate) is_testnet: bool,
 }
 
 #[derive(Debug, Deserialize)]

@@ -1,12 +1,15 @@
 use alloy::consensus::Transaction;
-use alloy::hex::FromHex;
+use alloy::hex::{self, FromHex};
 use alloy::primitives::{keccak256, Address, FixedBytes, TxHash, U256};
 use alloy::providers::{Provider, RootProvider};
 use alloy::sol;
 use alloy::sol_types::SolCall;
 use anyhow::Context;
 use std::collections::HashMap;
+use std::str::FromStr;
 use Bridgehub::requestL2TransactionDirectCall;
+
+use crate::commands::dev::execute_safe::ExecutedBundle;
 
 use super::super::elements::UpgradeOutput;
 
@@ -115,6 +118,41 @@ impl NetworkVerifier {
             create2_constructor_params: HashMap::new(),
             create2_known_bytecodes: HashMap::new(),
         })
+    }
+
+    /// Replay the executed-bundle log produced by `dev execute-safe --out`
+    /// to populate the legacy `create2_known_bytecodes` /
+    /// `create2_constructor_params` maps that
+    /// `VerificationResult::expect_create2_params` consumes. Each tx that
+    /// targets the configured Create2Factory with the configured salt is
+    /// turned into a `(deployed address → contract file + constructor args)`
+    /// entry. Same recognition rules as the legacy `check_create2_deploy`
+    /// (raw CREATE2 + Create2AndTransfer).
+    pub fn populate_create2_from_executed_bundle(
+        &mut self,
+        bundle: &ExecutedBundle,
+        create2_factory: &Address,
+        create2_salt: &FixedBytes<32>,
+        bytecode_verifier: &BytecodeVerifier,
+    ) {
+        for tx in &bundle.transactions {
+            let Some(to) = parse_hex_address(&tx.to) else {
+                continue;
+            };
+            let Some(input) = parse_hex_bytes(&tx.data) else {
+                continue;
+            };
+            if let Some((addr, name, params)) = check_create2_deploy_from_input(
+                to,
+                &input,
+                create2_factory,
+                create2_salt,
+                bytecode_verifier,
+            ) {
+                self.create2_constructor_params.insert(addr, params);
+                self.create2_known_bytecodes.insert(addr, name);
+            }
+        }
     }
 
     pub async fn new(
@@ -386,7 +424,31 @@ async fn check_create2_deploy(
         .unwrap()
         .unwrap();
 
-    if tx.to() != Some(*expected_create2_address) {
+    let to = tx.to()?;
+    check_create2_deploy_from_input(
+        to,
+        tx.input(),
+        expected_create2_address,
+        expected_create2_salt,
+        bytecode_verifier,
+    )
+}
+
+/// Same logic as `check_create2_deploy` but operates on raw `(to, input)`
+/// instead of a tx hash → useful for replaying the bundle that
+/// `dev execute-safe --out` writes (the bundle log already carries the raw
+/// data so we don't need an `eth_getTransactionByHash` round-trip).
+fn check_create2_deploy_from_input(
+    to: Address,
+    input: &[u8],
+    expected_create2_address: &Address,
+    expected_create2_salt: &FixedBytes<32>,
+    bytecode_verifier: &BytecodeVerifier,
+) -> Option<(Address, String, Vec<u8>)> {
+    if to != *expected_create2_address {
+        return None;
+    }
+    if input.len() < 32 {
         return None;
     }
 
@@ -395,30 +457,28 @@ async fn check_create2_deploy(
     // - By using the `Create2AndTransfer` contract.
     // We will try both here.
 
-    let salt = &tx.input()[0..32];
+    let salt = &input[0..32];
     if salt != expected_create2_salt.as_slice() {
-        println!("Salt mismatch: {:?} != {:?}", salt, expected_create2_salt);
         return None;
     }
 
-    if let Some((name, params)) = bytecode_verifier.try_parse_bytecode(&tx.input()[32..]) {
+    if let Some((name, params)) = bytecode_verifier.try_parse_bytecode(&input[32..]) {
         let addr = compute_create2_address_evm(
-            tx.to().unwrap(),
+            to,
             FixedBytes::<32>::from_slice(salt),
-            keccak256(&tx.input()[32..]),
+            keccak256(&input[32..]),
         );
         return Some((addr, name, params));
     };
 
-    let bytecode_input = &tx.input()[32..];
+    let bytecode_input = &input[32..];
 
     // Okay, this may be the `Create2AndTransfer` method.
     if let Some(create2_and_transfer_input) =
         bytecode_verifier.is_create2_and_transfer_bytecode_prefix(bytecode_input)
     {
-        let x = create2AndTransferParamsCall::abi_decode_raw(create2_and_transfer_input).unwrap();
+        let x = create2AndTransferParamsCall::abi_decode_raw(create2_and_transfer_input).ok()?;
         if salt != x.salt.as_slice() {
-            println!("Salt mismatch: {:?} != {:?}", salt, x.salt);
             return None;
         }
         // We do not need to cross check `owner` here, it will be cross checked against whatever owner is currently set
@@ -427,7 +487,7 @@ async fn check_create2_deploy(
         let (name, params) = bytecode_verifier.try_parse_bytecode(&x.bytecode)?;
         let salt = FixedBytes::<32>::from_slice(salt);
         let create2_and_transfer_addr =
-            compute_create2_address_evm(tx.to().unwrap(), salt, keccak256(&tx.input()[32..]));
+            compute_create2_address_evm(to, salt, keccak256(&input[32..]));
 
         let contract_addr =
             compute_create2_address_evm(create2_and_transfer_addr, salt, keccak256(&x.bytecode));
@@ -436,6 +496,15 @@ async fn check_create2_deploy(
     }
 
     None
+}
+
+fn parse_hex_address(s: &str) -> Option<Address> {
+    Address::from_str(s.trim()).ok()
+}
+
+fn parse_hex_bytes(s: &str) -> Option<Vec<u8>> {
+    let trimmed = s.trim().strip_prefix("0x").unwrap_or(s.trim());
+    hex::decode(trimmed).ok()
 }
 
 async fn check_gw_create2_deploy(

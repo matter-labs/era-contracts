@@ -250,6 +250,14 @@ mod tests {
                 .get("new_protocol_version")
                 .and_then(toml::Value::as_integer)
                 .unwrap() as u64,
+            governance_upgrade_timer_initial_delay: contracts_config_value
+                .get("governance_upgrade_timer_initial_delay")
+                .and_then(toml::Value::as_integer)
+                .unwrap_or(0) as u64,
+            is_testnet: contracts_config_value
+                .get("is_testnet")
+                .and_then(toml::Value::as_bool)
+                .unwrap_or(false),
         };
         let governance_calls = crate::upgrade_verification::artifacts::GovernanceCalls {
             stage0_calls: governance_call_value

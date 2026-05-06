@@ -1,8 +1,11 @@
 use std::path::PathBuf;
+use std::str::FromStr;
 
+use alloy::primitives::FixedBytes;
 use clap::{Parser, ValueEnum};
 
 use crate::{
+    commands::dev::execute_safe::ExecutedBundle,
     common::logger,
     upgrade_verification::{
         artifact_shape,
@@ -42,6 +45,26 @@ pub struct VerifyUpgradeArgs {
     /// Which local v31 genesis config to load.
     #[clap(long, value_enum, default_value_t = VerifyUpgradeGenesisConfig::Era)]
     pub genesis_config: VerifyUpgradeGenesisConfig,
+
+    /// Path to the executed-bundle JSON written by `dev execute-safe --out`.
+    /// Phase 6 (deployment provenance) replays this log to reconstruct
+    /// CREATE2 / TUPP deployments and verify each named v31 implementation
+    /// was deployed from the expected init bytecode + constructor args (the
+    /// immutables-aware check that Phase 5's runtime-hash comparison cannot
+    /// do). Required.
+    #[clap(long)]
+    pub executed_bundles: PathBuf,
+
+    /// Address of the Create2Factory used by the prepare scripts. The
+    /// default matches the factory address used by the v31 stage env
+    /// (`environments/stage/stage.yaml`).
+    #[clap(long, default_value = "0x4e59b44847b379578588920cA78FbF26c0B4956C")]
+    pub create2_factory: String,
+
+    /// CREATE2 salt used by the prepare scripts. This must match the value
+    /// passed to `ecosystem upgrade-prepare --create2-factory-salt`. Required.
+    #[clap(long)]
+    pub create2_salt: String,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -76,6 +99,25 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     let artifact = EcosystemUpgradeArtifact::read(&args.ecosystem_toml)?;
     artifact_shape::verify(&artifact)?;
 
+    // Read the executed-bundle log produced by `dev execute-safe --out`.
+    // Multiple invocations of `dev execute-safe` against the same path
+    // accumulate into a single file, so we only need to read one path here.
+    logger::info(format!("Executed bundle: {}", args.executed_bundles.display()));
+    let raw = std::fs::read_to_string(&args.executed_bundles).map_err(|err| {
+        anyhow::anyhow!("failed to read {}: {err}", args.executed_bundles.display())
+    })?;
+    let executed_bundle: ExecutedBundle = serde_json::from_str(&raw).map_err(|err| {
+        anyhow::anyhow!(
+            "failed to parse executed-bundle JSON {}: {err}",
+            args.executed_bundles.display()
+        )
+    })?;
+
+    let create2_factory = alloy::primitives::Address::from_str(&args.create2_factory)
+        .map_err(|err| anyhow::anyhow!("invalid --create2-factory address: {err}"))?;
+    let create2_salt = FixedBytes::<32>::from_str(&args.create2_salt)
+        .map_err(|err| anyhow::anyhow!("invalid --create2-salt: {err}"))?;
+
     let mut result = VerificationResult::default();
 
     let verification_result = crate::upgrade_verification::versions::v31::verify(
@@ -84,6 +126,9 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         args.contracts_commit.as_deref(),
         args.era_chain_id,
         args.genesis_config.into(),
+        &executed_bundle,
+        create2_factory,
+        create2_salt,
         &mut result,
     )
     .await;

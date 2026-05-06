@@ -250,6 +250,7 @@ impl ProposedUpgrade {
         result: &mut VerificationResult,
         expected_new_protocol_version: U256,
         expected_fixed_force_deployments_data: &str,
+        bytecodes_supplier_addr: Option<Address>,
     ) -> anyhow::Result<usize> {
         result.print_info("== DefaultUpgrade ProposedUpgrade ==");
         let initial_error_count = result.errors;
@@ -261,6 +262,7 @@ impl ProposedUpgrade {
             result,
             expected_version,
             expected_fixed_force_deployments_data,
+            bytecodes_supplier_addr,
         )
         .await?;
 
@@ -275,12 +277,18 @@ impl ProposedUpgrade {
         &self,
         verifiers: &Verifiers,
         result: &mut VerificationResult,
-        _bytecodes_supplier_addr: Address,
+        bytecodes_supplier_addr: Address,
         _is_gateway: bool,
     ) -> anyhow::Result<()> {
         let expected_version = get_expected_new_protocol_version();
-        self.verify_v31_template(verifiers, result, expected_version.into(), "")
-            .await?;
+        self.verify_v31_template(
+            verifiers,
+            result,
+            expected_version.into(),
+            "",
+            Some(bytecodes_supplier_addr),
+        )
+        .await?;
 
         Ok(())
     }
@@ -340,6 +348,7 @@ impl ProposedUpgrade {
         result: &mut VerificationResult,
         expected_version: ProtocolVersion,
         expected_fixed_force_deployments_data: &str,
+        bytecodes_supplier_addr: Option<Address>,
     ) -> anyhow::Result<()> {
         let tx = &self.l2ProtocolUpgradeTx;
 
@@ -411,7 +420,9 @@ impl ProposedUpgrade {
                 &tx.factoryDeps,
                 EXPECTED_V31_ERA_BYTECODES,
                 "Era",
-            );
+                bytecodes_supplier_addr,
+            )
+            .await;
             verify_era_force_deploy_and_upgrade(
                 verifiers,
                 result,
@@ -437,7 +448,9 @@ impl ProposedUpgrade {
                 &tx.factoryDeps,
                 EXPECTED_V31_ZKSYNC_OS_BYTECODES,
                 "ZKsync OS",
-            );
+                bytecodes_supplier_addr,
+            )
+            .await;
             verify_zksync_os_force_deploy_and_upgrade(
                 verifiers,
                 result,
@@ -455,12 +468,13 @@ impl ProposedUpgrade {
     }
 }
 
-fn verify_factory_deps(
+async fn verify_factory_deps(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
     factory_deps: &[U256],
     expected_bytecodes: &[&str],
     label: &str,
+    bytecodes_supplier_addr: Option<Address>,
 ) {
     let expected_bytecodes: HashSet<&str> = expected_bytecodes.iter().copied().collect();
     let mut actual_bytecodes = HashSet::new();
@@ -510,6 +524,46 @@ fn verify_factory_deps(
         result.report_ok(&format!(
             "{label} L2 upgrade tx factoryDeps match expected v31 dependency set"
         ));
+    }
+
+    // Re-add the legacy PUVT `BytecodesSupplier.publishingBlock(hash) != 0`
+    // check for every factoryDep when an RPC + supplier address are
+    // available (Phase 5 of puvt-what-to-do.md). This is intentionally a
+    // post-calldata check: it requires reading on-chain state from a live
+    // L1 RPC with the v31 prepare bundles already replayed.
+    if let Some(supplier_addr) = bytecodes_supplier_addr {
+        let supplier =
+            BytecodesSupplier::new(supplier_addr, verifiers.network_verifier.get_l1_provider());
+        let mut publish_errors = 0usize;
+        for dep in factory_deps {
+            let dep = fixed_bytes_from_u256(dep);
+            match supplier.publishingBlock(dep).call().await {
+                Ok(block) if block != U256::ZERO => {}
+                Ok(_) => {
+                    publish_errors += 1;
+                    let dep_label = verifiers
+                        .bytecode_verifier
+                        .zk_bytecode_hash_to_file(&dep)
+                        .cloned()
+                        .unwrap_or_else(|| format!("0x{dep:x}"));
+                    result.report_error(&format!(
+                        "BytecodesSupplier has not published {label} factoryDep {dep_label}"
+                    ));
+                }
+                Err(err) => {
+                    publish_errors += 1;
+                    result.report_error(&format!(
+                        "BytecodesSupplier.publishingBlock call failed for {label} factoryDep 0x{dep:x}: {err}"
+                    ));
+                }
+            }
+        }
+        if publish_errors == 0 {
+            result.report_ok(&format!(
+                "All {} {label} L2 upgrade tx factoryDeps are published in BytecodesSupplier",
+                factory_deps.len()
+            ));
+        }
     }
 }
 

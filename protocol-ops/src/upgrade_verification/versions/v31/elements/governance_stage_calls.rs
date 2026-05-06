@@ -705,12 +705,23 @@ async fn verify_set_new_version_upgrade_payload(
 
     errors +=
         verify_v31_upgrade_facet_cuts(&diamond_cut.facetCuts, artifact, verifiers, result).await?;
+    // Phase 5: when the artifact names a `bytecodes_supplier_addr` we also
+    // verify that every L2 upgrade tx `factoryDeps` entry has been published
+    // in `BytecodesSupplier` on the live L1 RPC. The legacy PUVT performed
+    // this check unconditionally; the calldata-only verifier dropped it, and
+    // we restore it here.
+    let bytecodes_supplier_addr = verifiers
+        .address_verifier
+        .name_to_address
+        .get("bytecodes_supplier_addr")
+        .copied();
     errors += verify_default_upgrade_payload(
         &diamond_cut.initCalldata,
         artifact_new_protocol_version,
         &artifact.contracts_config.force_deployments_data,
         verifiers,
         result,
+        bytecodes_supplier_addr,
     )
     .await?;
 
@@ -723,6 +734,7 @@ async fn verify_default_upgrade_payload(
     expected_fixed_force_deployments_data: &str,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
+    bytecodes_supplier_addr: Option<Address>,
 ) -> anyhow::Result<usize> {
     let upgrade = set_new_version_upgrade::upgradeCall::abi_decode(init_calldata)
         .context("decoding DefaultUpgrade.upgrade calldata")?;
@@ -733,6 +745,7 @@ async fn verify_default_upgrade_payload(
             result,
             expected_new_protocol_version,
             expected_fixed_force_deployments_data,
+            bytecodes_supplier_addr,
         )
         .await
 }

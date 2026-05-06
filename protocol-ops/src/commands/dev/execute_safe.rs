@@ -6,12 +6,36 @@ use anyhow::Context;
 use clap::Parser;
 use ethers::middleware::Middleware;
 use ethers::types::{Address, BlockNumber, Bytes, TransactionRequest, H256, U256};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use ethers::providers::{Http, Provider};
 use ethers::signers::{LocalWallet, Signer};
 
 use crate::common::logger;
+
+/// One replayed Safe tx as it lands on L1, persisted to `--out` so the
+/// PUVT (`ecosystem verify-upgrade`) can later reconstruct CREATE2 / TUPP
+/// deployments from the prepare bundles. The fields mirror the legacy
+/// `UpgradeOutput.transactions` shape but with the raw input data alongside
+/// each hash, so verifier-side parsing doesn't need an extra
+/// `eth_getTransactionByHash` round trip.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutedTx {
+    pub tx_hash: String,
+    pub to: String,
+    pub data: String,
+    pub value: String,
+    pub status: u64,
+}
+
+/// Top-level shape written to `--out`. Multiple `dev execute-safe`
+/// invocations can append by passing the same path; they are concatenated
+/// in execution order so verifier-side replay matches the on-chain order.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ExecutedBundle {
+    pub transactions: Vec<ExecutedTx>,
+}
 
 /// Per-tx gas estimate buffer in basis points (12500 = 125% = 25% headroom).
 const GAS_ESTIMATE_BUFFER_BPS: u64 = 12_500;
@@ -55,10 +79,25 @@ pub struct DevExecuteSafeArgs {
     /// the bundle.
     #[clap(long)]
     pub private_key: String,
+
+    /// Optional path to append the replayed transactions to as JSON. Use the
+    /// same path across multiple bundles (the file is read on entry and
+    /// rewritten on exit, so successful replays of multiple bundles
+    /// accumulate in execution order). Consumed later by
+    /// `ecosystem verify-upgrade --executed-bundles <path>` so the verifier
+    /// can reconstruct CREATE2 / TUPP deployments from the prepare output.
+    #[clap(long)]
+    pub out: Option<PathBuf>,
 }
 
 pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
-    execute_one_bundle(&args.safe_file, &args.l1_rpc_url, &args.private_key).await
+    execute_one_bundle(
+        &args.safe_file,
+        &args.l1_rpc_url,
+        &args.private_key,
+        args.out.as_deref(),
+    )
+    .await
 }
 
 /// Replay a single Safe bundle file under one signer.
@@ -66,6 +105,7 @@ async fn execute_one_bundle(
     safe_file: &Path,
     l1_rpc_url: &str,
     private_key: &str,
+    out_path: Option<&Path>,
 ) -> anyhow::Result<()> {
     logger::step(format!("Execute Safe file: {}", safe_file.display()));
 
@@ -113,6 +153,20 @@ async fn execute_one_bundle(
         .get_transaction_count(from, Some(BlockNumber::Pending.into()))
         .await
         .context("eth_getTransactionCount(pending)")?;
+
+    // Per-bundle tx log, persisted to `--out` after every tx so that even
+    // a partial run leaves usable data behind for verify-upgrade.
+    let mut executed: ExecutedBundle = match out_path {
+        Some(path) if path.exists() => {
+            let raw = fs::read_to_string(path).with_context(|| {
+                format!("failed to read existing executed-bundle file {}", path.display())
+            })?;
+            serde_json::from_str(&raw).with_context(|| {
+                format!("failed to parse existing executed-bundle file {}", path.display())
+            })?
+        }
+        _ => ExecutedBundle::default(),
+    };
 
     // Parse + sign + submit each tx sequentially, awaiting its receipt
     // before the next. Some bundle txs depend on contracts deployed by
@@ -188,9 +242,44 @@ async fn execute_one_bundle(
             status == 1.into(),
             "Safe tx #{idx} (hash {tx_hash:#x}) reverted (status=0)",
         );
+
+        if let Some(path) = out_path {
+            executed.transactions.push(ExecutedTx {
+                tx_hash: format!("{tx_hash:#x}"),
+                to: format!("{to:#x}"),
+                data: format!("0x{}", ethers::utils::hex::encode(receipt_input(tx)?)),
+                value: format!("{value}"),
+                status: status.as_u64(),
+            });
+            persist_executed_bundle(path, &executed)?;
+        }
     }
 
     logger::success("Safe file executed");
+    Ok(())
+}
+
+fn receipt_input(tx: &Value) -> anyhow::Result<Vec<u8>> {
+    let data_hex = tx
+        .get("data")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Safe tx missing `data` while building executed bundle"))?;
+    Ok(ethers::utils::hex::decode(data_hex.trim_start_matches("0x"))
+        .context("Safe tx `data` is not valid hex while building executed bundle")?)
+}
+
+fn persist_executed_bundle(path: &Path, bundle: &ExecutedBundle) -> anyhow::Result<()> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent).with_context(|| {
+                format!("failed to create executed-bundle output dir {}", parent.display())
+            })?;
+        }
+    }
+    let serialized = serde_json::to_string_pretty(bundle)
+        .context("failed to serialise executed bundle")?;
+    fs::write(path, serialized)
+        .with_context(|| format!("failed to write executed-bundle file {}", path.display()))?;
     Ok(())
 }
 

@@ -350,9 +350,21 @@ impl VerificationResult {
                 return;
             }
             self.report_ok(&format!("{} at {}", expected_file, address));
-        } else {
+        } else if deployed_bytecode == FixedBytes::<32>::ZERO {
             self.report_error(&format!(
-                "Bytecode at address {} empty: Expected {} at {}",
+                "No bytecode at address {}: Expected {} at {}",
+                address,
+                expected_file,
+                Location::caller()
+            ));
+        } else {
+            // The address has bytecode but its keccak doesn't match any known
+            // hash from `AllContractsHashes.json`. The most common cause is
+            // Solidity `immutable` constructor args being substituted into
+            // the deployed code, so the runtime hash differs from the
+            // compile-time hash.
+            self.report_error(&format!(
+                "Bytecode hash mismatch at address {}: Expected {} at {}",
                 address,
                 expected_file,
                 Location::caller()

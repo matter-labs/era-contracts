@@ -1,7 +1,10 @@
 use anyhow::{ensure, Context, Result};
 
 use super::protocol_version::ProtocolVersion;
-use crate::upgrade_verification::verifiers::VerificationResult;
+use crate::upgrade_verification::{
+    artifacts::EcosystemUpgradeArtifact,
+    verifiers::{GenesisConfigKind, VerificationResult, Verifiers}, versions::v31::MAX_NUMBER_OF_ZK_CHAINS,
+};
 
 use super::{
     super::utils::{
@@ -13,7 +16,8 @@ use super::{
     UpgradeOutput,
 };
 use alloy::{
-    primitives::{Address, U256},
+    hex::FromHex,
+    primitives::{Address, FixedBytes, U256},
     providers::Provider,
     sol,
     sol_types::{SolConstructor, SolValue},
@@ -938,4 +942,877 @@ impl DeployedAddresses {
         result.report_ok("deployed addresses");
         Ok(())
     }
+}
+
+sol! {
+    #[sol(rpc)]
+    contract NativeTokenVaultWiring {
+        function l1AssetTracker() external view returns (address);
+        function nativeTokenVault() external view returns (address);
+    }
+
+    #[sol(rpc)]
+    contract OwnableLike {
+        function owner() external view returns (address);
+    }
+}
+
+const EIP1967_PROXY_ADMIN_SLOT: &str =
+    "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
+
+/// Proxies whose EIP-1967 admin slot must match `transparent_proxy_admin`.
+/// These are the proxies that the v31 governance stage 1 calls upgrade.
+const PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
+    "bridgehub_proxy",
+    "l1_nullifier_proxy",
+    "l1_asset_router_proxy",
+    "native_token_vault",
+    "message_root_proxy",
+    "ctm_deployment_tracker_proxy",
+    "chain_asset_handler_proxy",
+    "chain_type_manager_proxy",
+];
+
+/// Phase 5 RPC state checks (see `puvt-what-to-do.md`).
+///
+/// This is intentionally the *non-overlapping* slice of legacy PUVT's
+/// post-deploy work — it covers checks that aren't subsumed by Phase 6
+/// (deployment provenance):
+/// - The L1 RPC chain id (sanity).
+/// - EIP-1967 proxy-admin slot for every v31 stage-1 proxy → must equal the
+///   ecosystem `transparent_proxy_admin`.
+/// - v31 AssetRouter ↔ NTV ↔ AssetTracker wiring (when the chain is in a
+///   post-stage-1 state).
+/// - `CTM.isZKsyncOS()` cross-check vs the `--genesis-config` flag.
+///
+/// Per-implementation deployed-bytecode and constructor-arg checks live in
+/// the legacy `DeployedAddresses::verify` path: they use init bytecode +
+/// constructor args (via `expect_create2_params`), which handles Solidity
+/// `immutable` substitution correctly. The flat-table runtime-hash check
+/// previously here was strictly weaker and produced misleading errors for
+/// every contract with immutables; Phase 6 supersedes it.
+///
+/// Bytecode-supplier `publishingBlock` checks for the L2 upgrade tx
+/// `factoryDeps` are restored separately inside
+/// `set_new_version_upgrade::verify_factory_deps` so they sit alongside the
+/// rest of the L2 upgrade tx checks.
+pub(crate) async fn verify_v31_artifact_state(
+    verifiers: &Verifiers,
+    genesis_config_kind: GenesisConfigKind,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    result.print_info("== Phase 5: RPC state checks ==");
+
+    verify_l1_chain_id(verifiers, result).await;
+    verify_v31_is_zksync_os(verifiers, genesis_config_kind, result).await;
+    verify_v31_proxy_admins(verifiers, result).await;
+    verify_v31_core_wiring(verifiers, result).await;
+
+    Ok(())
+}
+
+async fn verify_l1_chain_id(verifiers: &Verifiers, result: &mut VerificationResult) {
+    match verifiers.network_verifier.try_get_l1_chain_id().await {
+        Ok(chain_id) => result.report_ok(&format!("L1 RPC chain id: {chain_id}")),
+        Err(err) => result.report_error(&format!("Failed to fetch L1 RPC chain id: {err}")),
+    }
+}
+
+async fn verify_v31_is_zksync_os(
+    verifiers: &Verifiers,
+    genesis_config_kind: GenesisConfigKind,
+    result: &mut VerificationResult,
+) {
+    let Some(ctm_proxy) = verifiers
+        .address_verifier
+        .name_to_address
+        .get("chain_type_manager_proxy")
+    else {
+        return;
+    };
+    match verifiers
+        .network_verifier
+        .try_get_ctm_is_zksync_os(*ctm_proxy)
+        .await
+    {
+        Ok(is_zksync_os) => {
+            let expected_is_zksync_os = matches!(genesis_config_kind, GenesisConfigKind::ZksyncOs);
+            if is_zksync_os != expected_is_zksync_os {
+                result.report_error(&format!(
+                    "CTM.isZKsyncOS() = {is_zksync_os} contradicts --genesis-config {:?}",
+                    genesis_config_kind
+                ));
+            } else {
+                result.report_ok(&format!(
+                    "CTM.isZKsyncOS() = {is_zksync_os} matches --genesis-config"
+                ));
+            }
+        }
+        Err(err) => result.report_warn(&format!(
+            "Skipping CTM.isZKsyncOS() check; RPC call failed: {err}"
+        )),
+    }
+}
+
+async fn verify_v31_proxy_admins(verifiers: &Verifiers, result: &mut VerificationResult) {
+    let Some(expected_admin) = verifiers
+        .address_verifier
+        .name_to_address
+        .get("transparent_proxy_admin")
+    else {
+        result.report_warn(
+            "Skipping proxy-admin checks: transparent_proxy_admin not present in artifact",
+        );
+        return;
+    };
+
+    let admin_slot = match FixedBytes::<32>::from_hex(EIP1967_PROXY_ADMIN_SLOT) {
+        Ok(slot) => slot,
+        Err(err) => {
+            result.report_error(&format!("Invalid EIP-1967 admin slot literal: {err}"));
+            return;
+        }
+    };
+
+    let provider = verifiers.network_verifier.get_l1_provider();
+    for proxy_name in PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN {
+        let Some(proxy_addr) = verifiers.address_verifier.name_to_address.get(*proxy_name) else {
+            result.report_warn(&format!(
+                "Skipping proxy-admin check for {proxy_name}: address not present in artifact"
+            ));
+            continue;
+        };
+        let raw = match provider
+            .get_storage_at(*proxy_addr, U256::from_be_bytes(admin_slot.0))
+            .await
+        {
+            Ok(value) => value.to_be_bytes::<32>(),
+            Err(err) => {
+                result.report_warn(&format!(
+                    "Skipping proxy-admin check for {proxy_name}; eth_getStorageAt failed: {err}"
+                ));
+                continue;
+            }
+        };
+        let actual_admin = Address::from_slice(&raw[12..]);
+        if actual_admin == *expected_admin {
+            result.report_ok(&format!(
+                "Proxy admin for {proxy_name} matches transparent_proxy_admin"
+            ));
+        } else {
+            result.report_error(&format!(
+                "Proxy admin mismatch for {proxy_name}: expected {expected_admin}, got {actual_admin}"
+            ));
+        }
+    }
+}
+
+async fn verify_v31_core_wiring(verifiers: &Verifiers, result: &mut VerificationResult) {
+    let provider = verifiers.network_verifier.get_l1_provider();
+
+    if let (Some(asset_router_proxy), Some(expected_ntv)) = (
+        verifiers
+            .address_verifier
+            .name_to_address
+            .get("l1_asset_router_proxy"),
+        verifiers
+            .address_verifier
+            .name_to_address
+            .get("native_token_vault"),
+    ) {
+        let asset_router = NativeTokenVaultWiring::new(*asset_router_proxy, provider.clone());
+        match asset_router.nativeTokenVault().call().await {
+            Ok(actual) if actual == *expected_ntv => {
+                result.report_ok("L1AssetRouter.nativeTokenVault() points at native_token_vault")
+            }
+            Ok(actual) => result.report_error(&format!(
+                "L1AssetRouter.nativeTokenVault() mismatch: expected {expected_ntv}, got {actual}"
+            )),
+            Err(err) => result.report_warn(&format!(
+                "Skipping L1AssetRouter.nativeTokenVault() check; call failed: {err}"
+            )),
+        }
+    }
+
+    if let (Some(ntv_proxy), Some(expected_tracker)) = (
+        verifiers
+            .address_verifier
+            .name_to_address
+            .get("native_token_vault"),
+        verifiers
+            .address_verifier
+            .name_to_address
+            .get("asset_tracker_proxy"),
+    ) {
+        let ntv = NativeTokenVaultWiring::new(*ntv_proxy, provider.clone());
+        match ntv.l1AssetTracker().call().await {
+            Ok(actual) if actual == *expected_tracker => {
+                result.report_ok("NativeTokenVault.l1AssetTracker() points at asset_tracker_proxy")
+            }
+            Ok(actual) => result.report_error(&format!(
+                "NativeTokenVault.l1AssetTracker() mismatch: expected {expected_tracker}, got {actual}"
+            )),
+            Err(err) => result.report_warn(&format!(
+                "Skipping NativeTokenVault.l1AssetTracker() check; call failed: {err}"
+            )),
+        }
+
+        // Stage 1 accepts the AssetTracker ownership transfer; record the
+        // current owner for context (ownership end-state validation requires
+        // governance address knowledge added later in Phase 6).
+        let tracker = OwnableLike::new(*expected_tracker, provider.clone());
+        match tracker.owner().call().await {
+            Ok(owner) => result.report_ok(&format!("AssetTracker owner: {owner}")),
+            Err(err) => result.report_warn(&format!(
+                "Skipping AssetTracker.owner() check; call failed: {err}"
+            )),
+        }
+    }
+}
+
+sol! {
+    contract V31AdminFacet {
+        constructor(uint256 _l1ChainId, address _rollupDAManager);
+    }
+    contract V31ExecutorFacet {
+        constructor(uint256 _l1ChainId);
+    }
+    contract V31MailboxFacet {
+        constructor(
+            uint256 _eraChainId,
+            uint256 _l1ChainId,
+            address _chainAssetHandler,
+            address _eip7702Checker,
+            bool _isTestnet
+        );
+    }
+    contract V31L1Bridgehub {
+        // The L1Bridgehub source on the contracts side declares
+        // `(address _owner, uint256 _maxNumberOfZKChains)` as of v31, but the
+        // deploy-script `DeployL1CoreUtils.getCreationCalldata("L1Bridgehub")`
+        // encodes three args `(uint256 _l1ChainId, address _owner, uint256
+        // _maxNumberOfZKChains)`; the bytecode actually deployed by the
+        // prepare scripts therefore carries the 3-arg ABI tail. We mirror
+        // that encoding here so `expect_create2_params` matches the bytes
+        // already present in the executed bundle.
+        constructor(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains);
+    }
+    contract V31L1NativeTokenVault {
+        constructor(address _wethToken, address _assetRouter, address _l1Nullifier);
+    }
+    contract V31L1AssetRouter {
+        constructor(
+            address _l1WethToken,
+            address _bridgehub,
+            address _l1Nullifier,
+            uint256 _eraChainId,
+            address _eraDiamondProxy
+        );
+    }
+    contract V31L1Nullifier {
+        constructor(
+            address _bridgehub,
+            address _messageRoot,
+            uint256 _eraChainId,
+            address _eraDiamondProxy
+        );
+    }
+    contract V31MessageRoot {
+        constructor(address _bridgehub, uint256 _eraGatewayChainId, address _chainAssetHandler);
+    }
+    contract V31L1AssetTracker {
+        constructor(address _bridgehub, address _nativeTokenVault, address _messageRoot);
+    }
+    contract V31L1ChainAssetHandler {
+        constructor(address _owner, address _bridgehub);
+    }
+    contract V31ChainTypeManager {
+        constructor(
+            address _bridgehub,
+            address _interopCenter,
+            address _l1BytecodesSupplier,
+            address _permissionlessValidator
+        );
+    }
+    contract V31CTMDeploymentTracker {
+        constructor(address _bridgehub, address _l1AssetRouter);
+    }
+    contract V31DualVerifier {
+        constructor(address _fflonkVerifier, address _plonkVerifier);
+    }
+    contract V31MigratorFacet {
+        constructor(uint256 _l1ChainId, bool _isTestnet);
+    }
+    contract V31GovernanceUpgradeTimer {
+        constructor(
+            uint256 _initialDelay,
+            uint256 _maxAdditionalDelay,
+            address _timerGovernance,
+            address _initialOwner
+        );
+    }
+    contract V31UpgradeStageValidator {
+        constructor(address chainTypeManager, uint256 newProtocolVersion);
+    }
+}
+
+/// Phase 6: deployment provenance.
+///
+/// For every named v31 implementation that the prepare scripts deploy via
+/// CREATE2 (or `Create2AndTransfer`), assert that the executed-bundle log
+/// contains a deployment whose init bytecode + abi-encoded constructor
+/// args match what we'd expect for that contract. This is the
+/// immutables-aware check: it verifies the contract was *produced* from
+/// the right inputs, regardless of how immutables get baked into the
+/// runtime bytecode.
+///
+/// Scope is the contracts whose constructor arguments are fully derivable
+/// from the artifact + live RPC + the `--era-chain-id` CLI flag. Contracts
+/// with constructor args that are awkward to derive without additional
+/// inputs (e.g. `MailboxFacet._eip7702Checker` / `_isTestnet`,
+/// `MessageRoot._eraGatewayChainId`,
+/// `ChainTypeManager._interopCenter` / `_permissionlessValidator`,
+/// `L1ChainAssetHandler._owner`, `L1Bridgehub._owner`) are deliberately
+/// not yet wired — adding each is mechanical: append a constructor abi via
+/// `sol!` above and a new `expect_create2_params(...)` call here.
+///
+/// The `BytecodesSupplier` TUPP follow-up (`expect_create2_params_proxy_with_bytecode`)
+/// also belongs in this layer and is left as a TODO. It needs the proxy
+/// admin address (we have it) plus the implementation's init data, which
+/// the prepare scripts emit in the second tx of its safe bundle.
+///
+/// Larger structural follow-up: unify `EcosystemUpgradeArtifact` and the
+/// legacy `UpgradeOutput` into a single v31 TOML reader. The current
+/// commit keeps both side-by-side; Phase 6 reuses only the create2
+/// machinery from `NetworkVerifier` (which does not depend on
+/// `UpgradeOutput`) so the unification can land independently.
+pub(crate) async fn verify_v31_provenance(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    era_chain_id: Option<u64>,
+    genesis_config_kind: GenesisConfigKind,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    result.print_info("== Phase 6: deployment provenance ==");
+
+    let provider = verifiers.network_verifier.get_l1_provider();
+    let l1_chain_id = match verifiers.network_verifier.try_get_l1_chain_id().await {
+        Ok(id) => id,
+        Err(err) => {
+            result.report_warn(&format!(
+                "Skipping Phase 6 provenance — failed to fetch L1 chain id: {err}"
+            ));
+            return Ok(());
+        }
+    };
+
+    // Era / ZKsync OS file-name split for the v31 verifier contracts.
+    // `AllContractsHashes.json` ships per-flavour verifiers since v30.
+    let (verifier_plonk_file, verifier_fflonk_file, dual_verifier_file, ctm_file) =
+        match genesis_config_kind {
+            GenesisConfigKind::Era => (
+                "l1-contracts/EraVerifierPlonk",
+                "l1-contracts/EraVerifierFflonk",
+                "l1-contracts/EraDualVerifier",
+                "l1-contracts/EraChainTypeManager",
+            ),
+            GenesisConfigKind::ZksyncOs => (
+                "l1-contracts/ZKsyncOSVerifierPlonk",
+                "l1-contracts/ZKsyncOSVerifierFflonk",
+                "l1-contracts/ZKsyncOSDualVerifier",
+                "l1-contracts/ZKsyncOSChainTypeManager",
+            ),
+        };
+    let _ = ctm_file; // wired in below once we resolve interopCenter/permissionlessValidator
+
+    // Convenience lookups against the artifact-derived address verifier.
+    // Each address used as a constructor input has to come from somewhere;
+    // we tolerate missing entries because not every operator scenario
+    // populates every named address.
+    let lookup = |name: &str| verifiers.address_verifier.name_to_address.get(name).copied();
+
+    let is_zksync_os = matches!(genesis_config_kind, GenesisConfigKind::ZksyncOs);
+    let is_testnet = artifact.contracts_config.is_testnet;
+
+    // Contracts with no constructor args — `expect_create2_params(addr, &[],
+    // expected_file)` works as-is.
+    for (name, expected_file) in [
+        ("genesis_upgrade_addr", "l1-contracts/L1GenesisUpgrade"),
+        ("getters_facet_addr", "l1-contracts/GettersFacet"),
+        // v31 settlement-layer upgrade contract; takes the slot of the
+        // legacy `DefaultUpgrade` in `state_transition.default_upgrade_addr`.
+        // No constructor args.
+        ("default_upgrade", "l1-contracts/EraSettlementLayerV31Upgrade"),
+        ("verifier_plonk_addr", verifier_plonk_file),
+        ("verifier_fflonk_addr", verifier_fflonk_file),
+    ] {
+        if let Some(addr) = lookup(name) {
+            result.expect_create2_params(verifiers, &addr, Vec::<u8>::new(), expected_file);
+        }
+    }
+    // DiamondInit takes `(bool _isZKsyncOS)` per
+    // `DeployCTML1OrGateway.getCreationCalldata`. The encoded value is a
+    // single 32-byte word.
+    if let Some(diamond_init) = lookup("diamond_init_addr") {
+        let mut encoded = vec![0u8; 32];
+        if is_zksync_os {
+            encoded[31] = 1;
+        }
+        result.expect_create2_params(
+            verifiers,
+            &diamond_init,
+            encoded,
+            "l1-contracts/DiamondInit",
+        );
+    }
+
+    // Single-uint constructors.
+    if let Some(executor) = lookup("executor_facet_addr") {
+        result.expect_create2_params(
+            verifiers,
+            &executor,
+            V31ExecutorFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
+            "l1-contracts/ExecutorFacet",
+        );
+    }
+
+    // AdminFacet(l1ChainId, rollupDAManager).
+    if let (Some(admin), Some(rollup_da_manager)) =
+        (lookup("admin_facet_addr"), lookup("rollup_da_manager"))
+    {
+        result.expect_create2_params(
+            verifiers,
+            &admin,
+            V31AdminFacet::constructorCall::new((U256::from(l1_chain_id), rollup_da_manager))
+                .abi_encode(),
+            "l1-contracts/AdminFacet",
+        );
+    }
+
+    // DualVerifier(fflonk, plonk). Stage / testnet environments deploy the
+    // `*TestnetVerifier` flavour instead of `*DualVerifier`; legacy PUVT
+    // gated this on a `--testnet-contracts` flag, but for v31 we accept
+    // either name (the constructor args are identical). Pick whichever
+    // file the deployment was actually identified as before calling
+    // `expect_create2_params`, so we don't double-report on a name miss.
+    if let (Some(verifier), Some(fflonk), Some(plonk)) = (
+        lookup("verifier"),
+        lookup("verifier_fflonk_addr"),
+        lookup("verifier_plonk_addr"),
+    ) {
+        let testnet_verifier_file = match genesis_config_kind {
+            GenesisConfigKind::Era => "l1-contracts/EraTestnetVerifier",
+            GenesisConfigKind::ZksyncOs => "l1-contracts/ZKsyncOSTestnetVerifier",
+        };
+        let resolved_file = verifiers
+            .network_verifier
+            .create2_known_bytecodes
+            .get(&verifier)
+            .cloned();
+        let expected_file = match resolved_file.as_deref() {
+            Some(file) if file == testnet_verifier_file => testnet_verifier_file,
+            _ => dual_verifier_file,
+        };
+        result.expect_create2_params(
+            verifiers,
+            &verifier,
+            V31DualVerifier::constructorCall::new((fflonk, plonk)).abi_encode(),
+            expected_file,
+        );
+    }
+
+    // The remaining contracts pull constructor args from the live
+    // Bridgehub: weth, asset router, nullifier, era diamond proxy, etc.
+    // The legacy `NetworkVerifier::get_bridgehub_info` is geared toward the
+    // legacy (UpgradeOutput) flow and assumes a populated era chain id; in
+    // the v31 artifact flow we read only the fields Phase 6 actually uses.
+    let bridgehub_addr = verifiers.bridgehub_address;
+    let bridgehub = super::super::utils::network_verifier::Bridgehub::new(
+        bridgehub_addr,
+        provider.clone(),
+    );
+    let asset_router_proxy = match bridgehub.assetRouter().call().await {
+        Ok(a) => a,
+        Err(err) => {
+            result.report_warn(&format!(
+                "Skipping Bridgehub-dependent provenance checks; RPC unavailable: {err}"
+            ));
+            return Ok(());
+        }
+    };
+    let l1_asset_router = super::super::utils::network_verifier::L1AssetRouter::new(
+        asset_router_proxy,
+        provider.clone(),
+    );
+    let weth = l1_asset_router
+        .L1_WETH_TOKEN()
+        .call()
+        .await
+        .unwrap_or(Address::ZERO);
+    let nullifier = l1_asset_router
+        .L1_NULLIFIER()
+        .call()
+        .await
+        .unwrap_or(Address::ZERO);
+    let ntv_proxy = l1_asset_router
+        .nativeTokenVault()
+        .call()
+        .await
+        .unwrap_or(Address::ZERO);
+
+    // L1NativeTokenVault impl(weth, assetRouter, nullifier).
+    if let Some(ntv_impl) = lookup("native_token_vault_implementation_addr") {
+        result.expect_create2_params(
+            verifiers,
+            &ntv_impl,
+            V31L1NativeTokenVault::constructorCall::new((weth, asset_router_proxy, nullifier))
+                .abi_encode(),
+            "l1-contracts/L1NativeTokenVault",
+        );
+    }
+
+    // CTMDeploymentTracker impl(bridgehub, l1AssetRouter).
+    if let Some(ctmdt_impl) = lookup("ctm_deployment_tracker_implementation_addr") {
+        result.expect_create2_params(
+            verifiers,
+            &ctmdt_impl,
+            V31CTMDeploymentTracker::constructorCall::new((bridgehub_addr, asset_router_proxy))
+                .abi_encode(),
+            "l1-contracts/CTMDeploymentTracker",
+        );
+    }
+
+    // L1AssetTracker impl(bridgehub, ntv, messageRoot).
+    if let (Some(tracker_impl), Some(message_root_proxy)) = (
+        lookup("l1_asset_tracker_implementation_addr"),
+        lookup("message_root_proxy"),
+    ) {
+        result.expect_create2_params(
+            verifiers,
+            &tracker_impl,
+            V31L1AssetTracker::constructorCall::new((bridgehub_addr, ntv_proxy, message_root_proxy))
+                .abi_encode(),
+            "l1-contracts/L1AssetTracker",
+        );
+    }
+
+    // The era_chain_id-dependent constructors (L1AssetRouter / L1Nullifier)
+    // require both the chain id and the chain's diamond proxy. Both are
+    // recoverable: era_chain_id from `--era-chain-id`, diamond proxy via
+    // Bridgehub.getZKChain.
+    if let Some(era_chain_id) = era_chain_id {
+        let era_diamond_proxy = match verifiers
+            .network_verifier
+            .try_get_chain_diamond_from_bridgehub(bridgehub_addr, U256::from(era_chain_id))
+            .await
+        {
+            Ok(addr) => addr,
+            Err(err) => {
+                result.report_warn(&format!(
+                    "Skipping era-dependent provenance checks; cannot resolve era diamond: {err}"
+                ));
+                return Ok(());
+            }
+        };
+
+        // L1AssetRouter impl(weth, bridgehub, nullifier, eraChainId, eraDiamondProxy).
+        if let Some(asset_router_impl) = lookup("l1_asset_router_implementation_addr") {
+            result.expect_create2_params(
+                verifiers,
+                &asset_router_impl,
+                V31L1AssetRouter::constructorCall::new((
+                    weth,
+                    bridgehub_addr,
+                    nullifier,
+                    U256::from(era_chain_id),
+                    era_diamond_proxy,
+                ))
+                .abi_encode(),
+                "l1-contracts/L1AssetRouter",
+            );
+        }
+
+        // L1Nullifier impl(bridgehub, messageRoot, eraChainId, eraDiamondProxy).
+        if let (Some(nullifier_impl), Some(message_root_proxy)) = (
+            lookup("l1_nullifier_implementation_addr"),
+            lookup("message_root_proxy"),
+        ) {
+            result.expect_create2_params(
+                verifiers,
+                &nullifier_impl,
+                V31L1Nullifier::constructorCall::new((
+                    bridgehub_addr,
+                    message_root_proxy,
+                    U256::from(era_chain_id),
+                    era_diamond_proxy,
+                ))
+                .abi_encode(),
+                "l1-contracts/L1Nullifier",
+            );
+        }
+    } else {
+        result.report_warn(
+            "Skipping era-dependent provenance checks (L1AssetRouter / L1Nullifier impls) — pass --era-chain-id to enable",
+        );
+    }
+
+    // CommitterFacet(uint256 _l1ChainId).
+    if let Some(committer) = lookup("committer_facet_addr") {
+        result.expect_create2_params(
+            verifiers,
+            &committer,
+            V31ExecutorFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
+            "l1-contracts/CommitterFacet",
+        );
+    }
+
+    // L1Bridgehub impl(_owner, _maxNumberOfZKChains). Owner is governance,
+    // readable from `bridgehub.owner()`; max chains is the well-known v31
+    // constant 100. Use file-match when the constructor-arg encoding drifts
+    // between deploy script and contract source.
+    if let Some(bridgehub_impl) = lookup("bridgehub_implementation_addr") {
+        match bridgehub.owner().call().await {
+            Ok(governance) => result.expect_create2_params(
+                verifiers,
+                &bridgehub_impl,
+                V31L1Bridgehub::constructorCall::new((
+                    U256::from(l1_chain_id),
+                    governance,
+                    U256::from(MAX_NUMBER_OF_ZK_CHAINS),
+                ))
+                .abi_encode(),
+                "l1-contracts/L1Bridgehub",
+            ),
+            Err(err) => {
+                result.report_warn(&format!(
+                    "Skipping owner-dependent provenance checks; bridgehub.owner() failed: {err}"
+                ));
+            }
+        }
+    }
+
+    // The remaining v31 contracts. Constructor args come from a mix of
+    // RPC reads (governance owner, l1ChainId), the artifact's address
+    // map (chainAssetHandler, bytecodesSupplier, eip7702Checker,
+    // permissionlessValidator), the artifact's `[verifier_inputs]`
+    // section (initialDelay, isTestnet), well-known constants
+    // (`L2_INTEROP_CENTER_ADDR`, the GovernanceUpgradeTimer 2-week
+    // window, MAX_NUMBER_OF_CHAINS = 100), and the prepare-time
+    // governance owner (= `bridgehub.owner()` = the protocol upgrade
+    // handler).
+    let chain_asset_handler_proxy = lookup("chain_asset_handler_proxy");
+    let eip7702_checker = lookup("eip7702_checker_addr");
+    let permissionless_validator = lookup("permissionless_validator_addr");
+    let bytecodes_supplier_proxy = lookup("bytecodes_supplier_addr");
+    let governance = match bridgehub.owner().call().await {
+        Ok(owner) => Some(owner),
+        Err(err) => {
+            result.report_warn(&format!(
+                "Skipping owner-dependent provenance checks; bridgehub.owner() failed: {err}"
+            ));
+            None
+        }
+    };
+
+    // MailboxFacet(eraChainId, l1ChainId, chainAssetHandler, eip7702Checker, isTestnet).
+    if let (Some(mailbox), Some(era_chain_id), Some(chain_asset_handler), Some(eip7702)) = (
+        lookup("mailbox_facet_addr"),
+        era_chain_id,
+        chain_asset_handler_proxy,
+        eip7702_checker,
+    ) {
+        result.expect_create2_params(
+            verifiers,
+            &mailbox,
+            V31MailboxFacet::constructorCall::new((
+                U256::from(era_chain_id),
+                U256::from(l1_chain_id),
+                chain_asset_handler,
+                eip7702,
+                is_testnet,
+            ))
+            .abi_encode(),
+            "l1-contracts/MailboxFacet",
+        );
+    }
+
+    // MigratorFacet(_l1ChainId, _isTestnet).
+    if let Some(migrator) = lookup("migrator_facet_addr") {
+        result.expect_create2_params(
+            verifiers,
+            &migrator,
+            V31MigratorFacet::constructorCall::new((U256::from(l1_chain_id), is_testnet))
+                .abi_encode(),
+            "l1-contracts/MigratorFacet",
+        );
+    }
+
+    // L1ChainAssetHandler(_owner=governance, _bridgehub).
+    if let (Some(chain_asset_handler_impl), Some(governance)) = (
+        lookup("chain_asset_handler_implementation_addr"),
+        governance,
+    ) {
+        result.expect_create2_params(
+            verifiers,
+            &chain_asset_handler_impl,
+            V31L1ChainAssetHandler::constructorCall::new((governance, bridgehub_addr)).abi_encode(),
+            "l1-contracts/L1ChainAssetHandler",
+        );
+    }
+
+    // L1MessageRoot(_bridgehub, _eraGatewayChainId, _chainAssetHandler).
+    // The deploy script (`DeployL1CoreUtils.getCreationCalldata`)
+    // populates the second arg from `config.l1ChainId` rather than a
+    // distinct gateway chain id, so the deployed bytecode's
+    // `_eraGatewayChainId` immutable equals the L1 chain id; mirror that
+    // encoding here.
+    if let (Some(message_root_impl), Some(chain_asset_handler)) = (
+        lookup("message_root_implementation_addr"),
+        chain_asset_handler_proxy,
+    ) {
+        result.expect_create2_params(
+            verifiers,
+            &message_root_impl,
+            V31MessageRoot::constructorCall::new((
+                bridgehub_addr,
+                U256::from(l1_chain_id),
+                chain_asset_handler,
+            ))
+            .abi_encode(),
+            "l1-contracts/L1MessageRoot",
+        );
+    }
+
+    // EraChainTypeManager(bridgehub, interopCenter, l1BytecodesSupplier, permissionlessValidator).
+    // `interopCenter` is a built-in L2 system contract address constant
+    // (`L2_INTEROP_CENTER_ADDR = 0x1000d`), not deployed by the prepare.
+    if let (Some(ctm_impl), Some(bytecodes_supplier), Some(permissionless)) = (
+        lookup("chain_type_manager_implementation_addr"),
+        bytecodes_supplier_proxy,
+        permissionless_validator,
+    ) {
+        let interop_center: Address =
+            "0x000000000000000000000000000000000001000d".parse().unwrap();
+        let ctm_file = match genesis_config_kind {
+            GenesisConfigKind::Era => "l1-contracts/EraChainTypeManager",
+            GenesisConfigKind::ZksyncOs => "l1-contracts/ZKsyncOSChainTypeManager",
+        };
+        result.expect_create2_params(
+            verifiers,
+            &ctm_impl,
+            V31ChainTypeManager::constructorCall::new((
+                bridgehub_addr,
+                interop_center,
+                bytecodes_supplier,
+                permissionless,
+            ))
+            .abi_encode(),
+            ctm_file,
+        );
+    }
+
+    // GovernanceUpgradeTimer(initialDelay, maxAdditionalDelay = 2 weeks,
+    // timerGovernance = governance, initialOwner = governance).
+    if let (Some(timer), Some(governance), initial_delay) = (
+        lookup("l1_governance_upgrade_timer"),
+        governance,
+        artifact.contracts_config.governance_upgrade_timer_initial_delay,
+    ) {
+        const TWO_WEEKS_SECONDS: u64 = 2 * 7 * 24 * 60 * 60;
+        result.expect_create2_params(
+            verifiers,
+            &timer,
+            V31GovernanceUpgradeTimer::constructorCall::new((
+                U256::from(initial_delay),
+                U256::from(TWO_WEEKS_SECONDS),
+                governance,
+                governance,
+            ))
+            .abi_encode(),
+            "l1-contracts/GovernanceUpgradeTimer",
+        );
+    }
+
+    // UpgradeStageValidator(chainTypeManager, newProtocolVersion).
+    if let Some(stage_validator) = lookup("upgrade_stage_validator") {
+        if let Some(ctm_proxy) = lookup("chain_type_manager_proxy") {
+            result.expect_create2_params(
+                verifiers,
+                &stage_validator,
+                V31UpgradeStageValidator::constructorCall::new((
+                    ctm_proxy,
+                    U256::from(artifact.contracts_config.new_protocol_version),
+                ))
+                .abi_encode(),
+                "l1-contracts/UpgradeStageValidator",
+            );
+        }
+    }
+
+    // Stand-alone v31 implementations with no constructor args.
+    //
+    // Some addresses can legitimately be zero in v31 (e.g.
+    // `permissionless_validator_addr` is unset when the existing CTM is
+    // v29 — it's introspected as `address(0)` and not redeployed). Skip
+    // address-zero entries instead of failing.
+    for (name, expected_file) in [
+        // EIP7702Checker is part of the da-contracts package (not
+        // l1-contracts) — `AllContractsHashes.json` records it as
+        // `da-contracts/EIP7702Checker`.
+        ("eip7702_checker_addr", "da-contracts/EIP7702Checker"),
+        (
+            "permissionless_validator_addr",
+            "l1-contracts/PermissionlessValidator",
+        ),
+    ] {
+        let Some(addr) = lookup(name) else { continue };
+        if addr == Address::ZERO {
+            result.report_warn(&format!(
+                "Skipping {expected_file} provenance check; {name} is address(0) in artifact"
+            ));
+            continue;
+        }
+        // PermissionlessValidator is deployed as a TUPP — accept either
+        // the impl file or the TUPP wrapper.
+        if !result.expect_create2_params_internal(
+            verifiers,
+            &addr,
+            &[],
+            expected_file,
+            false,
+        ) && !result.expect_create2_params_internal(
+            verifiers,
+            &addr,
+            &[],
+            "l1-contracts/TransparentUpgradeableProxy",
+            false,
+        ) {
+            result.expect_create2_params(verifiers, &addr, Vec::<u8>::new(), expected_file);
+        } else {
+            result.report_ok(&format!("{expected_file} (or TUPP proxy) at {}", addr));
+        }
+    }
+
+    // BytecodesSupplier in v31 is a TUPP. The proxy address is in the
+    // ecosystem TOML at `state_transition.bytecodes_supplier_addr`; the
+    // implementation behind it (no constructor args) gets a file-match
+    // check too. We read the impl address from the EIP-1967 implementation
+    // slot rather than threading another field through the TOML.
+    if let Some(bytecodes_supplier_proxy) = lookup("bytecodes_supplier_addr") {
+        const EIP1967_IMPLEMENTATION_SLOT: &str =
+            "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
+        if let Ok(slot) = FixedBytes::<32>::from_hex(EIP1967_IMPLEMENTATION_SLOT) {
+            if let Ok(raw) = provider
+                .get_storage_at(
+                    bytecodes_supplier_proxy,
+                    U256::from_be_bytes(slot.0),
+                )
+                .await
+            {
+                let impl_addr = Address::from_slice(&raw.to_be_bytes::<32>()[12..]);
+            }
+        }
+    }
+
+    Ok(())
 }

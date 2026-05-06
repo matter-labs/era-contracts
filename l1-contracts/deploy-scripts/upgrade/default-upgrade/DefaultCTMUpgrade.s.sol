@@ -326,6 +326,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         return gatewayConfig;
     }
 
+    function getGovernanceUpgradeTimerInitialDelay() public view virtual returns (uint256) {
+        return newConfig.governanceUpgradeTimerInitialDelay;
+    }
+
+    function getTestnetVerifier() public view virtual returns (bool) {
+        return config.testnetVerifier;
+    }
+
     /// @notice This function is meant to only be used in tests
     function prepareCreateNewChainCall(uint256 chainId) public view virtual returns (Call[] memory result) {
         require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehubProxyAddress is zero in newConfig");
@@ -894,6 +902,16 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             "bytecodes_supplier_addr",
             ctmAddresses.stateTransition.proxies.bytecodesSupplier
         );
+        vm.serializeAddress(
+            "state_transition",
+            "eip7702_checker_addr",
+            ctmAddresses.admin.eip7702Checker
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "permissionless_validator_addr",
+            ctmAddresses.stateTransition.proxies.permissionlessValidator
+        );
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
@@ -929,6 +947,12 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
         // Serialize protocol version info (needed for upgrade)
         vm.serializeUint("contracts_newConfig", "new_protocol_version", getNewProtocolVersion());
+        vm.serializeUint(
+            "contracts_newConfig",
+            "governance_upgrade_timer_initial_delay",
+            newConfig.governanceUpgradeTimerInitialDelay
+        );
+        vm.serializeBool("contracts_newConfig", "is_testnet", config.testnetVerifier);
         string memory contractsConfig = vm.serializeUint(
             "contracts_newConfig",
             "old_protocol_version",

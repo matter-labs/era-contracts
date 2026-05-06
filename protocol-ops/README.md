@@ -108,22 +108,43 @@ mkdir -p /tmp/v31-stage
   --out /tmp/v31-stage/safe
 ```
 
-Replay the generated deployment bundles into the persistent Anvil fork:
+Replay the generated deployment bundles into the persistent Anvil fork. Pass
+`--out` so each replayed tx (with its hash, raw `to`/`data`/`value` and
+status) is appended to a single executed-bundle log. The verifier consumes
+this log later to recognise CREATE2 / Create2AndTransfer deployments and run
+the Phase 6 deployment-provenance checks (immutables-aware constructor-arg
+matching). Multiple invocations of `dev execute-safe --out <same path>`
+accumulate into one file in execution order:
 
 ```bash
+rm -f /tmp/v31-stage/executed.json
 for bundle in /tmp/v31-stage/safe/*.safe.json; do
   ./target/release/protocol_ops dev execute-safe \
     --l1-rpc-url "$ANVIL_RPC" \
     --safe-file "$bundle" \
-    --private-key "$ANVIL_DEPLOYER_PK"
+    --private-key "$ANVIL_DEPLOYER_PK" \
+    --out /tmp/v31-stage/executed.json
 done
 ```
 
-Then run the verifier against the same Anvil fork and the TOML produced by `upgrade-prepare`:
+Then run the verifier against the same Anvil fork and the TOML produced by
+`upgrade-prepare`. `--executed-bundles` and `--create2-salt` are required:
+the verifier always runs Phase 6 (deployment provenance) and needs both to
+identify each CREATE2 deployment in the log. `--create2-salt` must match
+the value `upgrade-prepare` was given. `--era-chain-id` should match the
+Era chain id in `environments/<env>/<env>.yaml` (e.g. `270` for the stage
+env above):
 
 ```bash
 ./target/release/protocol_ops ecosystem verify-upgrade \
   --ecosystem-toml ../l1-contracts/script-out/v31-upgrade-ecosystem.toml \
   --l1-rpc-url "$ANVIL_RPC" \
-  --era-chain-id <era-chain-id>
+  --era-chain-id 270 \
+  --executed-bundles /tmp/v31-stage/executed.json \
+  --create2-salt 0x83de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb7
 ```
+
+The `--create2-factory` flag defaults to the standard Foundry CREATE2
+factory (`0x4e59b44847b379578588920cA78FbF26c0B4956C`) used by the v31
+prepare scripts; override only if your prepare run targeted a different
+factory.
