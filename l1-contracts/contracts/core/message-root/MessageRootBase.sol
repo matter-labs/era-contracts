@@ -16,6 +16,7 @@ import {
     MessageRootNotRegistered,
     NonConsecutiveBatchNumber,
     OnlyAssetTracker,
+    OnlyChainAssetHandler,
     OnlyBridgehubOrChainAssetHandler,
     OnlyChain
 } from "../bridgehub/L1BridgehubErrors.sol";
@@ -118,6 +119,14 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
         _;
     }
 
+    /// @notice Checks that the message sender is the chain asset handler.
+    modifier onlyChainAssetHandler() {
+        if (msg.sender != _chainAssetHandler()) {
+            revert OnlyChainAssetHandler(msg.sender, _chainAssetHandler());
+        }
+        _;
+    }
+
     /// @notice Checks that the message sender is the specified ZK Chain.
     /// @param _chainId The ID of the chain that is required to be the caller.
     modifier onlyChain(uint256 _chainId) {
@@ -162,7 +171,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     function setMigratingChainBatchNumber(
         uint256 _chainId,
         uint256 _batchNumber
-    ) external onlyBridgehubOrChainAssetHandler {
+    ) external onlyChainAssetHandler {
         // Note, that it is possible that chain migrates to GW and returns to L1 without
         // committing any batches on GW.
         require(currentChainBatchNumber[_chainId] <= _batchNumber, ChainBatchRootAlreadyExists(_chainId, _batchNumber));

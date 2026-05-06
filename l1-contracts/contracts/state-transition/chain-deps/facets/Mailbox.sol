@@ -124,7 +124,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
     /// @inheritdoc IMailboxImpl
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
-    ) external onlyBridgehubOrInteropCenter returns (bytes32 canonicalTxHash) {
+    ) external onlyBridgehub returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(_request);
     }
 
