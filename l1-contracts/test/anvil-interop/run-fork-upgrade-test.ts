@@ -199,27 +199,23 @@ async function main(): Promise<void> {
     // `Ownable.owner()` hop) reverts. With `anvil --auto-impersonate` we can just send the
     // governance txs AS the handler address directly, which is what `executeGovernanceCalls` does.
     //
-    // `upgrade-prepare-all` writes one TOML per script (core + per-CTM) into
-    // `<out>/governance-tomls/`. We replay stages by re-emitting all stage-0 calls
-    // across TOMLs, then all stage-1, then all stage-2 — matches protocol-ops'
-    // `replay_governance_stages` ordering.
+    // `upgrade-prepare-all` writes a single merged `governance.toml` directly
+    // under `<out>/prepare/`. `gov upgrade-puh-guardians` (when run) emits a
+    // sibling `gov-upgrade.toml`. We replay stages by re-emitting all stage-0
+    // calls across both TOMLs, then all stage-1, then all stage-2 — matches
+    // protocol-ops' `replay_governance_stages` ordering.
     console.log(`\n=== Step 6: Executing governance calls (${elapsed()}) ===\n`);
-    const govTomlsDir = path.join(upgradeHarnessInputs.protocolOpsOutDir, "prepare", "governance-tomls");
-    const govTomls = fs.existsSync(govTomlsDir)
-      ? fs
-          .readdirSync(govTomlsDir)
-          .filter((f) => f.endsWith(".toml"))
-          .sort()
-          .map((f) => readEcosystemOutput(path.join(govTomlsDir, f)))
-      : [];
-    if (govTomls.length === 0) {
-      throw new Error(`No governance TOMLs emitted by upgrade-prepare-all in ${govTomlsDir}`);
+    const prepareDir = path.join(upgradeHarnessInputs.protocolOpsOutDir, "prepare");
+    const govTomlPaths = ["governance.toml", "gov-upgrade.toml"]
+      .map((name) => path.join(prepareDir, name))
+      .filter((p) => fs.existsSync(p));
+    if (govTomlPaths.length === 0) {
+      throw new Error(`No governance TOMLs emitted by upgrade-prepare-all under ${prepareDir}`);
     }
-    const stageKeys = ["stage0_calls", "stage1_calls", "stage2_calls"] as const;
-    const stagesByToml = govTomls.map((toml) => {
-      const calls = toml.governance_calls as Record<string, string> | undefined;
-      if (!calls) {
-        throw new Error("Governance TOML missing governance_calls section");
+    const stagesByToml = govTomlPaths.map((p) => {
+      const calls = (readEcosystemOutput(p).governance_calls ?? {}) as Record<string, string>;
+      if (!calls.stage0_calls) {
+        throw new Error(`Governance TOML missing governance_calls section: ${p}`);
       }
       return calls;
     });
@@ -240,15 +236,20 @@ async function main(): Promise<void> {
     for (const calls of stagesByToml) {
       await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(calls.stage2_calls), "Stage 2");
     }
-    void stageKeys; // silence linter for unused import-style typing aid
 
     // NOTE: we intentionally skip clearGenesisUpgradeTxHash / seedBatchCounters that the
     // synthetic-state runner does — real forked chain state already has correct values for both.
 
     // ── Step 7: Per-chain ChainUpgrade_v31 + L2 relay ────────────
     console.log(`\n=== Step 7: Per-chain ChainUpgrade_v31 + L2 relay (${elapsed()}) ===\n`);
-    // `default_upgrade_addr` is in the per-CTM output TOML (one CTM in this fork test).
-    const ctmTomlPath = path.join(govTomlsDir, `v31-upgrade-ctm-${chainTypeManager.toLowerCase()}.toml`);
+    // `default_upgrade_addr` lives in the per-CTM output TOML written by
+    // `CTMUpgradeV31ForTests.saveOutput` directly to `<l1-contracts>/script-out/`
+    // (forge writes it there; protocol-ops no longer copies it into `prepare/`).
+    const ctmTomlPath = path.join(
+      l1ContractsDir,
+      "script-out",
+      `v31-upgrade-ctm-${chainTypeManager.toLowerCase()}.toml`
+    );
     const ctmOutputToml = readEcosystemOutput(ctmTomlPath);
     const settlementLayerUpgradeAddr = readNestedString(
       ctmOutputToml,

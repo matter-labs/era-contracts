@@ -322,6 +322,41 @@
   },
   {
     "type": "function",
+    "name": "ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps",
+    "inputs": [
+      {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "governance",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "wraps",
+        "type": "tuple[]",
+        "internalType": "struct OwnerWrap[]",
+        "components": [
+          {
+            "name": "ownableContract",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "kind",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "governanceAcceptAdmin",
     "inputs": [
       {
@@ -395,6 +430,24 @@
   {
     "type": "function",
     "name": "governanceExecuteCalls",
+    "inputs": [
+      {
+        "name": "callsToExecute",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "governanceAddr",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "governanceExecuteCallsDirect",
     "inputs": [
       {
         "name": "callsToExecute",

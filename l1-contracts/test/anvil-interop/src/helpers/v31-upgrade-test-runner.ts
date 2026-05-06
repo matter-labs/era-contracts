@@ -135,19 +135,20 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       executeBundles: true,
     });
 
-    // `upgrade-prepare-all` writes per-step governance TOMLs into
-    // `<out>/governance-tomls/`. Pass them all to `upgrade-governance` so the
-    // resulting Safe bundle contains stage-0/1/2 calls from core + every CTM.
-    const prepareGovernanceTomlsDir = path.join(upgradeHarnessInputs.protocolOpsOutDir, "prepare", "governance-tomls");
-    const governanceTomlPaths = fs.existsSync(prepareGovernanceTomlsDir)
-      ? fs
-          .readdirSync(prepareGovernanceTomlsDir)
-          .filter((f) => f.endsWith(".toml"))
-          .sort()
-          .map((f) => path.join(prepareGovernanceTomlsDir, f))
-      : [];
-    if (governanceTomlPaths.length === 0) {
-      throw new Error(`No governance TOMLs emitted by upgrade-prepare-all in ${prepareGovernanceTomlsDir}`);
+    // `upgrade-prepare-all` writes a single merged `governance.toml` directly
+    // under `<out>/prepare/`. It already contains stage-0/1/2 calls from core
+    // + every CTM concatenated in source-order — no per-script split anymore.
+    const prepareDir = path.join(upgradeHarnessInputs.protocolOpsOutDir, "prepare");
+    const mergedGovernanceToml = path.join(prepareDir, "governance.toml");
+    if (!fs.existsSync(mergedGovernanceToml)) {
+      throw new Error(`Merged governance TOML not emitted by upgrade-prepare-all: ${mergedGovernanceToml}`);
+    }
+    const governanceTomlPaths = [mergedGovernanceToml];
+    // Optional gov-upgrade TOML (PUH/Guardians redeploy). Picked up alongside
+    // the ecosystem one when present.
+    const govUpgradeToml = path.join(prepareDir, "gov-upgrade.toml");
+    if (fs.existsSync(govUpgradeToml)) {
+      governanceTomlPaths.push(govUpgradeToml);
     }
 
     // ── Execute governance calls (stages 0-2) via protocol-ops bundle ──
@@ -170,14 +171,12 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       await seedBatchCounters(l1Provider, upgradeChainAddresses);
     }
     // ── Run per-chain upgrades (L1) and relay to L2 ──
-    // `default_upgrade_addr` now lives in the per-CTM output TOML written by
-    // `CTMUpgradeV31ForTests.saveOutput`. With one CTM, that's the single ctm
-    // toml in `governance-tomls/`. (The legacy "ecosystem combined output" no
-    // longer exists; orchestration was removed.)
+    // `default_upgrade_addr` lives in the per-CTM output TOML written by
+    // `CTMUpgradeV31ForTests.saveOutput` directly to `script-out/` (forge
+    // writes it there; protocol-ops no longer copies it into `prepare/`).
     const ctmTomlPath = path.join(
-      upgradeHarnessInputs.protocolOpsOutDir,
-      "prepare",
-      "governance-tomls",
+      l1ContractsDir,
+      "script-out",
       `v31-upgrade-ctm-${upgradeHarnessInputs.ctmProxyAddress.toLowerCase()}.toml`
     );
     const ctmOutputToml = readEcosystemOutput(ctmTomlPath);

@@ -7,13 +7,37 @@ create2_factory_salt = "0x000000000000000000000000000000000000000000000000000000
 bridgehub_proxy_addr = "0xc4fd2580c3487bba18d63f50301020132342fdbd"
 
 
-# TODO(EVM-1200): The CTM below is for ZKsync OS and NOT Era (the way it was done in the other envs).
-# This is due to the fact that no canonical Era chain is present on testnet. This will have to be resolved
-# together with zksync os support for upgrades.
+# TODO(EVM-1200): The single-CTM `[ctm_contracts]` block below is for ZKsync OS (Atlas)
+# and NOT Era — this is due to no canonical Era chain being present on testnet historically.
+# The newer `[[ctm_contracts.ctms]]` array reflects both CTMs that are actually registered
+# on the testnet bridgehub today.
 [ctm_contracts]
 ctm_proxy_addr = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
 l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
 rollup_da_manager = "0x064ac968CCad1948fceE025fD59c20b153c88072"
+
+# v31 multi-CTM list — consumed by `scripts/v31-simulate-upgrade.ts`.
+# Testnet is currently pre-v31 (Atlas on v30, Era on v29) — overrides are required
+# because the v31 getters (`ctm.isZKsyncOS()`, `ctm.L1_BYTECODES_SUPPLIER()`) don't
+# exist on either CTM yet.
+[[ctm_contracts.ctms]]
+# Atlas (ZKsyncOS) CTM (witness chain: 8022832, v30)
+# rollup_da_manager queried via `chain.getRollupDAManager()`.
+# TODO(kelemeno): bytecodes_supplier on testnet for Atlas — fill from deployment
+# notes (no on-chain getter exists on the v30 CTM).
+proxy = "0x54D55e74De9c6003E7a68a1fE70E633f05761eb5"
+is_zk_sync_os = true
+bytecodes_supplier = "0x0000000000000000000000000000000000000000" # TODO
+rollup_da_manager = "0x6b7D8FD12eF94485c8E928a055124F94C2B5d411"
+
+[[ctm_contracts.ctms]]
+# Era CTM (witness chain: 301, v29)
+# rollup_da_manager queried via `chain.getRollupDAManager()`.
+# TODO(kelemeno): bytecodes_supplier on testnet for Era — fill from deployment notes.
+proxy = "0x3Cc81628a14C824057a97C1B4Ab17758E5D18864"
+is_zk_sync_os = false
+bytecodes_supplier = "0x0000000000000000000000000000000000000000" # TODO
+rollup_da_manager = "0x2732eA4Db32527690A680D5A2B7FFae812bB656A"
 
 # Legacy Gateway configuration for settlement layer validation
 # This section contains historical data about chains that settled on the legacy Gateway

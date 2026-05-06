@@ -7,9 +7,31 @@ create2_factory_salt = "0x000000000000000000000000000000000000000000000000000000
 bridgehub_proxy_addr = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"
 
 [ctm_contracts]
+# Legacy single-CTM (Era) — kept for anvil-interop synthetic-state harnesses.
+# The v31 multi-CTM upgrade flow uses the `[[ctm_contracts.ctms]]` array below.
 ctm_proxy_addr = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"
 l1_bytecodes_supplier_addr = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
 rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
+
+# v31 multi-CTM list — consumed by `scripts/v31-simulate-upgrade.ts`.
+# Mainnet is currently pre-v31 — overrides are required because the v31 getters
+# (`ctm.isZKsyncOS()`, `ctm.L1_BYTECODES_SUPPLIER()`) don't exist yet.
+[[ctm_contracts.ctms]]
+# Era CTM (witness chain: 324)
+proxy = "0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C"
+is_zk_sync_os = false
+bytecodes_supplier = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
+rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
+
+[[ctm_contracts.ctms]]
+# Atlas (ZKsyncOS) CTM (witness chain: 30715)
+# rollup_da_manager queried via `chain.getRollupDAManager()` on the diamond proxy.
+# TODO(kelemeno): bytecodes_supplier on mainnet for Atlas — fill from the
+# zkOS deployment notes (no on-chain getter exists on the v30 CTM).
+proxy = "0x1adf137f59949c9081157d5dE1e002D1c992071F"
+is_zk_sync_os = true
+bytecodes_supplier = "0x0000000000000000000000000000000000000000" # TODO
+rollup_da_manager = "0x3F54A35a979Fe576159002B05bE2eDf9b455FAAA"
 
 # Legacy Gateway configuration for settlement layer validation
 # This section contains historical data about chains that settled on the legacy Gateway

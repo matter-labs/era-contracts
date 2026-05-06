@@ -5,7 +5,13 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 
-import {IAdminFunctions} from "contracts/script-interfaces/IAdminFunctions.sol";
+import {
+    IAdminFunctions,
+    OwnerWrap,
+    OWNER_KIND_NONE,
+    OWNER_KIND_LEGACY_GOVERNANCE,
+    OWNER_KIND_OZ_CHAIN_ADMIN
+} from "contracts/script-interfaces/IAdminFunctions.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
@@ -60,6 +66,26 @@ interface IAdminLegacy {
 interface IOwnableSingleStep {
     function owner() external view returns (address);
     function transferOwnership(address newOwner) external;
+}
+
+/// Subset of the legacy ZKsync `Governance.sol` (TimelockController-style)
+/// surface we need for wrapping. `executeInstant` is `onlySecurityCouncil`,
+/// `scheduleTransparent` is `onlyOwner`. The `Operation` struct is
+/// `(Call[], bytes32 predecessor, bytes32 salt)`.
+interface ILegacyGovernance {
+    struct LegacyOperation {
+        Call[] calls;
+        bytes32 predecessor;
+        bytes32 salt;
+    }
+    function scheduleTransparent(LegacyOperation calldata op, uint256 delay) external;
+    function executeInstant(LegacyOperation calldata op) external payable;
+    function securityCouncil() external view returns (address);
+}
+
+/// Subset of the legacy OZ `ChainAdmin` (Ownable variant) surface we need.
+interface IChainAdminMulticall {
+    function multicall(Call[] calldata calls, bool requireSuccess) external payable;
 }
 
 contract AdminFunctions is Script, IAdminFunctions {
@@ -184,7 +210,32 @@ contract AdminFunctions is Script, IAdminFunctions {
     ///
     /// Requires anvil `--auto-impersonate` (or a runner that has unlocked the
     /// resolved owner addresses) — broadcasts switch sender per-step.
+    ///
+    /// 2-arg variant kept for callers that don't need contract-owner wrapping
+    /// (i.e. every current owner is already an EOA). Delegates to the 3-arg
+    /// form with an empty registry; if any current owner is a contract that
+    /// isn't a no-key EOA, the helper reverts so the caller is forced to
+    /// supply a registry entry.
     function ensureCtmsAndProxyAdminsOwnedByGovernance(address bridgehub, address governance) public {
+        OwnerWrap[] memory empty = new OwnerWrap[](0);
+        ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps(bridgehub, governance, empty);
+    }
+
+    /// Walk every registered chain's CTM (deduplicated) and ensure both the
+    /// CTM (Ownable2Step) and its EIP-1967 ProxyAdmin (single-step Ownable) are
+    /// owned by `governance`. Each individual transfer is conditional, so
+    /// re-running this against an already-correct ecosystem is a no-op.
+    ///
+    /// `wraps` is a registry of contract owners that must be wrapped (since
+    /// they have no private key); see [`OwnerWrap`]. EOAs (current owner has
+    /// no code) are broadcast directly; contract owners not present in the
+    /// registry cause a hard revert so missing config surfaces immediately
+    /// instead of being papered over.
+    function ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps(
+        address bridgehub,
+        address governance,
+        OwnerWrap[] memory wraps
+    ) public {
         // Per-chain CTMs (Ownable2Step) — transfer + accept, plus their ProxyAdmins.
         uint256[] memory chainIds = IL1Bridgehub(bridgehub).getAllZKChainChainIDs();
         address[] memory seenCtms = new address[](chainIds.length);
@@ -204,19 +255,20 @@ contract AdminFunctions is Script, IAdminFunctions {
             Ownable2Step ctmOwnable = Ownable2Step(ctm);
             address ctmOwner = ctmOwnable.owner();
             if (ctmOwner != governance && ctmOwnable.pendingOwner() != governance) {
-                _anvilFund(ctmOwner);
-                vm.startBroadcast(ctmOwner);
-                ctmOwnable.transferOwnership(governance);
-                vm.stopBroadcast();
+                _issueAsOwner(ctmOwner, ctm, abi.encodeCall(Ownable2Step.transferOwnership, (governance)), wraps);
             }
             if (ctmOwnable.pendingOwner() == governance) {
+                // `governance` (PUH on stage/mainnet) has no key — on a fork
+                // we impersonate it, on a real chain this acceptOwnership must
+                // become a stage-0 governance call. The fork case is the only
+                // one this helper supports today.
                 _anvilFund(governance);
                 vm.startBroadcast(governance);
                 ctmOwnable.acceptOwnership();
                 vm.stopBroadcast();
             }
 
-            _ensureProxyAdminOwnedByGovernance(ctm, governance);
+            _ensureProxyAdminOwnedByGovernance(ctm, governance, wraps);
         }
 
         // Bridgehub-discoverable ecosystem proxies. Mirrors the contracts visited
@@ -227,16 +279,20 @@ contract AdminFunctions is Script, IAdminFunctions {
         address ctmDeploymentTracker = address(IL1Bridgehub(bridgehub).l1CtmDeployer());
         address l1Nullifier = address(IL1AssetRouter(assetRouter).L1_NULLIFIER());
 
-        _ensureProxyAdminOwnedByGovernance(bridgehub, governance);
-        _ensureProxyAdminOwnedByGovernance(assetRouter, governance);
-        _ensureProxyAdminOwnedByGovernance(chainAssetHandler, governance);
-        _ensureProxyAdminOwnedByGovernance(ctmDeploymentTracker, governance);
-        _ensureProxyAdminOwnedByGovernance(l1Nullifier, governance);
+        _ensureProxyAdminOwnedByGovernance(bridgehub, governance, wraps);
+        _ensureProxyAdminOwnedByGovernance(assetRouter, governance, wraps);
+        _ensureProxyAdminOwnedByGovernance(chainAssetHandler, governance, wraps);
+        _ensureProxyAdminOwnedByGovernance(ctmDeploymentTracker, governance, wraps);
+        _ensureProxyAdminOwnedByGovernance(l1Nullifier, governance, wraps);
     }
 
     /// Helper: read the EIP-1967 admin slot of `_proxy`, and if its single-step
     /// Ownable owner isn't already `_governance`, transfer ownership to it.
-    function _ensureProxyAdminOwnedByGovernance(address _proxy, address _governance) private {
+    function _ensureProxyAdminOwnedByGovernance(
+        address _proxy,
+        address _governance,
+        OwnerWrap[] memory _wraps
+    ) private {
         bytes32 eip1967AdminSlot = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
         address proxyAdmin = address(uint160(uint256(vm.load(_proxy, eip1967AdminSlot))));
         if (proxyAdmin == address(0)) {
@@ -246,10 +302,101 @@ contract AdminFunctions is Script, IAdminFunctions {
         if (paOwner == _governance) {
             return;
         }
-        _anvilFund(paOwner);
-        vm.startBroadcast(paOwner);
-        IOwnableSingleStep(proxyAdmin).transferOwnership(_governance);
+        _issueAsOwner(paOwner, proxyAdmin, abi.encodeCall(IOwnableSingleStep.transferOwnership, (_governance)), _wraps);
+    }
+
+    /// Issue `_data` against `_target` on behalf of `_currentOwner`. EOAs are
+    /// broadcast directly via `vm.startBroadcast`. Contract owners are looked
+    /// up in `_wraps` and routed through their wrapping shape (legacy
+    /// Governance.sol => `scheduleTransparent` + `executeInstant` from EOA;
+    /// OZ ChainAdmin (Ownable2Step) => `multicall` from EOA). Reverts on
+    /// contract owners that have no registry entry.
+    function _issueAsOwner(
+        address _currentOwner,
+        address _target,
+        bytes memory _data,
+        OwnerWrap[] memory _wraps
+    ) private {
+        if (_currentOwner.code.length == 0) {
+            _anvilFund(_currentOwner);
+            vm.startBroadcast(_currentOwner);
+            (bool ok, bytes memory ret) = _target.call(_data);
+            vm.stopBroadcast();
+            require(ok, _wrapDecodeRevert(ret));
+            return;
+        }
+        uint8 kind = OWNER_KIND_NONE;
+        for (uint256 i = 0; i < _wraps.length; i++) {
+            if (_wraps[i].ownableContract == _currentOwner) {
+                kind = _wraps[i].kind;
+                break;
+            }
+        }
+        if (kind == OWNER_KIND_LEGACY_GOVERNANCE) {
+            _wrapLegacyGovernance(_currentOwner, _target, _data);
+        } else if (kind == OWNER_KIND_OZ_CHAIN_ADMIN) {
+            _wrapOzChainAdmin(_currentOwner, _target, _data);
+        } else {
+            revert(
+                string.concat(
+                    "ownable contract owner without registry entry: ",
+                    vm.toString(_currentOwner),
+                    " - add it to permanent-values/<env>.toml [[ownable_proxies]]"
+                )
+            );
+        }
+    }
+
+    /// Storage-backed salt counter so consecutive `scheduleTransparent` ops
+    /// produced by a single script invocation get distinct hashes (the legacy
+    /// Governance contract rejects duplicate operation IDs). Foundry script
+    /// storage is per-invocation so this resets cleanly each run.
+    uint256 private _legacyGovSaltCounter;
+
+    function _wrapLegacyGovernance(address _gov, address _target, bytes memory _data) private {
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _target, value: 0, data: _data});
+        ILegacyGovernance.LegacyOperation memory op = ILegacyGovernance.LegacyOperation({
+            calls: calls,
+            predecessor: bytes32(0),
+            salt: bytes32(_legacyGovSaltCounter++)
+        });
+        address eoaOwner = IOwnableSingleStep(_gov).owner();
+        address sc = ILegacyGovernance(_gov).securityCouncil();
+        _anvilFund(eoaOwner);
+        vm.startBroadcast(eoaOwner);
+        ILegacyGovernance(_gov).scheduleTransparent(op, 0);
         vm.stopBroadcast();
+        _anvilFund(sc);
+        vm.startBroadcast(sc);
+        ILegacyGovernance(_gov).executeInstant(op);
+        vm.stopBroadcast();
+    }
+
+    function _wrapOzChainAdmin(address _admin, address _target, bytes memory _data) private {
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _target, value: 0, data: _data});
+        address eoaOwner = IOwnableSingleStep(_admin).owner();
+        _anvilFund(eoaOwner);
+        vm.startBroadcast(eoaOwner);
+        IChainAdminMulticall(_admin).multicall(calls, true);
+        vm.stopBroadcast();
+    }
+
+    /// Pull a string-typed revert reason out of `_returndata`. Falls back to a
+    /// generic message if the returndata isn't an Error(string).
+    function _wrapDecodeRevert(bytes memory _returndata) private pure returns (string memory) {
+        if (_returndata.length < 68) return "wrapped call failed (no revert reason)";
+        bytes4 sig;
+        assembly {
+            sig := mload(add(_returndata, 32))
+        }
+        if (sig != 0x08c379a0) return "wrapped call failed (non-string revert)";
+        bytes memory stripped = new bytes(_returndata.length - 4);
+        for (uint256 i = 0; i < stripped.length; i++) {
+            stripped[i] = _returndata[i + 4];
+        }
+        return abi.decode(stripped, (string));
     }
 
     // This function should be called by the owner to accept the admin role
@@ -329,6 +476,24 @@ contract AdminFunctions is Script, IAdminFunctions {
     function governanceExecuteCalls(bytes memory callsToExecute, address governanceAddr) public {
         Call[] memory calls = abi.decode(callsToExecute, (Call[]));
         Utils.executeCalls(governanceAddr, bytes32(0), 0, calls);
+    }
+
+    /// Fork-only governance replay: impersonate `governanceAddr` and forward
+    /// each call directly. Used when the governance contract is the
+    /// `ProtocolUpgradeHandler` (no `Ownable.owner()`, no `scheduleTransparent`
+    /// path that simulates without delays/signatures), so the standard
+    /// `Utils.executeCalls` flow is unusable. Real-chain replay still needs
+    /// the full PUH propose-execute mechanism — this helper exists strictly
+    /// for `--auto-impersonate` anvil forks.
+    function governanceExecuteCallsDirect(bytes memory callsToExecute, address governanceAddr) public {
+        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
+        _anvilFund(governanceAddr);
+        vm.startBroadcast(governanceAddr);
+        for (uint256 i = 0; i < calls.length; i++) {
+            (bool ok, bytes memory ret) = calls[i].target.call{value: calls[i].value}(calls[i].data);
+            require(ok, _wrapDecodeRevert(ret));
+        }
+        vm.stopBroadcast();
     }
 
     function ecosystemAdminExecuteCalls(bytes memory callsToExecute, address ecosystemAdminAddr) public {
