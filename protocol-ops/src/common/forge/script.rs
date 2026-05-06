@@ -90,7 +90,7 @@ impl ForgeScript {
     /// Apply wallet authentication against the anvil fork: always uses
     /// `--sender --unlocked` so forge impersonates the wallet's address via
     /// anvil auto-impersonation. Any private key on the wallet is ignored —
-    /// protocol-ops never broadcasts against real L1.
+    /// this Forge script never broadcasts against real L1.
     pub fn with_wallet(self, wallet: &Wallet) -> Self {
         self.with_sender(format!("{:#x}", wallet.address))
             .with_unlocked()

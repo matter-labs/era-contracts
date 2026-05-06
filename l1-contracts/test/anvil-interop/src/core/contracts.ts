@@ -28,6 +28,7 @@ const ARTIFACTS = {
   IL1Bridgehub: "IL1Bridgehub.sol/IL1Bridgehub.json",
   IL1GenesisUpgrade: "IL1GenesisUpgrade.sol/IL1GenesisUpgrade.json",
   IL2AssetRouter: "IL2AssetRouter.sol/IL2AssetRouter.json",
+  IZKChain: "IZKChain.sol/IZKChain.json",
   InteropCenter: "InteropCenter.sol/InteropCenter.json",
   InteropHandler: "InteropHandler.sol/InteropHandler.json",
   IComplexUpgraderZKsyncOSV29: "IComplexUpgraderZKsyncOSV29.sol/IComplexUpgraderZKsyncOSV29.json",

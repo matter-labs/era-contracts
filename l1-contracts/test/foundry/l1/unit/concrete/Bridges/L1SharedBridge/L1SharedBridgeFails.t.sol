@@ -155,28 +155,6 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         l1Nullifier.transferTokenToNTV(ETH_TOKEN_ADDRESS);
     }
 
-    // function test_transferFundsToSharedBridge_Eth_0_AmountTransferred() public {
-    //     vm.deal(address(l1Nullifier), 0);
-    //     vm.prank(address(nativeTokenVault));
-    //     vm.expectRevert(abi.encodeWithSelector(NoFundsTransferred.selector));
-    //     nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
-    // }
-
-    // function test_transferFundsToSharedBridge_Erc_0_AmountTransferred() public {
-    //     vm.prank(address(l1Nullifier));
-    //     token.transfer(address(1), amount);
-    //     vm.prank(address(nativeTokenVault));
-    //     vm.expectRevert(ZeroAmountToTransfer.selector);
-    //     nativeTokenVault.transferFundsFromSharedBridge(address(token));
-    // }
-
-    // function test_transferFundsToSharedBridge_Erc_WrongAmountTransferred() public {
-    //     vm.mockCall(address(token), abi.encodeWithSelector(IERC20.balanceOf.selector), abi.encode(10));
-    //     vm.prank(address(nativeTokenVault));
-    //     vm.expectRevert(abi.encodeWithSelector(WrongAmountTransferred.selector, 0, 10));
-    //     nativeTokenVault.transferFundsFromSharedBridge(address(token));
-    // }
-
     function test_bridgehubDepositBaseToken_Eth_Token_incorrectSender() public {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
         sharedBridge.bridgehubDepositBaseToken{value: amount}(chainId, ETH_TOKEN_ASSET_ID, alice, amount);

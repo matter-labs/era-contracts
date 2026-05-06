@@ -143,9 +143,10 @@ async function runParallelWorker(label: string, specs: string[], portOffset: num
 }
 
 async function main(): Promise<void> {
+  const liveMode = process.env.ANVIL_INTEROP_LIVE === "1";
   const keepChains = process.argv.includes("--keep-chains") || process.env.ANVIL_INTEROP_KEEP_CHAINS === "1";
   const skipSetup = process.env.ANVIL_INTEROP_SKIP_SETUP === "1";
-  const skipCleanup = keepChains || process.env.ANVIL_INTEROP_SKIP_CLEANUP === "1";
+  const skipCleanup = liveMode || keepChains || process.env.ANVIL_INTEROP_SKIP_CLEANUP === "1";
   const requestedSpecs = parseRequestedSpecs(process.argv.slice(2));
   const workerMode = process.env.ANVIL_INTEROP_PARALLEL_WORKER === "1";
   const freshDeploy = process.env.ANVIL_INTEROP_FRESH_DEPLOY === "1";
@@ -156,7 +157,8 @@ async function main(): Promise<void> {
     process.env.ANVIL_INTEROP_PORT_OFFSET = portOffset.toString();
   }
 
-  const shouldParallelize = !workerMode && !keepChains && !skipSetup && !freshDeploy && requestedSpecs.length === 0;
+  const shouldParallelize =
+    !liveMode && !workerMode && !keepChains && !skipSetup && !freshDeploy && requestedSpecs.length === 0;
 
   if (shouldParallelize) {
     await timedAsync("parallel hardhat interop workers", async () => {
@@ -170,10 +172,16 @@ async function main(): Promise<void> {
     return;
   }
 
-  const specsToRun = requestedSpecs.length > 0 ? requestedSpecs : allSpecFiles;
+  const liveDefaultSpecs = allSpecFiles.filter((spec) => /test\/anvil-interop\/test\/hardhat\/0[789]-/.test(spec));
+  const specsToRun = requestedSpecs.length > 0 ? requestedSpecs : liveMode ? liveDefaultSpecs : allSpecFiles;
 
   try {
-    if (!skipSetup) {
+    if (liveMode) {
+      if (!skipSetup) {
+        const runner = new DeploymentRunner();
+        await timedAsync("live interop state setup", () => runner.setupLiveState());
+      }
+    } else if (!skipSetup) {
       // Cleanup previous state (still uses shell script for process killing)
       timedRun("cleanup", "yarn", ["cleanup"], anvilInteropDir);
 

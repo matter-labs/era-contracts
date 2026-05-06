@@ -4,14 +4,8 @@ import { ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { getChainIdsByRole, getL2Chain } from "../../src/core/utils";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
-import {
-  ANVIL_DEFAULT_ACCOUNT_ADDR,
-  ANVIL_RECIPIENT_ADDR,
-  ETH_TOKEN_ADDRESS,
-  INTEROP_CENTER_ADDR,
-  L2_ASSET_ROUTER_ADDR,
-} from "../../src/core/const";
-import { runtimeConfig } from "../../src/core/runtime-config";
+import { getInteropRecipientAddress, getInteropSourceAddress } from "../../src/core/accounts";
+import { ETH_TOKEN_ADDRESS, INTEROP_CENTER_ADDR, L1_CHAIN_ID, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
 import { encodeEvmChainAddress } from "../../src/helpers/erc7930";
 import {
   sendInteropMessage,
@@ -22,6 +16,7 @@ import {
   getTokenTransferData,
   getInteropProtocolFee,
   getZkInteropFee,
+  getZkTokenAssetId,
   getZkTokenAddress,
   deployDummyInteropRecipient,
 } from "../../src/helpers/interop-helpers";
@@ -30,6 +25,7 @@ import {
   getNativeBalance,
   getTokenBalance,
   getTokenAddressForAsset,
+  getAssetIdForToken,
   approveToken,
   approveTokenForNtv,
   expectNativeSpend,
@@ -67,6 +63,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
   let sourceAssetId: string;
   let sourceZkTokenAddress: string;
   let zkInteropFee: BigNumber;
+  let fixedZkFeeTestsEnabled = false;
 
   // Randomized per-test amount ranges
   const BASE_TOKEN_MIN = ethers.utils.parseUnits("100", "gwei");
@@ -81,9 +78,14 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
   // DummyInteropRecipient on dest chain for base token (direct call) messages
   let dummyRecipient: string;
 
+  async function currentInteropFee(): Promise<BigNumber> {
+    interopFee = await getInteropProtocolFee(sourceProvider);
+    return interopFee;
+  }
+
   before(async () => {
     state = runner.loadState();
-    if (!state.chains || !state.l1Addresses || !state.chainAddresses || !state.testTokens || !state.zkToken) {
+    if (!state.chains || !state.l1Addresses || !state.chainAddresses || !state.testTokens) {
       throw new Error("Deployment state incomplete. Run setup first.");
     }
     gwSettledChainIds = getChainIdsByRole(state.chains.config, "gwSettled");
@@ -101,17 +103,36 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
 
     interopFee = await getInteropProtocolFee(sourceProvider);
     zkInteropFee = await getZkInteropFee(sourceProvider);
-    console.log(`   Interop protocol fee: ${ethers.utils.formatEther(interopFee)} ETH`);
+    console.log(`   Interop protocol fee: ${interopFee.toString()}`);
+    console.log(`   Fixed ZK interop fee: ${zkInteropFee.toString()}`);
 
     sourceTokenAddress = state.testTokens[sourceChainId];
-    sourceAssetId = encodeNtvAssetId(sourceChainId, sourceTokenAddress);
-    sourceZkTokenAddress = await getTokenAddressForAsset(sourceProvider, state.zkToken.assetId);
-    expect(sourceZkTokenAddress, "wrapped ZK token should be bridged to the source chain").to.not.equal(
-      ethers.constants.AddressZero
-    );
-    expect(await getZkTokenAddress(sourceProvider), "InteropCenter should resolve the seeded ZK token").to.equal(
-      sourceZkTokenAddress
-    );
+    sourceAssetId = await getAssetIdForToken(sourceProvider, sourceTokenAddress);
+    const zkTokenAssetId = state.zkToken?.assetId || (await getZkTokenAssetId(sourceProvider));
+    if (zkTokenAssetId === ethers.constants.HashZero) {
+      console.warn("   The ZK token has not yet been bridged to the source chain; fixed ZK fee tests will be skipped.");
+    } else {
+      sourceZkTokenAddress = await getTokenAddressForAsset(sourceProvider, zkTokenAssetId);
+      const interopZkTokenAddress = await getZkTokenAddress(sourceProvider);
+      if (
+        sourceZkTokenAddress === ethers.constants.AddressZero ||
+        interopZkTokenAddress === ethers.constants.AddressZero
+      ) {
+        console.warn(
+          "   The ZK token has not yet been bridged to the source chain; fixed ZK fee tests will be skipped."
+        );
+      } else {
+        expect(interopZkTokenAddress, "InteropCenter should resolve the seeded ZK token").to.equal(
+          sourceZkTokenAddress
+        );
+        const zkBalance = await getTokenBalance(sourceProvider, sourceZkTokenAddress, getInteropSourceAddress());
+        if (zkBalance.isZero()) {
+          console.warn("   ZK token balance is zero; fixed ZK fee tests will be skipped.");
+        } else {
+          fixedZkFeeTestsEnabled = true;
+        }
+      }
+    }
 
     // Deploy DummyInteropRecipient on destination chain for direct-call messages
     dummyRecipient = await deployDummyInteropRecipient(destProvider);
@@ -133,6 +154,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
 
   it("can send and receive a base token message (direct call with value)", async function () {
     const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
+    const interopFee = await currentInteropFee();
     const recipient = encodeEvmChainAddress(dummyRecipient, destChainId);
     const payload = "0x";
     const attributes = [interopCallValueAttr(amount)];
@@ -170,10 +192,20 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
   });
 
   it("can send and receive a base token message with fixed ZK fees", async function () {
+    if (!fixedZkFeeTestsEnabled) {
+      this.skip();
+    }
+
     const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
     const recipient = encodeEvmChainAddress(dummyRecipient, destChainId);
     const payload = "0x";
     const attributes = [interopCallValueAttr(amount), useFixedFeeAttr(true)];
+
+    const zkBalance = await getTokenBalance(sourceProvider, sourceZkTokenAddress, getInteropSourceAddress());
+    expect(
+      zkBalance.gte(zkInteropFee),
+      `fixed-fee base token message: sender ZK token balance ${zkBalance.toString()} is below required fee ${zkInteropFee.toString()}`
+    ).to.be.true;
 
     await approveToken(sourceProvider, sourceZkTokenAddress, INTEROP_CENTER_ADDR, zkInteropFee);
 
@@ -203,8 +235,9 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
 
   it("can send and receive a native ERC20 token message (indirect call via AssetRouter)", async function () {
     const erc20Amount = randomBigNumber(ERC20_MIN, ERC20_MAX);
+    const interopFee = await currentInteropFee();
     const recipient = encodeEvmChainAddress(L2_ASSET_ROUTER_ADDR, destChainId);
-    const payload = getTokenTransferData(sourceAssetId, erc20Amount, ANVIL_RECIPIENT_ADDR);
+    const payload = getTokenTransferData(sourceAssetId, erc20Amount, getInteropRecipientAddress());
     const attributes = [indirectCallAttr()];
     const msgValue = interopFee;
 
@@ -240,7 +273,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     // Resolve the token address on the destination chain for the source chain's token
     let destTokenAddr = await getTokenAddressForAsset(destProvider, sourceAssetId);
 
-    const recipientBalBefore = await getTokenBalance(destProvider, destTokenAddr, ANVIL_RECIPIENT_ADDR);
+    const recipientBalBefore = await getTokenBalance(destProvider, destTokenAddr, getInteropRecipientAddress());
 
     const receipt = await executeBundle(destProvider, result.bundleData, sourceChainId);
     expect(receipt.status).to.equal(1);
@@ -248,7 +281,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     // Re-resolve: NTV may have deployed the bridged token during executeBundle
     destTokenAddr = await getTokenAddressForAsset(destProvider, sourceAssetId);
 
-    const recipientBalAfter = await getTokenBalance(destProvider, destTokenAddr, ANVIL_RECIPIENT_ADDR);
+    const recipientBalAfter = await getTokenBalance(destProvider, destTokenAddr, getInteropRecipientAddress());
     expectBalanceDelta(recipientBalBefore, recipientBalAfter, erc20Amount, "ERC20 message: recipient token");
 
     const balDelta = recipientBalAfter.sub(recipientBalBefore);
@@ -264,9 +297,10 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     }
 
     const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
-    const ethAssetId = encodeNtvAssetId(runtimeConfig.l1ChainId, ETH_TOKEN_ADDRESS);
+    const interopFee = await currentInteropFee();
+    const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
     const recipient = encodeEvmChainAddress(L2_ASSET_ROUTER_ADDR, customBaseTokenChainId);
-    const payload = getTokenTransferData(ethAssetId, amount, ANVIL_RECIPIENT_ADDR);
+    const payload = getTokenTransferData(ethAssetId, amount, getInteropRecipientAddress());
     // callValue = amount because ETH is the sender's base token (native),
     // so the AssetRouter receives it via msg.value rather than ERC20 transferFrom.
     const attributes = [indirectCallAttr(amount)];
@@ -295,7 +329,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     let bridgedEthAddr = await getTokenAddressForAsset(customBaseTokenProvider!, ethAssetId);
     const recipientBalBefore =
       bridgedEthAddr !== ethers.constants.AddressZero
-        ? await getTokenBalance(customBaseTokenProvider!, bridgedEthAddr, ANVIL_RECIPIENT_ADDR)
+        ? await getTokenBalance(customBaseTokenProvider!, bridgedEthAddr, getInteropRecipientAddress())
         : ethers.BigNumber.from(0);
 
     const receipt = await executeBundle(customBaseTokenProvider!, result.bundleData, sourceChainId);
@@ -305,7 +339,11 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     bridgedEthAddr = await getTokenAddressForAsset(customBaseTokenProvider!, ethAssetId);
     expect(bridgedEthAddr).to.not.equal(ethers.constants.AddressZero, "bridged ETH token should be deployed");
 
-    const recipientBalAfter = await getTokenBalance(customBaseTokenProvider!, bridgedEthAddr, ANVIL_RECIPIENT_ADDR);
+    const recipientBalAfter = await getTokenBalance(
+      customBaseTokenProvider!,
+      bridgedEthAddr,
+      getInteropRecipientAddress()
+    );
     expectBalanceDelta(recipientBalBefore, recipientBalAfter, amount, "cross-base-token: recipient bridged ETH");
 
     const balDelta = recipientBalAfter.sub(recipientBalBefore);
@@ -331,14 +369,14 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       return;
     }
 
-    const customBaseTokenAssetId = encodeNtvAssetId(runtimeConfig.l1ChainId, customBaseTokenL1Addr);
+    const customBaseTokenAssetId = encodeNtvAssetId(L1_CHAIN_ID, customBaseTokenL1Addr);
     const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
 
     // Send from chain 14 → destChainId (ETH chain). The custom base token is native on
     // chain 14, so the AssetRouter receives it via msg.value (indirectCall with callValue).
     const customChainInteropFee = await getInteropProtocolFee(customBaseTokenProvider);
     const recipient = encodeEvmChainAddress(L2_ASSET_ROUTER_ADDR, destChainId);
-    const payload = getTokenTransferData(customBaseTokenAssetId, amount, ANVIL_RECIPIENT_ADDR);
+    const payload = getTokenTransferData(customBaseTokenAssetId, amount, getInteropRecipientAddress());
     const attributes = [indirectCallAttr(amount)];
     const msgValue = customChainInteropFee.add(amount);
 
@@ -359,7 +397,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     let bridgedTokenAddr = await getTokenAddressForAsset(destProvider, customBaseTokenAssetId);
     const recipientBalBefore =
       bridgedTokenAddr !== ethers.constants.AddressZero
-        ? await getTokenBalance(destProvider, bridgedTokenAddr, ANVIL_RECIPIENT_ADDR)
+        ? await getTokenBalance(destProvider, bridgedTokenAddr, getInteropRecipientAddress())
         : ethers.BigNumber.from(0);
 
     const receipt = await executeBundle(destProvider, result.bundleData, customBaseTokenChainId);
@@ -368,7 +406,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     bridgedTokenAddr = await getTokenAddressForAsset(destProvider, customBaseTokenAssetId);
     expect(bridgedTokenAddr).to.not.equal(ethers.constants.AddressZero, "bridged custom token should be deployed");
 
-    const recipientBalAfter = await getTokenBalance(destProvider, bridgedTokenAddr, ANVIL_RECIPIENT_ADDR);
+    const recipientBalAfter = await getTokenBalance(destProvider, bridgedTokenAddr, getInteropRecipientAddress());
     expectBalanceDelta(recipientBalBefore, recipientBalAfter, amount, "custom→era: recipient bridged token");
 
     const balDelta = recipientBalAfter.sub(recipientBalBefore);
@@ -379,7 +417,13 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
 
   it("can send and receive a bridged ERC20 token message (indirect call via AssetRouter)", async function () {
     const destTestToken = state.testTokens![destChainId];
-    const bridgedAssetId = encodeNtvAssetId(destChainId, destTestToken);
+    if (!destTestToken) {
+      console.log("   Destination test token not configured; skipping bridged ERC20 token message");
+      this.skip();
+      return;
+    }
+
+    const bridgedAssetId = await getAssetIdForToken(destProvider, destTestToken);
 
     // Resolve the bridged token address on the source chain
     const bridgedTokenOnSource = await getTokenAddressForAsset(sourceProvider, bridgedAssetId);
@@ -394,7 +438,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     }
 
     const bridgedAmount = ethers.utils.parseUnits("2", 18);
-    const bridgedBalance = await getTokenBalance(sourceProvider, bridgedTokenOnSource, ANVIL_DEFAULT_ACCOUNT_ADDR);
+    const bridgedBalance = await getTokenBalance(sourceProvider, bridgedTokenOnSource, getInteropSourceAddress());
 
     if (bridgedBalance.lt(bridgedAmount)) {
       console.log(`   Insufficient bridged token balance: have ${bridgedBalance}, need ${bridgedAmount}; skipping`);
@@ -403,13 +447,14 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     }
 
     const recipient = encodeEvmChainAddress(L2_ASSET_ROUTER_ADDR, destChainId);
-    const payload = getTokenTransferData(bridgedAssetId, bridgedAmount, ANVIL_RECIPIENT_ADDR);
+    const payload = getTokenTransferData(bridgedAssetId, bridgedAmount, getInteropRecipientAddress());
     const attributes = [indirectCallAttr()];
+    const interopFee = await currentInteropFee();
     const msgValue = interopFee;
 
     await approveTokenForNtv(sourceProvider, bridgedTokenOnSource, bridgedAmount);
 
-    const balBefore = await getTokenBalance(sourceProvider, bridgedTokenOnSource, ANVIL_DEFAULT_ACCOUNT_ADDR);
+    const balBefore = await getTokenBalance(sourceProvider, bridgedTokenOnSource, getInteropSourceAddress());
 
     const result = await sendInteropMessage({
       sourceProvider,
@@ -422,7 +467,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     expect(result.txHash).to.be.a("string").and.not.equal("");
     expect(result.interopBundle).to.not.be.null;
 
-    const balAfter = await getTokenBalance(sourceProvider, bridgedTokenOnSource, ANVIL_DEFAULT_ACCOUNT_ADDR);
+    const balAfter = await getTokenBalance(sourceProvider, bridgedTokenOnSource, getInteropSourceAddress());
     expect(
       balAfter.eq(balBefore.sub(bridgedAmount)),
       "bridged ERC20 message: sender token should decrease by bridgedAmount"
@@ -433,12 +478,12 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     // ── Execute on destination ──
     const destTokenAddr = await getTokenAddressForAsset(destProvider, bridgedAssetId);
 
-    const recipientBalBefore = await getTokenBalance(destProvider, destTokenAddr, ANVIL_RECIPIENT_ADDR);
+    const recipientBalBefore = await getTokenBalance(destProvider, destTokenAddr, getInteropRecipientAddress());
 
     const receipt = await executeBundle(destProvider, result.bundleData, sourceChainId);
     expect(receipt.status).to.equal(1);
 
-    const recipientBalAfter = await getTokenBalance(destProvider, destTokenAddr, ANVIL_RECIPIENT_ADDR);
+    const recipientBalAfter = await getTokenBalance(destProvider, destTokenAddr, getInteropRecipientAddress());
     expectBalanceDelta(recipientBalBefore, recipientBalAfter, bridgedAmount, "bridged ERC20 message: recipient token");
 
     const balDelta = recipientBalAfter.sub(recipientBalBefore);

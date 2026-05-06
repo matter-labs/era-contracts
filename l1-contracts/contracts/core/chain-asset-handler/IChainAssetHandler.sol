@@ -52,6 +52,14 @@ interface IChainAssetHandlerBase is IAssetHandler {
         address indexed zkChain
     );
 
+    /// @notice Emitted when migration related fns are paused.
+    /// @param pauser Address that triggered the pause
+    event PausedMigration(address indexed pauser);
+
+    /// @notice Emitted when migration related fns are unpaused.
+    /// @param pauser Address that triggered the unpause
+    event UnpausedMigration(address indexed pauser);
+
     function migrationNumber(uint256 _chainId) external view returns (uint256);
 
     /// @dev Denotes whether the migrations of chains is paused.

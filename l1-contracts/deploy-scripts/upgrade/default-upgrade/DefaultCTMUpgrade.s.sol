@@ -41,13 +41,13 @@ import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2G
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
-import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
+import {DefaultL2UpgradeStrategy} from "./DefaultL2UpgradeStrategy.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
 /// @notice Script used for default CTM upgrade flow. Should be run after Ecosystem upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
+contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     using stdToml for string;
 
     // solhint-disable-next-line gas-struct-packing
@@ -432,7 +432,7 @@ contract DefaultCTMUpgrade is Script, CTMUpgradeBase {
     function publishBytecodes() public virtual {
         bytes[] memory allDeps = CoreOnGatewayHelper.getFullListOfFactoryDependencies(
             config.isZKsyncOS,
-            getAdditionalForcedCoreContracts()
+            getAdditionalFactoryDependencyContracts()
         );
         BytecodesSupplier supplier = BytecodesSupplier(ctmAddresses.stateTransition.proxies.bytecodesSupplier);
 

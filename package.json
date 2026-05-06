@@ -17,6 +17,7 @@
   "devDependencies": {
     "@matterlabs/eslint-config-typescript": "^1.1.2",
     "@matterlabs/prettier-config": "^1.0.3",
+    "@matterlabs/zksync-js": "0.0.17",
     "@typescript-eslint/eslint-plugin": "^6.7.4",
     "@typescript-eslint/parser": "^6.7.4",
     "eslint": "^8.51.0",
@@ -26,7 +27,8 @@
     "markdownlint-cli": "^0.33.0",
     "prettier": "^3.8.1",
     "prettier-plugin-solidity": "^2.2.1",
-    "solhint": "^6.0.3"
+    "solhint": "^6.0.3",
+    "viem": "2.48.4"
   },
   "scripts": {
     "build-all-contracts": "yarn install && yarn --cwd da-contracts build:foundry && yarn --cwd l1-contracts build:foundry && yarn --cwd l2-contracts build:foundry && yarn --cwd system-contracts build:foundry",

@@ -10,7 +10,8 @@ import type { ContractName } from "../core/contracts";
 import type { providers } from "ethers";
 import { BigNumber, Contract, ethers, Wallet } from "ethers";
 import { getAbi } from "../core/contracts";
-import { ANVIL_DEFAULT_PRIVATE_KEY, L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
+import { getInteropSourcePrivateKey } from "../core/accounts";
+import { L2_NATIVE_TOKEN_VAULT_ADDR } from "../core/const";
 
 // ── Balance snapshot utilities ─────────────────────────────────
 
@@ -27,7 +28,7 @@ export async function captureBalance(
   provider: providers.JsonRpcProvider,
   tokenAddress?: string
 ): Promise<BalanceSnapshot> {
-  const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
+  const wallet = new Wallet(getInteropSourcePrivateKey(), provider);
   const native = await provider.getBalance(wallet.address);
 
   let token: BigNumber | undefined;
@@ -71,7 +72,7 @@ export async function approveToken(
   spender: string,
   amount: BigNumber
 ): Promise<void> {
-  const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
+  const wallet = new Wallet(getInteropSourcePrivateKey(), provider);
   const erc20 = new Contract(tokenAddress, getAbi("TestnetERC20Token"), wallet);
   const approveTx = await erc20.approve(spender, amount);
   await approveTx.wait();
@@ -94,6 +95,18 @@ export async function approveTokenForNtv(
 export async function getTokenAddressForAsset(provider: providers.JsonRpcProvider, assetId: string): Promise<string> {
   const vault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), provider);
   return vault.tokenAddress(assetId);
+}
+
+/**
+ * Look up the registered assetId for a given L2 token via L2NativeTokenVault.
+ */
+export async function getAssetIdForToken(provider: providers.JsonRpcProvider, tokenAddress: string): Promise<string> {
+  const vault = new Contract(L2_NATIVE_TOKEN_VAULT_ADDR, getAbi("L2NativeTokenVault"), provider);
+  const assetId: string = await vault.assetId(tokenAddress);
+  if (assetId === ethers.constants.HashZero) {
+    throw new Error(`Token ${tokenAddress} is not registered in L2NativeTokenVault`);
+  }
+  return assetId;
 }
 
 // ── Balance assertion helpers ──────────────────────────────────
@@ -127,8 +140,9 @@ export function expectBalanceDelta(before: BigNumber, after: BigNumber, expected
 }
 
 interface EthersLikeError {
+  body?: string;
   data?: unknown;
-  error?: { data?: unknown };
+  error?: unknown;
   receipt?: { blockNumber?: number };
   transaction?: {
     data?: string;
@@ -166,12 +180,27 @@ function extractRevertData(err: unknown): string {
   if (typeof err !== "object" || err === null) return "";
 
   const errorWithData = err as EthersLikeError;
-  const nestedData = errorWithData.error?.data;
-  if (typeof nestedData === "string") return nestedData;
+  const nestedErrorData = extractRevertData(errorWithData.error);
+  if (nestedErrorData !== "" && nestedErrorData !== "0x") return nestedErrorData;
 
   const directData = errorWithData.data;
-  if (typeof directData === "string") return directData;
+  if (typeof directData === "string" && directData !== "" && directData !== "0x") return directData;
 
+  const nestedData = extractRevertData(directData);
+  if (nestedData !== "" && nestedData !== "0x") return nestedData;
+
+  if (errorWithData.body) {
+    try {
+      const bodyData = extractRevertData(JSON.parse(errorWithData.body));
+      if (bodyData !== "" && bodyData !== "0x") return bodyData;
+    } catch {
+      // Keep checking other fields below.
+    }
+  }
+
+  if (nestedErrorData) return nestedErrorData;
+  if (nestedData) return nestedData;
+  if (typeof directData === "string") return directData;
   return "";
 }
 
@@ -217,8 +246,11 @@ export async function expectRevert(
       const hasReasonInMessage = msg.includes(matchValue);
       const errorWithData = typeof err === "object" && err !== null ? (err as EthersLikeError) : undefined;
       let errorData = extractRevertData(err);
-      if (!errorData && provider && errorWithData) {
-        errorData = await extractRevertDataFromCall(provider, errorWithData);
+      if ((errorData === "" || errorData === "0x") && provider && errorWithData) {
+        const recoveredData = await extractRevertDataFromCall(provider, errorWithData);
+        if (recoveredData) {
+          errorData = recoveredData;
+        }
       }
       const hasReasonInData = errorData.includes(matchValue);
       expect(
