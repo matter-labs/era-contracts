@@ -647,6 +647,11 @@ abstract contract NativeTokenVaultBase is
                             PAUSE
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev This pausability is inherited by both L1 and L2 vaults through the shared base.
+    /// @dev On L1 it is part of the emergency controls for asset movement.
+    /// Interop-specific emergency handling is expected to happen at the Gateway layer in GWAssetTracker.
+    /// On L2 it is kept only for legacy/shared-code reasons and should not be used as an emergency mechanism.
+    /// Future L2 logic should rely on the L1/GW freeze flow instead of local pausability.
     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
     function pause() external onlyOwner {
         _pause();
