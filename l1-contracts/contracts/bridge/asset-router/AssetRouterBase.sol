@@ -26,7 +26,8 @@ import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Bridges assets between L1 and ZK chain, supporting both ETH and ERC20 tokens.
+/// @dev Routes asset transfers for both L1 <-> ZK chain bridging and interop between ZK chains,
+/// supporting both ETH and ERC20 tokens.
 /// @dev Designed for use with a proxy for upgradability.
 abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
@@ -79,7 +80,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     }
 
     /*//////////////////////////////////////////////////////////////
-                            INITIATE DEPOSIT Functions
+                            INITIATE BRIDGE Functions
     //////////////////////////////////////////////////////////////*/
 
     function bridgehubDepositBaseToken(
@@ -278,7 +279,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _assetId The deposited asset ID.
     /// @param _bridgeMintCalldata The calldata used by remote asset handler to mint tokens for recipient.
-    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
+    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify bridge requests.
     /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
     function _requestToBridge(
         address _originalCaller,

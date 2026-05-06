@@ -11,7 +11,7 @@ import {SetBytecodeOnAddressHookFailed, Unauthorized} from "./errors/ZKOSContrac
 /// @title ZKOSContractDeployer
 /// @notice Minimal wrapper that forwards to the set bytecode on address system hook at a hardcoded address.
 contract ZKOSContractDeployer is IZKOSContractDeployer {
-    /// @notice Checks that the message sender is the native token vault.
+    /// @notice Checks that the message sender is the complex upgrader.
     modifier onlyComplexUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);

@@ -10,7 +10,7 @@ interface IAssetRouterShared {
 
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 and L2->L2 transactions.
     /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
-    /// @param _chainId The chain ID of the ZK chain to which deposit.
+    /// @param _chainId The chain ID of the ZK chain that receives the bridge request.
     /// @param _assetId The deposited asset ID.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _amount The total amount of tokens to be bridged.
