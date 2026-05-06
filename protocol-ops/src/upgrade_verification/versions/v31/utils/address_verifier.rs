@@ -249,11 +249,11 @@ impl AddressVerifier {
         );
         result.add_address(
             config.gateway.gateway_state_transition.migrator_facet_addr,
-            "gateway_migrator_facet_addr"
+            "gateway_migrator_facet_addr",
         );
         result.add_address(
             config.gateway.gateway_state_transition.committer_facet_addr,
-            "gateway_committer_facet_addr"
+            "gateway_committer_facet_addr",
         );
         result.add_address(
             config.gateway.gateway_state_transition.verifier_addr,
