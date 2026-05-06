@@ -4,8 +4,6 @@ pragma solidity ^0.8.20;
 
 // 0xf801b069
 error L1MessengerHookFailed();
-// 0xa3628b43
-error L1MessengerSendFailed();
 // 0x497087ab
 error NotEnoughGasSupplied();
 // 0xec7cdc0a
