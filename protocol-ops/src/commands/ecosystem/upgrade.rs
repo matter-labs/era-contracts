@@ -48,9 +48,11 @@ pub struct UpgradePrepareArgs {
     pub topology: crate::common::EcosystemArgs,
 
     /// Deployer EOA that signs the new-contract deployment txs emitted by
-    /// this stage.
+    /// this stage. Falls back to the topology source's deployer
+    /// (ecosystem.yaml::deployer or zkstack `configs/wallets.yaml::deployer`)
+    /// when omitted.
     #[clap(long)]
-    pub deployer_address: Address,
+    pub deployer_address: Option<Address>,
 
     // The following are auto-resolved from L1 on v31+ ecosystems.
     // Explicit overrides are only needed when upgrading from pre-v31 protocol
@@ -103,9 +105,14 @@ struct UpgradePrepareOutput<'a> {
 }
 
 pub async fn run_upgrade_prepare(args: UpgradePrepareArgs) -> anyhow::Result<()> {
-    let bridgehub = args.topology.resolve()?.bridgehub;
+    let ecosystem = args.topology.resolve()?;
+    let bridgehub = ecosystem.bridgehub;
+    let deployer_address = args.deployer_address.or(ecosystem.deployer).context(
+        "deployer EOA not specified: pass --deployer-address or use a topology \
+         source that includes a deployer (ecosystem.yaml or --zkstack-config-dir)",
+    )?;
     let mut runner = ForgeRunner::new(&args.shared)?;
-    let sender = runner.prepare_sender(args.deployer_address).await?;
+    let sender = runner.prepare_sender(deployer_address).await?;
 
     let contracts_path = resolve_l1_contracts_path(&paths::contracts_root())?;
     let script_path = "deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol";

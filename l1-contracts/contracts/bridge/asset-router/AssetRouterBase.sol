@@ -181,15 +181,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     }
 
     function _getTransferData(
-        bytes1 _encodingVersion,
+        bytes1, /* _encodingVersion */
         address,
         bytes calldata _data
     ) internal virtual returns (bytes32 assetId, bytes memory transferData) {
-        if (_encodingVersion == NEW_ENCODING_VERSION) {
-            (assetId, transferData) = DataEncoding.decodeAssetRouterBridgehubDepositData(_data);
-        } else {
-            revert UnsupportedEncodingVersion();
-        }
+        return DataEncoding.decodeAssetRouterBridgehubDepositData(_data);
     }
 
     /*//////////////////////////////////////////////////////////////
