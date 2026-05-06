@@ -31,6 +31,7 @@ import {
     L2_MESSAGE_ROOT,
     L2_NATIVE_TOKEN_VAULT,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     MAX_BUILT_IN_CONTRACT_ADDR,
     L2_ASSET_ROUTER,
     L2_BRIDGEHUB_ADDR
@@ -706,6 +707,15 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         assetMigrationNumber[_chainId][_assetId] = chainMigrationNumber;
 
         emit GatewayToL1MigrationInitiated(_assetId, _chainId, amount);
+    }
+
+    /// @notice Sends Gateway -> L1 migration data to L1 through the L2->L1 messenger.
+    /// @param _data The migration payload.
+    function _sendGatewayToL1MigrationDataToL1(GatewayToL1TokenBalanceMigrationData memory _data) internal {
+        // slither-disable-next-line unused-return,reentrancy-no-eth
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            abi.encodeCall(IAssetTrackerDataEncoding.receiveGatewayToL1MigrationOnL1, _data)
+        );
     }
 
     function _calculatePreviousChainMigrationNumber(uint256 _chainId) internal view returns (uint256) {
