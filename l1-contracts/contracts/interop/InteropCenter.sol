@@ -626,6 +626,7 @@ contract InteropCenter is
                 );
                 attributeUsed[2] = true;
                 bundleAttributes.executionAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
+                _validateOptionalInteroperableAddress(bundleAttributes.executionAddress);
             } else if (selector == IERC7786Attributes.unbundlerAddress.selector) {
                 require(!attributeUsed[3], AttributeAlreadySet(selector));
                 require(
@@ -635,6 +636,7 @@ contract InteropCenter is
                 );
                 attributeUsed[3] = true;
                 bundleAttributes.unbundlerAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
+                _validateOptionalInteroperableAddress(bundleAttributes.unbundlerAddress);
             } else if (selector == IERC7786Attributes.useFixedFee.selector) {
                 require(!attributeUsed[4], AttributeAlreadySet(selector));
                 require(
@@ -651,6 +653,14 @@ contract InteropCenter is
                 revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
         }
+    }
+
+    function _validateOptionalInteroperableAddress(bytes memory _interoperableAddress) internal pure {
+        if (_interoperableAddress.length == 0) {
+            return;
+        }
+
+        InteroperableAddress.parseEvmV1(_interoperableAddress);
     }
 
     /// @notice Checks if the attribute selector is supported by the InteropCenter.
