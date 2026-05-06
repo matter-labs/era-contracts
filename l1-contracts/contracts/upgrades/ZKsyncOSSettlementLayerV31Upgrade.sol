@@ -22,6 +22,12 @@ contract ZKsyncOSSettlementLayerV31Upgrade is SettlementLayerV31UpgradeBase {
         bool _zksyncOS,
         bytes memory _existingTxData
     ) public view override returns (bytes memory) {
+        L2UpgradeTxLib.validateZKsyncOSFlag(_zksyncOS, true);
+        L2UpgradeTxLib.validateUpgradeSelector(
+            _existingTxData,
+            IComplexUpgrader.forceDeployAndUpgradeUniversal.selector
+        );
+
         (
             IComplexUpgrader.UniversalContractUpgradeInfo[] memory forceDeployments,
             address delegateTo,

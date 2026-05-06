@@ -117,4 +117,18 @@ library L2UpgradeTxLib {
             revert UnexpectedUpgradeSelector();
         }
     }
+
+    /// @notice Validate that the chain type matches the upgrade wrapper type.
+    function validateZKsyncOSFlag(bool _zksyncOS, bool _expectedZKsyncOS) internal pure {
+        if (_zksyncOS != _expectedZKsyncOS) {
+            revert UnexpectedZKsyncOSFlag(_expectedZKsyncOS, _zksyncOS);
+        }
+    }
+
+    /// @notice Validate that the outer calldata targets the expected ComplexUpgrader entrypoint.
+    function validateUpgradeSelector(bytes memory _existingTxData, bytes4 _expectedSelector) internal pure {
+        if (bytes4(_existingTxData) != _expectedSelector) {
+            revert UnexpectedUpgradeSelector();
+        }
+    }
 }

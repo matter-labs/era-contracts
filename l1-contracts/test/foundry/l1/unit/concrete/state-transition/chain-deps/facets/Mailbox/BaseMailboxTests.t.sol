@@ -6,7 +6,9 @@ import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
-import {BaseTokenGasPriceDenominatorNotSet} from "contracts/common/L1ContractErrors.sol";
+import {BaseTokenGasPriceDenominatorNotSet, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
+import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 contract MailboxBaseTests is MailboxTest {
     function setUp() public virtual {
@@ -77,6 +79,32 @@ contract MailboxBaseTests is MailboxTest {
         assertEq(
             mailboxFacet.l2TransactionBaseCost(gasPrice, l2GasLimit, l2GasPerPubdataByteLimit),
             l2TransactionBaseCost
+        );
+    }
+
+    function test_requestL2TransactionToGatewayMailboxWithBalanceChange_RevertWhen_ExpirationTimestampNotZero() public {
+        uint256 chainId = 42;
+        utilsFacet.util_setChainId(eraChainId);
+
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.whitelistedSettlementLayers.selector, eraChainId),
+            abi.encode(true)
+        );
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
+            abi.encode(sender)
+        );
+
+        vm.prank(sender);
+        vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, 0, 1));
+        IMailboxImpl(address(mailboxFacet)).requestL2TransactionToGatewayMailboxWithBalanceChange(
+            chainId,
+            bytes32(0),
+            1,
+            0,
+            false
         );
     }
 }

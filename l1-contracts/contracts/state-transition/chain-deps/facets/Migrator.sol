@@ -39,7 +39,7 @@ import {
     VerifiedIsNotConsistentWithCommitted,
     MigrationInProgress
 } from "../../L1StateTransitionErrors.sol";
-import {NotAZKChain, NotCompatibleWithPriorityMode} from "../../../common/L1ContractErrors.sol";
+import {NotAZKChain, NotCompatibleWithPriorityMode, RemovingPermanentRestriction} from "../../../common/L1ContractErrors.sol";
 import {OnlyGateway} from "../../../core/bridgehub/L1BridgehubErrors.sol";
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 import {TxStatus} from "../../../common/Messaging.sol";
@@ -220,6 +220,10 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         uint256 batchesExecuted = _commitment.totalBatchesExecuted;
         uint256 batchesVerified = _commitment.totalBatchesVerified;
         uint256 batchesCommitted = _commitment.totalBatchesCommitted;
+
+        if (s.isPermanentRollup && !_commitment.isPermanentRollup) {
+            revert RemovingPermanentRestriction();
+        }
 
         s.totalBatchesCommitted = batchesCommitted;
         s.totalBatchesVerified = batchesVerified;
