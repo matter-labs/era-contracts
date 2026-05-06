@@ -132,7 +132,7 @@ contract ZKChainDeployer is L1ContractDeployer {
         address admin = chain.getAdmin();
         vm.startBroadcast(admin);
         chain.setDAValidatorPair(
-            ctmAddresses.daAddresses.l1RollupDAValidator,
+            ctmAddresses.daAddresses.daContracts.rollupSLDAValidator,
             L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256
         );
         vm.stopBroadcast();

@@ -983,6 +983,19 @@
   },
   {
     "type": "function",
+    "name": "getZKsyncOS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "isDiamondStorageFrozen",
     "inputs": [],
     "outputs": [

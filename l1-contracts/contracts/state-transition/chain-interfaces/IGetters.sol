@@ -177,4 +177,7 @@ interface IGetters is IZKChainBase {
 
     /// @return DA configuration.
     function getDAValidatorPair() external view returns (address, L2DACommitmentScheme);
+
+    /// @return Whether the chain uses ZKsyncOS.
+    function getZKsyncOS() external view returns (bool);
 }

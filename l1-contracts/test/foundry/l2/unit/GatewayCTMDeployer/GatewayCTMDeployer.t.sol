@@ -4,17 +4,18 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
+import {Verifiers} from "contracts/common/StateTransitionTypes.sol";
+
+import {DAContracts} from "contracts/common/StateTransitionTypes.sol";
 import {
     DeployedContracts,
     GatewayCTMDeployerConfig,
     GatewayDADeployerConfig,
-    DAContracts,
     GatewayProxyAdminDeployerConfig,
     GatewayProxyAdminDeployerResult,
     GatewayValidatorTimelockDeployerConfig,
     GatewayValidatorTimelockDeployerResult,
     GatewayVerifiersDeployerConfig,
-    Verifiers,
     GatewayCTMFinalConfig,
     GatewayCTMFinalResult
 } from "contracts/state-transition/chain-deps/gateway-ctm-deployer/GatewayCTMDeployer.sol";

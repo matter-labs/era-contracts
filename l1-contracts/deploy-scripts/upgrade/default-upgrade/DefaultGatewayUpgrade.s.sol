@@ -5,18 +5,20 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Utils} from "../../utils/Utils.sol";
+import {BytecodeUtils} from "../../utils/bytecode/BytecodeUtils.s.sol";
 import {
     StateTransitionDeployedAddresses,
     ChainCreationParamsConfig,
     StateTransitionDeployedAddresses,
-    ZkChainAddresses
+    ZkChainAddresses,
+    L1SpecificStateTransitionAddresses
 } from "../../utils/Types.sol";
+import {DAContracts} from "contracts/common/StateTransitionTypes.sol";
 import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -38,18 +40,23 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IValidatorTimelock} from "contracts/state-transition/validators/interfaces/IValidatorTimelock.sol";
 
 import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {CTMUpgradeBase} from "./CTMUpgradeBase.sol";
+import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
+import {PublishFactoryDepsResult} from "./CTMUpgradeBase.sol";
+import {Utils} from "../../utils/Utils.sol";
+import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
 
+// FIXME: consider deleting this file it is not used.
+// FIXME: if it is used however, it is not compatible with zksync os as it uses era bytecodes directly.
 /// @notice Script used for default CTM on gateway upgrade flow, should be run after L1 CTM upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
 contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
-    using stdToml for string;
-
     /**
      * @dev Storage slot with the admin of the contract.
      * This is the keccak-256 hash of "eip1967.proxy.admin" subtracted by 1, and is
@@ -72,6 +79,8 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     // solhint-disable-next-line gas-struct-packing
     struct Gateway {
         StateTransitionDeployedAddresses gatewayStateTransition;
+        L1SpecificStateTransitionAddresses gatewayL1Specific;
+        DAContracts gatewayDA;
         address gatewayTransparentProxyAdmin;
         bytes facetCutsData;
         uint256 chainId;
@@ -92,20 +101,40 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     CTMDeployedAddresses internal ctmDeployedAddresses;
 
     // TODO We need for composing upgrade transaction. but seems we don't need an upgrade transaction on gateway
-    uint256[] internal factoryDepsHashes;
-    mapping(bytes32 => bool) internal isHashInFactoryDeps;
+    PublishFactoryDepsResult internal factoryDepsResult;
+
+    /// @dev Gateway upgrades don't cache FixedForceDeploymentsData — returns empty so
+    /// buildZKsyncOSForceDeployments falls through to loading from disk.
+    function getFixedForceDeploymentsData() internal virtual override returns (FixedForceDeploymentsData memory) {
+        // Return empty struct — buildZKsyncOSForceDeployments will load bytecodes from disk.
+    }
 
     EcosystemUpgradeConfig internal upgradeConfig;
 
-    function initialize(
-        string memory permanentValuesInputPath,
+    function initializeWithArgs(
+        bool _isZKsyncOS,
+        bytes32 _create2FactorySalt,
+        uint256 _eraChainId,
+        uint256 _priorityTxsL2GasLimit,
+        uint256 _maxExpectedL1GasPrice,
+        Gateway memory _gatewayConfig,
         string memory newConfigPath,
-        string memory _outputPath
+        string memory _outputPath,
+        address _governance
     ) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
-        permanentValuesInputPath = string.concat(root, permanentValuesInputPath);
-        initializeConfigFromFile(permanentValuesInputPath, newConfigPath);
+
+        initializeConfig(
+            _create2FactorySalt,
+            _isZKsyncOS,
+            getChainCreationParamsConfig(Utils.genesisConfigPath(_isZKsyncOS)),
+            _eraChainId,
+            _priorityTxsL2GasLimit,
+            _maxExpectedL1GasPrice,
+            _gatewayConfig,
+            _governance
+        );
 
         console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
@@ -114,7 +143,6 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
 
     function initializeConfig(
         bytes32 _create2FactorySalt,
-        address _create2FactoryAddr,
         bool _isZKsyncOS,
         ChainCreationParamsConfig memory _chainCreationParams,
         uint256 _eraChainId,
@@ -124,7 +152,9 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         // Optional
         address _governance
     ) public {
-        _initCreate2FactoryParams(_create2FactoryAddr, _create2FactorySalt);
+        if (_create2FactorySalt != bytes32(0)) {
+            setCreate2Salt(_create2FactorySalt);
+        }
         config.l1ChainId = block.chainid;
         config.eraChainId = _eraChainId;
         setAddressesBasedOnBridgehub();
@@ -149,76 +179,8 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         (bool ok, bytes memory data) = ctmDeployedAddresses.stateTransition.verifiers.verifier.staticcall(
             abi.encodeWithSignature("IS_TESTNET_VERIFIER()")
         );
-        config.testnetVerifier = ok;
+        config.testnetVerifier = true;
         config.contracts.maxNumberOfChains = bridgehub.MAX_NUMBER_OF_ZK_CHAINS();
-    }
-
-    function initializeConfigFromFile(
-        string memory permanentValuesInputPath,
-        string memory newConfigPath
-    ) internal virtual {
-        string memory permanentValuesToml = vm.readFile(permanentValuesInputPath);
-        string memory toml = vm.readFile(newConfigPath);
-
-        (address create2FactoryAddr, bytes32 create2FactorySalt) = getPermanentValues(permanentValuesInputPath);
-
-        // Can we safely get it from the CTM? is it always exists even for zksync os ?
-        uint256 eraChainId = permanentValuesToml.readUint("$.era_chain_id");
-
-        address governance;
-        if (toml.keyExists("$.governance")) {
-            governance = toml.readAddress("$.governance");
-        } else {
-            governance = address(0);
-        }
-
-        // TODO can we discover it?. Try to get it from the chain
-        bool isZKsyncOS;
-        if (permanentValuesToml.keyExists("$.is_zk_sync_os")) {
-            isZKsyncOS = permanentValuesToml.readBool("$.is_zk_sync_os");
-        }
-        ChainCreationParamsConfig memory chainCreationParams = getChainCreationParamsConfig(
-            chainCreationParamsPath(isZKsyncOS)
-        );
-
-        Gateway memory gateway;
-        // Gateway params
-        gateway.chainId = permanentValuesToml.readUint("$.gateway.chain_id");
-        gateway.gatewayStateTransition.proxies.chainTypeManager = permanentValuesToml.readAddress(
-            "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
-        );
-
-        gateway.gatewayTransparentProxyAdmin = permanentValuesToml.readAddress(
-            "$.gateway.gateway_state_transition.chain_type_manager_proxy_admin"
-        );
-
-        gateway.gatewayStateTransition.rollupDAManager = permanentValuesToml.readAddress(
-            "$.gateway.gateway_state_transition.rollup_da_manager"
-        );
-
-        gateway.gatewayStateTransition.rollupSLDAValidator = permanentValuesToml.readAddress(
-            "$.gateway.gateway_state_transition.rollup_sl_da_validator"
-        );
-
-        // L2 transactions params
-        uint priorityTxsL2GasLimit = permanentValuesToml.readUint("$.priority_txs_l2_gas_limit");
-        uint maxExpectedL1GasPrice = permanentValuesToml.readUint("$.max_expected_l1_gas_price");
-
-        initializeConfig(
-            create2FactorySalt,
-            create2FactoryAddr,
-            isZKsyncOS,
-            chainCreationParams,
-            eraChainId,
-            priorityTxsL2GasLimit,
-            maxExpectedL1GasPrice,
-            gateway,
-            governance
-        );
-    }
-
-    function isHashInFactoryDepsCheck(bytes32 bytecodeHash) internal view virtual override returns (bool) {
-        return isHashInFactoryDeps[bytecodeHash];
     }
 
     /// @notice Full default upgrade preparation flow
@@ -256,26 +218,13 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             config.contracts.chainCreationParams,
             config.l1ChainId,
             config.ownerAddress,
-            factoryDepsHashes,
-            discoveredEraZkChain.zkChainProxy,
-            config.isZKsyncOS
+            factoryDepsResult,
+            discoveredEraZkChain.zkChainProxy
         );
         gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
         upgradeConfig.upgradeCutPrepared = true;
         console.log("UpgradeCutGenerated");
         saveOutput(upgradeConfig.outputPath);
-    }
-
-    /// @notice E2e upgrade generation
-    function run() public virtual override {
-        initialize(
-            vm.envString("PERMANENT_VALUES_INPUT"),
-            vm.envString("UPGRADE_GATEWAY_INPUT"),
-            vm.envString("UPGRADE_GATEWAY_OUTPUT")
-        );
-        prepareEcosystemUpgrade();
-
-        prepareDefaultGovernanceCalls();
     }
 
     function getNewProtocolVersion() public virtual returns (uint256) {
@@ -299,7 +248,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             IZKChain(bridgehub.getZKChain(config.eraChainId))
         );
 
-        ctmDeployedAddresses.daAddresses.l1RollupDAValidator = discoveredEraZkChain.l1DAValidator;
+        ctmDeployedAddresses.daAddresses.daContracts.rollupSLDAValidator = discoveredEraZkChain.l1DAValidator;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         newConfig.oldProtocolVersion = ctmProtocolVersion;
         require(
@@ -419,8 +368,8 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     function deployNewEcosystemContractsGW() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
 
-        gatewayConfig.gatewayStateTransition.verifiers.verifierFflonk = deployGWContract("EraVerifierFflonk");
-        gatewayConfig.gatewayStateTransition.verifiers.verifierPlonk = deployGWContract("EraVerifierPlonk");
+        gatewayConfig.gatewayStateTransition.verifiers.verifierFflonk = deployGWContract("VerifierFflonk");
+        gatewayConfig.gatewayStateTransition.verifiers.verifierPlonk = deployGWContract("VerifierPlonk");
         gatewayConfig.gatewayStateTransition.verifiers.verifier = deployGWContract("Verifier");
 
         gatewayConfig.gatewayStateTransition.facets.executorFacet = deployGWContract("ExecutorFacet");
@@ -431,7 +380,10 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
-        string memory gwCtmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
+        (, string memory gwCtmContractName) = DeployCTML1OrGateway.resolve(
+            config.isZKsyncOS,
+            CTMContract.ChainTypeManager
+        );
         gatewayConfig.gatewayStateTransition.implementations.chainTypeManager = deployGWContract(gwCtmContractName);
 
         deployUpgradeSpecificContractsGW();
@@ -484,7 +436,7 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         );
 
         uint256 previousProtocolVersion = getOldProtocolVersion();
-        uint256 deadline = getOldProtocolDeadline();
+        uint256 deadline = UpgradeHelperLib.getOldProtocolDeadline();
         uint256 newProtocolVersion = getNewProtocolVersion();
         Diamond.DiamondCutData memory upgradeCutData = abi.decode(
             gatewayConfig.upgradeCutData,
@@ -613,15 +565,10 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
             RollupDAManager.updateDAPair,
-            (gatewayConfig.gatewayStateTransition.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
+            (gatewayConfig.gatewayDA.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
         );
 
-        calls = _prepareL1ToGatewayCall(
-            l2Calldata,
-            l2GasLimit,
-            l1GasPrice,
-            gatewayConfig.gatewayStateTransition.rollupDAManager
-        );
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, gatewayConfig.gatewayDA.rollupDAManager);
     }
 
     function getAddresses() public view virtual override returns (CTMDeployedAddresses memory) {
@@ -632,17 +579,17 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        require(isZKBytecode, "Only ZK bytecodes is not supported in Gateway upgrade");
+        require(isZKBytecode, "Only ZK bytecodes are supported in Gateway upgrade");
         if (compareStrings(contractName, "DefaultUpgrade")) {
-            return Utils.readZKFoundryBytecodeL1("DefaultUpgrade.sol", "DefaultUpgrade");
+            return BytecodeUtils.readBytecodeL1(false, "DefaultUpgrade.sol", "DefaultUpgrade");
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
-            return Utils.readZKFoundryBytecodeL1("BytecodesSupplier.sol", "BytecodesSupplier");
+            return BytecodeUtils.readBytecodeL1(false, "BytecodesSupplier.sol", "BytecodesSupplier");
         } else if (compareStrings(contractName, "TransitionaryOwner")) {
-            return Utils.readZKFoundryBytecodeL1("TransitionaryOwner.sol", "TransitionaryOwner");
+            return BytecodeUtils.readBytecodeL1(false, "TransitionaryOwner.sol", "TransitionaryOwner");
         } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
-            return ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
+            return ContractsBytecodesLib.getCreationCodeEra("L2SharedBridgeLegacy");
         } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            return ContractsBytecodesLib.getCreationCode("ValidatorTimelock");
+            return ContractsBytecodesLib.getCreationCodeEra("ValidatorTimelock");
         }
         return super.getCreationCode(contractName, isZKBytecode);
     }
@@ -666,15 +613,11 @@ contract DefaultGatewayUpgrade is Script, CTMUpgradeBase {
             "chain_type_manager_proxy_admin",
             gatewayConfig.gatewayTransparentProxyAdmin
         );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "rollup_da_manager",
-            gatewayConfig.gatewayStateTransition.rollupDAManager
-        );
+        vm.serializeAddress("gateway_state_transition", "rollup_da_manager", gatewayConfig.gatewayDA.rollupDAManager);
         vm.serializeAddress(
             "gateway_state_transition",
             "rollup_l2_da_validator",
-            gatewayConfig.gatewayStateTransition.rollupSLDAValidator
+            gatewayConfig.gatewayDA.rollupSLDAValidator
         );
         vm.serializeAddress(
             "gateway_state_transition",

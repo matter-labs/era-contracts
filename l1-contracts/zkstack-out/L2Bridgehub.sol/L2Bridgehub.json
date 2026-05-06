@@ -996,6 +996,11 @@
         "internalType": "uint256"
       },
       {
+        "name": "_owner",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "_maxNumberOfZKChains",
         "type": "uint256",
         "internalType": "uint256"

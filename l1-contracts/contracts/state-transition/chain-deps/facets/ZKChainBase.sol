@@ -15,7 +15,11 @@ import {
     OnlyPriorityMode,
     MustBeEraChain
 } from "../../../common/L1ContractErrors.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {
+    GW_ASSET_TRACKER_ADDR,
+    L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_INTEROP_CENTER_ADDR
+} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "../../../core/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
@@ -118,6 +122,13 @@ contract ZKChainBase is ReentrancyGuard {
 
     modifier onlyGatewayAssetTracker() {
         if (msg.sender != GW_ASSET_TRACKER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    modifier onlyL2ChainAssetHandler() {
+        if (msg.sender != L2_CHAIN_ASSET_HANDLER_ADDR) {
             revert Unauthorized(msg.sender);
         }
         _;

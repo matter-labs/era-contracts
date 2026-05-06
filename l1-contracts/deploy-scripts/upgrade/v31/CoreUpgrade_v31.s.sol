@@ -30,21 +30,18 @@ import {
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
 
+/// FIXME currently we accept ownership as part of stage1, but in fact we should do it as part of stage0.
 /// @notice Script used for v31 upgrade flow
 contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
-    /// @notice E2e upgrade generation
-    function run() public virtual override {
-        initialize(
-            "/upgrade-envs/permanent-values/local.toml",
-            "/upgrade-envs/v0.31.0-interopB/local.toml",
-            vm.envString("V31_UPGRADE_ECOSYSTEM_OUTPUT")
-        );
-
-        prepareEcosystemUpgrade();
-        prepareDefaultGovernanceCalls();
+    function deployNewEcosystemContractsL1() public virtual override {
+        deployNewEcosystemContractsL1NoConnections();
+        // Configure AssetTracker connections after deployment
+        updateContractConnections();
     }
 
-    function deployNewEcosystemContractsL1() public virtual override {
+    /// @notice Deploy contracts only (no side effects like setAddresses / transferOwnership).
+    /// @dev Used by the test harness for idempotent re-runs where connections are already set up.
+    function deployNewEcosystemContractsL1NoConnections() public virtual {
         coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
         coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
         coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
@@ -63,9 +60,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
             "ChainRegistrationSender",
             false
         );
-        // deploySimpleContract("L1ChainTypeManager", false);
-        // Configure AssetTracker connections after deployment
-        updateContractConnections();
     }
 
     /// @notice Configure contract connections after deployment
@@ -100,22 +94,11 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
                           Internal functions
     //////////////////////////////////////////////////////////////*/
 
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        return super.getCreationCode(contractName, isZKBytecode);
-    }
-
     function getCreationCalldata(
         string memory contractName,
         bool isZKBytecode
     ) internal view override returns (bytes memory) {
         return super.getCreationCalldata(contractName, isZKBytecode);
-    }
-
-    function deployUsedUpgradeContract() internal returns (address) {
-        return deploySimpleContract("SettlementLayerV31Upgrade", false);
     }
 
     /// @notice Override to properly set deployerAddress in upgrade context
@@ -166,8 +149,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
         console.log("Accepting AssetTracker ownership and setting in NativeTokenVault");
         console.log("NTV address:", ntvProxy);
         console.log("AssetTracker address:", assetTrackerProxy);
-        // console.log()
-
         // Note: AssetTracker.setAddresses() was already called during deployment
         // in updateContractConnections(), and ownership was transferred to governance.
         // Now governance needs to accept the ownership transfer.

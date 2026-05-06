@@ -9,6 +9,10 @@ import {EcosystemUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/Ecosy
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
 import {Call} from "contracts/governance/Common.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/libraries/ProposedUpgradeLib.sol";
+import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../../../deploy-scripts/utils/Types.sol";
+import {PublishFactoryDepsResult} from "../../../../deploy-scripts/utils/bytecode/BytecodePublisher.s.sol";
 import {Test} from "forge-std/Test.sol";
 import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
 import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
@@ -19,6 +23,8 @@ import {UpgradeIntegrationTestBase} from "./UpgradeTestShared.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/message-root/IMessageRoot.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 /// @notice Test-only CTM upgrade that mocks large bytecode reads to avoid MemoryOOG
 contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
@@ -28,39 +34,51 @@ contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
         return bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001));
     }
 
-    /// @notice Override to skip bytecode publishing which reads large JSON files
+    /// @notice Override to skip bytecode publishing which reads large JSON files.
     function publishBytecodes() public override {
         console.log("Test mode: Skipping bytecode publishing to avoid MemoryOOG");
 
-        // Initialize factoryDepsHashes with dummy values
-        // The upgrade process expects at least 3 hashes: bootloader, defaultAA, evmEmulator
-        factoryDepsHashes = new uint256[](45); // Same size as real deployment
+        factoryDepsResult.factoryDepsHashes = new uint256[](45);
 
-        // Use the configured chain creation params hashes
-        factoryDepsHashes[0] = uint256(config.contracts.chainCreationParams.bootloaderHash);
-        factoryDepsHashes[1] = uint256(config.contracts.chainCreationParams.defaultAAHash);
-        factoryDepsHashes[2] = uint256(config.contracts.chainCreationParams.evmEmulatorHash);
+        factoryDepsResult.factoryDepsHashes[0] = uint256(config.contracts.chainCreationParams.bootloaderHash);
+        factoryDepsResult.factoryDepsHashes[1] = uint256(config.contracts.chainCreationParams.defaultAAHash);
+        factoryDepsResult.factoryDepsHashes[2] = uint256(config.contracts.chainCreationParams.evmEmulatorHash);
 
-        // Fill rest with dummy valid bytecode hashes and mark them as in factory deps
         bytes32 dummyHash = bytes32(uint256(0x0100000000000000000000000000000000000000000000000000000000000001));
         for (uint256 i = 3; i < 45; i++) {
-            factoryDepsHashes[i] = uint256(dummyHash);
+            factoryDepsResult.factoryDepsHashes[i] = uint256(dummyHash);
         }
 
-        // Mark all hashes as being in factory deps to pass validation
-        isHashInFactoryDeps[config.contracts.chainCreationParams.bootloaderHash] = true;
-        isHashInFactoryDeps[config.contracts.chainCreationParams.defaultAAHash] = true;
-        isHashInFactoryDeps[config.contracts.chainCreationParams.evmEmulatorHash] = true;
-        isHashInFactoryDeps[dummyHash] = true;
-
-        // Set the flag to indicate bytecodes are "published" for test purposes
         upgradeConfig.factoryDepsPublished = true;
     }
 
-    /// @notice Override to skip validation of bytecode hashes in factory deps
-    function isHashInFactoryDepsCheck(bytes32 _hash) internal view override returns (bool) {
-        // In test mode, always return true to skip validation
-        return true;
+    /// @notice Override to skip bytecode-heavy force deployment generation in getProposedUpgrade.
+    /// The base implementation reads all zkout bytecodes, causing MemoryOOG.
+    /// We return an empty upgrade instead.
+    function getProposedUpgrade(
+        StateTransitionDeployedAddresses memory stateTransition,
+        ChainCreationParamsConfig memory chainCreationParams,
+        uint256,
+        address,
+        PublishFactoryDepsResult memory _factoryDepsResult,
+        uint256 protocolUpgradeNonce
+    ) public override returns (ProposedUpgrade memory proposedUpgrade) {
+        proposedUpgrade = ProposedUpgrade({
+            l2ProtocolUpgradeTx: composeUpgradeTx(
+                new IComplexUpgrader.UniversalContractUpgradeInfo[](0),
+                _factoryDepsResult,
+                protocolUpgradeNonce
+            ),
+            bootloaderHash: chainCreationParams.bootloaderHash,
+            defaultAccountHash: chainCreationParams.defaultAAHash,
+            evmEmulatorHash: chainCreationParams.evmEmulatorHash,
+            verifier: address(0),
+            verifierParams: ProposedUpgradeLib.emptyVerifierParams(),
+            l1ContractsUpgradeCalldata: new bytes(0),
+            postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
+            upgradeTimestamp: 0,
+            newProtocolVersion: chainCreationParams.latestProtocolVersion
+        });
     }
 }
 
@@ -156,8 +174,6 @@ contract UpgradeIntegrationTest_Local is
         chainId = eraZKChainId;
         acceptPendingAdmin();
         console.log("setUp: Pending admin accepted");
-        PERMANENT_VALUES_INPUT = "/script-out/foundry-upgrade/permanent-ctm.toml";
-
         ECOSYSTEM_UPGRADE_INPUT = "/upgrade-envs/v0.31.0-interopB/foundry-upgrade.toml";
         ECOSYSTEM_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml";
         ECOSYSTEM_OUTPUT = "/script-out/foundry-upgrade/local-core.toml";
@@ -166,13 +182,12 @@ contract UpgradeIntegrationTest_Local is
         CHAIN_INPUT = "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-era.toml";
         CHAIN_OUTPUT = "/script-out/foundry-upgrade/local-gateway.toml";
         console.log("setUp: Paths configured");
-        preparePermanentValues();
-        console.log("setUp: Permanent values prepared");
         setupUpgrade(true);
         console.log("setUp: Upgrade setup complete");
         address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         console.log("setUp: Got bridgehub address", bridgehub);
         bytes32 eraBaseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(eraZKChainId);
+        _expectedBaseTokenAssetId = eraBaseTokenAssetId;
         console.log("setUp: Got era base token asset ID");
 
         vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.baseTokenAssetId, 0), abi.encode(eraBaseTokenAssetId));
@@ -182,7 +197,57 @@ contract UpgradeIntegrationTest_Local is
     }
 
     function test_DefaultUpgrade_Local() public {
-        /// we do the whole test in the setup, since it is very ram heavy.
-        require(true, "test passed");
+        // Heavy execution and event assertions live in setUp -> internalTest()
+        // (RAM constraint). This body validates persisted state outcomes.
+        address ctm = ctmUpgrade.getCTMAddress();
+        address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
+
+        // Protocol version bumps
+        assertEq(IChainTypeManager(ctm).protocolVersion(), _expectedNewVersion, "CTM protocolVersion not bumped");
+        assertEq(IGetters(_eraDiamond).getProtocolVersion(), _expectedNewVersion, "Era chain not upgraded");
+
+        // Era chain identity preserved across upgrade
+        assertEq(IGetters(_eraDiamond).getChainId(), eraZKChainId, "Era diamond points at wrong chainId");
+
+        // New chain registered, bound to the upgraded CTM, and exposes the right chainId/admin
+        assertTrue(_newChainDiamond != address(0), "New chain ID not registered");
+        assertEq(IGetters(_newChainDiamond).getChainId(), NEW_CHAIN_ID, "New diamond points at wrong chainId");
+        assertEq(IGetters(_newChainDiamond).getProtocolVersion(), _expectedNewVersion, "New chain wrong version");
+        assertEq(IBridgehubBase(bridgehub).chainTypeManager(NEW_CHAIN_ID), ctm, "New chain not linked to CTM");
+        assertEq(
+            IChainTypeManager(ctm).getChainAdmin(NEW_CHAIN_ID),
+            _expectedNewChainAdmin,
+            "New chain admin mismatch"
+        );
+
+        // Base-token asset id matches the era one (the mock at chainId=0 in setUp propagates it on creation)
+        assertEq(
+            IBridgehubBase(bridgehub).baseTokenAssetId(NEW_CHAIN_ID),
+            _expectedBaseTokenAssetId,
+            "New chain wrong baseTokenAssetId"
+        );
+
+        // CTM-side upgrade storage
+        assertEq(
+            IChainTypeManager(ctm).upgradeCutHash(ctmUpgrade.getOldProtocolVersion()),
+            _expectedUpgradeCutHash,
+            "Stored upgradeCutHash mismatch"
+        );
+        assertTrue(
+            IChainTypeManager(ctm).protocolVersionVerifier(_expectedNewVersion) != address(0),
+            "Missing verifier for new version"
+        );
+        assertGt(
+            IChainTypeManager(ctm).protocolVersionDeadline(_expectedNewVersion),
+            block.timestamp,
+            "Degenerate version deadline"
+        );
+
+        // Bridgehub-side registrations
+        assertTrue(IBridgehubBase(bridgehub).chainTypeManagerIsRegistered(ctm), "CTM not registered with bridgehub");
+        assertTrue(
+            IBridgehubBase(bridgehub).assetIdIsRegistered(_expectedBaseTokenAssetId),
+            "Base token assetId not registered"
+        );
     }
 }

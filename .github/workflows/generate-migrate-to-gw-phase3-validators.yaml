@@ -1,0 +1,89 @@
+name: "Migrate to Gateway: Phase 3 — Validators"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [stage, stage-interop-tests, sepolia, mainnet]
+      protocol_ops_tag:
+        description: "protocol-ops Docker image tag"
+        required: true
+        type: string
+      l1_rpc_url:
+        description: "L1 RPC URL"
+        required: true
+        type: string
+      gateway_rpc_url:
+        description: "Gateway L2 RPC URL"
+        required: true
+        type: string
+      chain_name:
+        description: "Chain name being migrated"
+        required: true
+        type: string
+      commit_operator:
+        description: "Chain commit-operator EOA"
+        required: true
+        type: string
+      prove_operator:
+        description: "Chain prove-operator EOA"
+        required: true
+        type: string
+      execute_operator:
+        description: "Chain execute-operator EOA"
+        required: true
+        type: string
+      l1_da_validator:
+        description: "Gateway L1 DA validator address (from vote-prep output: relayed_sl_da_validator)"
+        required: true
+        type: string
+      l2_da_commitment_scheme:
+        description: "L2 DA commitment scheme"
+        required: false
+        type: choice
+        options: [blobs-and-pubdata-keccak256, blobs-zk-sync-os]
+        default: blobs-and-pubdata-keccak256
+      l1_gas_price:
+        description: "L1 gas price in wei"
+        required: false
+        type: string
+        default: "1000000000"
+
+permissions:
+  contents: read
+
+jobs:
+  validators:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ENV_DIR: environments/${{ inputs.environment }}
+      WORK_DIR: ${{ github.workspace }}/protocol-ops-workdir
+      EXTRA_MOUNTS: ${{ github.workspace }}/environments/${{ inputs.environment }}:/contracts/env
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run phase 3 (validators + set-da)
+        run: |
+          mkdir -p "$WORK_DIR"
+          bash protocol-ops.sh --tag "${{ inputs.protocol_ops_tag }}" \
+            chain gateway migrate-to phase-3-validators \
+            --l1-rpc-url      "${{ inputs.l1_rpc_url }}" \
+            --ecosystem       /contracts/env/ecosystem.yaml \
+            --chain           "${{ inputs.chain_name }}" \
+            --gateway-rpc-url "${{ inputs.gateway_rpc_url }}" \
+            --commit-operator "${{ inputs.commit_operator }}" \
+            --prove-operator  "${{ inputs.prove_operator }}" \
+            --execute-operator "${{ inputs.execute_operator }}" \
+            --l1-da-validator "${{ inputs.l1_da_validator }}" \
+            --l2-da-commitment-scheme "${{ inputs.l2_da_commitment_scheme }}" \
+            --l1-gas-price    "${{ inputs.l1_gas_price }}" \
+            --out /contracts/work/session/safe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: safe-bundles-migrate-to-gw-phase3-${{ inputs.chain_name }}-${{ inputs.environment }}
+          path: ${{ env.WORK_DIR }}/safe/
+          if-no-files-found: error
+          retention-days: 30
