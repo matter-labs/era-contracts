@@ -36,8 +36,12 @@ const EIP1967_ADMIN_SLOT: H256 = H256([
     0x24, 0x3e, 0x63, 0xb6, 0xe8, 0xee, 0x11, 0x78, 0xd6, 0xa7, 0x17, 0x85, 0x0b, 0x5d, 0x61, 0x03,
 ]);
 
-/// `OpenZeppelin.ProxyAdmin.upgrade(ITransparentUpgradeableProxy,address)` selector.
-const PROXY_ADMIN_UPGRADE_SELECTOR: [u8; 4] = [0x99, 0xa8, 0x8e, 0xc4];
+/// `OpenZeppelin.ProxyAdmin.upgradeAndCall(ITransparentUpgradeableProxy,address,bytes)`
+/// selector (OZ v5). Stage's PUH ProxyAdmin only exposes the v5 form — the
+/// v4 `upgrade(address,address)` selector (0x99a88ec4) is absent and reverts
+/// on dispatch. We pass empty bytes for the post-upgrade call (no init-style
+/// hook needed for the impl swap).
+const PROXY_ADMIN_UPGRADE_AND_CALL_SELECTOR: [u8; 4] = [0x96, 0x23, 0x60, 0x9d];
 /// `ProtocolUpgradeHandler.updateGuardians(address)` selector.
 const PUH_UPDATE_GUARDIANS_SELECTOR: [u8; 4] = [0x69, 0x16, 0x16, 0xc5];
 /// `bridgehub.chainAssetHandler()` selector.
@@ -170,6 +174,11 @@ pub async fn deploy_puh_guardians(
     let script = runner
         .script_path_from_root(&zk_gov_dir, script_rel)
         .with_broadcast()
+        // The zk-governance foundry.toml has [profile.default|ci|lite] but no
+        // `anvil-interop` profile. If our parent harness exported
+        // FOUNDRY_PROFILE=anvil-interop (era-contracts side), forge would
+        // refuse to load the zk-governance side. Pin to default.
+        .with_env("FOUNDRY_PROFILE", "default")
         .with_env("PREV_PROTOCOL_UPGRADE_HANDLER", &format!("{:#x}", puh_proxy))
         .with_env("CHAIN_ASSET_HANDLER", &format!("{:#x}", chain_asset_handler))
         .with_env("CREATE2_FACTORY", &format!("{:#x}", create2_factory))
@@ -271,11 +280,12 @@ async fn read_eip1967_admin(rpc: &str, proxy: Address) -> anyhow::Result<Address
 }
 
 fn encode_proxy_admin_upgrade(proxy: Address, new_impl: Address) -> Vec<u8> {
-    let mut buf = Vec::with_capacity(4 + 64);
-    buf.extend_from_slice(&PROXY_ADMIN_UPGRADE_SELECTOR);
+    let mut buf = Vec::with_capacity(4 + 32 * 4);
+    buf.extend_from_slice(&PROXY_ADMIN_UPGRADE_AND_CALL_SELECTOR);
     buf.extend_from_slice(&abi_encode(&[
         Token::Address(proxy),
         Token::Address(new_impl),
+        Token::Bytes(Vec::new()),
     ]));
     buf
 }

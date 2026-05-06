@@ -55,19 +55,34 @@ function loadL2RpcMap(configDir: string): Map<number, string> {
 
   const configPath = path.join(configDir, "fork-l2-rpcs.json");
   if (fs.existsSync(configPath)) {
-    const parsed: unknown = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-    if (parsed === null || typeof parsed !== "object") {
-      throw new Error(`${configPath}: expected a JSON object { "<chainId>": "<url>" }`);
-    }
-    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
-      const chainId = Number(key);
-      if (!Number.isFinite(chainId)) {
-        throw new Error(`${configPath}: non-numeric chain ID key: ${key}`);
+    const raw = fs.readFileSync(configPath, "utf-8").trim();
+    if (raw.length > 0) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch (err) {
+        // The file used to hold a plain-text URL list and may still be that
+        // way locally. Don't hard-fail loading the harness config — log + skip.
+        console.warn(
+          `[fork-config] ${configPath} is not valid JSON, ignoring: ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+        return result;
       }
-      if (typeof value !== "string") {
-        throw new Error(`${configPath}: value for chain ${chainId} must be a string URL`);
+      if (parsed === null || typeof parsed !== "object") {
+        throw new Error(`${configPath}: expected a JSON object { "<chainId>": "<url>" }`);
       }
-      result.set(chainId, value);
+      for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+        const chainId = Number(key);
+        if (!Number.isFinite(chainId)) {
+          throw new Error(`${configPath}: non-numeric chain ID key: ${key}`);
+        }
+        if (typeof value !== "string") {
+          throw new Error(`${configPath}: value for chain ${chainId} must be a string URL`);
+        }
+        result.set(chainId, value);
+      }
     }
   }
 

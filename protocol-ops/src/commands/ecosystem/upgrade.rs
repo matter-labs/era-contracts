@@ -611,26 +611,41 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 
     // Phase 1b on the same fork: redeploy ProtocolUpgradeHandler + Guardians
     // and capture the stage-0 governance calls that wire them into the live
-    // PUH proxy. Folded into prepare-all so the upgrade is one command, one
-    // anvil session, one governance.toml.
-    let puh_inputs =
-        crate::commands::ecosystem::puh_guardians::PuhGuardiansInputs::from_env(
-            env_cfg.as_ref(),
-            bridgehub,
-        );
-    let puh_outcome =
-        crate::commands::ecosystem::puh_guardians::deploy_puh_guardians(
-            &mut runner,
-            &deployer,
-            &puh_inputs,
+    // PUH proxy. Only meaningful on PUH-governed envs (stage / mainnet) —
+    // legacy-Governance envs (e.g. testnet's internal `0xc4fd…` bridgehub
+    // owned by ZKsync `Governance.sol`) don't have a PUH to redeploy, so we
+    // skip this step entirely and the merged governance.toml carries only
+    // the core + per-CTM calls.
+    let governance_kind = env_cfg
+        .as_ref()
+        .map(|c| c.governance_kind())
+        .unwrap_or_default();
+    let puh_outcome = if governance_kind
+        == crate::common::env_config::GovernanceKind::Puh
+    {
+        Some(
+            crate::commands::ecosystem::puh_guardians::deploy_puh_guardians(
+                &mut runner,
+                &deployer,
+                &crate::commands::ecosystem::puh_guardians::PuhGuardiansInputs::from_env(
+                    env_cfg.as_ref(),
+                    bridgehub,
+                ),
+            )
+            .await
+            .context("PUH/Guardians redeploy step")?,
         )
-        .await
-        .context("PUH/Guardians redeploy step")?;
+    } else {
+        logger::info(
+            "Skipping PUH/Guardians redeploy (governance_kind != \"puh\" — env uses legacy Governance.sol)",
+        );
+        None
+    };
 
-    // Merge core + per-CTM governance calls + the in-memory PUH/Guardians
-    // stage-0 calls into a single `<out>/prepare/governance.toml`. The Solidity
-    // scripts each emit their own toml under `script-out/` (forge requirement),
-    // but downstream we only care about one merged file per command invocation.
+    // Merge core + per-CTM governance calls + (when present) the in-memory
+    // PUH/Guardians stage-0 calls into a single `<out>/prepare/governance.toml`.
+    // The Solidity scripts each emit their own toml under `script-out/` (forge
+    // requirement), but downstream we only care about one merged file.
     let merged_governance = if let Some(out_dir) = args.shared.out.clone() {
         let mut sources: Vec<PathBuf> = Vec::with_capacity(1 + prepared.ctm_tomls.len());
         sources.push(prepared.core_toml.clone());
@@ -638,7 +653,11 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             sources.push(src.clone());
         }
         let merged_path = out_dir.join("governance.toml");
-        write_merged_governance_toml(&sources, &puh_outcome.stage0_calls, &merged_path)?;
+        let extra_stage0 = puh_outcome
+            .as_ref()
+            .map(|o| o.stage0_calls.as_slice())
+            .unwrap_or(&[]);
+        write_merged_governance_toml(&sources, extra_stage0, &merged_path)?;
         Some(merged_path)
     } else {
         None
@@ -659,10 +678,22 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         merged_governance_toml: merged_governance
             .as_ref()
             .map(|p| p.display().to_string()),
-        puh_proxy: format!("{:#x}", puh_outcome.puh_proxy),
-        new_puh_impl: format!("{:#x}", puh_outcome.new_puh_impl),
-        new_guardians: format!("{:#x}", puh_outcome.new_guardians),
-        puh_proxy_admin: format!("{:#x}", puh_outcome.proxy_admin),
+        puh_proxy: puh_outcome
+            .as_ref()
+            .map(|o| format!("{:#x}", o.puh_proxy))
+            .unwrap_or_default(),
+        new_puh_impl: puh_outcome
+            .as_ref()
+            .map(|o| format!("{:#x}", o.new_puh_impl))
+            .unwrap_or_default(),
+        new_guardians: puh_outcome
+            .as_ref()
+            .map(|o| format!("{:#x}", o.new_guardians))
+            .unwrap_or_default(),
+        puh_proxy_admin: puh_outcome
+            .as_ref()
+            .map(|o| format!("{:#x}", o.proxy_admin))
+            .unwrap_or_default(),
     };
     write_output_if_requested(
         "ecosystem.upgrade-prepare-all",

@@ -5,6 +5,11 @@ create2_factory_salt = "0x000000000000000000000000000000000000000000000000000000
 
 [core_contracts]
 bridgehub_proxy_addr = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"
+# Mainnet's bridgehub.owner() is the ProtocolUpgradeHandler (decentralized
+# governance) — same shape as stage. Replay short-circuits via direct anvil
+# impersonation in fork mode (`governanceExecuteCallsDirect`). On real chain
+# the proposal goes through PUH's emergency / standard upgrade path.
+governance_kind = "puh"
 
 [ctm_contracts]
 # Legacy single-CTM (Era) — kept for anvil-interop synthetic-state harnesses.

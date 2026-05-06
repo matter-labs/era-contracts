@@ -368,6 +368,47 @@ async function executeSafeBundles(outDir: string, rpcUrl: string): Promise<void>
   }
 }
 
+/**
+ * Env-preset variant of `runEcosystemUpgradeScripts` for fork-mode upgrades
+ * against a real env (stage / mainnet / testnet). Skips the synthetic
+ * permanent-values templating that the v30→v31 harness does — the env preset
+ * already has the canonical bridgehub, ctm list, ownable_proxies, deployer,
+ * etc. We override only the ones that change per fork run: `--out` (temp dir)
+ * and `--l1-rpc-url` (the forked anvil instance).
+ *
+ * Uses the production CoreUpgrade_v31 / CTMUpgrade_v31 forge scripts via
+ * protocol-ops defaults. Returns the dir the prepare phase wrote to.
+ */
+export async function runEcosystemUpgradeScriptsForEnv(params: {
+  envName: string;
+  rpcUrl: string;
+  bridgehubAddress: string;
+  outBaseDir: string;
+  executeBundles?: boolean;
+}): Promise<{ prepareOutDir: string }> {
+  const prepareOutDir = path.join(params.outBaseDir, "prepare");
+  fs.rmSync(prepareOutDir, { recursive: true, force: true });
+
+  runProtocolOps([
+    "ecosystem",
+    "upgrade-prepare-all",
+    "--env",
+    params.envName,
+    "--bridgehub",
+    params.bridgehubAddress,
+    "--l1-rpc-url",
+    params.rpcUrl,
+    "--out",
+    prepareOutDir,
+    "--additional-args=--memory-limit=536870912",
+  ]);
+
+  if (params.executeBundles) {
+    await executeSafeBundles(prepareOutDir, params.rpcUrl);
+  }
+  return { prepareOutDir };
+}
+
 export async function runEcosystemUpgradeScripts(params: {
   rpcUrl: string;
   upgradeHarnessInputs: UpgradeHarnessInputs;
@@ -535,6 +576,118 @@ export async function runChainUpgradesAndRelayL2(params: {
 
     // Verify the L2 upgrade succeeded
     await verifyL2UpgradeResult(l2Provider, chain.chainId);
+  }
+}
+
+/**
+ * Multi-CTM aware variant of `runChainUpgradesAndRelayL2`. Used by env-preset
+ * fork tests (e.g. stage) where the bridgehub has both an Era CTM and an
+ * Atlas (zkOS) CTM, each with its own SettlementLayerV31Upgrade address.
+ *
+ * Groups chains by their on-chain CTM, looks up the per-CTM
+ * `script-out/v31-upgrade-ctm-<ctm>.toml` (written by
+ * `CTMUpgrade_v31.noGovernancePrepare`) to get the settlement-layer-upgrade
+ * address + isZKsyncOS flag, then delegates to `runChainUpgradesAndRelayL2`
+ * per group.
+ *
+ * Pass `skipL2Relay: true` to exercise the L1 chain-upgrade Safe bundle
+ * without spinning up L2 forks (useful for L1-only smoke tests).
+ */
+export async function runChainUpgradesPerCtm(params: {
+  l1Provider: ethers.providers.JsonRpcProvider;
+  anvilManager: AnvilManager;
+  bridgehubAddr: string;
+  upgradeChainAddresses: Array<{ chainId: number; diamondProxy: string }>;
+  protocolOpsOutDir: string;
+  /// L1-only mode: run the per-chain L1 upgrade Safe bundle but skip the
+  /// L2 relay (which requires an L2 fork). Default `false`.
+  skipL2Relay?: boolean;
+}): Promise<void> {
+  const {
+    l1Provider,
+    anvilManager,
+    bridgehubAddr,
+    upgradeChainAddresses,
+    protocolOpsOutDir,
+    skipL2Relay,
+  } = params;
+
+  const bridgehub = new ethers.Contract(bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
+
+  // Group chains by their CTM. On stage / mainnet there are 2 (Era + Atlas).
+  const groups = new Map<string, Array<{ chainId: number; diamondProxy: string }>>();
+  for (const chain of upgradeChainAddresses) {
+    const ctm: string = await bridgehub.chainTypeManager(chain.chainId);
+    if (!ctm || ctm === ethers.constants.AddressZero) {
+      throw new Error(`Chain ${chain.chainId}: no CTM registered on bridgehub`);
+    }
+    const key = ctm.toLowerCase();
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(chain);
+  }
+
+  for (const [ctmAddr, chains] of groups) {
+    console.log(
+      `\n── CTM ${ctmAddr}: running chain-upgrades for ${chains.length} chain(s) ──`
+    );
+
+    if (skipL2Relay) {
+      // L1-only path: just emit + execute the per-chain Safe bundle. No
+      // settlement-layer-upgrade lookup, no L2 relay.
+      const l1Chain = anvilManager.getL1Chain()!;
+      for (const chain of chains) {
+        const chainOutDir = path.join(protocolOpsOutDir, `chain-${chain.chainId}`);
+        fs.rmSync(chainOutDir, { recursive: true, force: true });
+        await forceBatchExecutedEqualsCommitted(l1Provider, chain.diamondProxy);
+        runProtocolOps([
+          "chain",
+          "upgrade",
+          "--bridgehub",
+          bridgehubAddr,
+          "--chain-id",
+          String(chain.chainId),
+          "--l1-rpc-url",
+          l1Chain.rpcUrl,
+          "--out",
+          chainOutDir,
+        ]);
+        await executeSafeBundles(chainOutDir, l1Chain.rpcUrl);
+        console.log(`  ✅ chain ${chain.chainId} L1 upgrade applied`);
+      }
+      continue;
+    }
+
+    // Full path: read per-CTM toml for the settlement-layer-upgrade addr
+    // + isZKsyncOS flag, then delegate to the existing single-CTM helper.
+    const ctmTomlPath = path.join(
+      contractsRootDir,
+      "l1-contracts",
+      "script-out",
+      `v31-upgrade-ctm-${ctmAddr}.toml`
+    );
+    if (!fs.existsSync(ctmTomlPath)) {
+      throw new Error(
+        `Missing per-CTM prepare output ${ctmTomlPath}. Did upgrade-prepare-all run for this CTM?`
+      );
+    }
+    const ctmOutputToml = readEcosystemOutput(ctmTomlPath);
+    const settlementLayerUpgradeAddr = readNestedString(
+      ctmOutputToml,
+      ["state_transition", "default_upgrade_addr"],
+      "SettlementLayerV31Upgrade address"
+    );
+    const isZKsyncOS = (ctmOutputToml as { is_zk_sync_os?: boolean }).is_zk_sync_os === true;
+
+    await runChainUpgradesAndRelayL2({
+      l1Provider,
+      anvilManager,
+      bridgehubAddr,
+      settlementLayerUpgradeAddr,
+      ctmAddr,
+      upgradeChainAddresses: chains,
+      isZKsyncOS,
+      protocolOpsOutDir,
+    });
   }
 }
 

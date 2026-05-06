@@ -34,6 +34,7 @@
  *   { "270": "https://mainnet.era.zksync.io", "271": "https://rpc.chain271.xyz" }
  */
 
+import * as fs from "fs";
 import * as path from "path";
 import { ethers } from "ethers";
 import { AnvilManager } from "./src/daemons/anvil-manager";
@@ -50,7 +51,9 @@ import {
   readEcosystemOutput,
   readNestedString,
   runChainUpgradesAndRelayL2,
+  runChainUpgradesPerCtm,
   runEcosystemUpgradeScripts,
+  runEcosystemUpgradeScriptsForEnv,
   verifyProtocolVersions,
 } from "./src/helpers/v31-upgrade-test-runner";
 import type { V31UpgradeScenario } from "./src/helpers/v31-upgrade-test-runner";
@@ -67,6 +70,35 @@ function elapsed(): string {
 /** Deterministic port allocation for fork-mode to avoid clashing with the default harness ports. */
 function allocatePort(offset: number): number {
   return 19545 + offset;
+}
+
+/**
+ * L1-only chain discovery: skips the L2 RPC requirement of `discoverForkChains`.
+ * Used when `FORK_SKIP_L2=1` so the harness can still resolve diamond proxies
+ * + chain admins for prepare/governance/stage3 testing without spinning L2
+ * forks. Returns objects with `l2RpcUrl: ""` to keep the shape compatible.
+ */
+async function discoverForkChainsL1Only(
+  l1Provider: ethers.providers.JsonRpcProvider,
+  cfg: { bridgehubAddress: string; chainIdFilter: number[] }
+): Promise<Array<{ chainId: number; diamondProxy: string; chainAdmin: string; l2RpcUrl: string }>> {
+  const bridgehub = new ethers.Contract(cfg.bridgehubAddress, getAbi("L1Bridgehub"), l1Provider);
+  const rawIds: ethers.BigNumber[] = await bridgehub.getAllZKChainChainIDs();
+  const allChainIds = rawIds.map((n) => n.toNumber());
+  const selected =
+    cfg.chainIdFilter.length > 0 ? cfg.chainIdFilter : allChainIds.slice(0, 2);
+  const adminAbi = getAbi("GettersFacet");
+  const out = [];
+  for (const chainId of selected) {
+    const diamondProxy: string = await bridgehub.getZKChain(chainId);
+    if (!diamondProxy || diamondProxy === ethers.constants.AddressZero) {
+      throw new Error(`Chain ${chainId}: not registered on bridgehub`);
+    }
+    const getters = new ethers.Contract(diamondProxy, adminAbi, l1Provider);
+    const chainAdmin: string = await getters.getAdmin();
+    out.push({ chainId, diamondProxy, chainAdmin, l2RpcUrl: "" });
+  }
+  return out;
 }
 
 /**
@@ -100,6 +132,22 @@ async function main(): Promise<void> {
   let cleanupUpgradeHarnessInputs: (() => void) | null = null;
   process.env.FOUNDRY_PROFILE = "anvil-interop";
   const keepChains = process.env.ANVIL_INTEROP_KEEP_CHAINS === "1";
+
+  // Env-preset mode: drive everything from `permanent-values/<preset>.toml`
+  // (multi-CTM, ownable_proxies registry, governance_kind = puh, ...) instead
+  // of the synthetic v30→v31 templating below. Set FORK_ENV_PRESET=stage (or
+  // testnet/mainnet) to enable.
+  const envPreset = process.env.FORK_ENV_PRESET?.trim();
+  // L1-only smoke mode: skip L2 fork creation + L2 relay. Useful when L2
+  // RPCs aren't available — exercises prepare + governance + per-chain L1
+  // upgrade tx + stage3 only.
+  const skipL2 = process.env.FORK_SKIP_L2 === "1";
+  // Skip the per-chain upgrade phase entirely. Use when targeted chains are
+  // not on the `old_protocol_version` the prepare-input expects (e.g. stage
+  // chains lagging behind v29 — `upgradeCutDataBlock[chainVersion]` is empty
+  // and `GetDiamondCutData.getDiamondCutData` reverts with `NoLogsFound`).
+  // Lets us still reach + validate `ecosystem stage3` on the same fork.
+  const skipChainUpgrades = process.env.FORK_SKIP_CHAIN_UPGRADES === "1";
 
   try {
     // ── Step 0: Load fork config ─────────────────────────────────
@@ -139,148 +187,218 @@ async function main(): Promise<void> {
 
     // ── Step 2: Discover chains from forked Bridgehub ────────────
     console.log(`\n=== Step 2: Discovering chains from Bridgehub (${elapsed()}) ===\n`);
-    const chains = await discoverForkChains(l1Provider, cfg);
+    const chains = skipL2
+      ? await discoverForkChainsL1Only(l1Provider, cfg)
+      : await discoverForkChains(l1Provider, cfg);
     for (const c of chains) {
-      console.log(`  Chain ${c.chainId}: diamondProxy=${c.diamondProxy} admin=${c.chainAdmin} l2Rpc=${c.l2RpcUrl}`);
+      console.log(
+        `  Chain ${c.chainId}: diamondProxy=${c.diamondProxy} admin=${c.chainAdmin}` +
+          (c.l2RpcUrl ? ` l2Rpc=${c.l2RpcUrl}` : " l2Rpc=<skipped>")
+      );
     }
 
     // ── Step 3: Start forked L2 anvils ───────────────────────────
-    console.log(`\n=== Step 3: Starting forked L2 anvils (${elapsed()}) ===\n`);
-    for (let i = 0; i < chains.length; i++) {
-      const c = chains[i];
-      await anvilManager.startChain({
-        chainId: c.chainId,
-        port: allocatePort(1 + i),
-        role: "directSettled",
-        forkUrl: c.l2RpcUrl,
-      });
+    if (skipL2) {
+      console.log(`\n=== Step 3: Skipped (FORK_SKIP_L2=1, L1-only mode) ===\n`);
+    } else {
+      console.log(`\n=== Step 3: Starting forked L2 anvils (${elapsed()}) ===\n`);
+      for (let i = 0; i < chains.length; i++) {
+        const c = chains[i];
+        await anvilManager.startChain({
+          chainId: c.chainId,
+          port: allocatePort(1 + i),
+          role: "directSettled",
+          forkUrl: c.l2RpcUrl,
+        });
+      }
     }
 
     // ── Step 4: Resolve L1 addresses from forked state ───────────
     console.log(`\n=== Step 4: Resolving governance + CTM addresses (${elapsed()}) ===\n`);
-    const { governance, chainTypeManager } = await resolveL1Addresses(
-      l1Provider,
+    // In env-preset mode the bridgehub may have multiple CTMs (e.g. stage's
+    // Era + Atlas), so we don't pin a single CTM here. Step 5 picks them up
+    // from `permanent-values/<preset>.toml`'s [[ctm_contracts.ctms]] list, and
+    // step 7 groups chains by their on-chain CTM.
+    const governance: string = await new ethers.Contract(
       cfg.bridgehubAddress,
-      chains[0].chainId
-    );
+      getAbi("L1Bridgehub"),
+      l1Provider
+    ).owner();
+    let chainTypeManager = "";
+    if (!envPreset) {
+      ({ chainTypeManager } = await resolveL1Addresses(
+        l1Provider,
+        cfg.bridgehubAddress,
+        chains[0].chainId
+      ));
+    }
     console.log(`  Governance: ${governance}`);
-    console.log(`  CTM:        ${chainTypeManager}`);
+    if (chainTypeManager) console.log(`  CTM:        ${chainTypeManager}`);
 
     // ── Step 5: Run ecosystem upgrade forge scripts ──────────────
     console.log(`\n=== Step 5: Running v31 ecosystem upgrade prepare (${elapsed()}) ===\n`);
-    const scenario: V31UpgradeScenario = {
-      label: "fork-v30-to-v31",
-      stateVersion: "fork", // unused in fork mode but required by the type
-      permanentValuesTemplatePath: process.env.FORK_PERMANENT_VALUES_PATH ?? "upgrade-envs/permanent-values/local.toml",
-      upgradeInputTemplatePath:
-        process.env.FORK_UPGRADE_INPUT_PATH ?? "upgrade-envs/v0.30.0-zksync-os-blobs/localhost.toml",
-      isZKsyncOS: true,
-      targetRoles: ["directSettled"], // unused in fork mode but required by the type
-    };
     const upgradeChainAddresses = chains.map((c) => ({ chainId: c.chainId, diamondProxy: c.diamondProxy }));
 
-    const upgradeHarnessInputs = prepareUpgradeHarnessInputs(scenario, {
-      l1Addresses: { bridgehub: cfg.bridgehubAddress, governance },
-      ctmAddresses: { chainTypeManager },
-      chainAddresses: upgradeChainAddresses,
-    });
-    cleanupUpgradeHarnessInputs = upgradeHarnessInputs.cleanup;
-
-    await runEcosystemUpgradeScripts({
-      rpcUrl: l1Chain.rpcUrl,
-      upgradeHarnessInputs,
-      executeBundles: true,
-    });
+    let prepareDir: string;
+    let upgradeHarnessInputsRef: ReturnType<typeof prepareUpgradeHarnessInputs> | null = null;
+    let scenarioIsZKsyncOS = true;
+    if (envPreset) {
+      // Real env preset (stage / mainnet / testnet): drive prepare-all from
+      // `permanent-values/<preset>.toml` directly. No template, no synthetic
+      // upgrade-input — the canonical artifacts already live in the repo.
+      const outBaseDir = path.join(
+        anvilInteropDir,
+        "outputs",
+        `fork-upgrade-${envPreset}`
+      );
+      fs.rmSync(outBaseDir, { recursive: true, force: true });
+      cleanupUpgradeHarnessInputs = () =>
+        fs.rmSync(outBaseDir, { recursive: true, force: true });
+      const result = await runEcosystemUpgradeScriptsForEnv({
+        envName: envPreset,
+        rpcUrl: l1Chain.rpcUrl,
+        bridgehubAddress: cfg.bridgehubAddress,
+        outBaseDir,
+        executeBundles: true,
+      });
+      prepareDir = result.prepareOutDir;
+    } else {
+      const scenario: V31UpgradeScenario = {
+        label: "fork-v30-to-v31",
+        stateVersion: "fork",
+        permanentValuesTemplatePath:
+          process.env.FORK_PERMANENT_VALUES_PATH ?? "upgrade-envs/permanent-values/local.toml",
+        upgradeInputTemplatePath:
+          process.env.FORK_UPGRADE_INPUT_PATH ??
+          "upgrade-envs/v0.30.0-zksync-os-blobs/localhost.toml",
+        isZKsyncOS: true,
+        targetRoles: ["directSettled"],
+      };
+      scenarioIsZKsyncOS = scenario.isZKsyncOS;
+      const upgradeHarnessInputs = prepareUpgradeHarnessInputs(scenario, {
+        l1Addresses: { bridgehub: cfg.bridgehubAddress, governance },
+        ctmAddresses: { chainTypeManager },
+        chainAddresses: upgradeChainAddresses,
+      });
+      upgradeHarnessInputsRef = upgradeHarnessInputs;
+      cleanupUpgradeHarnessInputs = upgradeHarnessInputs.cleanup;
+      await runEcosystemUpgradeScripts({
+        rpcUrl: l1Chain.rpcUrl,
+        upgradeHarnessInputs,
+        executeBundles: true,
+      });
+      prepareDir = path.join(upgradeHarnessInputs.protocolOpsOutDir, "prepare");
+    }
 
     // ── Step 6: Execute governance stages 0/1/2 ──────────────────
-    // We intentionally bypass protocol-ops' `upgrade-governance` here. On decentralized-governance
-    // stage/mainnet, `bridgehub.owner()` is a ProtocolUpgradeHandler proxy — not an Ownable2Step
-    // `Governance.sol` — so protocol-ops' `resolve_governance_owner` (which does a two-level
-    // `Ownable.owner()` hop) reverts. With `anvil --auto-impersonate` we can just send the
-    // governance txs AS the handler address directly, which is what `executeGovernanceCalls` does.
-    //
-    // `upgrade-prepare-all` writes a single merged `governance.toml` directly
-    // under `<out>/prepare/`. `gov upgrade-puh-guardians` (when run) emits a
-    // sibling `gov-upgrade.toml`. We replay stages by re-emitting all stage-0
-    // calls across both TOMLs, then all stage-1, then all stage-2 — matches
-    // protocol-ops' `replay_governance_stages` ordering.
+    // Direct-impersonate path: `bridgehub.owner()` on stage / mainnet is a
+    // ProtocolUpgradeHandler proxy (no `Ownable.owner()`), so `anvil
+    // --auto-impersonate` lets us send the governance txs *as* the handler.
+    // After folding gov-upgrade.toml into governance.toml (#0dd085d53), this
+    // is one TOML, not two.
     console.log(`\n=== Step 6: Executing governance calls (${elapsed()}) ===\n`);
-    const prepareDir = path.join(upgradeHarnessInputs.protocolOpsOutDir, "prepare");
-    const govTomlPaths = ["governance.toml", "gov-upgrade.toml"]
-      .map((name) => path.join(prepareDir, name))
-      .filter((p) => fs.existsSync(p));
-    if (govTomlPaths.length === 0) {
-      throw new Error(`No governance TOMLs emitted by upgrade-prepare-all under ${prepareDir}`);
+    const govTomlPath = path.join(prepareDir, "governance.toml");
+    if (!fs.existsSync(govTomlPath)) {
+      throw new Error(`No governance.toml emitted by upgrade-prepare-all at ${govTomlPath}`);
     }
-    const stagesByToml = govTomlPaths.map((p) => {
-      const calls = (readEcosystemOutput(p).governance_calls ?? {}) as Record<string, string>;
-      if (!calls.stage0_calls) {
-        throw new Error(`Governance TOML missing governance_calls section: ${p}`);
-      }
-      return calls;
-    });
-    for (const calls of stagesByToml) {
-      await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(calls.stage0_calls), "Stage 0");
+    const calls = (readEcosystemOutput(govTomlPath).governance_calls ?? {}) as Record<string, string>;
+    if (!calls.stage0_calls) {
+      throw new Error(`governance.toml missing governance_calls section: ${govTomlPath}`);
     }
+    await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(calls.stage0_calls), "Stage 0");
 
-    // Stage 0 starts the GovernanceUpgradeTimer; stage 1's first governance call
-    // is `checkDeadline()` which reverts unless `block.timestamp >= deadline`.
-    // On stage upgrades the configured `INITIAL_DELAY` is in the order of minutes
-    // (e.g. 1200s on Sepolia), and the harness can't wait wall-clock — fast-forward
-    // anvil time past the deadline so stage 1 can proceed.
+    // Stage 0 starts the GovernanceUpgradeTimer; stage 1's first call is
+    // `checkDeadline()` which reverts unless `block.timestamp >= deadline`.
+    // Fast-forward anvil time so stage 1 can proceed without waiting wall-clock.
     await advanceL1TimePastUpgradeDeadline(l1Provider);
 
-    for (const calls of stagesByToml) {
-      await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(calls.stage1_calls), "Stage 1");
-    }
-    for (const calls of stagesByToml) {
-      await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(calls.stage2_calls), "Stage 2");
-    }
+    await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(calls.stage1_calls), "Stage 1");
+    await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(calls.stage2_calls), "Stage 2");
 
-    // NOTE: we intentionally skip clearGenesisUpgradeTxHash / seedBatchCounters that the
-    // synthetic-state runner does — real forked chain state already has correct values for both.
+    // NOTE: skip clearGenesisUpgradeTxHash / seedBatchCounters — real fork state
+    // already has correct values for both.
 
-    // ── Step 7: Per-chain ChainUpgrade_v31 + L2 relay ────────────
-    console.log(`\n=== Step 7: Per-chain ChainUpgrade_v31 + L2 relay (${elapsed()}) ===\n`);
-    // `default_upgrade_addr` lives in the per-CTM output TOML written by
-    // `CTMUpgradeV31ForTests.saveOutput` directly to `<l1-contracts>/script-out/`
-    // (forge writes it there; protocol-ops no longer copies it into `prepare/`).
-    const ctmTomlPath = path.join(
-      l1ContractsDir,
-      "script-out",
-      `v31-upgrade-ctm-${chainTypeManager.toLowerCase()}.toml`
-    );
-    const ctmOutputToml = readEcosystemOutput(ctmTomlPath);
-    const settlementLayerUpgradeAddr = readNestedString(
-      ctmOutputToml,
-      ["state_transition", "default_upgrade_addr"],
-      "SettlementLayerV31Upgrade address"
-    );
-    await runChainUpgradesAndRelayL2({
-      l1Provider,
-      anvilManager,
-      bridgehubAddr: cfg.bridgehubAddress,
-      settlementLayerUpgradeAddr,
-      ctmAddr: chainTypeManager,
-      upgradeChainAddresses,
-      isZKsyncOS: scenario.isZKsyncOS,
-      protocolOpsOutDir: path.join(upgradeHarnessInputs.protocolOpsOutDir, "chains"),
-    });
+    // ── Step 7: Per-chain ChainUpgrade_v31 (+ L2 relay if not skipL2) ──
+    if (skipChainUpgrades) {
+      console.log(
+        `\n=== Step 7: Skipped (FORK_SKIP_CHAIN_UPGRADES=1) ===\n`
+      );
+    } else {
+    console.log(`\n=== Step 7: Per-chain ChainUpgrade_v31 (${elapsed()}) ===\n`);
+    const chainsOutDir = upgradeHarnessInputsRef
+      ? path.join(upgradeHarnessInputsRef.protocolOpsOutDir, "chains")
+      : path.join(anvilInteropDir, "outputs", `fork-upgrade-${envPreset!}`, "chains");
+    if (envPreset) {
+      // Multi-CTM-aware path. Groups chains by on-chain CTM and looks up the
+      // SettlementLayerV31Upgrade addr per CTM from its prepare-output toml.
+      await runChainUpgradesPerCtm({
+        l1Provider,
+        anvilManager,
+        bridgehubAddr: cfg.bridgehubAddress,
+        upgradeChainAddresses,
+        protocolOpsOutDir: chainsOutDir,
+        skipL2Relay: skipL2,
+      });
+    } else {
+      const ctmTomlPath = path.join(
+        l1ContractsDir,
+        "script-out",
+        `v31-upgrade-ctm-${chainTypeManager.toLowerCase()}.toml`
+      );
+      const ctmOutputToml = readEcosystemOutput(ctmTomlPath);
+      const settlementLayerUpgradeAddr = readNestedString(
+        ctmOutputToml,
+        ["state_transition", "default_upgrade_addr"],
+        "SettlementLayerV31Upgrade address"
+      );
+      await runChainUpgradesAndRelayL2({
+        l1Provider,
+        anvilManager,
+        bridgehubAddr: cfg.bridgehubAddress,
+        settlementLayerUpgradeAddr,
+        ctmAddr: chainTypeManager,
+        upgradeChainAddresses,
+        isZKsyncOS: scenarioIsZKsyncOS,
+        protocolOpsOutDir: chainsOutDir,
+      });
+    }
+    }
 
     // ── Step 8: Stage 3 post-governance migration ────────────────
     console.log(`\n=== Step 8: Running stage3 (${elapsed()}) ===\n`);
-    await runForgeScript({
-      scriptPath: "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:CoreUpgradeV31ForTests",
-      envVars: upgradeHarnessInputs.envVars,
-      rpcUrl: l1Chain.rpcUrl,
-      senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
-      projectRoot: l1ContractsDir,
-      sig: "stage3()",
-    });
+    if (envPreset) {
+      // Production stage3 entry point on the real upgrade contract — same
+      // forge script protocol-ops `ecosystem stage3` invokes. The bridgehub
+      // is passed as the lone positional arg.
+      await runForgeScript({
+        scriptPath: "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol:CoreUpgrade_v31",
+        envVars: {},
+        rpcUrl: l1Chain.rpcUrl,
+        senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
+        projectRoot: l1ContractsDir,
+        sig: "stage3(address)",
+        args: cfg.bridgehubAddress,
+      });
+    } else {
+      await runForgeScript({
+        scriptPath: "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:CoreUpgradeV31ForTests",
+        envVars: upgradeHarnessInputsRef!.envVars,
+        rpcUrl: l1Chain.rpcUrl,
+        senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
+        projectRoot: l1ContractsDir,
+        sig: "stage3()",
+      });
+    }
 
     // ── Step 9: Verify protocol version bump ─────────────────────
-    console.log(`\n=== Step 9: Verifying protocol versions (${elapsed()}) ===\n`);
-    await verifyProtocolVersions(l1Provider, upgradeChainAddresses);
+    if (skipL2) {
+      console.log(
+        `\n=== Step 9: Skipped protocol-version verify (FORK_SKIP_L2=1, no L2 forks) ===\n`
+      );
+    } else {
+      console.log(`\n=== Step 9: Verifying protocol versions (${elapsed()}) ===\n`);
+      await verifyProtocolVersions(l1Provider, upgradeChainAddresses);
+    }
 
     console.log(`\n=== Fork-mode upgrade test completed successfully! (${elapsed()}) ===\n`);
   } finally {
