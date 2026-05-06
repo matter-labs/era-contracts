@@ -196,7 +196,7 @@ contract UpgradeIntegrationTest_Local is
         // Heavy execution and event assertions live in setUp -> internalTest()
         // (RAM constraint). This body validates persisted state outcomes.
         address ctm = ctmUpgrade.getCTMAddress();
-        address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
+        address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
 
         // Protocol version bumps
         assertEq(IChainTypeManager(ctm).protocolVersion(), _expectedNewVersion, "CTM protocolVersion not bumped");
