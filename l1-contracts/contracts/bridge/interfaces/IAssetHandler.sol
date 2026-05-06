@@ -26,7 +26,7 @@ interface IAssetHandler {
     /// while L1 the provided msg.value is always 0. However, this may change in the future,
     /// so if your AssetHandler implementation relies on it, it is better to explicitly check it.
     /// @dev Note, that it is the responsibility of the asset handler to ensure that the provided data
-    /// is correct, since a malicioud `_chainId` can provide arbitrary data here.
+    /// is correct, since a malicious `_chainId` can provide arbitrary data here.
     function bridgeMint(uint256 _chainId, bytes32 _assetId, bytes calldata _data) external payable;
 
     /// @notice Burns bridged tokens and returns the calldata for L2 <-> L1 message.
