@@ -84,7 +84,8 @@ contract RegisterZKChainScript is Create2FactoryUtils, IRegisterZKChain {
 
     function loadChainCreationData(address _ctmAddress) internal {
         (config.diamondCutData, config.forceDeploymentsData) = GetDiamondCutData.getDiamondCutAndForceDeployment(
-            _ctmAddress
+            _ctmAddress,
+            false
         );
     }
 

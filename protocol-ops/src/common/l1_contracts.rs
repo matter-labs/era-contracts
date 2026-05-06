@@ -11,7 +11,9 @@ use anyhow::Context;
 use ethers::providers::{Http, Provider};
 use ethers::types::Address;
 
-use crate::abi::{BridgehubAbi, IChainTypeManagerAbi, ZkChainAbi};
+use crate::abi::{
+    BridgehubAbi, ChainTypeManagerBaseAbi, IChainTypeManagerAbi, TestnetVerifierAbi, ZkChainAbi,
+};
 
 fn provider(rpc_url: &str) -> anyhow::Result<Arc<Provider<Http>>> {
     Ok(Arc::new(Provider::<Http>::try_from(rpc_url)?))
@@ -115,34 +117,40 @@ pub async fn resolve_all_chain_ids(
     Ok(ids.iter().map(|id| id.as_u64()).collect())
 }
 
+/// Enumerate every CTM proxy currently registered under `bridgehub` by
+/// iterating its `getAllZKChainChainIDs()` and looking up each chain's
+/// `chainTypeManager`. Returns deduped addresses in first-seen order, with
+/// the first chain that uses each as a witness (handy for downstream
+/// auto-resolution of rollup-DA-manager).
+pub async fn discover_all_ctms(
+    l1_rpc_url: &str,
+    bridgehub: Address,
+) -> anyhow::Result<Vec<(Address, u64)>> {
+    let chain_ids = resolve_all_chain_ids(l1_rpc_url, bridgehub).await?;
+    let mut out: Vec<(Address, u64)> = Vec::new();
+    for cid in chain_ids {
+        let ctm = resolve_ctm_proxy(l1_rpc_url, bridgehub, cid)
+            .await
+            .with_context(|| format!("resolving CTM for chain {cid}"))?;
+        if !out.iter().any(|(a, _)| *a == ctm) {
+            out.push((ctm, cid));
+        }
+    }
+    Ok(out)
+}
+
 /// Resolve `ctm.L1_BYTECODES_SUPPLIER()` → bytecodes supplier address.
-///
-/// This getter is on the concrete `ChainTypeManagerBase` but not in the
-/// `IChainTypeManager` interface, so we encode the calldata manually
-/// (selector `0x18f0c09b`).
 pub async fn resolve_bytecodes_supplier(
     l1_rpc_url: &str,
     ctm_proxy: Address,
 ) -> anyhow::Result<Address> {
-    use ethers::providers::Middleware;
-
-    let provider = provider(l1_rpc_url)?;
-    // L1_BYTECODES_SUPPLIER() selector = 0x18f0c09b
-    let calldata = ethers::types::Bytes::from(ethers::utils::hex::decode("18f0c09b").unwrap());
-    let tx = ethers::types::TransactionRequest::new()
-        .to(ctm_proxy)
-        .data(calldata)
-        .into();
-    let result = provider
-        .call(&tx, None)
+    let ctm = ChainTypeManagerBaseAbi::new(ctm_proxy, provider(l1_rpc_url)?);
+    let supplier = ctm
+        .l1_bytecodes_supplier()
+        .call()
         .await
         .context("ctm.L1_BYTECODES_SUPPLIER() call failed")?;
-    anyhow::ensure!(
-        result.len() >= 32,
-        "ctm.L1_BYTECODES_SUPPLIER() returned invalid response"
-    );
-    let addr = Address::from_slice(&result[12..32]);
-    ensure_nonzero(addr, "ctm.L1_BYTECODES_SUPPLIER()")
+    ensure_nonzero(supplier, "ctm.L1_BYTECODES_SUPPLIER()")
 }
 
 /// Resolve `bridgehub.settlementLayer(chainId)` → gateway chain ID.
@@ -344,8 +352,6 @@ pub async fn resolve_is_testnet_verifier(
     l1_rpc_url: &str,
     ctm_proxy: Address,
 ) -> anyhow::Result<bool> {
-    use ethers::providers::Middleware;
-
     let p = provider(l1_rpc_url)?;
     let ctm = IChainTypeManagerAbi::new(ctm_proxy, p.clone());
 
@@ -361,18 +367,7 @@ pub async fn resolve_is_testnet_verifier(
         .context("ctm.protocolVersionVerifier() call failed")?;
     ensure_nonzero(verifier, "ctm.protocolVersionVerifier()")?;
 
-    // IS_TESTNET_VERIFIER() selector = 0x272d0f1a
-    let calldata = ethers::types::Bytes::from(ethers::utils::hex::decode("272d0f1a").unwrap());
-    let tx = ethers::types::TransactionRequest::new()
-        .to(verifier)
-        .data(calldata)
-        .into();
-    match p.call(&tx, None).await {
-        Ok(result) if result.len() >= 32 => {
-            // ABI-encoded bool: last byte is 0 or 1
-            Ok(result[31] == 1)
-        }
-        // Call reverted or returned unexpected data — not a testnet verifier
-        _ => Ok(false),
-    }
+    let verifier = TestnetVerifierAbi::new(verifier, p);
+    // Production verifiers and older deployments may not expose this constant.
+    Ok(verifier.is_testnet_verifier().call().await.unwrap_or(false))
 }

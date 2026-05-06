@@ -7,7 +7,6 @@ use crate::commands::chain::{
     validator::ChainValidatorArgs,
 };
 
-pub(crate) mod admin_call_builder;
 pub(crate) mod gateway;
 pub(crate) mod init;
 pub(crate) mod set_da_validator_pair;

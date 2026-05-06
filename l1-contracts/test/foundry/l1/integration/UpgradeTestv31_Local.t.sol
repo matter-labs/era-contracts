@@ -5,7 +5,6 @@ pragma solidity ^0.8.24;
 
 import {console2 as console} from "forge-std/Script.sol";
 
-import {EcosystemUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol";
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
 import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -14,8 +13,6 @@ import {ProposedUpgrade, ProposedUpgradeLib} from "contracts/state-transition/li
 import {ChainCreationParamsConfig, StateTransitionDeployedAddresses} from "../../../../deploy-scripts/utils/Types.sol";
 import {PublishFactoryDepsResult} from "../../../../deploy-scripts/utils/bytecode/BytecodePublisher.s.sol";
 import {Test} from "forge-std/Test.sol";
-import {DefaultCTMUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCTMUpgrade.s.sol";
-import {DefaultCoreUpgrade} from "../../../../deploy-scripts/upgrade/default-upgrade/DefaultCoreUpgrade.s.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
@@ -92,29 +89,10 @@ contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
     }
 }
 
-/// @notice Test-only ecosystem upgrade that uses the mocked CTM and Core upgrades
-contract EcosystemUpgrade_v31_Test is EcosystemUpgrade_v31 {
-    using stdToml for string;
-
-    /// @notice Override to return mocked CTM upgrade
-    function createCTMUpgrade() internal override returns (DefaultCTMUpgrade) {
-        return new CTMUpgrade_v31_Test();
-    }
-
-    /// @notice Override to return mocked Core upgrade
-    function createCoreUpgrade() internal override returns (DefaultCoreUpgrade) {
-        return new CoreUpgrade_v31_Test();
-    }
-
-    /// @notice Override to set protocol version from config for local testing
-    /// @dev In local tests, genesis deploys at v31 but we want to test upgrade to v32
-    function overrideProtocolVersionForLocalTesting(string memory upgradeInputPath) internal override {
-        string memory root = vm.projectRoot();
-        string memory upgradeToml = vm.readFile(string.concat(root, upgradeInputPath));
-        uint256 newProtocolVersion = upgradeToml.readUint("$.contracts.new_protocol_version");
-        getCTMUpgrade().setNewProtocolVersion(newProtocolVersion);
-    }
-}
+// Note: there is no longer a separate `EcosystemUpgrade_v31_Test` orchestrator subclass.
+// The local-fork integration test injects mocked Core and CTM upgrades by overriding
+// `createCoreUpgrade` / `createCTMUpgrade` on `UpgradeIntegrationTest_Local` directly,
+// and bumps the protocol version in `setUp` after `setupUpgrade()`.
 
 contract UpgradeIntegrationTest_Local is
     UpgradeIntegrationTestBase,
@@ -122,9 +100,27 @@ contract UpgradeIntegrationTest_Local is
     ZKChainDeployer,
     TokenDeployer
 {
-    /// @notice Override to use mocked ecosystem upgrade that uses mocked CTM upgrade
-    function createEcosystemUpgrade() internal override returns (EcosystemUpgrade_v31) {
-        return new EcosystemUpgrade_v31_Test();
+    using stdToml for string;
+
+    /// @notice Override to inject the mocked Core upgrade (skips setAssetTracker call).
+    function createCoreUpgrade() internal override returns (CoreUpgrade_v31) {
+        return new CoreUpgrade_v31_Test();
+    }
+
+    /// @notice Override to inject the mocked CTM upgrade (skips bytecode-heavy reads).
+    function createCTMUpgrade() internal override returns (CTMUpgrade_v31) {
+        return new CTMUpgrade_v31_Test();
+    }
+
+    /// @notice Bump the CTM's protocol version from the upgrade input TOML so the local
+    ///         genesis-at-v31 fixture exercises a v31 → v32 upgrade.
+    /// @dev    Replaces the former `overrideProtocolVersionForLocalTesting` hook on the
+    ///         deleted `DefaultEcosystemUpgrade` orchestrator.
+    function afterInitHook() internal override {
+        string memory root = vm.projectRoot();
+        string memory upgradeToml = vm.readFile(string.concat(root, ECOSYSTEM_UPGRADE_INPUT));
+        uint256 newProtocolVersion = upgradeToml.readUint("$.contracts.new_protocol_version");
+        ctmUpgrade.setNewProtocolVersion(newProtocolVersion);
     }
 
     /// @notice Set totalBatchesExecuted and totalBatchesCommitted before chain upgrade
@@ -184,7 +180,7 @@ contract UpgradeIntegrationTest_Local is
         console.log("setUp: Paths configured");
         setupUpgrade(true);
         console.log("setUp: Upgrade setup complete");
-        address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
+        address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         console.log("setUp: Got bridgehub address", bridgehub);
         bytes32 eraBaseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(eraZKChainId);
         _expectedBaseTokenAssetId = eraBaseTokenAssetId;
@@ -200,7 +196,7 @@ contract UpgradeIntegrationTest_Local is
         // Heavy execution and event assertions live in setUp -> internalTest()
         // (RAM constraint). This body validates persisted state outcomes.
         address ctm = ctmUpgrade.getCTMAddress();
-        address bridgehub = ecosystemUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
+        address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
 
         // Protocol version bumps
         assertEq(IChainTypeManager(ctm).protocolVersion(), _expectedNewVersion, "CTM protocolVersion not bumped");

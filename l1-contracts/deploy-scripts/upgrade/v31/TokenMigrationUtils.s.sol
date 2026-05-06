@@ -18,7 +18,7 @@ import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 /// @notice Shared token migration utilities for the v31 upgrade.
-/// @dev Used by both EcosystemUpgrade_v31 (stage3) and ChainUpgrade_v31.
+/// @dev Used by both `CoreUpgrade_v31.stage3` (post-governance migration) and `ChainUpgrade_v31`.
 library TokenMigrationUtils {
     using stdToml for string;
 

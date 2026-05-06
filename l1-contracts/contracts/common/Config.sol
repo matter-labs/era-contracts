@@ -49,6 +49,21 @@ uint256 constant MAINNET_CHAIN_ID = 1;
 // @dev The chainId of Ethereum Sepolia testnet
 uint256 constant SEPOLIA_CHAIN_ID = 11155111;
 
+/// @dev Hardcoded list of Sepolia chains that are still settling on a Gateway
+///      at v31 upgrade time. `_v31InitializeInner` skips them so the rest of the
+///      L1-settled fleet can finish the upgrade without a coordinated GW→L1
+///      chain migration in the same window. Each entry is a single chain id
+///      because Solidity's compile-time constants don't support arrays cleanly
+///      across files; the upgrade reads them via the helper below.
+///      - `270`     — stage zkSync Era (settles on stage Gateway 123).
+///      - `14183`   — testnet chain on the testnet Gateway.
+///      - `96371`   — testnet chain on the testnet Gateway.
+///      - `531050104` — testnet chain on the testnet Gateway.
+uint256 constant SEPOLIA_NON_MIGRATED_STAGE_ERA_CHAIN_ID = 270;
+uint256 constant SEPOLIA_NON_MIGRATED_TESTNET_CHAIN_ID_A = 14183;
+uint256 constant SEPOLIA_NON_MIGRATED_TESTNET_CHAIN_ID_B = 96371;
+uint256 constant SEPOLIA_NON_MIGRATED_TESTNET_CHAIN_ID_C = 531050104;
+
 /// @dev Timestamp - seconds since unix epoch. This value will be used on the mainnet.
 uint256 constant MAINNET_COMMIT_TIMESTAMP_NOT_OLDER = 3 days;
 

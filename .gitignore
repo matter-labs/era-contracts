@@ -31,6 +31,12 @@ l1-contracts/script-config/*
 l1-contracts/snapshots/*
 !l1-contracts/script-config/artifacts
 l1-contracts/script-out/*
+# protocol-ops auto-emits per-signer Safe-bundle JSONs + a manifest.json
+# index per --out invocation. Those are debug artifacts; the merged
+# governance.toml (also under the same dir) IS the canonical artifact and
+# stays tracked.
+l1-contracts/upgrade-envs/**/output/**/protocol-ops/**/*.safe.json
+l1-contracts/upgrade-envs/**/output/**/protocol-ops/**/manifest.json
 l1-contracts/test/foundry/l1/integration/deploy-scripts/script-out/*.toml
 !l1-contracts/script-out/.gitkeep
 *.timestamp

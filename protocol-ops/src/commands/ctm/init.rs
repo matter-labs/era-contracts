@@ -3,7 +3,6 @@ use clap::Parser;
 use ethers::types::{Address, H256};
 use serde::{Deserialize, Serialize};
 
-use crate::commands::ctm::accept_ownership::{accept_ownership, CtmAcceptOwnershipInput};
 use crate::commands::ctm::deploy::{deploy, CtmDeployInput};
 use crate::commands::hub::register_ctm::{register_ctm, RegisterCtmInput};
 
@@ -11,6 +10,7 @@ use crate::commands::output::write_output_if_requested;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
 use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
+use crate::config::forge_interface::script_params::ADMIN_FUNCTIONS_INVOCATION;
 use crate::types::VMOption;
 
 // ── CLI args ────────────────────────────────────────────────────────────────
@@ -140,14 +140,26 @@ pub async fn ctm_init(
     logger::info(format!("[timing] ctm.deploy: {:.2?}", t.elapsed()));
     let deployed = &deploy_output.deployed_addresses;
     let ctm_proxy = deployed.state_transition.state_transition_proxy_addr;
-
     logger::step("Accepting ownership of CTM contracts...");
-    let accept_input = CtmAcceptOwnershipInput {
-        ctm_proxy,
-        governance: deployed.governance_addr,
-        chain_admin: deployed.chain_admin,
-    };
-    accept_ownership(runner, owner, &accept_input).await?;
+    let accept_scripts = [
+        runner
+            .with_script_call(
+                &ADMIN_FUNCTIONS_INVOCATION,
+                "governanceAcceptOwner",
+                (deployed.governance_addr, ctm_proxy),
+            )?
+            .with_wallet(owner)
+            .with_timing_label("ctm.accept_owner"),
+        runner
+            .with_script_call(
+                &ADMIN_FUNCTIONS_INVOCATION,
+                "chainAdminAcceptAdmin",
+                (deployed.chain_admin, ctm_proxy),
+            )?
+            .with_wallet(owner)
+            .with_timing_label("ctm.accept_admin"),
+    ];
+    runner.run_scripts(accept_scripts)?;
 
     logger::step("Registering CTM on Bridgehub...");
     let register_input = RegisterCtmInput {

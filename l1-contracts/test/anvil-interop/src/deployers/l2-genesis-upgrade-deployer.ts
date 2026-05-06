@@ -3,7 +3,8 @@ import { relayTx } from "../core/utils";
 import { getAbi, getBytecode } from "../core/contracts";
 import { PREDEPLOY_SYSTEM_CONTRACTS } from "../core/predeploys";
 import type { SystemContractPredeploy } from "../core/predeploys";
-import { INITIAL_BASE_TOKEN_HOLDER_BALANCE, L1_CHAIN_ID, L2_BASE_TOKEN_ADDR, SYSTEM_CONTEXT_ADDR } from "../core/const";
+import { INITIAL_BASE_TOKEN_HOLDER_BALANCE, L2_BASE_TOKEN_ADDR, SYSTEM_CONTEXT_ADDR } from "../core/const";
+import { runtimeConfig } from "../core/runtime-config";
 import type { PriorityRequestData } from "../core/types";
 import { setSettlementLayerViaBootloader } from "../helpers/harness-shims";
 
@@ -86,14 +87,14 @@ export class L2GenesisUpgradeDeployer {
   private async initializeSettlementLayerViaBootloader(chainId: number): Promise<void> {
     const systemContext = new Contract(SYSTEM_CONTEXT_ADDR, systemContextAbi, this.l2Provider);
     const currentSettlementLayerChainId = await systemContext.currentSettlementLayerChainId();
-    if (currentSettlementLayerChainId.eq(L1_CHAIN_ID)) {
+    if (currentSettlementLayerChainId.eq(runtimeConfig.l1ChainId)) {
       console.log(`   Settlement layer already initialized to L1 for chain ${chainId}`);
       return;
     }
 
     await setSettlementLayerViaBootloader({
       provider: this.l2Provider,
-      settlementLayerChainId: L1_CHAIN_ID,
+      settlementLayerChainId: runtimeConfig.l1ChainId,
     });
     console.log(`   Initialized settlement layer to L1 for chain ${chainId}`);
   }

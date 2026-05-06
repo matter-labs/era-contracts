@@ -1,6 +1,69 @@
+use std::collections::HashSet;
+use std::sync::OnceLock;
+
 use serde_json::{json, Value};
 
 use super::runner::ForgeRunner;
+use crate::common::{logger, paths};
+
+/// Source-path prefix used to identify forge "script libraries" that exist
+/// only to support the deploy-scripts during a forge run. They have no
+/// production role; when `forge script --broadcast` runs against a real chain
+/// it CREATE2-deploys them anyway because their `public` library functions
+/// compile as `external`. We strip those CREATE2 deploys from the Safe-bundle
+/// output here so they don't pollute the upgrade Safe bundle (and ultimately
+/// real-chain state).
+const SCRIPT_LIB_SOURCE_PREFIX: &str = "deploy-scripts/";
+
+/// Set of `contractName`s whose compilation target source-path lives under
+/// `SCRIPT_LIB_SOURCE_PREFIX`. Built lazily by walking `<l1-contracts>/out/*.sol/*.json`
+/// on first use, cached for the rest of the process. Returns an empty set if
+/// the artifacts dir can't be read (no filtering happens; safe degradation).
+fn script_only_library_names() -> &'static HashSet<String> {
+    static SET: OnceLock<HashSet<String>> = OnceLock::new();
+    SET.get_or_init(|| {
+        let out_dir = paths::contracts_root().join("l1-contracts").join("out");
+        let mut names = HashSet::new();
+        let walker = match std::fs::read_dir(&out_dir) {
+            Ok(it) => it,
+            Err(_) => return names,
+        };
+        for entry in walker.flatten() {
+            let sol_dir = entry.path();
+            let Ok(inner) = std::fs::read_dir(&sol_dir) else {
+                continue;
+            };
+            for art in inner.flatten() {
+                let p = art.path();
+                if p.extension().and_then(|s| s.to_str()) != Some("json") {
+                    continue;
+                }
+                let Ok(s) = std::fs::read_to_string(&p) else {
+                    continue;
+                };
+                let Ok(meta) = serde_json::from_str::<Value>(&s) else {
+                    continue;
+                };
+                let Some(targets) = meta
+                    .get("metadata")
+                    .and_then(|m| m.get("settings"))
+                    .and_then(|s| s.get("compilationTarget"))
+                    .and_then(|t| t.as_object())
+                else {
+                    continue;
+                };
+                for (src_path, contract_name) in targets {
+                    if src_path.starts_with(SCRIPT_LIB_SOURCE_PREFIX) {
+                        if let Some(n) = contract_name.as_str() {
+                            names.insert(n.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        names
+    })
+}
 
 /// A contiguous run of txs that share a single `from` ("target") — the unit
 /// that can be executed as one Safe Transaction Builder batch.
@@ -97,7 +160,30 @@ pub(crate) fn run_payload_to_cast_transactions(
         None => return Ok(vec![]),
     };
     let mut out = Vec::with_capacity(txs.len());
+    let script_libs = script_only_library_names();
     for (idx, tx) in txs.iter().enumerate() {
+        // Drop forge-emitted CREATE2 deploys for script-only libraries (any
+        // `public` library function under `deploy-scripts/`). They have no
+        // production role and shouldn't end up in the Safe bundle. See
+        // `SCRIPT_LIB_SOURCE_PREFIX`.
+        let tx_type = tx
+            .get("transactionType")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if tx_type == "CREATE2" || tx_type == "CREATE" {
+            if let Some(name) = tx.get("contractName").and_then(|v| v.as_str()) {
+                if script_libs.contains(name) {
+                    let addr = tx
+                        .get("contractAddress")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("?");
+                    logger::info(format!(
+                        "Skipping CREATE2 of script-only library {name} ({addr}) in Safe bundle"
+                    ));
+                    continue;
+                }
+            }
+        }
         let params = tx.get("transaction").unwrap_or(tx);
         let to = match params.get("to").and_then(|v| v.as_str()) {
             Some(s) => s,

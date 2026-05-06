@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::Context;
 use chrono::Utc;
+use ethers::core::abi::Tokenize;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use xshell::{cmd, Shell};
@@ -17,7 +18,6 @@ use crate::common::{
     cmd::{Cmd, CmdResult},
     ethereum::query_chain_id_sync,
     logger, paths,
-    traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
     SharedRunArgs,
 };
@@ -30,15 +30,6 @@ pub struct ForgeScriptRun {
     pub broadcast_file: Option<PathBuf>,
     pub payload: Value,
     pub ts_ms: i64,
-}
-
-impl ForgeScriptRun {
-    pub fn transactions(&self) -> Option<&[Value]> {
-        self.payload
-            .get("transactions")
-            .and_then(|value| value.as_array())
-            .map(|array| array.as_slice())
-    }
 }
 
 /// Encapsulates the full execution environment for forge scripts:
@@ -147,6 +138,12 @@ impl ForgeRunner {
 
     /// Run a forge script.
     pub fn run(&mut self, mut script: ForgeScript) -> anyhow::Result<()> {
+        let start = script
+            .timing_label
+            .as_ref()
+            .map(|_| std::time::Instant::now());
+        let timing_label = script.timing_label.clone();
+
         if script.needs_bridgehub_skip() {
             let skip_path: String = String::from("contracts/bridgehub/*");
             script.args.add_arg(ForgeScriptArg::Skip { skip_path });
@@ -163,30 +160,61 @@ impl ForgeRunner {
         if command_result.is_ok() {
             self.record_run(&script, pre_run_ts_ms)?;
         }
-        Ok(command_result?)
+        command_result?;
+        if let (Some(label), Some(start)) = (timing_label, start) {
+            logger::info(format!("[timing] {label}: {:.2?}", start.elapsed()));
+        }
+        Ok(())
     }
 
-    /// Write `input` to the script's input path, run the script with `wallet` auth,
-    /// then read and return the output. Handles the standard input→forge→output pattern.
-    pub fn run_script<I: SaveConfig, O: ReadConfig>(
-        &mut self,
-        params: &ForgeScriptParams,
-        input: &I,
-        wallet: &Wallet,
-    ) -> anyhow::Result<O> {
-        let input_path = params.input(&self.foundry_scripts_path);
-        input.save(&self.shell, &input_path)?;
+    pub fn run_scripts<I>(&mut self, scripts: I) -> anyhow::Result<()>
+    where
+        I: IntoIterator<Item = ForgeScript>,
+    {
+        for script in scripts {
+            self.run(script)?;
+        }
+        Ok(())
+    }
 
-        let forge = Forge::new(&self.foundry_scripts_path)
-            .script(&params.script(), self.forge_args.clone())
-            .with_ffi()
+    pub fn script(&self, invocation: &ForgeScriptParams) -> ForgeScript {
+        let mut forge = Forge::new(&self.foundry_scripts_path)
+            .script(&invocation.script(), self.forge_args.clone());
+
+        if invocation.ffi() {
+            forge = forge.with_ffi();
+        }
+        if invocation.rpc_url() {
+            forge = forge.with_rpc_url(self.rpc_url.clone());
+        }
+        if let Some(gas_limit) = invocation.gas_limit() {
+            forge = forge.with_gas_limit(gas_limit);
+        }
+
+        forge
+    }
+
+    pub fn with_script_call<T: Tokenize>(
+        &self,
+        invocation: &ForgeScriptParams,
+        function: &str,
+        args: T,
+    ) -> anyhow::Result<ForgeScript> {
+        let Some(contract) = invocation.abi() else {
+            anyhow::bail!(
+                "script {:?} does not have an ABI registered",
+                invocation.script()
+            );
+        };
+        self.script(invocation)
+            .with_contract_call(contract, function, args)
+            .map(ForgeScript::with_broadcast)
+    }
+
+    pub fn script_path_from_root(&self, root: &Path, script_path: &Path) -> ForgeScript {
+        Forge::new(root)
+            .script(script_path, self.forge_args.clone())
             .with_rpc_url(self.rpc_url.clone())
-            .with_wallet(wallet);
-
-        self.run(forge)?;
-
-        let output_path = params.output(&self.foundry_scripts_path);
-        O::read(&self.shell, output_path)
     }
 
     fn execute(

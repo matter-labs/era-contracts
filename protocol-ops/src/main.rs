@@ -14,7 +14,7 @@ mod config;
 mod types;
 
 pub mod abi;
-pub mod admin_functions;
+pub mod abi_contracts;
 mod commands;
 
 #[derive(Parser, Debug)]

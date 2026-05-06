@@ -749,10 +749,10 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         address proxyAddress,
         address newImplementationAddress
     ) internal virtual returns (Call memory call) {
-        require(coreAddresses.shared.transparentProxyAdmin != address(0), "transparentProxyAdmin not newConfigured");
+        require(ctmAddresses.admin.transparentProxyAdmin != address(0), "ctm transparentProxyAdmin not set");
 
         call = Call({
-            target: coreAddresses.shared.transparentProxyAdmin,
+            target: ctmAddresses.admin.transparentProxyAdmin,
             data: abi.encodeCall(
                 ProxyAdmin.upgrade,
                 (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress)
