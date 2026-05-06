@@ -3,7 +3,7 @@ mod runner;
 mod script;
 use std::path::{Path, PathBuf};
 
-pub use cast_transactions::all_runs_cast_transactions;
+pub use cast_transactions::{split_into_bundles, SafeBundle};
 pub use runner::ForgeRunner;
 pub use script::{ForgeScript, ForgeScriptArg, ForgeScriptArgs};
 

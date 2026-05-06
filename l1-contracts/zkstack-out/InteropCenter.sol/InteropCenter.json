@@ -487,24 +487,6 @@
   },
   {
     "type": "function",
-    "name": "updateL2",
-    "inputs": [
-      {
-        "name": "_l1ChainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_owner",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "zkToken",
     "inputs": [],
     "outputs": [

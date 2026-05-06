@@ -6,6 +6,8 @@ export const ETH_TOKEN_ADDRESS = "0x0000000000000000000000000000000000000001";
 export const SYSTEM_CONTEXT_ADDR = "0x000000000000000000000000000000000000800b";
 export const L2_TO_L1_MESSENGER_ADDR = "0x0000000000000000000000000000000000008008";
 export const L2_BASE_TOKEN_ADDR = "0x000000000000000000000000000000000000800a";
+export const L2_CONTRACT_DEPLOYER_ADDR = "0x0000000000000000000000000000000000008006";
+export const L2_FORCE_DEPLOYER_ADDR = "0x0000000000000000000000000000000000008007";
 export const L2_COMPLEX_UPGRADER_ADDR = "0x000000000000000000000000000000000000800f";
 export const L2_GENESIS_UPGRADE_ADDR = "0x0000000000000000000000000000000000010001";
 
@@ -14,6 +16,7 @@ export const L2_ASSET_ROUTER_ADDR = "0x0000000000000000000000000000000000010003"
 export const L2_NATIVE_TOKEN_VAULT_ADDR = "0x0000000000000000000000000000000000010004";
 export const L2_MESSAGE_ROOT_ADDR = "0x0000000000000000000000000000000000010005";
 export const L2_WRAPPED_BASE_TOKEN_IMPL_ADDR = "0x0000000000000000000000000000000000010007";
+export const L2_INTEROP_ROOT_STORAGE_ADDR = "0x0000000000000000000000000000000000010008";
 export const L2_MESSAGE_VERIFICATION_ADDR = "0x0000000000000000000000000000000000010009";
 export const L2_CHAIN_ASSET_HANDLER_ADDR = "0x000000000000000000000000000000000001000a";
 export const L2_NTV_BEACON_DEPLOYER_ADDR = "0x000000000000000000000000000000000001000b";
@@ -45,6 +48,10 @@ export const ANVIL_FUND_BALANCE = "0x56BC75E2D63100000";
 export const INTEROP_SEND_BUNDLE_GAS_LIMIT = 500_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
 
+// Default TestnetERC20Token deployment parameters for interop test helpers
+export const TEST_TOKEN_DECIMALS = 18;
+export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
+
 export const INTEROP_BUNDLE_TUPLE_TYPE =
   "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool))";
 
@@ -68,6 +75,12 @@ export const CHAIN_ID_LEAF_PADDING = "0x39bc69363bb9e26cf14240de4e22569e95cf175c
 // L2 bootloader address (used for failed deposit logs)
 export const L2_BOOTLOADER_ADDR = "0x0000000000000000000000000000000000008001";
 
+// NTV (L2NativeTokenVault) storage slot numbers.
+// Obtained via: forge inspect L2NativeTokenVault storageLayout
+export const NTV_WETH_TOKEN_SLOT = 251;
+export const NTV_L1_CHAIN_ID_SLOT = 253;
+export const NTV_L2_TOKEN_PROXY_BYTECODE_HASH_SLOT = 255;
+
 // Event signatures
 // GenesisUpgrade(address indexed, L2CanonicalTransaction, uint256 indexed, bytes[])
 export const GENESIS_UPGRADE_EVENT_SIG =
@@ -76,3 +89,26 @@ export const NEW_PRIORITY_REQUEST_EVENT_SIG =
   "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])";
 export const L1_MESSAGE_SENT_EVENT_SIG = "L1MessageSent(address,bytes32,bytes)";
 export const FINALIZE_DEPOSIT_SIG = "finalizeDeposit(uint256,bytes32,bytes)";
+
+// Anvil account #2 — used as a secondary distinct recipient
+export const ANVIL_ACCOUNT2_ADDR = "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC";
+// Anvil account #2 private key
+export const ANVIL_ACCOUNT2_PRIVATE_KEY = "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a";
+
+// ── Interop enums (mirror Solidity Messaging.sol) ──────────────
+
+export enum BundleStatus {
+  Unreceived = 0,
+  Verified = 1,
+  FullyExecuted = 2,
+  Unbundled = 3,
+}
+
+export enum CallStatus {
+  Unprocessed = 0,
+  Executed = 1,
+  Cancelled = 2,
+}
+
+// Selector for a non-existent function: someVeryUnfortunateCall()
+export const FAILING_CALL_CALLDATA = "0x00056d83";

@@ -5,28 +5,38 @@ import {console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../utils/Utils.sol";
 import {BytecodeUtils} from "../utils/bytecode/BytecodeUtils.s.sol";
 import {
+    GW_ASSET_TRACKER_ADDR,
     L2_ASSET_ROUTER_ADDR,
+    L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
     L2_BRIDGEHUB_ADDR,
     L2_CHAIN_ASSET_HANDLER_ADDR,
+    L2_INTEROP_CENTER_ADDR,
+    L2_INTEROP_HANDLER_ADDR,
     L2_INTEROP_ROOT_STORAGE,
     L2_MESSAGE_ROOT_ADDR,
     L2_MESSAGE_VERIFICATION,
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
 } from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
+import {L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ContractsBytecodesLib} from "../utils/bytecode/ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
+import {
+    CoreContract,
+    EraVmSystemContract,
+    Language,
+    ZkSyncOsSystemContract,
+    ZKsyncOSUpgradeType
+} from "../ecosystem/CoreContract.sol";
+import {CoreOnGatewayHelper} from "../ecosystem/CoreOnGatewayHelper.sol";
+import {DeduplicateBytecodesCountMismatch} from "../ecosystem/DeployScriptErrors.sol";
+import {EraForceDeploymentsLib} from "./default-upgrade/EraForceDeploymentsLib.sol";
 
-// solhint-disable no-console, gas-custom-errors
-
-/// @notice Enum representing the programming language of the contract
-enum Language {
-    Solidity,
-    Yul
-}
+// solhint-disable no-console
 
 /// @notice Struct representing a system contract's details
 struct SystemContract {
@@ -39,232 +49,36 @@ struct SystemContract {
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
 uint256 constant SYSTEM_CONTRACTS_COUNT = 30;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
-uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 9;
+uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 13;
+/// @dev System contracts (0x800x) with l1-contracts EVM bytecodes for ZKsyncOS proxy upgrades.
+uint256 constant ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT = 3;
+
+/// @notice A built-in contract's identity plus its Era bytecode.
+struct BuiltinContractDeployInfo {
+    CoreContract id;
+    address addr;
+    bytes bytecode;
+}
 
 library SystemContractsProcessing {
-    /// @notice Retrieves the entire list of system contracts as a memory array
+    /// @notice Retrieves the entire list of system contracts as a memory array.
     /// @dev Note that it does not include all built-in contracts. Rather all those
     /// that are based in the `system-contracts` folder.
+    /// Note, that we do not populate the system contract for the genesis upgrade address,
+    /// as it is used during the genesis upgrade or during upgrades (and so it should be populated
+    /// as part of the upgrade script).
     /// @return An array of SystemContract structs containing all system contracts
     function getSystemContracts() public pure returns (SystemContract[] memory) {
-        // Initialize the in-memory array
         SystemContract[] memory systemContracts = new SystemContract[](SYSTEM_CONTRACTS_COUNT);
-        uint256 i = 0;
-
-        // Populate the array with system contract details
-        // Populate the array with system contract details using named parameters
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000000000,
-            codeName: "EmptyContract",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000000001,
-            codeName: "Ecrecover",
-            lang: Language.Yul,
-            isPrecompile: true
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000000002,
-            codeName: "SHA256",
-            lang: Language.Yul,
-            isPrecompile: true
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000000004,
-            codeName: "Identity",
-            lang: Language.Yul,
-            isPrecompile: true
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000000006,
-            codeName: "EcAdd",
-            lang: Language.Yul,
-            isPrecompile: true
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000000007,
-            codeName: "EcMul",
-            lang: Language.Yul,
-            isPrecompile: true
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000000008,
-            codeName: "EcPairing",
-            lang: Language.Yul,
-            isPrecompile: true
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000000005,
-            codeName: "Modexp",
-            lang: Language.Yul,
-            isPrecompile: true
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000008001,
-            codeName: "EmptyContract",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000008002,
-            codeName: "AccountCodeStorage",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000008003,
-            codeName: "NonceHolder",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000008004,
-            codeName: "KnownCodesStorage",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000008005,
-            codeName: "ImmutableSimulator",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000008006,
-            codeName: "ContractDeployer",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000008008,
-            codeName: "L1Messenger",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000008009,
-            codeName: "MsgValueSimulator",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x000000000000000000000000000000000000800A,
-            codeName: "L2BaseToken",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x000000000000000000000000000000000000800B,
-            codeName: "SystemContext",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x000000000000000000000000000000000000800c,
-            codeName: "BootloaderUtilities",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x000000000000000000000000000000000000800d,
-            codeName: "EventWriter",
-            lang: Language.Yul,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x000000000000000000000000000000000000800E,
-            codeName: "Compressor",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000008010,
-            codeName: "Keccak256",
-            lang: Language.Yul,
-            isPrecompile: true
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000008012,
-            codeName: "CodeOracle",
-            lang: Language.Yul,
-            isPrecompile: true
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000008013,
-            codeName: "EvmGasManager",
-            lang: Language.Yul,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000008014,
-            codeName: "EvmPredeploysManager",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000008015,
-            codeName: "EvmHashesStorage",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000000100,
-            codeName: "P256Verify",
-            lang: Language.Yul,
-            isPrecompile: true
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000008011,
-            codeName: "PubdataChunkPublisher",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000010000,
-            codeName: "Create2Factory",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-        systemContracts[i++] = SystemContract({
-            addr: 0x0000000000000000000000000000000000010006,
-            codeName: "SloadContract",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-        // Note, that we do not populate the system contract for the genesis upgrade address,
-        // as it is used during the genesis upgrade or during upgrades (and so it should be populated
-        // as part of the upgrade script).
-
+        for (uint256 i = 0; i < SYSTEM_CONTRACTS_COUNT; i++) {
+            EraVmSystemContract id = EraVmSystemContract(i);
+            systemContracts[i] = SystemContract({
+                addr: CoreOnGatewayHelper._resolveAddress(id),
+                codeName: CoreOnGatewayHelper._resolveContractName(id),
+                lang: CoreOnGatewayHelper._resolveLanguage(id),
+                isPrecompile: CoreOnGatewayHelper._resolveIsPrecompile(id)
+            });
+        }
         return systemContracts;
     }
 
@@ -305,7 +119,7 @@ library SystemContractsProcessing {
         }
 
         // Sanity check
-        require(included == toInclude, "Internal error: included != toInclude");
+        require(included == toInclude, DeduplicateBytecodesCountMismatch());
     }
 
     function getSystemContractsBytecodes() internal view returns (bytes[] memory result) {
@@ -348,99 +162,85 @@ library SystemContractsProcessing {
         }
     }
 
-    function getOtherContractsBytecodes() internal view returns (bytes[] memory result) {
-        result = new bytes[](OTHER_BUILT_IN_CONTRACTS_COUNT);
-
-        result[0] = ContractsBytecodesLib.getCreationCodeEra("L2Bridgehub");
-        result[1] = ContractsBytecodesLib.getCreationCodeEra("L2AssetRouter");
-        result[2] = ContractsBytecodesLib.getCreationCodeEra("L2NativeTokenVault");
-        result[3] = ContractsBytecodesLib.getCreationCodeEra("L2MessageRoot");
-        result[4] = ContractsBytecodesLib.getCreationCodeEra("L2WrappedBaseToken");
-        result[5] = ContractsBytecodesLib.getCreationCodeEra("L2MessageVerification");
-        result[6] = ContractsBytecodesLib.getCreationCodeEra("L2ChainAssetHandler");
-        result[7] = ContractsBytecodesLib.getCreationCodeEra("L2InteropRootStorage");
-        result[8] = ContractsBytecodesLib.getCreationCodeEra("BaseTokenHolder");
+    /// @notice The list of CoreContract entries that are "other built-in" contracts.
+    function getOtherBuiltinCoreContracts() internal pure returns (CoreContract[] memory ids) {
+        ids = new CoreContract[](OTHER_BUILT_IN_CONTRACTS_COUNT);
+        ids[0] = CoreContract.L2Bridgehub;
+        ids[1] = CoreContract.L2AssetRouter;
+        ids[2] = CoreContract.L2NativeTokenVault;
+        ids[3] = CoreContract.L2MessageRoot;
+        ids[4] = CoreContract.L2WrappedBaseToken;
+        ids[5] = CoreContract.L2MessageVerification;
+        ids[6] = CoreContract.L2ChainAssetHandler;
+        ids[7] = CoreContract.L2InteropRootStorage;
+        ids[8] = CoreContract.BaseTokenHolder;
+        ids[9] = CoreContract.L2AssetTracker;
+        ids[10] = CoreContract.InteropCenter;
+        ids[11] = CoreContract.InteropHandler;
+        ids[12] = CoreContract.GWAssetTracker;
     }
 
-    /// Note, that while proper initialization may require multiple steps,
-    /// those will be conducted inside a specialized upgrade. We still provide
-    /// these force deployments here for the sake of consistency
+    /// @notice System contracts that have l1-contracts EVM bytecodes and need ZKsyncOS proxy upgrades.
+    /// @dev Separate from getOtherBuiltinCoreContracts because Era handles these via getSystemContractsForceDeployments.
+    ///      ContractDeployer (0x8006) is intentionally excluded: it's a sequencer hook dispatcher,
+    ///      not a wrappable contract. Attempting to force-deploy a SystemContractProxy at 0x8006
+    ///      and then calling forceInitAdmin on it hits the hook with an unknown selector and reverts.
+    function getZKsyncOSExtraSystemContracts() internal pure returns (ZkSyncOsSystemContract[] memory ids) {
+        ids = new ZkSyncOsSystemContract[](ZKOS_EXTRA_SYSTEM_CONTRACTS_COUNT);
+        ids[0] = ZkSyncOsSystemContract.L2BaseToken;
+        ids[1] = ZkSyncOsSystemContract.L1Messenger;
+        ids[2] = ZkSyncOsSystemContract.SystemContext;
+    }
+
+    /// @notice Returns address+bytecode pairs for all "other built-in" contracts.
+    /// @dev Loads Era (zkout) bytecodes.
+    function getOtherBuiltinContracts() internal view returns (BuiltinContractDeployInfo[] memory contracts) {
+        CoreContract[] memory ids = getOtherBuiltinCoreContracts();
+        contracts = new BuiltinContractDeployInfo[](ids.length);
+        for (uint256 i = 0; i < ids.length; i++) {
+            string memory eraName = CoreOnGatewayHelper._resolveContractName(false, ids[i]);
+            contracts[i] = BuiltinContractDeployInfo({
+                id: ids[i],
+                addr: CoreOnGatewayHelper._resolveAddress(ids[i]),
+                bytecode: ContractsBytecodesLib.getCreationCodeEra(eraName)
+            });
+        }
+    }
+
+    /// @notice Build Era-style ForceDeployment[] from the built-in contracts list.
     function getOtherBuiltinForceDeployments(
         uint256 l1ChainId,
         address owner
     ) internal view returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
-        forceDeployments = new IL2ContractDeployer.ForceDeployment[](OTHER_BUILT_IN_CONTRACTS_COUNT);
-        bytes[] memory bytecodes = getOtherContractsBytecodes();
+        BuiltinContractDeployInfo[] memory contracts = getOtherBuiltinContracts();
+        forceDeployments = new IL2ContractDeployer.ForceDeployment[](contracts.length);
 
-        forceDeployments[0] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[0]),
-            newAddress: L2_BRIDGEHUB_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[1] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[1]),
-            newAddress: L2_ASSET_ROUTER_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[2] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[2]),
-            newAddress: L2_NATIVE_TOKEN_VAULT_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[3] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[3]),
-            newAddress: L2_MESSAGE_ROOT_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[4] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[4]),
-            newAddress: L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[5] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[5]),
-            newAddress: address(L2_MESSAGE_VERIFICATION),
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[6] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[6]),
-            newAddress: L2_CHAIN_ASSET_HANDLER_ADDR,
-            callConstructor: true,
-            value: 0,
-            input: abi.encode(
-                l1ChainId,
-                AddressAliasHelper.applyL1ToL2Alias(owner),
-                L2_BRIDGEHUB_ADDR,
-                L2_ASSET_ROUTER_ADDR,
-                L2_MESSAGE_ROOT_ADDR
-            )
-        });
-        forceDeployments[7] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[7]),
-            newAddress: address(L2_INTEROP_ROOT_STORAGE),
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
-        forceDeployments[8] = IL2ContractDeployer.ForceDeployment({
-            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[8]),
-            newAddress: L2_BASE_TOKEN_HOLDER_ADDR,
-            callConstructor: false,
-            value: 0,
-            input: ""
-        });
+        for (uint256 i = 0; i < contracts.length; i++) {
+            forceDeployments[i] = IL2ContractDeployer.ForceDeployment({
+                bytecodeHash: L2ContractHelper.hashL2Bytecode(contracts[i].bytecode),
+                newAddress: contracts[i].addr,
+                callConstructor: false,
+                value: 0,
+                input: ""
+            });
+        }
+
+        // Special case: L2ChainAssetHandler needs an initializer call after force deployment.
+        // Find it by address rather than hardcoding an array index.
+        for (uint256 i = 0; i < contracts.length; i++) {
+            if (contracts[i].addr == L2_CHAIN_ASSET_HANDLER_ADDR) {
+                forceDeployments[i].callConstructor = true;
+                // solhint-disable-next-line func-named-parameters
+                forceDeployments[i].input = abi.encode(
+                    l1ChainId,
+                    AddressAliasHelper.applyL1ToL2Alias(owner),
+                    L2_BRIDGEHUB_ADDR,
+                    L2_ASSET_ROUTER_ADDR,
+                    L2_MESSAGE_ROOT_ADDR
+                );
+                break;
+            }
+        }
     }
 
     function forceDeploymentsToHashes(
@@ -475,17 +275,6 @@ library SystemContractsProcessing {
         }
     }
 
-    function getBaseForceDeployments()
-        internal
-        view
-        returns (
-            // For purpose of making compilation of earlier upgrade scripts possible.
-            IL2ContractDeployer.ForceDeployment[] memory forceDeployments
-        )
-    {
-        getBaseForceDeployments(0, address(0));
-    }
-
     function getBaseForceDeployments(
         uint256 l1ChainId,
         address owner
@@ -499,7 +288,32 @@ library SystemContractsProcessing {
         forceDeployments = mergeForceDeployments(systemForceDeployments, otherForceDeployments);
     }
 
-    function getBaseListOfDependencies() internal view returns (bytes[] memory factoryDeps) {
+    function getBaseListOfDependencies(bool _isZKsyncOS) internal view returns (bytes[] memory factoryDeps) {
+        if (_isZKsyncOS) {
+            // ZKsyncOS has no bootloader / DefaultAccount / EVM emulator — those
+            // are Era-VM concepts.
+            //
+            // Two additional baselines, neither in the CoreContract enum:
+            //  - `SystemContractProxy`: every `updateZKsyncOSContract` call that needs
+            //    to materialize a proxy at a previously-empty system address force-deploys
+            //    this bytecode.
+            //  - `SystemContractProxyAdmin` (at 0x1000c): force-deployed once during every
+            //    upgrade via `_buildZKsyncOSProxyAdminEntry`, so its preimage must be
+            //    published too.
+            factoryDeps = new bytes[](2);
+            factoryDeps[0] = BytecodeUtils.readDeployedBytecodeL1(
+                true,
+                "SystemContractProxy.sol",
+                "SystemContractProxy"
+            );
+            factoryDeps[1] = BytecodeUtils.readDeployedBytecodeL1(
+                true,
+                "SystemContractProxyAdmin.sol",
+                "SystemContractProxyAdmin"
+            );
+            return factoryDeps;
+        }
+
         // Note that it is *important* that these go first in this exact order,
         // since the server will rely on it.
         bytes[] memory basicBytecodes = new bytes[](3);
@@ -508,8 +322,109 @@ library SystemContractsProcessing {
         basicBytecodes[2] = Utils.getEvmEmulatorBytecodeHash();
 
         bytes[] memory systemBytecodes = getSystemContractsBytecodes();
-        bytes[] memory otherBytecodes = getOtherContractsBytecodes();
+        BuiltinContractDeployInfo[] memory otherContracts = getOtherBuiltinContracts();
+        bytes[] memory otherBytecodes = new bytes[](otherContracts.length);
+        for (uint256 i = 0; i < otherContracts.length; i++) {
+            otherBytecodes[i] = otherContracts[i].bytecode;
+        }
 
         factoryDeps = mergeBytesArrays(mergeBytesArrays(basicBytecodes, systemBytecodes), otherBytecodes);
+    }
+
+    /// @notice Build the base ZKsyncOS force deployment array.
+    /// Parallel to `getBaseForceDeployments()` for Era — this is the ZKsyncOS equivalent.
+    /// Loads bytecode info per contract instead of materializing one large shared cache for this path.
+    function getBaseZKsyncOSForceDeployments()
+        internal
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory deployments)
+    {
+        CoreContract[] memory builtins = getOtherBuiltinCoreContracts();
+        ZkSyncOsSystemContract[] memory sysContracts = getZKsyncOSExtraSystemContracts();
+        uint256 totalBase = builtins.length + sysContracts.length + 1;
+
+        deployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](totalBase);
+
+        // Built-in contracts (0x10000+)
+        for (uint256 i = 0; i < builtins.length; i++) {
+            deployments[i] = _buildZKsyncOSEntry(builtins[i]);
+        }
+        // System contracts with l1-contracts EVM bytecodes (0x800x)
+        for (uint256 i = 0; i < sysContracts.length; i++) {
+            deployments[builtins.length + i] = _buildZKsyncOSEntryForSystemContract(sysContracts[i]);
+        }
+        // ProxyAdmin is direct-deployed on ZKsyncOS genesis and must also be available during upgrades.
+        deployments[totalBase - 1] = _buildZKsyncOSProxyAdminEntry();
+    }
+
+    function mergeUniversalForceDeployments(
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _left,
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _right
+    ) internal pure returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory result) {
+        result = new IComplexUpgrader.UniversalContractUpgradeInfo[](_left.length + _right.length);
+        for (uint256 i = 0; i < _left.length; i++) {
+            result[i] = _left[i];
+        }
+        for (uint256 i = 0; i < _right.length; i++) {
+            result[_left.length + i] = _right[i];
+        }
+    }
+
+    /// @dev Build a single ZKsyncOS force deployment entry for a CoreContract (user-space built-in).
+    function _buildZKsyncOSEntry(
+        CoreContract _id
+    ) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
+        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolve(true, _id);
+
+        // L2WrappedBaseToken sits directly at L2_WRAPPED_BASE_TOKEN_IMPL_ADDR as the
+        // implementation contract — it's *not* behind a TransparentUpgradeableProxy.
+        // User-space WETH proxies reference this address directly. So its upgrade is
+        // a plain bytecode replacement (Unsafe), not a system-proxy upgrade.
+        if (_id == CoreContract.L2WrappedBaseToken) {
+            return
+                IComplexUpgrader.UniversalContractUpgradeInfo({
+                    upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+                    deployedBytecodeInfo: Utils.getZKOSBytecodeInfoForContract(fileName, contractName),
+                    newAddress: CoreOnGatewayHelper._resolveAddress(_id)
+                });
+        }
+
+        bytes memory bytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
+
+        return
+            IComplexUpgrader.UniversalContractUpgradeInfo({
+                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
+                deployedBytecodeInfo: bytecodeInfo,
+                newAddress: CoreOnGatewayHelper._resolveAddress(_id)
+            });
+    }
+
+    /// @dev Build a single ZKsyncOS force deployment entry for a ZkSyncOsSystemContract.
+    function _buildZKsyncOSEntryForSystemContract(
+        ZkSyncOsSystemContract _id
+    ) private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
+        address addr = CoreOnGatewayHelper._resolveZkOsSystemContractAddress(_id);
+        (string memory fileName, string memory contractName) = CoreOnGatewayHelper.resolveZkOsSystemContract(_id);
+        bytes memory bytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo(fileName, contractName);
+
+        return
+            IComplexUpgrader.UniversalContractUpgradeInfo({
+                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
+                deployedBytecodeInfo: bytecodeInfo,
+                newAddress: addr
+            });
+    }
+
+    function _buildZKsyncOSProxyAdminEntry() private returns (IComplexUpgrader.UniversalContractUpgradeInfo memory) {
+        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract(
+            "SystemContractProxyAdmin.sol",
+            "SystemContractProxyAdmin"
+        );
+
+        return
+            IComplexUpgrader.UniversalContractUpgradeInfo({
+                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+                deployedBytecodeInfo: bytecodeInfo,
+                newAddress: L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
+            });
     }
 }

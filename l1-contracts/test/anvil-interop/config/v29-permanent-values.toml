@@ -2,11 +2,15 @@ era_chain_id = 10
 
 is_zk_sync_os = true
 
+# Dummy ZK token asset ID for test fixtures. On mainnet this would be
+# DataEncoding.encodeNTVAssetId(l1ChainId, zkTokenL1Address).
+zk_token_asset_id = "0x0000000000000000000000000000000000000000000000000000000000000001"
+
 [core_contracts]
-bridgehub_proxy_addr = "0xa8c43993c2895D5c6409D79d7a1E4ac773f708b6"
+bridgehub_proxy_addr = "0x6Cc160222EaFE8498E336f57b4f97303aD6d72CB"
 
 [ctm_contracts]
-ctm_proxy_addr = "0x06264314F4b1629aCf8C247491CA98CfB10e7eeF"
+ctm_proxy_addr = "0x1bbfe0aF215c21A824681a1Df59F0BA6023d35AD"
 rollup_da_manager = "0x0000000000000000000000000000000000000000"
 l1_bytecodes_supplier_addr = "0x0000000000000000000000000000000000000000"
 

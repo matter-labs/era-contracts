@@ -39,7 +39,8 @@ interface IComplexUpgrader {
     }
 
     /// @notice Executes an upgrade process by delegating calls to another contract.
-    /// @dev Compatible with Era only.
+    /// @dev Compatible with Era only. Deprecated from V32 onwards — use forceDeployAndUpgradeUniversal
+    /// instead, which supports both Era (via EraForceDeployment) and ZKsyncOS chain types.
     /// @param _forceDeployments the list of initial deployments that should be performed before the upgrade.
     /// They would typically, though not necessarily include the deployment of the upgrade implementation itself.
     /// @param _delegateTo the address of the contract to which the calls will be delegated
