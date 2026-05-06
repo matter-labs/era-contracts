@@ -69,3 +69,61 @@ Commands that support **`--out`** write a **`CommandEnvelope`** snapshot after a
 ## Requirements
 
 You need a working Foundry toolchain (`forge`, `cast`, etc.) and repo contract artifacts as expected by the scripts this tool wraps. From the repo root, `l1-contracts` must be built (`forge build`).
+
+### Running the Protocol Upgrade Verification Tool (PUVT)
+
+The PUVT requires we have already run the upgrade scripts that deploy all new protocol contracts. We can run the PUVT in local (development) mode or against a live chain.
+
+#### PUVT in Local Mode
+
+Start an anvil fork of the L1:
+
+```bash
+anvil --fork-url <l1-rpc-url>
+```
+
+Open a new terminal and run the protocol-ops upgrade tool. `upgrade-prepare` always runs the
+Foundry script against its own temporary fork and writes replayable bundles to `--out`; it does
+not leave its temporary fork running. For local PUVT testing, use an Anvil default account as the
+deployer so the emitted bundles can be replayed with the matching private key:
+
+```bash
+export ANVIL_RPC=http://127.0.0.1:8545
+export ANVIL_DEPLOYER=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+export ANVIL_DEPLOYER_PK=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+
+rm -rf /tmp/v31-stage
+mkdir -p /tmp/v31-stage
+
+./target/release/protocol_ops ecosystem upgrade-prepare \
+  --l1-rpc-url "$ANVIL_RPC" \
+  --ecosystem ../environments/stage/stage.yaml \
+  --deployer-address "$ANVIL_DEPLOYER" \
+  --upgrade-input-path /upgrade-envs/v0.31.0-interopB/stage.toml \
+  --create2-factory-salt 0x83de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb7 \
+  --bytecodes-supplier-address 0x662B8fE285BB3aab483e75Ec46136e01aaa154f9 \
+  --rollup-da-manager-address 0xeb7c0daaddfb52afa05400b489e7497b271d6122 \
+  --is-zk-sync-os false \
+  --governance-toml-out /tmp/v31-stage/governance.toml \
+  --out /tmp/v31-stage/safe
+```
+
+Replay the generated deployment bundles into the persistent Anvil fork:
+
+```bash
+for bundle in /tmp/v31-stage/safe/*.safe.json; do
+  ./target/release/protocol_ops dev execute-safe \
+    --l1-rpc-url "$ANVIL_RPC" \
+    --safe-file "$bundle" \
+    --private-key "$ANVIL_DEPLOYER_PK"
+done
+```
+
+Then run the verifier against the same Anvil fork and the TOML produced by `upgrade-prepare`:
+
+```bash
+./target/release/protocol_ops ecosystem verify-upgrade \
+  --ecosystem-toml ../l1-contracts/script-out/v31-upgrade-ecosystem.toml \
+  --l1-rpc-url "$ANVIL_RPC" \
+  --era-chain-id <era-chain-id>
+```

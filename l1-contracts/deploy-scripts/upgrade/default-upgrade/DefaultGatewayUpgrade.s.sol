@@ -376,6 +376,8 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
         gatewayConfig.gatewayStateTransition.facets.adminFacet = deployGWContract("AdminFacet");
         gatewayConfig.gatewayStateTransition.facets.mailboxFacet = deployGWContract("MailboxFacet");
         gatewayConfig.gatewayStateTransition.facets.gettersFacet = deployGWContract("GettersFacet");
+        gatewayConfig.gatewayStateTransition.facets.migratorFacet = deployGWContract("MigratorFacet");
+        gatewayConfig.gatewayStateTransition.facets.committerFacet = deployGWContract("CommitterFacet");
         gatewayConfig.gatewayStateTransition.facets.diamondInit = deployGWContract("DiamondInit");
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
@@ -638,6 +640,16 @@ contract DefaultGatewayUpgrade is Script, DefaultL2UpgradeStrategy {
             "gateway_state_transition",
             "getters_facet_addr",
             gatewayConfig.gatewayStateTransition.facets.gettersFacet
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "migrator_facet_addr",
+            gatewayConfig.gatewayStateTransition.facets.migratorFacet
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "committer_facet_addr",
+            gatewayConfig.gatewayStateTransition.facets.committerFacet
         );
         vm.serializeAddress(
             "gateway_state_transition",
