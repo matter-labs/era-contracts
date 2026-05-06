@@ -8,6 +8,7 @@ import {
     NewDeadlineExceedsMaxDeadline,
     NewDeadlineNotGreaterThanCurrent,
     TimerAlreadyStarted,
+    TimerNotStarted,
     ZeroAddress
 } from "../common/L1ContractErrors.sol";
 
@@ -87,6 +88,9 @@ contract GovernanceUpgradeTimer is Ownable2Step {
     ///
     /// Reverts with {DeadlineNotYetPassed} error if the current block timestamp is less than `deadline`.
     function checkDeadline() external view {
+        if (deadline == 0) {
+            revert TimerNotStarted();
+        }
         if (block.timestamp < deadline) {
             revert DeadlineNotYetPassed();
         }
