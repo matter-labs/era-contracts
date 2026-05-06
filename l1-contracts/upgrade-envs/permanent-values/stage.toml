@@ -11,6 +11,10 @@ create2_factory_salt = "0x000000000000000000000000000000000000000000000000000000
 
 [core_contracts]
 bridgehub_proxy_addr = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
+# Stage's bridgehub.owner() returns a ProtocolUpgradeHandler (decentralized
+# governance) — no `Ownable.owner()` / no fork-friendly schedule+execute path
+# without guardian sigs. Replay short-circuits via direct anvil impersonation.
+governance_kind = "puh"
 
 [ctm_contracts]
 # Legacy single-CTM (Era) — kept for anvil-interop synthetic-state harnesses
@@ -40,6 +44,26 @@ proxy = "0x73bee414c6e006525f3CceeDf6D8004c0370502E"
 is_zk_sync_os = true
 bytecodes_supplier = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
 rollup_da_manager = "0x461099b710C3Bd538FFF0bB0F817EDA52B5A532b"
+
+# Contracts that currently own a CTM or ProxyAdmin and have no private key —
+# any ownership-transfer call routed through them must be *wrapped* (called by
+# their EOA owner via `executeInstant` / `multicall`) rather than impersonated.
+# Consumed by `protocol-ops` via the `IAdminFunctions.OwnerWrap` registry; see
+# `AdminFunctions.s.sol::ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps`.
+[[ownable_proxies]]
+# Old zkOS `Governance.sol` instance — owns the Atlas (ZKsyncOS) CTM today.
+# Owner = securityCouncil = 0x5555555590930f501c88B73Ea43B3EEb5A71643c (EOA on stage).
+# minDelay = 0, so `scheduleTransparent(op, 0)` + `executeInstant(op)` works
+# in two consecutive txs from the same EOA.
+addr = "0xC66f0B45c05cF654eeC093650FD67865E85E8566"
+kind = "legacy_governance"
+
+[[ownable_proxies]]
+# Legacy OZ `ChainAdmin` (Ownable2Step). Owner = 0x5555…643c (same EOA).
+# Wrapped via `multicall([call], true)`. Registered defensively even though
+# stage's current CTM/ProxyAdmin set doesn't transit through it today.
+addr = "0x933dEA2C4241B1537fDD6da277eA62841B490172"
+kind = "oz_chain_admin"
 
 # Legacy Gateway configuration for settlement layer validation
 # This section contains historical data about chains that settled on the legacy Gateway
