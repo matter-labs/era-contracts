@@ -7,6 +7,7 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
 import {DepositsNotPaused, MigrationInProgress} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 contract UnpauseDepositsTest is MigratorTest {
     event DepositsUnpaused(uint256 chainId);
@@ -25,6 +26,7 @@ contract UnpauseDepositsTest is MigratorTest {
         address admin = utilsFacet.util_getAdmin();
         vm.startPrank(admin);
         migratorFacet.pauseDepositsBeforeInitiatingMigration();
+        vm.stopPrank();
     }
 
     function test_revertWhen_calledByNonAdmin() public {
@@ -92,6 +94,38 @@ contract UnpauseDepositsTest is MigratorTest {
         migratorFacet.unpauseDeposits();
 
         // Read storage to check that the recorded timestamp is reset to 0
+        uint256 pausedDepositsTimestamp = uint256(vm.load(address(migratorFacet), pausedDepositsTimestampSlot));
+        assertEq(pausedDepositsTimestamp, 0);
+    }
+
+    function test_unpauseDepositsOnGateway_RevertWhen_NotGatewayAssetTracker() public {
+        _pauseDeposits();
+        vm.chainId(block.chainid + 1);
+
+        address notGatewayAssetTracker = makeAddr("notGatewayAssetTracker");
+        vm.prank(notGatewayAssetTracker);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notGatewayAssetTracker));
+        migratorFacet.unpauseDepositsOnGateway();
+    }
+
+    function test_unpauseDepositsOnGateway_RevertWhen_DepositsNotPaused() public {
+        vm.chainId(block.chainid + 1);
+
+        vm.prank(GW_ASSET_TRACKER_ADDR);
+        vm.expectRevert(abi.encodeWithSelector(DepositsNotPaused.selector));
+        migratorFacet.unpauseDepositsOnGateway();
+    }
+
+    function test_unpauseDepositsOnGateway_Success() public {
+        _pauseDeposits();
+        uint256 chainId = utilsFacet.util_getChainId();
+
+        vm.chainId(block.chainid + 1);
+        vm.prank(GW_ASSET_TRACKER_ADDR);
+        vm.expectEmit(true, false, false, false);
+        emit DepositsUnpaused(chainId);
+        migratorFacet.unpauseDepositsOnGateway();
+
         uint256 pausedDepositsTimestamp = uint256(vm.load(address(migratorFacet), pausedDepositsTimestampSlot));
         assertEq(pausedDepositsTimestamp, 0);
     }
