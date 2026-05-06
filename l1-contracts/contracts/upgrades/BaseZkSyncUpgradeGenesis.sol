@@ -50,7 +50,7 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
         }
 
         // Since `_newProtocolVersion > previousProtocolVersion`, and both old and new major version is 0,
-        // the difference between minor versions is >= 0.
+        // the difference between minor versions is > 0.
         uint256 minorDelta = newMinorVersion - previousMinorVersion;
 
         // IMPORTANT Genesis Upgrade difference: We never set patchOnly to `true` to allow to put a system upgrade transaction there.

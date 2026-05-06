@@ -320,12 +320,12 @@ abstract contract ChainAssetHandlerBase is
 
     function _setMigrationInProgressOnL1(uint256 _chainId) internal virtual {}
 
-    /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
+    /// @dev IAssetHandler interface, used to receive a chain on the settlement layer.
     /// @param _assetId the assetId of the chain's CTM
     /// @param _bridgehubMintData the data for the mint
     // slither-disable-next-line locked-ether
     function bridgeMint(
-        uint256, // originChainId
+        uint256, // unused originChainId: chain assets are identified by _assetId.
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused whenMigrationsNotPaused {
@@ -335,7 +335,7 @@ abstract contract ChainAssetHandlerBase is
         );
 
         uint256 currentMigrationNumber = migrationNumber[bridgehubMintData.chainId];
-        /// If we are not migrating for the first time, we check that the migration number is correct.
+        // For repeated migrations back to L1, validate the expected migration sequence.
         if (currentMigrationNumber != 0 && block.chainid == _l1ChainId()) {
             require(
                 currentMigrationNumber == MIGRATION_NUMBER_L1_TO_SETTLEMENT_LAYER,
