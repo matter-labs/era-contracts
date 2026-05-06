@@ -35,6 +35,7 @@ const REQUIRED_CONTRACTS = [
   "IRegisterOnAllChains.sol",
   "IGatewayMigrateTokenBalances.sol",
   "IFinalizeUpgrade.sol",
+  "EcosystemUpgrade_v31.s.sol",
   "IL1NativeTokenVault.sol",
   "IL2NativeTokenVault.sol",
   "IL1AssetRouter.sol",
@@ -48,6 +49,7 @@ const REQUIRED_CONTRACTS = [
   "ISetupLegacyBridge.sol",
   "DefaultUpgrade.sol",
   // Used by anvil-interop test suite (contracts.ts)
+  "DummyInteropRecipient.sol",
   "GWAssetTracker.sol",
   "L2Bridgehub.sol",
   "InteropCenter.sol",
@@ -62,6 +64,7 @@ const REQUIRED_CONTRACTS = [
   "TestnetERC20Token.sol",
   "L1AssetRouter.sol",
   "InteropHandler.sol",
+  "IERC7786Attributes.sol",
   "L2ComplexUpgrader.sol",
   "L2GenesisUpgrade.sol",
   "L2MessageRoot.sol",
@@ -86,11 +89,10 @@ async function copyContractAbi(src: string, dest: string): Promise<void> {
     if (entry.isDirectory()) {
       await copyContractAbi(srcPath, destPath);
     } else if (entry.name.endsWith(".json")) {
-      // Read the JSON file, extract the ABI, and write it back
+      // Read the JSON file and reduce it to ABI-only JSON.
       const content = await fs.readFile(srcPath, "utf-8");
       const json = JSON.parse(content);
 
-      // Extract just the ABI field
       if (json.abi) {
         await fs.writeFile(destPath, JSON.stringify(json.abi, null, 2));
       } else {

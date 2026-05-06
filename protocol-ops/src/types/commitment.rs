@@ -16,7 +16,7 @@ pub enum DAValidatorType {
 }
 
 impl DAValidatorType {
-    pub fn to_u8(&self) -> u8 {
+    pub fn to_u8(self) -> u8 {
         match self {
             DAValidatorType::Rollup => 0,
             DAValidatorType::NoDA => 1,

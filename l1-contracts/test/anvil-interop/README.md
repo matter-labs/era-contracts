@@ -73,6 +73,48 @@ ANVIL_INTEROP_SKIP_SETUP=1 ANVIL_INTEROP_SKIP_CLEANUP=1 \
 
 You can also add `.only` to a `describe` or `it` block in the spec file to isolate tests.
 
+## Live Interop State
+
+`ANVIL_INTEROP_LIVE=1` skips Anvil setup and cleanup, writes the normal test manifest at `outputs/live-state/chains.json`
+from live RPCs and env, and runs specs `07`, `08`, and `09` by default. This file is not simulated chain state; it is
+the small manifest the existing specs load for RPC URLs, chain roles, and token addresses. The live setup
+deploys a fresh L1 `TestnetERC20Token`, mints it to `LIVE_SOURCE_PRIVATE_KEY`, deposits it to Chain A through the
+`@matterlabs/zksync-js` viem adapter, and records the resulting L2 token address. Specs derive the token asset ID from
+`L2NativeTokenVault` at execution time.
+
+```bash
+cd contracts/l1-contracts
+
+ANVIL_INTEROP_LIVE=1 \
+LIVE_L1_RPC=<l1-rpc> \
+LIVE_GW_RPC=<gateway-rpc> \
+LIVE_CHAIN_A_RPC=<source-chain-rpc> \
+LIVE_CHAIN_B_RPC=<destination-chain-rpc> \
+LIVE_SOURCE_PRIVATE_KEY=<sender-private-key> \
+LIVE_UNBUNDLER_PRIVATE_KEY=<unbundler-private-key> \
+yarn test:hardhat:interop
+```
+
+Fixed-ZK-fee test coverage discovers the ZK token asset ID from `InteropCenter.ZK_TOKEN_ASSET_ID()` on the source
+chain. If the ZK token has not been bridged there yet, or if the sender's ZK balance is zero, fixed-ZK-fee cases are
+skipped with a warning.
+
+Live environment variables:
+
+| Variable                           | Default / Effect                                                             |
+| ---------------------------------- | ---------------------------------------------------------------------------- |
+| `LIVE_L1_RPC`                      | Required L1 RPC for token deployment and L1->L2 deposits                     |
+| `LIVE_GW_RPC`                      | Required Gateway RPC; chain ID is discovered from this RPC                   |
+| `LIVE_CHAIN_A_RPC`                 | Required source-chain RPC; chain ID is discovered from this RPC              |
+| `LIVE_CHAIN_B_RPC`                 | Required destination-chain RPC; chain ID is discovered from this RPC         |
+| `LIVE_SOURCE_PRIVATE_KEY`          | Required source signer for setup and specs                                   |
+| `LIVE_UNBUNDLER_PRIVATE_KEY`       | Required alternative signer, must be distinct from `LIVE_SOURCE_PRIVATE_KEY` |
+| `LIVE_RECIPIENT_ADDRESS`           | Optional token recipient; defaults to `LIVE_SOURCE_PRIVATE_KEY` wallet       |
+| `LIVE_SECONDARY_RECIPIENT_ADDRESS` | Optional second token recipient; defaults to unbundler wallet                |
+| `LIVE_TEST_TOKEN_NAME`             | `Live Interop Test Token`                                                    |
+| `LIVE_TEST_TOKEN_SYMBOL`           | `LIT`                                                                        |
+| `LIVE_TEST_TOKEN_AMOUNT`           | `1000`, with 18 decimals                                                     |
+
 ## Test Specs
 
 | Spec                         | What it tests                                                                                                                                                |
@@ -200,14 +242,14 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 
 ### Impersonation
 
-| What                          | Who                      | Production equivalent                                                                    |
-| ----------------------------- | ------------------------ | ---------------------------------------------------------------------------------------- |
-| Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade tx                                                           |
-| Interop chain registration    | Default Anvil EOA        | L1 service-tx flow relayed via Bridgehub (impersonated, but contract logic is identical) |
-| GW chain registration         | `ChainAssetHandler`      | Governance flow                                                                          |
-| Settlement layer notification | `L2_BOOTLOADER_ADDR`     | Bootloader at batch start                                                                |
-| Governance calls              | Governance contract      | Multi-sig / timelock                                                                     |
-| GW L2Bridgehub ownership      | Aliased CTM governance   | Shared governance from deployment                                                        |
+| What                          | Who                      | Production equivalent                 |
+| ----------------------------- | ------------------------ | ------------------------------------- |
+| Genesis upgrade relay         | `L2_FORCE_DEPLOYER_ADDR` | Bootloader executes upgrade tx        |
+| Interop chain registration    | Default Anvil EOA        | Real L1 service-tx flow relayed to L2 |
+| GW chain registration         | `ChainAssetHandler`      | Governance flow                       |
+| Settlement layer notification | `L2_BOOTLOADER_ADDR`     | Bootloader at batch start             |
+| Governance calls              | Governance contract      | Multi-sig / timelock                  |
+| GW L2Bridgehub ownership      | Aliased CTM governance   | Shared governance from deployment     |
 
 ### Other Shortcuts
 
@@ -218,7 +260,8 @@ Contracts are first bootstrapped at hardcoded addresses via `anvil_setCode` and 
 - **Interop proofs**: Correct struct shape but empty proof arrays
 - **processLogsAndMessages impersonation**: The diamond proxy is impersonated instead of the operator (production uses the operator role)
 - **Settlement layer notification via impersonation**: `SystemContext.setSettlementLayerChainId` is called by impersonating the bootloader. On ZKsync OS, this is only emitted during actual migration between settlement layers (and during genesis/v31 upgrades), not at every batch
-- **v29 -> v31 upgrade harness**: `run-v29-to-v31-upgrade-test.ts` still applies direct `anvil_setStorageAt` patches to legacy chain state before per-chain upgrade. This is a test-only compatibility bridge, not a production upgrade flow.
+- **v29 -> v31 / v30 -> v31 upgrade harnesses**: `run-v29-to-v31-upgrade-test.ts` and `run-v30-to-v31-upgrade-test.ts` still apply direct `anvil_setStorageAt` patches before per-chain upgrade. Today this clears the lingering pre-v31 genesis-upgrade hash and seeds minimal batch counters (`totalBatchesExecuted = totalBatchesCommitted = 1`) so `saveV31UpgradeChainBatchNumber()` can run. This is a test-only compatibility bridge, not a production upgrade flow.
+- **L2 genesis bootstrap**: `l2-genesis-upgrade-deployer.ts` still bootstraps contract code and base-token balance via Anvil RPC before relaying the real genesis transaction. Production chains get that state directly from genesis.
 - **Temporary upgrade inputs**: the upgrade harness copies v29 config inputs into `test/anvil-interop/outputs/upgrade-harness-inputs/` and passes them to Forge via env overrides. It no longer mutates checked-in `upgrade-envs/.../local.toml`.
 
 ## Adding New Tests

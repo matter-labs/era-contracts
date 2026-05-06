@@ -2,7 +2,7 @@
 
 ARG FOUNDRY_ARCH=linux_amd64
 ARG FOUNDRY_ZKSYNC_TAG=nightly-807f47ace7cdd90eed7190dc4481952cfaa25938
-ARG FOUNDRY_VANILLA_VERSION=v1.3.5
+ARG FOUNDRY_VANILLA_VERSION=v1.5.1
 ARG NODE_MAJOR=20
 ARG RUST_TARGET=x86_64-unknown-linux-gnu
 ARG RUST_TOOLCHAIN=nightly-2025-09-19
@@ -16,11 +16,13 @@ FROM lukemathwalker/cargo-chef:latest-rust-1 AS planner
 COPY protocol-ops /src/protocol-ops
 COPY tools/zksync-os-genesis-gen /src/tools/zksync-os-genesis-gen
 COPY tools/wallets-gen /src/tools/wallets-gen
+COPY tools/upgrade-readiness-checker /src/tools/upgrade-readiness-checker
 
 RUN mkdir -p /recipes && \
     cd /src/protocol-ops && cargo chef prepare --recipe-path /recipes/protocol-ops.json && \
     cd /src/tools/zksync-os-genesis-gen && cargo chef prepare --recipe-path /recipes/genesis-gen.json && \
-    cd /src/tools/wallets-gen && cargo chef prepare --recipe-path /recipes/wallets-gen.json
+    cd /src/tools/wallets-gen && cargo chef prepare --recipe-path /recipes/wallets-gen.json && \
+    cd /src/tools/upgrade-readiness-checker && cargo chef prepare --recipe-path /recipes/upgrade-readiness-checker.json
 
 ########################################
 # 2) Build
@@ -87,6 +89,10 @@ WORKDIR /contracts/tools/wallets-gen
 COPY --from=planner /recipes/wallets-gen.json recipe.json
 RUN cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
 
+WORKDIR /contracts/tools/upgrade-readiness-checker
+COPY --from=planner /recipes/upgrade-readiness-checker.json recipe.json
+RUN cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
+
 # === Copy all source code ===
 WORKDIR /contracts
 COPY . /contracts
@@ -106,6 +112,11 @@ RUN cargo build --release --target ${RUST_TARGET} && \
 WORKDIR /contracts/tools/wallets-gen
 RUN cargo build --release --target ${RUST_TARGET} && \
     cp target/${RUST_TARGET}/release/wallets-gen ./ && \
+    rm -rf target
+
+WORKDIR /contracts/tools/upgrade-readiness-checker
+RUN cargo build --release --target ${RUST_TARGET} && \
+    cp target/${RUST_TARGET}/release/upgrade-readiness-checker ./ && \
     rm -rf target
 
 # === Install JS dependencies ===
@@ -129,7 +140,7 @@ RUN yarn --cwd system-contracts build:foundry
 # === Calculate hashes ===
 RUN yarn calculate-hashes:check
 
-# Keep full node_modules — forge ffi scripts need devDependencies (ts-node, etc.)
+# Keep full node_modules — forge ffi scripts depend on packages here (e.g. blakejs).
 
 ########################################
 # 3) Runtime
@@ -140,11 +151,12 @@ ARG NODE_MAJOR
 ARG YARN_VERSION
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    PATH=/contracts/protocol-ops:/contracts/tools/zksync-os-genesis-gen:/contracts/tools/wallets-gen:/usr/local/bin:$PATH \
+    PATH=/contracts/protocol-ops:/contracts/tools/zksync-os-genesis-gen:/contracts/tools/wallets-gen:/contracts/tools/upgrade-readiness-checker:/usr/local/bin:$PATH \
     FOUNDRY_DISABLE_NIGHTLY_WARNING=1 \
+    FOUNDRY_OFFLINE=true \
     XDG_CONFIG_HOME=/etc/xdg
 
-# Runtime deps + Node.js (needed for forge ffi scripts like blake2s256.ts)
+# Runtime deps + Node.js (needed for forge ffi scripts like blake2s256.js)
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates bash openssl jq curl gnupg && \
     curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - && \
@@ -162,6 +174,7 @@ COPY --from=build /root/.svm /root/.svm
 COPY --from=build /contracts/protocol-ops/protocol_ops /contracts/protocol-ops/protocol_ops
 COPY --from=build /contracts/tools/zksync-os-genesis-gen/zksync-os-genesis-gen /contracts/tools/zksync-os-genesis-gen/zksync-os-genesis-gen
 COPY --from=build /contracts/tools/wallets-gen/wallets-gen /contracts/tools/wallets-gen/wallets-gen
+COPY --from=build /contracts/tools/upgrade-readiness-checker/upgrade-readiness-checker /contracts/tools/upgrade-readiness-checker/upgrade-readiness-checker
 
 # === Set new WORKDIR and copy artifacts to /contracts/ ===
 WORKDIR /contracts
@@ -183,4 +196,5 @@ RUN mkdir -p /etc/xdg/zksync-tooling && \
 
 # Sanity
 RUN forge --version && cast --version && anvil --version && protocol_ops --help && \
-    zksync-os-genesis-gen --help && wallets-gen --help && node --version && yarn --version
+    zksync-os-genesis-gen --help && wallets-gen --help && upgrade-readiness-checker --help && \
+    node --version && yarn --version

@@ -10,13 +10,22 @@ use crate::common::forge::{Forge, ForgeRunner, ForgeScriptArg};
 use crate::common::logger;
 use crate::common::SharedRunArgs;
 
+/// Set chain-upgrade timestamp.
+///
+/// Drives `AdminFunctions.s.sol::adminScheduleUpgrade(admin, acr, version, ts)`
+/// against a forked anvil and emits a Gnosis Safe Transaction Builder JSON
+/// bundle via `--out`. Apply the bundle separately via
+/// `protocol-ops dev execute-safe` (or any Safe-bundle-aware executor).
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct ChainSetUpgradeTimestampArgs {
-    /// Chain admin address
-    #[clap(long)]
-    pub admin_address: Address,
-    /// AccessControlRestriction contract address
-    #[clap(long)]
+    #[clap(flatten)]
+    #[serde(flatten)]
+    pub topology: crate::common::EcosystemChainArgs,
+
+    /// AccessControlRestriction contract address. Defaults to `0x0…0` for
+    /// Ownable ChainAdmin deployments (i.e. every local-anvil fixture).
+    /// Pass explicitly when the chain uses an access-control-restriction.
+    #[clap(long, default_value = "0x0000000000000000000000000000000000000000")]
     pub access_control_restriction: Address,
     /// New packed protocol version (uint256)
     #[clap(long)]
@@ -31,16 +40,19 @@ pub struct ChainSetUpgradeTimestampArgs {
 }
 
 pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
-    let private_key = args
-        .shared
-        .private_key
-        .ok_or_else(|| anyhow::anyhow!("--private-key is required"))?;
+    let (eco, chain_id) = args.topology.resolve()?;
+    let mut runner = ForgeRunner::new(&args.shared)?;
 
-    let mut runner = ForgeRunner::new(
-        args.shared.simulate,
-        &args.shared.l1_rpc_url,
-        args.shared.forge_args.clone(),
-    )?;
+    let admin_address =
+        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, eco.bridgehub, chain_id)
+            .await
+            .context("resolving chain admin from L1")?;
+    // The Solidity script executes via ChainAdmin, but broadcasts from the
+    // ChainAdmin owner internally. Use that owner as Forge's sender so Foundry
+    // tracks the correct nonce on the anvil fork.
+    let sender = runner
+        .prepare_chain_admin_owner(eco.bridgehub, chain_id)
+        .await?;
 
     let script_path = Path::new("deploy-scripts/AdminFunctions.s.sol");
 
@@ -52,21 +64,24 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         url: runner.rpc_url.clone(),
     });
     script_args.add_arg(ForgeScriptArg::Ffi);
+    // Broadcast against the anvil fork so Forge records txs into its run
+    // file — protocol-ops extracts those into the Safe bundle.
     script_args.add_arg(ForgeScriptArg::Broadcast);
-    script_args.add_arg(ForgeScriptArg::PrivateKey {
-        private_key: format!("{:#x}", private_key),
-    });
     script_args.additional_args.extend([
-        format!("{:#x}", args.admin_address),
+        format!("{:#x}", admin_address),
         format!("{:#x}", args.access_control_restriction),
         args.new_protocol_version.clone(),
         args.upgrade_timestamp.clone(),
     ]);
 
-    let forge = Forge::new(&runner.foundry_scripts_path).script(script_path, script_args);
+    let forge = Forge::new(&runner.foundry_scripts_path)
+        .script(script_path, script_args)
+        .with_wallet(&sender);
 
-    logger::step("Setting chain upgrade timestamp via AdminFunctions.s.sol");
-    logger::info(format!("Admin address: {:#x}", args.admin_address));
+    logger::step(
+        "Preparing set-upgrade-timestamp Safe bundle via AdminFunctions.s.sol (simulation)",
+    );
+    logger::info(format!("Admin address: {:#x}", admin_address));
     logger::info(format!(
         "Access control restriction: {:#x}",
         args.access_control_restriction
@@ -80,7 +95,7 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
 
     runner
         .run(forge)
-        .context("Failed to set upgrade timestamp")?;
+        .context("Failed to prepare set-upgrade-timestamp")?;
 
     write_output_if_requested(
         "chain.set-upgrade-timestamp",
@@ -88,7 +103,7 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         &runner,
         &serde_json::json!({}),
         &serde_json::json!({
-            "admin_address": format!("{:#x}", args.admin_address),
+            "admin_address": format!("{:#x}", admin_address),
             "access_control_restriction": format!("{:#x}", args.access_control_restriction),
             "new_protocol_version": &args.new_protocol_version,
             "upgrade_timestamp": &args.upgrade_timestamp,
@@ -96,6 +111,6 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     )
     .await?;
 
-    logger::success("Set upgrade timestamp completed");
+    logger::success("Set upgrade timestamp prepared");
     Ok(())
 }

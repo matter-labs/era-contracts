@@ -301,7 +301,7 @@ error NotAllowed(address addr);
 // 0x64846fe4
 error NotARestriction(address addr);
 // 0xf306a770
-error NotAssetRouter(address _sender, address _assetRouter);
+error NotAssetRouter(address sender, address assetRouter);
 // 0xb49df1f2
 error NotAZKChain(address addr);
 // 0x7fdf8632
@@ -352,6 +352,8 @@ error PriorityModeRequiresPermanentRollup();
 error PriorityOperationsRollingHashMismatch();
 // 0xbeda0935
 error PriorityOpsRequestTimestampMissing(uint256 requestId);
+// 0xa840274f
+error PriorityQueueNotReady();
 // 0x1a4d284a
 error PriorityTxPubdataExceedsMaxPubDataPerBatch();
 // 0xa461f651
@@ -440,6 +442,8 @@ error Unauthorized(address caller);
 error UndefinedDiamondCutAction();
 // 0x6aa39880
 error UnexpectedSystemLog(uint256 logKey);
+// 0x8124d8ff
+error UnexpectedUpgradeSelector();
 // 0xc352bb73
 error UnknownVerifierType();
 // 0xf3dd1b9c

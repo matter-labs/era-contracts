@@ -82,10 +82,10 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCodeEra.
-        string[52] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[55] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction",
-            /// ??
             "BaseTokenHolder",
+            "GWAssetTracker",
             "L2AssetTracker",
             "L2BaseTokenEra",
             "L2BaseTokenZKOS",
@@ -94,7 +94,7 @@ library ContractsBytecodesLib {
             "BridgedTokenBeacon",
             "L1Bridgehub",
             "L2Bridgehub",
-            "BytecodesSupplier", // ???
+            "BytecodesSupplier",
             "ChainAdmin",
             "ChainAdminOwnable",
             "L1ChainAssetHandler",
@@ -105,7 +105,8 @@ library ContractsBytecodesLib {
             "DiamondInit",
             "DiamondProxy",
             "DefaultUpgrade",
-            "SettlementLayerV31Upgrade",
+            "EraSettlementLayerV31Upgrade",
+            "ZKsyncOSSettlementLayerV31Upgrade",
             "InteropCenter",
             "InteropHandler",
             "EraDualVerifier",
@@ -124,18 +125,19 @@ library ContractsBytecodesLib {
             "L1MessageRoot",
             "L2MessageRoot",
             "PermanentRestriction",
-            "ProxyAdmin", // ??
+            "ProxyAdmin",
             "UpgradeableBeacon",
             "RelayedSLDAValidator",
-            "RollupDAManager", // ???
+            "RollupDAManager",
             "TransparentUpgradeableProxy",
-            "ServerNotifier", // ???
+            "ServerNotifier",
             "ValidatorTimelock",
-            "ValidiumL1DAValidator", // ???
+            "ValidiumL1DAValidator",
             "L2InteropRootStorage",
             "L2MessageVerification",
             "L2V31Upgrade",
-            "UpgradeableBeaconDeployer"
+            "UpgradeableBeaconDeployer",
+            "SystemContractProxyAdmin"
         ];
 
         string[3] memory L2_GENERIC_CONTRACT_IDENTIFIERS = [
@@ -144,7 +146,7 @@ library ContractsBytecodesLib {
             "TimestampAsserter"
         ];
 
-        string[2] memory SYSTEM_CONTRACT_IDENTIFIERS = ["SystemTransparentUpgradeableProxy", "L2V29Upgrade"];
+        string[1] memory SYSTEM_CONTRACT_IDENTIFIERS = ["SystemTransparentUpgradeableProxy"];
 
         // --- Special Cases: System Contracts ---
         // These contracts are typically read from a 'system-contracts' or similar directory.

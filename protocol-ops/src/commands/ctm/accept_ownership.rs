@@ -1,5 +1,5 @@
 use crate::admin_functions::{accept_admin, accept_owner};
-use crate::common::{forge::ForgeRunner, wallets::Wallet};
+use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
 use ethers::types::Address;
 
 /// Input parameters for accepting ownership of CTM contracts.
@@ -17,10 +17,14 @@ pub async fn accept_ownership(
     input: &CtmAcceptOwnershipInput,
 ) -> anyhow::Result<()> {
     // Accept governance ownership of CTM contracts
+    let t = std::time::Instant::now();
     accept_owner(runner, input.governance, auth, input.ctm_proxy).await?;
+    logger::info(format!("[timing] ctm.accept_owner: {:.2?}", t.elapsed()));
 
     // Accept admin ownership of CTM contracts
+    let t = std::time::Instant::now();
     accept_admin(runner, input.chain_admin, auth, input.ctm_proxy).await?;
+    logger::info(format!("[timing] ctm.accept_admin: {:.2?}", t.elapsed()));
 
     Ok(())
 }

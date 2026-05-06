@@ -1,4 +1,4 @@
-use crate::common::{forge::ForgeRunner, wallets::Wallet};
+use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
 use ethers::types::Address;
 
 use crate::admin_functions::{accept_admin, accept_owner_aggregated};
@@ -18,10 +18,17 @@ pub async fn accept_ownership(
     input: &AcceptOwnershipInput,
 ) -> anyhow::Result<()> {
     // Accept admin ownership of Bridgehub contracts
+    let t = std::time::Instant::now();
     accept_admin(runner, input.chain_admin, auth, input.bridgehub).await?;
+    logger::info(format!("[timing] hub.accept_admin: {:.2?}", t.elapsed()));
 
     // Accept governance ownership of Bridgehub contracts
+    let t = std::time::Instant::now();
     accept_owner_aggregated(runner, input.governance, auth, input.bridgehub).await?;
+    logger::info(format!(
+        "[timing] hub.accept_owner_aggregated: {:.2?}",
+        t.elapsed()
+    ));
 
     Ok(())
 }

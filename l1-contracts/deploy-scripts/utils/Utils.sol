@@ -1019,12 +1019,10 @@ library Utils {
     }
 
     function blakeHashBytecode(bytes memory _bytecode) internal returns (bytes32 hashedBytecode) {
-        string[] memory input = new string[](5);
-        input[0] = "yarn";
-        input[1] = "--silent";
-        input[2] = "ts-node";
-        input[3] = "./scripts/blake2s256.ts";
-        input[4] = vm.toString(_bytecode);
+        string[] memory input = new string[](3);
+        input[0] = "node";
+        input[1] = "./scripts/blake2s256.js";
+        input[2] = vm.toString(_bytecode);
         hashedBytecode = bytes32(vm.ffi(input));
     }
 
@@ -1287,14 +1285,39 @@ library Utils {
             ? IOwnable(_admin).owner()
             : IAccessControlDefaultAdminRules(_accessControlRestriction).defaultAdmin();
 
-        // Calculate total ETH required
-        uint256 totalValue;
+        vm.startBroadcast(adminOwner);
+
+        // ChainAdminOwnable.multicall is `onlyOwner` and executes inner calls
+        // as msg.sender = ChainAdmin. External targets (Bridgehub, Diamond, etc.)
+        // recognise ChainAdmin as their admin, so multicall is the right path.
+        // Self-targeted calls (e.g. `setUpgradeTimestamp`) are `onlyOwner` and
+        // would see msg.sender = ChainAdmin != owner EOA, so those must be
+        // called directly from the owner.
+        Call[] memory externalCalls = new Call[](calls.length);
+        uint256 externalCount;
+        uint256 externalValue;
         for (uint256 i = 0; i < calls.length; i++) {
-            totalValue += calls[i].value;
+            if (calls[i].target == _admin) {
+                (bool success, bytes memory returnData) = _admin.call{value: calls[i].value}(calls[i].data);
+                if (!success) {
+                    assembly {
+                        revert(add(returnData, 0x20), mload(returnData))
+                    }
+                }
+            } else {
+                externalCalls[externalCount] = calls[i];
+                externalCount++;
+                externalValue += calls[i].value;
+            }
+        }
+        if (externalCount > 0) {
+            Call[] memory trimmed = new Call[](externalCount);
+            for (uint256 i = 0; i < externalCount; i++) {
+                trimmed[i] = externalCalls[i];
+            }
+            IChainAdmin(_admin).multicall{value: externalValue}(trimmed, true);
         }
 
-        vm.startBroadcast(adminOwner);
-        IChainAdmin(_admin).multicall{value: totalValue}(calls, true);
         vm.stopBroadcast();
     }
 

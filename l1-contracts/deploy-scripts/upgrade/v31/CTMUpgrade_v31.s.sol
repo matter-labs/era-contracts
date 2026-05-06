@@ -5,42 +5,19 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-
-import {Governance} from "contracts/governance/Governance.sol";
-
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
-
-import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-
-import {Call} from "contracts/governance/Common.sol";
-
-import {
-    L2_CHAIN_ASSET_HANDLER_ADDR,
-    L2_COMPLEX_UPGRADER_ADDR,
-    L2_VERSION_SPECIFIC_UPGRADER_ADDR
-} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
-import {StateTransitionDeployedAddresses, ChainCreationParamsConfig} from "../../utils/Types.sol";
 import {Utils} from "../../utils/Utils.sol";
+import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
-import {PublishFactoryDepsResult} from "../default-upgrade/CTMUpgradeBase.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
 import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.sol";
 
 /// @notice Script used for v31 upgrade flow
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
-    bytes internal l2V31UpgradeBytecodeInfo;
-
     /// @notice Deploy everything that should be deployed
     function deployNewCTMContracts() public virtual override {
         (ctmAddresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
@@ -73,103 +50,93 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         deployStateTransitionDiamondFacets();
     }
 
-    /// @notice Override to deploy v31-specific upgrade contract
+    /// @notice Override to deploy the correct v31 upgrade contract based on chain type.
     function deployUsedUpgradeContract() internal virtual override returns (address) {
-        console.log("Deploying SettlementLayerV31Upgrade as the chain upgrade contract");
-        return deploySimpleContract("SettlementLayerV31Upgrade", false);
+        string memory contractName = config.isZKsyncOS
+            ? "ZKsyncOSSettlementLayerV31Upgrade"
+            : "EraSettlementLayerV31Upgrade";
+        console.log("Deploying", contractName);
+        return deploySimpleContract(contractName, false);
     }
 
-    function getForceDeploymentContracts() internal override returns (CoreContract[] memory forceDeploymentContracts) {
-        forceDeploymentContracts = new CoreContract[](1);
-        forceDeploymentContracts[0] = CoreContract.L2V31Upgrade;
+    function getV31AdditionalFactoryDependencyContracts()
+        internal
+        pure
+        returns (CoreContract[] memory additionalDependencyContracts)
+    {
+        additionalDependencyContracts = new CoreContract[](1);
+        additionalDependencyContracts[0] = CoreContract.L2V31Upgrade;
     }
 
-    // FIXME: the logic in this function is only suitable for the dummy upgrade implementation.
-    // Should be rewritten once the full upgrade contract is available.
-    function getL2UpgradeTargetAndData(
-        IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
-    ) internal view virtual override returns (address, bytes memory) {
-        IL1AssetRouter assetRouter = IL1AssetRouter(address(bridgehub.assetRouter()));
-        uint256 chainId = upToDateZkChain.chainId;
-        bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(chainId);
-        INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(address(assetRouter.nativeTokenVault()));
-        uint256 baseTokenOriginChainId = nativeTokenVault.originChainId(baseTokenAssetId);
-        address baseTokenOriginAddress = baseTokenOriginChainId == block.chainid
-            ? bridgehub.baseToken(chainId)
-            : nativeTokenVault.originToken(baseTokenAssetId);
-        bytes memory l2UpgradeCalldata = abi.encodeCall(
-            IL2V31Upgrade.upgrade,
-            (baseTokenOriginChainId, baseTokenOriginAddress)
-        );
+    function getAdditionalFactoryDependencyContracts()
+        internal
+        override
+        returns (CoreContract[] memory additionalDependencyContracts)
+    {
+        return getV31AdditionalFactoryDependencyContracts();
+    }
+
+    function getAdditionalUniversalForceDeployments()
+        internal
+        override
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
+    {
         if (config.isZKsyncOS) {
-            require(l2V31UpgradeBytecodeInfo.length > 0, "L2V31Upgrade bytecode info not prepared");
-            IComplexUpgrader.UniversalContractUpgradeInfo[]
-                memory universalDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
-            universalDeployments[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
-                upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSSystemProxyUpgrade,
-                deployedBytecodeInfo: l2V31UpgradeBytecodeInfo,
-                newAddress: L2_VERSION_SPECIFIC_UPGRADER_ADDR
-            });
-            return (
-                address(L2_COMPLEX_UPGRADER_ADDR),
-                abi.encodeCall(
-                    IComplexUpgrader.forceDeployAndUpgradeUniversal,
-                    (universalDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
+            return getV31AdditionalZKsyncOSUniversalForceDeployments();
+        }
+
+        return buildEraUniversalForceDeployments(getV31AdditionalFactoryDependencyContracts());
+    }
+
+    function getV31L2UpgradeCalldata() internal returns (bytes memory) {
+        // The fixedForceDeploymentsData is ecosystem-wide (same for all chains).
+        // The additionalForceDeploymentsData placeholder is rewritten per-chain by
+        // SettlementLayerV31UpgradeBase._buildL2V31UpgradeCalldata at upgrade time.
+        return
+            abi.encodeCall(
+                IL2V31Upgrade.upgrade,
+                (
+                    config.isZKsyncOS,
+                    coreAddresses.bridgehub.proxies.ctmDeploymentTracker,
+                    generatedData.forceDeploymentsData,
+                    ""
                 )
             );
-        }
-
-        return (
-            address(L2_COMPLEX_UPGRADER_ADDR),
-            abi.encodeCall(
-                IComplexUpgrader.forceDeployAndUpgrade,
-                (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, l2UpgradeCalldata)
-            )
-        );
     }
 
-    // FIXME: should be rewritten to be more generic once the full upgrade is available.
-    function getProposedUpgrade(
-        StateTransitionDeployedAddresses memory stateTransition,
-        ChainCreationParamsConfig memory chainCreationParams,
-        uint256,
-        address,
-        PublishFactoryDepsResult memory _factoryDepsResult,
-        uint256 protocolUpgradeNonce
-    ) public virtual override returns (ProposedUpgrade memory proposedUpgrade) {
-        if (!config.isZKsyncOS) {
-            return
-                super.getProposedUpgrade(
-                    stateTransition,
-                    chainCreationParams,
-                    config.l1ChainId,
-                    config.ownerAddress,
-                    _factoryDepsResult,
-                    protocolUpgradeNonce
-                );
-        }
+    function getEraL2UpgradeTargetAndData(
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
+    ) internal virtual override returns (address, bytes memory) {
+        return
+            getComplexUpgraderTargetAndData(_deployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, getV31L2UpgradeCalldata());
+    }
 
-        // For ZKsyncOS v31 upgrades, upgrade the version-specific upgrader via proxy upgrade.
-        // Prepare bytecode info for getL2UpgradeTargetAndData (used in composeUpgradeTx).
-        l2V31UpgradeBytecodeInfo = Utils.getZKOSProxyUpgradeBytecodeInfo("L2V31Upgrade.sol", "L2V31Upgrade");
-        // ZKsyncOS uses UniversalContractUpgradeInfo instead of ForceDeployment[];
-        // buildUpgradeForceDeployments returns empty for ZKsyncOS.
-        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = buildUpgradeForceDeployments(
-            config.l1ChainId,
-            config.ownerAddress
-        );
-
-        proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: composeUpgradeTx(forceDeployments, _factoryDepsResult, protocolUpgradeNonce),
-            bootloaderHash: chainCreationParams.bootloaderHash,
-            defaultAccountHash: chainCreationParams.defaultAAHash,
-            evmEmulatorHash: chainCreationParams.evmEmulatorHash,
-            verifier: address(0),
-            verifierParams: getEmptyVerifierParams(),
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
-            upgradeTimestamp: 0,
-            newProtocolVersion: chainCreationParams.latestProtocolVersion
+    /// @notice V31-specific: include L2V31Upgrade as an additional ZKsyncOS force deployment.
+    /// @dev L2V31Upgrade is deployed as a standalone contract at the derived random address used as
+    /// the delegate target in `forceDeployAndUpgradeUniversal`, so it uses `ZKsyncOSUnsafeForceDeployment`
+    /// rather than `ZKsyncOSSystemProxyUpgrade`.
+    function getV31AdditionalZKsyncOSUniversalForceDeployments()
+        internal
+        returns (IComplexUpgrader.UniversalContractUpgradeInfo[] memory additional)
+    {
+        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade");
+        additional = new IComplexUpgrader.UniversalContractUpgradeInfo[](1);
+        additional[0] = IComplexUpgrader.UniversalContractUpgradeInfo({
+            upgradeType: IComplexUpgrader.ContractUpgradeType.ZKsyncOSUnsafeForceDeployment,
+            deployedBytecodeInfo: bytecodeInfo,
+            newAddress: L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo)
         });
+    }
+
+    function getZKsyncOSL2UpgradeTargetAndData(
+        IComplexUpgrader.UniversalContractUpgradeInfo[] memory _deployments
+    ) internal virtual override returns (address, bytes memory) {
+        // For ZKsyncOS, the delegateTo address is a derived address (not the constant
+        // L2_VERSION_SPECIFIC_UPGRADER_ADDR) to avoid overwriting existing bytecode.
+        // Must match the newAddress in getV31AdditionalZKsyncOSUniversalForceDeployments.
+        bytes memory bytecodeInfo = Utils.getZKOSBytecodeInfoForContract("L2V31Upgrade.sol", "L2V31Upgrade");
+        address delegateTo = L2GenesisForceDeploymentsHelper.generateRandomAddress(bytecodeInfo);
+
+        return getComplexUpgraderTargetAndData(_deployments, delegateTo, getV31L2UpgradeCalldata());
     }
 }

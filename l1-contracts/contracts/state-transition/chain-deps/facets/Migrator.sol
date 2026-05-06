@@ -138,7 +138,7 @@ contract MigratorFacet is ZKChainBase, IMigrator {
     }
 
     /// @inheritdoc IMigrator
-    function pauseDepositsOnGateway(uint256 _timestamp) external onlyGatewayAssetTracker onlyGateway {
+    function pauseDepositsOnGateway(uint256 _timestamp) external onlyL2ChainAssetHandler onlyGateway {
         s.pausedDepositsTimestamp = _timestamp;
         emit DepositsPaused(s.chainId, _timestamp);
     }

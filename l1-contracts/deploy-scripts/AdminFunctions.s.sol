@@ -37,6 +37,21 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
+/// @dev Protocol version threshold (packed `major << 32`) at which the Admin
+///      facet's `upgradeChainFromVersion` gained the leading `address _chainAddress`
+///      parameter. Chains still on a version below this expose only the legacy
+///      2-arg signature; calling the v31 variant against them hits the DiamondProxy
+///      fallback and reverts with `"F"`.
+uint256 constant V31_UPGRADE_CHAIN_FROM_VERSION_THRESHOLD = uint256(31) << 32;
+
+/// @notice Legacy 2-arg Admin interface used when the chain being upgraded is
+///         still on a pre-v31 protocol version (so its Admin facet only has
+///         the old selector). The abi-encoded call produced via this interface
+///         lands on the old facet; the new 3-arg selector would not.
+interface IAdminLegacy {
+    function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
+}
+
 contract AdminFunctions is Script, IAdminFunctions {
     using stdToml for string;
 
@@ -238,14 +253,16 @@ contract AdminFunctions is Script, IAdminFunctions {
             currentProtocolVersion
         );
 
-        // Execute the upgrade through the admin flow
-        Utils.adminExecute(
-            adminAddr,
-            accessControlRestriction,
-            chainAddress,
-            abi.encodeCall(IAdmin.upgradeChainFromVersion, (chainAddress, currentProtocolVersion, diamondCut)),
-            0
-        );
+        // Select the Admin facet's `upgradeChainFromVersion` signature that
+        // actually lives on the chain we're about to call. Pre-v31 chains
+        // expose the legacy 2-arg variant; v31+ expose the new 3-arg one that
+        // carries `chainAddress`. Using the wrong one hits the DiamondProxy
+        // fallback and reverts with `"F"`.
+        bytes memory upgradeCall = currentProtocolVersion < V31_UPGRADE_CHAIN_FROM_VERSION_THRESHOLD
+            ? abi.encodeCall(IAdminLegacy.upgradeChainFromVersion, (currentProtocolVersion, diamondCut))
+            : abi.encodeCall(IAdmin.upgradeChainFromVersion, (chainAddress, currentProtocolVersion, diamondCut));
+
+        Utils.adminExecute(adminAddr, accessControlRestriction, chainAddress, upgradeCall, 0);
 
         console.log("AdminFunctions: upgrade completed successfully");
     }

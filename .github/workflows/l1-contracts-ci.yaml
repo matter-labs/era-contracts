@@ -380,7 +380,9 @@ jobs:
             l2-contracts/zkout
             system-contracts/zkout
 
-      - name: Run coverage
+      # --- 1. Foundry coverage (unchanged) ---
+
+      - name: Run Foundry coverage
         run: yarn test:foundry --no-match-path 'test/foundry/l1/unit/concrete/Executor/*' && yarn coverage:foundry --report summary --report lcov
 
       # Installing the specific version of `lcov` because of
@@ -397,27 +399,110 @@ jobs:
       # filtering applies to the lcov file, the summary table generated in the previous step will
       # still include all files and directories. The `--rc branch_coverage=1` part keeps branch info
       # in the filtered report, since lcov defaults to removing branch info.
-      - name: Filter directories
+      - name: Filter Foundry coverage directories
         run: |
           lcov --ignore-errors unused --remove lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file lcov.info --rc branch_coverage=1
 
-      - name: Post coverage report
+      - name: Post Foundry coverage report
         run: |
           {
-            echo "## Coverage Report"
+            echo "## Foundry Coverage Report"
             echo ""
             echo '```'
             lcov --summary lcov.info --rc branch_coverage=1 2>&1
             echo '```'
           } >> $GITHUB_STEP_SUMMARY
 
-      - name: Verify minimum coverage
+      - name: Verify Foundry minimum coverage
         uses: zgosalvez/github-actions-report-lcov@df68834145a4a567247d6a3ea8565c4c39d1fd17 # v4.1.23
         with:
           coverage-files: ./l1-contracts/lcov.info
           working-directory: l1-contracts
           minimum-coverage: 75 # TODO(EVM-944): increase threshold to 85
 
+      # --- 2. Anvil interop coverage + merged report ---
+
+      # install-zksync-foundry only provides forge/cast; we need regular anvil for interop tests
+      - name: Install Foundry (for Anvil)
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.5.1
+
+      - name: Install anvil-interop dependencies
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn install
+
+      - name: Run Anvil interop coverage
+        working-directory: l1-contracts/test/anvil-interop
+        run: ANVIL_COVERAGE_MODE=1 yarn ts-node run-coverage.ts
+
+      - name: Cleanup Anvil
+        if: always()
+        working-directory: l1-contracts/test/anvil-interop
+        run: yarn cleanup
+
+      # Merge produces two outputs:
+      #   coverage/merged-lcov.info        — Foundry hits + Anvil hits
+      #   coverage/anvil-rebased-lcov.info — Foundry's files/lines/functions, Anvil hits only
+      # Both use Foundry as the baseline so all three reports share the same denominator.
+      - name: Merge Foundry + Anvil coverage
+        if: success()
+        run: yarn coverage:merge
+
+      - name: Filter Anvil rebased coverage
+        if: success()
+        run: |
+          lcov --ignore-errors unused --remove coverage/anvil-rebased-lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file coverage/anvil-rebased-lcov.info --rc branch_coverage=1
+
+      - name: Post Anvil interop coverage report
+        if: success()
+        run: |
+          {
+            echo "## Anvil Interop Coverage Report"
+            echo ""
+            echo '```'
+            lcov --summary coverage/anvil-rebased-lcov.info --rc branch_coverage=1 2>&1
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate Anvil untested lines report
+        if: success()
+        run: npx ts-node scripts/generate-untested-lines-report.ts coverage/anvil-rebased-lcov.info coverage/ANVIL_UNTESTED_LINES_REPORT.md
+
+      - name: Filter merged coverage
+        if: success()
+        run: |
+          lcov --ignore-errors unused --remove coverage/merged-lcov.info 'test/*' 'contracts/dev-contracts/*' 'lib/*' '../lib/*' 'lib/' 'deploy-scripts/*' --output-file coverage/merged-lcov.info --rc branch_coverage=1
+
+      - name: Post merged coverage report
+        if: success()
+        run: |
+          {
+            echo "## Merged Coverage Report (Foundry + Anvil Interop)"
+            echo ""
+            echo '```'
+            lcov --summary coverage/merged-lcov.info --rc branch_coverage=1 2>&1
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate merged untested lines report
+        if: success()
+        run: npx ts-node scripts/generate-untested-lines-report.ts coverage/merged-lcov.info coverage/MERGED_UNTESTED_LINES_REPORT.md
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            l1-contracts/lcov.info
+            l1-contracts/coverage/anvil/anvil-lcov.info
+            l1-contracts/coverage/anvil/anvil-coverage-summary.txt
+            l1-contracts/coverage/anvil-rebased-lcov.info
+            l1-contracts/coverage/ANVIL_UNTESTED_LINES_REPORT.md
+            l1-contracts/coverage/merged-lcov.info
+            l1-contracts/coverage/MERGED_UNTESTED_LINES_REPORT.md
+          if-no-files-found: warn
 
   # FIXME: restore gas report CI
   # gas-report:

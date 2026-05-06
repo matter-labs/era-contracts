@@ -36,8 +36,10 @@ import {
     L2_BRIDGEHUB_ADDR
 } from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
+import {L2MessageRoot} from "../../core/message-root/L2MessageRoot.sol";
 import {
     ChainIdNotRegistered,
     InvalidInteropCalldata,
@@ -46,13 +48,8 @@ import {
     Unauthorized,
     ZeroAddress
 } from "../../common/L1ContractErrors.sol";
-import {
-    CHAIN_TREE_EMPTY_ENTRY_HASH,
-    IMessageRootBase,
-    SHARED_ROOT_TREE_EMPTY_HASH
-} from "../../core/message-root/IMessageRoot.sol";
+import {IMessageRootBase} from "../../core/message-root/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {
     L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH,
     L2_TO_L1_LOGS_MERKLE_TREE_DEPTH,
@@ -60,7 +57,6 @@ import {
     MIGRATION_NUMBER_SETTLEMENT_LAYER_TO_L1
 } from "../../common/Config.sol";
 import {IBridgehubBase} from "../../core/bridgehub/IBridgehubBase.sol";
-import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
 import {
     InvalidAssetMigrationNumber,
@@ -84,14 +80,12 @@ import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IMailboxLegacy} from "../../state-transition/chain-interfaces/IMailboxLegacy.sol";
-import {IMigrator} from "../../state-transition/chain-interfaces/IMigrator.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {LegacySharedBridgeAddresses, SharedBridgeOnChainId} from "./LegacySharedBridgeAddresses.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
-    using FullMerkleMemory for FullMerkleMemory.FullTree;
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
     using SafeERC20 for IERC20;
 
@@ -173,7 +167,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     /// @inheritdoc IGWAssetTracker
-    function initL2(uint256 _l1ChainId, address _owner) external onlyUpgrader {
+    function initL2(uint256 _l1ChainId, address _owner) external reentrancyGuardInitializer onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
 
         // Fetch wrapped ZK token from Native Token Vault
@@ -182,8 +176,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         require(wrappedZK != address(0), ZeroAddress());
         wrappedZKToken = IERC20(wrappedZK);
 
-        require(_owner != address(0), ZeroAddress());
-        _transferOwnership(_owner);
+        if (owner() != _owner) {
+            require(_owner != address(0), ZeroAddress());
+            _transferOwnership(_owner);
+        }
     }
 
     /// @inheritdoc IGWAssetTracker
@@ -205,15 +201,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     /// @inheritdoc IGWAssetTracker
-    function agreeToPaySettlementFees(uint256 _chainId) external {
-        settlementFeePayerAgreement[msg.sender][_chainId] = true;
-        emit SettlementFeePayerAgreementUpdated(msg.sender, _chainId, true);
-    }
-
-    /// @inheritdoc IGWAssetTracker
-    function revokeSettlementFeePayerAgreement(uint256 _chainId) external {
-        settlementFeePayerAgreement[msg.sender][_chainId] = false;
-        emit SettlementFeePayerAgreementUpdated(msg.sender, _chainId, false);
+    function setSettlementFeePayerAgreement(uint256 _chainId, bool _agreed) external {
+        settlementFeePayerAgreement[msg.sender][_chainId] = _agreed;
+        emit SettlementFeePayerAgreementUpdated(msg.sender, _chainId, _agreed);
     }
 
     /// @inheritdoc IGWAssetTracker
@@ -401,7 +391,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     /// @notice Collects interop settlement fees from the designated fee payer using Wrapped ZK token.
     /// @dev Fee Collection Security Model:
-    /// - Fee payers must explicitly opt-in via `agreeToPaySettlementFees(chainId)` before they can be charged
+    /// - Fee payers must explicitly opt-in via `setSettlementFeePayerAgreement(chainId, true)` before they can be charged
     /// - This prevents front-running attacks where a malicious operator could specify another chain's
     ///   fee payer address to make them pay for unrelated settlements
     /// - Fee payers must also approve wrapped ZK tokens for this contract
@@ -438,23 +428,14 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     function _getEmptyMultichainBatchRoot(uint256 _chainId) internal returns (bytes32) {
-        bytes32 savedEmptyMultichainBatchRoot = emptyMultichainBatchRoot[_chainId];
-        if (savedEmptyMultichainBatchRoot != bytes32(0)) {
-            return savedEmptyMultichainBatchRoot;
+        bytes32 cachedRoot = emptyMultichainBatchRoot[_chainId];
+        if (cachedRoot != bytes32(0)) {
+            return cachedRoot;
         }
-        FullMerkleMemory.FullTree memory sharedTree;
-        sharedTree.createTree(1);
-        // slither-disable-next-line unused-return
-        sharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
 
-        DynamicIncrementalMerkleMemory.Bytes32PushTree memory chainTree;
-        chainTree.createTree(1);
-        bytes32 initialChainTreeHash = chainTree.setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
-        bytes32 leafHash = MessageHashing.chainIdLeafHash(initialChainTreeHash, _chainId);
-        bytes32 emptyMultichainBatchRootCalculated = sharedTree.pushNewLeaf(leafHash);
-
-        emptyMultichainBatchRoot[_chainId] = emptyMultichainBatchRootCalculated;
-        return emptyMultichainBatchRootCalculated;
+        bytes32 calculatedRoot = L2MessageRoot(address(L2_MESSAGE_ROOT)).getEmptyMultichainBatchRoot(_chainId);
+        emptyMultichainBatchRoot[_chainId] = calculatedRoot;
+        return calculatedRoot;
     }
 
     /// @notice Handles potential failed deposits. Not all L1->L2 txs are deposits.
@@ -691,13 +672,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IGWAssetTracker
-    function requestPauseDepositsForChain(uint256 _chainId) external onlyServiceTransactionSender {
-        address zkChain = _bridgehub().getZKChain(_chainId);
-        require(zkChain != address(0), ChainIdNotRegistered(_chainId));
-        IMigrator(zkChain).pauseDepositsOnGateway(block.timestamp);
-    }
-
-    /// @inheritdoc IGWAssetTracker
     function initiateGatewayToL1MigrationOnGateway(uint256 _chainId, bytes32 _assetId) external {
         address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
@@ -815,17 +789,5 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
         return L2_CHAIN_ASSET_HANDLER.migrationNumber(_chainId);
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        Test-only Functions
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev For local testing only.
-    function setLegacySharedBridgeAddressForLocalTesting(
-        uint256 _chainId,
-        address _legacySharedBridgeAddress
-    ) external onlyUpgrader {
-        legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
     }
 }

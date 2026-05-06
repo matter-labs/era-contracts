@@ -17,6 +17,7 @@ import {
     L2_BOOTLOADER_ADDRESS,
     L2_BRIDGEHUB,
     L2_COMPLEX_UPGRADER_ADDR,
+    L2_MESSAGE_ROOT,
     L2_MESSAGE_ROOT_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR,
     L2_BASE_TOKEN_SYSTEM_CONTRACT,
@@ -36,8 +37,14 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {L2AssetTrackerData} from "./L2AssetTrackerData.sol";
 import {L2UtilsBase} from "../l2-tests-in-l1-context/L2UtilsBase.sol";
 
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {RAND_ADDRESS} from "test/foundry/TestConstants.sol";
+
+import {LogFinder} from "../utils/LogFinder.sol";
+
 abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
+    using LogFinder for Vm.Log[];
 
     function test_processLogsAndMessages() public {
         finalizeDepositWithChainId(271);
@@ -51,16 +58,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         chainIds[1] = 260;
         L2UtilsBase.setupTokenBalancesForChainOperators(chainIds);
 
-        bytes[] memory input2 = L2AssetTrackerData.getData2();
-        for (uint256 i = 0; i < input2.length; i++) {
-            this.printProcess(abi.decode(input2[i], (ProcessLogsInput)));
-            return;
-        }
-
         ProcessLogsInput[] memory testData = L2AssetTrackerData.getData();
-
-        // Verify test data is not empty
-        assertTrue(testData.length > 0, "Test data should not be empty");
 
         // Add the required previous batch roots for batches 1-4
         // The test is trying to add batch 5, so we need batches 1-4 to exist first
@@ -74,13 +72,12 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                 .checked_write(bytes32(uint256(dummyBatchRoot) + i));
         }
 
-        uint256 successCount = 0;
+        // Snapshot fee-token balance before the loop to verify cross-iteration fee accounting.
+        IERC20 zkToken = GW_ASSET_TRACKER.wrappedZKToken();
+        uint256 feeBalanceBefore = zkToken.balanceOf(GW_ASSET_TRACKER_ADDR);
+        uint256 expectedFeeTotal;
 
         for (uint256 i = 0; i < testData.length; i++) {
-            console.log("Processing test data index", i, "for chainId", testData[i].chainId);
-            // Verify each test data entry has valid chain ID
-            assertTrue(testData[i].chainId > 0, "Chain ID should be positive");
-
             // Set the current batch number to 4 so that batch 5 can be added next
             if (testData[i].batchNumber > 0) {
                 stdstore
@@ -140,16 +137,16 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                 vm.store(address(GW_ASSET_TRACKER), structSlot, bytes32(uint256(1)));
             }
 
-            console.log("About to call processLogsAndMessages for index", i);
-
             // Get the ZKChain address for this chain - this will be the caller and the settlement fee payer
             address zkChainAddr = L2_BRIDGEHUB.getZKChain(testData[i].chainId);
 
             // Update settlementFeePayer to be the ZKChain address (which has tokens and approval)
             testData[i].settlementFeePayer = zkChainAddr;
 
-            vm.prank(zkChainAddr);
+            // Re-arm log capture so event assertions are scoped to this iteration's call.
+            vm.recordLogs();
 
+            vm.prank(zkChainAddr);
             (bool success, bytes memory data) = GW_ASSET_TRACKER_ADDR.call(
                 abi.encodeCall(GW_ASSET_TRACKER.processLogsAndMessages, testData[i])
             );
@@ -160,11 +157,40 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                 }
             }
             assertTrue(success, string.concat("processLogsAndMessages should succeed for iteration ", vm.toString(i)));
-            successCount++;
-            console.log("success", i);
+
+            // ---- Outcome assertions ----
+            Vm.Log[] memory iterLogs = vm.getRecordedLogs();
+
+            // Verify the chain batch root for this batch is now stored.
+            assertEq(
+                L2_MESSAGE_ROOT.chainBatchRoots(testData[i].chainId, testData[i].batchNumber),
+                testData[i].chainBatchRoot,
+                "chainBatchRoot not persisted"
+            );
+
+            // Settlement-fee event: when emitted for this chain, decode and check internal
+            // consistency (amount == fee * callCount) and accumulate the expected total
+            // for the cross-iteration balance check below.
+            Vm.Log[] memory feeLogs = iterLogs.findAllFrom(
+                "GatewaySettlementFeesCollected(uint256,address,uint256,uint256)",
+                GW_ASSET_TRACKER_ADDR
+            );
+            for (uint256 k = 0; k < feeLogs.length; k++) {
+                if (uint256(feeLogs[k].topics[1]) != testData[i].chainId) continue;
+                assertEq(address(uint160(uint256(feeLogs[k].topics[2]))), zkChainAddr, "fee event payer mismatch");
+                (uint256 amount, uint256 callCount) = abi.decode(feeLogs[k].data, (uint256, uint256));
+                assertEq(amount, GW_ASSET_TRACKER.gatewaySettlementFee() * callCount, "fee amount != fee * callCount");
+                expectedFeeTotal += amount;
+            }
         }
 
-        assertEq(successCount, testData.length, "All processLogsAndMessages calls should succeed");
+        // Cross-iteration invariant: wrappedZKToken held by the asset tracker must have grown
+        // by exactly the sum of fees reported in GatewaySettlementFeesCollected events.
+        assertEq(
+            zkToken.balanceOf(GW_ASSET_TRACKER_ADDR) - feeBalanceBefore,
+            expectedFeeTotal,
+            "wrappedZKToken delta != sum of fee events"
+        );
     }
 
     function getTxHashes(ProcessLogsInput memory input) public returns (bytes32[] memory) {
@@ -193,10 +219,6 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             .checked_write(balance);
     }
 
-    function printProcess(ProcessLogsInput memory) public {
-        /// its just here so that the ProcessLogsInput is printed in console
-    }
-
     function test_registerLegacyToken_nativeToken() public {
         bytes32 assetId = keccak256("test_asset_id");
 
@@ -223,15 +245,34 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             abi.encode(ntvBalance)
         );
 
+        // Pre-state: registerLegacyToken early-returns if the asset is already registered (see
+        // L2AssetTracker.registerLegacyToken). Lock that the fixture is fresh and the native-branch
+        // invariant chainBalance == 0 (see L2AssetTracker._registerLegacyToken) holds.
+        L2AssetTracker tracker = L2AssetTracker(L2_ASSET_TRACKER_ADDR);
+        assertFalse(tracker.isAssetRegistered(assetId), "Asset should not be registered before call");
+        assertEq(tracker.chainBalance(block.chainid, assetId), 0, "Origin-chain balance must be 0 pre-migration");
+
         // Call the migration function
         L2_ASSET_TRACKER.registerLegacyToken(assetId);
 
-        // Verify chainBalance was calculated correctly
-        // Expected: MAX_TOKEN_BALANCE - ntvBalance
-        uint256 expectedBalance = MAX_TOKEN_BALANCE - ntvBalance;
-        uint256 actualBalance = L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, assetId);
+        // ---- Outcome assertions ----
 
-        assertEq(actualBalance, expectedBalance, "Chain balance should be correctly migrated");
+        // Verify chainBalance is set to MAX_TOKEN_BALANCE - ntvBalance (native branch)
+        uint256 expectedBalance = MAX_TOKEN_BALANCE - ntvBalance;
+        assertEq(
+            tracker.chainBalance(block.chainid, assetId),
+            expectedBalance,
+            "Chain balance should be correctly migrated"
+        );
+
+        // Verify isAssetRegistered flipped to true at the end of _registerLegacyToken.
+        assertTrue(tracker.isAssetRegistered(assetId), "Asset should be registered after call");
+
+        // Verify totalPreV31TotalSupply: native branch saves {isSaved: true, amount: chainTotalSupply}
+        // where chainTotalSupply equals the freshly written chainBalance.
+        (bool isSaved, uint256 amount) = tracker.totalPreV31TotalSupply(assetId);
+        assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
+        assertEq(amount, expectedBalance, "totalPreV31TotalSupply.amount should equal chainTotalSupply");
     }
 
     function test_handleInitiateBridgingOnL2_requiresTokenRegistration() public {
@@ -281,6 +322,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
         uint256 amount = 300;
         uint256 l1ChainId = 1;
+        uint256 mockedTotalSupply = 1000;
 
         // Mock base token asset ID
         stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
@@ -307,7 +349,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         vm.mockCall(
             address(L2_BASE_TOKEN_SYSTEM_CONTRACT),
             abi.encodeWithSelector(IERC20.totalSupply.selector),
-            abi.encode(1000)
+            abi.encode(mockedTotalSupply)
         );
 
         // Mock currentSettlementLayerChainId to return L1 (not in gateway mode)
@@ -317,19 +359,32 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             abi.encode(l1ChainId)
         );
 
+        L2AssetTracker tracker = L2AssetTracker(L2_ASSET_TRACKER_ADDR);
         uint256 depositsBefore = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
+        assertFalse(tracker.isAssetRegistered(baseTokenAssetId), "Asset should not be registered before call");
 
         // Call as BaseTokenHolder (onlyBaseTokenHolderOrL2BaseToken modifier)
         vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, amount);
 
-        // Verify chain balance did NOT increase (foreign token, not native)
-        uint256 finalBalance = L2AssetTracker(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, baseTokenAssetId);
-        assertEq(finalBalance, 0, "Chain balance should remain 0 for foreign tokens");
+        // ---- Outcome assertions ----
 
-        // Verify totalSuccessfulDepositsFromL1 increased by amount
+        // chainBalance: base token's origin is L1, so the block.chainid branch is not taken; balance stays 0.
+        assertEq(
+            tracker.chainBalance(block.chainid, baseTokenAssetId),
+            0,
+            "Chain balance should remain 0 for foreign tokens"
+        );
+
+        // totalSuccessfulDepositsFromL1: incremented by amount (fromChainId == L1, settlement layer == L1).
         uint256 depositsAfter = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
         assertEq(depositsAfter - depositsBefore, amount, "totalSuccessfulDepositsFromL1 should increase by amount");
+
+        // _registerLegacyTokenIfNeeded was triggered on first contact: registration + supply snapshot set.
+        assertTrue(tracker.isAssetRegistered(baseTokenAssetId), "Asset should be registered after call");
+        (bool isSaved, uint256 savedAmount) = tracker.totalPreV31TotalSupply(baseTokenAssetId);
+        assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
+        assertEq(savedAmount, mockedTotalSupply, "totalPreV31TotalSupply.amount should equal mocked totalSupply");
     }
 
     /// @notice On Era, L2BaseTokenEra.mint() calls handleFinalizeBaseTokenBridgingOnL2 directly
@@ -338,6 +393,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         bytes32 baseTokenAssetId = keccak256("base_token_asset_id");
         uint256 amount = 300;
         uint256 l1ChainId = 1;
+        uint256 mockedTotalSupply = 1000;
 
         stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(uint256(baseTokenAssetId));
         stdstore.target(L2_ASSET_TRACKER_ADDR).sig("L1_CHAIN_ID()").checked_write(l1ChainId);
@@ -350,7 +406,7 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         vm.mockCall(
             address(L2_BASE_TOKEN_SYSTEM_CONTRACT),
             abi.encodeWithSelector(IERC20.totalSupply.selector),
-            abi.encode(1000)
+            abi.encode(mockedTotalSupply)
         );
 
         // Mock currentSettlementLayerChainId to return L1 (not in gateway mode)
@@ -360,21 +416,40 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             abi.encode(l1ChainId)
         );
 
+        L2AssetTracker tracker = L2AssetTracker(L2_ASSET_TRACKER_ADDR);
         uint256 depositsBefore = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
+        uint256 chainBalanceBefore = tracker.chainBalance(block.chainid, baseTokenAssetId);
+        assertFalse(tracker.isAssetRegistered(baseTokenAssetId), "Asset should not be registered before call");
 
         // Call as L2BaseToken (the Era flow: L2BaseTokenEra.mint() → asset tracker)
         vm.prank(address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(l1ChainId, amount);
 
-        // Verify totalSuccessfulDepositsFromL1 increased by amount
+        // ---- Outcome assertions ----
+
+        // chainBalance: base token's origin is L1, so the block.chainid branch in
+        // _handleFinalizeBridgingOnL2Inner is not taken; the balance must remain unchanged.
+        assertEq(
+            tracker.chainBalance(block.chainid, baseTokenAssetId),
+            chainBalanceBefore,
+            "Chain balance should remain unchanged for foreign-origin base token"
+        );
+
+        // totalSuccessfulDepositsFromL1: incremented by amount (fromChainId == L1, settlement layer == L1).
         uint256 depositsAfter = _readTotalSuccessfulDepositsFromL1(baseTokenAssetId);
         assertEq(depositsAfter - depositsBefore, amount, "totalSuccessfulDepositsFromL1 should increase by amount");
+
+        // _registerLegacyTokenIfNeeded was triggered on first contact: registration + supply snapshot set.
+        assertTrue(tracker.isAssetRegistered(baseTokenAssetId), "Asset should be registered after call");
+        (bool isSaved, uint256 savedAmount) = tracker.totalPreV31TotalSupply(baseTokenAssetId);
+        assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
+        assertEq(savedAmount, mockedTotalSupply, "totalPreV31TotalSupply.amount should equal mocked totalSupply");
     }
 
     /// @notice A random address must not be able to call handleFinalizeBaseTokenBridgingOnL2.
     function test_handleFinalizeBaseTokenBridgingOnL2_revertUnauthorized() public {
-        vm.prank(address(0xDEAD));
-        vm.expectRevert();
+        vm.prank(RAND_ADDRESS);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, RAND_ADDRESS));
         L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2(1, 100);
     }
 
@@ -435,8 +510,8 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
 
     /// @notice Verifies that only the ComplexUpgrader can call registerBaseTokenDuringUpgrade.
     function test_registerBaseTokenDuringUpgrade_revertUnauthorized() public {
-        vm.prank(address(0xDEAD));
-        vm.expectRevert();
+        vm.prank(RAND_ADDRESS);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, RAND_ADDRESS));
         L2_ASSET_TRACKER.registerBaseTokenDuringUpgrade();
     }
 
@@ -483,7 +558,9 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
             .with_key(block.chainid)
             .checked_write(uint256(2));
 
-        // Set asset migration number to 0 (not yet migrated)
+        // Set asset migration number to 0 (not yet migrated). chainMigrationNumber (2) !=
+        // savedAssetMigrationNumber (0), so the early-return in L2AssetTracker.initiateL1ToGatewayMigrationOnL2
+        // does not fire and the event will be emitted.
         stdstore
             .target(L2_ASSET_TRACKER_ADDR)
             .sig("assetMigrationNumber(uint256,bytes32)")
@@ -497,13 +574,11 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         // Mock sendMessageToL1 to avoid revert
         vm.mockCall(address(L2_BRIDGEHUB), abi.encodeWithSignature("sendMessageToL1(bytes)"), abi.encode(bytes32(0)));
 
-        // Get asset migration number before migration
+        // Snapshot pre-call state
         uint256 assetMigrationNumBefore = L2AssetTracker(L2_ASSET_TRACKER_ADDR).assetMigrationNumber(
             block.chainid,
             assetId
         );
-
-        // Verify initial state
         assertEq(assetMigrationNumBefore, 0, "Asset migration number should be 0 before migration");
 
         // Record logs to capture the event
@@ -512,21 +587,32 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
         // Call the migration function
         L2_ASSET_TRACKER.initiateL1ToGatewayMigrationOnL2(assetId);
 
-        // Verify the L1ToGatewayMigrationInitiated event was emitted
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        assertTrue(logs.length > 0, "Should emit L1ToGatewayMigrationInitiated event");
+        // ---- Outcome assertions ----
 
-        // Find the L1ToGatewayMigrationInitiated event
-        bool foundEvent = false;
-        bytes32 eventSignature = IL2AssetTracker.L1ToGatewayMigrationInitiated.selector;
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == eventSignature) {
-                foundEvent = true;
-                // Verify the indexed assetId matches
-                assertEq(logs[i].topics[1], assetId, "Event assetId should match");
-                break;
-            }
-        }
-        assertTrue(foundEvent, "L1ToGatewayMigrationInitiated event should be emitted");
+        // L1ToGatewayMigrationInitiated: only assetId is indexed; chainId is in data.
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        Vm.Log memory migrationLog = logs.requireOneFrom(
+            "L1ToGatewayMigrationInitiated(bytes32,uint256)",
+            L2_ASSET_TRACKER_ADDR
+        );
+        assertEq(migrationLog.topics[1], assetId, "Event assetId mismatch");
+        assertEq(abi.decode(migrationLog.data, (uint256)), block.chainid, "Event chainId mismatch");
+
+        // initiateL1ToGatewayMigrationOnL2 does NOT itself update assetMigrationNumber
+        // (that happens later via confirmMigrationOnL2 from L1). Verify it stays at the pre-call value.
+        assertEq(
+            L2AssetTracker(L2_ASSET_TRACKER_ADDR).assetMigrationNumber(block.chainid, assetId),
+            assetMigrationNumBefore,
+            "assetMigrationNumber must not change on L2-initiation"
+        );
+
+        // _registerLegacyTokenIfNeeded was triggered: isAssetRegistered + totalPreV31TotalSupply set.
+        assertTrue(
+            L2AssetTracker(L2_ASSET_TRACKER_ADDR).isAssetRegistered(assetId),
+            "Asset should be registered after migration init"
+        );
+        (bool isSaved, uint256 amount) = L2AssetTracker(L2_ASSET_TRACKER_ADDR).totalPreV31TotalSupply(assetId);
+        assertTrue(isSaved, "totalPreV31TotalSupply.isSaved should be true");
+        assertEq(amount, totalSupply, "totalPreV31TotalSupply.amount should match token totalSupply");
     }
 }

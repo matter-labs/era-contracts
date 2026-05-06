@@ -30,4 +30,6 @@ interface IGatewayUtils {
         bytes memory message,
         bytes32[] memory merkleProof
     ) external;
+
+    function dumpForceDeployments(address _ctm) external;
 }
