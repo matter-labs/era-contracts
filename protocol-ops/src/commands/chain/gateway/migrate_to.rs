@@ -1,33 +1,19 @@
-use std::path::Path;
-
 use anyhow::Context;
 use clap::{Parser, Subcommand};
 use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
+use crate::abi::{BridgehubAbi, IChainTypeManagerAbi};
 use crate::commands::output::write_output_if_requested;
-use crate::common::paths;
+use crate::common::addresses::{GATEWAY_L2_BRIDGEHUB, L2_BOOTLOADER};
 use crate::common::EcosystemChainArgs;
 use crate::common::SharedRunArgs;
-use crate::common::{
-    forge::{Forge, ForgeRunner, ForgeScriptArg},
-    logger,
+use crate::common::{forge::ForgeRunner, logger};
+use crate::config::forge_interface::script_params::{
+    ADMIN_FUNCTIONS_INVOCATION, GATEWAY_UTILS_INVOCATION,
 };
 
 use crate::types::L2DACommitmentScheme;
-
-use super::build_admin_functions_script;
-
-/// L2 system address of the Bridgehub on the gateway chain.
-const GATEWAY_L2_BRIDGEHUB: &str = "0x0000000000000000000000000000000000010002";
-/// L2 system address of the bootloader.
-const L2_BOOTLOADER: &str = "0x0000000000000000000000000000000000008001";
-
-/// Partial view of the vote preparation output TOML (diamond_cut_data field).
-#[derive(Debug, Deserialize)]
-struct VotePreparationOutput {
-    diamond_cut_data: String,
-}
 
 // ── Step 1: Pause deposits ------------------------------------------------
 
@@ -40,23 +26,16 @@ pub(crate) async fn stage_pause_deposits(
 ) -> anyhow::Result<()> {
     let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
 
-    let contracts_path = paths::resolve_l1_contracts_path()?;
     // Always broadcast the admin call, including in `--simulate`. The simulate
     // fork is ephemeral, but the Safe bundle is built from forge's broadcast
     // log, so the admin tx must be in there for downstream replay.
-    let should_send = "true".to_string();
-
-    let script = build_admin_functions_script(
-        &contracts_path,
-        runner,
-        "pauseDepositsBeforeInitiatingMigration(address,uint256,bool)",
-        vec![
-            format!("{:#x}", bridgehub),
-            chain_id.to_string(),
-            should_send,
-        ],
-    )?
-    .with_wallet(&sender);
+    let script = runner
+        .with_script_call(
+            &ADMIN_FUNCTIONS_INVOCATION,
+            "pauseDepositsBeforeInitiatingMigration",
+            (bridgehub, chain_id, true),
+        )?
+        .with_wallet(&sender);
 
     logger::step("Pausing deposits before migration");
     logger::info(format!("Chain ID: {}", chain_id));
@@ -78,22 +57,15 @@ pub(crate) async fn stage_notify_server(
 ) -> anyhow::Result<()> {
     let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
 
-    let contracts_path = paths::resolve_l1_contracts_path()?;
     // See pause-deposits for the rationale — always broadcast in simulate too
     // so the tx shows up in the bundle's --out / Safe file.
-    let should_send = "true".to_string();
-
-    let script = build_admin_functions_script(
-        &contracts_path,
-        runner,
-        "notifyServerMigrationToGateway(address,uint256,bool)",
-        vec![
-            format!("{:#x}", bridgehub),
-            chain_id.to_string(),
-            should_send,
-        ],
-    )?
-    .with_wallet(&sender);
+    let script = runner
+        .with_script_call(
+            &ADMIN_FUNCTIONS_INVOCATION,
+            "notifyServerMigrationToGateway",
+            (bridgehub, chain_id, true),
+        )?
+        .with_wallet(&sender);
 
     logger::step("Notifying server about migration");
     logger::info(format!("Chain ID: {}", chain_id));
@@ -115,46 +87,31 @@ pub(crate) async fn stage_submit(
     bridgehub: Address,
     chain_id: u64,
     gateway_chain_id: u64,
+    gateway_rpc_url: String,
     l1_gas_price: u64,
-    vote_preparation_toml: &str,
     refund_recipient: Address,
 ) -> anyhow::Result<()> {
     let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
 
-    let contracts_path = paths::resolve_l1_contracts_path()?;
     // See pause-deposits for the rationale — always broadcast in simulate too
-    // so the tx shows up in the bundle's --out / Safe file.
-    let should_send = "true".to_string();
-
-    // Read diamond_cut_data from the gateway vote preparation output.
-    // Strip leading '/' so PathBuf::join treats it as relative to contracts_path.
-    let output_path = contracts_path.join(vote_preparation_toml.trim_start_matches('/'));
-    let toml_content = std::fs::read_to_string(&output_path).with_context(|| {
-        format!(
-            "Failed to read vote preparation output: {}. Run convert vote-prepare first.",
-            output_path.display()
-        )
-    })?;
-    let output: VotePreparationOutput =
-        toml::from_str(&toml_content).context("Failed to parse vote preparation output")?;
-
-    let diamond_cut_data_hex = format!("0x{}", output.diamond_cut_data.trim_start_matches("0x"));
-
-    let script = build_admin_functions_script(
-        &contracts_path,
-        runner,
-        "migrateChainToGateway(address,uint256,uint256,uint256,bytes,address,bool)",
-        vec![
-            format!("{:#x}", bridgehub),
-            l1_gas_price.to_string(),
-            chain_id.to_string(),
-            gateway_chain_id.to_string(),
-            diamond_cut_data_hex,
-            format!("{:#x}", refund_recipient),
-            should_send,
-        ],
-    )?
-    .with_wallet(&sender);
+    // so the tx shows up in the bundle's --out / Safe file. The script
+    // fork-switches to `gateway_rpc_url` to read the gateway-side CTM's
+    // diamond cut data before constructing the migration message.
+    let script = runner
+        .with_script_call(
+            &ADMIN_FUNCTIONS_INVOCATION,
+            "migrateChainToGateway",
+            (
+                bridgehub,
+                l1_gas_price,
+                chain_id,
+                gateway_chain_id,
+                gateway_rpc_url,
+                refund_recipient,
+                true,
+            ),
+        )?
+        .with_wallet(&sender);
 
     logger::step("Submitting chain migration to gateway");
     logger::info(format!("Chain ID: {}", chain_id));
@@ -202,9 +159,6 @@ pub(crate) async fn stage_enable_validators(
             .await
             .context("Failed to resolve gateway chain ID from bridgehub")?;
     logger::info(format!("Gateway chain ID (from L1): {gateway_chain_id}"));
-    let contracts_path = paths::resolve_l1_contracts_path()?;
-
-    let should_send = "true".to_string();
 
     // Resolve ValidatorTimelock
     logger::step("Resolving gateway ValidatorTimelock");
@@ -238,22 +192,22 @@ pub(crate) async fn stage_enable_validators(
     logger::step("Enabling validators on gateway");
     for validator in &validators {
         logger::info(format!("Enabling validator {:#x}", validator));
-        let script = build_admin_functions_script(
-            &contracts_path,
-            runner,
-            "enableValidatorViaGateway(address,uint256,uint256,uint256,address,address,address,bool)",
-            vec![
-                format!("{:#x}", bridgehub),
-                inputs.l1_gas_price.to_string(),
-                chain_id.to_string(),
-                gateway_chain_id.to_string(),
-                format!("{:#x}", validator),
-                format!("{:#x}", gw_validator_timelock),
-                format!("{:#x}", sender.address),
-                should_send.clone(),
-            ],
-        )?
-        .with_wallet(&sender);
+        let script = runner
+            .with_script_call(
+                &ADMIN_FUNCTIONS_INVOCATION,
+                "enableValidatorViaGateway",
+                (
+                    bridgehub,
+                    inputs.l1_gas_price,
+                    chain_id,
+                    gateway_chain_id,
+                    *validator,
+                    gw_validator_timelock,
+                    sender.address,
+                    true,
+                ),
+            )?
+            .with_wallet(&sender);
         runner
             .run(script)
             .with_context(|| format!("enableValidatorViaGateway for {:#x}", validator))?;
@@ -288,7 +242,6 @@ pub(crate) async fn stage_set_da_validator_pair(
             .await
             .context("Failed to resolve gateway chain ID from bridgehub")?;
     logger::info(format!("Gateway chain ID (from L1): {gateway_chain_id}"));
-    let contracts_path = paths::resolve_l1_contracts_path()?;
 
     // Resolve the chain's diamond proxy on the gateway via L2 RPC.
     logger::step("Resolving chain diamond proxy on gateway");
@@ -300,24 +253,23 @@ pub(crate) async fn stage_set_da_validator_pair(
         chain_id, chain_diamond_on_gw
     ));
 
-    let should_send = "true".to_string();
-    let script = build_admin_functions_script(
-        &contracts_path,
-        runner,
-        "setDAValidatorPairWithGateway(address,uint256,uint256,uint256,address,uint8,address,address,bool)",
-        vec![
-            format!("{:#x}", bridgehub),
-            inputs.l1_gas_price.to_string(),
-            chain_id.to_string(),
-            gateway_chain_id.to_string(),
-            format!("{:#x}", inputs.l1_da_validator),
-            (inputs.l2_da_commitment_scheme as u8).to_string(),
-            format!("{:#x}", chain_diamond_on_gw),
-            format!("{:#x}", sender.address),
-            should_send,
-        ],
-    )?
-    .with_wallet(&sender);
+    let script = runner
+        .with_script_call(
+            &ADMIN_FUNCTIONS_INVOCATION,
+            "setDAValidatorPairWithGateway",
+            (
+                bridgehub,
+                inputs.l1_gas_price,
+                chain_id,
+                gateway_chain_id,
+                inputs.l1_da_validator,
+                inputs.l2_da_commitment_scheme as u8,
+                chain_diamond_on_gw,
+                sender.address,
+                true,
+            ),
+        )?
+        .with_wallet(&sender);
 
     runner
         .run(script)
@@ -333,28 +285,16 @@ async fn resolve_chain_diamond_on_gateway(
     gateway_rpc_url: &str,
     chain_id: u64,
 ) -> anyhow::Result<Address> {
-    use ethers::providers::{Http, Middleware, Provider};
+    use ethers::providers::{Http, Provider};
 
-    let provider = Provider::<Http>::try_from(gateway_rpc_url)?;
+    let provider = std::sync::Arc::new(Provider::<Http>::try_from(gateway_rpc_url)?);
     let gw_bridgehub: Address = GATEWAY_L2_BRIDGEHUB.parse()?;
-
-    let call = ethers::abi::encode(&[ethers::abi::Token::Uint(chain_id.into())]);
-    let mut calldata = ethers::utils::id("getZKChain(uint256)").to_vec();
-    calldata.extend_from_slice(&call);
-    let tx = ethers::types::TransactionRequest::new()
-        .to(gw_bridgehub)
-        .data(calldata);
-    let result = provider
-        .call(&tx.into(), None)
+    let bridgehub = BridgehubAbi::new(gw_bridgehub, provider);
+    let addr = bridgehub
+        .get_zk_chain(chain_id.into())
+        .call()
         .await
         .context("gateway L2 getZKChain call")?;
-    anyhow::ensure!(
-        result.len() >= 32,
-        "gateway L2 getZKChain({chain_id}) returned {} bytes (expected 32)",
-        result.len()
-    );
-    let addr = Address::from_slice(&result[12..32]);
-
     anyhow::ensure!(
         addr != Address::zero(),
         "getZKChain({chain_id}) returned zero — chain not registered on gateway"
@@ -374,29 +314,17 @@ async fn resolve_gateway_validator_timelock(
     gateway_rpc_url: &str,
     chain_id: u64,
 ) -> anyhow::Result<Address> {
-    use ethers::providers::{Http, Middleware, Provider};
+    use ethers::providers::{Http, Provider};
 
-    let provider = Provider::<Http>::try_from(gateway_rpc_url)?;
+    let provider = std::sync::Arc::new(Provider::<Http>::try_from(gateway_rpc_url)?);
     let gw_bridgehub: Address = GATEWAY_L2_BRIDGEHUB.parse()?;
+    let bridgehub = BridgehubAbi::new(gw_bridgehub, provider.clone());
 
-    // chainTypeManager(uint256) -> address
-    let ctm_call = ethers::abi::encode(&[ethers::abi::Token::Uint(chain_id.into())]);
-    let mut calldata = ethers::utils::id("chainTypeManager(uint256)").to_vec();
-    calldata.extend_from_slice(&ctm_call);
-    let tx = ethers::types::TransactionRequest::new()
-        .to(gw_bridgehub)
-        .data(calldata);
-    let result = provider
-        .call(&tx.into(), None)
+    let ctm = bridgehub
+        .chain_type_manager(chain_id.into())
+        .call()
         .await
         .context("gateway L2 chainTypeManager call")?;
-    anyhow::ensure!(
-        result.len() >= 32,
-        "gateway L2 chainTypeManager({chain_id}) returned {} bytes (expected 32) — \
-         is the gateway RPC URL correct?",
-        result.len()
-    );
-    let ctm = Address::from_slice(&result[12..32]);
     anyhow::ensure!(
         ctm != Address::zero(),
         "gateway L2 bridgehub.chainTypeManager({chain_id}) returned zero — \
@@ -405,21 +333,12 @@ async fn resolve_gateway_validator_timelock(
     );
     logger::info(format!("Gateway L2 CTM (from chain {chain_id}): {ctm:#x}"));
 
-    // validatorTimelockPostV29() -> address
-    let selector = ethers::utils::id("validatorTimelockPostV29()").to_vec();
-    let tx2 = ethers::types::TransactionRequest::new()
-        .to(ctm)
-        .data(selector);
-    let result = provider
-        .call(&tx2.into(), None)
+    let ctm = IChainTypeManagerAbi::new(ctm, provider);
+    let timelock = ctm
+        .validator_timelock_post_v29()
+        .call()
         .await
         .context("gateway L2 validatorTimelockPostV29 call")?;
-    anyhow::ensure!(
-        result.len() >= 32,
-        "gateway L2 CTM({ctm:#x}).validatorTimelockPostV29() returned {} bytes (expected 32)",
-        result.len()
-    );
-    let timelock = Address::from_slice(&result[12..32]);
 
     Ok(timelock)
 }
@@ -610,13 +529,19 @@ async fn get_finalize_params(
         "method": "eth_getTransactionReceipt",
         "params": [format!("{:#x}", tx_hash)]
     });
-    let receipt_resp: JsonRpcResponse<GatewayTransactionReceipt> = client
+    let receipt_raw: serde_json::Value = client
         .post(gateway_rpc_url)
         .json(&receipt_body)
         .send()
         .await?
         .json()
         .await?;
+    eprintln!(
+        "[debug get_finalize_params] raw receipt for {tx_hash:#x}: {}",
+        serde_json::to_string_pretty(&receipt_raw).unwrap_or_default()
+    );
+    let receipt_resp: JsonRpcResponse<GatewayTransactionReceipt> =
+        serde_json::from_value(receipt_raw)?;
     let receipt = receipt_resp
         .result
         .context("eth_getTransactionReceipt returned null")?;
@@ -646,13 +571,21 @@ async fn get_finalize_params(
         "method": "zks_getL2ToL1LogProof",
         "params": [format!("{:#x}", tx_hash), log_index]
     });
-    let proof_resp: JsonRpcResponse<L2ToL1LogProof> = client
+    let proof_raw: serde_json::Value = client
         .post(gateway_rpc_url)
         .json(&proof_body)
         .send()
         .await?
         .json()
         .await?;
+    eprintln!(
+        "[debug get_finalize_params] zks_getL2ToL1LogProof(tx={tx_hash:#x}, log_index={log_index}) → {}",
+        serde_json::to_string_pretty(&proof_raw).unwrap_or_default()
+    );
+    eprintln!(
+        "[debug get_finalize_params] tx_number_in_batch={tx_number_in_batch}, log_index={log_index}",
+    );
+    let proof_resp: JsonRpcResponse<L2ToL1LogProof> = serde_json::from_value(proof_raw)?;
     let proof = proof_resp
         .result
         .context("zks_getL2ToL1LogProof returned null")?;
@@ -718,13 +651,17 @@ pub struct Phase1SubmitArgs {
     #[clap(long)]
     pub gateway_chain_id: u64,
 
+    /// Gateway L2 RPC URL. The script fork-switches into the gateway L2
+    /// to read its CTM's diamond cut data (whose hash gateway L2 will
+    /// check at chain registration). Required because the gateway-side
+    /// CTM only exists on gateway L2 — its predicted CREATE2 address has
+    /// no code on L1.
+    #[clap(long)]
+    pub gateway_rpc_url: String,
+
     /// L1 gas price in wei for the L1->gateway-L2 priority tx.
     #[clap(long)]
     pub l1_gas_price: u64,
-
-    /// Path to the vote preparation TOML (for reading diamond_cut_data).
-    #[clap(long, default_value = "script-out/gateway-vote-preparation.toml")]
-    pub vote_preparation_toml: String,
 
     /// Refund recipient address for the L1->L2 priority tx.
     #[clap(long)]
@@ -732,7 +669,7 @@ pub struct Phase1SubmitArgs {
 }
 
 pub async fn run_phase1_submit(args: Phase1SubmitArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     // Both stages share one anvil fork — forge's broadcast log appends in
@@ -745,8 +682,8 @@ pub async fn run_phase1_submit(args: Phase1SubmitArgs) -> anyhow::Result<()> {
         bridgehub,
         chain_id,
         args.gateway_chain_id,
+        args.gateway_rpc_url.clone(),
         args.l1_gas_price,
-        &args.vote_preparation_toml,
         args.refund_recipient,
     )
     .await
@@ -779,7 +716,7 @@ pub struct Phase0PauseDepositsArgs {
 }
 
 pub async fn run_phase0_pause_deposits(args: Phase0PauseDepositsArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     stage_pause_deposits(&mut runner, bridgehub, chain_id)
@@ -815,13 +752,10 @@ pub struct Phase2FinalizeArgs {
     #[clap(long)]
     pub deployer_address: Address,
 
-    /// Gateway L2 RPC URL (for querying the withdrawal proof).
+    /// Gateway L2 RPC URL (for querying the withdrawal proof and for
+    /// the script's fork-switch to read the gateway CTM diamond cut data).
     #[clap(long)]
     pub gateway_rpc_url: String,
-
-    /// Path to the vote preparation TOML (for reading diamond_cut_data).
-    #[clap(long, default_value = "script-out/gateway-vote-preparation.toml")]
-    pub vote_preparation_toml: String,
 
     /// Number of L1 blocks to scan back when searching for the
     /// MigrationStarted event. Default: ~30 days at 12s/block.
@@ -838,7 +772,7 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
     // `InvalidProof()`. That's why the body is inlined here instead of
     // factored into a reusable `stage_finalize` helper shared with other
     // phases.
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let gateway_chain_id = crate::common::l1_contracts::resolve_settlement_layer(
         &args.shared.l1_rpc_url,
         bridgehub,
@@ -859,21 +793,6 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
         "Gateway diamond proxy (from L1): {:#x}",
         gateway_diamond_proxy
     ));
-
-    let contracts_path = paths::resolve_l1_contracts_path()?;
-
-    // Read diamond_cut_data.
-    // Strip leading '/' so PathBuf::join treats it as relative to contracts_path.
-    let output_path = contracts_path.join(args.vote_preparation_toml.trim_start_matches('/'));
-    let toml_content = std::fs::read_to_string(&output_path).with_context(|| {
-        format!(
-            "Failed to read vote preparation output: {}",
-            output_path.display()
-        )
-    })?;
-    let output: VotePreparationOutput =
-        toml::from_str(&toml_content).context("Failed to parse vote preparation output")?;
-    let diamond_cut_data_hex = format!("0x{}", output.diamond_cut_data.trim_start_matches("0x"));
 
     // Step 1: Find the migration transaction on L1
     logger::step("Searching for migration transaction on L1");
@@ -929,42 +848,27 @@ pub async fn run_phase2_finalize(args: Phase2FinalizeArgs) -> anyhow::Result<()>
     // signable address.
     let sender = runner.prepare_sender(args.deployer_address).await?;
 
-    // Build merkle proof array as a Solidity-compatible string.
-    let proof_str = format!(
-        "[{}]",
-        proof
-            .merkle_proof
-            .iter()
-            .map(|h| h.to_string())
-            .collect::<Vec<_>>()
-            .join(",")
-    );
-
     logger::step("Confirming L1->L2 transfer (finishMigrateChainToGateway)");
     {
-        let mut sa = args.shared.forge_args.clone();
-        sa.add_arg(ForgeScriptArg::Sig {
-            sig: "finishMigrateChainToGateway(address,bytes,uint256,uint256,bytes32,uint256,uint256,uint16,bytes32[],uint8)".to_string(),
-        });
-        sa.add_arg(ForgeScriptArg::RpcUrl {
-            url: runner.rpc_url.clone(),
-        });
-        sa.add_arg(ForgeScriptArg::Broadcast);
-        sa.add_arg(ForgeScriptArg::Ffi);
-        sa.additional_args.extend([
-            format!("{:#x}", bridgehub),
-            diamond_cut_data_hex,
-            chain_id.to_string(),
-            gateway_chain_id.to_string(),
-            format!("{:#x}", priority_op_hash),
-            proof.batch_number.to_string(),
-            proof.l2_message_index.to_string(),
-            proof.l2_tx_number_in_batch.to_string(),
-            proof_str,
-            "1".to_string(), // TxStatus.Success
-        ]);
-        let script = Forge::new(&contracts_path)
-            .script(Path::new("deploy-scripts/gateway/GatewayUtils.s.sol"), sa)
+        let merkle_proof = crate::common::ethereum::parse_merkle_proof(&proof.merkle_proof)?;
+        let script = runner
+            .with_script_call(
+                &GATEWAY_UTILS_INVOCATION,
+                "finishMigrateChainToGateway",
+                ((
+                    bridgehub,
+                    proof.l2_tx_number_in_batch,
+                    1u8,
+                    priority_op_hash,
+                    chain_id,
+                    gateway_chain_id,
+                    proof.batch_number,
+                    proof.l2_message_index,
+                    args.gateway_rpc_url.clone(),
+                    merkle_proof,
+                ),),
+            )?
+            .with_ffi()
             .with_wallet(&sender);
         runner
             .run(script)
@@ -1034,7 +938,7 @@ pub struct Phase3ValidatorsArgs {
 }
 
 pub async fn run_phase3_validators(args: Phase3ValidatorsArgs) -> anyhow::Result<()> {
-    let (bridgehub, chain_id) = args.topology.resolve_bridgehub()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     let enable_inputs = EnableValidatorsInputs {

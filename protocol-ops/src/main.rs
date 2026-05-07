@@ -15,7 +15,7 @@ mod types;
 mod upgrade_verification;
 
 pub mod abi;
-pub mod admin_functions;
+pub mod abi_contracts;
 mod commands;
 
 #[derive(Parser, Debug)]

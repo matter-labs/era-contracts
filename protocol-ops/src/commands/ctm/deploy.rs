@@ -1,26 +1,17 @@
-use ethers::{
-    contract::BaseContract,
-    types::{Address, H256},
-};
-use lazy_static::lazy_static;
+use ethers::types::{Address, H256};
 use serde::Serialize;
 
-use crate::abi::IDEPLOYCTMABI_ABI;
 use crate::common::{
-    forge::{Forge, ForgeRunner},
+    forge::ForgeRunner,
     traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
 };
 use crate::config::forge_interface::{
     deploy_ctm::{input::DeployCTMConfig, output::DeployCTMOutput},
     deploy_ecosystem::input::InitialDeploymentConfig,
-    script_params::DEPLOY_CTM_SCRIPT_PARAMS,
+    script_params::DEPLOY_CTM_INVOCATION,
 };
 use crate::types::{L1Network, VMOption};
-
-lazy_static! {
-    static ref DEPLOY_CTM_FUNCTIONS: BaseContract = BaseContract::from(IDEPLOYCTMABI_ABI.clone());
-}
 
 /// Input parameters for deploying CTM contracts.
 #[derive(Debug, Clone, Serialize)]
@@ -63,25 +54,15 @@ pub fn deploy(
         input.vm_type,
     );
 
-    let input_path = DEPLOY_CTM_SCRIPT_PARAMS.input(&runner.foundry_scripts_path);
+    let input_path = DEPLOY_CTM_INVOCATION.input(&runner.foundry_scripts_path);
     deploy_config.save(&runner.shell, input_path)?;
 
-    let calldata = DEPLOY_CTM_FUNCTIONS
-        .encode(
+    let forge = runner
+        .with_script_call(
+            &DEPLOY_CTM_INVOCATION,
             "runWithBridgehub",
             (input.bridgehub, input.reuse_gov_and_admin),
-        )
-        .map_err(|e| anyhow::anyhow!("Failed to encode calldata: {}", e))?;
-
-    let forge = Forge::new(&runner.foundry_scripts_path)
-        .script(
-            &DEPLOY_CTM_SCRIPT_PARAMS.script(),
-            runner.forge_args.clone(),
-        )
-        .with_ffi()
-        .with_calldata(&calldata)
-        .with_rpc_url(runner.rpc_url.clone())
-        .with_broadcast()
+        )?
         .with_wallet(auth)
         .with_env(
             "CREATE2_FACTORY_SALT",
@@ -90,6 +71,6 @@ pub fn deploy(
 
     runner.run(forge)?;
 
-    let output_path = DEPLOY_CTM_SCRIPT_PARAMS.output(&runner.foundry_scripts_path);
+    let output_path = DEPLOY_CTM_INVOCATION.output(&runner.foundry_scripts_path);
     DeployCTMOutput::read(&runner.shell, output_path)
 }

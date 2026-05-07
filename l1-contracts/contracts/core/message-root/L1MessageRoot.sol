@@ -9,13 +9,20 @@ import {IL1MessageRoot} from "./IL1MessageRoot.sol";
 import {
     CurrentBatchNumberAlreadySet,
     InvalidSettlementLayerForBatch,
+    NotAllChainsOnL1,
     OnlyOnSettlementLayer,
     TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber,
     TotalBatchesExecutedZero,
     LocallyNoChainsAtGenesis,
-    V31UpgradeChainBatchNumberAlreadySet,
-    NotAllChainsOnL1
+    V31UpgradeChainBatchNumberAlreadySet
 } from "../bridgehub/L1BridgehubErrors.sol";
+import {
+    SEPOLIA_CHAIN_ID,
+    SEPOLIA_NON_MIGRATED_STAGE_ERA_CHAIN_ID,
+    SEPOLIA_NON_MIGRATED_TESTNET_CHAIN_ID_A,
+    SEPOLIA_NON_MIGRATED_TESTNET_CHAIN_ID_B,
+    SEPOLIA_NON_MIGRATED_TESTNET_CHAIN_ID_C
+} from "../../common/Config.sol";
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {MessageHashing, ProofData} from "../../common/libraries/MessageHashing.sol";
@@ -91,9 +98,35 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
     function _v31InitializeInner(uint256[] memory _allZKChains) internal {
         uint256 allZKChainsLength = _allZKChains.length;
         for (uint256 i = 0; i < allZKChainsLength; ++i) {
-            require(IBridgehubBase(_bridgehub()).settlementLayer(_allZKChains[i]) == block.chainid, NotAllChainsOnL1());
-            v31UpgradeChainBatchNumber[_allZKChains[i]] = V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE;
+            uint256 chainId = _allZKChains[i];
+            // Per-L1 allowlist of chains that are knowingly still on Gateway at v31
+            // upgrade time. They keep their `v31UpgradeChainBatchNumber` slot at zero
+            // and initialise it via `saveV31UpgradeChainBatchNumber` once they migrate
+            // back to L1. All other chains MUST be on L1 here, otherwise the upgrade
+            // would race with a pending migration.
+            if (_isKnownNonMigratedChainAtV31Upgrade(chainId)) {
+                continue;
+            }
+            require(IBridgehubBase(_bridgehub()).settlementLayer(chainId) == block.chainid, NotAllChainsOnL1());
+            v31UpgradeChainBatchNumber[chainId] = V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE;
         }
+    }
+
+    /// @dev Hardcoded per-L1 list of chains that are still on Gateway at the time of
+    ///      the v31 ecosystem upgrade. Keeps the upgrade unblocked without requiring
+    ///      a coordinated GW→L1 migration of every chain in the same window.
+    ///      The Sepolia bridgehubs (stage + testnet) share an L1 chain id, so a
+    ///      single branch covers both — only chains actually registered on the
+    ///      relevant bridgehub will ever pass through this loop.
+    function _isKnownNonMigratedChainAtV31Upgrade(uint256 _chainId) private view returns (bool) {
+        if (block.chainid == SEPOLIA_CHAIN_ID) {
+            return
+                _chainId == SEPOLIA_NON_MIGRATED_STAGE_ERA_CHAIN_ID ||
+                _chainId == SEPOLIA_NON_MIGRATED_TESTNET_CHAIN_ID_A ||
+                _chainId == SEPOLIA_NON_MIGRATED_TESTNET_CHAIN_ID_B ||
+                _chainId == SEPOLIA_NON_MIGRATED_TESTNET_CHAIN_ID_C;
+        }
+        return false;
     }
 
     function saveV31UpgradeChainBatchNumber(uint256 _chainId) external onlyChain(_chainId) {

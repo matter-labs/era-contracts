@@ -5,12 +5,47 @@ pragma solidity 0.8.28;
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {L2DACommitmentScheme, PubdataPricingMode} from "contracts/common/Config.sol";
 
+/// Per-env list of contracts that can appear as the current owner of a CTM /
+/// ProxyAdmin and need their calls wrapped (since they have no private key)
+/// when running ownership-transfer pre-steps on a real chain. `kind` is a
+/// uint8 (instead of an enum) so the ABI is a plain `(address,uint8)` tuple
+/// — easy to encode from Rust and trivial to extend.
+///
+/// Kind values:
+///   - 0 = `OWNER_KIND_NONE` (placeholder; treated as "not in registry")
+///   - 1 = `OWNER_KIND_LEGACY_GOVERNANCE` (legacy ZKsync `Governance.sol`,
+///     wrapped via `scheduleTransparent` + `executeInstant` from EOA)
+///   - 2 = `OWNER_KIND_OZ_CHAIN_ADMIN` (Ownable2Step `ChainAdmin`, wrapped
+///     via `multicall` from EOA)
+struct OwnerWrap {
+    address ownableContract;
+    uint8 kind;
+}
+
+uint8 constant OWNER_KIND_NONE = 0;
+uint8 constant OWNER_KIND_LEGACY_GOVERNANCE = 1;
+uint8 constant OWNER_KIND_OZ_CHAIN_ADMIN = 2;
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IAdminFunctions {
     function initConfig() external;
 
     function governanceAcceptOwner(address governor, address target) external;
+
+    function governanceAcceptOwnerConditional(address governor, address target) external;
+
+    function transferOwnerConditional(address target, address newOwner) external;
+
+    function transferOwnerSingleConditional(address target, address newOwner) external;
+
+    function ensureCtmsAndProxyAdminsOwnedByGovernance(address bridgehub, address governance) external;
+
+    function ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps(
+        address bridgehub,
+        address governance,
+        OwnerWrap[] calldata wraps
+    ) external;
 
     function governanceAcceptAdmin(address governor, address target) external;
 
@@ -24,6 +59,8 @@ interface IAdminFunctions {
     ) external;
 
     function governanceExecuteCalls(bytes calldata callsToExecute, address governanceAddr) external;
+
+    function governanceExecuteCallsDirect(bytes calldata callsToExecute, address governanceAddr) external;
 
     function ecosystemAdminExecuteCalls(bytes calldata callsToExecute, address ecosystemAdminAddr) external;
 
@@ -115,7 +152,7 @@ interface IAdminFunctions {
         uint256 l1GasPrice,
         uint256 l2ChainId,
         uint256 gatewayChainId,
-        bytes calldata gatewayDiamondCutData,
+        string calldata gatewayRpcUrl,
         address refundRecipient,
         bool shouldSend
     ) external;

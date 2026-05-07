@@ -114,7 +114,7 @@ interface IAdminFunction {
         uint256 l1GasPrice,
         uint256 l2ChainId,
         uint256 gatewayChainId,
-        bytes calldata gatewayDiamondCutData,
+        string calldata gatewayRpcUrl,
         address refundRecipient,
         bool shouldSend
     ) external;

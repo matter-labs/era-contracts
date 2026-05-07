@@ -1,5 +1,5 @@
 use crate::common::{
-    forge::{Forge, ForgeRunner},
+    forge::ForgeRunner,
     traits::{ReadConfig, SaveConfig},
     wallets::Wallet,
 };
@@ -8,7 +8,7 @@ use crate::config::forge_interface::{
         input::{DeployL1Config, InitialDeploymentConfig},
         output::DeployL1CoreContractsOutput,
     },
-    script_params::DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS,
+    script_params::DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION,
 };
 use ethers::types::{Address, H256};
 
@@ -40,17 +40,11 @@ pub fn deploy(
         input.with_legacy_bridge,
     );
 
-    let input_path =
-        DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS.input(&runner.foundry_scripts_path);
+    let input_path = DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION.input(&runner.foundry_scripts_path);
     deploy_config.save(&runner.shell, &input_path)?;
 
-    let forge = Forge::new(&runner.foundry_scripts_path)
-        .script(
-            &DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS.script(),
-            runner.forge_args.clone(),
-        )
-        .with_ffi()
-        .with_rpc_url(runner.rpc_url.clone())
+    let forge = runner
+        .script(&DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION)
         .with_broadcast()
         .with_wallet(auth)
         .with_env(
@@ -61,6 +55,6 @@ pub fn deploy(
     runner.run(forge)?;
 
     let output_path =
-        DEPLOY_ECOSYSTEM_CORE_CONTRACTS_SCRIPT_PARAMS.output(&runner.foundry_scripts_path);
+        DEPLOY_ECOSYSTEM_CORE_CONTRACTS_INVOCATION.output(&runner.foundry_scripts_path);
     DeployL1CoreContractsOutput::read(&runner.shell, output_path)
 }

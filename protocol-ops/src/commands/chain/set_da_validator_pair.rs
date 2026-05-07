@@ -1,20 +1,19 @@
-use std::path::Path;
-
 use anyhow::Context;
 use clap::Parser;
 use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::output::write_output_if_requested;
-use crate::common::forge::{Forge, ForgeRunner, ForgeScriptArg};
+use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
+use crate::config::forge_interface::script_params::ADMIN_FUNCTIONS_INVOCATION;
 use crate::types::L2DACommitmentScheme;
 
 /// Set the DA validator pair for an L1-settling chain.
 ///
 /// Drives `AdminFunctions.s.sol::setDAValidatorPair(bridgehub, chainId,
-/// l1DaValidator, l2DaCommitmentScheme, false)` against a forked anvil and
+/// l1DaValidator, l2DaCommitmentScheme, true)` against a forked anvil and
 /// emits a Gnosis Safe Transaction Builder JSON bundle via `--out`. Replay
 /// the bundle via `protocol-ops dev execute-safe` (or any Safe-bundle-aware
 /// executor) to apply it.
@@ -58,55 +57,39 @@ struct ChainSetDaValidatorPairOutputPayload {
 }
 
 pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
-    let (eco, chain_id) = args.topology.resolve()?;
+    let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
     let admin_address =
-        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, eco.bridgehub, chain_id)
+        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
             .await
             .context("resolving chain admin from L1")?;
     // The Solidity script executes via ChainAdmin, but broadcasts from the
     // ChainAdmin owner internally. Use that owner as Forge's sender so Foundry
     // tracks the correct nonce on the anvil fork.
     let sender = runner
-        .prepare_chain_admin_owner(eco.bridgehub, chain_id)
+        .prepare_chain_admin_owner(bridgehub, chain_id)
         .await?;
 
-    let script_path = Path::new("deploy-scripts/AdminFunctions.s.sol");
-    let script_full_path = runner.foundry_scripts_path.join(script_path);
-    if !script_full_path.exists() {
-        anyhow::bail!("Script not found: {}", script_full_path.display());
-    }
-
-    let mut script_args = runner.forge_args.clone();
-    script_args.add_arg(ForgeScriptArg::Sig {
-        sig: "setDAValidatorPair(address,uint256,address,uint8,bool)".to_string(),
-    });
-    script_args.add_arg(ForgeScriptArg::RpcUrl {
-        url: runner.rpc_url.clone(),
-    });
-    script_args.add_arg(ForgeScriptArg::Ffi);
-    // Broadcast against the anvil fork so Forge records txs into its run
-    // file — protocol-ops extracts those into the Safe bundle.
-    script_args.add_arg(ForgeScriptArg::Broadcast);
-    // `_shouldSend = true` so the script actually invokes
-    // `Utils.adminExecuteCalls` and produces broadcast records.
-    script_args.additional_args.extend([
-        format!("{:#x}", eco.bridgehub),
-        chain_id.to_string(),
-        format!("{:#x}", args.l1_da_validator),
-        (args.l2_da_commitment_scheme as u8).to_string(),
-        "true".to_string(),
-    ]);
-
-    let forge = Forge::new(&runner.foundry_scripts_path)
-        .script(script_path, script_args)
+    let forge = runner
+        .with_script_call(
+            &ADMIN_FUNCTIONS_INVOCATION,
+            "setDAValidatorPair",
+            (
+                bridgehub,
+                ethers::types::U256::from(chain_id),
+                args.l1_da_validator,
+                args.l2_da_commitment_scheme as u8,
+                true,
+            ),
+        )?
+        .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
         .with_wallet(&sender);
 
     logger::step(
         "Preparing set-da-validator-pair Safe bundle via AdminFunctions.s.sol (simulation)",
     );
-    logger::info(format!("Bridgehub: {:#x}", eco.bridgehub));
+    logger::info(format!("Bridgehub: {:#x}", bridgehub));
     logger::info(format!("Chain ID: {chain_id}"));
     logger::info(format!("Admin address: {:#x}", admin_address));
     logger::info(format!("L1 DA validator: {:#x}", args.l1_da_validator));

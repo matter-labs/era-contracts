@@ -5,7 +5,8 @@ import { DeploymentRunner } from "../../src/deployment-runner";
 import { getChainIdsByRole, getL2Chain } from "../../src/core/utils";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
 import { getInteropRecipientAddress, getInteropSourceAddress } from "../../src/core/accounts";
-import { ETH_TOKEN_ADDRESS, INTEROP_CENTER_ADDR, L1_CHAIN_ID, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
+import { ETH_TOKEN_ADDRESS, INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
+import { runtimeConfig } from "../../src/core/runtime-config";
 import { encodeEvmChainAddress } from "../../src/helpers/erc7930";
 import {
   sendInteropMessage,
@@ -298,7 +299,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
 
     const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
     const interopFee = await currentInteropFee();
-    const ethAssetId = encodeNtvAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+    const ethAssetId = encodeNtvAssetId(runtimeConfig.l1ChainId, ETH_TOKEN_ADDRESS);
     const recipient = encodeEvmChainAddress(L2_ASSET_ROUTER_ADDR, customBaseTokenChainId);
     const payload = getTokenTransferData(ethAssetId, amount, getInteropRecipientAddress());
     // callValue = amount because ETH is the sender's base token (native),
@@ -369,7 +370,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       return;
     }
 
-    const customBaseTokenAssetId = encodeNtvAssetId(L1_CHAIN_ID, customBaseTokenL1Addr);
+    const customBaseTokenAssetId = encodeNtvAssetId(runtimeConfig.l1ChainId, customBaseTokenL1Addr);
     const amount = randomBigNumber(BASE_TOKEN_MIN, BASE_TOKEN_MAX);
 
     // Send from chain 14 → destChainId (ETH chain). The custom base token is native on

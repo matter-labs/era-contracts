@@ -137,9 +137,6 @@ RUN yarn --cwd l1-contracts build:foundry
 RUN yarn --cwd l2-contracts build:foundry
 RUN yarn --cwd system-contracts build:foundry
 
-# === Calculate hashes ===
-RUN yarn calculate-hashes:check
-
 # Keep full node_modules — forge ffi scripts depend on packages here (e.g. blakejs).
 
 ########################################

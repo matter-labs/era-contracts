@@ -1,32 +1,26 @@
-use std::{
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use std::path::{Path, PathBuf};
 
 use clap::{Parser, ValueEnum};
-use ethers::{
-    core::types::Bytes,
-    prelude::{LocalWallet, Middleware, Signer},
-    types::{Address, H256, U256},
-    utils::{hex, hex::ToHexExt},
-};
+use ethers::{contract::BaseContract, core::abi::Tokenize, core::types::Bytes, utils::hex};
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
-use crate::common::ethereum::create_ethers_client;
 use crate::common::wallets::Wallet;
 
 /// ForgeScript is a wrapper around the forge script command.
+#[derive(Clone)]
 pub struct ForgeScript {
     pub(crate) base_path: PathBuf,
     pub(crate) script_path: PathBuf,
     pub(crate) args: ForgeScriptArgs,
     pub(crate) envs: Vec<(String, String)>,
+    pub(crate) timing_label: Option<String>,
 }
 
 impl ForgeScript {
-    pub fn wallet_args_passed(&self) -> bool {
-        self.args.wallet_args_passed()
+    pub fn with_timing_label(mut self, label: impl Into<String>) -> Self {
+        self.timing_label = Some(label.into());
+        self
     }
 
     /// Add the ffi flag to the forge script command.
@@ -63,23 +57,23 @@ impl ForgeScript {
         self
     }
 
-    pub fn with_signature(mut self, signature: &str) -> Self {
-        self.args.add_arg(ForgeScriptArg::Sig {
-            sig: signature.to_string(),
-        });
-        self
-    }
-
-    pub fn with_zksync(mut self) -> Self {
-        self.args.add_arg(ForgeScriptArg::Zksync);
-        self
-    }
-
     pub fn with_calldata(mut self, calldata: &Bytes) -> Self {
         self.args.add_arg(ForgeScriptArg::Sig {
             sig: hex::encode(calldata),
         });
         self
+    }
+
+    pub fn with_contract_call<T: Tokenize>(
+        self,
+        contract: &BaseContract,
+        function: &str,
+        args: T,
+    ) -> anyhow::Result<Self> {
+        let calldata = contract
+            .encode(function, args)
+            .map_err(|error| anyhow::anyhow!("failed to encode {}: {}", function, error))?;
+        Ok(self.with_calldata(&calldata))
     }
 
     pub fn with_gas_limit(mut self, gas_limit: u64) -> Self {
@@ -102,38 +96,6 @@ impl ForgeScript {
             .with_unlocked()
     }
 
-    /// Adds the private key of the deployer account.
-    pub fn with_private_key(mut self, private_key: H256) -> Self {
-        self.args.add_arg(ForgeScriptArg::PrivateKey {
-            private_key: private_key.encode_hex(),
-        });
-        self
-    }
-
-    // Do not start the script if balance is not enough
-    pub fn private_key(&self) -> anyhow::Result<Option<LocalWallet>> {
-        for a in &self.args.args {
-            if let ForgeScriptArg::PrivateKey { private_key } = a {
-                let key = H256::from_str(private_key)
-                    .map_err(|e| anyhow::anyhow!("invalid private key hex: {e}"))?;
-                let wallet = LocalWallet::from_bytes(key.as_bytes())
-                    .map_err(|e| anyhow::anyhow!("invalid private key: {e}"))?;
-                return Ok(Some(wallet));
-            }
-        }
-        Ok(None)
-    }
-
-    pub fn rpc_url(&self) -> Option<String> {
-        self.args.args.iter().find_map(|a| {
-            if let ForgeScriptArg::RpcUrl { url } = a {
-                Some(url.clone())
-            } else {
-                None
-            }
-        })
-    }
-
     pub(crate) fn sig(&self) -> Option<String> {
         self.args.args.iter().find_map(|a| {
             if let ForgeScriptArg::Sig { sig } = a {
@@ -149,22 +111,6 @@ impl ForgeScript {
             .args
             .iter()
             .any(|a| matches!(a, ForgeScriptArg::Broadcast))
-    }
-
-    pub fn address(&self) -> anyhow::Result<Option<Address>> {
-        Ok(self.private_key()?.map(|k| k.address()))
-    }
-
-    pub async fn get_the_balance(&self) -> anyhow::Result<Option<U256>> {
-        let Some(rpc_url) = self.rpc_url() else {
-            return Ok(None);
-        };
-        let Some(private_key) = self.private_key()? else {
-            return Ok(None);
-        };
-        let client = create_ethers_client(private_key, rpc_url, None)?;
-        let balance = client.get_balance(client.address(), None).await?;
-        Ok(Some(balance))
     }
 
     pub(crate) fn needs_bridgehub_skip(&self) -> bool {
@@ -193,27 +139,6 @@ const PROHIBITED_ARGS: [&str; 10] = [
     "-s",
 ];
 
-const WALLET_ARGS: [&str; 18] = [
-    "-a",
-    "--from",
-    "-i",
-    "--private-keys",
-    "--private-key",
-    "--mnemonics",
-    "--mnemonic-passphrases",
-    "--mnemonic-derivation-paths",
-    "--mnemonic-indexes",
-    "--keystore",
-    "--account",
-    "--password",
-    "--password-file",
-    "-l",
-    "--ledger",
-    "-t",
-    "--trezor",
-    "--aws",
-];
-
 /// Set of known forge script arguments necessary for execution.
 #[derive(Display, Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[strum(serialize_all = "kebab-case", prefix = "--")]
@@ -224,10 +149,6 @@ pub enum ForgeScriptArg {
         api_key: String,
     },
     Ffi,
-    #[strum(to_string = "private-key={private_key}")]
-    PrivateKey {
-        private_key: String,
-    },
     #[strum(to_string = "rpc-url={url}")]
     RpcUrl {
         url: String,
@@ -246,7 +167,6 @@ pub enum ForgeScriptArg {
         url: String,
     },
     Verify,
-    Resume,
     #[strum(to_string = "sender={address}")]
     Sender {
         address: String,
@@ -389,16 +309,6 @@ impl ForgeScriptArgs {
             return;
         }
         self.args.push(arg);
-    }
-
-    pub fn wallet_args_passed(&self) -> bool {
-        self.additional_args
-            .iter()
-            .any(|arg| WALLET_ARGS.contains(&arg.as_ref()))
-    }
-
-    pub fn with_zksync(&mut self) {
-        self.zksync = true;
     }
 }
 
