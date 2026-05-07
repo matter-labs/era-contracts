@@ -15,10 +15,27 @@ use crate::common::{logger, paths};
 /// real-chain state).
 const SCRIPT_LIB_SOURCE_PREFIX: &str = "deploy-scripts/";
 
+/// Contract names that live under `SCRIPT_LIB_SOURCE_PREFIX` but ARE
+/// intentionally deployed as part of the upgrade flow and must NOT be
+/// stripped from the Safe bundle. Currently only `Create2AndTransfer`, the
+/// wrapper used by `create2WithDeterministicOwner`
+/// (`Create2FactoryUtils.s.sol::create2WithDeterministicOwner`) to deploy
+/// and transfer ownership atomically — its CREATE2 lands the wrapper, and
+/// the wrapper's constructor in turn CREATE2s the inner contract (e.g.
+/// `BridgedTokenBeacon`, `ProxyAdmin`). Dropping this from the bundle
+/// silently breaks every `deployWithCreate2AndOwner` call: the bundle
+/// applies on-chain without the wrapper deploy, so the inner contract is
+/// never deployed at the address the simulation captured, and downstream
+/// scripts (e.g. `RegisterZKChain`) revert when they call into that
+/// non-contract.
+const KEEP_UNDER_SCRIPT_PREFIX: &[&str] = &["Create2AndTransfer"];
+
 /// Set of `contractName`s whose compilation target source-path lives under
 /// `SCRIPT_LIB_SOURCE_PREFIX`. Built lazily by walking `<l1-contracts>/out/*.sol/*.json`
 /// on first use, cached for the rest of the process. Returns an empty set if
 /// the artifacts dir can't be read (no filtering happens; safe degradation).
+/// Names listed in [`KEEP_UNDER_SCRIPT_PREFIX`] are excluded so their
+/// intentional CREATE2 deploys survive Safe-bundle filtering.
 fn script_only_library_names() -> &'static HashSet<String> {
     static SET: OnceLock<HashSet<String>> = OnceLock::new();
     SET.get_or_init(|| {
@@ -55,6 +72,9 @@ fn script_only_library_names() -> &'static HashSet<String> {
                 for (src_path, contract_name) in targets {
                     if src_path.starts_with(SCRIPT_LIB_SOURCE_PREFIX) {
                         if let Some(n) = contract_name.as_str() {
+                            if KEEP_UNDER_SCRIPT_PREFIX.iter().any(|k| *k == n) {
+                                continue;
+                            }
                             names.insert(n.to_string());
                         }
                     }
