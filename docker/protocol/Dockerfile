@@ -97,6 +97,17 @@ RUN cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
 WORKDIR /contracts
 COPY . /contracts
 
+# === Copy zk-governance source ===
+# protocol-ops's PUH/Guardians redeploy step (`ecosystem upgrade-prepare-all`
+# on PUH-governed envs like stage / mainnet) shells out to a forge script
+# inside zk-governance. The runtime path it expects is `<era>/../../zk-governance/l1-contracts`,
+# which inside the container resolves to `/zk-governance/l1-contracts`. The
+# CI workflow checks out matter-labs/zk-governance at $GITHUB_WORKSPACE/zk-governance/
+# so it lands inside the docker build context. The era-contracts `COPY .`
+# above also captures it under `/contracts/zk-governance/`, but we move it
+# into place so protocol-ops finds it at its expected sibling location.
+COPY zk-governance /zk-governance
+
 # === Build Rust binaries (deps already cached by cook) ===
 # Keep binaries in their project-relative locations (matches local layout)
 WORKDIR /contracts/protocol-ops
@@ -136,6 +147,12 @@ RUN yarn --cwd da-contracts build:foundry
 RUN yarn --cwd l1-contracts build:foundry
 RUN yarn --cwd l2-contracts build:foundry
 RUN yarn --cwd system-contracts build:foundry
+
+# Pre-compile zk-governance contracts. This both seeds /root/.svm/ with solc
+# 0.8.24 (zk-governance pins it; the runtime image runs with FOUNDRY_OFFLINE=true
+# so missing solc downloads would fail) and produces out/ artifacts that
+# DeployPUHAndGuardians.s.sol reads at runtime.
+RUN cd /zk-governance/l1-contracts && forge build
 
 # Keep full node_modules — forge ffi scripts depend on packages here (e.g. blakejs).
 
@@ -185,6 +202,10 @@ COPY --from=build /contracts/node_modules /contracts/node_modules
 COPY --from=build /contracts/package.json /contracts/package.json
 COPY --from=build /contracts/AllContractsHashes.json /contracts/AllContractsHashes.json
 COPY --from=build /contracts/SystemConfig.json /contracts/SystemConfig.json
+
+# zk-governance lives at `/zk-governance` (sibling-style path) so protocol-ops
+# resolves it correctly via `<era>/../../zk-governance/l1-contracts`.
+COPY --from=build /zk-governance /zk-governance
 
 # Disable foundry-zksync telemetry
 RUN mkdir -p /etc/xdg/zksync-tooling && \
