@@ -66,7 +66,16 @@ pub struct V31PrepareInputs {
 /// CTM in input order).
 pub struct V31PrepareOutput {
     pub core_toml: PathBuf,
-    pub ctm_tomls: Vec<(Address, PathBuf)>,
+    pub ctm_tomls: Vec<CtmPrepareEntry>,
+}
+
+/// Per-CTM prepare result: where the script wrote its TOML, and the resolved
+/// `is_zk_sync_os` flag (used downstream to label per-CTM sections in the
+/// merged ecosystem TOML as `[ctms.era]` vs `[ctms.zksync_os]`).
+pub struct CtmPrepareEntry {
+    pub proxy: Address,
+    pub toml: PathBuf,
+    pub is_zk_sync_os: bool,
 }
 
 // ── struct ────────────────────────────────────────────────────────────────
@@ -113,11 +122,15 @@ impl<'a> V31UpgradeInner<'a> {
 
         let mut ctm_tomls = Vec::with_capacity(inputs.ctms.len());
         for ctm in &inputs.ctms {
-            let path = self
+            let (path, is_zk_sync_os) = self
                 .prepare_ctm(runner, deployer, inputs, ctm)
                 .await
                 .with_context(|| format!("ctm prepare ({:#x})", ctm.proxy))?;
-            ctm_tomls.push((ctm.proxy, path));
+            ctm_tomls.push(CtmPrepareEntry {
+                proxy: ctm.proxy,
+                toml: path,
+                is_zk_sync_os,
+            });
         }
 
         Ok(V31PrepareOutput {
@@ -210,7 +223,7 @@ impl<'a> V31UpgradeInner<'a> {
         deployer: &Wallet,
         inputs: &V31PrepareInputs,
         ctm: &CtmInputs,
-    ) -> anyhow::Result<PathBuf> {
+    ) -> anyhow::Result<(PathBuf, bool)> {
         ensure_script_exists(self.contracts_path, &inputs.ctm_script_path)?;
 
         let ctm_proxy = ctm.proxy;
@@ -353,7 +366,7 @@ impl<'a> V31UpgradeInner<'a> {
             .run(script)
             .context("Failed to execute CTMUpgrade_v31.noGovernancePrepare")?;
 
-        Ok(ctm_output_path)
+        Ok((ctm_output_path, is_zk_sync_os))
     }
 }
 
