@@ -153,135 +153,90 @@ mod tests {
     #[test]
     fn validates_minimal_ecosystem_upgrade_output() {
         let toml = r#"
-                        chain_upgrade_diamond_cut = "0x1234"
-
-                        [contracts_config]
-                        diamond_cut_data = "0xabcd"
-                        force_deployments_data = "0x1234"
-                        old_protocol_version = 1
-                        new_protocol_version = 2
-
                         [governance_calls]
                         stage0_calls = "0x00"
                         stage1_calls = "0x0102"
                         stage2_calls = "0x030405"
+
+                        [core]
+
+                        [ctms.era]
+                        chain_upgrade_diamond_cut = "0x1234"
+
+                        [ctms.era.contracts_config]
+                        diamond_cut_data = "0xabcd"
+                        force_deployments_data = "0x1234"
+                        old_protocol_version = 1
+                        new_protocol_version = 2
+                        governance_upgrade_timer_initial_delay = 0
+                        is_testnet = false
                         "#;
 
-        validate_ecosystem_artifact(&ecosystem_artifact(toml)).unwrap();
+        validate_ecosystem_artifact(&EcosystemUpgradeArtifact::from_toml_str(toml).unwrap())
+            .unwrap();
     }
 
     #[test]
     fn validates_ecosystem_artifact_shape() {
         let toml = r#"
-                        chain_admin_addr = "0x0000000000000000000000000000000000000001"
-                        chain_upgrade_diamond_cut = "0x1234"
-                        old_protocol_version = 1
-                        new_protocol_version = 2
-
-                        [contracts_config]
-                        diamond_cut_data = "0xabcd"
-                        force_deployments_data = "0x1234"
-                        old_protocol_version = 1
-                        new_protocol_version = 2
-
-                        [deployed_addresses]
-                        chain_admin = "0x0000000000000000000000000000000000000002"
-
-                        [deployed_addresses.bridgehub]
-                        bridgehub_proxy_addr = "0x0000000000000000000000000000000000000003"
-
                         [governance_calls]
                         stage0_calls = "0x00"
                         stage1_calls = "0x0102"
                         stage2_calls = "0x030405"
+
+                        [core]
+                        chain_admin_addr = "0x0000000000000000000000000000000000000001"
+
+                        [ctms.era]
+                        chain_upgrade_diamond_cut = "0x1234"
+
+                        [ctms.era.contracts_config]
+                        diamond_cut_data = "0xabcd"
+                        force_deployments_data = "0x1234"
+                        old_protocol_version = 1
+                        new_protocol_version = 2
+                        governance_upgrade_timer_initial_delay = 0
+                        is_testnet = false
+
+                        [ctms.era.deployed_addresses]
+                        chain_admin = "0x0000000000000000000000000000000000000002"
+
+                        [ctms.era.deployed_addresses.bridgehub]
+                        bridgehub_proxy_addr = "0x0000000000000000000000000000000000000003"
                         "#;
 
-        validate_ecosystem_artifact(&ecosystem_artifact(toml)).unwrap();
+        validate_ecosystem_artifact(&EcosystemUpgradeArtifact::from_toml_str(toml).unwrap())
+            .unwrap();
     }
 
     #[test]
     fn rejects_malformed_ecosystem_address_fields() {
         let toml = r#"
-                        chain_upgrade_diamond_cut = "0x1234"
-
-                        [contracts_config]
-                        diamond_cut_data = "0xabcd"
-                        force_deployments_data = "0x1234"
-                        old_protocol_version = 1
-                        new_protocol_version = 2
-
                         [governance_calls]
                         stage0_calls = "0x00"
                         stage1_calls = "0x0102"
                         stage2_calls = "0x030405"
 
-                        [deployed_addresses]
+                        [core]
+
+                        [ctms.era]
+                        chain_upgrade_diamond_cut = "0x1234"
+
+                        [ctms.era.contracts_config]
+                        diamond_cut_data = "0xabcd"
+                        force_deployments_data = "0x1234"
+                        old_protocol_version = 1
+                        new_protocol_version = 2
+                        governance_upgrade_timer_initial_delay = 0
+                        is_testnet = false
+
+                        [ctms.era.deployed_addresses]
                         chain_admin = "not-an-address"
                         "#;
 
-        assert!(validate_ecosystem_artifact(&ecosystem_artifact(toml)).is_err());
-    }
-
-    fn ecosystem_artifact(toml: &str) -> EcosystemUpgradeArtifact {
-        let value: toml::Value = toml::from_str(toml).unwrap();
-        let chain_upgrade_diamond_cut = value
-            .get("chain_upgrade_diamond_cut")
-            .and_then(toml::Value::as_str)
-            .unwrap()
-            .to_string();
-        let governance_call_value = value.get("governance_calls").unwrap();
-        let contracts_config_value = value.get("contracts_config").unwrap();
-        let contracts_config = crate::upgrade_verification::artifacts::ContractsConfig {
-            diamond_cut_data: contracts_config_value
-                .get("diamond_cut_data")
-                .and_then(toml::Value::as_str)
-                .unwrap()
-                .to_string(),
-            force_deployments_data: contracts_config_value
-                .get("force_deployments_data")
-                .and_then(toml::Value::as_str)
-                .unwrap()
-                .to_string(),
-            old_protocol_version: contracts_config_value
-                .get("old_protocol_version")
-                .and_then(toml::Value::as_integer)
-                .unwrap() as u64,
-            new_protocol_version: contracts_config_value
-                .get("new_protocol_version")
-                .and_then(toml::Value::as_integer)
-                .unwrap() as u64,
-            governance_upgrade_timer_initial_delay: contracts_config_value
-                .get("governance_upgrade_timer_initial_delay")
-                .and_then(toml::Value::as_integer)
-                .unwrap_or(0) as u64,
-            is_testnet: contracts_config_value
-                .get("is_testnet")
-                .and_then(toml::Value::as_bool)
-                .unwrap_or(false),
-        };
-        let governance_calls = crate::upgrade_verification::artifacts::GovernanceCalls {
-            stage0_calls: governance_call_value
-                .get("stage0_calls")
-                .and_then(toml::Value::as_str)
-                .unwrap()
-                .to_string(),
-            stage1_calls: governance_call_value
-                .get("stage1_calls")
-                .and_then(toml::Value::as_str)
-                .unwrap()
-                .to_string(),
-            stage2_calls: governance_call_value
-                .get("stage2_calls")
-                .and_then(toml::Value::as_str)
-                .unwrap()
-                .to_string(),
-        };
-
-        EcosystemUpgradeArtifact {
-            value,
-            chain_upgrade_diamond_cut,
-            contracts_config,
-            governance_calls,
-        }
+        assert!(
+            validate_ecosystem_artifact(&EcosystemUpgradeArtifact::from_toml_str(toml).unwrap())
+                .is_err()
+        );
     }
 }

@@ -108,6 +108,23 @@ pub(crate) async fn verify_governance_stage_calls(
     Ok(())
 }
 
+/// Stage 1 call layout: 11 ecosystem-wide calls (indices 0..=10), then 3
+/// per-CTM calls (CTM proxy upgrade, setChainCreationParams,
+/// setNewVersionUpgrade) repeated once per `[ctms.<flavor>]` section in the
+/// artifact, in the order [`EcosystemUpgradeArtifact::ctms`] returns.
+const STAGE1_PREFIX_LEN: usize = 11;
+const STAGE1_PER_CTM_LEN: usize = 3;
+
+/// Index of the per-CTM `ChainTypeManager` proxy upgrade within the
+/// per-CTM block (offset relative to the start of that block).
+const PER_CTM_OFFSET_UPGRADE_CTM: usize = 0;
+const PER_CTM_OFFSET_SET_CHAIN_CREATION_PARAMS: usize = 1;
+const PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE: usize = 2;
+
+fn ctm_block_start(ctm_index: usize) -> usize {
+    STAGE1_PREFIX_LEN + ctm_index * STAGE1_PER_CTM_LEN
+}
+
 impl GovernanceStage1Calls {
     pub(crate) async fn verify_artifact(
         &self,
@@ -115,13 +132,14 @@ impl GovernanceStage1Calls {
         verifiers: &Verifiers,
         result: &mut VerificationResult,
     ) -> anyhow::Result<()> {
-        self.verify_call_shape(verifiers, result)?;
+        self.verify_call_shape(artifact.ctms.len(), verifiers, result)?;
         self.verify_artifact_payloads(artifact, verifiers, result)
             .await
     }
 
     fn verify_call_shape(
         &self,
+        ctm_count: usize,
         verifiers: &Verifiers,
         result: &mut VerificationResult,
     ) -> anyhow::Result<()> {
@@ -130,7 +148,7 @@ impl GovernanceStage1Calls {
         const ACCEPT_ASSET_TRACKER_OWNERSHIP: usize = 7;
         const SET_ASSET_TRACKER: usize = 8;
 
-        let list_of_calls = [
+        let mut list_of_calls: Vec<(&'static str, &'static str)> = vec![
             // Upgrade Bridgehub proxy.
             ("transparent_proxy_admin", "upgrade(address,address)"),
             // Upgrade L1 nullifier proxy.
@@ -156,19 +174,27 @@ impl GovernanceStage1Calls {
             ("upgrade_timer", "checkDeadline()"),
             // Check that migrations are paused.
             ("upgrade_stage_validator", "checkMigrationsPaused()"),
-            // Upgrade CTM proxy.
-            ("transparent_proxy_admin", "upgrade(address,address)"),
-            // Set chain creation params on the upgraded CTM.
-            (
-                "chain_type_manager_proxy",
-                "setChainCreationParams((address,bytes32,uint64,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))",
-            ),
-            // Register the new protocol version upgrade on the upgraded CTM.
-            (
-                "chain_type_manager_proxy",
-                "setNewVersionUpgrade(((address,uint8,bool,bytes4[])[],address,bytes),uint256,uint256,uint256,address)",
-            ),
         ];
+        // Append the per-CTM block once per registered CTM in the artifact.
+        // Multi-CTM upgrades (e.g. Era + ZKsyncOS in one prepare run) emit
+        // these three calls per CTM, in the order `[ctms.era]` then
+        // `[ctms.zksync_os]`.
+        for _ in 0..ctm_count {
+            list_of_calls.extend_from_slice(&[
+                // Upgrade CTM proxy.
+                ("transparent_proxy_admin", "upgrade(address,address)"),
+                // Set chain creation params on the upgraded CTM.
+                (
+                    "chain_type_manager_proxy",
+                    "setChainCreationParams((address,bytes32,uint64,bytes32,((address,uint8,bool,bytes4[])[],address,bytes),bytes))",
+                ),
+                // Register the new protocol version upgrade on the upgraded CTM.
+                (
+                    "chain_type_manager_proxy",
+                    "setNewVersionUpgrade(((address,uint8,bool,bytes4[])[],address,bytes),uint256,uint256,uint256,address)",
+                ),
+            ]);
+        }
         self.calls.verify(&list_of_calls, verifiers, result)?;
 
         // The accepted AssetTracker proxy must be the one wired into NativeTokenVault.
@@ -218,9 +244,6 @@ impl GovernanceStage1Calls {
         const UPGRADE_MESSAGE_ROOT: usize = 4;
         const UPGRADE_CTM_DEPLOYMENT_TRACKER: usize = 5;
         const UPGRADE_CHAIN_ASSET_HANDLER: usize = 6;
-        const UPGRADE_CTM: usize = 11;
-        const SET_CHAIN_CREATION_PARAMS: usize = 12;
-        const SET_NEW_VERSION_UPGRADE: usize = 13;
 
         let mut errors = 0;
 
@@ -279,25 +302,39 @@ impl GovernanceStage1Calls {
             verifiers,
             result,
         );
-        // Verify CTM proxy upgrade payload.
-        errors += verify_ctm_upgrade_call_args(&self.calls, UPGRADE_CTM, verifiers, result);
-        // Verify CTM chain creation params payload from the ecosystem TOML.
-        errors += verify_set_chain_creation_params_payload(
-            &self.calls,
-            SET_CHAIN_CREATION_PARAMS,
-            artifact,
-            verifiers,
-            result,
-        );
-        // Verify CTM new version upgrade payload from the ecosystem TOML.
-        errors += verify_set_new_version_upgrade_payload(
-            &self.calls,
-            SET_NEW_VERSION_UPGRADE,
-            artifact,
-            verifiers,
-            result,
-        )
-        .await?;
+
+        // Per-CTM block: CTM proxy upgrade, setChainCreationParams,
+        // setNewVersionUpgrade. Validated against each CTM's own
+        // chain_upgrade_diamond_cut + contracts_config.
+        for (i, ctm) in artifact.ctms.iter().enumerate() {
+            let block = ctm_block_start(i);
+            result.print_info(&format!(
+                "-- CTM[{i}] = {} ----------------------",
+                ctm.flavor.label()
+            ));
+            errors += verify_ctm_upgrade_call_args(
+                &self.calls,
+                block + PER_CTM_OFFSET_UPGRADE_CTM,
+                verifiers,
+                result,
+            );
+            errors += verify_set_chain_creation_params_payload(
+                &self.calls,
+                block + PER_CTM_OFFSET_SET_CHAIN_CREATION_PARAMS,
+                ctm,
+                verifiers,
+                result,
+            );
+            errors += verify_set_new_version_upgrade_payload(
+                &self.calls,
+                block + PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE,
+                artifact,
+                ctm,
+                verifiers,
+                result,
+            )
+            .await?;
+        }
 
         if errors > 0 {
             anyhow::bail!("{} errors", errors);
@@ -314,7 +351,8 @@ impl GovernanceStage1Calls {
         l1_expected_chain_upgrade_diamond_cut: &str,
         l1_bytecodes_supplier_addr: Address,
     ) -> anyhow::Result<(String, String)> {
-        self.verify_call_shape(verifiers, result)?;
+        // Legacy single-CTM caller: assumes exactly one per-CTM block.
+        self.verify_call_shape(1, verifiers, result)?;
         result.print_info("== Gov stage 1 payloads ===");
 
         const SET_CHAIN_CREATION_PARAMS: usize = 12;
@@ -524,7 +562,7 @@ fn verify_ctm_upgrade_call_args(
 fn verify_set_chain_creation_params_payload(
     calls: &CallList,
     index: usize,
-    artifact: &EcosystemUpgradeArtifact,
+    ctm: &crate::upgrade_verification::artifacts::CtmArtifact,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
 ) -> usize {
@@ -587,13 +625,13 @@ fn verify_set_chain_creation_params_payload(
     errors += expect_hex_equal(
         result,
         "chain creation diamond cut",
-        &artifact.contracts_config.diamond_cut_data,
+        &ctm.contracts_config.diamond_cut_data,
         &hex::encode(params.diamondCut.abi_encode()),
     );
     errors += expect_hex_equal(
         result,
         "force deployments data",
-        &artifact.contracts_config.force_deployments_data,
+        &ctm.contracts_config.force_deployments_data,
         &hex::encode(&params.forceDeploymentsData),
     );
 
@@ -604,6 +642,7 @@ async fn verify_set_new_version_upgrade_payload(
     calls: &CallList,
     index: usize,
     artifact: &EcosystemUpgradeArtifact,
+    ctm: &crate::upgrade_verification::artifacts::CtmArtifact,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
 ) -> anyhow::Result<usize> {
@@ -616,8 +655,8 @@ async fn verify_set_new_version_upgrade_payload(
         .context("decoding setNewVersionUpgrade")?;
 
     let mut errors = 0;
-    let artifact_old_protocol_version = U256::from(artifact.contracts_config.old_protocol_version);
-    let artifact_new_protocol_version = U256::from(artifact.contracts_config.new_protocol_version);
+    let artifact_old_protocol_version = U256::from(ctm.contracts_config.old_protocol_version);
+    let artifact_new_protocol_version = U256::from(ctm.contracts_config.new_protocol_version);
 
     if data.oldProtocolVersion != artifact_old_protocol_version {
         result.report_error(&format!(
@@ -693,7 +732,7 @@ async fn verify_set_new_version_upgrade_payload(
     errors += expect_hex_equal(
         result,
         "chain upgrade diamond cut",
-        &artifact.chain_upgrade_diamond_cut,
+        &ctm.chain_upgrade_diamond_cut,
         &hex::encode(diamond_cut.abi_encode()),
     );
     errors += expect_named_address(
@@ -718,7 +757,7 @@ async fn verify_set_new_version_upgrade_payload(
     errors += verify_default_upgrade_payload(
         &diamond_cut.initCalldata,
         artifact_new_protocol_version,
-        &artifact.contracts_config.force_deployments_data,
+        &ctm.contracts_config.force_deployments_data,
         verifiers,
         result,
         bytecodes_supplier_addr,
