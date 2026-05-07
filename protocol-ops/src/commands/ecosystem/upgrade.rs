@@ -61,14 +61,15 @@ pub struct UpgradeGovernanceArgs {
     #[serde(flatten)]
     pub topology: crate::common::EcosystemArgs,
 
-    /// Path(s) to governance calls TOML(s) written by a prepare command via
-    /// `--governance-toml-out`. Each TOML contains hex-encoded stage 0/1/2
-    /// calldata. Pass `--governance-toml` once per TOML — typically once for
-    /// `core-upgrade-prepare` and once per `ctm-upgrade-prepare` invocation.
-    /// All stage-0 calls (across TOMLs in the order given) execute first, then
-    /// all stage-1 calls, then all stage-2 calls. Each `governanceExecuteCalls`
-    /// invocation lands in the same Safe bundle since the governance owner
-    /// signs every stage.
+    /// Path(s) to TOML(s) carrying a top-level `[governance_calls]` table with
+    /// hex-encoded `stage0_calls` / `stage1_calls` / `stage2_calls`. Typically
+    /// the single merged ecosystem TOML written by `upgrade-prepare-all`
+    /// (`<out>/ecosystem.toml`); legacy per-script TOMLs (one core + one per
+    /// CTM) also work and may be passed multiple times. All stage-0 calls
+    /// (across TOMLs in the order given) execute first, then all stage-1
+    /// calls, then all stage-2 calls. Each `governanceExecuteCalls` invocation
+    /// lands in the same Safe bundle since the governance owner signs every
+    /// stage.
     #[clap(long, num_args = 1..)]
     pub governance_toml: Vec<PathBuf>,
 }
@@ -88,15 +89,16 @@ pub async fn run_upgrade_governance(mut args: UpgradeGovernanceArgs) -> anyhow::
         if args.shared.out.is_none() {
             args.shared.out = Some(env_out_base.join("governance"));
         }
-        // Auto-discover the merged governance TOML from the prepare phase
-        // output. `upgrade-prepare-all` emits a single `governance.toml`
-        // containing core + per-CTM + PUH/Guardians stage-0 calls, so we no
-        // longer need to merge multiple files at replay time.
+        // Auto-discover the merged ecosystem TOML from the prepare phase
+        // output. `upgrade-prepare-all` emits a single `ecosystem.toml`
+        // whose top-level `[governance_calls]` table carries the merged
+        // stage 0/1/2 calls (core + per-CTM + PUH/Guardians stage-0), so
+        // we no longer need to merge multiple files at replay time.
         if args.governance_toml.is_empty() {
-            let candidate = env_out_base.join("prepare").join("governance.toml");
+            let candidate = env_out_base.join("prepare").join("ecosystem.toml");
             if candidate.is_file() {
                 logger::info(format!(
-                    "Auto-discovered governance TOML at {}",
+                    "Auto-discovered ecosystem TOML at {}",
                     candidate.display()
                 ));
                 args.governance_toml.push(candidate);
@@ -428,11 +430,15 @@ struct CtmConfigEntry {
 struct UpgradePrepareAllOutput {
     core_governance_toml: String,
     ctm_governance_tomls: Vec<CtmGovernanceTomlEntry>,
-    /// Merged stage 0/1/2 calls written to `<out>/prepare/governance.toml`,
-    /// when `--out` is set. Downstream `upgrade-governance --env <env>` picks
-    /// this up automatically.
+    /// Merged ecosystem TOML written to `<out>/prepare/ecosystem.toml`, when
+    /// `--out` is set. Contains top-level `[governance_calls]` (merged stage
+    /// 0/1/2 hex), `[core]` (the CTM-agnostic core prepare output), and one
+    /// `[ctms.<flavor>]` table per CTM (`era` or `zksync_os`, keyed off
+    /// `is_zk_sync_os`) carrying the per-CTM diamond cut + contracts config.
+    /// Downstream `upgrade-governance --env <env>` and `verify-upgrade` both
+    /// consume this single file.
     #[serde(skip_serializing_if = "Option::is_none")]
-    merged_governance_toml: Option<String>,
+    merged_ecosystem_toml: Option<String>,
     puh_proxy: String,
     new_puh_impl: String,
     new_guardians: String,
@@ -637,21 +643,22 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     };
 
     // Merge core + per-CTM governance calls + (when present) the in-memory
-    // PUH/Guardians stage-0 calls into a single `<out>/prepare/governance.toml`.
+    // PUH/Guardians stage-0 calls into a single `<out>/prepare/ecosystem.toml`.
     // The Solidity scripts each emit their own toml under `script-out/` (forge
-    // requirement), but downstream we only care about one merged file.
-    let merged_governance = if let Some(out_dir) = args.shared.out.clone() {
-        let mut sources: Vec<PathBuf> = Vec::with_capacity(1 + prepared.ctm_tomls.len());
-        sources.push(prepared.core_toml.clone());
-        for (_ctm, src) in &prepared.ctm_tomls {
-            sources.push(src.clone());
-        }
-        let merged_path = out_dir.join("governance.toml");
+    // requirement), but downstream (PUVT + governance replay) only consumes
+    // the merged file.
+    let merged_ecosystem = if let Some(out_dir) = args.shared.out.clone() {
+        let merged_path = out_dir.join("ecosystem.toml");
         let extra_stage0 = puh_outcome
             .as_ref()
             .map(|o| o.stage0_calls.as_slice())
             .unwrap_or(&[]);
-        write_merged_governance_toml(&sources, extra_stage0, &merged_path)?;
+        write_merged_ecosystem_toml(
+            &prepared.core_toml,
+            &prepared.ctm_tomls,
+            extra_stage0,
+            &merged_path,
+        )?;
         Some(merged_path)
     } else {
         None
@@ -660,16 +667,16 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     let ctm_governance_tomls: Vec<CtmGovernanceTomlEntry> = prepared
         .ctm_tomls
         .iter()
-        .map(|(ctm, src)| CtmGovernanceTomlEntry {
-            ctm_proxy: format!("{ctm:#x}"),
-            governance_toml: src.display().to_string(),
+        .map(|entry| CtmGovernanceTomlEntry {
+            ctm_proxy: format!("{:#x}", entry.proxy),
+            governance_toml: entry.toml.display().to_string(),
         })
         .collect();
 
     let out_payload = UpgradePrepareAllOutput {
         core_governance_toml: prepared.core_toml.display().to_string(),
         ctm_governance_tomls,
-        merged_governance_toml: merged_governance.as_ref().map(|p| p.display().to_string()),
+        merged_ecosystem_toml: merged_ecosystem.as_ref().map(|p| p.display().to_string()),
         puh_proxy: puh_outcome
             .as_ref()
             .map(|o| format!("{:#x}", o.puh_proxy))
@@ -717,65 +724,121 @@ fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> 
 /// in the order they were prepared). `extra_stage0` is appended to stage 0
 /// after the file-sourced calls — used for the PUH/Guardians redeploy calls
 /// emitted in-memory by [`puh_guardians::deploy_puh_guardians`].
-fn write_merged_governance_toml(
-    sources: &[PathBuf],
+/// Merge the core + per-CTM prepare TOMLs (plus optional in-memory PUH
+/// stage-0 calls) into a single ecosystem TOML at `dst`. Shape:
+///
+/// ```toml
+/// [governance_calls]              # merged stage 0/1/2 hex across all sources
+/// stage0_calls = "0x..."
+/// stage1_calls = "0x..."
+/// stage2_calls = "0x..."
+///
+/// [core]                          # whole core TOML minus its [governance_calls]
+/// ...
+///
+/// [ctms.era]                      # whole CTM TOML minus its [governance_calls];
+/// ...                             # key is "era" if !is_zk_sync_os else "zksync_os".
+/// [ctms.zksync_os]                # second CTM, when present.
+/// ...
+/// ```
+fn write_merged_ecosystem_toml(
+    core_toml: &Path,
+    ctm_entries: &[crate::commands::ecosystem::v31_upgrade_inner::CtmPrepareEntry],
     extra_stage0: &[crate::common::governance_calls::GovernanceCall],
     dst: &Path,
 ) -> anyhow::Result<()> {
     use crate::common::governance_calls::{empty_calls_hex, encode_calls, merge_call_array_hex};
     use ethers::utils::hex;
+    use toml::value::{Table, Value};
 
     if let Some(parent) = dst.parent() {
         fs::create_dir_all(parent)?;
     }
-    let mut stage0: Vec<String> = Vec::new();
-    let mut stage1: Vec<String> = Vec::new();
-    let mut stage2: Vec<String> = Vec::new();
-    for src in sources {
-        let raw = fs::read_to_string(src).with_context(|| format!("read {}", src.display()))?;
-        let parsed: EcosystemUpgradeOutput =
-            toml::from_str(&raw).with_context(|| format!("parse {}", src.display()))?;
-        stage0.push(parsed.governance_calls.stage0_calls);
-        stage1.push(parsed.governance_calls.stage1_calls);
-        stage2.push(parsed.governance_calls.stage2_calls);
+
+    // Read each source as a generic TOML table; pop [governance_calls] out so
+    // it can be merged at the top level, leaving the rest to embed verbatim.
+    fn load_and_split(path: &Path) -> anyhow::Result<(Table, GovernanceCalls)> {
+        let raw = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+        let mut value: Table =
+            toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
+        let gov = value
+            .remove("governance_calls")
+            .with_context(|| format!("missing [governance_calls] in {}", path.display()))?;
+        let gov: GovernanceCalls = gov
+            .try_into()
+            .with_context(|| format!("invalid [governance_calls] in {}", path.display()))?;
+        Ok((value, gov))
     }
-    let extra_stage0_hex = if extra_stage0.is_empty() {
-        None
-    } else {
-        Some(format!("0x{}", hex::encode(encode_calls(extra_stage0))))
-    };
-    if let Some(ref h) = extra_stage0_hex {
-        stage0.push(h.clone());
+
+    let (core_body, core_gov) = load_and_split(core_toml)?;
+
+    let mut ctms_table: Table = Table::new();
+    let mut stage0: Vec<String> = vec![core_gov.stage0_calls];
+    let mut stage1: Vec<String> = vec![core_gov.stage1_calls];
+    let mut stage2: Vec<String> = vec![core_gov.stage2_calls];
+
+    for entry in ctm_entries {
+        let (body, gov) = load_and_split(&entry.toml)?;
+        let label = if entry.is_zk_sync_os {
+            "zksync_os"
+        } else {
+            "era"
+        };
+        if ctms_table.contains_key(label) {
+            anyhow::bail!(
+                "duplicate CTM flavor `{label}`: two CTMs cannot share the same `is_zk_sync_os` value in one upgrade"
+            );
+        }
+        ctms_table.insert(label.to_string(), Value::Table(body));
+        stage0.push(gov.stage0_calls);
+        stage1.push(gov.stage1_calls);
+        stage2.push(gov.stage2_calls);
     }
-    let s0 = if stage0.is_empty() {
-        empty_calls_hex()
-    } else {
-        merge_call_array_hex(&stage0.iter().map(String::as_str).collect::<Vec<_>>())?
+
+    if !extra_stage0.is_empty() {
+        stage0.push(format!("0x{}", hex::encode(encode_calls(extra_stage0))));
+    }
+
+    let merge = |chunks: &[String]| -> anyhow::Result<String> {
+        if chunks.is_empty() {
+            Ok(empty_calls_hex())
+        } else {
+            merge_call_array_hex(&chunks.iter().map(String::as_str).collect::<Vec<_>>())
+        }
     };
-    let s1 = if stage1.is_empty() {
-        empty_calls_hex()
-    } else {
-        merge_call_array_hex(&stage1.iter().map(String::as_str).collect::<Vec<_>>())?
-    };
-    let s2 = if stage2.is_empty() {
-        empty_calls_hex()
-    } else {
-        merge_call_array_hex(&stage2.iter().map(String::as_str).collect::<Vec<_>>())?
-    };
+    let s0 = merge(&stage0)?;
+    let s1 = merge(&stage1)?;
+    let s2 = merge(&stage2)?;
+
+    let mut governance_calls_table = Table::new();
+    governance_calls_table.insert("stage0_calls".into(), Value::String(s0));
+    governance_calls_table.insert("stage1_calls".into(), Value::String(s1));
+    governance_calls_table.insert("stage2_calls".into(), Value::String(s2));
+
+    // Build the document with [governance_calls] first, then [core], then
+    // [ctms.*]. `toml::to_string` orders keys as inserted.
+    let mut doc = Table::new();
+    doc.insert(
+        "governance_calls".into(),
+        Value::Table(governance_calls_table),
+    );
+    doc.insert("core".into(), Value::Table(core_body));
+    doc.insert("ctms".into(), Value::Table(ctms_table));
+
     let body = format!(
         "# Auto-generated by `protocol-ops ecosystem upgrade-prepare-all`.\n\
-         # Merged governance calls from {} per-script TOML(s).\n\
-         \n\
-         [governance_calls]\n\
-         stage0_calls = \"{s0}\"\n\
-         stage1_calls = \"{s1}\"\n\
-         stage2_calls = \"{s2}\"\n",
-        sources.len()
+         # Merged ecosystem upgrade artifact: top-level [governance_calls] holds\n\
+         # the combined stage 0/1/2 hex from {} prepare TOML(s); [core] mirrors the\n\
+         # core prepare output (minus its own [governance_calls]); [ctms.<flavor>]\n\
+         # mirrors each per-CTM prepare output (one section per `is_zk_sync_os`\n\
+         # value) for downstream verification.\n\n{}",
+        1 + ctm_entries.len(),
+        toml::to_string(&doc).context("serialize merged ecosystem TOML")?
     );
     fs::write(dst, body)
-        .with_context(|| format!("Failed to write merged governance TOML: {}", dst.display()))?;
+        .with_context(|| format!("Failed to write merged ecosystem TOML: {}", dst.display()))?;
     logger::info(format!(
-        "Merged governance TOML written to: {}",
+        "Merged ecosystem TOML written to: {}",
         dst.display()
     ));
     Ok(())
