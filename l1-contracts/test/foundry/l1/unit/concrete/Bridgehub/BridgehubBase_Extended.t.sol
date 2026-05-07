@@ -110,9 +110,13 @@ contract BridgehubBase_Extended_Test is Test {
         _assertChainIdInList(CHAIN_ID_TO_UNREGISTER);
 
         vm.expectEmit(true, true, false, true, address(bridgehub));
-        emit IBridgehubBase.ZKChainUnregistered(
-            CHAIN_ID_TO_UNREGISTER, zkChain, ctm, baseTokenAssetId, GATEWAY_CHAIN_ID
-        );
+        emit IBridgehubBase.ZKChainUnregistered({
+            chainId: CHAIN_ID_TO_UNREGISTER,
+            zkChain: zkChain,
+            chainTypeManager: ctm,
+            baseTokenAssetId: baseTokenAssetId,
+            settlementLayer: GATEWAY_CHAIN_ID
+        });
         vm.prank(owner);
         bridgehub.unregisterZKChain(CHAIN_ID_TO_UNREGISTER);
 

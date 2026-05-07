@@ -339,7 +339,7 @@ export function resolveFunctionHits(
 
   for (let i = 0; i < sorted.length; i++) {
     const startLine = sorted[i].line;
-    const endLine = i + 1 < sorted.length ? sorted[i + 1].line - 1 : (fileLineCount ?? startLine + 200);
+    const endLine = i + 1 < sorted.length ? sorted[i + 1].line - 1 : fileLineCount ?? startLine + 200;
 
     let hit = false;
     for (let line = startLine; line <= endLine; line++) {

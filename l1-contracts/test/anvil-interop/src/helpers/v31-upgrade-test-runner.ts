@@ -736,7 +736,7 @@ async function traceFailedTx(provider: ethers.providers.JsonRpcProvider, txHash:
     } catch (callErr: unknown) {
       const reason =
         callErr instanceof Error
-          ? ((callErr as { reason?: string }).reason ?? callErr.message.slice(0, 200))
+          ? (callErr as { reason?: string }).reason ?? callErr.message.slice(0, 200)
           : String(callErr).slice(0, 200);
       lines.push(`  revert reason: ${reason}`);
     }

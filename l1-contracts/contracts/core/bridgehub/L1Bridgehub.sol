@@ -129,7 +129,13 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         delete baseTokenAssetId[_chainId];
         delete settlementLayer[_chainId];
 
-        emit ZKChainUnregistered(_chainId, zkChain, ctm, chainBaseTokenAssetId, currentSettlementLayer);
+        emit ZKChainUnregistered({
+            chainId: _chainId,
+            zkChain: zkChain,
+            chainTypeManager: ctm,
+            baseTokenAssetId: chainBaseTokenAssetId,
+            settlementLayer: currentSettlementLayer
+        });
     }
 
     /// @notice Register new chain. New chains can be only registered on Bridgehub deployed on L1. Later they can be moved to any other layer.
