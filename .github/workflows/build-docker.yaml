@@ -41,7 +41,7 @@ jobs:
       - name: Checkout zk-governance
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          repository: matter-labs/zk-governance
+          repository: zksync-association/zk-governance
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.zk_governance_ref || 'main' }}
           submodules: recursive
           path: zk-governance
