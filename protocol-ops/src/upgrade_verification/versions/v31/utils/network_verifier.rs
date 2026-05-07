@@ -252,7 +252,7 @@ impl NetworkVerifier {
 
     pub async fn get_bytecode_hash_at(&self, address: &Address) -> FixedBytes<32> {
         let code = self.l1_provider.get_code_at(*address).await.unwrap();
-        if code.len() == 0 {
+        if code.is_empty() {
             // If address has no bytecode - we return formal 0s.
             FixedBytes::ZERO
         } else {
@@ -546,7 +546,7 @@ async fn check_gw_create2_deploy(
                 l2_call._request.l2Contract,
                 create2_call._salt,
                 create2_call._bytecodeHash,
-                keccak256(create2_call._input.to_vec()),
+                keccak256(&create2_call._input),
             );
 
             if let Some(file_name) =
