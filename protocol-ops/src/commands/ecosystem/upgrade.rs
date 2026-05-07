@@ -566,10 +566,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 );
             }
         }
-        let core_flavor = entries
-            .iter()
-            .find_map(|e| (e.is_zk_sync_os == Some(false)).then_some(false))
-            .or_else(|| entries.first().and_then(|e| e.is_zk_sync_os));
         let ctms = entries
             .iter()
             .map(|e| CtmInputs {
@@ -579,7 +575,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 rollup_da_manager: e.rollup_da_manager,
             })
             .collect::<Vec<_>>();
-        (ctms, core_flavor)
+        (ctms, infer_core_is_zk_sync_os(entries))
     } else {
         anyhow::bail!(
             "either --ctm-config, --ctm-proxy, or --env <name> (with [[ctm_contracts.ctms]] in permanent-values) must be provided"
@@ -702,6 +698,18 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 
     logger::success("upgrade-prepare-all completed");
     Ok(())
+}
+
+/// Pick the `is_zk_sync_os` flavor the Core script will deploy under when
+/// running against a multi-CTM ecosystem (Era + Atlas). Era wins if any entry
+/// declares `is_zk_sync_os = false` — its system contracts are the strict
+/// subset, so a Core deploy targeting Era is also valid for Atlas. If no entry
+/// pins the flavor, fall back to the first entry's hint.
+fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> Option<bool> {
+    entries
+        .iter()
+        .find_map(|e| (e.is_zk_sync_os == Some(false)).then_some(false))
+        .or_else(|| entries.first().and_then(|e| e.is_zk_sync_os))
 }
 
 /// Read each per-script governance TOML and write a single merged TOML

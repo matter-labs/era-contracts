@@ -91,7 +91,12 @@ impl<'a> V31UpgradeInner<'a> {
     /// Run `CoreUpgrade_v31.noGovernancePrepare` then
     /// `CTMUpgrade_v31.noGovernancePrepare` once per CTM, all on the
     /// supplied runner. Returns the per-step output TOML paths.
-    pub async fn prepare(
+    ///
+    /// `pub(super)` so production callers must go through
+    /// [`super::v31_upgrade_full::V31UpgradeFull::prepare`] — that wrapper
+    /// runs the `ensureCtmsAndProxyAdminsOwnedByGovernance` precondition
+    /// first, which stage 1 of the upgrade depends on.
+    pub(super) async fn prepare(
         &self,
         runner: &mut ForgeRunner,
         deployer: &Wallet,

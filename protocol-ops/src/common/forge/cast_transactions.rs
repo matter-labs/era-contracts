@@ -72,7 +72,7 @@ fn script_only_library_names() -> &'static HashSet<String> {
                 for (src_path, contract_name) in targets {
                     if src_path.starts_with(SCRIPT_LIB_SOURCE_PREFIX) {
                         if let Some(n) = contract_name.as_str() {
-                            if KEEP_UNDER_SCRIPT_PREFIX.iter().any(|k| *k == n) {
+                            if KEEP_UNDER_SCRIPT_PREFIX.contains(&n) {
                                 continue;
                             }
                             names.insert(n.to_string());
