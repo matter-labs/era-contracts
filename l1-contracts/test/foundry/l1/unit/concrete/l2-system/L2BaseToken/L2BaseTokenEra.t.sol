@@ -119,8 +119,27 @@ contract L2BaseTokenEraTest is Test {
         l2BaseToken.initL2(1);
 
         // totalSupply should equal existing supply
-        // holder = INITIAL - existingSupply + 0 => totalSupply = INITIAL - (INITIAL - existingSupply) = existingSupply
+        // holder = INITIAL + 0 => totalSupply = existingSupply + INITIAL - INITIAL = existingSupply
         assertEq(l2BaseToken.totalSupply(), existingSupply, "totalSupply should match existing supply after init");
+    }
+
+    function test_totalSupply_capIncludesExistingSupplyAfterInitialization() public {
+        uint256 existingSupply = 50 ether;
+
+        // Set __DEPRECATED_totalSupply (slot 1)
+        vm.store(address(l2BaseToken), bytes32(uint256(1)), bytes32(existingSupply));
+
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        l2BaseToken.initL2(1);
+
+        vm.prank(L2_BOOTLOADER_ADDRESS);
+        l2BaseToken.mint(alice, INITIAL_BASE_TOKEN_HOLDER_BALANCE);
+
+        assertEq(
+            l2BaseToken.totalSupply(),
+            existingSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE,
+            "totalSupply cap should include existing supply"
+        );
     }
 
     function test_totalSupply_decreasesWhenHolderBalanceIncreases() public {
@@ -403,12 +422,12 @@ contract L2BaseTokenEraTest is Test {
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2BaseToken.initL2(1);
 
-        // holder = INITIAL - existingSupply + 0 (no prior holder balance)
-        uint256 expectedHolderBalance = INITIAL_BASE_TOKEN_HOLDER_BALANCE - existingSupply;
+        // holder = INITIAL + 0 (no prior holder balance)
+        uint256 expectedHolderBalance = INITIAL_BASE_TOKEN_HOLDER_BALANCE;
         assertEq(
             l2BaseToken.balanceOf(uint256(uint160(L2_BASE_TOKEN_HOLDER_ADDR))),
             expectedHolderBalance,
-            "Holder balance should be INITIAL - existingSupply"
+            "Holder balance should be INITIAL"
         );
 
         // totalSupply should match existing supply
@@ -428,12 +447,17 @@ contract L2BaseTokenEraTest is Test {
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2BaseToken.initL2(1);
 
-        // holder = INITIAL - existingSupply + existingHolderBalance
-        uint256 expectedHolderBalance = INITIAL_BASE_TOKEN_HOLDER_BALANCE - existingSupply + existingHolderBalance;
+        // holder = INITIAL + existingHolderBalance
+        uint256 expectedHolderBalance = INITIAL_BASE_TOKEN_HOLDER_BALANCE + existingHolderBalance;
         assertEq(
             l2BaseToken.balanceOf(uint256(uint160(L2_BASE_TOKEN_HOLDER_ADDR))),
             expectedHolderBalance,
             "Holder balance should include existing holder balance"
+        );
+        assertEq(
+            l2BaseToken.totalSupply(),
+            existingSupply - existingHolderBalance,
+            "totalSupply should account for existing holder balance"
         );
     }
 

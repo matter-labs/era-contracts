@@ -29,7 +29,7 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  * ## Initial Balance
  *
  * During migration, this contract is initialized with 2^127 - 1 base tokens.
- * On Era, the existing total supply is deducted from the initial balance.
+ * On Era, the existing total supply is tracked separately in L2BaseTokenEra.__DEPRECATED_totalSupply.
  * On ZK OS, the full amount is minted since balances are tracked natively.
  * This is sufficient for any reasonable base token, as no token has a total supply greater than 2^127.
  *
@@ -49,7 +49,7 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  * ## Force-received funds caveat
  *
  * The implicit meaning of this contract's balance is "funds that the chain can still mint".
- * On Era, totalSupply is computed as INITIAL_BASE_TOKEN_HOLDER_BALANCE - eraAccountBalance[BaseTokenHolder].
+ * On Era, totalSupply is computed as __DEPRECATED_totalSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE - eraAccountBalance[BaseTokenHolder].
  * On ZK OS, totalSupply is computed as zkosPreV31TotalSupply + (INITIAL - holder.balance).
  * If funds are force-sent to this contract (bypassing access controls), the holder balance
  * would increase, causing totalSupply() to undercount. This can happen via:
