@@ -76,6 +76,14 @@ interface IBridgehubBase {
 
     event NewChain(uint256 indexed chainId, address chainTypeManager, address indexed chainGovernance);
 
+    event ZKChainUnregistered(
+        uint256 indexed chainId,
+        address indexed zkChain,
+        address chainTypeManager,
+        bytes32 baseTokenAssetId,
+        uint256 settlementLayer
+    );
+
     event ChainTypeManagerAdded(address indexed chainTypeManager);
 
     event ChainTypeManagerRemoved(address indexed chainTypeManager);
@@ -94,6 +102,8 @@ interface IBridgehubBase {
     function chainTypeManagerIsRegistered(address _chainTypeManager) external view returns (bool);
 
     function chainTypeManager(uint256 _chainId) external view returns (address);
+
+    function chainIdWasUnregistered(uint256 _chainId) external view returns (bool);
 
     function assetIdIsRegistered(bytes32 _baseTokenAssetId) external view returns (bool);
 

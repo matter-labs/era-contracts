@@ -34,6 +34,9 @@ interface IL1Bridgehub is IBridgehubBase {
     /// @notice Set settlement layer status
     function setSettlementLayerStatus(uint256 _settlementLayerChainId, bool _isWhitelisted) external;
 
+    /// @notice Irreversibly unregister a decommissioned ZK chain.
+    function unregisterZKChain(uint256 _chainId) external;
+
     /// @notice Set addresses (L1 specific)
     // function setAddresses(
     //     address _assetRouter,

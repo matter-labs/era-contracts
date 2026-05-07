@@ -20,6 +20,8 @@ error ChainBatchRootZero();
 error ChainExists();
 // 0xf8d5f418
 error ChainNotReadyForMigration(uint256 chainId);
+// 0x3cc1ccaa
+error ChainSettlesOnL1(uint256 chainId);
 // 0x824e4e26
 error ChainsSettlementLayerMismatch(uint256 chainToRegisterSL, uint256 chainRegisteredOnSL);
 // 0x1ed6c04f
@@ -104,3 +106,5 @@ error V31UpgradeChainBatchNumberNotSet();
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
 // 0x7b968d06
 error ZKChainNotRegistered();
+// 0xa742107e
+error ZKChainIsSettlementLayer(uint256 chainId);

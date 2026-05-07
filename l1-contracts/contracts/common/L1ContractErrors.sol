@@ -81,6 +81,8 @@ error ChainIdIsHardcoded();
 error ChainIdMismatch();
 // 0x23f3c357
 error ChainIdNotRegistered(uint256 chainId);
+// 0x58a45a69
+error ChainIdWasUnregistered(uint256 chainId);
 // 0x8f620a06
 error ChainIdTooBig();
 // 0x5e361ef9

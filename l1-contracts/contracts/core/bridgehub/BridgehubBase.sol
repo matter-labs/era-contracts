@@ -30,6 +30,7 @@ import {
     ChainIdCantBeCurrentChain,
     ChainIdIsHardcoded,
     ChainIdNotRegistered,
+    ChainIdWasUnregistered,
     ChainIdTooBig,
     EmptyAssetId,
     NoCTMForAssetId,
@@ -130,12 +131,15 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /// @dev If the Bridgehub is on L2 the address is aliased.
     address public chainRegistrationSender;
 
+    /// @notice Chain IDs that were intentionally decommissioned and must not be reused.
+    mapping(uint256 chainId => bool wasUnregistered) public chainIdWasUnregistered;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[36] private __gap;
+    uint256[35] private __gap;
 
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
@@ -300,6 +304,10 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     /// @notice This function is used to register a new zkChain in the system.
     /// @notice see external counterpart for full natspec.
     function _registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) internal {
+        if (chainIdWasUnregistered[_chainId]) {
+            revert ChainIdWasUnregistered(_chainId);
+        }
+
         // slither-disable-next-line unused-return
         zkChainMap.set(_chainId, _zkChain);
         if (_checkMaxNumberOfZKChains && zkChainMap.length() > _maxNumberOfZKChains()) {
@@ -481,6 +489,10 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         uint256 _chainId,
         uint256 _newSettlementLayerChainId
     ) external onlyChainAssetHandler returns (address zkChain, address ctm) {
+        if (chainIdWasUnregistered[_chainId]) {
+            revert ChainIdWasUnregistered(_chainId);
+        }
+
         if (!whitelistedSettlementLayers[_newSettlementLayerChainId]) {
             revert SLNotWhitelisted();
         }
@@ -511,6 +523,10 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         uint256 _chainId,
         TokenBridgingData calldata _baseTokenBridgingData
     ) external onlyChainAssetHandler returns (address zkChain, address ctm) {
+        if (chainIdWasUnregistered[_chainId]) {
+            revert ChainIdWasUnregistered(_chainId);
+        }
+
         ctm = ctmAssetIdToAddress[_assetId];
         if (ctm == address(0)) {
             revert NoCTMForAssetId(_assetId);
@@ -541,6 +557,10 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
         uint256 _chainId,
         TxStatus _txStatus
     ) external onlyChainAssetHandler returns (address zkChain, address ctm) {
+        if (chainIdWasUnregistered[_chainId]) {
+            revert ChainIdWasUnregistered(_chainId);
+        }
+
         zkChain = getZKChain(_chainId);
         ctm = chainTypeManager[_chainId];
         if (_txStatus == TxStatus.Failure) {
@@ -591,6 +611,10 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
             _chainId == HARD_CODED_CHAIN_ID && (block.chainid == MAINNET_CHAIN_ID || block.chainid == SEPOLIA_CHAIN_ID)
         ) {
             revert ChainIdIsHardcoded();
+        }
+
+        if (chainIdWasUnregistered[_chainId]) {
+            revert ChainIdWasUnregistered(_chainId);
         }
 
         if (_chainTypeManager == address(0)) {

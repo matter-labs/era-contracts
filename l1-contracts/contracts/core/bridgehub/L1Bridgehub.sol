@@ -21,11 +21,13 @@ import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
-import {SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
+import {ChainSettlesOnL1, SecondBridgeAddressTooLow, ZKChainIsSettlementLayer} from "./L1BridgehubErrors.sol";
 import {SettlementLayersMustSettleOnL1} from "../../common/L1ContractErrors.sol";
 import {
     ChainIdAlreadyExists,
     ChainIdMismatch,
+    ChainIdNotRegistered,
+    ChainIdWasUnregistered,
     IncorrectBridgeHubAddress,
     MsgValueMismatch,
     WrongMagicValue,
@@ -97,6 +99,37 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         }
         whitelistedSettlementLayers[_settlementLayerChainId] = _isWhitelisted;
         emit SettlementLayerRegistered(_settlementLayerChainId, _isWhitelisted);
+    }
+
+    /// @inheritdoc IL1Bridgehub
+    function unregisterZKChain(uint256 _chainId) external onlyOwner {
+        // slither-disable-next-line unused-return
+        (bool exists, address zkChain) = zkChainMap.tryGet(_chainId);
+        if (!exists) {
+            revert ChainIdNotRegistered(_chainId);
+        }
+        if (whitelistedSettlementLayers[_chainId]) {
+            revert ZKChainIsSettlementLayer(_chainId);
+        }
+
+        uint256 currentSettlementLayer = settlementLayer[_chainId];
+        if (currentSettlementLayer == block.chainid) {
+            revert ChainSettlesOnL1(_chainId);
+        }
+
+        address ctm = chainTypeManager[_chainId];
+        bytes32 chainBaseTokenAssetId = baseTokenAssetId[_chainId];
+
+        // slither-disable-next-line unused-return
+        zkChainMap.remove(_chainId);
+        chainIdWasUnregistered[_chainId] = true;
+
+        delete chainTypeManager[_chainId];
+        delete __DEPRECATED_baseToken[_chainId];
+        delete baseTokenAssetId[_chainId];
+        delete settlementLayer[_chainId];
+
+        emit ZKChainUnregistered(_chainId, zkChain, ctm, chainBaseTokenAssetId, currentSettlementLayer);
     }
 
     /// @notice Register new chain. New chains can be only registered on Bridgehub deployed on L1. Later they can be moved to any other layer.
@@ -289,6 +322,10 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// @param _chainId The chain Id of the chain
     /// @param _zkChain Address of the zkChain
     function registerAlreadyDeployedZKChain(uint256 _chainId, address _zkChain) external onlyOwner {
+        if (chainIdWasUnregistered[_chainId]) {
+            revert ChainIdWasUnregistered(_chainId);
+        }
+
         if (_zkChain == address(0)) {
             revert ZeroAddress();
         }

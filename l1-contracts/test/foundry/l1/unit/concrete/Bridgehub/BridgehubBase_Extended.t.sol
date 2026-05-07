@@ -3,6 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
@@ -13,12 +14,17 @@ import {
     ZeroAddress,
     ChainIdNotRegistered,
     AssetIdAlreadyRegistered,
-    AssetHandlerNotRegistered,
+    ChainIdWasUnregistered,
     Unauthorized,
     NoCTMForAssetId
 } from "contracts/common/L1ContractErrors.sol";
-import {AlreadyCurrentSL, NotChainAssetHandler} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
-import {TokenBridgingData} from "contracts/common/Messaging.sol";
+import {
+    AlreadyCurrentSL,
+    ChainSettlesOnL1,
+    NotChainAssetHandler,
+    ZKChainIsSettlementLayer
+} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {TokenBridgingData, TxStatus} from "contracts/common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 contract DummyGWAssetTracker {
@@ -29,6 +35,8 @@ contract BridgehubBase_Extended_Test is Test {
     L1Bridgehub bridgehub;
     address owner;
     uint256 maxNumberOfChains;
+    uint256 internal constant CHAIN_ID_TO_UNREGISTER = 123;
+    uint256 internal constant GATEWAY_CHAIN_ID = 456;
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -90,6 +98,103 @@ contract BridgehubBase_Extended_Test is Test {
         uint256 nonExistentChainId = 999;
         vm.expectRevert(abi.encodeWithSelector(ChainIdNotRegistered.selector, nonExistentChainId));
         bridgehub.ctmAssetIdFromChainId(nonExistentChainId);
+    }
+
+    function test_unregisterZKChain() public {
+        (, address ctm,, bytes32 baseTokenAssetId, address zkChain) = _setupGatewaySettledChain(CHAIN_ID_TO_UNREGISTER);
+
+        assertEq(bridgehub.getZKChain(CHAIN_ID_TO_UNREGISTER), zkChain);
+        assertEq(bridgehub.chainTypeManager(CHAIN_ID_TO_UNREGISTER), ctm);
+        assertEq(bridgehub.baseTokenAssetId(CHAIN_ID_TO_UNREGISTER), baseTokenAssetId);
+        assertEq(bridgehub.settlementLayer(CHAIN_ID_TO_UNREGISTER), GATEWAY_CHAIN_ID);
+        _assertChainIdInList(CHAIN_ID_TO_UNREGISTER);
+
+        vm.expectEmit(true, true, false, true, address(bridgehub));
+        emit IBridgehubBase.ZKChainUnregistered(
+            CHAIN_ID_TO_UNREGISTER, zkChain, ctm, baseTokenAssetId, GATEWAY_CHAIN_ID
+        );
+        vm.prank(owner);
+        bridgehub.unregisterZKChain(CHAIN_ID_TO_UNREGISTER);
+
+        assertTrue(bridgehub.chainIdWasUnregistered(CHAIN_ID_TO_UNREGISTER));
+        assertEq(bridgehub.getZKChain(CHAIN_ID_TO_UNREGISTER), address(0));
+        assertEq(bridgehub.chainTypeManager(CHAIN_ID_TO_UNREGISTER), address(0));
+        assertEq(bridgehub.baseTokenAssetId(CHAIN_ID_TO_UNREGISTER), bytes32(0));
+        assertEq(bridgehub.settlementLayer(CHAIN_ID_TO_UNREGISTER), 0);
+        _assertChainIdNotInList(CHAIN_ID_TO_UNREGISTER);
+        _assertChainIdInList(GATEWAY_CHAIN_ID);
+    }
+
+    function test_RevertWhen_unregisterZKChainNotOwner() public {
+        _setupGatewaySettledChain(CHAIN_ID_TO_UNREGISTER);
+
+        address notOwner = makeAddr("notOwner");
+        vm.prank(notOwner);
+        vm.expectRevert("Ownable: caller is not the owner");
+        bridgehub.unregisterZKChain(CHAIN_ID_TO_UNREGISTER);
+    }
+
+    function test_RevertWhen_unregisterZKChainNotRegistered() public {
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(ChainIdNotRegistered.selector, CHAIN_ID_TO_UNREGISTER));
+        bridgehub.unregisterZKChain(CHAIN_ID_TO_UNREGISTER);
+    }
+
+    function test_RevertWhen_unregisterZKChainSettlesOnL1() public {
+        (address chainAssetHandler,, bytes32 ctmAssetId,,) = _prepareChainRegistration();
+        _registerChainOnL1(
+            CHAIN_ID_TO_UNREGISTER, makeAddr("zkChain"), ctmAssetId, keccak256("baseTokenAssetId"), chainAssetHandler
+        );
+
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(ChainSettlesOnL1.selector, CHAIN_ID_TO_UNREGISTER));
+        bridgehub.unregisterZKChain(CHAIN_ID_TO_UNREGISTER);
+    }
+
+    function test_RevertWhen_unregisterZKChainIsSettlementLayer() public {
+        (address chainAssetHandler,, bytes32 ctmAssetId,,) = _prepareChainRegistration();
+        _registerChainOnL1(
+            CHAIN_ID_TO_UNREGISTER, makeAddr("zkChain"), ctmAssetId, keccak256("baseTokenAssetId"), chainAssetHandler
+        );
+
+        vm.prank(owner);
+        bridgehub.setSettlementLayerStatus(CHAIN_ID_TO_UNREGISTER, true);
+
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(ZKChainIsSettlementLayer.selector, CHAIN_ID_TO_UNREGISTER));
+        bridgehub.unregisterZKChain(CHAIN_ID_TO_UNREGISTER);
+    }
+
+    function test_RevertWhen_reusingUnregisteredChainId() public {
+        (address chainAssetHandler, address ctm, bytes32 ctmAssetId, bytes32 baseTokenAssetId, address zkChain) =
+            _setupGatewaySettledChain(CHAIN_ID_TO_UNREGISTER);
+        assertEq(bridgehub.getZKChain(CHAIN_ID_TO_UNREGISTER), zkChain);
+
+        vm.prank(owner);
+        bridgehub.unregisterZKChain(CHAIN_ID_TO_UNREGISTER);
+
+        vm.prank(chainAssetHandler);
+        vm.expectRevert(abi.encodeWithSelector(ChainIdWasUnregistered.selector, CHAIN_ID_TO_UNREGISTER));
+        bridgehub.forwardedBridgeMint(
+            ctmAssetId, CHAIN_ID_TO_UNREGISTER, _tokenBridgingData(baseTokenAssetId, CHAIN_ID_TO_UNREGISTER)
+        );
+
+        vm.prank(chainAssetHandler);
+        vm.expectRevert(abi.encodeWithSelector(ChainIdWasUnregistered.selector, CHAIN_ID_TO_UNREGISTER));
+        bridgehub.registerNewZKChain(CHAIN_ID_TO_UNREGISTER, makeAddr("newZkChain"), false);
+
+        vm.prank(chainAssetHandler);
+        vm.expectRevert(abi.encodeWithSelector(ChainIdWasUnregistered.selector, CHAIN_ID_TO_UNREGISTER));
+        bridgehub.forwardedBridgeConfirmTransferResult(CHAIN_ID_TO_UNREGISTER, TxStatus.Failure);
+
+        bytes[] memory factoryDeps = new bytes[](0);
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(ChainIdWasUnregistered.selector, CHAIN_ID_TO_UNREGISTER));
+        bridgehub.createNewChain(CHAIN_ID_TO_UNREGISTER, ctm, baseTokenAssetId, 0, owner, "", factoryDeps);
+
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(ChainIdWasUnregistered.selector, CHAIN_ID_TO_UNREGISTER));
+        bridgehub.registerAlreadyDeployedZKChain(CHAIN_ID_TO_UNREGISTER, makeAddr("alreadyDeployedZkChain"));
     }
 
     // Test getHyperchain (legacy function)
@@ -401,5 +506,91 @@ contract BridgehubBase_Extended_Test is Test {
         bridgehub.acceptAdmin();
 
         assertEq(bridgehub.admin(), newAdmin);
+    }
+
+    function _setupGatewaySettledChain(uint256 _chainId)
+        internal
+        returns (address chainAssetHandler, address ctm, bytes32 ctmAssetId, bytes32 baseTokenAssetId, address zkChain)
+    {
+        (chainAssetHandler, ctm, ctmAssetId,,) = _prepareChainRegistration();
+
+        baseTokenAssetId = keccak256("baseTokenAssetId");
+        zkChain = makeAddr("zkChain");
+        _registerChainOnL1(_chainId, zkChain, ctmAssetId, baseTokenAssetId, chainAssetHandler);
+
+        _registerChainOnL1(GATEWAY_CHAIN_ID, makeAddr("gatewayChain"), ctmAssetId, baseTokenAssetId, chainAssetHandler);
+        vm.prank(owner);
+        bridgehub.setSettlementLayerStatus(GATEWAY_CHAIN_ID, true);
+
+        vm.prank(chainAssetHandler);
+        bridgehub.forwardedBridgeBurnSetSettlementLayer(_chainId, GATEWAY_CHAIN_ID);
+    }
+
+    function _prepareChainRegistration()
+        internal
+        returns (address chainAssetHandler, address ctm, bytes32 ctmAssetId, address l1CtmDeployer, address assetRouter)
+    {
+        chainAssetHandler = makeAddr("chainAssetHandler");
+        l1CtmDeployer = makeAddr("l1CtmDeployer");
+        assetRouter = makeAddr("assetRouter");
+
+        vm.prank(owner);
+        bridgehub.setAddresses(
+            assetRouter,
+            ICTMDeploymentTracker(l1CtmDeployer),
+            IMessageRootBase(makeAddr("messageRoot")),
+            chainAssetHandler,
+            makeAddr("chainRegistrationSender")
+        );
+
+        ctm = makeAddr("ctm");
+        vm.prank(owner);
+        bridgehub.addChainTypeManager(ctm);
+
+        bytes32 ctmAdditionalData = bytes32(uint256(uint160(ctm)));
+        vm.prank(l1CtmDeployer);
+        bridgehub.setCTMAssetAddress(ctmAdditionalData, ctm);
+        ctmAssetId = bridgehub.ctmAssetIdFromAddress(ctm);
+    }
+
+    function _registerChainOnL1(
+        uint256 _chainId,
+        address _zkChain,
+        bytes32 _ctmAssetId,
+        bytes32 _baseTokenAssetId,
+        address _chainAssetHandler
+    ) internal {
+        vm.prank(_chainAssetHandler);
+        bridgehub.forwardedBridgeMint(_ctmAssetId, _chainId, _tokenBridgingData(_baseTokenAssetId, _chainId));
+
+        vm.prank(_chainAssetHandler);
+        bridgehub.registerNewZKChain(_chainId, _zkChain, true);
+    }
+
+    function _tokenBridgingData(bytes32 _baseTokenAssetId, uint256 _originChainId)
+        internal
+        pure
+        returns (TokenBridgingData memory)
+    {
+        return TokenBridgingData({assetId: _baseTokenAssetId, originToken: address(0), originChainId: _originChainId});
+    }
+
+    function _assertChainIdInList(uint256 _chainId) internal view {
+        uint256[] memory chainIds = bridgehub.getAllZKChainChainIDs();
+        uint256 chainIdsLength = chainIds.length;
+        for (uint256 i = 0; i < chainIdsLength; ++i) {
+            if (chainIds[i] == _chainId) {
+                return;
+            }
+        }
+        assertTrue(false, "Chain id not found");
+    }
+
+    function _assertChainIdNotInList(uint256 _chainId) internal view {
+        uint256[] memory chainIds = bridgehub.getAllZKChainChainIDs();
+        uint256 chainIdsLength = chainIds.length;
+        for (uint256 i = 0; i < chainIdsLength; ++i) {
+            assertNotEq(chainIds[i], _chainId);
+        }
     }
 }
