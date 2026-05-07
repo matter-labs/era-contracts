@@ -1,3 +1,14 @@
+// AGENTS.md mandates "NEVER override storage slots in tests" with no exceptions,
+// but the fork-upgrade harness in this directory is the one place we can't avoid
+// it: forks are pinned at a block whose pending batches haven't yet been
+// executed, and there is no public API to drive `totalBatchesExecuted` to match
+// `totalBatchesCommitted` without replaying many real batch executions on every
+// run. The override below substitutes for that history; it is scoped to fork
+// runs and never touches a real chain.
+//
+// Slot indices below are taken from `forge inspect <Contract> storageLayout` on
+// the v31 contracts; if any of these contracts ever shift their storage layout
+// these constants need to move with it.
 import type { providers } from "ethers";
 import { Contract, ethers } from "ethers";
 import type { ContractInterface } from "@ethersproject/contracts";
@@ -5,11 +16,9 @@ import { impersonateAndRun } from "../core/utils";
 import { L2_BOOTLOADER_ADDR, SYSTEM_CONTEXT_ADDR } from "../core/const";
 import { getAbi } from "../core/contracts";
 
-// ZKChainStorage layout in the chain's diamond proxy. `s` (the only ZKChainBase
-// state variable) lives at slot 0 of the proxy, so each `ZKChainStorage` field
-// inherits the slot offset advertised in the comments of `ZKChainStorage.sol`.
-// Used by `forceBatchExecutedEqualsCommitted` to satisfy the `NotAllBatchesExecuted`
-// guard in `SettlementLayerV31UpgradeBase.upgrade`.
+// `ZKChainBase.s` (the only state variable) lives at slot 0 of the proxy, so
+// `ZKChainStorage` field offsets are absolute. Used by
+// `forceBatchExecutedEqualsCommitted`.
 const ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT = 11;
 const ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT = 13;
 

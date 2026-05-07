@@ -65,7 +65,7 @@ interface IAdminLegacy {
 ///         Avoids calling `pendingOwner()` (Ownable2Step-only) on plain Ownable.
 interface IOwnableSingleStep {
     function owner() external view returns (address);
-    function transferOwnership(address newOwner) external;
+    function transferOwnership(address _newOwner) external;
 }
 
 /// Subset of the legacy ZKsync `Governance.sol` (TimelockController-style)
@@ -91,104 +91,86 @@ interface IChainAdminMulticall {
 contract AdminFunctions is Script, IAdminFunctions {
     using stdToml for string;
 
-    struct Config {
-        address admin;
-        address governor;
-    }
-
-    Config internal config;
-
-    function initConfig() public {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/config-admin-functionsons.toml");
-        string memory toml = vm.readFile(path);
-        config.admin = toml.readAddress("$.target_addr");
-        config.governor = toml.readAddress("$.governor");
-    }
-
-    // This function should be called by the owner to accept the admin role
-    function governanceAcceptOwner(address governor, address target) public {
-        Ownable2Step adminContract = Ownable2Step(target);
+    function governanceAcceptOwner(address _governor, address _target) public {
+        Ownable2Step adminContract = Ownable2Step(_target);
         Utils.executeUpgrade({
-            _governor: governor,
+            _governor: _governor,
             _salt: bytes32(0),
-            _target: target,
+            _target: _target,
             _data: abi.encodeCall(adminContract.acceptOwnership, ()),
             _value: 0,
             _delay: 0
         });
     }
 
-    // This function should be called by governance to accept ownership of all core contracts
-    // Only accepts ownership for contracts that have pendingOwner set to governance
-    function governanceAcceptOwnerAggregated(address governor, address bridgehub) public {
-        // Query contract addresses from bridgehub
-        address assetRouter = address(IL1Bridgehub(bridgehub).assetRouter());
-        address chainAssetHandler = address(IL1Bridgehub(bridgehub).chainAssetHandler());
-        address ctmDeploymentTracker = address(IL1Bridgehub(bridgehub).l1CtmDeployer());
+    /// Walk every Bridgehub-discoverable ecosystem ownable (bridgehub itself,
+    /// asset router, l1 nullifier, ctm deployer, chain asset handler) and
+    /// accept the pending ownership transfer where one is targeted at
+    /// `_governor`. Idempotent — running against an already-correct ecosystem
+    /// is a no-op.
+    function governanceAcceptOwnerAggregated(address _governor, address _bridgehub) public {
+        address assetRouter = address(IL1Bridgehub(_bridgehub).assetRouter());
+        address chainAssetHandler = address(IL1Bridgehub(_bridgehub).chainAssetHandler());
+        address ctmDeploymentTracker = address(IL1Bridgehub(_bridgehub).l1CtmDeployer());
 
-        // Query l1Nullifier from assetRouter
         IL1AssetRouter assetRouterContract = IL1AssetRouter(assetRouter);
         address l1Nullifier = address(assetRouterContract.L1_NULLIFIER());
 
-        // Accept ownership only for contracts with pending ownership
-        if (Ownable2Step(bridgehub).pendingOwner() == governor) {
-            governanceAcceptOwner(governor, bridgehub);
+        if (Ownable2Step(_bridgehub).pendingOwner() == _governor) {
+            governanceAcceptOwner(_governor, _bridgehub);
         }
-        if (Ownable2Step(assetRouter).pendingOwner() == governor) {
-            governanceAcceptOwner(governor, assetRouter);
+        if (Ownable2Step(assetRouter).pendingOwner() == _governor) {
+            governanceAcceptOwner(_governor, assetRouter);
         }
-        if (Ownable2Step(l1Nullifier).pendingOwner() == governor) {
-            governanceAcceptOwner(governor, l1Nullifier);
+        if (Ownable2Step(l1Nullifier).pendingOwner() == _governor) {
+            governanceAcceptOwner(_governor, l1Nullifier);
         }
-        if (Ownable2Step(ctmDeploymentTracker).pendingOwner() == governor) {
-            governanceAcceptOwner(governor, ctmDeploymentTracker);
+        if (Ownable2Step(ctmDeploymentTracker).pendingOwner() == _governor) {
+            governanceAcceptOwner(_governor, ctmDeploymentTracker);
         }
-        if (Ownable2Step(chainAssetHandler).pendingOwner() == governor) {
-            governanceAcceptOwner(governor, chainAssetHandler);
+        if (Ownable2Step(chainAssetHandler).pendingOwner() == _governor) {
+            governanceAcceptOwner(_governor, chainAssetHandler);
         }
     }
 
-    // Conditionally accept ownership directly as `governor`. Caller is expected
-    // to broadcast as `governor` (forge --sender + --unlocked / anvil
-    // impersonation, or governor as a real signer). Skipped when the target's
-    // pendingOwner is not `governor`. Unlike `governanceAcceptOwner`, this does
-    // NOT route through a Governance scheduleTransparent/execute wrapper, so it
-    // works against governance addresses that are not Ownable Governance.sol
-    // contracts (e.g. ProtocolUpgradeHandler on stage/mainnet).
-    function governanceAcceptOwnerConditional(address governor, address target) public {
-        if (Ownable2Step(target).pendingOwner() != governor) {
+    /// Unlike `governanceAcceptOwner`, this does NOT route through a Governance
+    /// scheduleTransparent/execute wrapper, so it works against governance
+    /// addresses that are not Ownable Governance.sol contracts (e.g.
+    /// ProtocolUpgradeHandler on stage/mainnet). Caller is expected to
+    /// broadcast as `_governor` (forge `--sender` + `--unlocked` / anvil
+    /// impersonation, or governor as a real signer).
+    function governanceAcceptOwnerConditional(address _governor, address _target) public {
+        if (Ownable2Step(_target).pendingOwner() != _governor) {
             return;
         }
         vm.startBroadcast();
-        Ownable2Step(target).acceptOwnership();
+        Ownable2Step(_target).acceptOwnership();
         vm.stopBroadcast();
     }
 
-    // Conditionally start an Ownable2Step ownership transfer to `newOwner`. Broadcasts
-    // as the script's --sender (which must be the current owner). No-op when ownership
-    // is already at or pending to `newOwner`.
-    function transferOwnerConditional(address target, address newOwner) public {
-        Ownable2Step ownable = Ownable2Step(target);
-        if (ownable.owner() == newOwner || ownable.pendingOwner() == newOwner) {
+    /// Broadcasts as the script's `--sender` (which must be the current
+    /// owner). No-op when ownership is already at or pending to `_newOwner`.
+    function transferOwnerConditional(address _target, address _newOwner) public {
+        Ownable2Step ownable = Ownable2Step(_target);
+        if (ownable.owner() == _newOwner || ownable.pendingOwner() == _newOwner) {
             return;
         }
         vm.startBroadcast();
-        ownable.transferOwnership(newOwner);
+        ownable.transferOwnership(_newOwner);
         vm.stopBroadcast();
     }
 
-    // Single-step Ownable transfer (e.g. OZ ProxyAdmin) — `transferOwnership`
-    // immediately changes the owner with no acceptOwnership step. No-op when
-    // ownership is already at `newOwner`. Broadcasts as --sender, which must
-    // be the current owner.
-    function transferOwnerSingleConditional(address target, address newOwner) public {
-        IOwnableSingleStep ownable = IOwnableSingleStep(target);
-        if (ownable.owner() == newOwner) {
+    /// Single-step Ownable transfer (e.g. OZ ProxyAdmin) — `transferOwnership`
+    /// immediately changes the owner with no acceptOwnership step. No-op when
+    /// ownership is already at `_newOwner`. Broadcasts as `--sender`, which
+    /// must be the current owner.
+    function transferOwnerSingleConditional(address _target, address _newOwner) public {
+        IOwnableSingleStep ownable = IOwnableSingleStep(_target);
+        if (ownable.owner() == _newOwner) {
             return;
         }
         vm.startBroadcast();
-        ownable.transferOwnership(newOwner);
+        ownable.transferOwnership(_newOwner);
         vm.stopBroadcast();
     }
 
@@ -203,7 +185,7 @@ contract AdminFunctions is Script, IAdminFunctions {
 
     /// Walk every registered chain's CTM (deduplicated) and ensure both the
     /// CTM (Ownable2Step) and its EIP-1967 ProxyAdmin (single-step Ownable) are
-    /// owned by `governance`. Each individual transfer is conditional, so
+    /// owned by `_governance`. Each individual transfer is conditional, so
     /// re-running this against an already-correct ecosystem is a no-op. Intended
     /// for upgrade pre-stages where governance must own these contracts before
     /// stage 1 governance calls (e.g. ProxyAdmin.upgradeAndCall) execute.
@@ -216,32 +198,26 @@ contract AdminFunctions is Script, IAdminFunctions {
     /// form with an empty registry; if any current owner is a contract that
     /// isn't a no-key EOA, the helper reverts so the caller is forced to
     /// supply a registry entry.
-    function ensureCtmsAndProxyAdminsOwnedByGovernance(address bridgehub, address governance) public {
+    function ensureCtmsAndProxyAdminsOwnedByGovernance(address _bridgehub, address _governance) public {
         OwnerWrap[] memory empty = new OwnerWrap[](0);
-        ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps(bridgehub, governance, empty);
+        ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps(_bridgehub, _governance, empty);
     }
 
-    /// Walk every registered chain's CTM (deduplicated) and ensure both the
-    /// CTM (Ownable2Step) and its EIP-1967 ProxyAdmin (single-step Ownable) are
-    /// owned by `governance`. Each individual transfer is conditional, so
-    /// re-running this against an already-correct ecosystem is a no-op.
-    ///
-    /// `wraps` is a registry of contract owners that must be wrapped (since
+    /// `_wraps` is a registry of contract owners that must be wrapped (since
     /// they have no private key); see [`OwnerWrap`]. EOAs (current owner has
     /// no code) are broadcast directly; contract owners not present in the
     /// registry cause a hard revert so missing config surfaces immediately
     /// instead of being papered over.
     function ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps(
-        address bridgehub,
-        address governance,
-        OwnerWrap[] memory wraps
+        address _bridgehub,
+        address _governance,
+        OwnerWrap[] memory _wraps
     ) public {
-        // Per-chain CTMs (Ownable2Step) — transfer + accept, plus their ProxyAdmins.
-        uint256[] memory chainIds = IL1Bridgehub(bridgehub).getAllZKChainChainIDs();
+        uint256[] memory chainIds = IL1Bridgehub(_bridgehub).getAllZKChainChainIDs();
         address[] memory seenCtms = new address[](chainIds.length);
         uint256 seenCtmCount = 0;
         for (uint256 i = 0; i < chainIds.length; i++) {
-            address ctm = IL1Bridgehub(bridgehub).chainTypeManager(chainIds[i]);
+            address ctm = IL1Bridgehub(_bridgehub).chainTypeManager(chainIds[i]);
             bool already = false;
             for (uint256 j = 0; j < seenCtmCount; j++) {
                 if (seenCtms[j] == ctm) {
@@ -254,36 +230,36 @@ contract AdminFunctions is Script, IAdminFunctions {
 
             Ownable2Step ctmOwnable = Ownable2Step(ctm);
             address ctmOwner = ctmOwnable.owner();
-            if (ctmOwner != governance && ctmOwnable.pendingOwner() != governance) {
-                _issueAsOwner(ctmOwner, ctm, abi.encodeCall(Ownable2Step.transferOwnership, (governance)), wraps);
+            if (ctmOwner != _governance && ctmOwnable.pendingOwner() != _governance) {
+                _issueAsOwner(ctmOwner, ctm, abi.encodeCall(Ownable2Step.transferOwnership, (_governance)), _wraps);
             }
-            if (ctmOwnable.pendingOwner() == governance) {
-                // `governance` (PUH on stage/mainnet) has no key — on a fork
+            if (ctmOwnable.pendingOwner() == _governance) {
+                // `_governance` (PUH on stage/mainnet) has no key — on a fork
                 // we impersonate it, on a real chain this acceptOwnership must
                 // become a stage-0 governance call. The fork case is the only
                 // one this helper supports today.
-                _anvilFund(governance);
-                vm.startBroadcast(governance);
+                _anvilFund(_governance);
+                vm.startBroadcast(_governance);
                 ctmOwnable.acceptOwnership();
                 vm.stopBroadcast();
             }
 
-            _ensureProxyAdminOwnedByGovernance(ctm, governance, wraps);
+            _ensureProxyAdminOwnedByGovernance(ctm, _governance, _wraps);
         }
 
         // Bridgehub-discoverable ecosystem proxies. Mirrors the contracts visited
         // by `governanceAcceptOwnerAggregated`, since the same ProxyAdmins gate
         // their `upgradeAndCall` invocations during stage 1 governance calls.
-        address assetRouter = address(IL1Bridgehub(bridgehub).assetRouter());
-        address chainAssetHandler = address(IL1Bridgehub(bridgehub).chainAssetHandler());
-        address ctmDeploymentTracker = address(IL1Bridgehub(bridgehub).l1CtmDeployer());
+        address assetRouter = address(IL1Bridgehub(_bridgehub).assetRouter());
+        address chainAssetHandler = address(IL1Bridgehub(_bridgehub).chainAssetHandler());
+        address ctmDeploymentTracker = address(IL1Bridgehub(_bridgehub).l1CtmDeployer());
         address l1Nullifier = address(IL1AssetRouter(assetRouter).L1_NULLIFIER());
 
-        _ensureProxyAdminOwnedByGovernance(bridgehub, governance, wraps);
-        _ensureProxyAdminOwnedByGovernance(assetRouter, governance, wraps);
-        _ensureProxyAdminOwnedByGovernance(chainAssetHandler, governance, wraps);
-        _ensureProxyAdminOwnedByGovernance(ctmDeploymentTracker, governance, wraps);
-        _ensureProxyAdminOwnedByGovernance(l1Nullifier, governance, wraps);
+        _ensureProxyAdminOwnedByGovernance(_bridgehub, _governance, _wraps);
+        _ensureProxyAdminOwnedByGovernance(assetRouter, _governance, _wraps);
+        _ensureProxyAdminOwnedByGovernance(chainAssetHandler, _governance, _wraps);
+        _ensureProxyAdminOwnedByGovernance(ctmDeploymentTracker, _governance, _wraps);
+        _ensureProxyAdminOwnedByGovernance(l1Nullifier, _governance, _wraps);
     }
 
     /// Helper: read the EIP-1967 admin slot of `_proxy`, and if its single-step
@@ -399,96 +375,93 @@ contract AdminFunctions is Script, IAdminFunctions {
         return abi.decode(stripped, (string));
     }
 
-    // This function should be called by the owner to accept the admin role
-    function governanceAcceptAdmin(address governor, address target) public {
-        IZKChain adminContract = IZKChain(target);
+    function governanceAcceptAdmin(address _governor, address _target) public {
+        IZKChain adminContract = IZKChain(_target);
         Utils.executeUpgrade({
-            _governor: governor,
+            _governor: _governor,
             _salt: bytes32(0),
-            _target: target,
+            _target: _target,
             _data: abi.encodeCall(adminContract.acceptAdmin, ()),
             _value: 0,
             _delay: 0
         });
     }
 
-    // This function should be called by the owner to accept the admin role
-    function chainAdminAcceptAdmin(ChainAdmin chainAdmin, address target) public {
-        IZKChain adminContract = IZKChain(target);
+    function chainAdminAcceptAdmin(ChainAdmin _chainAdmin, address _target) public {
+        IZKChain adminContract = IZKChain(_target);
 
         Call[] memory calls = new Call[](1);
-        calls[0] = Call({target: target, value: 0, data: abi.encodeCall(adminContract.acceptAdmin, ())});
+        calls[0] = Call({target: _target, value: 0, data: abi.encodeCall(adminContract.acceptAdmin, ())});
 
         vm.startBroadcast();
-        chainAdmin.multicall(calls, true);
+        _chainAdmin.multicall(calls, true);
         vm.stopBroadcast();
     }
 
-    // This function should be called by the owner to update token multiplier setter role
     function chainSetTokenMultiplierSetter(
-        address chainAdmin,
-        address accessControlRestriction,
-        address diamondProxyAddress,
-        address setter
+        address _chainAdmin,
+        address _accessControlRestriction,
+        address _diamondProxyAddress,
+        address _setter
     ) public {
-        if (accessControlRestriction == address(0)) {
-            _chainSetTokenMultiplierSetterOwnable(chainAdmin, setter);
+        if (_accessControlRestriction == address(0)) {
+            _chainSetTokenMultiplierSetterOwnable(_chainAdmin, _setter);
         } else {
-            _chainSetTokenMultiplierSetterLatestChainAdmin(accessControlRestriction, diamondProxyAddress, setter);
+            _chainSetTokenMultiplierSetterLatestChainAdmin(_accessControlRestriction, _diamondProxyAddress, _setter);
         }
     }
 
-    function _chainSetTokenMultiplierSetterOwnable(address chainAdmin, address setter) internal {
-        IChainAdminOwnable admin = IChainAdminOwnable(chainAdmin);
+    function _chainSetTokenMultiplierSetterOwnable(address _chainAdmin, address _setter) internal {
+        IChainAdminOwnable admin = IChainAdminOwnable(_chainAdmin);
 
         vm.startBroadcast();
-        admin.setTokenMultiplierSetter(setter);
+        admin.setTokenMultiplierSetter(_setter);
         vm.stopBroadcast();
     }
 
     function _chainSetTokenMultiplierSetterLatestChainAdmin(
-        address accessControlRestriction,
-        address diamondProxyAddress,
-        address setter
+        address _accessControlRestriction,
+        address _diamondProxyAddress,
+        address _setter
     ) internal {
-        AccessControlRestriction restriction = AccessControlRestriction(accessControlRestriction);
+        AccessControlRestriction restriction = AccessControlRestriction(_accessControlRestriction);
 
         if (
-            restriction.requiredRoles(diamondProxyAddress, IAdmin.setTokenMultiplier.selector) !=
+            restriction.requiredRoles(_diamondProxyAddress, IAdmin.setTokenMultiplier.selector) !=
             SET_TOKEN_MULTIPLIER_SETTER_ROLE
         ) {
             vm.startBroadcast();
             restriction.setRequiredRoleForCall(
-                diamondProxyAddress,
+                _diamondProxyAddress,
                 IAdmin.setTokenMultiplier.selector,
                 SET_TOKEN_MULTIPLIER_SETTER_ROLE
             );
             vm.stopBroadcast();
         }
 
-        if (!restriction.hasRole(SET_TOKEN_MULTIPLIER_SETTER_ROLE, setter)) {
+        if (!restriction.hasRole(SET_TOKEN_MULTIPLIER_SETTER_ROLE, _setter)) {
             vm.startBroadcast();
-            restriction.grantRole(SET_TOKEN_MULTIPLIER_SETTER_ROLE, setter);
+            restriction.grantRole(SET_TOKEN_MULTIPLIER_SETTER_ROLE, _setter);
             vm.stopBroadcast();
         }
     }
 
-    function governanceExecuteCalls(bytes memory callsToExecute, address governanceAddr) public {
-        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
-        Utils.executeCalls(governanceAddr, bytes32(0), 0, calls);
+    function governanceExecuteCalls(bytes memory _callsToExecute, address _governanceAddr) public {
+        Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
+        Utils.executeCalls(_governanceAddr, bytes32(0), 0, calls);
     }
 
-    /// Fork-only governance replay: impersonate `governanceAddr` and forward
+    /// Fork-only governance replay: impersonate `_governanceAddr` and forward
     /// each call directly. Used when the governance contract is the
     /// `ProtocolUpgradeHandler` (no `Ownable.owner()`, no `scheduleTransparent`
     /// path that simulates without delays/signatures), so the standard
     /// `Utils.executeCalls` flow is unusable. Real-chain replay still needs
     /// the full PUH propose-execute mechanism — this helper exists strictly
     /// for `--auto-impersonate` anvil forks.
-    function governanceExecuteCallsDirect(bytes memory callsToExecute, address governanceAddr) public {
-        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
-        _anvilFund(governanceAddr);
-        vm.startBroadcast(governanceAddr);
+    function governanceExecuteCallsDirect(bytes memory _callsToExecute, address _governanceAddr) public {
+        Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
+        _anvilFund(_governanceAddr);
+        vm.startBroadcast(_governanceAddr);
         for (uint256 i = 0; i < calls.length; i++) {
             (bool ok, bytes memory ret) = calls[i].target.call{value: calls[i].value}(calls[i].data);
             require(ok, _wrapDecodeRevert(ret));
@@ -496,53 +469,49 @@ contract AdminFunctions is Script, IAdminFunctions {
         vm.stopBroadcast();
     }
 
-    function ecosystemAdminExecuteCalls(bytes memory callsToExecute, address ecosystemAdminAddr) public {
-        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
-        saveAndSendAdminTx(ecosystemAdminAddr, calls, true);
+    function ecosystemAdminExecuteCalls(bytes memory _callsToExecute, address _ecosystemAdminAddr) public {
+        Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
+        saveAndSendAdminTx(_ecosystemAdminAddr, calls, true);
     }
 
-    function adminEncodeMulticall(bytes memory callsToExecute) external pure {
-        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
+    function adminEncodeMulticall(bytes memory _callsToExecute) external pure {
+        Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
 
         bytes memory result = abi.encodeCall(ChainAdmin.multicall, (calls, true));
         console.logBytes(result);
     }
 
     function adminExecuteUpgrade(
-        bytes memory diamondCut,
-        address adminAddr,
-        address accessControlRestriction,
-        address chainDiamondProxy
+        bytes memory _diamondCut,
+        address _adminAddr,
+        address _accessControlRestriction,
+        address _chainDiamondProxy
     ) public {
-        uint256 oldProtocolVersion = IZKChain(chainDiamondProxy).getProtocolVersion();
-        Diamond.DiamondCutData memory upgradeCutData = abi.decode(diamondCut, (Diamond.DiamondCutData));
+        uint256 oldProtocolVersion = IZKChain(_chainDiamondProxy).getProtocolVersion();
+        Diamond.DiamondCutData memory upgradeCutData = abi.decode(_diamondCut, (Diamond.DiamondCutData));
 
         Utils.adminExecute(
-            adminAddr,
-            accessControlRestriction,
-            chainDiamondProxy,
-            abi.encodeCall(IAdmin.upgradeChainFromVersion, (chainDiamondProxy, oldProtocolVersion, upgradeCutData)),
+            _adminAddr,
+            _accessControlRestriction,
+            _chainDiamondProxy,
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainDiamondProxy, oldProtocolVersion, upgradeCutData)),
             0
         );
     }
 
-    /// @notice Upgrade a chain by reading the diamond cut directly from the CTM
-    /// @dev This avoids TOML parsing issues with large hex strings
-    /// @param chainAddress The address of the chain proxy to upgrade
-    /// @param adminAddr The address of the ChainAdmin
-    /// @param accessControlRestriction The address of the AccessControlRestriction
-    function upgradeChainFromCTM(address chainAddress, address adminAddr, address accessControlRestriction) public {
-        console.log("AdminFunctions: upgrading chain", chainAddress);
+    /// @notice Upgrade a chain by reading the diamond cut directly from the CTM.
+    /// @dev Reads the diamond cut from the CTM's storage to avoid TOML parsing
+    ///      issues with large hex strings.
+    function upgradeChainFromCTM(address _chainAddress, address _adminAddr, address _accessControlRestriction) public {
+        console.log("AdminFunctions: upgrading chain", _chainAddress);
 
-        IZKChain chain = IZKChain(chainAddress);
+        IZKChain chain = IZKChain(_chainAddress);
         IChainTypeManager ctm = IChainTypeManager(chain.getChainTypeManager());
         console.log("AdminFunctions: using CTM", address(ctm));
 
-        // Get the protocol version from CTM
         uint256 newProtocolVersion = ctm.protocolVersion();
         console.log("AdminFunctions: new protocol version", newProtocolVersion);
 
-        // Get the current chain protocol version
         uint256 currentProtocolVersion = chain.getProtocolVersion();
         console.log("AdminFunctions: current chain protocol version", currentProtocolVersion);
 
@@ -551,7 +520,6 @@ contract AdminFunctions is Script, IAdminFunctions {
             "AdminFunctions: new protocol version must be greater than current"
         );
 
-        // Get the upgrade data from CTM using the GetDiamondCutData library
         Diamond.DiamondCutData memory diamondCut = GetDiamondCutData.getDiamondCutData(
             address(ctm),
             currentProtocolVersion
@@ -560,104 +528,98 @@ contract AdminFunctions is Script, IAdminFunctions {
         // Select the Admin facet's `upgradeChainFromVersion` signature that
         // actually lives on the chain we're about to call. Pre-v31 chains
         // expose the legacy 2-arg variant; v31+ expose the new 3-arg one that
-        // carries `chainAddress`. Using the wrong one hits the DiamondProxy
+        // carries `_chainAddress`. Using the wrong one hits the DiamondProxy
         // fallback and reverts with `"F"`.
         bytes memory upgradeCall = currentProtocolVersion < V31_UPGRADE_CHAIN_FROM_VERSION_THRESHOLD
             ? abi.encodeCall(IAdminLegacy.upgradeChainFromVersion, (currentProtocolVersion, diamondCut))
-            : abi.encodeCall(IAdmin.upgradeChainFromVersion, (chainAddress, currentProtocolVersion, diamondCut));
+            : abi.encodeCall(IAdmin.upgradeChainFromVersion, (_chainAddress, currentProtocolVersion, diamondCut));
 
-        Utils.adminExecute(adminAddr, accessControlRestriction, chainAddress, upgradeCall, 0);
+        Utils.adminExecute(_adminAddr, _accessControlRestriction, _chainAddress, upgradeCall, 0);
 
         console.log("AdminFunctions: upgrade completed successfully");
     }
 
     function adminScheduleUpgrade(
-        address adminAddr,
-        address accessControlRestriction,
-        uint256 newProtocolVersion,
-        uint256 timestamp
+        address _adminAddr,
+        address _accessControlRestriction,
+        uint256 _newProtocolVersion,
+        uint256 _timestamp
     ) public {
         Utils.adminExecute(
-            adminAddr,
-            accessControlRestriction,
-            adminAddr,
-            // We do instant upgrades, but obviously it should be different in prod
-            abi.encodeCall(ChainAdmin.setUpgradeTimestamp, (newProtocolVersion, timestamp)),
+            _adminAddr,
+            _accessControlRestriction,
+            _adminAddr,
+            // Instant upgrade — production should pass a non-zero `_timestamp`.
+            abi.encodeCall(ChainAdmin.setUpgradeTimestamp, (_newProtocolVersion, _timestamp)),
             0
         );
     }
 
-    function makePermanentRollup(ChainAdmin chainAdmin, address target) public {
-        IZKChain adminContract = IZKChain(target);
+    function makePermanentRollup(ChainAdmin _chainAdmin, address _target) public {
+        IZKChain adminContract = IZKChain(_target);
 
         Call[] memory calls = new Call[](1);
-        calls[0] = Call({target: target, value: 0, data: abi.encodeCall(adminContract.makePermanentRollup, ())});
+        calls[0] = Call({target: _target, value: 0, data: abi.encodeCall(adminContract.makePermanentRollup, ())});
 
         vm.startBroadcast();
-        chainAdmin.multicall(calls, true);
+        _chainAdmin.multicall(calls, true);
         vm.stopBroadcast();
     }
 
     function updateValidator(
-        address adminAddr,
-        address accessControlRestriction,
-        address validatorTimelock,
-        uint256 chainId,
-        address validatorAddress,
-        bool addValidator
+        address _adminAddr,
+        address _accessControlRestriction,
+        address _validatorTimelock,
+        uint256 _chainId,
+        address _validatorAddress,
+        bool _addValidator
     ) public {
         bytes memory data;
-        // The interface should be compatible with both the new and the old ValidatorTimelock
-        if (addValidator) {
-            data = abi.encodeCall(ValidatorTimelock.addValidatorForChainId, (chainId, validatorAddress));
+        // Selector is identical between the new and old ValidatorTimelock,
+        // so this works against both shapes.
+        if (_addValidator) {
+            data = abi.encodeCall(ValidatorTimelock.addValidatorForChainId, (_chainId, _validatorAddress));
         } else {
-            data = abi.encodeCall(ValidatorTimelock.removeValidatorForChainId, (chainId, validatorAddress));
+            data = abi.encodeCall(ValidatorTimelock.removeValidatorForChainId, (_chainId, _validatorAddress));
         }
 
-        Utils.adminExecute(adminAddr, accessControlRestriction, validatorTimelock, data, 0);
+        Utils.adminExecute(_adminAddr, _accessControlRestriction, _validatorTimelock, data, 0);
     }
 
     /// @notice Adds L2WrappedBaseToken of a chain to the store.
-    /// @param storeAddress THe address of the `L2WrappedBaseTokenStore`.
-    /// @param ecosystemAdmin The address of the ecosystem admin contract.
-    /// @param chainId The chain id of the chain.
-    /// @param l2WBaseToken The address of the L2WrappedBaseToken.
     function addL2WethToStore(
-        address storeAddress,
-        ChainAdmin ecosystemAdmin,
-        uint256 chainId,
-        address l2WBaseToken
+        address _storeAddress,
+        ChainAdmin _ecosystemAdmin,
+        uint256 _chainId,
+        address _l2WBaseToken
     ) public {
-        L2WrappedBaseTokenStore l2WrappedBaseTokenStore = L2WrappedBaseTokenStore(storeAddress);
+        L2WrappedBaseTokenStore l2WrappedBaseTokenStore = L2WrappedBaseTokenStore(_storeAddress);
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
-            target: storeAddress,
+            target: _storeAddress,
             value: 0,
-            data: abi.encodeCall(l2WrappedBaseTokenStore.initializeChain, (chainId, l2WBaseToken))
+            data: abi.encodeCall(l2WrappedBaseTokenStore.initializeChain, (_chainId, _l2WBaseToken))
         });
 
         vm.startBroadcast();
-        ecosystemAdmin.multicall(calls, true);
+        _ecosystemAdmin.multicall(calls, true);
         vm.stopBroadcast();
     }
 
-    /// @notice Change pubdata pricing mode. Need to be called by chain admin.
-    /// @param chainAdmin The chain admin
-    /// @param target The zk chain contract.
-    /// @param pricingMode The new pricing mode.
-    function setPubdataPricingMode(ChainAdmin chainAdmin, address target, PubdataPricingMode pricingMode) public {
-        IZKChain zkChainContract = IZKChain(target);
+    /// @notice Change pubdata pricing mode. Must be called by chain admin.
+    function setPubdataPricingMode(ChainAdmin _chainAdmin, address _target, PubdataPricingMode _pricingMode) public {
+        IZKChain zkChainContract = IZKChain(_target);
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
-            target: target,
+            target: _target,
             value: 0,
-            data: abi.encodeCall(zkChainContract.setPubdataPricingMode, (pricingMode))
+            data: abi.encodeCall(zkChainContract.setPubdataPricingMode, (_pricingMode))
         });
 
         vm.startBroadcast();
-        chainAdmin.multicall(calls, true);
+        _chainAdmin.multicall(calls, true);
         vm.stopBroadcast();
     }
 
@@ -727,29 +689,29 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     function prepareUpgradeZKChainOnGateway(
-        uint256 l1GasPrice,
-        uint256 oldProtocolVersion,
-        bytes memory upgradeCutData,
-        address chainDiamondProxyOnGateway,
-        uint256 gatewayChainId,
-        uint256 chainId,
-        address bridgehub,
-        address l1AssetRouterProxy,
-        address refundRecipient,
-        bool shouldSend
+        uint256 _l1GasPrice,
+        uint256 _oldProtocolVersion,
+        bytes memory _upgradeCutData,
+        address _chainDiamondProxyOnGateway,
+        uint256 _gatewayChainId,
+        uint256 _chainId,
+        address _bridgehub,
+        address _l1AssetRouterProxy,
+        address _refundRecipient,
+        bool _shouldSend
     ) public {
         _prepareUpgradeZKChainOnGatewayInner(
             UpgradeZKChainOnGatewayParams({
-                l1GasPrice: l1GasPrice,
-                oldProtocolVersion: oldProtocolVersion,
-                upgradeCutData: upgradeCutData,
-                chainDiamondProxyOnGateway: chainDiamondProxyOnGateway,
-                gatewayChainId: gatewayChainId,
-                chainId: chainId,
-                bridgehub: bridgehub,
-                l1AssetRouterProxy: l1AssetRouterProxy,
-                refundRecipient: refundRecipient,
-                shouldSend: shouldSend
+                l1GasPrice: _l1GasPrice,
+                oldProtocolVersion: _oldProtocolVersion,
+                upgradeCutData: _upgradeCutData,
+                chainDiamondProxyOnGateway: _chainDiamondProxyOnGateway,
+                gatewayChainId: _gatewayChainId,
+                chainId: _chainId,
+                bridgehub: _bridgehub,
+                l1AssetRouterProxy: _l1AssetRouterProxy,
+                refundRecipient: _refundRecipient,
+                shouldSend: _shouldSend
             })
         );
     }
@@ -952,23 +914,23 @@ contract AdminFunctions is Script, IAdminFunctions {
     /// The gateway-side CTM only exists on gateway L2 — its predicted
     /// CREATE2 address has no code on L1, so we must read it from L2.
     function migrateChainToGateway(
-        address bridgehub,
-        uint256 l1GasPrice,
-        uint256 l2ChainId,
-        uint256 gatewayChainId,
-        string calldata gatewayRpcUrl,
-        address refundRecipient,
+        address _bridgehub,
+        uint256 _l1GasPrice,
+        uint256 _l2ChainId,
+        uint256 _gatewayChainId,
+        string calldata _gatewayRpcUrl,
+        address _refundRecipient,
         bool _shouldSend
     ) public {
         _migrateChainToGatewayInner(
             MigrateChainToGatewayParams({
-                bridgehub: bridgehub,
-                l1GasPrice: l1GasPrice,
-                l2ChainId: l2ChainId,
-                gatewayChainId: gatewayChainId,
-                gatewayRpcUrl: gatewayRpcUrl,
+                bridgehub: _bridgehub,
+                l1GasPrice: _l1GasPrice,
+                l2ChainId: _l2ChainId,
+                gatewayChainId: _gatewayChainId,
+                gatewayRpcUrl: _gatewayRpcUrl,
                 gatewayDiamondCutData: hex"",
-                refundRecipient: refundRecipient,
+                refundRecipient: _refundRecipient,
                 _shouldSend: _shouldSend
             })
         );
@@ -978,23 +940,23 @@ contract AdminFunctions is Script, IAdminFunctions {
     /// CTM's diamond cut data (e.g. tests where the CTM is deployed on the
     /// same anvil instance and no fork-switch is needed).
     function migrateChainToGatewayWithCutData(
-        address bridgehub,
-        uint256 l1GasPrice,
-        uint256 l2ChainId,
-        uint256 gatewayChainId,
-        bytes calldata gatewayDiamondCutData,
-        address refundRecipient,
+        address _bridgehub,
+        uint256 _l1GasPrice,
+        uint256 _l2ChainId,
+        uint256 _gatewayChainId,
+        bytes calldata _gatewayDiamondCutData,
+        address _refundRecipient,
         bool _shouldSend
     ) public {
         _migrateChainToGatewayInner(
             MigrateChainToGatewayParams({
-                bridgehub: bridgehub,
-                l1GasPrice: l1GasPrice,
-                l2ChainId: l2ChainId,
-                gatewayChainId: gatewayChainId,
+                bridgehub: _bridgehub,
+                l1GasPrice: _l1GasPrice,
+                l2ChainId: _l2ChainId,
+                gatewayChainId: _gatewayChainId,
                 gatewayRpcUrl: "",
-                gatewayDiamondCutData: gatewayDiamondCutData,
-                refundRecipient: refundRecipient,
+                gatewayDiamondCutData: _gatewayDiamondCutData,
+                refundRecipient: _refundRecipient,
                 _shouldSend: _shouldSend
             })
         );
@@ -1040,26 +1002,26 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     function setDAValidatorPairWithGateway(
-        address bridgehub,
-        uint256 l1GasPrice,
-        uint256 l2ChainId,
-        uint256 gatewayChainId,
-        address l1DAValidator,
-        L2DACommitmentScheme l2DACommitmentScheme,
-        address chainDiamondProxyOnGateway,
-        address refundRecipient,
+        address _bridgehub,
+        uint256 _l1GasPrice,
+        uint256 _l2ChainId,
+        uint256 _gatewayChainId,
+        address _l1DAValidator,
+        L2DACommitmentScheme _l2DACommitmentScheme,
+        address _chainDiamondProxyOnGateway,
+        address _refundRecipient,
         bool _shouldSend
     ) public {
         _setDAValidatorPairWithGatewayInner(
             SetDAValidatorPairWithGatewayParams({
-                bridgehub: bridgehub,
-                l1GasPrice: l1GasPrice,
-                l2ChainId: l2ChainId,
-                gatewayChainId: gatewayChainId,
-                l1DAValidator: l1DAValidator,
-                l2DACommitmentScheme: l2DACommitmentScheme,
-                chainDiamondProxyOnGateway: chainDiamondProxyOnGateway,
-                refundRecipient: refundRecipient,
+                bridgehub: _bridgehub,
+                l1GasPrice: _l1GasPrice,
+                l2ChainId: _l2ChainId,
+                gatewayChainId: _gatewayChainId,
+                l1DAValidator: _l1DAValidator,
+                l2DACommitmentScheme: _l2DACommitmentScheme,
+                chainDiamondProxyOnGateway: _chainDiamondProxyOnGateway,
+                refundRecipient: _refundRecipient,
                 _shouldSend: _shouldSend
             })
         );
@@ -1104,41 +1066,44 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     function enableValidatorViaGateway(
-        address bridgehub,
-        uint256 l1GasPrice,
-        uint256 l2ChainId,
-        uint256 gatewayChainId,
-        address validatorAddress,
-        address gatewayValidatorTimelock,
-        address refundRecipient,
+        address _bridgehub,
+        uint256 _l1GasPrice,
+        uint256 _l2ChainId,
+        uint256 _gatewayChainId,
+        address _validatorAddress,
+        address _gatewayValidatorTimelock,
+        address _refundRecipient,
         bool _shouldSend
     ) public {
         _enableValidatorViaGatewayInner(
             EnableValidatorViaGatewayParams({
-                bridgehub: bridgehub,
-                l1GasPrice: l1GasPrice,
-                l2ChainId: l2ChainId,
-                gatewayChainId: gatewayChainId,
-                validatorAddress: validatorAddress,
-                gatewayValidatorTimelock: gatewayValidatorTimelock,
-                refundRecipient: refundRecipient,
+                bridgehub: _bridgehub,
+                l1GasPrice: _l1GasPrice,
+                l2ChainId: _l2ChainId,
+                gatewayChainId: _gatewayChainId,
+                validatorAddress: _validatorAddress,
+                gatewayValidatorTimelock: _gatewayValidatorTimelock,
+                refundRecipient: _refundRecipient,
                 _shouldSend: _shouldSend
             })
         );
     }
 
     function enableValidator(
-        address bridgehub,
-        uint256 l2ChainId,
-        address validatorAddress,
-        address validatorTimelock,
+        address _bridgehub,
+        uint256 _l2ChainId,
+        address _validatorAddress,
+        address _validatorTimelock,
         bool _shouldSend
     ) public {
-        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(bridgehub, l2ChainId);
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _l2ChainId);
 
-        bytes memory callData = abi.encodeCall(ValidatorTimelock.addValidatorForChainId, (l2ChainId, validatorAddress));
+        bytes memory callData = abi.encodeCall(
+            ValidatorTimelock.addValidatorForChainId,
+            (_l2ChainId, _validatorAddress)
+        );
         Call[] memory calls = new Call[](1);
-        calls[0] = Call({target: validatorTimelock, value: 0, data: callData});
+        calls[0] = Call({target: _validatorTimelock, value: 0, data: callData});
 
         saveAndSendAdminTx(l2ChainInfo.admin, calls, _shouldSend);
     }
@@ -1197,24 +1162,22 @@ contract AdminFunctions is Script, IAdminFunctions {
         saveAndSendAdminTx(l2ChainInfo.admin, calls, data.shouldSend);
     }
 
-    // The public function preserves the original interface
-    // and simply wraps the input into the struct before calling the inner function.
     function startMigrateChainFromGateway(
-        address bridgehub,
-        uint256 l1GasPrice,
-        uint256 l2ChainId,
-        uint256 gatewayChainId,
-        bytes memory l1DiamondCutData,
-        address refundRecipient,
+        address _bridgehub,
+        uint256 _l1GasPrice,
+        uint256 _l2ChainId,
+        uint256 _gatewayChainId,
+        bytes memory _l1DiamondCutData,
+        address _refundRecipient,
         bool _shouldSend
     ) public {
         StartMigrateChainFromGatewayParams memory params = StartMigrateChainFromGatewayParams({
-            bridgehub: bridgehub,
-            l1GasPrice: l1GasPrice,
-            l2ChainId: l2ChainId,
-            gatewayChainId: gatewayChainId,
-            l1DiamondCutData: l1DiamondCutData,
-            refundRecipient: refundRecipient,
+            bridgehub: _bridgehub,
+            l1GasPrice: _l1GasPrice,
+            l2ChainId: _l2ChainId,
+            gatewayChainId: _gatewayChainId,
+            l1DiamondCutData: _l1DiamondCutData,
+            refundRecipient: _refundRecipient,
             shouldSend: _shouldSend
         });
 
@@ -1256,24 +1219,24 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     function adminL1L2Tx(
-        address bridgehub,
-        uint256 l1GasPrice,
-        uint256 chainId,
-        address to,
-        uint256 value,
-        bytes memory data,
-        address refundRecipient,
+        address _bridgehub,
+        uint256 _l1GasPrice,
+        uint256 _chainId,
+        address _to,
+        uint256 _value,
+        bytes memory _data,
+        address _refundRecipient,
         bool _shouldSend
     ) public {
         _adminL1L2TxInner(
             AdminL1L2TxParams({
-                bridgehub: bridgehub,
-                l1GasPrice: l1GasPrice,
-                chainId: chainId,
-                to: to,
-                value: value,
-                data: data,
-                refundRecipient: refundRecipient,
+                bridgehub: _bridgehub,
+                l1GasPrice: _l1GasPrice,
+                chainId: _chainId,
+                to: _to,
+                value: _value,
+                data: _data,
+                refundRecipient: _refundRecipient,
                 _shouldSend: _shouldSend
             })
         );

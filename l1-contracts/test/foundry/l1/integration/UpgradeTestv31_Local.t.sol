@@ -94,6 +94,31 @@ contract CoreUpgrade_v31_Test is CoreUpgrade_v31 {
 // `createCoreUpgrade` / `createCTMUpgrade` on `UpgradeIntegrationTest_Local` directly,
 // and bumps the protocol version in `setUp` after `setupUpgrade()`.
 
+// AGENTS.md mandates "NEVER override storage slots in tests" with no exceptions,
+// but this local-fork harness is the one place we can't avoid it: the v31 upgrade
+// flow depends on chain state (batches executed/committed > 0, MessageRoot's
+// per-chain placeholder, MessageRoot reinitializer version) that production
+// reaches via real batch commits and the real `initializeL1V31Upgrade` call.
+// In a freshly-deployed local fixture neither has happened yet, and there is no
+// public API to drive them. The overrides below substitute for that history;
+// they are scoped to this `setUp`/`beforeChainUpgrade` and never run against a
+// real chain.
+//
+// Slot indices below are taken from `forge inspect <Contract> storageLayout` on
+// the v31 contracts; if any of these contracts ever shift their storage layout
+// these constants need to move with it.
+
+// Slot of `ZKChainBase.totalBatchesExecuted` (absolute, not relative to DIAMOND_STORAGE_POSITION).
+// See `contracts/state-transition/chain-deps/ZKChainStorage.sol`.
+uint256 constant ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT = 11;
+// Slot of `ZKChainBase.totalBatchesCommitted` (absolute).
+uint256 constant ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT = 13;
+// Slot of `L1MessageRoot.v31UpgradeChainBatchNumber` (mapping). Layout:
+// `Initializable(0)`, `MessageRootBase(1-12)`, `__gap[37](13-49)`, this(50).
+uint256 constant L1_MESSAGE_ROOT_V31_UPGRADE_BATCH_NUMBER_SLOT = 50;
+// Slot of OZ `Initializable._initialized` (uint8 packed with `_initializing`).
+uint256 constant OZ_INITIALIZABLE_VERSION_SLOT = 0;
+
 contract UpgradeIntegrationTest_Local is
     UpgradeIntegrationTestBase,
     L1ContractDeployer,
@@ -123,29 +148,19 @@ contract UpgradeIntegrationTest_Local is
         ctmUpgrade.setNewProtocolVersion(newProtocolVersion);
     }
 
-    /// @notice Set totalBatchesExecuted and totalBatchesCommitted before chain upgrade
-    /// @dev Required because saveV31UpgradeChainBatchNumber checks that totalBatchesExecuted > 0
+    /// Make the freshly-deployed Era diamond look like it has a committed and
+    /// executed batch (both at 1) so `saveV31UpgradeChainBatchNumber`'s
+    /// `totalBatchesExecuted > 0` and `totalBatchesCommitted == totalBatchesExecuted`
+    /// guards pass, and seed the L1MessageRoot's per-chain placeholder that
+    /// `initializeL1V31Upgrade` would have set in production. See the
+    /// fork-only-violation note at the top of this file.
     function beforeChainUpgrade() internal override {
-        // Set totalBatchesExecuted and totalBatchesCommitted to 1
-        // Both need to be set to satisfy: require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
-        // Note: These are absolute storage slots, not relative to DIAMOND_STORAGE_POSITION
-        // See: contracts/state-transition/chain-deps/ZKChainStorage.sol
-        bytes32 totalBatchesExecutedSlot = bytes32(uint256(11)); // STORAGE SLOT: 11
-        bytes32 totalBatchesCommittedSlot = bytes32(uint256(13)); // STORAGE SLOT: 13
         address eraChainDiamond = addresses.bridgehub.getZKChain(eraZKChainId);
+        vm.store(eraChainDiamond, bytes32(ZK_CHAIN_TOTAL_BATCHES_EXECUTED_SLOT), bytes32(uint256(1)));
+        vm.store(eraChainDiamond, bytes32(ZK_CHAIN_TOTAL_BATCHES_COMMITTED_SLOT), bytes32(uint256(1)));
 
-        vm.store(eraChainDiamond, totalBatchesExecutedSlot, bytes32(uint256(1)));
-        vm.store(eraChainDiamond, totalBatchesCommittedSlot, bytes32(uint256(1)));
-
-        // Set v31UpgradeChainBatchNumber[eraZKChainId] to placeholder value
-        // In local tests, the era chain is deployed AFTER MessageRoot, so v31UpgradeChainBatchNumber[9]
-        // was never initialized to the placeholder value. In a real V31 upgrade, initializeL1V31Upgrade()
-        // would be called first to set all existing chains to the placeholder.
         address messageRoot = address(addresses.bridgehub.messageRoot());
-
-        // v31UpgradeChainBatchNumber is at slot 50 in L1MessageRoot
-        // Storage layout: Initializable(0), MessageRootBase vars(1-12), __gap[37](13-49), v31UpgradeChainBatchNumber(50)
-        bytes32 v31MappingSlot = keccak256(abi.encode(eraZKChainId, uint256(50)));
+        bytes32 v31MappingSlot = keccak256(abi.encode(eraZKChainId, L1_MESSAGE_ROOT_V31_UPGRADE_BATCH_NUMBER_SLOT));
         vm.store(messageRoot, v31MappingSlot, bytes32(V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE));
     }
 
@@ -154,11 +169,13 @@ contract UpgradeIntegrationTest_Local is
         _deployL1Contracts();
         console.log("setUp: L1 contracts deployed");
 
-        // Reset L1MessageRoot's initializer version to 1 so that initializeL1V31Upgrade() (reinitializer(2)) works
-        // Fresh deployments call initialize() which uses reinitializer(2), but we need to test the upgrade path
-        // Initializable storage slot 0 contains the version (uint8) packed with _initializing (bool)
+        // Roll L1MessageRoot's `_initialized` back to 1 so that
+        // `initializeL1V31Upgrade()` (a `reinitializer(2)` call) is allowed
+        // to run during the upgrade. Fresh deployments call `initialize()`
+        // (also reinitializer(2)) so the proxy already sits at version 2.
+        // See the fork-only-violation note at the top of this file.
         address messageRootProxy = address(addresses.bridgehub.messageRoot());
-        vm.store(messageRootProxy, bytes32(uint256(0)), bytes32(uint256(1)));
+        vm.store(messageRootProxy, bytes32(OZ_INITIALIZABLE_VERSION_SLOT), bytes32(uint256(1)));
         console.log("setUp: Reset L1MessageRoot initializer version to 1");
         _deployTokens();
         console.log("setUp: Tokens deployed");

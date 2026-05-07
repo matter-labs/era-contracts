@@ -17,22 +17,22 @@
     "name": "addL2WethToStore",
     "inputs": [
       {
-        "name": "storeAddress",
+        "name": "_storeAddress",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "ecosystemAdmin",
+        "name": "_ecosystemAdmin",
         "type": "address",
         "internalType": "contract ChainAdmin"
       },
       {
-        "name": "chainId",
+        "name": "_chainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "l2WBaseToken",
+        "name": "_l2WBaseToken",
         "type": "address",
         "internalType": "address"
       }
@@ -45,7 +45,7 @@
     "name": "adminEncodeMulticall",
     "inputs": [
       {
-        "name": "callsToExecute",
+        "name": "_callsToExecute",
         "type": "bytes",
         "internalType": "bytes"
       }
@@ -58,22 +58,22 @@
     "name": "adminExecuteUpgrade",
     "inputs": [
       {
-        "name": "diamondCut",
+        "name": "_diamondCut",
         "type": "bytes",
         "internalType": "bytes"
       },
       {
-        "name": "adminAddr",
+        "name": "_adminAddr",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "accessControlRestriction",
+        "name": "_accessControlRestriction",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "chainDiamondProxy",
+        "name": "_chainDiamondProxy",
         "type": "address",
         "internalType": "address"
       }
@@ -86,37 +86,37 @@
     "name": "adminL1L2Tx",
     "inputs": [
       {
-        "name": "bridgehub",
+        "name": "_bridgehub",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "l1GasPrice",
+        "name": "_l1GasPrice",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "chainId",
+        "name": "_chainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "to",
+        "name": "_to",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "value",
+        "name": "_value",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "data",
+        "name": "_data",
         "type": "bytes",
         "internalType": "bytes"
       },
       {
-        "name": "refundRecipient",
+        "name": "_refundRecipient",
         "type": "address",
         "internalType": "address"
       },
@@ -134,22 +134,22 @@
     "name": "adminScheduleUpgrade",
     "inputs": [
       {
-        "name": "adminAddr",
+        "name": "_adminAddr",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "accessControlRestriction",
+        "name": "_accessControlRestriction",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "newProtocolVersion",
+        "name": "_newProtocolVersion",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "timestamp",
+        "name": "_timestamp",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -162,12 +162,12 @@
     "name": "chainAdminAcceptAdmin",
     "inputs": [
       {
-        "name": "chainAdmin",
+        "name": "_chainAdmin",
         "type": "address",
         "internalType": "contract ChainAdmin"
       },
       {
-        "name": "target",
+        "name": "_target",
         "type": "address",
         "internalType": "address"
       }
@@ -180,22 +180,22 @@
     "name": "chainSetTokenMultiplierSetter",
     "inputs": [
       {
-        "name": "chainAdmin",
+        "name": "_chainAdmin",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "accessControlRestriction",
+        "name": "_accessControlRestriction",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "diamondProxyAddress",
+        "name": "_diamondProxyAddress",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "setter",
+        "name": "_setter",
         "type": "address",
         "internalType": "address"
       }
@@ -208,12 +208,12 @@
     "name": "ecosystemAdminExecuteCalls",
     "inputs": [
       {
-        "name": "callsToExecute",
+        "name": "_callsToExecute",
         "type": "bytes",
         "internalType": "bytes"
       },
       {
-        "name": "ecosystemAdminAddr",
+        "name": "_ecosystemAdminAddr",
         "type": "address",
         "internalType": "address"
       }
@@ -226,22 +226,22 @@
     "name": "enableValidator",
     "inputs": [
       {
-        "name": "bridgehub",
+        "name": "_bridgehub",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "l2ChainId",
+        "name": "_l2ChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "validatorAddress",
+        "name": "_validatorAddress",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "validatorTimelock",
+        "name": "_validatorTimelock",
         "type": "address",
         "internalType": "address"
       },
@@ -259,37 +259,37 @@
     "name": "enableValidatorViaGateway",
     "inputs": [
       {
-        "name": "bridgehub",
+        "name": "_bridgehub",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "l1GasPrice",
+        "name": "_l1GasPrice",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "l2ChainId",
+        "name": "_l2ChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "gatewayChainId",
+        "name": "_gatewayChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "validatorAddress",
+        "name": "_validatorAddress",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "gatewayValidatorTimelock",
+        "name": "_gatewayValidatorTimelock",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "refundRecipient",
+        "name": "_refundRecipient",
         "type": "address",
         "internalType": "address"
       },
@@ -307,12 +307,12 @@
     "name": "ensureCtmsAndProxyAdminsOwnedByGovernance",
     "inputs": [
       {
-        "name": "bridgehub",
+        "name": "_bridgehub",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "governance",
+        "name": "_governance",
         "type": "address",
         "internalType": "address"
       }
@@ -325,17 +325,17 @@
     "name": "ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps",
     "inputs": [
       {
-        "name": "bridgehub",
+        "name": "_bridgehub",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "governance",
+        "name": "_governance",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "wraps",
+        "name": "_wraps",
         "type": "tuple[]",
         "internalType": "struct OwnerWrap[]",
         "components": [
@@ -360,12 +360,12 @@
     "name": "governanceAcceptAdmin",
     "inputs": [
       {
-        "name": "governor",
+        "name": "_governor",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "target",
+        "name": "_target",
         "type": "address",
         "internalType": "address"
       }
@@ -378,12 +378,12 @@
     "name": "governanceAcceptOwner",
     "inputs": [
       {
-        "name": "governor",
+        "name": "_governor",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "target",
+        "name": "_target",
         "type": "address",
         "internalType": "address"
       }
@@ -396,12 +396,12 @@
     "name": "governanceAcceptOwnerAggregated",
     "inputs": [
       {
-        "name": "governor",
+        "name": "_governor",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "bridgehub",
+        "name": "_bridgehub",
         "type": "address",
         "internalType": "address"
       }
@@ -414,12 +414,12 @@
     "name": "governanceAcceptOwnerConditional",
     "inputs": [
       {
-        "name": "governor",
+        "name": "_governor",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "target",
+        "name": "_target",
         "type": "address",
         "internalType": "address"
       }
@@ -432,12 +432,12 @@
     "name": "governanceExecuteCalls",
     "inputs": [
       {
-        "name": "callsToExecute",
+        "name": "_callsToExecute",
         "type": "bytes",
         "internalType": "bytes"
       },
       {
-        "name": "governanceAddr",
+        "name": "_governanceAddr",
         "type": "address",
         "internalType": "address"
       }
@@ -450,12 +450,12 @@
     "name": "governanceExecuteCallsDirect",
     "inputs": [
       {
-        "name": "callsToExecute",
+        "name": "_callsToExecute",
         "type": "bytes",
         "internalType": "bytes"
       },
       {
-        "name": "governanceAddr",
+        "name": "_governanceAddr",
         "type": "address",
         "internalType": "address"
       }
@@ -493,22 +493,15 @@
   },
   {
     "type": "function",
-    "name": "initConfig",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "makePermanentRollup",
     "inputs": [
       {
-        "name": "chainAdmin",
+        "name": "_chainAdmin",
         "type": "address",
         "internalType": "contract ChainAdmin"
       },
       {
-        "name": "target",
+        "name": "_target",
         "type": "address",
         "internalType": "address"
       }
@@ -521,32 +514,32 @@
     "name": "migrateChainToGateway",
     "inputs": [
       {
-        "name": "bridgehub",
+        "name": "_bridgehub",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "l1GasPrice",
+        "name": "_l1GasPrice",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "l2ChainId",
+        "name": "_l2ChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "gatewayChainId",
+        "name": "_gatewayChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "gatewayRpcUrl",
+        "name": "_gatewayRpcUrl",
         "type": "string",
         "internalType": "string"
       },
       {
-        "name": "refundRecipient",
+        "name": "_refundRecipient",
         "type": "address",
         "internalType": "address"
       },
@@ -564,32 +557,32 @@
     "name": "migrateChainToGatewayWithCutData",
     "inputs": [
       {
-        "name": "bridgehub",
+        "name": "_bridgehub",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "l1GasPrice",
+        "name": "_l1GasPrice",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "l2ChainId",
+        "name": "_l2ChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "gatewayChainId",
+        "name": "_gatewayChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "gatewayDiamondCutData",
+        "name": "_gatewayDiamondCutData",
         "type": "bytes",
         "internalType": "bytes"
       },
       {
-        "name": "refundRecipient",
+        "name": "_refundRecipient",
         "type": "address",
         "internalType": "address"
       },
@@ -676,52 +669,52 @@
     "name": "prepareUpgradeZKChainOnGateway",
     "inputs": [
       {
-        "name": "l1GasPrice",
+        "name": "_l1GasPrice",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "oldProtocolVersion",
+        "name": "_oldProtocolVersion",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "upgradeCutData",
+        "name": "_upgradeCutData",
         "type": "bytes",
         "internalType": "bytes"
       },
       {
-        "name": "chainDiamondProxyOnGateway",
+        "name": "_chainDiamondProxyOnGateway",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "gatewayChainId",
+        "name": "_gatewayChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "chainId",
+        "name": "_chainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "bridgehub",
+        "name": "_bridgehub",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "l1AssetRouterProxy",
+        "name": "_l1AssetRouterProxy",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "refundRecipient",
+        "name": "_refundRecipient",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "shouldSend",
+        "name": "_shouldSend",
         "type": "bool",
         "internalType": "bool"
       }
@@ -795,42 +788,42 @@
     "name": "setDAValidatorPairWithGateway",
     "inputs": [
       {
-        "name": "bridgehub",
+        "name": "_bridgehub",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "l1GasPrice",
+        "name": "_l1GasPrice",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "l2ChainId",
+        "name": "_l2ChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "gatewayChainId",
+        "name": "_gatewayChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "l1DAValidator",
+        "name": "_l1DAValidator",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "l2DACommitmentScheme",
+        "name": "_l2DACommitmentScheme",
         "type": "uint8",
         "internalType": "enum L2DACommitmentScheme"
       },
       {
-        "name": "chainDiamondProxyOnGateway",
+        "name": "_chainDiamondProxyOnGateway",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "refundRecipient",
+        "name": "_refundRecipient",
         "type": "address",
         "internalType": "address"
       },
@@ -848,17 +841,17 @@
     "name": "setPubdataPricingMode",
     "inputs": [
       {
-        "name": "chainAdmin",
+        "name": "_chainAdmin",
         "type": "address",
         "internalType": "contract ChainAdmin"
       },
       {
-        "name": "target",
+        "name": "_target",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "pricingMode",
+        "name": "_pricingMode",
         "type": "uint8",
         "internalType": "enum PubdataPricingMode"
       }
@@ -899,32 +892,32 @@
     "name": "startMigrateChainFromGateway",
     "inputs": [
       {
-        "name": "bridgehub",
+        "name": "_bridgehub",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "l1GasPrice",
+        "name": "_l1GasPrice",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "l2ChainId",
+        "name": "_l2ChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "gatewayChainId",
+        "name": "_gatewayChainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "l1DiamondCutData",
+        "name": "_l1DiamondCutData",
         "type": "bytes",
         "internalType": "bytes"
       },
       {
-        "name": "refundRecipient",
+        "name": "_refundRecipient",
         "type": "address",
         "internalType": "address"
       },
@@ -942,12 +935,12 @@
     "name": "transferOwnerConditional",
     "inputs": [
       {
-        "name": "target",
+        "name": "_target",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "newOwner",
+        "name": "_newOwner",
         "type": "address",
         "internalType": "address"
       }
@@ -960,12 +953,12 @@
     "name": "transferOwnerSingleConditional",
     "inputs": [
       {
-        "name": "target",
+        "name": "_target",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "newOwner",
+        "name": "_newOwner",
         "type": "address",
         "internalType": "address"
       }
@@ -1001,32 +994,32 @@
     "name": "updateValidator",
     "inputs": [
       {
-        "name": "adminAddr",
+        "name": "_adminAddr",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "accessControlRestriction",
+        "name": "_accessControlRestriction",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "validatorTimelock",
+        "name": "_validatorTimelock",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "chainId",
+        "name": "_chainId",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "validatorAddress",
+        "name": "_validatorAddress",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "addValidator",
+        "name": "_addValidator",
         "type": "bool",
         "internalType": "bool"
       }
@@ -1039,17 +1032,17 @@
     "name": "upgradeChainFromCTM",
     "inputs": [
       {
-        "name": "chainAddress",
+        "name": "_chainAddress",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "adminAddr",
+        "name": "_adminAddr",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "accessControlRestriction",
+        "name": "_accessControlRestriction",
         "type": "address",
         "internalType": "address"
       }

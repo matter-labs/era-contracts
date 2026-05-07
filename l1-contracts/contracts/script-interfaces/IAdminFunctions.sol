@@ -29,8 +29,6 @@ uint8 constant OWNER_KIND_OZ_CHAIN_ADMIN = 2;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IAdminFunctions {
-    function initConfig() external;
-
     function governanceAcceptOwner(address governor, address target) external;
 
     function governanceAcceptOwnerConditional(address governor, address target) external;
