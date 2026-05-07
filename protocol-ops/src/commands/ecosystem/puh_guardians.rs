@@ -1,9 +1,9 @@
 //! PUH/Guardians redeploy helper, called as part of
 //! `ecosystem upgrade-prepare-all`.
 //!
-//! Runs `DeployPUHAndGuardians.s.sol` from the sibling `zk-governance/l1-contracts`
-//! checkout (default `../../zk-governance/l1-contracts`, branch derived from
-//! `vg/oz-audit-feb-2026`) on the same anvil fork as the core/CTM prepares,
+//! Runs `DeployPUHAndGuardians.s.sol` from the sibling `zk-governance`
+//! checkout (default `../../zk-governance`, foundry root with `foundry.toml`
+//! at the top level) on the same anvil fork as the core/CTM prepares,
 //! and returns the two PUH proposal calls that wire the new contracts into
 //! the existing PUH proxy:
 //!
@@ -49,10 +49,10 @@ const BRIDGEHUB_CHAIN_ASSET_HANDLER_SELECTOR: [u8; 4] = [0x70, 0xd8, 0xaf, 0x87]
 
 /// Default well-known CREATE2 deployer (Arachnid). Deployed on Sepolia + mainnet.
 const DEFAULT_CREATE2_FACTORY: &str = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
-/// Default forge script (in zk-governance/l1-contracts).
+/// Default forge script (relative to the zk-governance foundry root).
 const DEFAULT_SCRIPT_PATH: &str = "scripts/DeployPUHAndGuardians.s.sol:DeployPUHAndGuardians";
 /// Default sibling checkout path for zk-governance.
-pub const DEFAULT_ZK_GOV_DIR: &str = "../../zk-governance/l1-contracts";
+pub const DEFAULT_ZK_GOV_DIR: &str = "../../zk-governance";
 
 /// Inputs for the PUH/Guardians redeploy step. Most fields default — callers
 /// (`ecosystem upgrade-prepare-all`) should pass `env` for the auto-fills and
@@ -120,7 +120,9 @@ pub async fn deploy_puh_guardians(
         .unwrap_or_else(|| H256::from(keccak256(b"v31:Guardians")));
 
     // Resolve --zk-governance-dir relative to the contracts root (`paths::contracts_root()`),
-    // so the default `../../zk-governance/l1-contracts` works regardless of shell cwd.
+    // so the default `../../zk-governance` works regardless of shell cwd. Some
+    // checkouts wrap the foundry project in an `l1-contracts/` subdir; if the
+    // top-level dir has no `foundry.toml`, descend into `l1-contracts`.
     let zk_gov_dir = if inputs.zk_governance_dir.is_absolute() {
         inputs.zk_governance_dir.clone()
     } else {
@@ -129,6 +131,17 @@ pub async fn deploy_puh_guardians(
     let zk_gov_dir = zk_gov_dir
         .canonicalize()
         .with_context(|| format!("zk-governance dir not found: {}", zk_gov_dir.display()))?;
+    let zk_gov_dir = if zk_gov_dir.join("foundry.toml").exists() {
+        zk_gov_dir
+    } else if zk_gov_dir.join("l1-contracts/foundry.toml").exists() {
+        zk_gov_dir.join("l1-contracts")
+    } else {
+        anyhow::bail!(
+            "zk-governance foundry root not found: neither {} nor {}/l1-contracts contains foundry.toml",
+            zk_gov_dir.display(),
+            zk_gov_dir.display()
+        );
+    };
     let script_full = zk_gov_dir.join(
         DEFAULT_SCRIPT_PATH
             .split(':')
@@ -157,7 +170,7 @@ pub async fn deploy_puh_guardians(
     let proxy_admin = read_eip1967_admin(&runner.rpc_url, puh_proxy).await?;
     logger::info(format!("PUH ProxyAdmin: {proxy_admin:#x}"));
 
-    // Forge writes the deploy output TOML inside zk-governance/l1-contracts/script-out/
+    // Forge writes the deploy output TOML inside zk-governance/script-out/
     // so it falls under that repo's `fs_permissions` whitelist.
     let zk_gov_script_out = zk_gov_dir.join("script-out");
     fs::create_dir_all(&zk_gov_script_out)?;

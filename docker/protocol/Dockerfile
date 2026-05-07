@@ -100,12 +100,11 @@ COPY . /contracts
 # === Copy zk-governance source ===
 # protocol-ops's PUH/Guardians redeploy step (`ecosystem upgrade-prepare-all`
 # on PUH-governed envs like stage / mainnet) shells out to a forge script
-# inside zk-governance. The runtime path it expects is `<era>/../../zk-governance/l1-contracts`,
-# which inside the container resolves to `/zk-governance/l1-contracts`. The
-# CI workflow checks out matter-labs/zk-governance at $GITHUB_WORKSPACE/zk-governance/
-# so it lands inside the docker build context. The era-contracts `COPY .`
-# above also captures it under `/contracts/zk-governance/`, but we move it
-# into place so protocol-ops finds it at its expected sibling location.
+# inside zk-governance. The runtime path it expects is `<era>/../../zk-governance`,
+# which inside the container resolves to `/zk-governance` (foundry root with
+# `foundry.toml` at the top level — no `l1-contracts/` wrapper). The CI
+# workflow checks out zksync-association/zk-governance at
+# $GITHUB_WORKSPACE/zk-governance/ so it lands inside the docker build context.
 COPY zk-governance /zk-governance
 
 # === Build Rust binaries (deps already cached by cook) ===
@@ -151,8 +150,15 @@ RUN yarn --cwd system-contracts build:foundry
 # Pre-compile zk-governance contracts. This both seeds /root/.svm/ with solc
 # 0.8.24 (zk-governance pins it; the runtime image runs with FOUNDRY_OFFLINE=true
 # so missing solc downloads would fail) and produces out/ artifacts that
-# DeployPUHAndGuardians.s.sol reads at runtime.
-RUN cd /zk-governance/l1-contracts && forge build
+# DeployPUHAndGuardians.s.sol reads at runtime. Some refs wrap the foundry
+# project in `l1-contracts/`; pick whichever holds `foundry.toml`.
+RUN if [ -f /zk-governance/foundry.toml ]; then \
+      cd /zk-governance && forge build; \
+    elif [ -f /zk-governance/l1-contracts/foundry.toml ]; then \
+      cd /zk-governance/l1-contracts && forge build; \
+    else \
+      echo "zk-governance foundry root not found" >&2 && exit 1; \
+    fi
 
 # Keep full node_modules — forge ffi scripts depend on packages here (e.g. blakejs).
 
@@ -204,7 +210,7 @@ COPY --from=build /contracts/AllContractsHashes.json /contracts/AllContractsHash
 COPY --from=build /contracts/SystemConfig.json /contracts/SystemConfig.json
 
 # zk-governance lives at `/zk-governance` (sibling-style path) so protocol-ops
-# resolves it correctly via `<era>/../../zk-governance/l1-contracts`.
+# resolves it correctly via `<era>/../../zk-governance`.
 COPY --from=build /zk-governance /zk-governance
 
 # Disable foundry-zksync telemetry
