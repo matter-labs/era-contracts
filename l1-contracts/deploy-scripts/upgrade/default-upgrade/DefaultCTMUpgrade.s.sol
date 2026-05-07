@@ -902,11 +902,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             "bytecodes_supplier_addr",
             ctmAddresses.stateTransition.proxies.bytecodesSupplier
         );
-        vm.serializeAddress(
-            "state_transition",
-            "eip7702_checker_addr",
-            ctmAddresses.admin.eip7702Checker
-        );
+        vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
         vm.serializeAddress(
             "state_transition",
             "permissionless_validator_addr",

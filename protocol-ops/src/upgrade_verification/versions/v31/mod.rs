@@ -37,6 +37,7 @@ pub(crate) fn get_expected_old_protocol_version() -> ProtocolVersion {
     ProtocolVersion::from_str(EXPECTED_OLD_PROTOCOL_VERSION_STR).unwrap()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn verify(
     artifact: &EcosystemUpgradeArtifact,
     l1_rpc_url: &str,
@@ -87,7 +88,14 @@ pub(crate) async fn verify(
 
     verify_v31_artifact_state(&verifiers, genesis_config_kind, result).await?;
 
-    verify_v31_provenance(artifact, &verifiers, era_chain_id, genesis_config_kind, result).await?;
+    verify_v31_provenance(
+        artifact,
+        &verifiers,
+        era_chain_id,
+        genesis_config_kind,
+        result,
+    )
+    .await?;
 
     Ok(())
 }

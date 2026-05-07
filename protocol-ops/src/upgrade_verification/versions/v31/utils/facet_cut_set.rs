@@ -40,7 +40,7 @@ impl std::fmt::Debug for FacetInfo {
         let mut selectors = self
             .selectors
             .iter()
-            .map(|e| hex::encode(e))
+            .map(hex::encode)
             .collect::<Vec<String>>();
         selectors.sort();
         f.debug_struct("FacetInfo")
@@ -91,7 +91,7 @@ impl FacetCutSet {
 
 impl PartialOrd for FacetCutSet {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.facets.len().cmp(&other.facets.len()))
+        Some(self.cmp(other))
     }
 }
 

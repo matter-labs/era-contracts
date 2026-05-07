@@ -7,7 +7,7 @@ use alloy::{
 use super::super::elements::call_list::{CallList, UpgradeProposal};
 
 pub(crate) fn encode_upgrade_data(encoded_calls: &str) -> String {
-    let calls_list = CallList::parse(&encoded_calls);
+    let calls_list = CallList::parse(encoded_calls);
     let upgrade_proposal = UpgradeProposal {
         calls: calls_list.elems,
         executor: Address::ZERO,

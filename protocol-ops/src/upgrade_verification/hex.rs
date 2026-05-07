@@ -10,7 +10,7 @@ pub(crate) fn decode_required_hex(field: &str, value: &str) -> anyhow::Result<Ve
 
     anyhow::ensure!(!hex_value.is_empty(), "{field} must not be empty");
     anyhow::ensure!(
-        hex_value.len() % 2 == 0,
+        hex_value.len().is_multiple_of(2),
         "{field} must contain an even number of hex characters"
     );
 

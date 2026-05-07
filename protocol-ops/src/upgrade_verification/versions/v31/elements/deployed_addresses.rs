@@ -3,7 +3,8 @@ use anyhow::{ensure, Context, Result};
 use super::protocol_version::ProtocolVersion;
 use crate::upgrade_verification::{
     artifacts::EcosystemUpgradeArtifact,
-    verifiers::{GenesisConfigKind, VerificationResult, Verifiers}, versions::v31::MAX_NUMBER_OF_ZK_CHAINS,
+    verifiers::{GenesisConfigKind, VerificationResult, Verifiers},
+    versions::v31::MAX_NUMBER_OF_ZK_CHAINS,
 };
 
 use super::{
@@ -589,7 +590,7 @@ impl DeployedAddresses {
 
         result.expect_create2_params(
             verifiers,
-            &chain_type_manager_addr,
+            chain_type_manager_addr,
             ChainTypeManager::constructorCall::new((bridgehub_addr,)).abi_encode(),
             "l1-contracts/ChainTypeManager",
         );
@@ -738,7 +739,7 @@ impl DeployedAddresses {
                 .await
                 .context(format!("Failed to retrieve the bytecode for {}", address))?;
 
-            if bytecode.len() == 0 {
+            if bytecode.is_empty() {
                 result.report_error(&format!("No bytecode for facet {}", l1_facet.name));
             }
             let info: Vec<_> =
@@ -1329,7 +1330,13 @@ pub(crate) async fn verify_v31_provenance(
     // Each address used as a constructor input has to come from somewhere;
     // we tolerate missing entries because not every operator scenario
     // populates every named address.
-    let lookup = |name: &str| verifiers.address_verifier.name_to_address.get(name).copied();
+    let lookup = |name: &str| {
+        verifiers
+            .address_verifier
+            .name_to_address
+            .get(name)
+            .copied()
+    };
 
     let is_zksync_os = matches!(genesis_config_kind, GenesisConfigKind::ZksyncOs);
     let is_testnet = artifact.contracts_config.is_testnet;
@@ -1342,7 +1349,10 @@ pub(crate) async fn verify_v31_provenance(
         // v31 settlement-layer upgrade contract; takes the slot of the
         // legacy `DefaultUpgrade` in `state_transition.default_upgrade_addr`.
         // No constructor args.
-        ("default_upgrade", "l1-contracts/EraSettlementLayerV31Upgrade"),
+        (
+            "default_upgrade",
+            "l1-contracts/EraSettlementLayerV31Upgrade",
+        ),
         ("verifier_plonk_addr", verifier_plonk_file),
         ("verifier_fflonk_addr", verifier_fflonk_file),
     ] {
@@ -1427,10 +1437,8 @@ pub(crate) async fn verify_v31_provenance(
     // legacy (UpgradeOutput) flow and assumes a populated era chain id; in
     // the v31 artifact flow we read only the fields Phase 6 actually uses.
     let bridgehub_addr = verifiers.bridgehub_address;
-    let bridgehub = super::super::utils::network_verifier::Bridgehub::new(
-        bridgehub_addr,
-        provider.clone(),
-    );
+    let bridgehub =
+        super::super::utils::network_verifier::Bridgehub::new(bridgehub_addr, provider.clone());
     let asset_router_proxy = match bridgehub.assetRouter().call().await {
         Ok(a) => a,
         Err(err) => {
@@ -1490,8 +1498,12 @@ pub(crate) async fn verify_v31_provenance(
         result.expect_create2_params(
             verifiers,
             &tracker_impl,
-            V31L1AssetTracker::constructorCall::new((bridgehub_addr, ntv_proxy, message_root_proxy))
-                .abi_encode(),
+            V31L1AssetTracker::constructorCall::new((
+                bridgehub_addr,
+                ntv_proxy,
+                message_root_proxy,
+            ))
+            .abi_encode(),
             "l1-contracts/L1AssetTracker",
         );
     }
@@ -1691,8 +1703,9 @@ pub(crate) async fn verify_v31_provenance(
         bytecodes_supplier_proxy,
         permissionless_validator,
     ) {
-        let interop_center: Address =
-            "0x000000000000000000000000000000000001000d".parse().unwrap();
+        let interop_center: Address = "0x000000000000000000000000000000000001000d"
+            .parse()
+            .unwrap();
         let ctm_file = match genesis_config_kind {
             GenesisConfigKind::Era => "l1-contracts/EraChainTypeManager",
             GenesisConfigKind::ZksyncOs => "l1-contracts/ZKsyncOSChainTypeManager",
@@ -1716,7 +1729,9 @@ pub(crate) async fn verify_v31_provenance(
     if let (Some(timer), Some(governance), initial_delay) = (
         lookup("l1_governance_upgrade_timer"),
         governance,
-        artifact.contracts_config.governance_upgrade_timer_initial_delay,
+        artifact
+            .contracts_config
+            .governance_upgrade_timer_initial_delay,
     ) {
         const TWO_WEEKS_SECONDS: u64 = 2 * 7 * 24 * 60 * 60;
         result.expect_create2_params(
@@ -1774,19 +1789,15 @@ pub(crate) async fn verify_v31_provenance(
         }
         // PermissionlessValidator is deployed as a TUPP — accept either
         // the impl file or the TUPP wrapper.
-        if !result.expect_create2_params_internal(
-            verifiers,
-            &addr,
-            &[],
-            expected_file,
-            false,
-        ) && !result.expect_create2_params_internal(
-            verifiers,
-            &addr,
-            &[],
-            "l1-contracts/TransparentUpgradeableProxy",
-            false,
-        ) {
+        if !result.expect_create2_params_internal(verifiers, &addr, &[], expected_file, false)
+            && !result.expect_create2_params_internal(
+                verifiers,
+                &addr,
+                &[],
+                "l1-contracts/TransparentUpgradeableProxy",
+                false,
+            )
+        {
             result.expect_create2_params(verifiers, &addr, Vec::<u8>::new(), expected_file);
         } else {
             result.report_ok(&format!("{expected_file} (or TUPP proxy) at {}", addr));
@@ -1803,13 +1814,10 @@ pub(crate) async fn verify_v31_provenance(
             "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
         if let Ok(slot) = FixedBytes::<32>::from_hex(EIP1967_IMPLEMENTATION_SLOT) {
             if let Ok(raw) = provider
-                .get_storage_at(
-                    bytecodes_supplier_proxy,
-                    U256::from_be_bytes(slot.0),
-                )
+                .get_storage_at(bytecodes_supplier_proxy, U256::from_be_bytes(slot.0))
                 .await
             {
-                let impl_addr = Address::from_slice(&raw.to_be_bytes::<32>()[12..]);
+                let _impl_addr = Address::from_slice(&raw.to_be_bytes::<32>()[12..]);
             }
         }
     }

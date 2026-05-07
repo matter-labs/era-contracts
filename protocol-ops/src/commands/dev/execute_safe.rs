@@ -159,10 +159,16 @@ async fn execute_one_bundle(
     let mut executed: ExecutedBundle = match out_path {
         Some(path) if path.exists() => {
             let raw = fs::read_to_string(path).with_context(|| {
-                format!("failed to read existing executed-bundle file {}", path.display())
+                format!(
+                    "failed to read existing executed-bundle file {}",
+                    path.display()
+                )
             })?;
             serde_json::from_str(&raw).with_context(|| {
-                format!("failed to parse existing executed-bundle file {}", path.display())
+                format!(
+                    "failed to parse existing executed-bundle file {}",
+                    path.display()
+                )
             })?
         }
         _ => ExecutedBundle::default(),
@@ -264,20 +270,23 @@ fn receipt_input(tx: &Value) -> anyhow::Result<Vec<u8>> {
         .get("data")
         .and_then(|v| v.as_str())
         .ok_or_else(|| anyhow::anyhow!("Safe tx missing `data` while building executed bundle"))?;
-    Ok(ethers::utils::hex::decode(data_hex.trim_start_matches("0x"))
-        .context("Safe tx `data` is not valid hex while building executed bundle")?)
+    ethers::utils::hex::decode(data_hex.trim_start_matches("0x"))
+        .context("Safe tx `data` is not valid hex while building executed bundle")
 }
 
 fn persist_executed_bundle(path: &Path, bundle: &ExecutedBundle) -> anyhow::Result<()> {
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {
             fs::create_dir_all(parent).with_context(|| {
-                format!("failed to create executed-bundle output dir {}", parent.display())
+                format!(
+                    "failed to create executed-bundle output dir {}",
+                    parent.display()
+                )
             })?;
         }
     }
-    let serialized = serde_json::to_string_pretty(bundle)
-        .context("failed to serialise executed bundle")?;
+    let serialized =
+        serde_json::to_string_pretty(bundle).context("failed to serialise executed bundle")?;
     fs::write(path, serialized)
         .with_context(|| format!("failed to write executed-bundle file {}", path.display()))?;
     Ok(())

@@ -102,7 +102,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     // Read the executed-bundle log produced by `dev execute-safe --out`.
     // Multiple invocations of `dev execute-safe` against the same path
     // accumulate into a single file, so we only need to read one path here.
-    logger::info(format!("Executed bundle: {}", args.executed_bundles.display()));
+    logger::info(format!(
+        "Executed bundle: {}",
+        args.executed_bundles.display()
+    ));
     let raw = std::fs::read_to_string(&args.executed_bundles).map_err(|err| {
         anyhow::anyhow!("failed to read {}: {err}", args.executed_bundles.display())
     })?;

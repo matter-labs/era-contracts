@@ -33,12 +33,10 @@ use clap::Subcommand;
 
 use crate::{
     commands::ecosystem::init::EcosystemInitArgs,
-    commands::ecosystem::upgrade::{UpgradeGovernanceArgs, UpgradePrepareArgs},
-    commands::ecosystem::verify_upgrade::VerifyUpgradeArgs,
     commands::ecosystem::simulator::GovernanceTomlToSimulatorArgs,
-    commands::ecosystem::verify_upgrade::VerifyUpgradeArgs,
     commands::ecosystem::stage3::Stage3Args,
     commands::ecosystem::upgrade::{ListCtmsArgs, UpgradeGovernanceArgs, UpgradePrepareAllArgs},
+    commands::ecosystem::verify_upgrade::VerifyUpgradeArgs,
 };
 
 pub(crate) mod init;
@@ -46,9 +44,9 @@ pub(crate) mod puh_guardians;
 pub(crate) mod simulator;
 pub(crate) mod stage3;
 pub(crate) mod upgrade;
-pub(crate) mod verify_upgrade;
 pub(crate) mod v31_upgrade_full;
 pub(crate) mod v31_upgrade_inner;
+pub(crate) mod verify_upgrade;
 
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]

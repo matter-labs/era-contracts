@@ -91,6 +91,7 @@ impl Verifiers {
     }
 
     /// Creates a new `Verifiers` instance.
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         testnet_contracts: bool,
         bridgehub_address: impl AsRef<str>,

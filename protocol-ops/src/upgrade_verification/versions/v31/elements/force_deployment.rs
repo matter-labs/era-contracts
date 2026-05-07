@@ -206,7 +206,7 @@ pub fn verify_force_deployments(
         }
 
         // Address is as expected, so check the bytecode and constructor.
-        result.expect_zk_bytecode(verifiers, &force_deployment.bytecodeHash, &contract);
+        result.expect_zk_bytecode(verifiers, &force_deployment.bytecodeHash, contract);
 
         if &force_deployment.callConstructor != expected_constructor {
             result.report_error(&format!(
