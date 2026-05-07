@@ -110,6 +110,14 @@ const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
     ),
     (&["state_transition", "diamond_init_addr"], "diamond_init"),
     (&["state_transition", "verifier_addr"], "verifier"),
+    (
+        &["state_transition", "eip7702_checker_addr"],
+        "eip7702_checker_addr",
+    ),
+    (
+        &["state_transition", "permissionless_validator_addr"],
+        "permissionless_validator_addr",
+    ),
 ];
 
 impl AddressVerifier {
