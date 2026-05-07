@@ -8,22 +8,8 @@ import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {ICTMDeploymentTracker} from "contracts/core/ctm-deployment/ICTMDeploymentTracker.sol";
 import {IMessageRootBase} from "contracts/core/message-root/IMessageRoot.sol";
-import {
-    CTMNotRegistered,
-    CTMAlreadyRegistered,
-    ZeroAddress,
-    ChainIdNotRegistered,
-    AssetIdAlreadyRegistered,
-    ChainIdWasUnregistered,
-    Unauthorized,
-    NoCTMForAssetId
-} from "contracts/common/L1ContractErrors.sol";
-import {
-    AlreadyCurrentSL,
-    ChainSettlesOnL1,
-    NotChainAssetHandler,
-    ZKChainIsSettlementLayer
-} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
+import {CTMNotRegistered, CTMAlreadyRegistered, ZeroAddress, ChainIdNotRegistered, AssetIdAlreadyRegistered, ChainIdWasUnregistered, Unauthorized, NoCTMForAssetId} from "contracts/common/L1ContractErrors.sol";
+import {AlreadyCurrentSL, ChainSettlesOnL1, NotChainAssetHandler, ZKChainIsSettlementLayer} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
 import {TokenBridgingData, TxStatus} from "contracts/common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -101,7 +87,9 @@ contract BridgehubBase_Extended_Test is Test {
     }
 
     function test_unregisterZKChain() public {
-        (, address ctm,, bytes32 baseTokenAssetId, address zkChain) = _setupGatewaySettledChain(CHAIN_ID_TO_UNREGISTER);
+        (, address ctm, , bytes32 baseTokenAssetId, address zkChain) = _setupGatewaySettledChain(
+            CHAIN_ID_TO_UNREGISTER
+        );
 
         assertEq(bridgehub.getZKChain(CHAIN_ID_TO_UNREGISTER), zkChain);
         assertEq(bridgehub.chainTypeManager(CHAIN_ID_TO_UNREGISTER), ctm);
@@ -145,9 +133,13 @@ contract BridgehubBase_Extended_Test is Test {
     }
 
     function test_RevertWhen_unregisterZKChainSettlesOnL1() public {
-        (address chainAssetHandler,, bytes32 ctmAssetId,,) = _prepareChainRegistration();
+        (address chainAssetHandler, , bytes32 ctmAssetId, , ) = _prepareChainRegistration();
         _registerChainOnL1(
-            CHAIN_ID_TO_UNREGISTER, makeAddr("zkChain"), ctmAssetId, keccak256("baseTokenAssetId"), chainAssetHandler
+            CHAIN_ID_TO_UNREGISTER,
+            makeAddr("zkChain"),
+            ctmAssetId,
+            keccak256("baseTokenAssetId"),
+            chainAssetHandler
         );
 
         vm.prank(owner);
@@ -156,9 +148,13 @@ contract BridgehubBase_Extended_Test is Test {
     }
 
     function test_RevertWhen_unregisterZKChainIsSettlementLayer() public {
-        (address chainAssetHandler,, bytes32 ctmAssetId,,) = _prepareChainRegistration();
+        (address chainAssetHandler, , bytes32 ctmAssetId, , ) = _prepareChainRegistration();
         _registerChainOnL1(
-            CHAIN_ID_TO_UNREGISTER, makeAddr("zkChain"), ctmAssetId, keccak256("baseTokenAssetId"), chainAssetHandler
+            CHAIN_ID_TO_UNREGISTER,
+            makeAddr("zkChain"),
+            ctmAssetId,
+            keccak256("baseTokenAssetId"),
+            chainAssetHandler
         );
 
         vm.prank(owner);
@@ -170,8 +166,13 @@ contract BridgehubBase_Extended_Test is Test {
     }
 
     function test_RevertWhen_reusingUnregisteredChainId() public {
-        (address chainAssetHandler, address ctm, bytes32 ctmAssetId, bytes32 baseTokenAssetId, address zkChain) =
-            _setupGatewaySettledChain(CHAIN_ID_TO_UNREGISTER);
+        (
+            address chainAssetHandler,
+            address ctm,
+            bytes32 ctmAssetId,
+            bytes32 baseTokenAssetId,
+            address zkChain
+        ) = _setupGatewaySettledChain(CHAIN_ID_TO_UNREGISTER);
         assertEq(bridgehub.getZKChain(CHAIN_ID_TO_UNREGISTER), zkChain);
 
         vm.prank(owner);
@@ -180,7 +181,9 @@ contract BridgehubBase_Extended_Test is Test {
         vm.prank(chainAssetHandler);
         vm.expectRevert(abi.encodeWithSelector(ChainIdWasUnregistered.selector, CHAIN_ID_TO_UNREGISTER));
         bridgehub.forwardedBridgeMint(
-            ctmAssetId, CHAIN_ID_TO_UNREGISTER, _tokenBridgingData(baseTokenAssetId, CHAIN_ID_TO_UNREGISTER)
+            ctmAssetId,
+            CHAIN_ID_TO_UNREGISTER,
+            _tokenBridgingData(baseTokenAssetId, CHAIN_ID_TO_UNREGISTER)
         );
 
         vm.prank(chainAssetHandler);
@@ -512,11 +515,13 @@ contract BridgehubBase_Extended_Test is Test {
         assertEq(bridgehub.admin(), newAdmin);
     }
 
-    function _setupGatewaySettledChain(uint256 _chainId)
+    function _setupGatewaySettledChain(
+        uint256 _chainId
+    )
         internal
         returns (address chainAssetHandler, address ctm, bytes32 ctmAssetId, bytes32 baseTokenAssetId, address zkChain)
     {
-        (chainAssetHandler, ctm, ctmAssetId,,) = _prepareChainRegistration();
+        (chainAssetHandler, ctm, ctmAssetId, , ) = _prepareChainRegistration();
 
         baseTokenAssetId = keccak256("baseTokenAssetId");
         zkChain = makeAddr("zkChain");
@@ -571,11 +576,10 @@ contract BridgehubBase_Extended_Test is Test {
         bridgehub.registerNewZKChain(_chainId, _zkChain, true);
     }
 
-    function _tokenBridgingData(bytes32 _baseTokenAssetId, uint256 _originChainId)
-        internal
-        pure
-        returns (TokenBridgingData memory)
-    {
+    function _tokenBridgingData(
+        bytes32 _baseTokenAssetId,
+        uint256 _originChainId
+    ) internal pure returns (TokenBridgingData memory) {
         return TokenBridgingData({assetId: _baseTokenAssetId, originToken: address(0), originChainId: _originChainId});
     }
 

@@ -20,28 +20,7 @@ import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IMessageRootBase} from "../message-root/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "../ctm-deployment/ICTMDeploymentTracker.sol";
 import {AlreadyCurrentSL, NotChainAssetHandler, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
-import {
-    AssetHandlerNotRegistered,
-    AssetIdAlreadyRegistered,
-    AssetIdNotSupported,
-    BridgeHubAlreadyRegistered,
-    CTMAlreadyRegistered,
-    CTMNotRegistered,
-    ChainIdCantBeCurrentChain,
-    ChainIdIsHardcoded,
-    ChainIdNotRegistered,
-    ChainIdWasUnregistered,
-    ChainIdTooBig,
-    EmptyAssetId,
-    NoCTMForAssetId,
-    NotCurrentSettlementLayer,
-    SettlementLayersMustSettleOnL1,
-    SharedBridgeNotSet,
-    Unauthorized,
-    ZKChainLimitReached,
-    ZeroAddress,
-    ZeroChainId
-} from "../../common/L1ContractErrors.sol";
+import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdIsHardcoded, ChainIdNotRegistered, ChainIdWasUnregistered, ChainIdTooBig, EmptyAssetId, NoCTMForAssetId, NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../../common/L1ContractErrors.sol";
 import {HARD_CODED_CHAIN_ID, MAINNET_CHAIN_ID, SEPOLIA_CHAIN_ID} from "../../common/Config.sol";
 import {GW_ASSET_TRACKER, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 
@@ -132,6 +111,7 @@ abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2Step
     address public chainRegistrationSender;
 
     /// @notice Chain IDs that were intentionally decommissioned and must not be reused.
+    // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => bool wasUnregistered) public chainIdWasUnregistered;
 
     /**
