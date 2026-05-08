@@ -7,6 +7,10 @@ ARG NODE_MAJOR=20
 ARG RUST_TARGET=x86_64-unknown-linux-gnu
 ARG RUST_TOOLCHAIN=nightly-2025-09-19
 ARG YARN_VERSION=1.22.19
+# Pre-baked toolchain base for the build stage (see Dockerfile.base +
+# build-docker-base.yaml). Must be a global ARG so it's visible in the
+# `FROM ${BUILD_BASE_IMAGE}` line below.
+ARG BUILD_BASE_IMAGE=ghcr.io/matter-labs/protocol-ops-base:latest
 
 ########################################
 # 1) Planner — prepare cargo-chef recipes
@@ -32,7 +36,6 @@ RUN mkdir -p /recipes && \
 # That base is rebuilt only when toolchain versions change (see
 # `Dockerfile.base` and `.github/workflows/build-docker-base.yaml`).
 # Saves ~10 minutes off every main build by skipping the install steps.
-ARG BUILD_BASE_IMAGE=ghcr.io/matter-labs/protocol-ops-base:latest
 FROM ${BUILD_BASE_IMAGE} AS build
 
 ARG RUST_TARGET
