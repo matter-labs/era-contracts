@@ -7,9 +7,9 @@ ARG NODE_MAJOR=20
 ARG RUST_TARGET=x86_64-unknown-linux-gnu
 ARG RUST_TOOLCHAIN=nightly-2025-09-19
 ARG YARN_VERSION=1.22.19
-# Pre-baked toolchain base for the build stage (see Dockerfile.base +
+# Pre-baked toolchain base for the build stages (see Dockerfile.base +
 # build-docker-base.yaml). Must be a global ARG so it's visible in the
-# `FROM ${BUILD_BASE_IMAGE}` line below.
+# `FROM ${BUILD_BASE_IMAGE}` lines below.
 ARG BUILD_BASE_IMAGE=ghcr.io/matter-labs/protocol-ops-base:latest
 
 ########################################
@@ -29,16 +29,18 @@ RUN mkdir -p /recipes && \
     cd /src/tools/upgrade-readiness-checker && cargo chef prepare --recipe-path /recipes/upgrade-readiness-checker.json
 
 ########################################
-# 2) Build
+# 2a) Rust build (parallel with 2b)
 ########################################
-# Build stage uses a pre-baked base image with apt deps + Node/Yarn +
-# foundry-zksync + foundry vanilla anvil + Rust toolchain + cargo-chef.
-# That base is rebuilt only when toolchain versions change (see
-# `Dockerfile.base` and `.github/workflows/build-docker-base.yaml`).
-# Saves ~10 minutes off every main build by skipping the install steps.
-FROM ${BUILD_BASE_IMAGE} AS build
+# Compiles the 4 binaries in isolation. Buildkit auto-parallelizes this stage
+# with the forge-builder stage below (no cross-deps). The only contract input
+# Rust needs is `l1-contracts/zkstack-out/` (committed JSON ABIs read by
+# `abigen!` macros at compile time) — we COPY that subset rather than the
+# whole tree so a Solidity-only change doesn't invalidate the cargo layers.
+FROM ${BUILD_BASE_IMAGE} AS cargo-builder
 
 ARG RUST_TARGET
+
+WORKDIR /contracts
 
 # === Cook Rust dependencies (cached until Cargo.toml/lock change) ===
 # BuildKit cache mounts:
@@ -78,25 +80,13 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/contracts/tools/upgrade-readiness-checker/target,id=upgrade-readiness-checker-target,sharing=locked \
     cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
 
-# === Copy all source code ===
+# === Copy Rust source + the only contract input cargo needs (zkstack-out) ===
 WORKDIR /contracts
-COPY . /contracts
-
-# === Copy zk-governance source ===
-# protocol-ops's PUH/Guardians redeploy step (`ecosystem upgrade-prepare-all`
-# on PUH-governed envs like stage / mainnet) shells out to a forge script
-# inside zk-governance. The runtime path it expects is `<era>/../../zk-governance`,
-# which inside the container resolves to `/zk-governance` (foundry root with
-# `foundry.toml` at the top level — no `l1-contracts/` wrapper). The CI
-# workflow checks out zksync-association/zk-governance at
-# $GITHUB_WORKSPACE/zk-governance/ so it lands inside the docker build context.
-COPY zk-governance /zk-governance
+COPY protocol-ops /contracts/protocol-ops
+COPY tools /contracts/tools
+COPY l1-contracts/zkstack-out /contracts/l1-contracts/zkstack-out
 
 # === Build Rust binaries (deps already cached by cook) ===
-# Reuse the same `id=` cache mounts as the cook step so cargo doesn't redo dep
-# compilation — only the application crate compiles here. Binaries are `cp`-ed
-# out of the cache mount BEFORE the RUN ends (cache mounts don't persist into
-# the final image), then live in the project-relative location for runtime.
 WORKDIR /contracts/protocol-ops
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
@@ -125,8 +115,30 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     cargo build --release --target ${RUST_TARGET} && \
     cp target/${RUST_TARGET}/release/upgrade-readiness-checker ./
 
-# === Install JS dependencies ===
+########################################
+# 2b) Forge build (parallel with 2a)
+########################################
+# yarn install + forge build for each contracts subproject + zk-governance.
+# Independent of cargo-builder, so buildkit runs them in parallel — wall-time
+# of the build stage drops to max(rust, forge) instead of rust + forge.
+FROM ${BUILD_BASE_IMAGE} AS forge-builder
+
 WORKDIR /contracts
+
+# === Copy all source code ===
+COPY . /contracts
+
+# === Copy zk-governance source ===
+# protocol-ops's PUH/Guardians redeploy step (`ecosystem upgrade-prepare-all`
+# on PUH-governed envs like stage / mainnet) shells out to a forge script
+# inside zk-governance. The runtime path it expects is `<era>/../../zk-governance`,
+# which inside the container resolves to `/zk-governance` (foundry root with
+# `foundry.toml` at the top level — no `l1-contracts/` wrapper). The CI
+# workflow checks out zksync-association/zk-governance at
+# $GITHUB_WORKSPACE/zk-governance/ so it lands inside the docker build context.
+COPY zk-governance /zk-governance
+
+# === Install JS dependencies ===
 RUN yarn install --frozen-lockfile
 
 # === Clean + compile contracts ===
@@ -181,33 +193,33 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     npm cache clean --force && \
     rm -rf /var/lib/apt/lists/*
 
-# === Copy foundry binaries and solc cache from build stage ===
-COPY --from=build /usr/local/bin/forge /usr/local/bin/forge
-COPY --from=build /usr/local/bin/cast  /usr/local/bin/cast
-COPY --from=build /usr/local/bin/anvil /usr/local/bin/anvil
-COPY --from=build /root/.svm /root/.svm
-# === Copy protocol_ops and tools (project-relative, matches local layout) ===
-COPY --from=build /contracts/protocol-ops/protocol_ops /contracts/protocol-ops/protocol_ops
-COPY --from=build /contracts/tools/zksync-os-genesis-gen/zksync-os-genesis-gen /contracts/tools/zksync-os-genesis-gen/zksync-os-genesis-gen
-COPY --from=build /contracts/tools/wallets-gen/wallets-gen /contracts/tools/wallets-gen/wallets-gen
-COPY --from=build /contracts/tools/upgrade-readiness-checker/upgrade-readiness-checker /contracts/tools/upgrade-readiness-checker/upgrade-readiness-checker
+# === Copy foundry binaries and solc cache from forge-builder ===
+COPY --from=forge-builder /usr/local/bin/forge /usr/local/bin/forge
+COPY --from=forge-builder /usr/local/bin/cast  /usr/local/bin/cast
+COPY --from=forge-builder /usr/local/bin/anvil /usr/local/bin/anvil
+COPY --from=forge-builder /root/.svm /root/.svm
+# === Copy protocol_ops and tools binaries from cargo-builder ===
+COPY --from=cargo-builder /contracts/protocol-ops/protocol_ops /contracts/protocol-ops/protocol_ops
+COPY --from=cargo-builder /contracts/tools/zksync-os-genesis-gen/zksync-os-genesis-gen /contracts/tools/zksync-os-genesis-gen/zksync-os-genesis-gen
+COPY --from=cargo-builder /contracts/tools/wallets-gen/wallets-gen /contracts/tools/wallets-gen/wallets-gen
+COPY --from=cargo-builder /contracts/tools/upgrade-readiness-checker/upgrade-readiness-checker /contracts/tools/upgrade-readiness-checker/upgrade-readiness-checker
 
-# === Set new WORKDIR and copy artifacts to /contracts/ ===
+# === Set new WORKDIR and copy contract artifacts from forge-builder ===
 WORKDIR /contracts
-COPY --from=build /contracts/configs /contracts/configs
-COPY --from=build /contracts/l1-contracts /contracts/l1-contracts
-COPY --from=build /contracts/l2-contracts /contracts/l2-contracts
-COPY --from=build /contracts/system-contracts /contracts/system-contracts
-COPY --from=build /contracts/da-contracts /contracts/da-contracts
-COPY --from=build /contracts/lib /contracts/lib
-COPY --from=build /contracts/node_modules /contracts/node_modules
-COPY --from=build /contracts/package.json /contracts/package.json
-COPY --from=build /contracts/AllContractsHashes.json /contracts/AllContractsHashes.json
-COPY --from=build /contracts/SystemConfig.json /contracts/SystemConfig.json
+COPY --from=forge-builder /contracts/configs /contracts/configs
+COPY --from=forge-builder /contracts/l1-contracts /contracts/l1-contracts
+COPY --from=forge-builder /contracts/l2-contracts /contracts/l2-contracts
+COPY --from=forge-builder /contracts/system-contracts /contracts/system-contracts
+COPY --from=forge-builder /contracts/da-contracts /contracts/da-contracts
+COPY --from=forge-builder /contracts/lib /contracts/lib
+COPY --from=forge-builder /contracts/node_modules /contracts/node_modules
+COPY --from=forge-builder /contracts/package.json /contracts/package.json
+COPY --from=forge-builder /contracts/AllContractsHashes.json /contracts/AllContractsHashes.json
+COPY --from=forge-builder /contracts/SystemConfig.json /contracts/SystemConfig.json
 
 # zk-governance lives at `/zk-governance` (sibling-style path) so protocol-ops
 # resolves it correctly via `<era>/../../zk-governance`.
-COPY --from=build /zk-governance /zk-governance
+COPY --from=forge-builder /zk-governance /zk-governance
 
 # Disable foundry-zksync telemetry
 RUN mkdir -p /etc/xdg/zksync-tooling && \
