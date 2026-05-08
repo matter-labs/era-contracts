@@ -234,9 +234,9 @@ mod tests {
                         chain_admin = "not-an-address"
                         "#;
 
-        assert!(
-            validate_ecosystem_artifact(&EcosystemUpgradeArtifact::from_toml_str(toml).unwrap())
-                .is_err()
-        );
+        assert!(validate_ecosystem_artifact(
+            &EcosystemUpgradeArtifact::from_toml_str(toml).unwrap()
+        )
+        .is_err());
     }
 }

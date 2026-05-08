@@ -86,7 +86,7 @@ pub(crate) async fn verify(
 
     verify_governance_stage_calls(artifact, &verifiers, result).await?;
 
-    verify_v31_artifact_state(&verifiers, genesis_config_kind, result).await?;
+    verify_v31_artifact_state(artifact, &verifiers, result).await?;
 
     verify_v31_provenance(
         artifact,

@@ -96,10 +96,7 @@ impl EcosystemUpgradeArtifact {
         let mut ctms = Vec::with_capacity(flavor_keys.len());
         for key in &flavor_keys {
             let flavor = CtmFlavor::parse(key)?;
-            let raw = ctms_table
-                .get(key)
-                .expect("present, just iterated")
-                .clone();
+            let raw = ctms_table.get(key).expect("present, just iterated").clone();
             let table = match &raw {
                 toml::Value::Table(t) => t.clone(),
                 _ => anyhow::bail!("[ctms.{key}] must be a table"),

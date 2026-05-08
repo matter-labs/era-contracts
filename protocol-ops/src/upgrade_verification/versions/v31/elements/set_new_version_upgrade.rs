@@ -7,7 +7,10 @@ use alloy::{
 use anyhow::Context;
 use std::collections::HashSet;
 
-use crate::upgrade_verification::verifiers::{VerificationResult, Verifiers};
+use crate::upgrade_verification::{
+    artifacts::CtmFlavor,
+    verifiers::{VerificationResult, Verifiers},
+};
 
 use super::{super::get_expected_new_protocol_version, protocol_version::ProtocolVersion};
 
@@ -238,10 +241,17 @@ sol! {
     #[sol(rpc)]
     contract BytecodesSupplier {
         mapping(bytes32 bytecodeHash => uint256 blockNumber) public publishingBlock;
+        mapping(bytes32 bytecodeHash => uint256 blockNumber) public evmPublishingBlock;
     }
 }
 
 impl upgradeCall {} // Placeholder implementation.
+
+#[derive(Debug, Clone, Copy)]
+enum FactoryDepHashKind {
+    EraZkBytecode,
+    ZksyncOsEvmBytecode,
+}
 
 impl ProposedUpgrade {
     pub async fn verify_v31_template(
@@ -251,12 +261,13 @@ impl ProposedUpgrade {
         expected_new_protocol_version: U256,
         expected_fixed_force_deployments_data: &str,
         bytecodes_supplier_addr: Option<Address>,
+        ctm_flavor: CtmFlavor,
     ) -> anyhow::Result<usize> {
         result.print_info("== DefaultUpgrade ProposedUpgrade ==");
         let initial_error_count = result.errors;
         let expected_version = ProtocolVersion::from(expected_new_protocol_version);
 
-        self.verify_static_fields(result, verifiers, expected_new_protocol_version);
+        self.verify_static_fields(result, verifiers, expected_new_protocol_version, ctm_flavor);
         self.verify_l2_protocol_upgrade_tx(
             verifiers,
             result,
@@ -287,6 +298,7 @@ impl ProposedUpgrade {
             expected_version.into(),
             "",
             Some(bytecodes_supplier_addr),
+            CtmFlavor::Era,
         )
         .await?;
 
@@ -298,14 +310,32 @@ impl ProposedUpgrade {
         result: &mut VerificationResult,
         verifiers: &Verifiers,
         expected_new_protocol_version: U256,
+        ctm_flavor: CtmFlavor,
     ) {
-        result.expect_zk_bytecode(verifiers, &self.bootloaderHash, BOOTLOADER_CONTRACT);
-        result.expect_zk_bytecode(
-            verifiers,
-            &self.defaultAccountHash,
-            DEFAULT_ACCOUNT_CONTRACT,
-        );
-        result.expect_zk_bytecode(verifiers, &self.evmEmulatorHash, EVM_EMULATOR_CONTRACT);
+        match ctm_flavor {
+            CtmFlavor::Era => {
+                result.expect_zk_bytecode(verifiers, &self.bootloaderHash, BOOTLOADER_CONTRACT);
+                result.expect_zk_bytecode(
+                    verifiers,
+                    &self.defaultAccountHash,
+                    DEFAULT_ACCOUNT_CONTRACT,
+                );
+                result.expect_zk_bytecode(verifiers, &self.evmEmulatorHash, EVM_EMULATOR_CONTRACT);
+            }
+            CtmFlavor::ZksyncOs => {
+                expect_zero_bytecode_hash(result, &self.bootloaderHash, "ZKsync OS bootloaderHash");
+                expect_zero_bytecode_hash(
+                    result,
+                    &self.defaultAccountHash,
+                    "ZKsync OS defaultAccountHash",
+                );
+                expect_zero_bytecode_hash(
+                    result,
+                    &self.evmEmulatorHash,
+                    "ZKsync OS evmEmulatorHash",
+                );
+            }
+        }
 
         if self.verifier != Address::ZERO {
             result.report_error(&format!(
@@ -421,6 +451,7 @@ impl ProposedUpgrade {
                 EXPECTED_V31_ERA_BYTECODES,
                 "Era",
                 bytecodes_supplier_addr,
+                FactoryDepHashKind::EraZkBytecode,
             )
             .await;
             verify_era_force_deploy_and_upgrade(
@@ -449,6 +480,7 @@ impl ProposedUpgrade {
                 EXPECTED_V31_ZKSYNC_OS_BYTECODES,
                 "ZKsync OS",
                 bytecodes_supplier_addr,
+                FactoryDepHashKind::ZksyncOsEvmBytecode,
             )
             .await;
             verify_zksync_os_force_deploy_and_upgrade(
@@ -475,6 +507,7 @@ async fn verify_factory_deps(
     expected_bytecodes: &[&str],
     label: &str,
     bytecodes_supplier_addr: Option<Address>,
+    hash_kind: FactoryDepHashKind,
 ) {
     let expected_bytecodes: HashSet<&str> = expected_bytecodes.iter().copied().collect();
     let mut actual_bytecodes = HashSet::new();
@@ -482,7 +515,7 @@ async fn verify_factory_deps(
 
     for dep in factory_deps {
         let dep = fixed_bytes_from_u256(dep);
-        match verifiers.bytecode_verifier.zk_bytecode_hash_to_file(&dep) {
+        match bytecode_hash_to_file(verifiers, &dep, hash_kind) {
             Some(file_name) => {
                 if !expected_bytecodes.contains(file_name.as_str()) {
                     errors += 1;
@@ -537,13 +570,17 @@ async fn verify_factory_deps(
         let mut publish_errors = 0usize;
         for dep in factory_deps {
             let dep = fixed_bytes_from_u256(dep);
-            match supplier.publishingBlock(dep).call().await {
+            let publishing_block = match hash_kind {
+                FactoryDepHashKind::EraZkBytecode => supplier.publishingBlock(dep).call().await,
+                FactoryDepHashKind::ZksyncOsEvmBytecode => {
+                    supplier.evmPublishingBlock(dep).call().await
+                }
+            };
+            match publishing_block {
                 Ok(block) if block != U256::ZERO => {}
                 Ok(_) => {
                     publish_errors += 1;
-                    let dep_label = verifiers
-                        .bytecode_verifier
-                        .zk_bytecode_hash_to_file(&dep)
+                    let dep_label = bytecode_hash_to_file(verifiers, &dep, hash_kind)
                         .cloned()
                         .unwrap_or_else(|| format!("0x{dep:x}"));
                     result.report_error(&format!(
@@ -552,8 +589,12 @@ async fn verify_factory_deps(
                 }
                 Err(err) => {
                     publish_errors += 1;
+                    let mapping_name = match hash_kind {
+                        FactoryDepHashKind::EraZkBytecode => "publishingBlock",
+                        FactoryDepHashKind::ZksyncOsEvmBytecode => "evmPublishingBlock",
+                    };
                     result.report_error(&format!(
-                        "BytecodesSupplier.publishingBlock call failed for {label} factoryDep 0x{dep:x}: {err}"
+                        "BytecodesSupplier.{mapping_name} call failed for {label} factoryDep 0x{dep:x}: {err}"
                     ));
                 }
             }
@@ -700,13 +741,15 @@ fn verify_zksync_os_l2_v31_deployment(
 
     match zksync_os_bytecode_info_hashes(&deployment.deployedBytecodeInfo) {
         Some((first_hash, observable_hash)) => {
-            if bytecode_hash_matches_file(verifiers, &first_hash, L2_V31_UPGRADE_CONTRACT)
-                || bytecode_hash_matches_file(verifiers, &observable_hash, L2_V31_UPGRADE_CONTRACT)
-            {
+            if evm_deployed_bytecode_hash_matches_file(
+                verifiers,
+                &observable_hash,
+                L2_V31_UPGRADE_CONTRACT,
+            ) {
                 result.report_ok("ZKsync OS delegate deployment uses L2V31Upgrade bytecode info");
             } else {
                 result.report_error(&format!(
-                    "ZKsync OS delegate bytecode info does not map to {}: first={}, observable={}",
+                    "ZKsync OS delegate bytecode info does not map to {}: blake={}, observable={}",
                     L2_V31_UPGRADE_CONTRACT, first_hash, observable_hash
                 ));
             }
@@ -804,6 +847,44 @@ fn bytecode_hash_matches_file(
         .bytecode_verifier
         .zk_bytecode_hash_to_file(bytecode_hash)
         .is_some_and(|file| file == expected_file)
+}
+
+fn evm_deployed_bytecode_hash_matches_file(
+    verifiers: &Verifiers,
+    bytecode_hash: &FixedBytes<32>,
+    expected_file: &str,
+) -> bool {
+    verifiers
+        .bytecode_verifier
+        .evm_deployed_bytecode_hash_to_file(bytecode_hash)
+        .is_some_and(|file| file == expected_file)
+}
+
+fn bytecode_hash_to_file<'a>(
+    verifiers: &'a Verifiers,
+    bytecode_hash: &FixedBytes<32>,
+    hash_kind: FactoryDepHashKind,
+) -> Option<&'a String> {
+    match hash_kind {
+        FactoryDepHashKind::EraZkBytecode => verifiers
+            .bytecode_verifier
+            .zk_bytecode_hash_to_file(bytecode_hash),
+        FactoryDepHashKind::ZksyncOsEvmBytecode => verifiers
+            .bytecode_verifier
+            .evm_deployed_bytecode_hash_to_file(bytecode_hash),
+    }
+}
+
+fn expect_zero_bytecode_hash(
+    result: &mut VerificationResult,
+    bytecode_hash: &FixedBytes<32>,
+    label: &str,
+) {
+    if *bytecode_hash == FixedBytes::<32>::ZERO {
+        result.report_ok(&format!("{label} is zero"));
+    } else {
+        result.report_error(&format!("{label} must be zero, got {}", bytecode_hash));
+    }
 }
 
 #[cfg(test)]

@@ -2,7 +2,7 @@ use anyhow::{ensure, Context, Result};
 
 use super::protocol_version::ProtocolVersion;
 use crate::upgrade_verification::{
-    artifacts::EcosystemUpgradeArtifact,
+    artifacts::{CtmArtifact, CtmFlavor, EcosystemUpgradeArtifact},
     verifiers::{GenesisConfigKind, VerificationResult, Verifiers},
     versions::v31::MAX_NUMBER_OF_ZK_CHAINS,
 };
@@ -21,11 +21,13 @@ use alloy::{
     primitives::{Address, FixedBytes, U256},
     providers::Provider,
     sol,
-    sol_types::{SolConstructor, SolValue},
+    sol_types::{SolCall, SolConstructor, SolValue},
 };
 use serde::Deserialize;
+use std::str::FromStr;
 
 const MAINNET_CHAIN_ID: u64 = 1;
+const L2_INTEROP_CENTER_ADDR: &str = "0x000000000000000000000000000000000001000d";
 
 sol! {
     contract L1NativeTokenVault {
@@ -97,6 +99,11 @@ sol! {
 
     contract ChainTypeManager {
         constructor(address _bridgehub);
+    }
+
+    #[sol(rpc)]
+    contract V31ChainTypeManagerView {
+        function PERMISSIONLESS_VALIDATOR() external view returns (address);
     }
 
     #[sol(rpc)]
@@ -947,12 +954,6 @@ impl DeployedAddresses {
 
 sol! {
     #[sol(rpc)]
-    contract NativeTokenVaultWiring {
-        function l1AssetTracker() external view returns (address);
-        function nativeTokenVault() external view returns (address);
-    }
-
-    #[sol(rpc)]
     contract OwnableLike {
         function owner() external view returns (address);
     }
@@ -982,9 +983,8 @@ const PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
 /// - The L1 RPC chain id (sanity).
 /// - EIP-1967 proxy-admin slot for every v31 stage-1 proxy → must equal the
 ///   ecosystem `transparent_proxy_admin`.
-/// - v31 AssetRouter ↔ NTV ↔ AssetTracker wiring (when the chain is in a
-///   post-stage-1 state).
-/// - `CTM.isZKsyncOS()` cross-check vs the `--genesis-config` flag.
+/// - Pre-upgrade AssetRouter → NTV wiring when the getter exists on the live
+///   proxy.
 ///
 /// Per-implementation deployed-bytecode and constructor-arg checks live in
 /// the legacy `DeployedAddresses::verify` path: they use init bytecode +
@@ -998,16 +998,97 @@ const PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
 /// `set_new_version_upgrade::verify_factory_deps` so they sit alongside the
 /// rest of the L2 upgrade tx checks.
 pub(crate) async fn verify_v31_artifact_state(
+    artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
-    genesis_config_kind: GenesisConfigKind,
     result: &mut VerificationResult,
 ) -> Result<()> {
-    result.print_info("== Phase 5: RPC state checks ==");
+    result.print_info("== RPC state checks ==");
 
     verify_l1_chain_id(verifiers, result).await;
-    verify_v31_is_zksync_os(verifiers, genesis_config_kind, result).await;
     verify_v31_proxy_admins(verifiers, result).await;
     verify_v31_core_wiring(verifiers, result).await;
+    verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await;
+
+    Ok(())
+}
+
+async fn verify_per_ctm_v31_provenance(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+    bridgehub_addr: Address,
+) -> Result<()> {
+    let interop_center = Address::from_str(L2_INTEROP_CENTER_ADDR)
+        .context("invalid L2_INTEROP_CENTER_ADDR literal")?;
+
+    for ctm in &artifact.ctms {
+        let label = ctm.flavor.label();
+        result.print_info(&format!("-- CTM deployment provenance: {label} --"));
+
+        let Some(ctm_impl) = required_ctm_address(
+            ctm,
+            &["state_transition", "chain_type_manager_implementation_addr"],
+            result,
+        ) else {
+            continue;
+        };
+        let Some(bytecodes_supplier) = required_ctm_address(
+            ctm,
+            &["state_transition", "bytecodes_supplier_addr"],
+            result,
+        ) else {
+            continue;
+        };
+        let Some(permissionless_validator) = required_ctm_address(
+            ctm,
+            &["state_transition", "permissionless_validator_addr"],
+            result,
+        ) else {
+            continue;
+        };
+
+        let ctm_file = match ctm.flavor {
+            CtmFlavor::Era => "l1-contracts/EraChainTypeManager",
+            CtmFlavor::ZksyncOs => "l1-contracts/ZKsyncOSChainTypeManager",
+        };
+        result.expect_create2_params(
+            verifiers,
+            &ctm_impl,
+            V31ChainTypeManager::constructorCall::new((
+                bridgehub_addr,
+                interop_center,
+                bytecodes_supplier,
+                permissionless_validator,
+            ))
+            .abi_encode(),
+            ctm_file,
+        );
+
+        if permissionless_validator == Address::ZERO {
+            result.report_warn(&format!(
+                "Skipping {label} PermissionlessValidator provenance check; permissionless_validator_addr is address(0) in artifact"
+            ));
+            continue;
+        }
+
+        let Some(transparent_proxy_admin) = required_ctm_address(
+            ctm,
+            &["deployed_addresses", "transparent_proxy_admin"],
+            result,
+        ) else {
+            continue;
+        };
+        result
+            .expect_create2_params_proxy_with_bytecode(
+                verifiers,
+                &permissionless_validator,
+                V31PermissionlessValidator::initializeCall::new(()).abi_encode(),
+                transparent_proxy_admin,
+                Vec::<u8>::new(),
+                "l1-contracts/PermissionlessValidator",
+            )
+            .await;
+    }
 
     Ok(())
 }
@@ -1016,42 +1097,6 @@ async fn verify_l1_chain_id(verifiers: &Verifiers, result: &mut VerificationResu
     match verifiers.network_verifier.try_get_l1_chain_id().await {
         Ok(chain_id) => result.report_ok(&format!("L1 RPC chain id: {chain_id}")),
         Err(err) => result.report_error(&format!("Failed to fetch L1 RPC chain id: {err}")),
-    }
-}
-
-async fn verify_v31_is_zksync_os(
-    verifiers: &Verifiers,
-    genesis_config_kind: GenesisConfigKind,
-    result: &mut VerificationResult,
-) {
-    let Some(ctm_proxy) = verifiers
-        .address_verifier
-        .name_to_address
-        .get("chain_type_manager_proxy")
-    else {
-        return;
-    };
-    match verifiers
-        .network_verifier
-        .try_get_ctm_is_zksync_os(*ctm_proxy)
-        .await
-    {
-        Ok(is_zksync_os) => {
-            let expected_is_zksync_os = matches!(genesis_config_kind, GenesisConfigKind::ZksyncOs);
-            if is_zksync_os != expected_is_zksync_os {
-                result.report_error(&format!(
-                    "CTM.isZKsyncOS() = {is_zksync_os} contradicts --genesis-config {:?}",
-                    genesis_config_kind
-                ));
-            } else {
-                result.report_ok(&format!(
-                    "CTM.isZKsyncOS() = {is_zksync_os} matches --genesis-config"
-                ));
-            }
-        }
-        Err(err) => result.report_warn(&format!(
-            "Skipping CTM.isZKsyncOS() check; RPC call failed: {err}"
-        )),
     }
 }
 
@@ -1121,7 +1166,7 @@ async fn verify_v31_core_wiring(verifiers: &Verifiers, result: &mut Verification
             .name_to_address
             .get("native_token_vault"),
     ) {
-        let asset_router = NativeTokenVaultWiring::new(*asset_router_proxy, provider.clone());
+        let asset_router = L1AssetRouter::new(*asset_router_proxy, provider.clone());
         match asset_router.nativeTokenVault().call().await {
             Ok(actual) if actual == *expected_ntv => {
                 result.report_ok("L1AssetRouter.nativeTokenVault() points at native_token_vault")
@@ -1135,29 +1180,11 @@ async fn verify_v31_core_wiring(verifiers: &Verifiers, result: &mut Verification
         }
     }
 
-    if let (Some(ntv_proxy), Some(expected_tracker)) = (
-        verifiers
-            .address_verifier
-            .name_to_address
-            .get("native_token_vault"),
-        verifiers
-            .address_verifier
-            .name_to_address
-            .get("asset_tracker_proxy"),
-    ) {
-        let ntv = NativeTokenVaultWiring::new(*ntv_proxy, provider.clone());
-        match ntv.l1AssetTracker().call().await {
-            Ok(actual) if actual == *expected_tracker => {
-                result.report_ok("NativeTokenVault.l1AssetTracker() points at asset_tracker_proxy")
-            }
-            Ok(actual) => result.report_error(&format!(
-                "NativeTokenVault.l1AssetTracker() mismatch: expected {expected_tracker}, got {actual}"
-            )),
-            Err(err) => result.report_warn(&format!(
-                "Skipping NativeTokenVault.l1AssetTracker() check; call failed: {err}"
-            )),
-        }
-
+    if let Some(expected_tracker) = verifiers
+        .address_verifier
+        .name_to_address
+        .get("asset_tracker_proxy")
+    {
         // Stage 1 accepts the AssetTracker ownership transfer; record the
         // current owner for context (ownership end-state validation requires
         // governance address knowledge added later in Phase 6).
@@ -1167,6 +1194,80 @@ async fn verify_v31_core_wiring(verifiers: &Verifiers, result: &mut Verification
             Err(err) => result.report_warn(&format!(
                 "Skipping AssetTracker.owner() check; call failed: {err}"
             )),
+        }
+    }
+}
+
+async fn verify_v31_ctm_permissionless_validator(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) {
+    let provider = verifiers.network_verifier.get_l1_provider();
+    for ctm in &artifact.ctms {
+        let label = ctm.flavor.label();
+        let Some(ctm_impl) = required_ctm_address(
+            ctm,
+            &["state_transition", "chain_type_manager_implementation_addr"],
+            result,
+        ) else {
+            continue;
+        };
+        let Some(expected_permissionless_validator) = required_ctm_address(
+            ctm,
+            &["state_transition", "permissionless_validator_addr"],
+            result,
+        ) else {
+            continue;
+        };
+
+        if expected_permissionless_validator == Address::ZERO {
+            result.report_error(&format!(
+                "{label}.permissionless_validator_addr is address(0); v31 CTM implementations must be constructed with a PermissionlessValidator proxy"
+            ));
+            continue;
+        }
+
+        let ctm_view = V31ChainTypeManagerView::new(ctm_impl, provider.clone());
+        match ctm_view.PERMISSIONLESS_VALIDATOR().call().await {
+            Ok(actual) if actual == expected_permissionless_validator => result.report_ok(&format!(
+                "{label}.chain_type_manager_implementation PERMISSIONLESS_VALIDATOR() matches permissionless_validator_addr"
+            )),
+            Ok(actual) => result.report_error(&format!(
+                "{label}.chain_type_manager_implementation PERMISSIONLESS_VALIDATOR() mismatch: expected {expected_permissionless_validator}, got {actual}"
+            )),
+            Err(err) => result.report_error(&format!(
+                "Failed to call {label}.chain_type_manager_implementation PERMISSIONLESS_VALIDATOR(): {err}"
+            )),
+        }
+    }
+}
+
+fn required_ctm_address(
+    ctm: &CtmArtifact,
+    path: &[&str],
+    result: &mut VerificationResult,
+) -> Option<Address> {
+    let path_label = format!("ctms.{}.{}", ctm.flavor.label(), path.join("."));
+    let mut current = &ctm.value;
+    for segment in path {
+        let Some(next) = current.get(*segment) else {
+            result.report_error(&format!("{path_label} is required"));
+            return None;
+        };
+        current = next;
+    }
+
+    let Some(raw) = current.as_str() else {
+        result.report_error(&format!("{path_label} must be an address string"));
+        return None;
+    };
+
+    match Address::from_str(raw) {
+        Ok(address) => Some(address),
+        Err(err) => {
+            result.report_error(&format!("{path_label} is not a valid address: {err}"));
+            None
         }
     }
 }
@@ -1235,6 +1336,9 @@ sol! {
             address _permissionlessValidator
         );
     }
+    contract V31PermissionlessValidator {
+        function initialize();
+    }
     contract V31CTMDeploymentTracker {
         constructor(address _bridgehub, address _l1AssetRouter);
     }
@@ -1257,7 +1361,7 @@ sol! {
     }
 }
 
-/// Phase 6: deployment provenance.
+/// Deployment provenance.
 ///
 /// For every named v31 implementation that the prepare scripts deploy via
 /// CREATE2 (or `Create2AndTransfer`), assert that the executed-bundle log
@@ -1294,14 +1398,14 @@ pub(crate) async fn verify_v31_provenance(
     genesis_config_kind: GenesisConfigKind,
     result: &mut VerificationResult,
 ) -> Result<()> {
-    result.print_info("== Phase 6: deployment provenance ==");
+    result.print_info("== Deployment provenance ==");
 
     let provider = verifiers.network_verifier.get_l1_provider();
     let l1_chain_id = match verifiers.network_verifier.try_get_l1_chain_id().await {
         Ok(id) => id,
         Err(err) => {
             result.report_warn(&format!(
-                "Skipping Phase 6 provenance — failed to fetch L1 chain id: {err}"
+                "Skipping deployment provenance — failed to fetch L1 chain id: {err}"
             ));
             return Ok(());
         }
@@ -1309,22 +1413,19 @@ pub(crate) async fn verify_v31_provenance(
 
     // Era / ZKsync OS file-name split for the v31 verifier contracts.
     // `AllContractsHashes.json` ships per-flavour verifiers since v30.
-    let (verifier_plonk_file, verifier_fflonk_file, dual_verifier_file, ctm_file) =
-        match genesis_config_kind {
-            GenesisConfigKind::Era => (
-                "l1-contracts/EraVerifierPlonk",
-                "l1-contracts/EraVerifierFflonk",
-                "l1-contracts/EraDualVerifier",
-                "l1-contracts/EraChainTypeManager",
-            ),
-            GenesisConfigKind::ZksyncOs => (
-                "l1-contracts/ZKsyncOSVerifierPlonk",
-                "l1-contracts/ZKsyncOSVerifierFflonk",
-                "l1-contracts/ZKsyncOSDualVerifier",
-                "l1-contracts/ZKsyncOSChainTypeManager",
-            ),
-        };
-    let _ = ctm_file; // wired in below once we resolve interopCenter/permissionlessValidator
+    let (verifier_plonk_file, verifier_fflonk_file, dual_verifier_file) = match genesis_config_kind
+    {
+        GenesisConfigKind::Era => (
+            "l1-contracts/EraVerifierPlonk",
+            "l1-contracts/EraVerifierFflonk",
+            "l1-contracts/EraDualVerifier",
+        ),
+        GenesisConfigKind::ZksyncOs => (
+            "l1-contracts/ZKsyncOSVerifierPlonk",
+            "l1-contracts/ZKsyncOSVerifierFflonk",
+            "l1-contracts/ZKsyncOSDualVerifier",
+        ),
+    };
 
     // Convenience lookups against the artifact-derived address verifier.
     // Each address used as a constructor input has to come from somewhere;
@@ -1605,8 +1706,8 @@ pub(crate) async fn verify_v31_provenance(
 
     // The remaining v31 contracts. Constructor args come from a mix of
     // RPC reads (governance owner, l1ChainId), the artifact's address
-    // map (chainAssetHandler, bytecodesSupplier, eip7702Checker,
-    // permissionlessValidator), the artifact's `[verifier_inputs]`
+    // map (chainAssetHandler, bytecodesSupplier, eip7702Checker),
+    // the artifact's `[verifier_inputs]`
     // section (initialDelay, isTestnet), well-known constants
     // (`L2_INTEROP_CENTER_ADDR`, the GovernanceUpgradeTimer 2-week
     // window, MAX_NUMBER_OF_CHAINS = 100), and the prepare-time
@@ -1614,8 +1715,6 @@ pub(crate) async fn verify_v31_provenance(
     // handler).
     let chain_asset_handler_proxy = lookup("chain_asset_handler_proxy");
     let eip7702_checker = lookup("eip7702_checker_addr");
-    let permissionless_validator = lookup("permissionless_validator_addr");
-    let bytecodes_supplier_proxy = lookup("bytecodes_supplier_addr");
     let governance = match bridgehub.owner().call().await {
         Ok(owner) => Some(owner),
         Err(err) => {
@@ -1695,35 +1794,6 @@ pub(crate) async fn verify_v31_provenance(
         );
     }
 
-    // EraChainTypeManager(bridgehub, interopCenter, l1BytecodesSupplier, permissionlessValidator).
-    // `interopCenter` is a built-in L2 system contract address constant
-    // (`L2_INTEROP_CENTER_ADDR = 0x1000d`), not deployed by the prepare.
-    if let (Some(ctm_impl), Some(bytecodes_supplier), Some(permissionless)) = (
-        lookup("chain_type_manager_implementation_addr"),
-        bytecodes_supplier_proxy,
-        permissionless_validator,
-    ) {
-        let interop_center: Address = "0x000000000000000000000000000000000001000d"
-            .parse()
-            .unwrap();
-        let ctm_file = match genesis_config_kind {
-            GenesisConfigKind::Era => "l1-contracts/EraChainTypeManager",
-            GenesisConfigKind::ZksyncOs => "l1-contracts/ZKsyncOSChainTypeManager",
-        };
-        result.expect_create2_params(
-            verifiers,
-            &ctm_impl,
-            V31ChainTypeManager::constructorCall::new((
-                bridgehub_addr,
-                interop_center,
-                bytecodes_supplier,
-                permissionless,
-            ))
-            .abi_encode(),
-            ctm_file,
-        );
-    }
-
     // GovernanceUpgradeTimer(initialDelay, maxAdditionalDelay = 2 weeks,
     // timerGovernance = governance, initialOwner = governance).
     if let (Some(timer), Some(governance), initial_delay) = (
@@ -1764,44 +1834,18 @@ pub(crate) async fn verify_v31_provenance(
         }
     }
 
-    // Stand-alone v31 implementations with no constructor args.
-    //
-    // Some addresses can legitimately be zero in v31 (e.g.
-    // `permissionless_validator_addr` is unset when the existing CTM is
-    // v29 — it's introspected as `address(0)` and not redeployed). Skip
-    // address-zero entries instead of failing.
-    for (name, expected_file) in [
-        // EIP7702Checker is part of the da-contracts package (not
-        // l1-contracts) — `AllContractsHashes.json` records it as
-        // `da-contracts/EIP7702Checker`.
-        ("eip7702_checker_addr", "da-contracts/EIP7702Checker"),
-        (
-            "permissionless_validator_addr",
-            "l1-contracts/PermissionlessValidator",
-        ),
-    ] {
-        let Some(addr) = lookup(name) else { continue };
-        if addr == Address::ZERO {
-            result.report_warn(&format!(
-                "Skipping {expected_file} provenance check; {name} is address(0) in artifact"
-            ));
-            continue;
-        }
-        // PermissionlessValidator is deployed as a TUPP — accept either
-        // the impl file or the TUPP wrapper.
-        if !result.expect_create2_params_internal(verifiers, &addr, &[], expected_file, false)
-            && !result.expect_create2_params_internal(
-                verifiers,
-                &addr,
-                &[],
-                "l1-contracts/TransparentUpgradeableProxy",
-                false,
-            )
-        {
-            result.expect_create2_params(verifiers, &addr, Vec::<u8>::new(), expected_file);
-        } else {
-            result.report_ok(&format!("{expected_file} (or TUPP proxy) at {}", addr));
-        }
+    verify_per_ctm_v31_provenance(artifact, verifiers, result, bridgehub_addr).await?;
+
+    // EIP7702Checker is part of the da-contracts package (not
+    // l1-contracts) — `AllContractsHashes.json` records it as
+    // `da-contracts/EIP7702Checker`.
+    if let Some(eip7702) = eip7702_checker {
+        result.expect_create2_params(
+            verifiers,
+            &eip7702,
+            Vec::<u8>::new(),
+            "da-contracts/EIP7702Checker",
+        );
     }
 
     // BytecodesSupplier in v31 is a TUPP. The proxy address is in the

@@ -13,7 +13,7 @@ use std::fs;
 use std::panic::Location;
 
 use crate::upgrade_verification::{
-    artifacts::EcosystemUpgradeArtifact,
+    artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
     versions::v31::{
         utils::{
             address_from_short_hex, address_verifier::AddressVerifier,
@@ -36,6 +36,8 @@ pub(crate) struct Verifiers {
     pub bytecode_verifier: BytecodeVerifier,
     pub network_verifier: NetworkVerifier,
     pub genesis_config: GenesisConfig,
+    pub era_genesis_config: GenesisConfig,
+    pub zksync_os_genesis_config: GenesisConfig,
     pub fee_param_verifier: FeeParamVerifier,
     pub gateway_bridgehub_address: Address,
     pub representative_era_chain_id: Option<u64>,
@@ -77,13 +79,24 @@ impl Verifiers {
         let network_verifier = NetworkVerifier::new_v31(l1_rpc.into())?;
         let address_verifier = AddressVerifier::new_v31_from_artifact(artifact)?;
 
+        let era_genesis_config =
+            GenesisConfig::init_v31(GenesisConfigKind::Era, contracts_commit).await?;
+        let zksync_os_genesis_config =
+            GenesisConfig::init_v31(GenesisConfigKind::ZksyncOs, contracts_commit).await?;
+        let genesis_config = match genesis_config_kind {
+            GenesisConfigKind::Era => era_genesis_config.clone(),
+            GenesisConfigKind::ZksyncOs => zksync_os_genesis_config.clone(),
+        };
+
         Ok(Self {
             testnet_contracts: false,
             bridgehub_address,
             address_verifier,
             bytecode_verifier,
             network_verifier,
-            genesis_config: GenesisConfig::init_v31(genesis_config_kind, contracts_commit).await?,
+            genesis_config,
+            era_genesis_config,
+            zksync_os_genesis_config,
             fee_param_verifier: FeeParamVerifier::empty(),
             gateway_bridgehub_address: address_from_short_hex("10002"),
             representative_era_chain_id,
@@ -133,15 +146,18 @@ impl Verifiers {
         let fee_param_verifier =
             FeeParamVerifier::safe_init(&bridgehub_address, &network_verifier, contracts_commit)
                 .await;
+        let genesis_config = GenesisConfig::init_from_github(era_commit)
+            .await
+            .expect("Failed to init");
         Self {
             testnet_contracts,
             bridgehub_address,
             address_verifier,
             bytecode_verifier,
             network_verifier,
-            genesis_config: GenesisConfig::init_from_github(era_commit)
-                .await
-                .expect("Failed to init"),
+            genesis_config: genesis_config.clone(),
+            era_genesis_config: genesis_config.clone(),
+            zksync_os_genesis_config: genesis_config,
             fee_param_verifier,
             gateway_bridgehub_address: address_from_short_hex("10002"),
             representative_era_chain_id: Some(era_chain_id),
@@ -167,9 +183,16 @@ impl Verifiers {
             .add_address(info.legacy_bridge, "legacy_erc20_bridge_proxy");
         Ok(())
     }
+
+    pub(crate) fn genesis_config_for_ctm(&self, flavor: CtmFlavor) -> &GenesisConfig {
+        match flavor {
+            CtmFlavor::Era => &self.era_genesis_config,
+            CtmFlavor::ZksyncOs => &self.zksync_os_genesis_config,
+        }
+    }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct GenesisConfig {
     pub genesis_root: String,
     #[serde(default)]
