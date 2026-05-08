@@ -37,10 +37,10 @@ CI installs `foundry-zksync` via `./.github/actions/install-zksync-foundry`. To 
 
 ```bash
 mkdir ./foundry-zksync
-curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.30/foundry_zksync_v0.0.30_linux_amd64.tar.gz
-tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
+curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.1.5/foundry_zksync_v0.1.5_linux_amd64.tar.gz
+tar zxf foundry_zksync_v0.1.5_linux_amd64.tar.gz -C ./foundry-zksync
 chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-rm foundry_zksync_v0.0.30_linux_amd64.tar.gz
+rm foundry_zksync_v0.1.5_linux_amd64.tar.gz
 export PATH="$PWD/foundry-zksync:$PATH"
 ```
 
@@ -82,7 +82,7 @@ Common foundry test failures and their root causes:
 These run the full L1↔L2 interop flow against real anvil instances on ports 9545/4050-4053. They need:
 
 - All four foundry builds done above.
-- Pre-generated chain states under `l1-contracts/test/anvil-interop/state/` (committed; only regenerate when mock system contracts change — see "Regenerating chain states" below).
+- Pre-generated chain states under `l1-contracts/test/anvil-interop/chain-states/` (committed; only regenerate when mock system contracts change — see "Regenerating chain states" below).
 
 ```bash
 cd l1-contracts
@@ -105,16 +105,16 @@ CI runs this in the `if: always()` cleanup step; do the same locally.
 
 ```bash
 cd l1-contracts
-forge build
+FOUNDRY_PROFILE=anvil-interop forge build
 cd test/anvil-interop
 npx ts-node setup-and-dump-state.ts
 ```
 
-Commit the regenerated `state/` files alongside the contract change. CI doesn't regenerate states — it expects committed states to match the current mock contracts.
+Commit the regenerated `chain-states/` files alongside the contract change. CI currently does not regenerate states on PRs — it expects committed states to match the current mock contracts.
 
 ### 1c. Upgrade tests (v29→v31, v30→v31)
 
-These exercise the full v31 upgrade flow against captured v29 / v30 chain states. They use protocol-ops's `ecosystem upgrade-prepare` (the legacy monolithic flow — see `protocol-ops.md`) plus `ecosystem upgrade-governance`, then `chain upgrade` per chain.
+These exercise the full v31 upgrade flow against captured v29 / v30 chain states. They use protocol-ops's split flow: `ecosystem upgrade-prepare-all` to deploy core + per-CTM contracts and emit merged governance calls, `ecosystem upgrade-governance` to replay stages 0/1/2, then `chain upgrade` per chain.
 
 ```bash
 cd l1-contracts/test/anvil-interop
@@ -129,7 +129,7 @@ Prerequisites: same as anvil-interop tests (all foundry builds done). Plus:
 
 Common failures:
 
-- **"Script not found: deploy-scripts/upgrade/v31/EcosystemUpgrade_v31.s.sol"** — `yarn l1 build:foundry` not run, or run without the test path included.
+- **"Script not found: deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol"** or **`CTMUpgrade_v31.s.sol`** — `yarn l1 build:foundry` not run, or the test override path is wrong.
 - **"call to non-contract address 0x0…"** — usually the upgrade script reading an address before the contract is deployed/registered. Use `cast run <txhash>` against the still-running anvil to get the trace; see `AGENTS.md` "Debugging Failed Transactions with cast run" for the recipe.
 - **"vm.writeToml: path not allowed"** — script-out path concatenation issue. Check that `vm.projectRoot()` is concatenated once, not twice.
 
@@ -154,7 +154,7 @@ For `protocol-ops` (Rust):
 
 ```bash
 cd protocol-ops
-cargo fmt --check          # CI runs without --check; locally use --check first to see diffs
+cargo fmt --check
 cargo clippy --all-targets -- -D warnings
 ```
 
@@ -176,7 +176,7 @@ codespell . \
   --skip='_typos.toml,*.json,*.lock,*.html,*.map,target,node_modules,venv,dist,report,yarn-error.log,lib,l1-contracts/lib,system-contracts/lib,l2-contracts/lib,da-contracts/lib'
 
 # Quick "did *I* introduce a typo" check: only run on what your branch changed
-git diff --name-only main -- ':!lib' ':!*/lib/*' | xargs -d'\n' typos
+git diff --name-only -z main -- ':!lib' ':!*/lib/*' | xargs -0 typos
 ```
 
 Sanity-check the filter is right: a clean run on the current branch should print **0** errors. If your numbers are in the hundreds you're seeing submodule noise — fix the filter, don't fix the code.
@@ -210,7 +210,7 @@ Don't whitelist actual misspellings — fix them. cSpell warnings shown in the I
 ```bash
 cd l1-contracts
 yarn selectors --fix
-git add ../selectors      # exact path varies; follow git status
+git add selectors         # from l1-contracts; from repo root: git add l1-contracts/selectors
 ```
 
 CI runs `yarn l1 selectors --check`; locally run `--fix` first, then `--check` to confirm.
@@ -280,7 +280,7 @@ yarn lint:sol --fix --noPrompt
 yarn lint:ts --fix
 yarn prettier:fix
 yarn l1 errors-lint --check
-( cd protocol-ops && cargo fmt && cargo clippy --all-targets -- -D warnings )
+( cd protocol-ops && cargo fmt --check && cargo clippy --all-targets -- -D warnings )
 
 # 4. Selectors
 ( cd l1-contracts && yarn selectors --fix )
