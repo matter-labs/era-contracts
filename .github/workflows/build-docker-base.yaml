@@ -6,7 +6,7 @@ name: Build Docker Base Image
 # and skip ~10 min of toolchain installs each run.
 on:
   push:
-    branches: [main]
+    branches: [main, kl/anvil-hardening]
     paths:
       - 'docker/protocol/Dockerfile.base'
       - '.github/workflows/build-docker-base.yaml'
