@@ -27,53 +27,15 @@ RUN mkdir -p /recipes && \
 ########################################
 # 2) Build
 ########################################
-FROM debian:bookworm-slim AS build
+# Build stage uses a pre-baked base image with apt deps + Node/Yarn +
+# foundry-zksync + foundry vanilla anvil + Rust toolchain + cargo-chef.
+# That base is rebuilt only when toolchain versions change (see
+# `Dockerfile.base` and `.github/workflows/build-docker-base.yaml`).
+# Saves ~10 minutes off every main build by skipping the install steps.
+ARG BUILD_BASE_IMAGE=ghcr.io/matter-labs/protocol-ops-base:latest
+FROM ${BUILD_BASE_IMAGE} AS build
 
-ARG FOUNDRY_ARCH
-ARG FOUNDRY_ZKSYNC_TAG
-ARG FOUNDRY_VANILLA_VERSION
-ARG NODE_MAJOR
 ARG RUST_TARGET
-ARG RUST_TOOLCHAIN
-ARG YARN_VERSION
-
-ENV DEBIAN_FRONTEND=noninteractive \
-    PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH \
-    RUSTUP_HOME=/usr/local/rustup \
-    CARGO_HOME=/usr/local/cargo \
-    YARN_CACHE_FOLDER=/tmp/yarn-cache
-
-# Build deps
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl git bash coreutils openssl jq xz-utils gnupg \
-      build-essential pkg-config libssl-dev && \
-    rm -rf /var/lib/apt/lists/*
-
-# Node + Yarn
-RUN curl -fsSL https://deb.nodesource.com/setup_${NODE_MAJOR}.x | bash - \
- && apt-get update && apt-get install -y --no-install-recommends nodejs \
- && npm i -g yarn@${YARN_VERSION} \
- && npm cache clean --force \
- && rm -rf /var/lib/apt/lists/*
-
-# Foundry zksync (forge + cast)
-RUN curl -L -o /tmp/foundry.tgz https://github.com/matter-labs/foundry-zksync/releases/download/${FOUNDRY_ZKSYNC_TAG}/foundry_zksync_nightly_${FOUNDRY_ARCH}.tar.gz \
- && tar zxf /tmp/foundry.tgz -C /usr/local/bin/ \
- && chmod +x /usr/local/bin/forge /usr/local/bin/cast \
- && rm /tmp/foundry.tgz
-
-# Foundry vanilla (anvil)
-RUN curl -L -o /tmp/foundry-vanilla.tgz https://github.com/foundry-rs/foundry/releases/download/${FOUNDRY_VANILLA_VERSION}/foundry_${FOUNDRY_VANILLA_VERSION}_${FOUNDRY_ARCH}.tar.gz \
- && tar zxf /tmp/foundry-vanilla.tgz -C /tmp/ anvil \
- && mv /tmp/anvil /usr/local/bin/anvil \
- && chmod +x /usr/local/bin/anvil \
- && rm /tmp/foundry-vanilla.tgz
-
-# === Install Rust ===
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-    sh -s -- -y --default-toolchain ${RUST_TOOLCHAIN} --no-modify-path
-RUN rustup target add ${RUST_TARGET}
-RUN cargo install cargo-chef --locked
 
 # === Cook Rust dependencies (cached until Cargo.toml/lock change) ===
 # BuildKit cache mounts:
