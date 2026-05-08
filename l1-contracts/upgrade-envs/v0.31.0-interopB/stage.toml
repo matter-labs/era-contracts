@@ -11,6 +11,13 @@ old_protocol_version = 0x1d00000000
 priority_txs_l2_gas_limit = 2000000
 max_expected_l1_gas_price = 50000000000
 
+# Stage's Era chain (270) is still settling on the stage Gateway (chain 123)
+# at v31 upgrade time. The canonical `L1MessageRoot._v31InitializeInner`
+# requires every registered chain to be on L1 — so we deploy
+# `L1MessageRootStageSepolia` instead, which skips chain 270 specifically.
+# See `CoreUpgrade_v31._messageRootContractName`.
+message_root_stage_sepolia_variant = true
+
 [contracts]
 governance_min_delay = 0
 

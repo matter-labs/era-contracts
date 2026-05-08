@@ -90,7 +90,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
     /// @dev Used by the test harness for idempotent re-runs where connections are already set up.
     function deployNewEcosystemContractsL1NoConnections() public virtual {
         coreAddresses.bridgehub.implementations.bridgehub = deploySimpleContract("L1Bridgehub", false);
-        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract("L1MessageRoot", false);
+        coreAddresses.bridgehub.implementations.messageRoot = deploySimpleContract(_messageRootContractName(), false);
         coreAddresses.bridges.implementations.l1Nullifier = deploySimpleContract("L1Nullifier", false);
         coreAddresses.bridges.implementations.l1AssetRouter = deploySimpleContract("L1AssetRouter", false);
         coreAddresses.bridges.implementations.l1NativeTokenVault = deploySimpleContract("L1NativeTokenVault", false);
@@ -168,7 +168,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
         string memory contractName,
         bool isZkBytecode
     ) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "L1MessageRoot")) {
+        if (compareStrings(contractName, _messageRootContractName())) {
             return abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ());
         } else if (compareStrings(contractName, "L1AssetTracker")) {
             // Initialize AssetTracker with config.deployerAddress which is now properly set
@@ -276,6 +276,28 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
         vm.stopBroadcast();
 
         console.log("v31 stage3 migration complete!");
+    }
+
+    /// @notice Pick the L1 MessageRoot impl to deploy.
+    /// @dev Defaults to the canonical `L1MessageRoot`. Stage Sepolia opts into
+    ///      `L1MessageRootStageSepolia` (skips chain 270 in `_v31InitializeInner`)
+    ///      via `message_root_stage_sepolia_variant = true` at the top level of
+    ///      the upgrade input TOML — chain 270 is still settling on the stage
+    ///      Gateway (chain 123) at v31 upgrade time, so the canonical impl
+    ///      would revert with `NotAllChainsOnL1`.
+    function _messageRootContractName() internal view returns (string memory) {
+        if (bytes(v31UpgradeInputRelPath).length == 0) {
+            return "L1MessageRoot";
+        }
+        string memory root = vm.projectRoot();
+        string memory upgradeToml = vm.readFile(string.concat(root, v31UpgradeInputRelPath));
+        if (
+            upgradeToml.keyExists("$.message_root_stage_sepolia_variant") &&
+            upgradeToml.readBool("$.message_root_stage_sepolia_variant")
+        ) {
+            return "L1MessageRootStageSepolia";
+        }
+        return "L1MessageRoot";
     }
 
     /// @notice Build the legacy-GW decommission calls (historical intervals + blacklist).
