@@ -59,6 +59,10 @@ pub struct V31PrepareInputs {
     /// signature still needs the flag). When `None`, auto-resolved from any
     /// registered CTM via `ctm.isZKsyncOS()` (v31+ getter).
     pub core_is_zk_sync_os_override: Option<bool>,
+    /// ZK token asset ID used by CTM prepare. For named envs this comes from
+    /// `upgrade-envs/permanent-values/<env>.toml`; otherwise it is explicitly
+    /// supplied or falls back only for networks with a canonical value.
+    pub zk_token_asset_id: H256,
 }
 
 /// Output of the prepare phase: the TOMLs each forge invocation wrote, in
@@ -333,9 +337,6 @@ impl<'a> V31UpgradeInner<'a> {
             .join(output_path_str.trim_start_matches('/'));
         let _ = fs::remove_file(&ctm_output_path);
 
-        let l1_network = crate::types::L1Network::from_l1_rpc(&runner.rpc_url)?;
-        let zk_token_asset_id = l1_network.zk_token_asset_id();
-
         let script = runner
             .script_path_from_root(
                 self.contracts_path,
@@ -353,7 +354,7 @@ impl<'a> V31UpgradeInner<'a> {
                     inputs.upgrade_input_path.clone(),
                     output_path_str.clone(),
                     governance,
-                    zk_token_asset_id,
+                    inputs.zk_token_asset_id,
                 ),),
             )?
             .with_broadcast()

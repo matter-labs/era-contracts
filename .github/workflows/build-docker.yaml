@@ -19,7 +19,7 @@ on:
         description: "zk-governance branch/tag/SHA baked into the image. PUH/Guardians redeploy uses this checkout."
         type: string
         required: false
-        default: "main"
+        default: "vg/oz-audit-feb-2026"
 
 jobs:
   build-image:
@@ -42,7 +42,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: zksync-association/zk-governance
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.zk_governance_ref || 'main' }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.zk_governance_ref || 'vg/oz-audit-feb-2026' }}
           submodules: recursive
           path: zk-governance
 

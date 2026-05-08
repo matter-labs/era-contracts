@@ -3,30 +3,35 @@
 ## Relevant files
 
 - `protocol-ops/src/main.rs` — top-level CLI dispatcher.
-- `protocol-ops/src/commands/ecosystem/` — ecosystem-wide commands (`upgrade-prepare`, `upgrade-prepare-all`, `upgrade-governance`, …).
+- `protocol-ops/src/commands/ecosystem/` — ecosystem-wide commands (`upgrade-prepare-all`, `upgrade-governance`, `stage3`, `list-ctms`, `governance-toml-to-simulator`, …).
 - `protocol-ops/src/commands/ecosystem/v31_upgrade_inner.rs` — canonical v31 prepare-phase orchestration (`V31UpgradeInner::prepare`).
 - `protocol-ops/src/commands/ecosystem/v31_upgrade_full.rs` — `V31UpgradeFull` = Inner + ecosystem precondition (`ensureCtmsAndProxyAdminsOwnedByGovernance`).
-- `protocol-ops/src/commands/ecosystem/upgrade.rs` — CLI handlers (`run_upgrade_prepare`, `run_upgrade_prepare_all`, `run_upgrade_governance`) and the free `replay_governance_stages` helper.
+- `protocol-ops/src/commands/ecosystem/upgrade.rs` — CLI handlers (`run_upgrade_prepare_all`, `run_upgrade_governance`, `run_list_ctms`) and the free `replay_governance_stages` helper.
+- `protocol-ops/src/commands/ecosystem/simulator.rs` — converts prepared governance TOMLs into transaction-simulator JSON.
 - `protocol-ops/src/commands/chain/` — per-chain commands (`chain upgrade`, `chain gateway convert`, `chain gateway migrate-to`, …).
-- `protocol-ops/src/commands/dev/execute_safe.rs` — replays a Gnosis Safe Transaction Builder JSON bundle against an anvil fork.
+- `protocol-ops/src/commands/dev/execute_safe.rs` — executes a Gnosis Safe Transaction Builder JSON bundle by signing each tx with a supplied private key and sending raw transactions to the given RPC URL.
 - `protocol-ops/src/common/forge/runner.rs` — `ForgeRunner`: owns the anvil fork lifecycle and records every broadcast tx into `runner.runs()` for per-sender Safe-bundle emission.
 - `protocol-ops/src/common/l1_contracts.rs` — auto-resolution helpers (CTM, governance, bytecodes supplier, validator timelock, etc.) — read live state directly from L1.
 - `protocol-ops/src/config/forge_interface/script_params.rs` — `ForgeScriptParams` invocation specs for each forge script the CLI invokes.
 - `l1-contracts/deploy-scripts/AdminFunctions.s.sol` — Solidity helpers invoked by protocol-ops (e.g. `governanceExecuteCalls`, `ensureCtmsAndProxyAdminsOwnedByGovernance`). Auto-imported via the `IAdminFunctions` interface.
-- `l1-contracts/deploy-scripts/upgrade/v31/{CoreUpgrade_v31,CTMUpgrade_v31,EcosystemUpgrade_v31}.s.sol` — Solidity entry points for v31 deploys.
+- `l1-contracts/deploy-scripts/upgrade/v31/{CoreUpgrade_v31,CTMUpgrade_v31,ChainUpgrade_v31}.s.sol` — Solidity entry points for v31 deploys.
 
 ## What protocol-ops is
 
 protocol-ops is a Rust CLI that drives privileged ecosystem operations (upgrades, gateway migrations, validator changes, …) by:
 
 1. Spinning up a local **anvil fork** of L1 (the `ForgeRunner` owns this).
-2. Running forge scripts against the fork, with permissioned senders **impersonated** via anvil auto-impersonation (`--sender --unlocked`). protocol-ops never broadcasts against real L1.
+2. Running production forge-script commands against the fork, with permissioned senders **impersonated** via anvil auto-impersonation (`--sender --unlocked`).
 3. Recording every broadcast tx forge emits into `runner.runs()`, then splitting them by `from` into per-signer **Safe Transaction Builder JSON bundles** in the requested `--out` directory.
-4. Real-world signers (multisig members) later replay those bundles against L1 — that's where state actually changes in production.
+4. Operators later execute those bundles through the real signer path (Safe UI / approved executor / owner flow) — that's where state actually changes outside the fork.
 
-So protocol-ops is a **simulator + bundle emitter**, not a broadcaster. The anvil fork is the simulation environment that lets us produce the post-state and verify each step works; the bundles are the durable artifact handed off to humans.
+So the main protocol-ops commands are **simulator + bundle emitters**, not direct broadcasters. The anvil fork is the simulation environment that lets us produce the post-state and verify each step works; the bundles are the durable artifact handed off to operators.
 
-`dev execute-safe` is the symmetric replay tool — given a Safe bundle JSON and a private key, it replays the bundle against an anvil fork (used by tests and local validation).
+`dev execute-safe` is a developer replay helper. Given a Safe bundle JSON, an RPC URL, and a private key, it signs and submits every transaction from that key's address. It is intended for anvil/local validation unless someone deliberately points it at a live testnet RPC.
+
+`ecosystem governance-toml-to-simulator` is the transaction-simulator bridge: it reads a prepared protocol-ops governance TOML, decodes `stage0_calls` / `stage1_calls` / `stage2_calls`, and emits the simulator's JSON transaction list.
+
+Sharp edge: filename handling is not fully unified. Existing stage prepare output and `governance-toml-to-simulator --env` use `<out>/prepare/governance.toml`; the current `upgrade-governance --env` auto-discovery path in `upgrade.rs` looks for `<out>/prepare/ecosystem.toml`. Until that is normalized, pass `--governance-toml` explicitly when replaying governance stages.
 
 ## High-level architecture
 
@@ -42,7 +47,7 @@ For non-trivial flows (the v31 upgrade in particular) we keep a small library-st
 
 - **`V31UpgradeInner`** — canonical prepare orchestration. `prepare(runner, deployer, inputs)` fires `CoreUpgrade_v31.noGovernancePrepare` once and `CTMUpgrade_v31.noGovernancePrepare` once per target CTM, on a single shared `ForgeRunner`. Returns the per-step output TOML paths.
 - **`V31UpgradeFull`** — wraps Inner with the real-world precondition `ensureCtmsAndProxyAdminsOwnedByGovernance`. Has only a `prepare` method — the governance phase is plumbing, not orchestration.
-- **Free `replay_governance_stages` helper** in `upgrade.rs` — reads each prepared TOML's hex-encoded `stage{N}_calls`, dispatches `governanceExecuteCalls` per stage on the runner. No struct because there's no state.
+- **Free `replay_governance_stages` helper** in `upgrade.rs` — reads each prepared TOML's hex-encoded `stage{N}_calls`, dispatches `governanceExecuteCalls` for legacy Governance or `governanceExecuteCallsDirect` for PUH-governed environments. No struct because there's no state.
 
 The asymmetry (Inner/Full for prepare; free fn for governance) is deliberate: prepare needs orchestration (multiple forge invocations + preconditions); governance is a single ABI-passthrough loop.
 
@@ -89,9 +94,9 @@ Every `runner.run(...)` simultaneously (a) executes the script on the anvil fork
 
 Solidity helpers like `ensureCtmsAndProxyAdminsOwnedByGovernance` use nested `vm.startBroadcast(<owner>)` so that inner permission-gated calls (e.g. `transferOwnership`) are recorded against the EOA that actually controls the contract. The Rust side just signs the outer dispatch call as the deployer; per-sender bundle splitting handles the rest.
 
-### `dev execute-safe` chunking
+### `dev execute-safe` replay
 
-Replaying Safe bundles against anvil submits txs in chunks of `MAX_INFLIGHT` (10), with concurrent submit + receipt-await within a chunk and sequential chunks. Bounds RPC pressure (vs. unbounded `try_join_all`, which can saturate anvil's event loop with concurrent receipt pollers and stall tx import) without giving up most of the parallelism on bundles of typical size (15-30 txs).
+Replaying Safe bundles submits txs sequentially: estimate gas, sign locally, send the raw tx, await its receipt, then continue. This is intentional because later bundle txs may depend on state created by earlier txs. Safe Transaction Builder JSON does not contain the broadcasting Safe address, so the broadcaster is always the address derived from `--private-key`.
 
 ### Forbidden patterns
 
@@ -111,4 +116,4 @@ When reviewing a protocol-ops PR:
 4. **Does the new flow produce one Safe bundle per signer per phase?** If a single phase emits multiple bundles for the same signer, that's a sign the orchestration logic should be on one shared `ForgeRunner`.
 5. **Does the prepare phase rely on data only present in-memory across forge invocations?** If yes, either pass it via TOML written by the previous forge call or use CREATE2 determinism — don't fold separate phases back into one forge process to dodge the question.
 6. **Are addresses in the orchestration code resolved via `l1_contracts.rs` or via `script_params` consts?** Hardcoded addresses anywhere in protocol-ops are almost always wrong.
-7. **Does the new code touch the legacy monolithic `EcosystemUpgrade_v31` flow?** That flow exists only to keep the v31 fork test in `l1-contracts/test/anvil-interop/` working; new development should target `CoreUpgrade_v31` + `CTMUpgrade_v31` via `upgrade-prepare-all`.
+7. **Does the new code reintroduce the legacy monolithic `EcosystemUpgrade_v31` flow?** Push back. Current v31 work should target `CoreUpgrade_v31` + `CTMUpgrade_v31` via `upgrade-prepare-all`.
