@@ -23,7 +23,7 @@ use crate::config::forge_interface::script_params::ADMIN_FUNCTIONS_INVOCATION;
 /// chain registered on the bridgehub — each chain's bundle lands under
 /// `<--out>/<chain-id>/` so the bundles don't collide. With `--env`, the
 /// per-chain `<--out>` defaults to
-/// `upgrade-envs/.../<env>/protocol-ops/chain-upgrades/<chain-id>/`.
+/// `upgrade-envs/.../<env>/chain-upgrades/<chain-id>/`.
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct ChainUpgradeArgs {
     #[clap(flatten)]

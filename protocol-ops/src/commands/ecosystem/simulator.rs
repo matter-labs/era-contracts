@@ -16,7 +16,7 @@ pub struct GovernanceTomlToSimulatorArgs {
     pub topology: crate::common::EcosystemArgs,
 
     /// Path to a protocol-ops governance TOML. Defaults to
-    /// `upgrade-envs/v0.31.0-interopB/output/<env>/protocol-ops/prepare/governance.toml`
+    /// `upgrade-envs/v0.31.0-interopB/output/<env>/prepare/governance.toml`
     /// when `--env` is set.
     #[clap(long)]
     pub governance_toml: Option<PathBuf>,

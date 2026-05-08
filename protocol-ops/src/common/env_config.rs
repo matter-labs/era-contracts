@@ -231,13 +231,14 @@ impl EnvConfig {
 }
 
 /// Default output dir for an env, e.g.
-/// `upgrade-envs/v0.31.0-interopB/output/<env>/protocol-ops/`.
+/// `upgrade-envs/v0.31.0-interopB/output/<env>/`. Outputs land directly under
+/// the env dir — no `protocol-ops/` subfolder — so the artifacts a reviewer
+/// expects to find for stage / mainnet are immediately visible.
 pub fn default_protocol_ops_out_dir(env: &str) -> anyhow::Result<PathBuf> {
     Ok(resolve_l1_contracts_path()?
         .join(V31_UPGRADE_DIR)
         .join("output")
-        .join(env)
-        .join("protocol-ops"))
+        .join(env))
 }
 
 fn parse_v31_upgrade_input(content: &str) -> V31UpgradeInputs {

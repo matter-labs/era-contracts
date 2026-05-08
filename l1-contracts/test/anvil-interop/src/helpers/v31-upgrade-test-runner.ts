@@ -135,15 +135,15 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       executeBundles: true,
     });
 
-    // `upgrade-prepare-all` writes a single merged `governance.toml` directly
+    // `upgrade-prepare-all` writes a single merged `ecosystem.toml` directly
     // under `<out>/prepare/`. It already contains stage-0/1/2 calls from core
     // + every CTM concatenated in source-order — no per-script split anymore.
     const prepareDir = path.join(upgradeHarnessInputs.protocolOpsOutDir, "prepare");
-    const mergedGovernanceToml = path.join(prepareDir, "governance.toml");
-    if (!fs.existsSync(mergedGovernanceToml)) {
-      throw new Error(`Merged governance TOML not emitted by upgrade-prepare-all: ${mergedGovernanceToml}`);
+    const mergedEcosystemToml = path.join(prepareDir, "ecosystem.toml");
+    if (!fs.existsSync(mergedEcosystemToml)) {
+      throw new Error(`Merged ecosystem TOML not emitted by upgrade-prepare-all: ${mergedEcosystemToml}`);
     }
-    const governanceTomlPaths = [mergedGovernanceToml];
+    const governanceTomlPaths = [mergedEcosystemToml];
     // Optional gov-upgrade TOML (PUH/Guardians redeploy). Picked up alongside
     // the ecosystem one when present.
     const govUpgradeToml = path.join(prepareDir, "gov-upgrade.toml");

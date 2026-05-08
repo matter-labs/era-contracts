@@ -32,12 +32,14 @@
 use clap::Subcommand;
 
 use crate::{
+    commands::ecosystem::broadcast::UpgradeBroadcastArgs,
     commands::ecosystem::init::EcosystemInitArgs,
     commands::ecosystem::simulator::GovernanceTomlToSimulatorArgs,
     commands::ecosystem::stage3::Stage3Args,
     commands::ecosystem::upgrade::{ListCtmsArgs, UpgradeGovernanceArgs, UpgradePrepareAllArgs},
 };
 
+pub(crate) mod broadcast;
 pub(crate) mod init;
 pub(crate) mod puh_guardians;
 pub(crate) mod simulator;
@@ -64,6 +66,12 @@ pub enum EcosystemCommands {
     /// `--governance-toml` explicitly.
     #[command(name = "upgrade-governance")]
     UpgradeGovernance(UpgradeGovernanceArgs),
+    /// Broadcast the bundles produced by `upgrade-prepare-all` to a real (or
+    /// fork) RPC under the supplied EOA keys. Multi-bundle dispatcher around
+    /// `dev execute-safe`: reads `manifest.json`, replays each bundle in order
+    /// signed by its declared `target`. Direct EOA broadcast — no Safe UI.
+    #[command(name = "upgrade-broadcast")]
+    UpgradeBroadcast(UpgradeBroadcastArgs),
     /// Phase 4 of the ecosystem upgrade: post-governance bridged-token
     /// migration. Calls `CoreUpgrade_v31.stage3(bridgehub)`, which registers
     /// ETH + every v31-bridged token in NTV's bridgedTokens list and
@@ -84,6 +92,7 @@ pub(crate) async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
         EcosystemCommands::Init(args) => init::run(args).await,
         EcosystemCommands::UpgradePrepareAll(args) => upgrade::run_upgrade_prepare_all(args).await,
         EcosystemCommands::UpgradeGovernance(args) => upgrade::run_upgrade_governance(args).await,
+        EcosystemCommands::UpgradeBroadcast(args) => broadcast::run(args).await,
         EcosystemCommands::Stage3(args) => stage3::run(args).await,
         EcosystemCommands::ListCtms(args) => upgrade::run_list_ctms(args).await,
         EcosystemCommands::GovernanceTomlToSimulator(args) => simulator::run(args).await,
