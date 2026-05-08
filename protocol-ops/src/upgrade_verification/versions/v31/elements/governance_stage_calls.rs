@@ -956,37 +956,42 @@ async fn verify_v31_upgrade_facet_cuts(
     let proposed_added_facet_cuts = proposed_added_facet_cut_set(facet_cuts);
 
     match expected_v31_upgrade_facet_cuts(ctm, verifiers, result).await? {
-        Some(ExpectedFacetCuts::Exact(expected_facet_cuts))
-            if proposed_facet_cuts == expected_facet_cuts =>
-        {
+        Some(ExpectedFacetCuts::Exact {
+            facets: expected_facet_cuts,
+            chain_id,
+        }) if proposed_facet_cuts == expected_facet_cuts => {
             result.report_ok(&format!(
-                "{} chain upgrade facet cuts match current diamond and new facets",
-                ctm.flavor.label()
+                "{} chain upgrade facet cuts match chain {} current diamond and new facets",
+                ctm.flavor.label(),
+                chain_id
             ));
         }
-        Some(ExpectedFacetCuts::Exact(expected_facet_cuts)) => {
-            // TEMPORARY: keep the rest of PUVT runnable while investigating
-            // the Era pre-upgrade diamond state used to build the remove set.
-            result.report_warn(&format!(
-                "TEMPORARY: ignoring invalid {} chain upgrade facet cuts. Expected: {:#?}\nReceived: {:#?}",
+        Some(ExpectedFacetCuts::Exact {
+            facets: expected_facet_cuts,
+            chain_id,
+        }) => {
+            result.report_error(&format!(
+                "Invalid {} chain upgrade facet cuts for representative chain {}. Expected: {:#?}\nReceived: {:#?}",
                 ctm.flavor.label(),
+                chain_id,
                 expected_facet_cuts,
                 proposed_facet_cuts
             ));
         }
-        Some(ExpectedFacetCuts::AddsOnly(expected_added_facet_cuts))
-            if proposed_added_facet_cuts == expected_added_facet_cuts =>
-        {
+        Some(ExpectedFacetCuts::AddsOnly {
+            facets: expected_added_facet_cuts,
+            reason,
+        }) if proposed_added_facet_cuts == expected_added_facet_cuts => {
             result.report_ok(&format!(
                 "{} chain upgrade added facets match new facet bytecode selectors",
                 ctm.flavor.label()
             ));
-            result.report_warn(&format!(
-                "Skipped exact {} removal-set reconstruction; no representative chain id is available for this CTM",
-                ctm.flavor.label()
-            ));
+            result.report_warn(&reason);
         }
-        Some(ExpectedFacetCuts::AddsOnly(expected_added_facet_cuts)) => {
+        Some(ExpectedFacetCuts::AddsOnly {
+            facets: expected_added_facet_cuts,
+            ..
+        }) => {
             result.report_error(&format!(
                 "Invalid {} chain upgrade added facets. Expected: {:#?}\nReceived: {:#?}",
                 ctm.flavor.label(),
@@ -1068,8 +1073,13 @@ fn proposed_added_facet_cut_set(facet_cuts: &[set_new_version_upgrade::FacetCut]
 }
 
 enum ExpectedFacetCuts {
-    Exact(FacetCutSet),
-    AddsOnly(FacetCutSet),
+    Exact { facets: FacetCutSet, chain_id: U256 },
+    AddsOnly { facets: FacetCutSet, reason: String },
+}
+
+struct RepresentativeChainDiamond {
+    chain_id: U256,
+    diamond: Address,
 }
 
 async fn expected_v31_upgrade_facet_cuts(
@@ -1078,49 +1088,35 @@ async fn expected_v31_upgrade_facet_cuts(
     result: &mut VerificationResult,
 ) -> anyhow::Result<Option<ExpectedFacetCuts>> {
     let added_facets = expected_v31_added_facets(ctm, verifiers, result).await?;
-    let Some(era_chain_id) = verifiers.representative_era_chain_id else {
-        return Ok(Some(ExpectedFacetCuts::AddsOnly(added_facets)));
+    let Some(representative) = find_representative_chain_diamond(ctm, verifiers, result).await?
+    else {
+        return Ok(Some(ExpectedFacetCuts::AddsOnly {
+            facets: added_facets,
+            reason: format!(
+                "Skipped exact {} removal-set reconstruction; no registered chain on this CTM matches artifact old protocol {}",
+                ctm.flavor.label(),
+                protocol_label(U256::from(ctm.contracts_config.old_protocol_version))
+            ),
+        }));
     };
 
-    if ctm.flavor != crate::upgrade_verification::artifacts::CtmFlavor::Era {
-        return Ok(Some(ExpectedFacetCuts::AddsOnly(added_facets)));
-    }
-
-    let chain_diamond = match verifiers
-        .network_verifier
-        .try_get_chain_diamond_from_bridgehub(verifiers.bridgehub_address, U256::from(era_chain_id))
-        .await
+    let current_facets = match GettersFacet::new(
+        representative.diamond,
+        verifiers.network_verifier.get_l1_provider(),
+    )
+    .facets()
+    .call()
+    .await
     {
-        Ok(address) if address != Address::ZERO => address,
-        Ok(_) => {
-            result.report_error(&format!(
-                "Bridgehub returned zero chain diamond for provided --era-chain-id {era_chain_id}"
-            ));
-            return Ok(None);
-        }
+        Ok(facets) => facets,
         Err(err) => {
             result.report_error(&format!(
-                "Cannot fetch current chain diamond for --era-chain-id {era_chain_id}: {err}"
+                "Cannot fetch current diamond facets from {}: {err}",
+                representative.diamond
             ));
             return Ok(None);
         }
     };
-
-    let current_facets =
-        match GettersFacet::new(chain_diamond, verifiers.network_verifier.get_l1_provider())
-            .facets()
-            .call()
-            .await
-        {
-            Ok(facets) => facets,
-            Err(err) => {
-                result.report_error(&format!(
-                    "Cannot fetch current diamond facets from {}: {err}",
-                    chain_diamond
-                ));
-                return Ok(None);
-            }
-        };
 
     let mut facets_to_remove = FacetCutSet::new();
     for facet in current_facets {
@@ -1132,9 +1128,119 @@ async fn expected_v31_upgrade_facet_cuts(
         });
     }
 
-    Ok(Some(ExpectedFacetCuts::Exact(
-        facets_to_remove.merge(added_facets),
-    )))
+    Ok(Some(ExpectedFacetCuts::Exact {
+        facets: facets_to_remove.merge(added_facets),
+        chain_id: representative.chain_id,
+    }))
+}
+
+async fn find_representative_chain_diamond(
+    ctm: &CtmArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> anyhow::Result<Option<RepresentativeChainDiamond>> {
+    let Some(ctm_proxy) = required_ctm_address(
+        ctm,
+        &["state_transition", "chain_type_manager_proxy"],
+        result,
+    ) else {
+        return Ok(None);
+    };
+
+    let expected_protocol = U256::from(ctm.contracts_config.old_protocol_version);
+
+    if ctm.flavor == CtmFlavor::Era {
+        if let Some(era_chain_id) = verifiers.representative_era_chain_id {
+            let chain_id = U256::from(era_chain_id);
+            match inspect_chain_for_facet_cut_reconstruction(
+                chain_id,
+                ctm_proxy,
+                expected_protocol,
+                verifiers,
+            )
+            .await?
+            {
+                Some(representative) => return Ok(Some(representative)),
+                None => {}
+            }
+        }
+    }
+
+    let chain_ids = match verifiers
+        .network_verifier
+        .try_get_all_zk_chain_ids(verifiers.bridgehub_address)
+        .await
+    {
+        Ok(ids) => ids,
+        Err(err) => {
+            result.report_warn(&format!(
+                "Cannot scan registered chains for {} facet removal reconstruction: {err}",
+                ctm.flavor.label()
+            ));
+            return Ok(None);
+        }
+    };
+
+    for chain_id in chain_ids {
+        if let Some(representative) = inspect_chain_for_facet_cut_reconstruction(
+            chain_id,
+            ctm_proxy,
+            expected_protocol,
+            verifiers,
+        )
+        .await?
+        {
+            return Ok(Some(representative));
+        }
+    }
+
+    Ok(None)
+}
+
+async fn inspect_chain_for_facet_cut_reconstruction(
+    chain_id: U256,
+    expected_ctm: Address,
+    expected_protocol: U256,
+    verifiers: &Verifiers,
+) -> anyhow::Result<Option<RepresentativeChainDiamond>> {
+    let chain_ctm = match verifiers
+        .network_verifier
+        .try_get_chain_type_manager_from_bridgehub(verifiers.bridgehub_address, chain_id)
+        .await
+    {
+        Ok(chain_ctm) => chain_ctm,
+        Err(_) => return Ok(None),
+    };
+    if chain_ctm != expected_ctm {
+        return Ok(None);
+    }
+
+    let diamond = match verifiers
+        .network_verifier
+        .try_get_chain_diamond_from_bridgehub(verifiers.bridgehub_address, chain_id)
+        .await
+    {
+        Ok(diamond) if diamond != Address::ZERO => diamond,
+        _ => return Ok(None),
+    };
+
+    let protocol = match verifiers
+        .network_verifier
+        .try_get_chain_protocol_version(diamond)
+        .await
+    {
+        Ok(protocol) => protocol,
+        Err(_) => return Ok(None),
+    };
+    if protocol != expected_protocol {
+        return Ok(None);
+    }
+
+    Ok(Some(RepresentativeChainDiamond { chain_id, diamond }))
+}
+
+fn protocol_label(version: U256) -> String {
+    format!("{} ({version})", ProtocolVersion::from(version))
 }
 
 async fn expected_v31_added_facets(

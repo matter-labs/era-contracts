@@ -34,6 +34,10 @@ const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
         "native_token_vault",
     ),
     (
+        &["upgrade_addresses", "native_token_vault_addr"],
+        "native_token_vault",
+    ),
+    (
         &["deployed_addresses", "bridgehub", "bridgehub_proxy_addr"],
         "bridgehub_proxy",
     ),
