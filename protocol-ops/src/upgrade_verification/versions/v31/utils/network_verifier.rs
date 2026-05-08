@@ -63,6 +63,11 @@ sol! {
         function isZKsyncOS() external view returns (bool);
     }
 
+    #[sol(rpc)]
+    contract ZKChain {
+        function getProtocolVersion() external view returns (uint256);
+    }
+
     function create2AndTransferParams(bytes memory bytecode, bytes32 salt, address owner);
 
     function create2(
@@ -310,6 +315,43 @@ impl NetworkVerifier {
             .call()
             .await
             .context("failed to fetch CTM protocolVersion")
+    }
+
+    pub async fn try_get_all_zk_chain_ids(
+        &self,
+        bridgehub_addr: Address,
+    ) -> anyhow::Result<Vec<U256>> {
+        let bridgehub = Bridgehub::new(bridgehub_addr, self.l1_provider.clone());
+        bridgehub
+            .getAllZKChainChainIDs()
+            .call()
+            .await
+            .context("failed to fetch registered ZK chain ids")
+    }
+
+    pub async fn try_get_chain_type_manager_from_bridgehub(
+        &self,
+        bridgehub_addr: Address,
+        chain_id: U256,
+    ) -> anyhow::Result<Address> {
+        let bridgehub = Bridgehub::new(bridgehub_addr, self.l1_provider.clone());
+        bridgehub
+            .chainTypeManager(chain_id)
+            .call()
+            .await
+            .context("failed to fetch chain type manager from Bridgehub")
+    }
+
+    pub async fn try_get_chain_protocol_version(
+        &self,
+        chain_diamond_addr: Address,
+    ) -> anyhow::Result<U256> {
+        let chain = ZKChain::new(chain_diamond_addr, self.l1_provider.clone());
+        chain
+            .getProtocolVersion()
+            .call()
+            .await
+            .context("failed to fetch ZK chain protocolVersion")
     }
 
     pub async fn try_get_ctm_is_zksync_os(&self, ctm_addr: Address) -> anyhow::Result<bool> {
