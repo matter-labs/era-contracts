@@ -58,8 +58,13 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             ctmAddresses.stateTransition.proxies.bytecodesSupplier
         ) = deployTuppWithContract("BytecodesSupplier", false);
 
+        (
+            ctmAddresses.stateTransition.implementations.permissionlessValidator,
+            ctmAddresses.stateTransition.proxies.permissionlessValidator
+        ) = deployTuppWithContract("PermissionlessValidator", false);
+
         // Deploy new ChainTypeManager implementation
-        // The constructor will receive the new BytecodesSupplier proxy address
+        // The constructor will receive the new BytecodesSupplier and PermissionlessValidator proxy addresses.
         // Select the correct ChainTypeManager based on chain type (Era vs ZKsyncOS)
         // FIXME we never actually use deploySimpleContract or deploy TUPP with anything else than false. We need to clean this code.
         (, string memory ctmContractName) = DeployCTML1OrGateway.resolve(
