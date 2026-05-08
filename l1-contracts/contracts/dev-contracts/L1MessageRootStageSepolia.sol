@@ -2,25 +2,26 @@
 
 pragma solidity 0.8.28;
 
-import {L1MessageRoot} from "./L1MessageRoot.sol";
-import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
-import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "./IMessageRoot.sol";
-import {NotAllChainsOnL1} from "../bridgehub/L1BridgehubErrors.sol";
+import {L1MessageRoot} from "../core/message-root/L1MessageRoot.sol";
+import {IBridgehubBase} from "../core/bridgehub/IBridgehubBase.sol";
+import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "../core/message-root/IMessageRoot.sol";
+import {NotAllChainsOnL1} from "../core/bridgehub/L1BridgehubErrors.sol";
 
 /// @dev The single chain on the stage Sepolia bridgehub
 ///      (`0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE`) that is still settling
 ///      on the stage Gateway (chain 123) at v31 upgrade time.
 uint256 constant STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID = 270;
 
-/// @notice Stage Sepolia variant of `L1MessageRoot`.
+/// @notice Stage Sepolia variant of `L1MessageRoot`. Lives under `dev-contracts/`
+///         because it's a one-off, environment-specific impl rather than a
+///         canonical L1 contract.
 ///
 /// @dev Stage's Era chain (270) hasn't been migrated back from the stage Gateway
 ///      (chain 123) at v31 upgrade time. The canonical `_v31InitializeInner`
 ///      requires every registered chain to be on L1, so the upgrade would revert
 ///      on stage. This variant skips chain 270 specifically; the chain stamps its
 ///      own slot via `saveV31UpgradeChainBatchNumber` once it migrates back.
-///      Used only for the stage Sepolia upgrade — selected by
-///      `CoreUpgrade_v31` when the upgrade input opts in.
+///      Selected by `CoreUpgrade_v31` when the upgrade input opts in.
 contract L1MessageRootStageSepolia is L1MessageRoot {
     constructor(
         address _bridgehub,

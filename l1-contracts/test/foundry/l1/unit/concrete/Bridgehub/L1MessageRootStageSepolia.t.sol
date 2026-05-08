@@ -8,7 +8,7 @@ import {L1MessageRoot} from "contracts/core/message-root/L1MessageRoot.sol";
 import {
     L1MessageRootStageSepolia,
     STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID
-} from "contracts/core/message-root/L1MessageRootStageSepolia.sol";
+} from "contracts/dev-contracts/L1MessageRootStageSepolia.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/message-root/IMessageRoot.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {NotAllChainsOnL1} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
