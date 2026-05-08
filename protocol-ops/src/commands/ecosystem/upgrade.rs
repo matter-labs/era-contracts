@@ -589,6 +589,17 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     };
 
     let bridgehub = args.topology.resolve()?;
+    let zk_token_asset_id = match env_cfg.as_ref() {
+        Some(cfg) => cfg.zk_token_asset_id().ok_or_else(|| {
+            anyhow::anyhow!(
+                "permanent-values/{}.toml is missing top-level `zk_token_asset_id`; \
+                 named envs must define it explicitly because there is no canonical network-wide value",
+                cfg.env
+            )
+        })?,
+        None => crate::types::L1Network::from_l1_rpc(&args.shared.l1_rpc_url)?
+            .zk_token_asset_id()?,
+    };
     let mut runner = ForgeRunner::new(&args.shared)?;
     let deployer = runner.prepare_sender(deployer_address).await?;
 
@@ -602,6 +613,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         core_script_path: args.core_script_path.clone(),
         ctm_script_path: args.ctm_script_path.clone(),
         core_is_zk_sync_os_override,
+        zk_token_asset_id,
     };
     let proxies: Vec<crate::common::env_config::OwnableProxyEntry> = env_cfg
         .as_ref()

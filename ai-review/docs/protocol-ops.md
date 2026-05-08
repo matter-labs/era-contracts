@@ -14,7 +14,7 @@
 - `protocol-ops/src/common/l1_contracts.rs` — auto-resolution helpers (CTM, governance, bytecodes supplier, validator timelock, etc.) — read live state directly from L1.
 - `protocol-ops/src/config/forge_interface/script_params.rs` — `ForgeScriptParams` invocation specs for each forge script the CLI invokes.
 - `l1-contracts/deploy-scripts/AdminFunctions.s.sol` — Solidity helpers invoked by protocol-ops (e.g. `governanceExecuteCalls`, `ensureCtmsAndProxyAdminsOwnedByGovernance`). Auto-imported via the `IAdminFunctions` interface.
-- `l1-contracts/deploy-scripts/upgrade/v31/{CoreUpgrade_v31,CTMUpgrade_v31,EcosystemUpgrade_v31}.s.sol` — Solidity entry points for v31 deploys.
+- `l1-contracts/deploy-scripts/upgrade/v31/{CoreUpgrade_v31,CTMUpgrade_v31,ChainUpgrade_v31}.s.sol` — Solidity entry points for v31 deploys.
 
 ## What protocol-ops is
 
@@ -30,6 +30,8 @@ So the main protocol-ops commands are **simulator + bundle emitters**, not direc
 `dev execute-safe` is a developer replay helper. Given a Safe bundle JSON, an RPC URL, and a private key, it signs and submits every transaction from that key's address. It is intended for anvil/local validation unless someone deliberately points it at a live testnet RPC.
 
 `ecosystem governance-toml-to-simulator` is the transaction-simulator bridge: it reads a prepared protocol-ops governance TOML, decodes `stage0_calls` / `stage1_calls` / `stage2_calls`, and emits the simulator's JSON transaction list.
+
+Sharp edge: filename handling is not fully unified. Existing stage prepare output and `governance-toml-to-simulator --env` use `<out>/prepare/governance.toml`; the current `upgrade-governance --env` auto-discovery path in `upgrade.rs` looks for `<out>/prepare/ecosystem.toml`. Until that is normalized, pass `--governance-toml` explicitly when replaying governance stages.
 
 ## High-level architecture
 

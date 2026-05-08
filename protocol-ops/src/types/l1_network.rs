@@ -5,10 +5,7 @@ use ethers::types::H256;
 use serde::{Deserialize, Serialize};
 use strum::EnumIter;
 
-use crate::common::addresses::{
-    LOCAL_ZK_TOKEN_ADDRESS, LOCAL_ZK_TOKEN_ASSET_ID, MAINNET_ZK_TOKEN_ASSET_ID,
-    SEPOLIA_ZK_TOKEN_ASSET_ID,
-};
+use crate::common::addresses::{LOCAL_ZK_TOKEN_ADDRESS, LOCAL_ZK_TOKEN_ASSET_ID};
 
 #[derive(
     Copy,
@@ -45,18 +42,17 @@ impl L1Network {
         }
     }
 
-    /// TODO: remove, define these in a separate ecosystems/chains registry
-    pub fn zk_token_asset_id(&self) -> H256 {
+    pub fn zk_token_asset_id(&self) -> anyhow::Result<H256> {
         match self {
             L1Network::Localhost => {
                 // When testing locally, we deploy the ZK token inside interop tests, so we need to derive its asset id
                 // from LOCAL_ZK_TOKEN_ADDRESS.
                 let _ = LOCAL_ZK_TOKEN_ADDRESS;
-                H256::from_str(LOCAL_ZK_TOKEN_ASSET_ID).unwrap()
+                Ok(H256::from_str(LOCAL_ZK_TOKEN_ASSET_ID).unwrap())
             }
-            L1Network::Sepolia => H256::from_str(SEPOLIA_ZK_TOKEN_ASSET_ID).unwrap(),
-            L1Network::Mainnet => H256::from_str(MAINNET_ZK_TOKEN_ASSET_ID).unwrap(),
-            L1Network::Holesky => H256::zero(),
+            L1Network::Sepolia | L1Network::Holesky | L1Network::Mainnet => anyhow::bail!(
+                "no canonical ZK token asset ID for {self}; pass --zk-token-asset-id or use --env with zk_token_asset_id in permanent-values"
+            ),
         }
     }
 }

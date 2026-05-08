@@ -43,7 +43,8 @@ pub fn deploy(
     }
     let zk_token_asset_id = input
         .zk_token_asset_id
-        .unwrap_or(l1_network.zk_token_asset_id());
+        .map(Ok)
+        .unwrap_or_else(|| l1_network.zk_token_asset_id())?;
 
     let deploy_config = DeployCTMConfig::new(
         input.owner,

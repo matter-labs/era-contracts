@@ -1,3 +1,5 @@
+zk_token_asset_id = "0x83e2fbc0a739b3c765de4c2b4bf8072a71ea8fbb09c8cf579c71425d8bc8804a"
+
 [permanent_contracts]
 create2_factory_addr = "0xf1Ebfaa992854ECcB01Ac1F60e5b5279095cca7F"
 # this salt can be changed from run to run to. Todo: move this to input of script.

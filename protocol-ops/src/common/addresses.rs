@@ -14,14 +14,6 @@ pub const LOCAL_ZK_TOKEN_ADDRESS: &str = "0x8207187d1682B3ebaF2e1bdE471aC9d5B886
 pub const LOCAL_ZK_TOKEN_ASSET_ID: &str =
     "0x50c8daa176d24869d010ad74c2d374427601375ca2264e94f73784e299d572d4";
 
-/// Sepolia ZK token asset ID.
-pub const SEPOLIA_ZK_TOKEN_ASSET_ID: &str =
-    "0x0d643837c76916220dfe0d5e971cfc3dc2c7569b3ce12851c8e8f17646d86bca";
-
-/// Mainnet ZK token asset ID.
-pub const MAINNET_ZK_TOKEN_ASSET_ID: &str =
-    "0x83e2fbc0a739b3c765de4c2b4bf8072a71ea8fbb09c8cf579c71425d8bc8804a";
-
 /// Placeholder ZK token asset ID used by gateway vote-preparation input templates.
 pub const DEFAULT_ZK_TOKEN_ASSET_ID: &str =
     "0x0000000000000000000000000000000000000000000000000000000000000001";

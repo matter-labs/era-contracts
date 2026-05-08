@@ -33,6 +33,8 @@ const PERMANENT_VALUES_DIR: &str = "upgrade-envs/permanent-values";
 
 #[derive(Debug, Deserialize)]
 pub struct PermanentValues {
+    #[serde(default)]
+    pub zk_token_asset_id: Option<H256>,
     pub core_contracts: CoreContracts,
     #[serde(default)]
     pub ctm_contracts: Option<CtmContracts>,
@@ -221,6 +223,10 @@ impl EnvConfig {
 
     pub fn governance_kind(&self) -> GovernanceKind {
         self.permanent.core_contracts.governance_kind
+    }
+
+    pub fn zk_token_asset_id(&self) -> Option<H256> {
+        self.permanent.zk_token_asset_id
     }
 }
 
