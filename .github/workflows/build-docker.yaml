@@ -84,3 +84,11 @@ jobs:
           file: docker/protocol/Dockerfile
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          # GitHub Actions buildx cache. `mode=max` caches every layer (not just
+          # the final ones), so cargo-chef cooks and forge builds are reused
+          # across runs whenever their inputs haven't changed. Cold first run is
+          # the same speed as before; warm runs drop dramatically (~25 min →
+          # ~5–10 min when only Rust source changes; ~3–5 min when only contracts
+          # change).
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

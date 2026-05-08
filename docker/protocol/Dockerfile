@@ -76,22 +76,42 @@ RUN rustup target add ${RUST_TARGET}
 RUN cargo install cargo-chef --locked
 
 # === Cook Rust dependencies (cached until Cargo.toml/lock change) ===
+# BuildKit cache mounts:
+#   - /usr/local/cargo/{registry,git} are shared across all four cooks AND the
+#     subsequent cargo build steps (one crates.io fetch, reused 8x).
+#   - Each `target/` mount has its own `id=` so the four crates don't fight over
+#     the same incremental directory; the same id is reused by the later
+#     `cargo build --release` so it doesn't redo dep compilation.
+# `sharing=locked` is conservative — it serializes concurrent access, fine here
+# because the four cooks are sequential anyway.
 WORKDIR /contracts/protocol-ops
 COPY --from=planner /recipes/protocol-ops.json recipe.json
-RUN cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/contracts/protocol-ops/target,id=protocol-ops-target,sharing=locked \
+    cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
 
 WORKDIR /contracts/tools/zksync-os-genesis-gen
 COPY --from=planner /recipes/genesis-gen.json recipe.json
 COPY tools/zksync-os-genesis-gen/rust-toolchain.toml ./
-RUN cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/contracts/tools/zksync-os-genesis-gen/target,id=genesis-gen-target,sharing=locked \
+    cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
 
 WORKDIR /contracts/tools/wallets-gen
 COPY --from=planner /recipes/wallets-gen.json recipe.json
-RUN cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/contracts/tools/wallets-gen/target,id=wallets-gen-target,sharing=locked \
+    cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
 
 WORKDIR /contracts/tools/upgrade-readiness-checker
 COPY --from=planner /recipes/upgrade-readiness-checker.json recipe.json
-RUN cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/contracts/tools/upgrade-readiness-checker/target,id=upgrade-readiness-checker-target,sharing=locked \
+    cargo chef cook --release --target ${RUST_TARGET} --recipe-path recipe.json
 
 # === Copy all source code ===
 WORKDIR /contracts
@@ -108,26 +128,37 @@ COPY . /contracts
 COPY zk-governance /zk-governance
 
 # === Build Rust binaries (deps already cached by cook) ===
-# Keep binaries in their project-relative locations (matches local layout)
+# Reuse the same `id=` cache mounts as the cook step so cargo doesn't redo dep
+# compilation — only the application crate compiles here. Binaries are `cp`-ed
+# out of the cache mount BEFORE the RUN ends (cache mounts don't persist into
+# the final image), then live in the project-relative location for runtime.
 WORKDIR /contracts/protocol-ops
-RUN cargo build --bin protocol_ops --release --target ${RUST_TARGET} && \
-    cp target/${RUST_TARGET}/release/protocol_ops ./ && \
-    rm -rf target
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/contracts/protocol-ops/target,id=protocol-ops-target,sharing=locked \
+    cargo build --bin protocol_ops --release --target ${RUST_TARGET} && \
+    cp target/${RUST_TARGET}/release/protocol_ops ./
 
 WORKDIR /contracts/tools/zksync-os-genesis-gen
-RUN cargo build --release --target ${RUST_TARGET} && \
-    cp target/${RUST_TARGET}/release/zksync-os-genesis-gen ./ && \
-    rm -rf target
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/contracts/tools/zksync-os-genesis-gen/target,id=genesis-gen-target,sharing=locked \
+    cargo build --release --target ${RUST_TARGET} && \
+    cp target/${RUST_TARGET}/release/zksync-os-genesis-gen ./
 
 WORKDIR /contracts/tools/wallets-gen
-RUN cargo build --release --target ${RUST_TARGET} && \
-    cp target/${RUST_TARGET}/release/wallets-gen ./ && \
-    rm -rf target
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/contracts/tools/wallets-gen/target,id=wallets-gen-target,sharing=locked \
+    cargo build --release --target ${RUST_TARGET} && \
+    cp target/${RUST_TARGET}/release/wallets-gen ./
 
 WORKDIR /contracts/tools/upgrade-readiness-checker
-RUN cargo build --release --target ${RUST_TARGET} && \
-    cp target/${RUST_TARGET}/release/upgrade-readiness-checker ./ && \
-    rm -rf target
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
+    --mount=type=cache,target=/contracts/tools/upgrade-readiness-checker/target,id=upgrade-readiness-checker-target,sharing=locked \
+    cargo build --release --target ${RUST_TARGET} && \
+    cp target/${RUST_TARGET}/release/upgrade-readiness-checker ./
 
 # === Install JS dependencies ===
 WORKDIR /contracts
