@@ -15,11 +15,16 @@ on:
         description: "Optional override of the default image tag name"
         type: string
         required: false
+      zk_governance_repo:
+        description: "owner/repo of the zk-governance checkout (e.g. zksync-association/zk-governance, or a personal fork)."
+        type: string
+        required: false
+        default: "kelemeno/zk-governance"
       zk_governance_ref:
         description: "zk-governance branch/tag/SHA baked into the image. PUH/Guardians redeploy uses this checkout."
         type: string
         required: false
-        default: "vg/oz-audit-feb-2026"
+        default: "kl/v31-puh-guardians-redeploy"
 
 jobs:
   build-image:
@@ -41,8 +46,8 @@ jobs:
       - name: Checkout zk-governance
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          repository: zksync-association/zk-governance
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.zk_governance_ref || 'vg/oz-audit-feb-2026' }}
+          repository: ${{ github.event_name == 'workflow_dispatch' && inputs.zk_governance_repo || 'kelemeno/zk-governance' }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.zk_governance_ref || 'kl/v31-puh-guardians-redeploy' }}
           submodules: recursive
           path: zk-governance
 
