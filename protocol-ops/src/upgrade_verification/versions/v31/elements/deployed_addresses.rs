@@ -1433,15 +1433,11 @@ pub(crate) async fn verify_v31_provenance(
     result.print_info("== Deployment provenance ==");
 
     let provider = verifiers.network_verifier.get_l1_provider();
-    let l1_chain_id = match verifiers.network_verifier.try_get_l1_chain_id().await {
-        Ok(id) => id,
-        Err(err) => {
-            result.report_warn(&format!(
-                "Skipping deployment provenance — failed to fetch L1 chain id: {err}"
-            ));
-            return Ok(());
-        }
-    };
+    let l1_chain_id = verifiers
+        .network_verifier
+        .try_get_l1_chain_id()
+        .await
+        .unwrap_or_else(|err| panic!("Failed to fetch L1 chain id for provenance: {err}"));
 
     // Era / ZKsync OS file-name split for the v31 verifier contracts.
     // `AllContractsHashes.json` ships per-flavour verifiers since v30.
@@ -1572,15 +1568,9 @@ pub(crate) async fn verify_v31_provenance(
     let bridgehub_addr = verifiers.bridgehub_address;
     let bridgehub =
         super::super::utils::network_verifier::Bridgehub::new(bridgehub_addr, provider.clone());
-    let asset_router_proxy = match bridgehub.assetRouter().call().await {
-        Ok(a) => a,
-        Err(err) => {
-            result.report_warn(&format!(
-                "Skipping Bridgehub-dependent provenance checks; RPC unavailable: {err}"
-            ));
-            return Ok(());
-        }
-    };
+    let asset_router_proxy = bridgehub.assetRouter().call().await.unwrap_or_else(|err| {
+        panic!("Failed to call Bridgehub.assetRouter() for provenance: {err}")
+    });
     let l1_asset_router = super::super::utils::network_verifier::L1AssetRouter::new(
         asset_router_proxy,
         provider.clone(),
@@ -1589,17 +1579,17 @@ pub(crate) async fn verify_v31_provenance(
         .L1_WETH_TOKEN()
         .call()
         .await
-        .unwrap_or(Address::ZERO);
+        .unwrap_or_else(|err| panic!("Failed to call L1AssetRouter.L1_WETH_TOKEN(): {err}"));
     let nullifier = l1_asset_router
         .L1_NULLIFIER()
         .call()
         .await
-        .unwrap_or(Address::ZERO);
+        .unwrap_or_else(|err| panic!("Failed to call L1AssetRouter.L1_NULLIFIER(): {err}"));
     let ntv_proxy = l1_asset_router
         .nativeTokenVault()
         .call()
         .await
-        .unwrap_or(Address::ZERO);
+        .unwrap_or_else(|err| panic!("Failed to call L1AssetRouter.nativeTokenVault(): {err}"));
 
     // L1NativeTokenVault impl(weth, assetRouter, nullifier).
     if let Some(ntv_impl) = lookup("native_token_vault_implementation_addr") {
