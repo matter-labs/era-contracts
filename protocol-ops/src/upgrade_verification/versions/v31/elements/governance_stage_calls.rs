@@ -1147,7 +1147,6 @@ async fn verify_v31_upgrade_facet_cuts(
 ) -> anyhow::Result<usize> {
     let initial_error_count = result.errors;
     let proposed_facet_cuts = proposed_upgrade_facet_cut_set(facet_cuts, result);
-    let proposed_added_facet_cuts = proposed_added_facet_cut_set(facet_cuts);
 
     match expected_v31_upgrade_facet_cuts(ctm, verifiers, result).await? {
         Some(ExpectedFacetCuts::Exact {
@@ -1170,27 +1169,6 @@ async fn verify_v31_upgrade_facet_cuts(
                 chain_id,
                 expected_facet_cuts,
                 proposed_facet_cuts
-            ));
-        }
-        Some(ExpectedFacetCuts::AddsOnly {
-            facets: expected_added_facet_cuts,
-            reason,
-        }) if proposed_added_facet_cuts == expected_added_facet_cuts => {
-            result.report_ok(&format!(
-                "{} chain upgrade added facets match new facet bytecode selectors",
-                ctm.flavor.label()
-            ));
-            result.report_warn(&reason);
-        }
-        Some(ExpectedFacetCuts::AddsOnly {
-            facets: expected_added_facet_cuts,
-            ..
-        }) => {
-            result.report_error(&format!(
-                "Invalid {} chain upgrade added facets. Expected: {:#?}\nReceived: {:#?}",
-                ctm.flavor.label(),
-                expected_added_facet_cuts,
-                proposed_added_facet_cuts
             ));
         }
         None if verifiers.representative_era_chain_id.is_none() => {
@@ -1268,7 +1246,6 @@ fn proposed_added_facet_cut_set(facet_cuts: &[set_new_version_upgrade::FacetCut]
 
 enum ExpectedFacetCuts {
     Exact { facets: FacetCutSet, chain_id: U256 },
-    AddsOnly { facets: FacetCutSet, reason: String },
 }
 
 struct RepresentativeChainDiamond {
@@ -1284,14 +1261,12 @@ async fn expected_v31_upgrade_facet_cuts(
     let added_facets = expected_v31_added_facets(ctm, verifiers, result).await?;
     let Some(representative) = find_representative_chain_diamond(ctm, verifiers, result).await?
     else {
-        return Ok(Some(ExpectedFacetCuts::AddsOnly {
-            facets: added_facets,
-            reason: format!(
-                "Skipped exact {} removal-set reconstruction; no registered chain on this CTM matches artifact old protocol {}",
-                ctm.flavor.label(),
-                protocol_label(U256::from(ctm.contracts_config.old_protocol_version))
-            ),
-        }));
+        result.report_error(&format!(
+            "Cannot reconstruct exact {} chain upgrade facet cuts: no registered chain on this CTM matches artifact old protocol {}",
+            ctm.flavor.label(),
+            protocol_label(U256::from(ctm.contracts_config.old_protocol_version))
+        ));
+        return Ok(None);
     };
 
     let current_facets = match GettersFacet::new(
