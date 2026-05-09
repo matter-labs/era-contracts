@@ -112,7 +112,7 @@ pub(crate) async fn verify(
 
     verify_per_chain_protocol_versions(artifact, &verifiers, result).await?;
 
-    verify_v31_artifact_state(artifact, &verifiers, result).await?;
+    verify_v31_artifact_state(artifact, &verifiers, create2_factory, result).await?;
 
     verify_v31_provenance(
         artifact,

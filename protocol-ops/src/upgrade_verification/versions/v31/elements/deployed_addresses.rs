@@ -27,6 +27,7 @@ use serde::Deserialize;
 use std::str::FromStr;
 
 const MAINNET_CHAIN_ID: u64 = 1;
+const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
 const L2_INTEROP_CENTER_ADDR: &str = "0x000000000000000000000000000000000001000d";
 
 sol! {
@@ -981,6 +982,7 @@ const PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
 /// post-deploy work — it covers checks that aren't subsumed by Phase 6
 /// (deployment provenance):
 /// - The L1 RPC chain id (sanity).
+/// - Runtime bytecode at the configured Create2Factory address.
 /// - EIP-1967 proxy-admin slot for every v31 stage-1 proxy → must equal the
 ///   ecosystem `transparent_proxy_admin`.
 /// - Pre-upgrade AssetRouter → NTV wiring when the getter exists on the live
@@ -1000,11 +1002,15 @@ const PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
 pub(crate) async fn verify_v31_artifact_state(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
+    create2_factory: Address,
     result: &mut VerificationResult,
 ) -> Result<()> {
     result.print_info("== RPC state checks ==");
 
     verify_l1_chain_id(verifiers, result).await;
+    result
+        .expect_deployed_bytecode(verifiers, &create2_factory, CREATE2_FACTORY_CONTRACT_NAME)
+        .await;
     verify_v31_proxy_admins(verifiers, result).await;
     verify_v31_core_wiring(verifiers, result).await;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await;
