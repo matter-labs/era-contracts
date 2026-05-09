@@ -27,7 +27,9 @@ use serde::Deserialize;
 use std::str::FromStr;
 
 const MAINNET_CHAIN_ID: u64 = 1;
+// TODO: remove this name here
 const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
+// TODO: surely there is a way to not hardcode this
 const L2_INTEROP_CENTER_ADDR: &str = "0x000000000000000000000000000000000001000d";
 
 sol! {
@@ -983,6 +985,7 @@ const PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
 /// (deployment provenance):
 /// - The L1 RPC chain id (sanity).
 /// - Runtime bytecode at the configured Create2Factory address.
+/// - Runtime bytecode at the ecosystem `transparent_proxy_admin` address.
 /// - EIP-1967 proxy-admin slot for every v31 stage-1 proxy → must equal the
 ///   ecosystem `transparent_proxy_admin`.
 /// - Pre-upgrade AssetRouter → NTV wiring when the getter exists on the live
@@ -1117,6 +1120,10 @@ async fn verify_v31_proxy_admins(verifiers: &Verifiers, result: &mut Verificatio
         );
         return;
     };
+
+    result
+        .expect_deployed_bytecode(verifiers, expected_admin, "TransparentProxyAdmin")
+        .await;
 
     let admin_slot = match FixedBytes::<32>::from_hex(EIP1967_PROXY_ADMIN_SLOT) {
         Ok(slot) => slot,
