@@ -1426,7 +1426,7 @@ sol! {
 pub(crate) async fn verify_v31_provenance(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
-    era_chain_id: Option<u64>,
+    era_chain_id: u64,
     genesis_config_kind: GenesisConfigKind,
     result: &mut VerificationResult,
 ) -> Result<()> {
@@ -1632,62 +1632,52 @@ pub(crate) async fn verify_v31_provenance(
     }
 
     // The era_chain_id-dependent constructors (L1AssetRouter / L1Nullifier)
-    // require both the chain id and the chain's diamond proxy. Both are
-    // recoverable: era_chain_id from `--era-chain-id`, diamond proxy via
-    // Bridgehub.getZKChain.
-    if let Some(era_chain_id) = era_chain_id {
-        let era_diamond_proxy = match verifiers
-            .network_verifier
-            .try_get_chain_diamond_from_bridgehub(bridgehub_addr, U256::from(era_chain_id))
-            .await
-        {
-            Ok(addr) => addr,
-            Err(err) => {
-                result.report_warn(&format!(
-                    "Skipping era-dependent provenance checks; cannot resolve era diamond: {err}"
-                ));
-                return Ok(());
-            }
-        };
+    // require both the chain id and the chain's diamond proxy. The CLI requires
+    // `--era-chain-id`; the diamond proxy must resolve from Bridgehub.
+    let era_diamond_proxy = verifiers
+        .network_verifier
+        .try_get_chain_diamond_from_bridgehub(bridgehub_addr, U256::from(era_chain_id))
+        .await
+        .unwrap_or_else(|err| {
+            panic!("Failed to call Bridgehub.getZKChain({era_chain_id}) for provenance: {err}")
+        });
+    if era_diamond_proxy == Address::ZERO {
+        panic!("Bridgehub.getZKChain({era_chain_id}) returned address(0) for provenance");
+    }
 
-        // L1AssetRouter impl(weth, bridgehub, nullifier, eraChainId, eraDiamondProxy).
-        if let Some(asset_router_impl) = lookup("l1_asset_router_implementation_addr") {
-            result.expect_create2_params(
-                verifiers,
-                &asset_router_impl,
-                V31L1AssetRouter::constructorCall::new((
-                    weth,
-                    bridgehub_addr,
-                    nullifier,
-                    U256::from(era_chain_id),
-                    era_diamond_proxy,
-                ))
-                .abi_encode(),
-                "l1-contracts/L1AssetRouter",
-            );
-        }
+    // L1AssetRouter impl(weth, bridgehub, nullifier, eraChainId, eraDiamondProxy).
+    if let Some(asset_router_impl) = lookup("l1_asset_router_implementation_addr") {
+        result.expect_create2_params(
+            verifiers,
+            &asset_router_impl,
+            V31L1AssetRouter::constructorCall::new((
+                weth,
+                bridgehub_addr,
+                nullifier,
+                U256::from(era_chain_id),
+                era_diamond_proxy,
+            ))
+            .abi_encode(),
+            "l1-contracts/L1AssetRouter",
+        );
+    }
 
-        // L1Nullifier impl(bridgehub, messageRoot, eraChainId, eraDiamondProxy).
-        if let (Some(nullifier_impl), Some(message_root_proxy)) = (
-            lookup("l1_nullifier_implementation_addr"),
-            lookup("message_root_proxy"),
-        ) {
-            result.expect_create2_params(
-                verifiers,
-                &nullifier_impl,
-                V31L1Nullifier::constructorCall::new((
-                    bridgehub_addr,
-                    message_root_proxy,
-                    U256::from(era_chain_id),
-                    era_diamond_proxy,
-                ))
-                .abi_encode(),
-                "l1-contracts/L1Nullifier",
-            );
-        }
-    } else {
-        result.report_warn(
-            "Skipping era-dependent provenance checks (L1AssetRouter / L1Nullifier impls) — pass --era-chain-id to enable",
+    // L1Nullifier impl(bridgehub, messageRoot, eraChainId, eraDiamondProxy).
+    if let (Some(nullifier_impl), Some(message_root_proxy)) = (
+        lookup("l1_nullifier_implementation_addr"),
+        lookup("message_root_proxy"),
+    ) {
+        result.expect_create2_params(
+            verifiers,
+            &nullifier_impl,
+            V31L1Nullifier::constructorCall::new((
+                bridgehub_addr,
+                message_root_proxy,
+                U256::from(era_chain_id),
+                era_diamond_proxy,
+            ))
+            .abi_encode(),
+            "l1-contracts/L1Nullifier",
         );
     }
 
@@ -1748,9 +1738,8 @@ pub(crate) async fn verify_v31_provenance(
     };
 
     // MailboxFacet(eraChainId, l1ChainId, chainAssetHandler, eip7702Checker, isTestnet).
-    if let (Some(mailbox), Some(era_chain_id), Some(chain_asset_handler), Some(eip7702)) = (
+    if let (Some(mailbox), Some(chain_asset_handler), Some(eip7702)) = (
         lookup("mailbox_facet_addr"),
-        era_chain_id,
         chain_asset_handler_proxy,
         eip7702_checker,
     ) {

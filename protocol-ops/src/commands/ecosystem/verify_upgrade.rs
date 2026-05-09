@@ -40,7 +40,7 @@ pub struct VerifyUpgradeArgs {
     /// used to read Bridgehub/diamond state, while this id selects which chain's
     /// diamond to inspect.
     #[clap(long, alias = "chain-id")]
-    pub era_chain_id: Option<u64>,
+    pub era_chain_id: u64,
 
     /// Which local v31 genesis config to load.
     #[clap(long, value_enum, default_value_t = VerifyUpgradeGenesisConfig::Era)]
@@ -92,9 +92,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     } else {
         logger::info("Contracts hashes: local repository AllContractsHashes.json");
     }
-    if let Some(era_chain_id) = args.era_chain_id {
-        logger::info(format!("Representative ZK chain ID: {era_chain_id}"));
-    }
+    logger::info(format!("Representative ZK chain ID: {}", args.era_chain_id));
 
     let artifact = EcosystemUpgradeArtifact::read(&args.ecosystem_toml)?;
     artifact_shape::verify(&artifact)?;

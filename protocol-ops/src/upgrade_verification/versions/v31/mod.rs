@@ -66,7 +66,7 @@ pub(crate) async fn verify(
     artifact: &EcosystemUpgradeArtifact,
     l1_rpc_url: &str,
     contracts_commit: Option<&str>,
-    era_chain_id: Option<u64>,
+    era_chain_id: u64,
     genesis_config_kind: GenesisConfigKind,
     executed_bundle: &ExecutedBundle,
     create2_factory: Address,
@@ -78,7 +78,7 @@ pub(crate) async fn verify(
         artifact,
         l1_rpc_url,
         contracts_commit,
-        era_chain_id,
+        Some(era_chain_id),
         genesis_config_kind,
     )
     .await?;
