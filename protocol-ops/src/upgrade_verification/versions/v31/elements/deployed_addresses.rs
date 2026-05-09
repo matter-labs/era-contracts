@@ -1073,13 +1073,6 @@ async fn verify_per_ctm_v31_provenance(
             ctm_file,
         );
 
-        if permissionless_validator == Address::ZERO {
-            result.report_warn(&format!(
-                "Skipping {label} PermissionlessValidator provenance check; permissionless_validator_addr is address(0) in artifact"
-            ));
-            continue;
-        }
-
         let Some(transparent_proxy_admin) = required_ctm_address(
             ctm,
             &["deployed_addresses", "transparent_proxy_admin"],
@@ -1087,6 +1080,30 @@ async fn verify_per_ctm_v31_provenance(
         ) else {
             continue;
         };
+
+        if bytecodes_supplier == Address::ZERO {
+            result.report_warn(&format!(
+                "Skipping {label} BytecodesSupplier provenance check; bytecodes_supplier_addr is address(0) in artifact"
+            ));
+        } else {
+            result
+                .expect_create2_params_proxy_with_bytecode(
+                    verifiers,
+                    &bytecodes_supplier,
+                    V31BytecodesSupplier::initializeCall::new(()).abi_encode(),
+                    transparent_proxy_admin,
+                    Vec::<u8>::new(),
+                    "l1-contracts/BytecodesSupplier",
+                )
+                .await;
+        }
+
+        if permissionless_validator == Address::ZERO {
+            result.report_warn(&format!(
+                "Skipping {label} PermissionlessValidator provenance check; permissionless_validator_addr is address(0) in artifact"
+            ));
+            continue;
+        }
         result
             .expect_create2_params_proxy_with_bytecode(
                 verifiers,
@@ -1352,6 +1369,9 @@ sol! {
     contract V31PermissionlessValidator {
         function initialize();
     }
+    contract V31BytecodesSupplier {
+        function initialize();
+    }
     contract V31CTMDeploymentTracker {
         constructor(address _bridgehub, address _l1AssetRouter);
     }
@@ -1394,10 +1414,9 @@ sol! {
 /// not yet wired — adding each is mechanical: append a constructor abi via
 /// `sol!` above and a new `expect_create2_params(...)` call here.
 ///
-/// The `BytecodesSupplier` TUPP follow-up (`expect_create2_params_proxy_with_bytecode`)
-/// also belongs in this layer and is left as a TODO. It needs the proxy
-/// admin address (we have it) plus the implementation's init data, which
-/// the prepare scripts emit in the second tx of its safe bundle.
+/// The per-CTM TUPPs (`BytecodesSupplier` and `PermissionlessValidator`)
+/// are verified with `expect_create2_params_proxy_with_bytecode`, using the
+/// live implementation slot and the executed-bundle CREATE2 provenance.
 ///
 /// Larger structural follow-up: unify `EcosystemUpgradeArtifact` and the
 /// legacy `UpgradeOutput` into a single v31 TOML reader. The current
@@ -1859,24 +1878,6 @@ pub(crate) async fn verify_v31_provenance(
             Vec::<u8>::new(),
             "da-contracts/EIP7702Checker",
         );
-    }
-
-    // BytecodesSupplier in v31 is a TUPP. The proxy address is in the
-    // ecosystem TOML at `state_transition.bytecodes_supplier_addr`; the
-    // implementation behind it (no constructor args) gets a file-match
-    // check too. We read the impl address from the EIP-1967 implementation
-    // slot rather than threading another field through the TOML.
-    if let Some(bytecodes_supplier_proxy) = lookup("bytecodes_supplier_addr") {
-        const EIP1967_IMPLEMENTATION_SLOT: &str =
-            "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
-        if let Ok(slot) = FixedBytes::<32>::from_hex(EIP1967_IMPLEMENTATION_SLOT) {
-            if let Ok(raw) = provider
-                .get_storage_at(bytecodes_supplier_proxy, U256::from_be_bytes(slot.0))
-                .await
-            {
-                let _impl_addr = Address::from_slice(&raw.to_be_bytes::<32>()[12..]);
-            }
-        }
     }
 
     Ok(())
