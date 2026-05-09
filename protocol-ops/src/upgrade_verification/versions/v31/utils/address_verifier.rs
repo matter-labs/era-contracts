@@ -298,6 +298,10 @@ impl AddressVerifier {
         self.address_to_name.get(address)
     }
 
+    pub fn get_by_name(&self, name: &str) -> Option<Address> {
+        self.name_to_address.get(name).copied()
+    }
+
     pub fn name_or_unknown(&self, address: &Address) -> String {
         match self.address_to_name.get(address) {
             Some(name) => name.clone(),

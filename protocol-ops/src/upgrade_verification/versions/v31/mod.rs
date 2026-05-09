@@ -7,7 +7,7 @@ use alloy::primitives::{Address, FixedBytes};
 use crate::{
     commands::dev::execute_safe::ExecutedBundle,
     upgrade_verification::{
-        artifacts::EcosystemUpgradeArtifact,
+        artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
         verifiers::{GenesisConfigKind, VerificationResult, Verifiers},
     },
 };
@@ -18,14 +18,13 @@ pub(crate) mod utils;
 pub(crate) use elements::UpgradeOutput;
 use elements::{
     deployed_addresses::{verify_v31_artifact_state, verify_v31_provenance},
-    governance_stage_calls::verify_governance_stage_calls,
+    governance_stage_calls::{verify_governance_stage_calls, verify_per_chain_protocol_versions},
     protocol_version::ProtocolVersion,
 };
 
 pub(crate) const EXPECTED_NEW_PROTOCOL_VERSION_STR: &str = "0.31.0";
-// v31 supports chains upgrading from v29 or v30; this is only for copied PUVT scaffolding
-// until old-version checks are adapted to read the prepared artifact/on-chain state.
-pub(crate) const EXPECTED_OLD_PROTOCOL_VERSION_STR: &str = "0.30.0";
+pub(crate) const EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR: &str = "0.29.4";
+pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.30.1";
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
 pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
 
@@ -33,8 +32,33 @@ pub(crate) fn get_expected_new_protocol_version() -> ProtocolVersion {
     ProtocolVersion::from_str(EXPECTED_NEW_PROTOCOL_VERSION_STR).unwrap()
 }
 
+// TODO: cleanup, remove
 pub(crate) fn get_expected_old_protocol_version() -> ProtocolVersion {
-    ProtocolVersion::from_str(EXPECTED_OLD_PROTOCOL_VERSION_STR).unwrap()
+    get_expected_old_protocol_version_for_ctm_flavor(CtmFlavor::Era)
+}
+
+pub(crate) fn get_expected_old_protocol_version_for_ctm_flavor(
+    flavor: CtmFlavor,
+) -> ProtocolVersion {
+    let version = match flavor {
+        CtmFlavor::Era => EXPECTED_ERA_OLD_PROTOCOL_VERSION_STR,
+        CtmFlavor::ZksyncOs => EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR,
+    };
+    ProtocolVersion::from_str(version).unwrap()
+}
+
+pub(crate) fn is_expected_old_protocol_version_for_ctm_flavor(
+    version: ProtocolVersion,
+    flavor: CtmFlavor,
+) -> bool {
+    version == get_expected_old_protocol_version_for_ctm_flavor(flavor)
+}
+
+pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static str {
+    match flavor {
+        CtmFlavor::Era => "v0.29.4",
+        CtmFlavor::ZksyncOs => "v0.30.1",
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -85,6 +109,8 @@ pub(crate) async fn verify(
     ));
 
     verify_governance_stage_calls(artifact, &verifiers, result).await?;
+
+    verify_per_chain_protocol_versions(artifact, &verifiers, result).await?;
 
     verify_v31_artifact_state(artifact, &verifiers, result).await?;
 

@@ -2,7 +2,7 @@ use alloy::{
     hex,
     primitives::{keccak256, Address, FixedBytes, U256},
     sol,
-    sol_types::SolCall,
+    sol_types::{SolCall, SolValue},
 };
 use anyhow::Context;
 use std::collections::HashSet;
@@ -12,7 +12,10 @@ use crate::upgrade_verification::{
     verifiers::{VerificationResult, Verifiers},
 };
 
-use super::{super::get_expected_new_protocol_version, protocol_version::ProtocolVersion};
+use super::{
+    super::get_expected_new_protocol_version, fixed_force_deployment::FixedForceDeploymentsData,
+    protocol_version::ProtocolVersion,
+};
 
 const L2_FORCE_DEPLOYER_ADDRESS: u32 = 0x8007;
 const L2_COMPLEX_UPGRADER_ADDRESS: u32 = 0x800f;
@@ -459,7 +462,8 @@ impl ProposedUpgrade {
                 result,
                 &decoded,
                 expected_fixed_force_deployments_data,
-            )?;
+            )
+            .await?;
             result.report_ok("Decoded Era forceDeployAndUpgrade L2 upgrade tx");
             return Ok(());
         }
@@ -488,7 +492,8 @@ impl ProposedUpgrade {
                 result,
                 &decoded,
                 expected_fixed_force_deployments_data,
-            )?;
+            )
+            .await?;
             result.report_ok("Decoded ZKsync OS forceDeployAndUpgradeUniversal L2 upgrade tx");
             return Ok(());
         }
@@ -608,7 +613,7 @@ async fn verify_factory_deps(
     }
 }
 
-fn verify_era_force_deploy_and_upgrade(
+async fn verify_era_force_deploy_and_upgrade(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
     decoded: &IComplexUpgrader::forceDeployAndUpgradeCall,
@@ -650,6 +655,7 @@ fn verify_era_force_deploy_and_upgrade(
         false,
         expected_fixed_force_deployments_data,
     )
+    .await
 }
 
 fn verify_era_l2_v31_deployment(
@@ -683,7 +689,7 @@ fn verify_era_l2_v31_deployment(
     }
 }
 
-fn verify_zksync_os_force_deploy_and_upgrade(
+async fn verify_zksync_os_force_deploy_and_upgrade(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
     decoded: &IComplexUpgrader::forceDeployAndUpgradeUniversalCall,
@@ -714,6 +720,7 @@ fn verify_zksync_os_force_deploy_and_upgrade(
         true,
         expected_fixed_force_deployments_data,
     )
+    .await
 }
 
 fn verify_zksync_os_l2_v31_deployment(
@@ -761,7 +768,7 @@ fn verify_zksync_os_l2_v31_deployment(
     }
 }
 
-fn verify_l2_v31_upgrade_inner_calldata(
+async fn verify_l2_v31_upgrade_inner_calldata(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
     calldata: &[u8],
@@ -796,6 +803,16 @@ fn verify_l2_v31_upgrade_inner_calldata(
         } else {
             result.report_ok("IL2V31Upgrade.upgrade fixedForceDeploymentsData matches TOML");
         }
+    }
+
+    // Decode fixedForceDeploymentsData and verify each field independently so
+    // the artifact hex is not merely trusted as a self-referential source of truth.
+    result.print_info("-- fixedForceDeploymentsData field verification (inner calldata) --");
+    match FixedForceDeploymentsData::abi_decode(&decoded._fixedForceDeploymentsData) {
+        Ok(fixed_data) => fixed_data.verify(verifiers, result).await?,
+        Err(err) => result.report_error(&format!(
+            "Failed to decode IL2V31Upgrade.upgrade fixedForceDeploymentsData: {err}"
+        )),
     }
 
     if !decoded._additionalForceDeploymentsData.is_empty() {

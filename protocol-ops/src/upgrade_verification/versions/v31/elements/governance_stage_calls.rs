@@ -9,7 +9,8 @@ use crate::upgrade_verification::{
 };
 
 use super::super::{
-    get_expected_new_protocol_version, get_expected_old_protocol_version,
+    expected_old_protocol_version_label, get_expected_new_protocol_version,
+    get_expected_old_protocol_version, get_expected_old_protocol_version_for_ctm_flavor,
     utils::{
         compute_selector,
         facet_cut_set::{self, FacetCutSet, FacetInfo},
@@ -23,7 +24,10 @@ use alloy::{
     sol_types::{SolCall, SolValue},
 };
 use anyhow::Context;
-use std::{collections::HashSet, str::FromStr};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
 
 pub struct GovernanceStage0Calls {
     pub calls: CallList,
@@ -108,6 +112,156 @@ pub(crate) async fn verify_governance_stage_calls(
         calls: CallList::parse(&artifact.governance_calls.stage2_calls),
     };
     stage2.verify_artifact(artifact, verifiers, result)?;
+
+    Ok(())
+}
+
+pub(crate) async fn verify_per_chain_protocol_versions(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> anyhow::Result<()> {
+    result.print_info("== Per-chain protocol versions ===");
+
+    let mut expected_by_ctm = HashMap::new();
+    let mut setup_errors = 0usize;
+    for ctm in &artifact.ctms {
+        let artifact_old_protocol_version = U256::from(ctm.contracts_config.old_protocol_version);
+        let expected_old_protocol_version: U256 =
+            get_expected_old_protocol_version_for_ctm_flavor(ctm.flavor).into();
+        if artifact_old_protocol_version != expected_old_protocol_version {
+            result.report_error(&format!(
+                "{} CTM old protocol version must be {}, got {}",
+                ctm.flavor.label(),
+                expected_old_protocol_version_label(ctm.flavor),
+                protocol_label(artifact_old_protocol_version)
+            ));
+            setup_errors += 1;
+        }
+
+        let Some(ctm_proxy) = required_ctm_address(
+            ctm,
+            &["state_transition", "chain_type_manager_proxy"],
+            result,
+        ) else {
+            setup_errors += 1;
+            continue;
+        };
+
+        if let Some((previous_flavor, _)) =
+            expected_by_ctm.insert(ctm_proxy, (ctm.flavor, expected_old_protocol_version))
+        {
+            result.report_error(&format!(
+                "CTM proxy {} is configured for both {} and {}",
+                ctm_proxy,
+                previous_flavor.label(),
+                ctm.flavor.label()
+            ));
+            setup_errors += 1;
+        }
+    }
+
+    if setup_errors > 0 {
+        anyhow::bail!("{} errors", setup_errors);
+    }
+
+    let chain_ids = match verifiers
+        .network_verifier
+        .try_get_all_zk_chain_ids(verifiers.bridgehub_address)
+        .await
+    {
+        Ok(chain_ids) => chain_ids,
+        Err(err) => {
+            result.report_warn(&format!(
+                "Skipping per-chain protocol-version sweep; failed to fetch Bridgehub.getAllZKChainChainIDs(): {err}",
+            ));
+            return Ok(());
+        }
+    };
+
+    if chain_ids.is_empty() {
+        result.report_warn(
+            "Bridgehub has no registered ZK chains; per-chain protocol-version sweep inspected nothing",
+        );
+        return Ok(());
+    }
+
+    let mut inspected = 0usize;
+    for chain_id in chain_ids {
+        let chain_ctm = match verifiers
+            .network_verifier
+            .try_get_chain_type_manager_from_bridgehub(verifiers.bridgehub_address, chain_id)
+            .await
+        {
+            Ok(chain_ctm) => chain_ctm,
+            Err(err) => {
+                result.report_warn(&format!(
+                    "Skipping chain {chain_id}; failed to fetch Bridgehub.chainTypeManager(): {err}",
+                ));
+                continue;
+            }
+        };
+
+        let Some((flavor, expected_protocol)) = expected_by_ctm.get(&chain_ctm).copied() else {
+            result.report_warn(&format!(
+                "Chain {chain_id} uses CTM {} which is not present in this v31 artifact",
+                chain_ctm
+            ));
+            continue;
+        };
+
+        let diamond = match verifiers
+            .network_verifier
+            .try_get_chain_diamond_from_bridgehub(verifiers.bridgehub_address, chain_id)
+            .await
+        {
+            Ok(diamond) if diamond != Address::ZERO => diamond,
+            Ok(_) => {
+                result.report_warn(&format!(
+                    "Skipping chain {chain_id}; Bridgehub.getZKChain() returned zero address",
+                ));
+                continue;
+            }
+            Err(err) => {
+                result.report_warn(&format!(
+                    "Skipping chain {chain_id}; failed to fetch Bridgehub.getZKChain(): {err}",
+                ));
+                continue;
+            }
+        };
+
+        let protocol_version = match verifiers
+            .network_verifier
+            .try_get_chain_protocol_version(diamond)
+            .await
+        {
+            Ok(protocol_version) => protocol_version,
+            Err(err) => {
+                result.report_warn(&format!(
+                    "Skipping chain {chain_id}; failed to fetch diamond protocol version from {diamond}: {err}",
+                ));
+                continue;
+            }
+        };
+
+        inspected += 1;
+        if protocol_version != expected_protocol {
+            result.report_warn(&format!(
+                "Chain {chain_id} on {} CTM has protocol version {}, expected {}",
+                flavor.label(),
+                protocol_label(protocol_version),
+                protocol_label(expected_protocol)
+            ));
+        }
+    }
+
+    if inspected == 0 {
+        result.report_warn("Per-chain protocol-version sweep did not inspect any chain diamonds");
+    } else {
+        result.report_ok(&format!(
+            "Per-chain protocol-version sweep inspected {inspected} chain(s)"
+        ));
+    }
 
     Ok(())
 }
@@ -414,7 +568,8 @@ impl GovernanceStage1Calls {
                 ctm,
                 verifiers,
                 result,
-            );
+            )
+            .await;
             errors += verify_set_new_version_upgrade_payload(
                 &self.calls,
                 block + PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE,
@@ -680,7 +835,7 @@ fn verify_ctm_upgrade_call_args(
     }
 }
 
-fn verify_set_chain_creation_params_payload(
+async fn verify_set_chain_creation_params_payload(
     calls: &CallList,
     index: usize,
     ctm: &crate::upgrade_verification::artifacts::CtmArtifact,
@@ -771,6 +926,29 @@ fn verify_set_chain_creation_params_payload(
         &hex::encode(&params.forceDeploymentsData),
     );
 
+    // Decode forceDeploymentsData and verify each field independently so the
+    // artifact hex is not merely trusted as a self-referential source of truth.
+    result.print_info(&format!(
+        "-- forceDeploymentsData field verification ({} setChainCreationParams) --",
+        ctm.flavor.label()
+    ));
+    match FixedForceDeploymentsData::abi_decode(&params.forceDeploymentsData) {
+        Ok(fixed_data) => {
+            if let Err(err) = fixed_data.verify(verifiers, result).await {
+                result.report_error(&format!(
+                    "forceDeploymentsData field verification failed: {err}"
+                ));
+                errors += 1;
+            }
+        }
+        Err(err) => {
+            result.report_error(&format!(
+                "Failed to decode setChainCreationParams forceDeploymentsData: {err}"
+            ));
+            errors += 1;
+        }
+    }
+
     errors
 }
 
@@ -799,15 +977,31 @@ async fn verify_set_new_version_upgrade_payload(
             artifact_old_protocol_version, data.oldProtocolVersion
         ));
         errors += 1;
+    } else {
+        result.report_ok(&format!(
+            "{} setNewVersionUpgrade old protocol version matches TOML ({})",
+            ctm.flavor.label(),
+            protocol_label(artifact_old_protocol_version)
+        ));
     }
 
     let decoded_old_protocol_version = ProtocolVersion::from(artifact_old_protocol_version);
-    if !is_allowed_v31_old_protocol_version(decoded_old_protocol_version) {
+    let expected_old_protocol_version: U256 =
+        get_expected_old_protocol_version_for_ctm_flavor(ctm.flavor).into();
+    if artifact_old_protocol_version != expected_old_protocol_version {
         result.report_error(&format!(
-            "Unsupported v31 source protocol version in TOML: {}",
+            "{} CTM old protocol version must be {}, got {}",
+            ctm.flavor.label(),
+            expected_old_protocol_version_label(ctm.flavor),
             decoded_old_protocol_version
         ));
         errors += 1;
+    } else {
+        result.report_ok(&format!(
+            "{} CTM old protocol version is {}",
+            ctm.flavor.label(),
+            expected_old_protocol_version_label(ctm.flavor)
+        ));
     }
 
     if let Some(ctm_addr) = required_ctm_address(
@@ -1486,10 +1680,6 @@ fn required_ctm_address(
             None
         }
     }
-}
-
-fn is_allowed_v31_old_protocol_version(version: ProtocolVersion) -> bool {
-    version.major == 0 && matches!(version.minor, 29 | 30)
 }
 
 impl ChainCreationParams {
