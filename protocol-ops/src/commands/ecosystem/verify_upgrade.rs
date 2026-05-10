@@ -134,6 +134,16 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     )
     .await;
 
+    result.result = if result.errors == 0 && result.warnings == 0 {
+        "upgrade calldata verified".to_string()
+    } else if result.errors == 0 {
+        format!("upgrade calldata verified with {} warning(s)", result.warnings)
+    } else {
+        format!(
+            "verification failed: {} error(s), {} warning(s)",
+            result.errors, result.warnings
+        )
+    };
     logger::outro(format!("{}", result));
     verification_result?;
     result.ensure_success()
