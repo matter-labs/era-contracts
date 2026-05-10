@@ -1,15 +1,33 @@
 use alloy::{
     primitives::{Address, U256},
+    sol,
     sol_types::SolValue,
 };
 use serde::{Deserialize, Serialize};
-
-use super::super::elements::initialize_data_new_chain::{FeeParams, PubdataPricingMode};
 
 use super::{
     get_contents_from_github,
     network_verifier::{Bridgehub, NetworkVerifier},
 };
+
+sol! {
+    #[derive(Debug, Default, PartialEq, Eq)]
+    enum PubdataPricingMode {
+        #[default]
+        Rollup,
+        Validium
+    }
+
+    #[derive(Debug, Default, PartialEq, Eq)]
+    struct FeeParams {
+        PubdataPricingMode pubdataPricingMode;
+        uint32 batchOverheadL1Gas;
+        uint32 maxPubdataPerBatch;
+        uint32 maxL2GasPerBatch;
+        uint32 priorityTxMaxPubdata;
+        uint64 minimalL2GasPrice;
+    }
+}
 
 // This value is the slot in the diamond where the fee params are stored. Taken from
 // https://www.notion.so/matterlabs/Upgrade-steps-17aa48363f2380688151e547192e3b79?pvs=4#17aa48363f2380e99862d11605517d54

@@ -949,6 +949,22 @@ async fn verify_set_chain_creation_params_payload(
         }
     }
 
+    // Decode the chain-creation diamond cut's initCalldata and verify the three
+    // bytecode hashes independently of the artifact hex.
+    result.print_info(&format!(
+        "-- InitializeDataNewChain field verification ({} setChainCreationParams) --",
+        ctm.flavor.label()
+    ));
+    match InitializeDataNewChain::abi_decode(&params.diamondCut.initCalldata) {
+        Ok(init_data) => init_data.verify(verifiers, result),
+        Err(err) => {
+            result.report_error(&format!(
+                "Failed to decode InitializeDataNewChain from chain-creation initCalldata: {err}"
+            ));
+            errors += 1;
+        }
+    }
+
     errors
 }
 
@@ -1778,9 +1794,7 @@ pub async fn verify_chain_creation_diamond_cut(
     result.expect_address(verifiers, &diamond_cut.initAddress, name);
     let initialize_data_new_chain = InitializeDataNewChain::abi_decode(&diamond_cut.initCalldata)
         .expect("Failed to decode InitializeDataNewChain");
-    initialize_data_new_chain
-        .verify(verifiers, result, is_gateway)
-        .await?;
+    initialize_data_new_chain.verify(verifiers, result);
 
     Ok(())
 }

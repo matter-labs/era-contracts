@@ -3,7 +3,7 @@ use anyhow::Context;
 use call_list::CallList;
 use deployed_addresses::DeployedAddresses;
 use governance_stage_calls::{GovernanceStage0Calls, GovernanceStage1Calls, GovernanceStage2Calls};
-use initialize_data_new_chain::{FeeParams, PubdataPricingMode};
+use super::utils::fee_param_verifier::{FeeParams, PubdataPricingMode};
 use protocol_version::ProtocolVersion;
 use serde::Deserialize;
 
