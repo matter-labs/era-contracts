@@ -157,18 +157,16 @@ COPY . /contracts
 COPY zk-governance /zk-governance
 
 # === Compile contracts ===
+# Bytecode drift detection (`AllContractsHashes.json` ↔ built artifacts) is
+# NOT done here — it lives in the dedicated `Update Hashes in PR` workflow
+# (`.github/workflows/update-hashes-on-demand.yaml`) which devs trigger
+# manually to regenerate + commit the hash file back to the PR. Failing the
+# docker build on stale hashes would force every contract-touching branch
+# through a "trigger regen → wait → re-trigger docker" loop.
 RUN yarn --cwd da-contracts build:foundry
 RUN yarn --cwd l1-contracts build:foundry
 RUN yarn --cwd l2-contracts build:foundry
 RUN yarn --cwd system-contracts build:foundry
-
-# Verify built bytecodes match the committed `AllContractsHashes.json`. The
-# same `yarn calculate-hashes:check` developers run locally via
-# `recompute_hashes.sh`. Failing here is the cheapest possible canary for
-# bytecode drift (wrong solc, wrong foundry version, non-deterministic
-# source) — much faster than catching it downstream when a chain-init or
-# upgrade script breaks because a hash mismatched.
-RUN yarn calculate-hashes:check
 
 # Pre-compile zk-governance contracts. This both seeds /root/.svm/ with solc
 # 0.8.24 (zk-governance pins it; the runtime image runs with FOUNDRY_OFFLINE=true
