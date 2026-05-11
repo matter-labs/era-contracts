@@ -463,7 +463,10 @@ abstract contract NativeTokenVaultBase is
         if (_assetId == _baseTokenAssetId()) {
             require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
             if (_isBridgedToken) {
-                // Send tokens to BaseTokenHolder and notify L2AssetTracker via burnAndStartBridging
+                // This is the interop/asset-router case where this chain's base token is being
+                // bridged to a chain with a different base token. NTV still has to produce the
+                // bridge burn data for the asset-router flow, but the actual source-side base
+                // token burn/accounting goes through BaseTokenHolder.
                 L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: msg.value}(_chainId);
             }
         } else {
