@@ -566,7 +566,7 @@ contract InteropCenter is
         uint256 _chainId,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp,
-        BalanceChange memory _balanceChange
+        BalanceChange calldata _balanceChange
     ) external override onlySettlementLayerRelayedSender {
         address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
         if (zkChain == address(0)) {

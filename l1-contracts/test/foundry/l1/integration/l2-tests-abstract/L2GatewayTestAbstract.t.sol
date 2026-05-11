@@ -106,7 +106,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         );
         BalanceChange memory balanceChange = BalanceChange({
             version: BALANCE_CHANGE_VERSION,
-            baseTokenAssetId: bytes32(0),
+            baseTokenAssetId: l2Bridgehub.baseTokenAssetId(mintChainId),
             baseTokenAmount: 0,
             assetId: bytes32(0),
             amount: 0,

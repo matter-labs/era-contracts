@@ -52,6 +52,7 @@ import {IL2AssetTracker, L2AssetTracker} from "contracts/bridge/asset-tracker/L2
 import {IL1AssetTracker, L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 import {IGWAssetTracker} from "contracts/bridge/asset-tracker/IGWAssetTracker.sol";
+import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {IMessageVerification} from "contracts/core/message-root/IMessageRoot.sol";
 
 import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
@@ -150,15 +151,15 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     }
 
     function getChainBalanceLocation(bytes32 _assetId, uint256 _chainId) internal pure returns (bytes32) {
-        return computeNestedMappingSlot(uint256(_assetId), _chainId, 0 + 151);
+        return computeNestedMappingSlot(uint256(_assetId), _chainId, 0 + 201);
     }
 
     function getAssetMigrationNumberLocation(bytes32 _assetId, uint256 _chainId) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(_assetId, keccak256(abi.encodePacked(_chainId, uint256(1 + 151)))));
+        return keccak256(abi.encodePacked(_assetId, keccak256(abi.encodePacked(_chainId, uint256(1 + 201)))));
     }
 
     function getTotalSupplyAcrossAllChainsLocation(bytes32 _assetId) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(_assetId, uint256(2 + 151)));
+        return keccak256(abi.encodePacked(_assetId, uint256(2 + 201)));
     }
 
     function computeNestedMappingSlot(
@@ -415,6 +416,10 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encodeWithSelector(IBridgehubBase.getZKChain.selector),
             abi.encode(0x0000000000000000000000000000000000000011)
         );
+        // confirmMigrationOnGateway (Gateway->L1) now calls IMigrator.unpauseDepositsOnGateway on
+        // the migrating chain's ZK chain. _bridgehub() inside GWAssetTracker returns L2_BRIDGEHUB,
+        // and its getZKChain mock above returns `tokenAddress`, so we mock on that address.
+        vm.mockCall(tokenAddress, abi.encodeWithSelector(IMigrator.unpauseDepositsOnGateway.selector), abi.encode());
         vm.store(address(assetTracker), getChainBalanceLocation(assetId, gwChainId), bytes32(amount));
         vm.store(address(gwAssetTracker), getChainBalanceLocation(assetId, gwChainId), bytes32(amount));
         vm.store(address(gwAssetTracker), getTotalSupplyAcrossAllChainsLocation(assetId), bytes32(amount));

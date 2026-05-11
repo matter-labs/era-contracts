@@ -51,6 +51,7 @@ import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainA
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {IMailboxLegacy} from "contracts/state-transition/chain-interfaces/IMailboxLegacy.sol";
+import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 
 import {IInteropHandler} from "contracts/interop/IInteropHandler.sol";

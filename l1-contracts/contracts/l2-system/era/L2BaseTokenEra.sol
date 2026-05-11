@@ -38,7 +38,8 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     /// @dev The delta (INITIAL - holder balance) tracks tokens minted after V31 via the BaseTokenHolder pattern.
     /// @dev This formula is safe because selfdestruct is not supported on Era, so no funds can be force-sent to BaseTokenHolder.
     function totalSupply() external view returns (uint256) {
-        return __DEPRECATED_totalSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE - eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR];
+        return
+            __DEPRECATED_totalSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE - eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR];
     }
 
     /// @notice Transfer tokens from one address to another.
@@ -111,7 +112,6 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
         L1_CHAIN_ID = _l1ChainId;
 
         eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR] =
-            INITIAL_BASE_TOKEN_HOLDER_BALANCE +
-            eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR];
+            INITIAL_BASE_TOKEN_HOLDER_BALANCE + eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR];
     }
 }

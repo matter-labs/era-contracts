@@ -218,6 +218,13 @@
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "unpauseDepositsOnGateway",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "event",
     "name": "DepositsPaused",
     "inputs": [
@@ -513,6 +520,11 @@
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "RemovingPermanentRestriction",
+    "inputs": []
   },
   {
     "type": "error",

@@ -30,6 +30,7 @@ import {
 import {ChainIdNotRegistered, SlotOccupied, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
+import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {ProcessLogsTestHelper} from "./ProcessLogsTestHelper.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
@@ -162,6 +163,9 @@ contract GWAssetTrackerTest is Test {
             abi.encodeWithSignature("addChainBatchRoot(uint256,uint256,bytes32)"),
             abi.encode()
         );
+        // Wildcard mock for unpauseDepositsOnGateway, called on the migrating chain at the end of a
+        // Gateway -> L1 confirmMigrationOnGateway.
+        vm.mockCall(mockZKChain, abi.encodeWithSelector(IMigrator.unpauseDepositsOnGateway.selector), abi.encode());
     }
 
     function test_InitL2() public {

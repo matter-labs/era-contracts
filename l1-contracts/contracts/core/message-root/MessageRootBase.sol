@@ -168,10 +168,7 @@ abstract contract MessageRootBase is IMessageRootBase, ReentrancyGuard, Initiali
     }
 
     /// @notice During the chain migration, we move the batch number from the old settlement layer to the new one to ensure consistency.
-    function setMigratingChainBatchNumber(
-        uint256 _chainId,
-        uint256 _batchNumber
-    ) external onlyChainAssetHandler {
+    function setMigratingChainBatchNumber(uint256 _chainId, uint256 _batchNumber) external onlyChainAssetHandler {
         // Note, that it is possible that chain migrates to GW and returns to L1 without
         // committing any batches on GW.
         require(currentChainBatchNumber[_chainId] <= _batchNumber, ChainBatchRootAlreadyExists(_chainId, _batchNumber));
