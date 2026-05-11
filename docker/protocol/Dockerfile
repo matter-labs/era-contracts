@@ -125,7 +125,25 @@ FROM ${BUILD_BASE_IMAGE} AS forge-builder
 
 WORKDIR /contracts
 
+# === Install JS dependencies before copying source ===
+# yarn install only depends on the per-workspace package.json files +
+# yarn.lock. Copying just those first lets the node_modules layer stay
+# cached when ONLY Solidity / TS source changes — saves ~1-2 min wall time
+# per warm-cache rebuild. `.dockerignore` excludes the host's node_modules,
+# so the subsequent `COPY . /contracts` only overlays source on top.
+COPY package.json yarn.lock /contracts/
+COPY l1-contracts/package.json /contracts/l1-contracts/
+COPY l2-contracts/package.json /contracts/l2-contracts/
+COPY da-contracts/package.json /contracts/da-contracts/
+COPY system-contracts/package.json /contracts/system-contracts/
+COPY gas-bound-caller/package.json /contracts/gas-bound-caller/
+RUN yarn install --frozen-lockfile
+
 # === Copy all source code ===
+# `.dockerignore` excludes node_modules / out / zkout / cache / target /
+# broadcast, so this layer only invalidates when a real source file
+# changes. No need for the previous `forge clean` / `yarn clean` dance —
+# the container always starts from a fresh build dir.
 COPY . /contracts
 
 # === Copy zk-governance source ===
@@ -138,22 +156,19 @@ COPY . /contracts
 # $GITHUB_WORKSPACE/zk-governance/ so it lands inside the docker build context.
 COPY zk-governance /zk-governance
 
-# === Install JS dependencies ===
-RUN yarn install --frozen-lockfile
-
-# === Clean + compile contracts ===
-RUN forge clean --root da-contracts
-RUN yarn --cwd l1-contracts clean
-RUN forge clean --root l1-contracts
-RUN yarn --cwd l2-contracts clean
-RUN forge clean --root l2-contracts
-RUN yarn --cwd system-contracts clean
-RUN forge clean --root system-contracts
-
+# === Compile contracts ===
 RUN yarn --cwd da-contracts build:foundry
 RUN yarn --cwd l1-contracts build:foundry
 RUN yarn --cwd l2-contracts build:foundry
 RUN yarn --cwd system-contracts build:foundry
+
+# Verify built bytecodes match the committed `AllContractsHashes.json`. The
+# same `yarn calculate-hashes:check` developers run locally via
+# `recompute_hashes.sh`. Failing here is the cheapest possible canary for
+# bytecode drift (wrong solc, wrong foundry version, non-deterministic
+# source) — much faster than catching it downstream when a chain-init or
+# upgrade script breaks because a hash mismatched.
+RUN yarn calculate-hashes:check
 
 # Pre-compile zk-governance contracts. This both seeds /root/.svm/ with solc
 # 0.8.24 (zk-governance pins it; the runtime image runs with FOUNDRY_OFFLINE=true
