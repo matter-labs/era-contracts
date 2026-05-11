@@ -74,6 +74,7 @@ error NotSystemContext(address _sender);
 error OnlyAssetTracker(address, address);
 // 0x527b87c7
 error OnlyBridgehub(address msgSender, address bridgehub);
+error OnlyChainAssetHandler(address sender, address chainAssetHandler);
 // 0x2d396674
 error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, address chainAssetHandler);
 // 0x73fe6c1b

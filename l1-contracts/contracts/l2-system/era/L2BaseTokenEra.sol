@@ -50,8 +50,7 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
         if (
             msg.sender != MSG_VALUE_SYSTEM_CONTRACT &&
             msg.sender != L2_DEPLOYER_SYSTEM_CONTRACT_ADDR &&
-            msg.sender != L2_BOOTLOADER_ADDRESS &&
-            msg.sender != L2_BASE_TOKEN_HOLDER_ADDR
+            msg.sender != L2_BOOTLOADER_ADDRESS
         ) {
             revert Unauthorized(msg.sender);
         }

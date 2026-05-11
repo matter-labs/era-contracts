@@ -229,17 +229,6 @@ contract L2BaseTokenEraTest is Test {
         assertEq(l2BaseToken.balanceOf(uint256(uint160(bob))), transferAmount, "Bob should receive tokens");
     }
 
-    function test_transferFromTo_successFromBaseTokenHolder() public {
-        _setEraBalance(alice, ALICE_INITIAL_BALANCE);
-
-        uint256 transferAmount = 1 ether;
-
-        vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
-        l2BaseToken.transferFromTo(alice, bob, transferAmount);
-
-        assertEq(l2BaseToken.balanceOf(uint256(uint160(bob))), transferAmount, "Bob should receive tokens");
-    }
-
     function test_transferFromTo_zeroAmount() public {
         _setEraBalance(alice, ALICE_INITIAL_BALANCE);
 
@@ -262,6 +251,12 @@ contract L2BaseTokenEraTest is Test {
 
         vm.prank(unauthorized);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, unauthorized));
+        l2BaseToken.transferFromTo(alice, bob, 1 ether);
+    }
+
+    function test_transferFromTo_revertWhenCalledByBaseTokenHolder() public {
+        vm.prank(L2_BASE_TOKEN_HOLDER_ADDR);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, L2_BASE_TOKEN_HOLDER_ADDR));
         l2BaseToken.transferFromTo(alice, bob, 1 ether);
     }
 
