@@ -106,3 +106,9 @@ migrate_to_sl_batch = 7371
 migrate_from_sl_batch = 8416
 sl_batch_lower_bound = 8663
 sl_batch_upper_bound = 26620
+
+# New Gateway to be whitelisted as part of the v31 upgrade. Emits a single
+# `setSettlementLayerStatus(new_gateway.chain_id, true)` governance call on
+# the L1 Bridgehub during stage 2.
+[new_gateway]
+chain_id = 2708
