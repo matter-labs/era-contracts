@@ -39,6 +39,7 @@ import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {BalanceChange} from "contracts/common/Messaging.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
+import {AssetIdMismatch} from "contracts/common/L1ContractErrors.sol";
 
 import {LogFinder} from "test-utils/LogFinder.sol";
 
@@ -132,6 +133,34 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             diamondProxy,
             "Chain registration must be unchanged after forward"
         );
+    }
+
+    function test_forwardToL2OnGateway_L2_RevertWhen_BaseTokenAssetIdMismatch() public {
+        finalizeDeposit();
+
+        vm.startPrank(SETTLEMENT_LAYER_RELAY_SENDER);
+        vm.mockCall(
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            abi.encodeWithSelector(IChainAssetHandlerBase.migrationNumber.selector),
+            abi.encode(1)
+        );
+
+        bytes32 expectedBaseTokenAssetId = l2Bridgehub.baseTokenAssetId(mintChainId);
+        BalanceChange memory balanceChange = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            baseTokenAssetId: bytes32(uint256(expectedBaseTokenAssetId) + 1),
+            baseTokenAmount: 0,
+            assetId: bytes32(0),
+            amount: 0,
+            tokenOriginChainId: 0,
+            originToken: address(0)
+        });
+
+        vm.expectRevert(
+            abi.encodeWithSelector(AssetIdMismatch.selector, expectedBaseTokenAssetId, balanceChange.baseTokenAssetId)
+        );
+        l2InteropCenter.forwardTransactionOnGatewayWithBalanceChange(mintChainId, bytes32(0), 0, balanceChange);
+        vm.stopPrank();
     }
 
     function test_withdrawFromGateway() public {

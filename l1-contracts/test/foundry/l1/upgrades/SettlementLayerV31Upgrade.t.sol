@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {EraSettlementLayerV31Upgrade} from "contracts/upgrades/EraSettlementLayerV31Upgrade.sol";
-import {PriorityQueueNotReady} from "contracts/common/L1ContractErrors.sol";
+import {PriorityQueueNotReady, UnexpectedUpgradeSelector} from "contracts/common/L1ContractErrors.sol";
 import {NotAllBatchesExecuted} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -22,6 +22,7 @@ import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgra
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {ZKsyncOSSettlementLayerV31Upgrade} from "contracts/upgrades/ZKsyncOSSettlementLayerV31Upgrade.sol";
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
+import {UnexpectedZKsyncOSFlag} from "contracts/upgrades/ZkSyncUpgradeErrors.sol";
 import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {TokenBridgingData, TokenMetadata} from "contracts/common/Messaging.sol";
 import {
@@ -450,6 +451,31 @@ contract SettlementLayerV31UpgradeSharedTest is SettlementLayerV31UpgradeTestBas
 }
 
 contract SettlementLayerV31UpgradeEraV29Test is SettlementLayerV31UpgradeTestBase {
+    function test_RevertWhen_EraUpgradeReceivesZKsyncOSFlag() public {
+        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = new IL2ContractDeployer.ForceDeployment[](0);
+        bytes memory upgradeTxData = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgrade,
+            (
+                forceDeployments,
+                L2_VERSION_SPECIFIC_UPGRADER_ADDR,
+                abi.encodeCall(IL2V31Upgrade.upgrade, (true, address(0), "", ""))
+            )
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedZKsyncOSFlag.selector, false, true));
+        upgrade.getL2UpgradeTxData(mockBridgehub, testChainId, true, upgradeTxData);
+    }
+
+    function test_RevertWhen_EraExistingTxSelectorIsUnexpected() public {
+        bytes memory unexpectedUpgradeTxData = abi.encodeCall(
+            IComplexUpgrader.upgrade,
+            (L2_VERSION_SPECIFIC_UPGRADER_ADDR, _placeholderV31Calldata())
+        );
+
+        vm.expectRevert(UnexpectedUpgradeSelector.selector);
+        upgrade.getL2UpgradeTxData(mockBridgehub, testChainId, false, unexpectedUpgradeTxData);
+    }
+
     function test_RewritesEraV29ForceDeployAndUpgradeWithChainSpecificV31Arguments() public {
         _setupMocks();
         _prepareV31ProposedUpgrade();
@@ -639,5 +665,34 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
             zkosUpgrade.getL2UpgradeTxData(mockBridgehub, testChainId, true, originalUpgradeTxData),
             expectedUpgradeTxData
         );
+    }
+
+    function test_RevertWhen_ZKsyncOSExistingTxSelectorIsUnexpected() public {
+        bytes memory unexpectedUpgradeTxData = abi.encodeCall(
+            IComplexUpgrader.upgrade,
+            (
+                L2_VERSION_SPECIFIC_UPGRADER_ADDR,
+                abi.encodeCall(IL2V31Upgrade.upgrade, (true, address(0), "", ""))
+            )
+        );
+
+        vm.expectRevert(UnexpectedUpgradeSelector.selector);
+        zkosUpgrade.getL2UpgradeTxData(mockBridgehub, testChainId, true, unexpectedUpgradeTxData);
+    }
+
+    function test_RevertWhen_ZKsyncOSUpgradeReceivesEraFlag() public {
+        IComplexUpgrader.UniversalContractUpgradeInfo[]
+            memory forceDeployments = new IComplexUpgrader.UniversalContractUpgradeInfo[](0);
+        bytes memory upgradeTxData = abi.encodeCall(
+            IComplexUpgrader.forceDeployAndUpgradeUniversal,
+            (
+                forceDeployments,
+                L2_VERSION_SPECIFIC_UPGRADER_ADDR,
+                abi.encodeCall(IL2V31Upgrade.upgrade, (false, address(0), "", ""))
+            )
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(UnexpectedZKsyncOSFlag.selector, true, false));
+        zkosUpgrade.getL2UpgradeTxData(mockBridgehub, testChainId, false, upgradeTxData);
     }
 }
