@@ -245,19 +245,19 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
     }
 
     /// @notice Stage 2 governance calls (post-upgrade-contracts):
-    ///         legacy-GW historical migration intervals + old-GW blacklist,
-    ///         followed by the new-GW whitelist.
-    /// @dev Reads the optional `[legacy_gateway]` and `[new_gateway]` sections
-    ///      from the upgrade input TOML. Either section may be absent (e.g.
-    ///      local fixtures) — missing sections contribute zero calls.
+    ///         legacy-GW historical migration intervals + old-GW blacklist.
+    /// @dev Reads the optional `[legacy_gateway]` section from the upgrade input TOML.
+    ///      Returns an empty array if the section is absent (e.g. local fixtures).
+    /// @dev The new-GW bring-up (whitelist + CTM registration + settlement-fee
+    ///      configuration + asset-handler wiring) lives in
+    ///      `deploy-scripts/gateway/GatewayVotePreparation.s.sol` — protocol-ops
+    ///      runs that script as a separate step in `ecosystem upgrade-prepare-all`
+    ///      and merges its `governance_calls_to_execute` into the same stage-2
+    ///      hex via `write_merged_ecosystem_toml`. Keeping the two sources
+    ///      separate lets `GatewayVotePreparation` stay reusable for any future
+    ///      GW bring-up (not v31-specific).
     function prepareVersionSpecificStage2GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
-        Call[] memory decommissionCalls = _buildLegacyGatewayDecommissionCalls();
-        Call[] memory whitelistCalls = _buildNewGatewayWhitelistCalls();
-
-        Call[][] memory merge = new Call[][](2);
-        merge[0] = decommissionCalls;
-        merge[1] = whitelistCalls;
-        calls = UpgradeUtils.mergeCallsArray(merge);
+        return _buildLegacyGatewayDecommissionCalls();
     }
 
     /// @notice Post-governance migration: register bridged tokens in NTV and
@@ -355,39 +355,6 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
 
         console.log("Legacy GW chain ID:", oldGwChainId);
         console.log("Historical interval calls:", intervalCalls.length);
-    }
-
-    /// @notice Build the new-GW whitelist call.
-    /// @dev Reads `[new_gateway]` from the upgrade input TOML:
-    ///      - `new_gateway.chain_id` — the new GW's chain ID (required if section present)
-    ///      Returns an empty array if the section is missing (e.g. local fixtures).
-    function _buildNewGatewayWhitelistCalls() internal returns (Call[] memory calls) {
-        if (bytes(v31UpgradeInputRelPath).length == 0) {
-            return new Call[](0);
-        }
-
-        string memory root = vm.projectRoot();
-        string memory upgradeToml = vm.readFile(string.concat(root, v31UpgradeInputRelPath));
-
-        if (!upgradeToml.keyExists("$.new_gateway")) {
-            console.log("[new_gateway] section absent from upgrade input - skipping whitelist call");
-            return new Call[](0);
-        }
-
-        uint256 newGwChainId = upgradeToml.readUint("$.new_gateway.chain_id");
-        require(newGwChainId != 0, "new_gateway.chain_id must be non-zero");
-
-        address bridgehubProxy = coreAddresses.bridgehub.proxies.bridgehub;
-        require(bridgehubProxy != address(0), "bridgehub proxy not discovered");
-
-        calls = new Call[](1);
-        calls[0] = Call({
-            target: bridgehubProxy,
-            value: 0,
-            data: abi.encodeCall(IL1Bridgehub.setSettlementLayerStatus, (newGwChainId, true))
-        });
-
-        console.log("New GW chain ID (whitelisted):", newGwChainId);
     }
 
     /// @notice Emit one `setHistoricalMigrationInterval` call per `[[legacy_gateway.chain_intervals]]` entry.

@@ -619,8 +619,12 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         .as_ref()
         .map(|cfg| cfg.ownable_proxies().to_vec())
         .unwrap_or_default();
+    let new_gateway_cfg = env_cfg
+        .as_ref()
+        .and_then(|cfg| cfg.new_gateway().cloned());
     let full = V31UpgradeFull::new(V31UpgradeInner::new(&contracts_path, bridgehub))
-        .with_ownable_proxies(proxies);
+        .with_ownable_proxies(proxies)
+        .with_new_gateway(new_gateway_cfg);
     let prepared = full.prepare(&mut runner, &deployer, &inputs).await?;
 
     // Phase 1b on the same fork: redeploy ProtocolUpgradeHandler + Guardians
@@ -655,8 +659,9 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     };
 
     // Merge core + per-CTM governance calls + (when present) the in-memory
-    // PUH/Guardians stage-0 calls into a single `<out>/prepare/ecosystem.toml`.
-    // The Solidity scripts each emit their own toml under `script-out/` (forge
+    // PUH/Guardians stage-0 calls + (when present) the new-Gateway bring-up
+    // bundle into a single `<out>/prepare/ecosystem.toml`. The Solidity
+    // scripts each emit their own toml under `script-out/` (forge
     // requirement), but downstream (PUVT + governance replay) only consumes
     // the merged file.
     let merged_ecosystem = if let Some(out_dir) = args.shared.out.clone() {
@@ -669,6 +674,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             &prepared.core_toml,
             &prepared.ctm_tomls,
             extra_stage0,
+            prepared.new_gateway_toml.as_deref(),
             &merged_path,
         )?;
         Some(merged_path)
@@ -733,11 +739,13 @@ fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> 
 
 /// Read each per-script governance TOML and write a single merged TOML
 /// containing all stage 0/1/2 calls in source-order (core first, then CTMs
-/// in the order they were prepared). `extra_stage0` is appended to stage 0
-/// after the file-sourced calls — used for the PUH/Guardians redeploy calls
-/// emitted in-memory by [`puh_guardians::deploy_puh_guardians`].
+/// in the order they were prepared, then the optional new-Gateway bundle
+/// appended to stage 2). `extra_stage0` is appended to stage 0 after the
+/// file-sourced calls — used for the PUH/Guardians redeploy calls emitted
+/// in-memory by [`puh_guardians::deploy_puh_guardians`].
 /// Merge the core + per-CTM prepare TOMLs (plus optional in-memory PUH
-/// stage-0 calls) into a single ecosystem TOML at `dst`. Shape:
+/// stage-0 calls and an optional `GatewayVotePreparation` bundle for the
+/// new gateway) into a single ecosystem TOML at `dst`. Shape:
 ///
 /// ```toml
 /// [governance_calls]              # merged stage 0/1/2 hex across all sources
@@ -752,11 +760,15 @@ fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> 
 /// ...                             # key is "era" if !is_zk_sync_os else "zksync_os".
 /// [ctms.zksync_os]                # second CTM, when present.
 /// ...
+///
+/// [new_gateway]                   # only when present: GatewayVotePreparation
+/// ...                             # output minus governance_calls_to_execute.
 /// ```
 fn write_merged_ecosystem_toml(
     core_toml: &Path,
     ctm_entries: &[crate::commands::ecosystem::v31_upgrade_inner::CtmPrepareEntry],
     extra_stage0: &[crate::common::governance_calls::GovernanceCall],
+    new_gateway_toml: Option<&Path>,
     dst: &Path,
 ) -> anyhow::Result<()> {
     use crate::common::governance_calls::{empty_calls_hex, encode_calls, merge_call_array_hex};
@@ -811,6 +823,34 @@ fn write_merged_ecosystem_toml(
         stage0.push(format!("0x{}", hex::encode(encode_calls(extra_stage0))));
     }
 
+    // `GatewayVotePreparation` writes a flat TOML whose `governance_calls_to_execute`
+    // field is an abi-encoded `Call[]`. Pop that into the stage-2 chunks, keep
+    // the rest (per-contract addresses + diamond cut data) under a top-level
+    // `[new_gateway]` block so reviewers can still audit the deployed addresses.
+    let new_gateway_body: Option<Table> = if let Some(path) = new_gateway_toml {
+        let raw =
+            fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+        let mut value: Table =
+            toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
+        let gov_hex = value
+            .remove("governance_calls_to_execute")
+            .with_context(|| {
+                format!("missing governance_calls_to_execute in {}", path.display())
+            })?;
+        let gov_hex = match gov_hex {
+            Value::String(s) => s,
+            other => anyhow::bail!(
+                "governance_calls_to_execute in {} is not a string (got {})",
+                path.display(),
+                other.type_str()
+            ),
+        };
+        stage2.push(gov_hex);
+        Some(value)
+    } else {
+        None
+    };
+
     let merge = |chunks: &[String]| -> anyhow::Result<String> {
         if chunks.is_empty() {
             Ok(empty_calls_hex())
@@ -828,7 +868,8 @@ fn write_merged_ecosystem_toml(
     governance_calls_table.insert("stage2_calls".into(), Value::String(s2));
 
     // Build the document with [governance_calls] first, then [core], then
-    // [ctms.*]. `toml::to_string` orders keys as inserted.
+    // [ctms.*], then optional [new_gateway]. `toml::to_string` orders keys as
+    // inserted.
     let mut doc = Table::new();
     doc.insert(
         "governance_calls".into(),
@@ -836,15 +877,22 @@ fn write_merged_ecosystem_toml(
     );
     doc.insert("core".into(), Value::Table(core_body));
     doc.insert("ctms".into(), Value::Table(ctms_table));
+    if let Some(body) = new_gateway_body {
+        doc.insert("new_gateway".into(), Value::Table(body));
+    }
 
+    let new_gateway_count = if new_gateway_toml.is_some() { 1 } else { 0 };
     let body = format!(
         "# Auto-generated by `protocol-ops ecosystem upgrade-prepare-all`.\n\
          # Merged ecosystem upgrade artifact: top-level [governance_calls] holds\n\
          # the combined stage 0/1/2 hex from {} prepare TOML(s); [core] mirrors the\n\
          # core prepare output (minus its own [governance_calls]); [ctms.<flavor>]\n\
          # mirrors each per-CTM prepare output (one section per `is_zk_sync_os`\n\
-         # value) for downstream verification.\n\n{}",
-        1 + ctm_entries.len(),
+         # value) for downstream verification. When [new_gateway] is present, it\n\
+         # mirrors GatewayVotePreparation's output (deployed GW CTM addresses +\n\
+         # diamond cut data) — its `governance_calls_to_execute` has already been\n\
+         # folded into stage 2 above.\n\n{}",
+        1 + ctm_entries.len() + new_gateway_count,
         toml::to_string(&doc).context("serialize merged ecosystem TOML")?
     );
     fs::write(dst, body)

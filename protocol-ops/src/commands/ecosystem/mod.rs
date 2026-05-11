@@ -52,6 +52,7 @@ use crate::{
 
 pub(crate) mod broadcast;
 pub(crate) mod init;
+pub(crate) mod new_gateway_prepare;
 pub(crate) mod puh_guardians;
 pub(crate) mod simulator;
 pub(crate) mod stage3;

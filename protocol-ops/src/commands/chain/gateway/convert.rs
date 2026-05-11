@@ -1,6 +1,6 @@
 use anyhow::Context;
 use clap::Parser;
-use ethers::types::{Address, Bytes};
+use ethers::types::{Address, Bytes, U256};
 use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -171,7 +171,7 @@ pub(crate) struct VotePrepareInputs<'a> {
     pub ctm_representative_chain_id: u64,
     pub vote_preparation_toml: &'a str,
     pub refund_recipient: Address,
-    pub gateway_settlement_fee: u64,
+    pub gateway_settlement_fee: U256,
 }
 
 /// Run vote-prepare on an existing `runner`. `sender` must be the whitelisted
@@ -489,7 +489,7 @@ pub async fn run_convert(args: ConvertArgs) -> anyhow::Result<()> {
             ctm_representative_chain_id: args.ctm_representative_chain_id,
             vote_preparation_toml: &args.vote_preparation_toml,
             refund_recipient: args.gateway_deployer,
-            gateway_settlement_fee: args.gateway_settlement_fee,
+            gateway_settlement_fee: U256::from(args.gateway_settlement_fee),
         },
     )
     .await

@@ -67,10 +67,15 @@ pub struct V31PrepareInputs {
 
 /// Output of the prepare phase: the TOMLs each forge invocation wrote, in
 /// the order the governance phase should replay them (core first, then per
-/// CTM in input order).
+/// CTM in input order, then the optional new-Gateway bring-up bundle).
 pub struct V31PrepareOutput {
     pub core_toml: PathBuf,
     pub ctm_tomls: Vec<CtmPrepareEntry>,
+    /// Absent when the env's `[new_gateway]` block isn't set. When present,
+    /// points at `GatewayVotePreparation`'s output TOML; the merge logic in
+    /// `upgrade::write_merged_ecosystem_toml` decodes
+    /// `governance_calls_to_execute` from this file and appends to stage 2.
+    pub new_gateway_toml: Option<PathBuf>,
 }
 
 /// Per-CTM prepare result: where the script wrote its TOML, and the resolved
@@ -140,6 +145,7 @@ impl<'a> V31UpgradeInner<'a> {
         Ok(V31PrepareOutput {
             core_toml,
             ctm_tomls,
+            new_gateway_toml: None,
         })
     }
 

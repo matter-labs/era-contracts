@@ -9,11 +9,12 @@
 
 use ethers::types::Address;
 
-use crate::common::env_config::OwnableProxyEntry;
+use crate::common::env_config::{NewGatewayConfig, OwnableProxyEntry};
 use crate::common::forge::ForgeRunner;
 use crate::common::wallets::Wallet;
 use crate::config::forge_interface::script_params::ADMIN_FUNCTIONS_INVOCATION;
 
+use super::new_gateway_prepare::prepare_new_gateway;
 use super::v31_upgrade_inner::{V31PrepareInputs, V31PrepareOutput, V31UpgradeInner};
 
 pub struct V31UpgradeFull<'a> {
@@ -22,6 +23,12 @@ pub struct V31UpgradeFull<'a> {
     /// (see `OwnerWrap` in `IAdminFunctions.sol`). Empty for envs where every
     /// current owner is already an EOA.
     ownable_proxies: Vec<OwnableProxyEntry>,
+    /// Optional new-Gateway bring-up config from the env's `[new_gateway]`
+    /// block. When present, the prepare phase runs
+    /// `GatewayVotePreparation.s.sol` against this gateway on the same anvil
+    /// fork and stashes the output TOML path in `V31PrepareOutput` for the
+    /// stage-2 merge.
+    new_gateway: Option<NewGatewayConfig>,
 }
 
 impl<'a> V31UpgradeFull<'a> {
@@ -29,6 +36,7 @@ impl<'a> V31UpgradeFull<'a> {
         Self {
             inner,
             ownable_proxies: Vec::new(),
+            new_gateway: None,
         }
     }
 
@@ -37,10 +45,19 @@ impl<'a> V31UpgradeFull<'a> {
         self
     }
 
+    pub fn with_new_gateway(mut self, new_gateway: Option<NewGatewayConfig>) -> Self {
+        self.new_gateway = new_gateway;
+        self
+    }
+
     /// Run the prepare phase: `ensureCtmsAndProxyAdminsOwnedByGovernance` as
     /// a precondition, then `inner.prepare`. Both broadcast against the
     /// supplied runner so all deployer/owner txs go into one Safe-bundle
     /// emission.
+    ///
+    /// When `[new_gateway]` is configured, also runs `GatewayVotePreparation`
+    /// after Core+CTM prepares — those broadcasts (CREATE2 deploys of the GW
+    /// CTM contract set) merge into the same deployer Safe bundle.
     pub async fn prepare(
         &self,
         runner: &mut ForgeRunner,
@@ -48,7 +65,15 @@ impl<'a> V31UpgradeFull<'a> {
         inputs: &V31PrepareInputs,
     ) -> anyhow::Result<V31PrepareOutput> {
         self.run_pre_steps(runner, deployer).await?;
-        self.inner.prepare(runner, deployer, inputs).await
+        let mut prepared = self.inner.prepare(runner, deployer, inputs).await?;
+
+        if let Some(ref new_gw) = self.new_gateway {
+            let path = prepare_new_gateway(runner, deployer, self.inner.bridgehub(), new_gw)
+                .await?;
+            prepared.new_gateway_toml = Some(path);
+        }
+
+        Ok(prepared)
     }
 
     /// Pre-step hook: ensure governance owns each registered CTM + ProxyAdmin
