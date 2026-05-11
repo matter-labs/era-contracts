@@ -31,8 +31,6 @@ import {TimeNotReached, TooManyFactoryDeps, ZeroAddress} from "../common/L1Contr
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
-error UpgradeInnerFailed();
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
