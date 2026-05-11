@@ -76,16 +76,18 @@ error NotEnoughSignatures();
 error NotEraChain();
 // 0xa7050bf6
 error NotHistoricalRoot(bytes32);
-error NotZKChain();
+// 0x87470e36
 error NotL1(uint256 blockChainId);
-// 0x1e9f6a9e
-error NotZKsyncOS();
 // 0xd7b2559b
 error NotMigrated();
 // 0xd0266e26
 error NotSettlementLayer();
 // 0xa1b035c8
 error NotSigner();
+// 0xa43ae064
+error NotZKChain();
+// 0x1e9f6a9e
+error NotZKsyncOS();
 // 0x04e05fd1
 error OnlyOneBlobWithCalldataAllowed();
 // 0x885ae069

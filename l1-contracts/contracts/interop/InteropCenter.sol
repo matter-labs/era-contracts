@@ -669,6 +669,7 @@ contract InteropCenter is
             return;
         }
 
+        // slither-disable-next-line unused-return
         InteroperableAddress.parseEvmV1(_interoperableAddress);
     }
 

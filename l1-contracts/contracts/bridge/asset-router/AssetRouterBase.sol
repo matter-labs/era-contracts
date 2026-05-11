@@ -185,6 +185,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         address,
         bytes calldata _data
     ) internal virtual returns (bytes32 assetId, bytes memory transferData) {
+        // slither-disable-next-line unused-return
         return DataEncoding.decodeAssetRouterBridgehubDepositData(_data);
     }
 
