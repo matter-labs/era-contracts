@@ -8,15 +8,20 @@ import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
+import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
+import {BaseTokenHolder} from "contracts/l2-system/BaseTokenHolder.sol";
 
 import {
     L2_ASSET_ROUTER_ADDR,
     L2_ASSET_TRACKER_ADDR,
     L2_BASE_TOKEN_HOLDER_ADDR,
+    L2_COMPLEX_UPGRADER_ADDR,
     L2_NATIVE_TOKEN_VAULT_ADDR
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractInterfaces.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
@@ -53,7 +58,7 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         );
 
         // Prepare bridgeBurn parameters
-        uint256 destinationChainId = 12345;
+        uint256 destinationChainId = L1_CHAIN_ID;
         uint256 depositAmount = 1 ether;
         address receiver = makeAddr("receiver");
         address originalCaller = makeAddr("originalCaller");
@@ -63,12 +68,30 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         // Deal ETH to the asset router (needed because bridgeBurn is called with msg.value)
         vm.deal(L2_ASSET_ROUTER_ADDR, depositAmount);
 
-        // For base token bridgeBurn, the NTV sends ETH to BaseTokenHolder via burnAndStartBridging()
-        // rather than calling bridgeBurn on L2BaseToken directly, as it was done before introduction of BaseTokenHolder.
-        // The DummyL2BaseTokenHolder deployed in test setup already has burnAndStartBridging()
+        // Initialize the asset tracker as it would be during upgrade so the real
+        // BaseTokenHolder path can account for the base token correctly.
+        vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
+        IL2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(L1_CHAIN_ID, baseTokenAssetIdLocal, false);
+        if (!IAssetTrackerBase(L2_ASSET_TRACKER_ADDR).isAssetRegistered(baseTokenAssetIdLocal)) {
+            IL2AssetTracker(L2_ASSET_TRACKER_ADDR).registerBaseTokenDuringUpgrade();
+        }
+        vm.stopPrank();
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
+            abi.encode(L1_CHAIN_ID)
+        );
+
+        // Replace the dummy holder with the real implementation so the regression test
+        // observes the full tracker-accounting path.
+        BaseTokenHolder baseTokenHolder = new BaseTokenHolder();
+        vm.etch(L2_BASE_TOKEN_HOLDER_ADDR, address(baseTokenHolder).code);
 
         // Record the BaseTokenHolder balance before
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
+        uint256 chainBalanceBefore =
+            IAssetTrackerBase(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, baseTokenAssetIdLocal);
+        uint256 totalWithdrawalsBefore = _readTotalWithdrawalsToL1(baseTokenAssetIdLocal);
 
         // Call bridgeBurn from the asset router (which is the only allowed caller)
         // Before the fix: This would revert because bridgeBurn would try to call
@@ -89,6 +112,16 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
             holderBalanceAfter - holderBalanceBefore,
             depositAmount,
             "BaseTokenHolder should receive the deposit amount"
+        );
+        assertEq(
+            IAssetTrackerBase(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, baseTokenAssetIdLocal),
+            chainBalanceBefore,
+            "chainBalance should not change for bridged base token burns on L2"
+        );
+        assertEq(
+            _readTotalWithdrawalsToL1(baseTokenAssetIdLocal) - totalWithdrawalsBefore,
+            depositAmount,
+            "totalWithdrawalsToL1 should only increase once for bridged base token burn"
         );
     }
 
