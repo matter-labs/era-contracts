@@ -163,9 +163,6 @@ contract GWAssetTrackerTest is Test {
             abi.encodeWithSignature("addChainBatchRoot(uint256,uint256,bytes32)"),
             abi.encode()
         );
-        // Wildcard mock for unpauseDepositsOnGateway, called on the migrating chain at the end of a
-        // Gateway -> L1 confirmMigrationOnGateway.
-        vm.mockCall(mockZKChain, abi.encodeWithSelector(IMigrator.unpauseDepositsOnGateway.selector), abi.encode());
     }
 
     function test_InitL2() public {
@@ -653,6 +650,10 @@ contract GWAssetTrackerTest is Test {
             isL1ToGateway: false
         });
 
+        // confirmMigrationOnGateway (Gateway -> L1) calls IMigrator.unpauseDepositsOnGateway
+        // on the migrating chain's ZK chain; mockZKChain has no code so mock the call.
+        vm.mockCall(mockZKChain, abi.encodeWithSelector(IMigrator.unpauseDepositsOnGateway.selector), abi.encode());
+
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.confirmMigrationOnGateway(data);
 
@@ -675,6 +676,10 @@ contract GWAssetTrackerTest is Test {
 
         uint256 initialBalance = gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID);
         uint256 initialAssetMigrationNumber = gwAssetTracker.assetMigrationNumber(CHAIN_ID, ASSET_ID);
+
+        // confirmMigrationOnGateway (Gateway -> L1) calls IMigrator.unpauseDepositsOnGateway
+        // on the migrating chain's ZK chain; mockZKChain has no code so mock the call.
+        vm.mockCall(mockZKChain, abi.encodeWithSelector(IMigrator.unpauseDepositsOnGateway.selector), abi.encode());
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.confirmMigrationOnGateway(data);
