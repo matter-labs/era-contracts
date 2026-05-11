@@ -33,11 +33,12 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
     }
 
     /// @notice Returns the total circulating supply of base tokens.
-    /// @dev Computed as: INITIAL_BASE_TOKEN_HOLDER_BALANCE - current holder balance
-    /// @dev This replaces the previous storage-based totalSupply that was incremented on mint.
+    /// @dev Computed as: __DEPRECATED_totalSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE - current holder balance.
+    /// @dev __DEPRECATED_totalSupply captures the total supply that existed before the V31 upgrade.
+    /// @dev The delta (INITIAL - holder balance) tracks tokens minted after V31 via the BaseTokenHolder pattern.
     /// @dev This formula is safe because selfdestruct is not supported on Era, so no funds can be force-sent to BaseTokenHolder.
     function totalSupply() external view returns (uint256) {
-        return INITIAL_BASE_TOKEN_HOLDER_BALANCE - eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR];
+        return __DEPRECATED_totalSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE - eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR];
     }
 
     /// @notice Transfer tokens from one address to another.
@@ -99,7 +100,7 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
 
     /// @notice Initializes the L2 Base Token contract during the V31 upgrade.
     /// @dev Sets the L1 chain ID and initializes the BaseTokenHolder balance.
-    /// @dev Formula: eraAccountBalance[holder] = INITIAL_BASE_TOKEN_HOLDER_BALANCE - __DEPRECATED_totalSupply + eraAccountBalance[holder]
+    /// @dev Formula: eraAccountBalance[holder] = INITIAL_BASE_TOKEN_HOLDER_BALANCE + eraAccountBalance[holder].
     /// @dev Can only be called by the ComplexUpgrader contract.
     /// @param _l1ChainId The chain ID of L1.
     function initL2(uint256 _l1ChainId) external override onlyComplexUpgrader {
@@ -110,8 +111,7 @@ contract L2BaseTokenEra is L2BaseTokenBase, IL2BaseTokenEra {
         L1_CHAIN_ID = _l1ChainId;
 
         eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR] =
-            INITIAL_BASE_TOKEN_HOLDER_BALANCE -
-            __DEPRECATED_totalSupply +
+            INITIAL_BASE_TOKEN_HOLDER_BALANCE +
             eraAccountBalance[L2_BASE_TOKEN_HOLDER_ADDR];
     }
 }
