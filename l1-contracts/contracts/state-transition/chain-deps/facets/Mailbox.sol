@@ -48,7 +48,7 @@ import {
     TransactionNotAllowed,
     ZeroAddress
 } from "../../../common/L1ContractErrors.sol";
-import {DepositsPaused, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {DepositsPaused, NotL1, NotSettlementLayer, NotZKChain} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -307,7 +307,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification, IMailbo
             revert NotSettlementLayer();
         }
         if (IBridgehubBase(s.bridgehub).getZKChain(_chainId) != msg.sender) {
-            revert NotHyperchain();
+            revert NotZKChain();
         }
         // Note during the upgrade to V31 no chain will be on GW.
 
