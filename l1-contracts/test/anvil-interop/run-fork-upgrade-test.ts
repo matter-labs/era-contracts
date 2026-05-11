@@ -305,11 +305,40 @@ async function main(): Promise<void> {
     // NOTE: skip clearGenesisUpgradeTxHash / seedBatchCounters — real fork state
     // already has correct values for both.
 
-    // ── Step 7: Per-chain ChainUpgrade_v31 (+ L2 relay if not skipL2) ──
-    if (skipChainUpgrades) {
-      console.log("\n=== Step 7: Skipped (FORK_SKIP_CHAIN_UPGRADES=1) ===\n");
+    // ── Step 7: Stage 3 legacy-token registration ────────────────
+    // Runs before per-chain upgrades so withdrawals on each chain unblock
+    // the instant its diamond upgrade lands — see the phase doc on
+    // `protocol-ops/src/commands/ecosystem/mod.rs`.
+    console.log(`\n=== Step 7: Running stage3 (${elapsed()}) ===\n`);
+    if (envPreset) {
+      // Production stage3 entry point on the real upgrade contract — same
+      // forge script protocol-ops `ecosystem stage3` invokes. The bridgehub
+      // is passed as the lone positional arg.
+      await runForgeScript({
+        scriptPath: "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol:CoreUpgrade_v31",
+        envVars: {},
+        rpcUrl: l1Chain.rpcUrl,
+        senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
+        projectRoot: l1ContractsDir,
+        sig: "stage3(address)",
+        args: cfg.bridgehubAddress,
+      });
     } else {
-      console.log(`\n=== Step 7: Per-chain ChainUpgrade_v31 (${elapsed()}) ===\n`);
+      await runForgeScript({
+        scriptPath: "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:CoreUpgradeV31ForTests",
+        envVars: upgradeHarnessInputsRef!.envVars,
+        rpcUrl: l1Chain.rpcUrl,
+        senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
+        projectRoot: l1ContractsDir,
+        sig: "stage3()",
+      });
+    }
+
+    // ── Step 8: Per-chain ChainUpgrade_v31 (+ L2 relay if not skipL2) ──
+    if (skipChainUpgrades) {
+      console.log("\n=== Step 8: Skipped (FORK_SKIP_CHAIN_UPGRADES=1) ===\n");
+    } else {
+      console.log(`\n=== Step 8: Per-chain ChainUpgrade_v31 (${elapsed()}) ===\n`);
       const chainsOutDir = upgradeHarnessInputsRef
         ? path.join(upgradeHarnessInputsRef.protocolOpsOutDir, "chains")
         : path.join(anvilInteropDir, "outputs", `fork-upgrade-${envPreset!}`, "chains");
@@ -347,32 +376,6 @@ async function main(): Promise<void> {
           protocolOpsOutDir: chainsOutDir,
         });
       }
-    }
-
-    // ── Step 8: Stage 3 post-governance migration ────────────────
-    console.log(`\n=== Step 8: Running stage3 (${elapsed()}) ===\n`);
-    if (envPreset) {
-      // Production stage3 entry point on the real upgrade contract — same
-      // forge script protocol-ops `ecosystem stage3` invokes. The bridgehub
-      // is passed as the lone positional arg.
-      await runForgeScript({
-        scriptPath: "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol:CoreUpgrade_v31",
-        envVars: {},
-        rpcUrl: l1Chain.rpcUrl,
-        senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
-        projectRoot: l1ContractsDir,
-        sig: "stage3(address)",
-        args: cfg.bridgehubAddress,
-      });
-    } else {
-      await runForgeScript({
-        scriptPath: "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:CoreUpgradeV31ForTests",
-        envVars: upgradeHarnessInputsRef!.envVars,
-        rpcUrl: l1Chain.rpcUrl,
-        senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
-        projectRoot: l1ContractsDir,
-        sig: "stage3()",
-      });
     }
 
     // ── Step 9: Verify protocol version bump ─────────────────────
