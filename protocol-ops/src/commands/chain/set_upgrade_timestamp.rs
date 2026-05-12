@@ -56,6 +56,8 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
             (
                 admin_address,
                 args.access_control_restriction,
+                bridgehub,
+                chain_id,
                 new_protocol_version,
                 upgrade_timestamp,
             ),
@@ -74,6 +76,8 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         "Access control restriction: {:#x}",
         args.access_control_restriction
     ));
+    logger::info(format!("Bridgehub: {:#x}", bridgehub));
+    logger::info(format!("Chain ID: {}", chain_id));
     logger::info(format!(
         "New protocol version: {}",
         args.new_protocol_version
@@ -93,6 +97,8 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         &serde_json::json!({
             "admin_address": format!("{:#x}", admin_address),
             "access_control_restriction": format!("{:#x}", args.access_control_restriction),
+            "bridgehub": format!("{:#x}", bridgehub),
+            "chain_id": chain_id,
             "new_protocol_version": &args.new_protocol_version,
             "upgrade_timestamp": &args.upgrade_timestamp,
         }),
