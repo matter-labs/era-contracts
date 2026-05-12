@@ -530,6 +530,35 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         if args.deployer_address.is_none() {
             args.deployer_address = cfg.owner_address();
         }
+        // Default --upgrade-input-path to upgrade-envs/v0.31.0-interopB/<env>.toml
+        // when running with `--env`. The CLI default is `local.toml` (for
+        // local-anvil fixtures). On stage / mainnet / testnet the per-env
+        // file carries env-specific knobs the upgrade scripts rely on —
+        // most importantly `message_root_stage_sepolia_variant = true` for
+        // stage, which switches `CoreUpgrade_v31._messageRootContractName()`
+        // to the variant that skips chain 270's still-on-GW-123 settlement
+        // check. Without this override, stage's L1MessageRoot upgrade reverts
+        // during stage-1 governance with `NotAllChainsOnL1`. Only override
+        // when the caller hasn't explicitly passed `--upgrade-input-path`.
+        if args.upgrade_input_path == UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH {
+            let per_env_rel = format!("/upgrade-envs/v0.31.0-interopB/{}.toml", cfg.env);
+            let per_env_abs = paths::contracts_root()
+                .join("l1-contracts")
+                .join(per_env_rel.trim_start_matches('/'));
+            if per_env_abs.exists() {
+                logger::info(format!(
+                    "Using per-env upgrade input: {}",
+                    per_env_rel
+                ));
+                args.upgrade_input_path = per_env_rel;
+            } else {
+                logger::info(format!(
+                    "Per-env upgrade input not found at {} — falling back to default {}",
+                    per_env_abs.display(),
+                    UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH
+                ));
+            }
+        }
     }
     let deployer_address = args
         .deployer_address
@@ -675,6 +704,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             &prepared.ctm_tomls,
             extra_stage0,
             prepared.new_gateway_toml.as_deref(),
+            inputs.zk_token_asset_id,
             &merged_path,
         )?;
         Some(merged_path)
@@ -769,9 +799,13 @@ fn write_merged_ecosystem_toml(
     ctm_entries: &[crate::commands::ecosystem::v31_upgrade_inner::CtmPrepareEntry],
     extra_stage0: &[crate::common::governance_calls::GovernanceCall],
     new_gateway_toml: Option<&Path>,
+    zk_token_asset_id: ethers::types::H256,
     dst: &Path,
 ) -> anyhow::Result<()> {
-    use crate::common::governance_calls::{empty_calls_hex, encode_calls, merge_call_array_hex};
+    use crate::common::governance_calls::{
+        empty_calls_hex, encode_calls, merge_call_array_hex, GovernanceCall,
+    };
+    use ethers::types::U256;
     use ethers::utils::hex;
     use toml::value::{Table, Value};
 
@@ -827,7 +861,30 @@ fn write_merged_ecosystem_toml(
     // field is an abi-encoded `Call[]`. Pop that into the stage-2 chunks, keep
     // the rest (per-contract addresses + diamond cut data) under a top-level
     // `[new_gateway]` block so reviewers can still audit the deployed addresses.
+    //
+    // Before appending the GW bundle, *prepend* a call to
+    // `L1AssetTracker.registerLegacyToken(zkTokenAssetId)`. The GW bundle
+    // contains L1→L2 priority txs that charge the GW's base token (ZK on
+    // ZKsyncOS chains); after stage 1 swaps the NTV to v31, those base-token
+    // burns route through `L1AssetTracker.handleChainBalanceIncreaseOnL1`
+    // which calls `_requireRegistered`. The registration normally happens in
+    // stage3 (post-governance), so without this prepend the GW priority txs
+    // revert with `AssetIdNotRegistered`. The injected call is idempotent on
+    // the assetId (its `isAssetRegistered` guard short-circuits a second
+    // call), so stage3 still succeeds when it walks the same assetId later.
     let new_gateway_body: Option<Table> = if let Some(path) = new_gateway_toml {
+        let asset_tracker = read_asset_tracker_proxy_from_core(core_toml)?;
+        let selector = &ethers::utils::id("registerLegacyToken(bytes32)")[..4];
+        let mut data = Vec::with_capacity(36);
+        data.extend_from_slice(selector);
+        data.extend_from_slice(zk_token_asset_id.as_bytes());
+        let prefix = vec![GovernanceCall {
+            target: asset_tracker,
+            value: U256::zero(),
+            data,
+        }];
+        stage2.push(format!("0x{}", hex::encode(encode_calls(&prefix))));
+
         let raw =
             fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
         let mut value: Table =
@@ -902,6 +959,29 @@ fn write_merged_ecosystem_toml(
         dst.display()
     ));
     Ok(())
+}
+
+/// Pull `asset_tracker_proxy_addr` off the core prepare TOML. Same data
+/// `prepare_new_gateway::read_asset_tracker_proxy` reads — duplicated here
+/// because the merge step also needs it for the stage-2 prefix call, and
+/// keeping it crate-local avoids pulling the gateway-prepare module into
+/// the merge module.
+fn read_asset_tracker_proxy_from_core(core_toml: &Path) -> anyhow::Result<Address> {
+    #[derive(serde::Deserialize)]
+    struct Top {
+        asset_tracker_proxy_addr: String,
+    }
+    let raw = fs::read_to_string(core_toml)
+        .with_context(|| format!("read {}", core_toml.display()))?;
+    let top: Top = toml::from_str(&raw)
+        .with_context(|| format!("parse {}", core_toml.display()))?;
+    top.asset_tracker_proxy_addr.parse().with_context(|| {
+        format!(
+            "asset_tracker_proxy_addr in {} is not a valid address: {}",
+            core_toml.display(),
+            top.asset_tracker_proxy_addr,
+        )
+    })
 }
 
 /// Read the multi-CTM config TOML and return per-CTM inputs + the

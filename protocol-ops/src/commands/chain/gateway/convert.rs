@@ -172,6 +172,14 @@ pub(crate) struct VotePrepareInputs<'a> {
     pub vote_preparation_toml: &'a str,
     pub refund_recipient: Address,
     pub gateway_settlement_fee: U256,
+    /// Pre-resolved `force_deployments_data` (raw bytes — not 0x-prefixed
+    /// hex). When `Some`, `stage_vote_prepare` skips the on-chain dump and
+    /// uses this value directly. Required on pre-v31 ecosystems where the
+    /// CTM doesn't yet expose `newChainCreationParamsBlock`; readable from
+    /// the v31 CTM prepare's output TOML
+    /// (`contracts_newConfig.force_deployments_data`, see
+    /// `DefaultCTMUpgrade.s.sol:913`).
+    pub force_deployments_data_override: Option<Bytes>,
 }
 
 /// Run vote-prepare on an existing `runner`. `sender` must be the whitelisted
@@ -196,8 +204,29 @@ pub(crate) async fn stage_vote_prepare(
     .context("Failed to resolve CTM proxy from bridgehub")?;
     logger::info(format!("CTM proxy (from L1): {:#x}", ctm_proxy));
 
-    // Dump force deployments data from the CTM.
-    let force_deployments_data = dump_force_deployments(runner, ctm_proxy)?;
+    // Source force_deployments_data: prefer an explicit override (used by
+    // the v31 ecosystem flow, which has just produced the post-upgrade
+    // `force_deployments_data` in the CTM prepare's output TOML) over the
+    // on-chain dump. The on-chain dump path reads via
+    // `ctm.newChainCreationParamsBlock(version)`, a v31+ getter, so on
+    // pre-v31 ecosystems it reverts — the override avoids that.
+    // The Solidity side reads via `toml.readBytes` which requires the
+    // `"0x..."` prefix. `dump_force_deployments` returns the dump-script's
+    // serialized bytes (already 0x-prefixed); the override path supplies
+    // raw bytes that we re-encode the same way.
+    let force_deployments_data = match &inputs.force_deployments_data_override {
+        Some(bytes) => {
+            logger::info(format!(
+                "force_deployments_data (override, {} bytes)",
+                bytes.len()
+            ));
+            format!("0x{}", hex::encode(bytes.as_ref()))
+        }
+        None => {
+            logger::info("force_deployments_data (dumping from on-chain CTM)");
+            dump_force_deployments(runner, ctm_proxy)?
+        }
+    };
 
     // Build the vote preparation input TOML from CLI args.
     let toml_content = format!(
@@ -490,6 +519,9 @@ pub async fn run_convert(args: ConvertArgs) -> anyhow::Result<()> {
             vote_preparation_toml: &args.vote_preparation_toml,
             refund_recipient: args.gateway_deployer,
             gateway_settlement_fee: U256::from(args.gateway_settlement_fee),
+            // CLI flow runs against a chain already on the latest version,
+            // so the on-chain dump works — no override needed.
+            force_deployments_data_override: None,
         },
     )
     .await

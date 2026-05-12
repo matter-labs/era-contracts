@@ -68,8 +68,16 @@ impl<'a> V31UpgradeFull<'a> {
         let mut prepared = self.inner.prepare(runner, deployer, inputs).await?;
 
         if let Some(ref new_gw) = self.new_gateway {
-            let path = prepare_new_gateway(runner, deployer, self.inner.bridgehub(), new_gw)
-                .await?;
+            let path = prepare_new_gateway(
+                runner,
+                deployer,
+                self.inner.bridgehub(),
+                &prepared.core_toml,
+                new_gw,
+                &prepared.ctm_tomls,
+                inputs.zk_token_asset_id,
+            )
+            .await?;
             prepared.new_gateway_toml = Some(path);
         }
 
