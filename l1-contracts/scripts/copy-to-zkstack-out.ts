@@ -62,6 +62,7 @@ const REQUIRED_CONTRACTS = [
   "L2NativeTokenVaultDev.sol",
   "L2AssetTracker.sol",
   "Executor.sol",
+  "IServerNotifier.sol",
   "L1NativeTokenVault.sol",
   "TestnetERC20Token.sol",
   "L1AssetRouter.sol",
