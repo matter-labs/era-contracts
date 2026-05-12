@@ -17,6 +17,7 @@ import { loadAbiFromOut, loadBytecodeFromOut, loadCreationBytecodeFromOut } from
 const ARTIFACTS = {
   AdminFacet: "Admin.sol/AdminFacet.json",
   BaseTokenHolder: "BaseTokenHolder.sol/BaseTokenHolder.json",
+  BridgedStandardERC20: "BridgedStandardERC20.sol/BridgedStandardERC20.json",
   ChainAdminOwnable: "ChainAdminOwnable.sol/ChainAdminOwnable.json",
   ChainRegistrationSender: "ChainRegistrationSender.sol/ChainRegistrationSender.json",
   DummyInteropRecipient: "DummyInteropRecipient.sol/DummyInteropRecipient.json",

@@ -106,3 +106,13 @@ migrate_to_sl_batch = 7371
 migrate_from_sl_batch = 8416
 sl_batch_lower_bound = 8663
 sl_batch_upper_bound = 26620
+
+# New Gateway brought up by v31. Drives `GatewayVotePreparation.s.sol` (full
+# bring-up bundle into stage 2). `refund_recipient` defaults to the deployer
+# EOA when omitted; only set it to override.
+[new_gateway]
+chain_id = 2708
+# 0.2 ZK = 2e17 wei ≈ $0.01 USD at ZK ≈ $0.05. Bump up/down as price moves.
+settlement_fee = "0x2C68AF0BB140000"
+# Atlas (ZKsyncOS) witness chain — resolves to the Atlas CTM.
+ctm_representative_chain_id = 2702

@@ -23,7 +23,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Context;
-use ethers::types::{Address, H256};
+use ethers::types::{Address, H256, U256};
 use serde::Deserialize;
 
 use crate::common::paths::resolve_l1_contracts_path;
@@ -46,6 +46,47 @@ pub struct PermanentValues {
     /// Empty/absent on envs where every current owner is already an EOA.
     #[serde(default, rename = "ownable_proxies")]
     pub ownable_proxies: Vec<OwnableProxyEntry>,
+    /// Optional new-Gateway bring-up block. When present, the v31 ecosystem
+    /// prepare flow runs `GatewayVotePreparation.s.sol` against this gateway
+    /// and folds its `governance_calls_to_execute` into the merged stage-2
+    /// hex — that single bundle whitelists the GW on L1, registers the GW
+    /// CTM, wires asset handlers, accepts ownership of the GW RollupDAManager
+    /// + ServerNotifier, and sets the initial interop settlement fee.
+    #[serde(default)]
+    pub new_gateway: Option<NewGatewayConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct NewGatewayConfig {
+    /// Chain ID of the gateway being brought up (e.g. 2708 for stage).
+    pub chain_id: u64,
+    /// Initial `gatewaySettlementFee` (wrapped-ZK wei) to write to the GW's
+    /// `GWAssetTracker.setGatewaySettlementFee` via L1→L2 priority tx.
+    /// Quoted with a `0x` prefix in TOML — ethers's `U256` serde reads quoted
+    /// strings as hex (raw decimal in quotes is treated as a hex literal),
+    /// so the TOML value must look like `settlement_fee = "0x3b9aca00"`.
+    pub settlement_fee: U256,
+    /// Where unused L1→L2 priority-tx gas is refunded. EOAs work as-is
+    /// (`AddressAliasHelper` is a no-op on them), so the natural default is
+    /// the deployer EOA that publishes the call on L1 — `prepare_new_gateway`
+    /// applies that default when this field is absent. Override here only
+    /// when you specifically want refunds to land somewhere else (e.g. a
+    /// chain-admin Safe).
+    ///
+    /// NOTE: setting this to a contract (e.g. governance / PUH) makes refunds
+    /// land at the aliased contract address on L2, which is generally
+    /// uncontrolled — funds get stuck.
+    #[serde(default)]
+    pub refund_recipient: Option<Address>,
+    /// Chain ID whose registered CTM `GatewayVotePreparation` should treat as
+    /// the "source" — the deployed GW CTM is a variant of this CTM. Pick the
+    /// chain whose CTM is the one the new gateway will host (typically Era).
+    pub ctm_representative_chain_id: u64,
+    /// Optional pre-deployed server notifier address. When present, the
+    /// `GatewayVotePreparation` skips the redeploy + ownership-transfer
+    /// preamble. Leave absent on first GW bring-up.
+    #[serde(default)]
+    pub server_notifier: Option<Address>,
 }
 
 #[derive(Debug, Deserialize, Clone, Copy)]
@@ -228,16 +269,21 @@ impl EnvConfig {
     pub fn zk_token_asset_id(&self) -> Option<H256> {
         self.permanent.zk_token_asset_id
     }
+
+    pub fn new_gateway(&self) -> Option<&NewGatewayConfig> {
+        self.permanent.new_gateway.as_ref()
+    }
 }
 
 /// Default output dir for an env, e.g.
-/// `upgrade-envs/v0.31.0-interopB/output/<env>/protocol-ops/`.
+/// `upgrade-envs/v0.31.0-interopB/output/<env>/`. Outputs land directly under
+/// the env dir — no `protocol-ops/` subfolder — so the artifacts a reviewer
+/// expects to find for stage / mainnet are immediately visible.
 pub fn default_protocol_ops_out_dir(env: &str) -> anyhow::Result<PathBuf> {
     Ok(resolve_l1_contracts_path()?
         .join(V31_UPGRADE_DIR)
         .join("output")
-        .join(env)
-        .join("protocol-ops"))
+        .join(env))
 }
 
 fn parse_v31_upgrade_input(content: &str) -> V31UpgradeInputs {
@@ -272,4 +318,38 @@ fn match_unquoted_uint(line: &str, key: &str) -> Option<u64> {
     // Strip optional trailing comment.
     let value = rest.split('#').next()?.trim();
     value.parse().ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Smoke-tests that `permanent-values/stage.toml` (which is the env used
+    /// for the v31 prepare-all rehearsal on Sepolia stage) deserializes into
+    /// `PermanentValues` end-to-end — including the optional `[new_gateway]`
+    /// block and its U256 hex literal. Catches any future TOML drift before
+    /// it shows up as a runtime parse error from `protocol-ops ecosystem
+    /// upgrade-prepare-all --env stage`.
+    #[test]
+    fn stage_permanent_values_parses() {
+        let path = resolve_l1_contracts_path()
+            .expect("resolve l1-contracts")
+            .join(PERMANENT_VALUES_DIR)
+            .join("stage.toml");
+        let raw = fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let pv: PermanentValues = toml::from_str(&raw)
+            .unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+        let ng = pv
+            .new_gateway
+            .expect("permanent-values/stage.toml must carry [new_gateway]");
+        assert_eq!(ng.chain_id, 2708);
+        // 0.2 ZK = 2e17 wei, sized for ~$0.01 per interop call at ZK ≈ $0.05.
+        assert_eq!(
+            ng.settlement_fee,
+            U256::from(200_000_000_000_000_000u128)
+        );
+        // GW 2708 is a ZKsync OS chain → CTM source is Atlas (witness 2702).
+        assert_eq!(ng.ctm_representative_chain_id, 2702);
+    }
 }

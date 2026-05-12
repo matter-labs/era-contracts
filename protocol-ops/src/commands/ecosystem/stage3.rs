@@ -1,10 +1,18 @@
-//! `protocol-ops ecosystem stage3` — Phase 4: post-governance bridged-token
-//! migration.
+//! `protocol-ops ecosystem stage3` — Phase 3: legacy-token registration.
 //!
 //! Runs `CoreUpgrade_v31.stage3(bridgehubProxy)` on the env's bridgehub:
 //!   - registers ETH + every entry in the v31-bridged-tokens config in NTV's
 //!     bridgedTokens list,
-//!   - migrates non-zero `chainBalance` entries into the L1AssetTracker.
+//!   - calls `registerLegacyToken` on the L1AssetTracker (moves chainBalances
+//!     out of the NTV) for every token with non-zero balance.
+//!
+//! Sequencing: runs *before* the per-chain upgrades (Phase 4). The L1NTV
+//! starts routing every withdrawal through the L1AssetTracker the moment
+//! stage 1 of governance lands, so registering tokens early means each
+//! chain's withdrawals unblock immediately when its diamond upgrade lands —
+//! both `_requireRegistered(assetId)` (this phase) and
+//! `v31UpgradeChainBatchNumber` (per-chain upgrade) gates are cleared back
+//! to back instead of leaving an extra registration freeze afterwards.
 //!
 //! Any signer can run this (no governance privileges needed); we default to
 //! the env's `owner_address` since that EOA is the one already used for the
@@ -65,6 +73,25 @@ pub async fn run(mut args: Stage3Args) -> anyhow::Result<()> {
     })?;
 
     let bridgehub = args.topology.resolve()?;
+    let l1_contracts_path = resolve_l1_contracts_path()?;
+
+    // If a per-env tokens file exists under
+    // `upgrade-envs/v0.31.0-interopB/<env>-bridged-tokens.toml` (produced by
+    // `scripts/discover-legacy-bridged-tokens.ts`), point the forge script at
+    // it via `UPGRADE_BRIDGED_TOKENS_INPUT_OVERRIDE`. That way the discovered
+    // list flows into `registerBridgedTokensInNTV` without anyone hand-editing
+    // `script-config/v31-bridged-tokens.toml`. We only set the override when
+    // the file actually exists so local fixtures (which don't have a per-env
+    // tokens file) still fall back to the committed `script-config/` default.
+    let bridged_tokens_override = env_cfg.as_ref().and_then(|cfg| {
+        let rel = format!(
+            "/upgrade-envs/v0.31.0-interopB/{}-bridged-tokens.toml",
+            cfg.env
+        );
+        let absolute = l1_contracts_path.join(rel.trim_start_matches('/'));
+        absolute.exists().then_some(rel)
+    });
+
     let mut runner = ForgeRunner::new(&args.shared)?;
     let sender = runner.prepare_sender(sender_address).await?;
 
@@ -72,9 +99,15 @@ pub async fn run(mut args: Stage3Args) -> anyhow::Result<()> {
         "ecosystem stage3 → CoreUpgrade_v31.stage3({:#x}) on bridgehub {bridgehub:#x}",
         bridgehub
     ));
-    let l1_contracts_path = resolve_l1_contracts_path()?;
+    if let Some(ref rel) = bridged_tokens_override {
+        logger::info(format!("Bridged tokens input (per-env override): {rel}"));
+    } else {
+        logger::info(
+            "Bridged tokens input: script-config/v31-bridged-tokens.toml (committed default)",
+        );
+    }
     let script_rel = Path::new(STAGE3_SCRIPT);
-    let script = runner
+    let mut script = runner
         .script_path_from_root(&l1_contracts_path, script_rel)
         .with_contract_call(
             &crate::abi_contracts::CORE_UPGRADE_V31_CONTRACT,
@@ -85,6 +118,9 @@ pub async fn run(mut args: Stage3Args) -> anyhow::Result<()> {
         .with_ffi()
         .with_gas_limit(crate::common::forge::DEFAULT_SCRIPT_GAS_LIMIT)
         .with_wallet(&sender);
+    if let Some(rel) = bridged_tokens_override {
+        script = script.with_env("UPGRADE_BRIDGED_TOKENS_INPUT_OVERRIDE", rel);
+    }
     runner
         .run(script)
         .context("Failed to execute CoreUpgrade_v31.stage3 forge script")?;

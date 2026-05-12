@@ -284,13 +284,18 @@ async function main(): Promise<void> {
     // After folding gov-upgrade.toml into governance.toml (#0dd085d53), this
     // is one TOML, not two.
     console.log(`\n=== Step 6: Executing governance calls (${elapsed()}) ===\n`);
-    const govTomlPath = path.join(prepareDir, "governance.toml");
-    if (!fs.existsSync(govTomlPath)) {
-      throw new Error(`No governance.toml emitted by upgrade-prepare-all at ${govTomlPath}`);
+    // env-preset mode emits a merged `ecosystem.toml` (top-level
+    // [governance_calls]); the synthetic v30→v31 harness still writes
+    // `governance.toml`. Pick whichever exists.
+    const govTomlPath = [path.join(prepareDir, "ecosystem.toml"), path.join(prepareDir, "governance.toml")].find(
+      (p) => fs.existsSync(p)
+    );
+    if (!govTomlPath) {
+      throw new Error(`No governance/ecosystem TOML emitted by upgrade-prepare-all under ${prepareDir}`);
     }
     const calls = (readEcosystemOutput(govTomlPath).governance_calls ?? {}) as Record<string, string>;
     if (!calls.stage0_calls) {
-      throw new Error(`governance.toml missing governance_calls section: ${govTomlPath}`);
+      throw new Error(`${path.basename(govTomlPath)} missing governance_calls section: ${govTomlPath}`);
     }
     await executeGovernanceCalls(l1Provider, governance, decodeGovernanceCalls(calls.stage0_calls), "Stage 0");
 
@@ -305,11 +310,40 @@ async function main(): Promise<void> {
     // NOTE: skip clearGenesisUpgradeTxHash / seedBatchCounters — real fork state
     // already has correct values for both.
 
-    // ── Step 7: Per-chain ChainUpgrade_v31 (+ L2 relay if not skipL2) ──
-    if (skipChainUpgrades) {
-      console.log("\n=== Step 7: Skipped (FORK_SKIP_CHAIN_UPGRADES=1) ===\n");
+    // ── Step 7: Stage 3 legacy-token registration ────────────────
+    // Runs before per-chain upgrades so withdrawals on each chain unblock
+    // the instant its diamond upgrade lands — see the phase doc on
+    // `protocol-ops/src/commands/ecosystem/mod.rs`.
+    console.log(`\n=== Step 7: Running stage3 (${elapsed()}) ===\n`);
+    if (envPreset) {
+      // Production stage3 entry point on the real upgrade contract — same
+      // forge script protocol-ops `ecosystem stage3` invokes. The bridgehub
+      // is passed as the lone positional arg.
+      await runForgeScript({
+        scriptPath: "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol:CoreUpgrade_v31",
+        envVars: {},
+        rpcUrl: l1Chain.rpcUrl,
+        senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
+        projectRoot: l1ContractsDir,
+        sig: "stage3(address)",
+        args: cfg.bridgehubAddress,
+      });
     } else {
-      console.log(`\n=== Step 7: Per-chain ChainUpgrade_v31 (${elapsed()}) ===\n`);
+      await runForgeScript({
+        scriptPath: "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:CoreUpgradeV31ForTests",
+        envVars: upgradeHarnessInputsRef!.envVars,
+        rpcUrl: l1Chain.rpcUrl,
+        senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
+        projectRoot: l1ContractsDir,
+        sig: "stage3()",
+      });
+    }
+
+    // ── Step 8: Per-chain ChainUpgrade_v31 (+ L2 relay if not skipL2) ──
+    if (skipChainUpgrades) {
+      console.log("\n=== Step 8: Skipped (FORK_SKIP_CHAIN_UPGRADES=1) ===\n");
+    } else {
+      console.log(`\n=== Step 8: Per-chain ChainUpgrade_v31 (${elapsed()}) ===\n`);
       const chainsOutDir = upgradeHarnessInputsRef
         ? path.join(upgradeHarnessInputsRef.protocolOpsOutDir, "chains")
         : path.join(anvilInteropDir, "outputs", `fork-upgrade-${envPreset!}`, "chains");
@@ -347,32 +381,6 @@ async function main(): Promise<void> {
           protocolOpsOutDir: chainsOutDir,
         });
       }
-    }
-
-    // ── Step 8: Stage 3 post-governance migration ────────────────
-    console.log(`\n=== Step 8: Running stage3 (${elapsed()}) ===\n`);
-    if (envPreset) {
-      // Production stage3 entry point on the real upgrade contract — same
-      // forge script protocol-ops `ecosystem stage3` invokes. The bridgehub
-      // is passed as the lone positional arg.
-      await runForgeScript({
-        scriptPath: "deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol:CoreUpgrade_v31",
-        envVars: {},
-        rpcUrl: l1Chain.rpcUrl,
-        senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
-        projectRoot: l1ContractsDir,
-        sig: "stage3(address)",
-        args: cfg.bridgehubAddress,
-      });
-    } else {
-      await runForgeScript({
-        scriptPath: "test/foundry/l1/integration/_EcosystemUpgradeV31ForTests.sol:CoreUpgradeV31ForTests",
-        envVars: upgradeHarnessInputsRef!.envVars,
-        rpcUrl: l1Chain.rpcUrl,
-        senderAddress: ANVIL_DEFAULT_ACCOUNT_ADDR,
-        projectRoot: l1ContractsDir,
-        sig: "stage3()",
-      });
     }
 
     // ── Step 9: Verify protocol version bump ─────────────────────

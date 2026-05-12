@@ -100,8 +100,13 @@ pub async fn run(args: DevExecuteSafeArgs) -> anyhow::Result<()> {
     .await
 }
 
-/// Replay a single Safe bundle file under one signer.
-async fn execute_one_bundle(
+/// Replay a single Safe bundle file under one signer. Despite the file
+/// extension, this is **not** a Safe-UI flow: the file is a plain
+/// `transactions[]` JSON (Safe Transaction Builder–compatible for the multisig
+/// case), and we sign + submit each tx directly via `eth_sendRawTransaction`.
+/// Used both by `dev execute-safe` (single bundle) and the multi-bundle
+/// dispatcher in `ecosystem upgrade-broadcast`.
+pub(crate) async fn execute_one_bundle(
     safe_file: &Path,
     l1_rpc_url: &str,
     private_key: &str,
@@ -289,6 +294,118 @@ fn persist_executed_bundle(path: &Path, bundle: &ExecutedBundle) -> anyhow::Resu
         serde_json::to_string_pretty(bundle).context("failed to serialise executed bundle")?;
     fs::write(path, serialized)
         .with_context(|| format!("failed to write executed-bundle file {}", path.display()))?;
+    Ok(())
+}
+
+/// Replay a Safe bundle file under an **anvil-impersonated** EOA. Matches
+/// `execute_one_bundle` on the wire shape but skips local signing — txs are
+/// dispatched via `eth_sendTransaction` with `from` set to `sender`. Anvil
+/// started with `--auto-impersonate` (or after `anvil_impersonateAccount`)
+/// accepts these without holding the EOA's key. Used for fork-rehearsal of
+/// stage / mainnet bundles whose real signer keys aren't available locally.
+pub(crate) async fn execute_one_bundle_unlocked(
+    safe_file: &Path,
+    l1_rpc_url: &str,
+    sender: Address,
+) -> anyhow::Result<()> {
+    logger::step(format!(
+        "Execute Safe file (unlocked): {}",
+        safe_file.display()
+    ));
+
+    let content = fs::read_to_string(safe_file)
+        .with_context(|| format!("Failed to read Safe file: {}", safe_file.display()))?;
+    let root: Value =
+        serde_json::from_str(&content).context("Failed to parse Safe file as JSON")?;
+    let safe_txs = root
+        .get("transactions")
+        .and_then(|t| t.as_array())
+        .ok_or_else(|| anyhow::anyhow!("Safe file missing or invalid `.transactions` array"))?;
+
+    let provider = Provider::<Http>::try_from(l1_rpc_url)
+        .context("connect L1 provider")?
+        .interval(std::time::Duration::from_millis(50));
+    let chain_id = provider
+        .get_chainid()
+        .await
+        .context("eth_chainId")?
+        .as_u64();
+
+    logger::info(format!(
+        "Replaying {} tx(s) under impersonated broadcaster {:#x}",
+        safe_txs.len(),
+        sender,
+    ));
+
+    let base_nonce = provider
+        .get_transaction_count(sender, Some(BlockNumber::Pending.into()))
+        .await
+        .context("eth_getTransactionCount(pending)")?;
+
+    for (idx, tx) in safe_txs.iter().enumerate() {
+        let to: Address = tx
+            .get("to")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `to`"))?
+            .parse()
+            .with_context(|| format!("Safe tx #{idx} `to` is not a valid address"))?;
+        let data_hex = tx
+            .get("data")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `data`"))?;
+        let data = Bytes::from(
+            ethers::utils::hex::decode(data_hex.trim_start_matches("0x"))
+                .with_context(|| format!("Safe tx #{idx} `data` is not valid hex"))?,
+        );
+        let value_str = tx
+            .get("value")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Safe tx #{idx} missing `value`"))?;
+        let value = parse_decimal_or_hex_u256(value_str)
+            .with_context(|| format!("Safe tx #{idx} `value` is not a valid number"))?;
+
+        let estimate_req: ethers::types::transaction::eip2718::TypedTransaction =
+            TransactionRequest::new()
+                .from(sender)
+                .to(to)
+                .data(data.clone())
+                .value(value)
+                .into();
+        let estimated = provider
+            .estimate_gas(&estimate_req, None)
+            .await
+            .with_context(|| format!("eth_estimateGas for Safe tx #{idx} (to {to:#x})"))?;
+        let buffered =
+            estimated.saturating_mul(U256::from(GAS_ESTIMATE_BUFFER_BPS)) / U256::from(10_000);
+        let gas_limit = std::cmp::min(buffered, U256::from(PER_TX_GAS_LIMIT_CAP));
+
+        let req = TransactionRequest::new()
+            .from(sender)
+            .to(to)
+            .data(data)
+            .value(value)
+            .chain_id(chain_id)
+            .gas(gas_limit)
+            .gas_price(1_000_000_000u64)
+            .nonce(base_nonce + idx);
+
+        let pending = provider
+            .send_transaction(req, None)
+            .await
+            .with_context(|| format!("eth_sendTransaction for Safe tx #{idx} (to {to:#x})"))?;
+        let tx_hash = pending.tx_hash();
+        let receipt = pending
+            .await
+            .with_context(|| format!("await receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?
+            .ok_or_else(|| anyhow::anyhow!("no receipt for Safe tx #{idx} (hash {tx_hash:#x})"))?;
+        let status = receipt.status.unwrap_or_default();
+        anyhow::ensure!(
+            status == 1.into(),
+            "Safe tx #{idx} (hash {tx_hash:#x}) reverted (status=0)",
+        );
+    }
+
+    logger::success("Safe file executed");
     Ok(())
 }
 

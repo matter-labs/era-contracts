@@ -168,7 +168,10 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
         string memory contractName,
         bool isZkBytecode
     ) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, _messageRootContractName())) {
+        if (
+            compareStrings(contractName, "L1MessageRoot") ||
+            compareStrings(contractName, _messageRootContractName())
+        ) {
             return abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ());
         } else if (compareStrings(contractName, "L1AssetTracker")) {
             // Initialize AssetTracker with config.deployerAddress which is now properly set
@@ -248,6 +251,14 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
     ///         legacy-GW historical migration intervals + old-GW blacklist.
     /// @dev Reads the optional `[legacy_gateway]` section from the upgrade input TOML.
     ///      Returns an empty array if the section is absent (e.g. local fixtures).
+    /// @dev The new-GW bring-up (whitelist + CTM registration + settlement-fee
+    ///      configuration + asset-handler wiring) lives in
+    ///      `deploy-scripts/gateway/GatewayVotePreparation.s.sol` — protocol-ops
+    ///      runs that script as a separate step in `ecosystem upgrade-prepare-all`
+    ///      and merges its `governance_calls_to_execute` into the same stage-2
+    ///      hex via `write_merged_ecosystem_toml`. Keeping the two sources
+    ///      separate lets `GatewayVotePreparation` stay reusable for any future
+    ///      GW bring-up (not v31-specific).
     function prepareVersionSpecificStage2GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         return _buildLegacyGatewayDecommissionCalls();
     }

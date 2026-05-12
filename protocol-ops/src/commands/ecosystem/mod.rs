@@ -11,17 +11,28 @@
 //!     emits: <out>/prepare/NN_*.safe.json             (per-signer deployer/EOA bundles)
 //!
 //! Phase 2  ecosystem upgrade-governance    (governance owner / PUH signs)
-//!     replays stages 0/1/2 from the merged governance.toml
+//!     replays stages 0/1/2 from the merged governance.toml. Once stage 1
+//!     completes the upgraded L1NTV routes every withdrawal through the new
+//!     L1AssetTracker, so the next two phases run against that wiring.
 //!
-//! Phase 3  chain upgrade                   (each chain admin signs separately)
+//! Phase 3  ecosystem stage3                (any signer)
+//!     legacy-token registration: registers ETH + every entry in the
+//!     v31-bridged-tokens config in NTV's bridgedTokens list and calls
+//!     `registerLegacyToken` on the L1AssetTracker so chainBalances move
+//!     out of the NTV. Runs *before* the per-chain upgrades so that each
+//!     chain's withdrawals unblock the instant its diamond upgrade lands
+//!     (both `_requireRegistered(assetId)` and `v31UpgradeChainBatchNumber`
+//!     gates are cleared together). All chain withdrawals are blocked from
+//!     the moment stage 1 wires the AssetTracker until *both* registration
+//!     and the per-chain upgrade have happened, so registering first keeps
+//!     this freeze window from compounding across chains.
+//!
+//! Phase 4  chain upgrade                   (each chain admin signs separately)
 //!     `Admin.upgradeChainFromVersion(...)` per registered ZK chain. Pass
 //!     `--chain-id` to target one chain; omit to loop over every registered
-//!     chain on the bridgehub.
-//!
-//! Phase 4  ecosystem stage3                (any signer)
-//!     post-governance bridged-token migration: registers ETH + every entry
-//!     in the v31-bridged-tokens config in NTV's bridgedTokens list and
-//!     migrates non-zero `chainBalance` entries into the L1AssetTracker.
+//!     chain on the bridgehub. With tokens already registered in Phase 3,
+//!     each chain's withdrawals come back online the moment its upgrade
+//!     transaction is mined.
 //! ```
 //!
 //! Pre-flight (chains migrate off legacy GW back to L1) and the new GW
@@ -32,6 +43,7 @@
 use clap::Subcommand;
 
 use crate::{
+    commands::ecosystem::broadcast::UpgradeBroadcastArgs,
     commands::ecosystem::init::EcosystemInitArgs,
     commands::ecosystem::simulator::GovernanceTomlToSimulatorArgs,
     commands::ecosystem::stage3::Stage3Args,
@@ -39,7 +51,9 @@ use crate::{
     commands::ecosystem::verify_upgrade::VerifyUpgradeArgs,
 };
 
+pub(crate) mod broadcast;
 pub(crate) mod init;
+pub(crate) mod new_gateway_prepare;
 pub(crate) mod puh_guardians;
 pub(crate) mod simulator;
 pub(crate) mod stage3;
@@ -69,10 +83,19 @@ pub enum EcosystemCommands {
     /// Verify ecosystem upgrade artifacts produced by upgrade-prepare.
     #[command(name = "verify-upgrade")]
     VerifyUpgrade(VerifyUpgradeArgs),
-    /// Phase 4 of the ecosystem upgrade: post-governance bridged-token
-    /// migration. Calls `CoreUpgrade_v31.stage3(bridgehub)`, which registers
-    /// ETH + every v31-bridged token in NTV's bridgedTokens list and
-    /// migrates non-zero chainBalance entries into L1AssetTracker. Any signer.
+    /// Broadcast the bundles produced by `upgrade-prepare-all` to a real (or
+    /// fork) RPC under the supplied EOA keys. Multi-bundle dispatcher around
+    /// `dev execute-safe`: reads `manifest.json`, replays each bundle in order
+    /// signed by its declared `target`. Direct EOA broadcast — no Safe UI.
+    #[command(name = "upgrade-broadcast")]
+    UpgradeBroadcast(UpgradeBroadcastArgs),
+    /// Phase 3 of the ecosystem upgrade: legacy-token registration. Calls
+    /// `CoreUpgrade_v31.stage3(bridgehub)`, which registers ETH + every
+    /// v31-bridged token in NTV's bridgedTokens list and calls
+    /// `registerLegacyToken` on the L1AssetTracker (moves chainBalances out
+    /// of the NTV). Runs *before* per-chain upgrades so each chain's
+    /// withdrawals come back online as soon as its diamond upgrade lands.
+    /// Any signer.
     Stage3(Stage3Args),
     /// Print a starter `--ctm-config` TOML by enumerating every CTM
     /// registered on the supplied bridgehub. Use this on stage / mainnet to
@@ -90,6 +113,7 @@ pub(crate) async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
         EcosystemCommands::UpgradePrepareAll(args) => upgrade::run_upgrade_prepare_all(args).await,
         EcosystemCommands::UpgradeGovernance(args) => upgrade::run_upgrade_governance(args).await,
         EcosystemCommands::VerifyUpgrade(args) => verify_upgrade::run(args).await,
+        EcosystemCommands::UpgradeBroadcast(args) => broadcast::run(args).await,
         EcosystemCommands::Stage3(args) => stage3::run(args).await,
         EcosystemCommands::ListCtms(args) => upgrade::run_list_ctms(args).await,
         EcosystemCommands::GovernanceTomlToSimulator(args) => simulator::run(args).await,
