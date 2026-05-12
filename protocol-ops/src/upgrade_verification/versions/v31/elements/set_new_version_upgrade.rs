@@ -5,7 +5,7 @@ use alloy::{
     sol_types::{SolCall, SolValue},
 };
 use anyhow::Context;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::upgrade_verification::{
     artifacts::CtmFlavor,
@@ -13,7 +13,8 @@ use crate::upgrade_verification::{
 };
 
 use super::{
-    super::get_expected_new_protocol_version, fixed_force_deployment::FixedForceDeploymentsData,
+    super::{get_expected_new_protocol_version, utils::apply_l2_to_l1_alias},
+    fixed_force_deployment::FixedForceDeploymentsData,
     protocol_version::ProtocolVersion,
 };
 
@@ -28,6 +29,496 @@ const L2_V31_UPGRADE_CONTRACT: &str = "l1-contracts/L2V31Upgrade";
 const BOOTLOADER_CONTRACT: &str = "Bootloader";
 const DEFAULT_ACCOUNT_CONTRACT: &str = "system-contracts/DefaultAccount";
 const EVM_EMULATOR_CONTRACT: &str = "EvmEmulator";
+
+// ── L2 address constants (mirrors L2ContractAddresses.sol, BUILT_IN_CONTRACTS_OFFSET=0x10000) ──
+const L2_CREATE2_FACTORY_ADDR: u32 = 0x10000;
+const L2_SLOAD_CONTRACT_ADDR: u32 = 0x10006;
+const L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR: u32 = 0x1000c;
+const L2_BRIDGEHUB_ADDR: u32 = 0x10002;
+const L2_ASSET_ROUTER_ADDR: u32 = 0x10003;
+const L2_NATIVE_TOKEN_VAULT_ADDR: u32 = 0x10004;
+const L2_MESSAGE_ROOT_ADDR: u32 = 0x10005;
+const L2_WRAPPED_BASE_TOKEN_IMPL_ADDR: u32 = 0x10007;
+const L2_INTEROP_ROOT_STORAGE_ADDR: u32 = 0x10008;
+const L2_MESSAGE_VERIFICATION_ADDR: u32 = 0x10009;
+const L2_CHAIN_ASSET_HANDLER_ADDR: u32 = 0x1000a;
+const L2_INTEROP_CENTER_ADDR: u32 = 0x1000d;
+const L2_INTEROP_HANDLER_ADDR: u32 = 0x1000e;
+const L2_ASSET_TRACKER_ADDR: u32 = 0x1000f;
+const GW_ASSET_TRACKER_ADDR: u32 = 0x10010;
+const L2_BASE_TOKEN_HOLDER_ADDR: u32 = 0x10011;
+
+/// How to validate the `input` field of an Era force deployment entry.
+enum EraFdInput {
+    /// input must be empty.
+    Empty,
+    /// L2ChainAssetHandler: input = abi.encode(l1ChainId, aliasedOwner, bridgehub, assetRouter, messageRoot).
+    L2ChainAssetHandler,
+}
+
+struct EraExpectedFd {
+    address: Address,
+    file: &'static str,
+    call_constructor: bool,
+    input_kind: EraFdInput,
+}
+
+/// Expected v31 Era `ForceDeployment[]` passed to `ComplexUpgrader.forceDeployAndUpgrade`.
+///
+/// Order mirrors the deploy script: system contracts (EraVmSystemContract enum 0..30),
+/// then fixed-address core contracts (_fillFixedAddressCoreContracts), then L2V31Upgrade.
+fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
+    macro_rules! simple {
+        ($file:expr, $addr:expr) => {
+            EraExpectedFd {
+                address: address_from_short_u32($addr),
+                file: $file,
+                call_constructor: false,
+                input_kind: EraFdInput::Empty,
+            }
+        };
+    }
+    vec![
+        // ── EraVM system contracts (SYSTEM_CONTRACTS_COUNT = 31) ──
+        simple!("system-contracts/EmptyContract", 0x0000),
+        simple!("Ecrecover", 0x0001),
+        simple!("SHA256", 0x0002),
+        simple!("Identity", 0x0004),
+        simple!("EcAdd", 0x0006),
+        simple!("EcMul", 0x0007),
+        simple!("EcPairing", 0x0008),
+        simple!("Modexp", 0x0005),
+        simple!("system-contracts/EmptyContract", 0x8001), // bootloader slot
+        simple!("system-contracts/AccountCodeStorage", 0x8002),
+        simple!("system-contracts/NonceHolder", 0x8003),
+        simple!("system-contracts/KnownCodesStorage", 0x8004),
+        simple!("system-contracts/ImmutableSimulator", 0x8005),
+        simple!("system-contracts/ContractDeployer", 0x8006),
+        simple!("system-contracts/L1Messenger", 0x8008),
+        simple!("system-contracts/MsgValueSimulator", 0x8009),
+        simple!("l1-contracts/L2BaseTokenEra", 0x800a), // L2BaseToken bytecode is L2BaseTokenEra
+        simple!("system-contracts/SystemContext", 0x800b),
+        simple!("system-contracts/BootloaderUtilities", 0x800c),
+        simple!("EventWriter", 0x800d),
+        simple!("system-contracts/Compressor", 0x800e),
+        simple!("Keccak256", 0x8010),
+        simple!("system-contracts/PubdataChunkPublisher", 0x8011),
+        simple!("CodeOracle", 0x8012),
+        simple!("EvmGasManager", 0x8013),
+        simple!("system-contracts/EvmPredeploysManager", 0x8014),
+        simple!("system-contracts/EvmHashesStorage", 0x8015),
+        simple!("P256Verify", 0x0100),
+        simple!("system-contracts/Create2Factory", L2_CREATE2_FACTORY_ADDR),
+        simple!("system-contracts/SloadContract", L2_SLOAD_CONTRACT_ADDR),
+        simple!(
+            "l1-contracts/SystemContractProxyAdmin",
+            L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
+        ),
+        // ── Fixed-address core contracts (FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 13) ──
+        simple!("l1-contracts/L2Bridgehub", L2_BRIDGEHUB_ADDR),
+        simple!("l1-contracts/L2AssetRouter", L2_ASSET_ROUTER_ADDR),
+        simple!(
+            "l1-contracts/L2NativeTokenVault",
+            L2_NATIVE_TOKEN_VAULT_ADDR
+        ),
+        simple!("l1-contracts/L2MessageRoot", L2_MESSAGE_ROOT_ADDR),
+        simple!(
+            "l1-contracts/L2WrappedBaseToken",
+            L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
+        ),
+        simple!(
+            "l1-contracts/L2MessageVerification",
+            L2_MESSAGE_VERIFICATION_ADDR
+        ),
+        // L2ChainAssetHandler: callConstructor=true, special input
+        EraExpectedFd {
+            address: address_from_short_u32(L2_CHAIN_ASSET_HANDLER_ADDR),
+            file: "l1-contracts/L2ChainAssetHandler",
+            call_constructor: true,
+            input_kind: EraFdInput::L2ChainAssetHandler,
+        },
+        simple!(
+            "l1-contracts/L2InteropRootStorage",
+            L2_INTEROP_ROOT_STORAGE_ADDR
+        ),
+        simple!("l1-contracts/BaseTokenHolder", L2_BASE_TOKEN_HOLDER_ADDR),
+        simple!("l1-contracts/L2AssetTracker", L2_ASSET_TRACKER_ADDR),
+        simple!("l1-contracts/InteropCenter", L2_INTEROP_CENTER_ADDR),
+        simple!("l1-contracts/InteropHandler", L2_INTEROP_HANDLER_ADDR),
+        simple!("l1-contracts/GWAssetTracker", GW_ASSET_TRACKER_ADDR),
+        // ── Additional: L2V31Upgrade (the delegate target for this upgrade) ──
+        simple!(
+            L2_V31_UPGRADE_CONTRACT,
+            L2_VERSION_SPECIFIC_UPGRADER_ADDRESS
+        ),
+    ]
+}
+
+/// Validate the full `ForceDeployment[]` array from `ComplexUpgrader.forceDeployAndUpgrade`
+/// against the expected v31 list.
+async fn verify_v31_era_force_deployments(
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+    deployments: &[IComplexUpgrader::ForceDeployment],
+) -> anyhow::Result<()> {
+    let expected = expected_v31_era_force_deployments();
+    let mut expected_map: HashMap<Address, EraExpectedFd> =
+        expected.into_iter().map(|e| (e.address, e)).collect();
+
+    for deployment in deployments {
+        let addr = deployment.newAddress;
+        match expected_map.remove(&addr) {
+            None => {
+                let hash_label = verifiers
+                    .bytecode_verifier
+                    .zk_bytecode_hash_to_file(&deployment.bytecodeHash)
+                    .cloned()
+                    .unwrap_or_else(|| format!("unknown hash {}", deployment.bytecodeHash));
+                result.report_error(&format!(
+                    "Unexpected Era force deployment at {} ({})",
+                    addr, hash_label
+                ));
+            }
+            Some(expected_entry) => {
+                result.expect_zk_bytecode(verifiers, &deployment.bytecodeHash, expected_entry.file);
+                if deployment.callConstructor != expected_entry.call_constructor {
+                    result.report_error(&format!(
+                        "Era force deployment at {} ({}): callConstructor expected {}, got {}",
+                        addr,
+                        expected_entry.file,
+                        expected_entry.call_constructor,
+                        deployment.callConstructor
+                    ));
+                }
+                if deployment.value != U256::ZERO {
+                    result.report_error(&format!(
+                        "Era force deployment at {} ({}): value must be zero, got {}",
+                        addr, expected_entry.file, deployment.value
+                    ));
+                }
+                match expected_entry.input_kind {
+                    EraFdInput::Empty => {
+                        if !deployment.input.is_empty() {
+                            result.report_error(&format!(
+                                "Era force deployment at {} ({}): input must be empty",
+                                addr, expected_entry.file
+                            ));
+                        }
+                    }
+                    EraFdInput::L2ChainAssetHandler => {
+                        verify_l2_chain_asset_handler_input(verifiers, result, &deployment.input)
+                            .await;
+                    }
+                }
+            }
+        }
+    }
+
+    let mut missing: Vec<_> = expected_map
+        .values()
+        .map(|e| format!("{} at {}", e.file, e.address))
+        .collect();
+    missing.sort();
+    for m in &missing {
+        result.report_error(&format!("Missing Era force deployment: {}", m));
+    }
+
+    if missing.is_empty() {
+        result.report_ok("All Era force deployments match the expected v31 list");
+    }
+    Ok(())
+}
+
+/// Verify the ABI-encoded constructor input for the L2ChainAssetHandler force deployment.
+///
+/// Expected: abi.encode(l1ChainId, aliasedOwner, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR).
+async fn verify_l2_chain_asset_handler_input(
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+    input: &[u8],
+) {
+    type Decoded = (U256, Address, Address, Address, Address);
+    let (l1_chain_id, aliased_owner, l2_bridgehub, l2_asset_router, l2_message_root) =
+        match Decoded::abi_decode(input) {
+            Ok(v) => v,
+            Err(err) => {
+                result.report_error(&format!(
+                    "L2ChainAssetHandler force deployment input: failed to ABI-decode: {err}"
+                ));
+                return;
+            }
+        };
+
+    match verifiers.network_verifier.try_get_l1_chain_id().await {
+        Ok(expected_chain_id) => {
+            if l1_chain_id != U256::from(expected_chain_id) {
+                result.report_error(&format!(
+                    "L2ChainAssetHandler input l1ChainId: expected {expected_chain_id}, got {l1_chain_id}"
+                ));
+            } else {
+                result.report_ok("L2ChainAssetHandler input l1ChainId matches RPC");
+            }
+        }
+        Err(err) => result.report_warn(&format!(
+            "Cannot verify L2ChainAssetHandler input l1ChainId: {err}"
+        )),
+    }
+
+    match verifiers
+        .address_verifier
+        .get_by_name("aliased_protocol_upgrade_handler_proxy")
+    {
+        Some(expected) => {
+            if aliased_owner == expected {
+                result
+                    .report_ok("L2ChainAssetHandler input aliasedOwner matches aliased governance");
+            } else {
+                result.report_error(&format!(
+                    "L2ChainAssetHandler input aliasedOwner: expected {expected}, got {aliased_owner}"
+                ));
+            }
+        }
+        None => {
+            // Fallback: try to derive alias from any governance address in the book.
+            let governance = verifiers.address_verifier.get_by_name("governance");
+            let puh = verifiers
+                .address_verifier
+                .get_by_name("protocol_upgrade_handler_proxy");
+            if let Some(gov_addr) = governance.or(puh) {
+                let expected_aliased = apply_l2_to_l1_alias(Address(*gov_addr));
+                if aliased_owner == expected_aliased {
+                    result.report_ok(
+                        "L2ChainAssetHandler input aliasedOwner matches derived alias of governance",
+                    );
+                } else {
+                    result.report_error(&format!(
+                        "L2ChainAssetHandler input aliasedOwner: derived alias {expected_aliased}, got {aliased_owner}"
+                    ));
+                }
+            } else {
+                result.report_warn(&format!(
+                    "L2ChainAssetHandler input aliasedOwner (not verified, governance address missing from address book): {aliased_owner}"
+                ));
+            }
+        }
+    }
+
+    let expected_bridgehub = address_from_short_u32(L2_BRIDGEHUB_ADDR);
+    if l2_bridgehub != expected_bridgehub {
+        result.report_error(&format!(
+            "L2ChainAssetHandler input l2Bridgehub: expected {expected_bridgehub}, got {l2_bridgehub}"
+        ));
+    }
+    let expected_asset_router = address_from_short_u32(L2_ASSET_ROUTER_ADDR);
+    if l2_asset_router != expected_asset_router {
+        result.report_error(&format!(
+            "L2ChainAssetHandler input l2AssetRouter: expected {expected_asset_router}, got {l2_asset_router}"
+        ));
+    }
+    let expected_message_root = address_from_short_u32(L2_MESSAGE_ROOT_ADDR);
+    if l2_message_root != expected_message_root {
+        result.report_error(&format!(
+            "L2ChainAssetHandler input l2MessageRoot: expected {expected_message_root}, got {l2_message_root}"
+        ));
+    }
+}
+
+/// ZKsync OS upgrade type — mirrors IComplexUpgrader.ContractUpgradeType.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum ZksyncOSUpgradeType {
+    SystemProxyUpgrade,
+    UnsafeForceDeployment,
+}
+
+struct ZksyncOSExpectedFd {
+    address: Address,
+    file: &'static str,
+    upgrade_type: ZksyncOSUpgradeType,
+}
+
+/// Expected v31 ZKsyncOS `UniversalContractUpgradeInfo[]` passed to
+/// `ComplexUpgrader.forceDeployAndUpgradeUniversal` — excludes the L2V31Upgrade delegate-target
+/// entry, which is validated separately by `verify_zksync_os_l2_v31_deployment`.
+fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
+    macro_rules! proxy {
+        ($file:expr, $addr:expr) => {
+            ZksyncOSExpectedFd {
+                address: address_from_short_u32($addr),
+                file: $file,
+                upgrade_type: ZksyncOSUpgradeType::SystemProxyUpgrade,
+            }
+        };
+    }
+    macro_rules! unsafe_fd {
+        ($file:expr, $addr:expr) => {
+            ZksyncOSExpectedFd {
+                address: address_from_short_u32($addr),
+                file: $file,
+                upgrade_type: ZksyncOSUpgradeType::UnsafeForceDeployment,
+            }
+        };
+    }
+    vec![
+        // ── Fixed-address core contracts (getFixedAddressCoreContracts, 13 entries) ──
+        proxy!("l1-contracts/L2Bridgehub", L2_BRIDGEHUB_ADDR),
+        proxy!("l1-contracts/L2AssetRouter", L2_ASSET_ROUTER_ADDR),
+        proxy!(
+            "l1-contracts/L2NativeTokenVaultZKOS",
+            L2_NATIVE_TOKEN_VAULT_ADDR
+        ),
+        proxy!("l1-contracts/L2MessageRoot", L2_MESSAGE_ROOT_ADDR),
+        // L2WrappedBaseToken sits directly as the implementation — not behind a proxy.
+        unsafe_fd!(
+            "l1-contracts/L2WrappedBaseToken",
+            L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
+        ),
+        proxy!(
+            "l1-contracts/L2MessageVerification",
+            L2_MESSAGE_VERIFICATION_ADDR
+        ),
+        proxy!(
+            "l1-contracts/L2ChainAssetHandler",
+            L2_CHAIN_ASSET_HANDLER_ADDR
+        ),
+        proxy!(
+            "l1-contracts/L2InteropRootStorage",
+            L2_INTEROP_ROOT_STORAGE_ADDR
+        ),
+        proxy!("l1-contracts/BaseTokenHolder", L2_BASE_TOKEN_HOLDER_ADDR),
+        proxy!("l1-contracts/L2AssetTracker", L2_ASSET_TRACKER_ADDR),
+        proxy!("l1-contracts/InteropCenter", L2_INTEROP_CENTER_ADDR),
+        proxy!("l1-contracts/InteropHandler", L2_INTEROP_HANDLER_ADDR),
+        proxy!("l1-contracts/GWAssetTracker", GW_ASSET_TRACKER_ADDR),
+        // ── ZKsync-OS system contracts (getZKsyncOSExtraSystemContracts, 3 entries) ──
+        proxy!("l1-contracts/L2BaseTokenZKOS", 0x800a), // L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
+        proxy!("l1-contracts/L1MessengerZKOS", 0x8008), // L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
+        proxy!("l1-contracts/SystemContext", 0x800b),   // L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR
+        // ── ProxyAdmin (_buildZKsyncOSProxyAdminEntry) ──
+        unsafe_fd!(
+            "l1-contracts/SystemContractProxyAdmin",
+            L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
+        ),
+    ]
+}
+
+/// Validate all entries of `UniversalContractUpgradeInfo[]` except the L2V31Upgrade delegate-target
+/// (which is already validated by `verify_zksync_os_l2_v31_deployment`).
+fn verify_v31_zksync_os_force_deployments(
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+    deployments: &[IComplexUpgrader::UniversalContractUpgradeInfo],
+    delegate_to: Address,
+) {
+    let expected = expected_v31_zksync_os_force_deployments();
+    let mut expected_map: HashMap<Address, ZksyncOSExpectedFd> =
+        expected.into_iter().map(|e| (e.address, e)).collect();
+
+    for deployment in deployments {
+        // Skip the L2V31Upgrade delegate-target; already validated elsewhere.
+        if deployment.newAddress == delegate_to {
+            continue;
+        }
+
+        let addr = deployment.newAddress;
+        match expected_map.remove(&addr) {
+            None => {
+                result.report_error(&format!("Unexpected ZKsyncOS force deployment at {}", addr));
+            }
+            Some(expected_entry) => {
+                // Verify upgradeType.
+                let actual_upgrade_type = if deployment.upgradeType
+                    == IComplexUpgrader::ContractUpgradeType::ZKsyncOSSystemProxyUpgrade
+                {
+                    ZksyncOSUpgradeType::SystemProxyUpgrade
+                } else if deployment.upgradeType
+                    == IComplexUpgrader::ContractUpgradeType::ZKsyncOSUnsafeForceDeployment
+                {
+                    ZksyncOSUpgradeType::UnsafeForceDeployment
+                } else {
+                    result.report_error(&format!(
+                        "ZKsyncOS force deployment at {} ({}): unexpected upgradeType {:?}",
+                        addr, expected_entry.file, deployment.upgradeType
+                    ));
+                    continue;
+                };
+                if actual_upgrade_type != expected_entry.upgrade_type {
+                    result.report_error(&format!(
+                        "ZKsyncOS force deployment at {} ({}): upgradeType expected {:?}, got {:?}",
+                        addr, expected_entry.file, expected_entry.upgrade_type, actual_upgrade_type
+                    ));
+                }
+
+                // Verify deployedBytecodeInfo -> file.
+                verify_zksync_os_deployed_bytecode_info(
+                    verifiers,
+                    result,
+                    &deployment.deployedBytecodeInfo,
+                    expected_entry.file,
+                    &format!("{addr}"),
+                    expected_entry.upgrade_type,
+                );
+            }
+        }
+    }
+
+    let mut missing: Vec<_> = expected_map
+        .values()
+        .map(|e| format!("{} at {}", e.file, e.address))
+        .collect();
+    missing.sort();
+    for m in &missing {
+        result.report_error(&format!("Missing ZKsyncOS force deployment: {}", m));
+    }
+
+    if missing.is_empty() {
+        result.report_ok(
+            "All ZKsyncOS force deployments match the expected v31 list (excluding L2V31Upgrade delegate target)",
+        );
+    }
+}
+
+/// Verify the `deployedBytecodeInfo` of a ZKsyncOS force deployment entry maps to the expected file.
+///
+/// - `ZKsyncOSUnsafeForceDeployment`: 96-byte triple (blake2s | padding | keccak256); observable at [64..96].
+/// - `ZKsyncOSSystemProxyUpgrade`: abi.encode(implInfo_96, proxyInfo_96) = 320 bytes;
+///   impl observable (keccak256 of deployed impl bytecode) at [160..192].
+fn verify_zksync_os_deployed_bytecode_info(
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+    bytecode_info: &[u8],
+    expected_file: &str,
+    addr_label: &str,
+    upgrade_type: ZksyncOSUpgradeType,
+) {
+    let (expected_len, observable_range) = match upgrade_type {
+        ZksyncOSUpgradeType::UnsafeForceDeployment => (96usize, 64..96),
+        ZksyncOSUpgradeType::SystemProxyUpgrade => (320usize, 160..192),
+    };
+
+    if bytecode_info.len() != expected_len {
+        result.report_error(&format!(
+            "ZKsyncOS force deployment at {addr_label} ({expected_file}): \
+             deployedBytecodeInfo length {} expected {expected_len}",
+            bytecode_info.len()
+        ));
+        return;
+    }
+
+    let observable = FixedBytes::<32>::from_slice(&bytecode_info[observable_range]);
+    if evm_deployed_bytecode_hash_matches_file(verifiers, &observable, expected_file) {
+        // ok — no noise on success to keep output readable
+    } else {
+        let actual_file = verifiers
+            .bytecode_verifier
+            .evm_deployed_bytecode_hash_to_file(&observable)
+            .cloned()
+            .unwrap_or_else(|| format!("unknown hash {observable}"));
+        result.report_error(&format!(
+            "ZKsyncOS force deployment at {addr_label}: expected file {expected_file}, \
+             observable hash maps to {actual_file}"
+        ));
+    }
+}
 
 // Mirrors CoreOnGatewayHelper.getFullListOfFactoryDependencies(false, [L2V31Upgrade]).
 const EXPECTED_V31_ERA_BYTECODES: &[&str] = &[
@@ -631,22 +1122,7 @@ async fn verify_era_force_deploy_and_upgrade(
         ));
     }
 
-    let mut matching_deployments = decoded._forceDeployments.iter().filter(|deployment| {
-        bytecode_hash_matches_file(verifiers, &deployment.bytecodeHash, L2_V31_UPGRADE_CONTRACT)
-    });
-    match (matching_deployments.next(), matching_deployments.next()) {
-        (Some(deployment), None) => {
-            verify_era_l2_v31_deployment(verifiers, result, expected_delegate_to, deployment);
-        }
-        (None, _) => result.report_error(&format!(
-            "Era forceDeployAndUpgrade does not include an {} force deployment",
-            L2_V31_UPGRADE_CONTRACT
-        )),
-        (Some(_), Some(_)) => result.report_error(&format!(
-            "Era forceDeployAndUpgrade contains multiple {} force deployments",
-            L2_V31_UPGRADE_CONTRACT
-        )),
-    }
+    verify_v31_era_force_deployments(verifiers, result, &decoded._forceDeployments).await?;
 
     verify_l2_v31_upgrade_inner_calldata(
         verifiers,
@@ -695,6 +1171,15 @@ async fn verify_zksync_os_force_deploy_and_upgrade(
     decoded: &IComplexUpgrader::forceDeployAndUpgradeUniversalCall,
     expected_fixed_force_deployments_data: &str,
 ) -> anyhow::Result<()> {
+    // Validate all expected force deployments (17 fixed entries; L2V31Upgrade delegate validated below).
+    verify_v31_zksync_os_force_deployments(
+        verifiers,
+        result,
+        &decoded._forceDeployments,
+        decoded._delegateTo,
+    );
+
+    // Validate the L2V31Upgrade delegate-target entry (1 unsafe force deployment at a derived address).
     let mut matching_deployments = decoded
         ._forceDeployments
         .iter()
