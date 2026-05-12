@@ -41,6 +41,7 @@ pub(crate) struct Verifiers {
     pub fee_param_verifier: FeeParamVerifier,
     pub gateway_bridgehub_address: Address,
     pub representative_era_chain_id: Option<u64>,
+    pub zk_token_asset_id: Option<FixedBytes<32>>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -100,6 +101,7 @@ impl Verifiers {
             fee_param_verifier: FeeParamVerifier::empty(),
             gateway_bridgehub_address: address_from_short_hex("10002"),
             representative_era_chain_id,
+            zk_token_asset_id: None,
         })
     }
 
@@ -161,6 +163,7 @@ impl Verifiers {
             fee_param_verifier,
             gateway_bridgehub_address: address_from_short_hex("10002"),
             representative_era_chain_id: Some(era_chain_id),
+            zk_token_asset_id: None,
         }
     }
 

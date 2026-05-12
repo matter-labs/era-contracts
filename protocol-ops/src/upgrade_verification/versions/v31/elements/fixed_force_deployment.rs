@@ -3,7 +3,15 @@ use alloy::sol;
 
 use crate::upgrade_verification::verifiers::{VerificationResult, Verifiers};
 
+use super::super::utils::apply_l2_to_l1_alias;
 use super::super::MAX_NUMBER_OF_ZK_CHAINS;
+
+sol! {
+    #[sol(rpc)]
+    interface BridgehubBase {
+        function chainRegistrationSender() external view returns (address);
+    }
+}
 
 sol! {
     #[derive(Debug)]
@@ -287,26 +295,59 @@ impl FixedForceDeploymentsData {
         result.expect_address(verifiers, &self.l2SharedBridgeLegacyImpl, "zero");
         result.expect_address(verifiers, &self.l2BridgedStandardERC20Impl, "zero");
 
-        if self.aliasedChainRegistrationSender == Address::ZERO {
-            result.report_error("aliasedChainRegistrationSender must not be zero");
-        } else {
-            result.report_warn(&format!(
-                "FixedForceDeploymentsData aliasedChainRegistrationSender (not verified against address book): {}",
-                self.aliasedChainRegistrationSender
-            ));
+        let bridgehub = BridgehubBase::new(
+            verifiers.bridgehub_address,
+            verifiers.network_verifier.get_l1_provider(),
+        );
+        match bridgehub.chainRegistrationSender().call().await {
+            Ok(sender) => {
+                let expected_alias = apply_l2_to_l1_alias(sender);
+                if self.aliasedChainRegistrationSender == expected_alias {
+                    result.report_ok(&format!(
+                        "aliasedChainRegistrationSender matches applyL1ToL2Alias(Bridgehub.chainRegistrationSender()) = {expected_alias}"
+                    ));
+                } else {
+                    result.report_error(&format!(
+                        "aliasedChainRegistrationSender mismatch: expected {} (alias of {}), got {}",
+                        expected_alias, sender, self.aliasedChainRegistrationSender
+                    ));
+                }
+            }
+            Err(err) => {
+                result.report_warn(&format!(
+                    "Could not verify aliasedChainRegistrationSender via RPC: {err}. Raw value: {}",
+                    self.aliasedChainRegistrationSender
+                ));
+            }
         }
 
         if self.dangerousTestOnlyForcedBeacon != Address::ZERO {
             result.report_error("dangerousTestOnlyForcedBeacon must be 0");
         }
 
-        if self.zkTokenAssetId == FixedBytes::<32>::ZERO {
-            result.report_error("zkTokenAssetId must not be zero");
-        } else {
-            result.report_warn(&format!(
-                "FixedForceDeploymentsData zkTokenAssetId (not verified against expected value): {}",
-                self.zkTokenAssetId
-            ));
+        match verifiers.zk_token_asset_id {
+            Some(expected) => {
+                if self.zkTokenAssetId == expected {
+                    result.report_ok(&format!(
+                        "zkTokenAssetId matches --zk-token-asset-id ({expected})"
+                    ));
+                } else {
+                    result.report_error(&format!(
+                        "zkTokenAssetId mismatch: expected {expected}, got {}",
+                        self.zkTokenAssetId
+                    ));
+                }
+            }
+            None => {
+                if self.zkTokenAssetId == FixedBytes::<32>::ZERO {
+                    result.report_error("zkTokenAssetId must not be zero");
+                } else {
+                    result.report_warn(&format!(
+                        "zkTokenAssetId not fully verified (pass --zk-token-asset-id to enable): {}",
+                        self.zkTokenAssetId
+                    ));
+                }
+            }
         }
 
         Ok(())

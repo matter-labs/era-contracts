@@ -65,6 +65,12 @@ pub struct VerifyUpgradeArgs {
     /// passed to `ecosystem upgrade-prepare --create2-factory-salt`. Required.
     #[clap(long)]
     pub create2_salt: String,
+
+    /// Expected ZK token asset ID (`keccak256(abi.encode(l1ChainId, 0x10004, zkTokenL1Address))`).
+    /// When provided, `FixedForceDeploymentsData.zkTokenAssetId` is verified against this value
+    /// instead of only checked for non-zero. Recommended for production verification runs.
+    #[clap(long)]
+    pub zk_token_asset_id: Option<FixedBytes<32>>,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -130,6 +136,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         &executed_bundle,
         create2_factory,
         create2_salt,
+        args.zk_token_asset_id,
         &mut result,
     )
     .await;

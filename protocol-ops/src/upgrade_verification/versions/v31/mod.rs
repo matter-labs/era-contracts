@@ -71,6 +71,7 @@ pub(crate) async fn verify(
     executed_bundle: &ExecutedBundle,
     create2_factory: Address,
     create2_salt: FixedBytes<32>,
+    zk_token_asset_id: Option<FixedBytes<32>>,
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
     result.print_info("== Config verification ==");
@@ -82,6 +83,7 @@ pub(crate) async fn verify(
         genesis_config_kind,
     )
     .await?;
+    verifiers.zk_token_asset_id = zk_token_asset_id;
     result.report_ok(&format!(
         "v31 verifier context loaded with {} named addresses",
         verifiers.address_verifier.name_to_address.len()
