@@ -5,7 +5,11 @@ pragma solidity 0.8.28;
 import {MigratorTest} from "./_Migrator_Shared.t.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 import {IL1ChainAssetHandler} from "contracts/core/chain-asset-handler/IL1ChainAssetHandler.sol";
-import {DepositsNotPaused, MigrationInProgress} from "contracts/state-transition/L1StateTransitionErrors.sol";
+import {
+    AlreadyMigrated,
+    DepositsNotPaused,
+    MigrationInProgress
+} from "contracts/state-transition/L1StateTransitionErrors.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract UnpauseDepositsTest is MigratorTest {
@@ -41,6 +45,36 @@ contract UnpauseDepositsTest is MigratorTest {
         address admin = utilsFacet.util_getAdmin();
         vm.startPrank(admin);
         vm.expectRevert(abi.encodeWithSelector(DepositsNotPaused.selector));
+        migratorFacet.unpauseDeposits();
+    }
+
+    function test_revertWhen_chainSettledOnRemoteSettlementLayer() public {
+        // Pausing deposits before initiating migration sets the flag on both L1 and the current
+        // settlement layer (when the chain is on a remote SL). Admin must not be able to clear
+        // only L1's flag — that would leave Gateway's flag set indefinitely. This test asserts
+        // that `unpauseDeposits` reverts while the chain is still on a remote SL.
+        _pauseDeposits();
+        address fakeSettlementLayer = makeAddr("settlementLayer");
+        utilsFacet.util_setSettlementLayer(fakeSettlementLayer);
+        address admin = utilsFacet.util_getAdmin();
+        address bridgehub = utilsFacet.util_getBridgehub();
+        address mockChainAssetHandler = makeAddr("mockChainAssetHandler");
+
+        // The migration-in-progress check runs before the new settlement-layer check, so we
+        // must keep it passing in order to actually exercise the new revert.
+        vm.mockCall(
+            bridgehub,
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
+            abi.encode(mockChainAssetHandler)
+        );
+        vm.mockCall(
+            mockChainAssetHandler,
+            abi.encodeWithSelector(IL1ChainAssetHandler.isMigrationInProgress.selector),
+            abi.encode(false)
+        );
+
+        vm.startPrank(admin);
+        vm.expectRevert(abi.encodeWithSelector(AlreadyMigrated.selector));
         migratorFacet.unpauseDeposits();
     }
 

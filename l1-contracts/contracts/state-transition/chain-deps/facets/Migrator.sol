@@ -129,6 +129,13 @@ contract MigratorFacet is ZKChainBase, IMigrator {
             !IL1ChainAssetHandler(IL1Bridgehub(s.bridgehub).chainAssetHandler()).isMigrationInProgress(s.chainId),
             MigrationInProgress()
         );
+        // Pausing also flips the deposit-pause flag on the Gateway via a cross-chain message
+        // (see `pauseDepositsBeforeInitiatingMigration`). Only L1's flag can be cleared from
+        // here, so refuse to unpause while the chain is still settled on a remote SL — that
+        // would leave Gateway's flag set and the two sides desynchronized. Admin must wait for
+        // the chain to be back on L1 (or let `forwardedBridgeMint` clear L1's flag as part of
+        // the GW->L1 migration completion).
+        require(s.settlementLayer == address(0), AlreadyMigrated());
         _unpauseDeposits();
     }
 
