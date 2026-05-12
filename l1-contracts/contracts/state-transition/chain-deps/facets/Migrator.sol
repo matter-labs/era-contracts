@@ -102,6 +102,17 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         if (s.priorityModeInfo.canBeActivated) {
             revert NotCompatibleWithPriorityMode();
         }
+        // Retry path: if L1 is already paused and the chain is on a remote SL, this is a retry
+        // of the cross-chain pause msg (e.g. the original `requestPauseDepositsForChainOnGateway`
+        // did not land on Gateway). Re-send the msg using L1's existing `pausedDepositsTimestamp`
+        // without touching it. The retry is idempotent: `pauseDepositsOnGateway` overwrites GW's
+        // flag with the same value, and the time-window check on GW (`timestamp + window <=
+        // block.timestamp`) is gated off the same original timestamp regardless of how many
+        // retries fire, so the safety window can't be shortened.
+        if (s.pausedDepositsTimestamp != 0 && s.settlementLayer != address(0)) {
+            IL1AssetTracker(s.assetTracker).requestPauseDepositsForChainOnGateway(s.chainId);
+            return;
+        }
         require(s.pausedDepositsTimestamp == 0, DepositsAlreadyPaused());
         uint256 timestamp;
         // Note, if the chain is new (total number of priority transactions is 0) we allow admin to pause the deposits with immediate effect.

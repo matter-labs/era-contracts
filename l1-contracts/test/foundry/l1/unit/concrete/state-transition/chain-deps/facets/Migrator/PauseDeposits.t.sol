@@ -104,6 +104,48 @@ contract PauseDepositsTest is MigratorTest {
         migratorFacet.pauseDepositsBeforeInitiatingMigration();
     }
 
+    function test_retry_resendsCrossChainPauseMsg_withoutTouchingL1Flag() public {
+        // Setup: L1 already paused (pausedDepositsTimestamp != 0) AND chain on a remote SL.
+        // This is the "the original cross-chain pause msg failed to land on Gateway" recovery
+        // path: calling pauseDepositsBeforeInitiatingMigration again should re-send the msg
+        // using L1's existing pausedDepositsTimestamp, without overwriting it and without
+        // emitting a new DepositsPaused event.
+        uint256 chainId = utilsFacet.util_getChainId();
+        address admin = utilsFacet.util_getAdmin();
+        address settlementLayer = makeAddr("settlementLayer");
+        address assetTracker = makeAddr("assetTracker");
+
+        // Warp forward so block.timestamp is comfortably > 0 and we can pick an "earlier" pause.
+        vm.warp(1000);
+        // Pretend admin previously paused (set pausedDepositsTimestamp directly to a known value).
+        uint256 originalPauseTimestamp = block.timestamp - 100;
+        vm.store(address(migratorFacet), pausedDepositsTimestampSlot, bytes32(originalPauseTimestamp));
+
+        utilsFacet.util_setSettlementLayer(settlementLayer);
+        utilsFacet.util_setAssetTracker(assetTracker);
+
+        // Expect the cross-chain pause msg to be re-sent.
+        vm.expectCall(
+            assetTracker,
+            abi.encodeWithSelector(IL1AssetTracker.requestPauseDepositsForChainOnGateway.selector, chainId)
+        );
+        // Mock it so the call doesn't revert.
+        vm.mockCall(
+            assetTracker,
+            abi.encodeWithSelector(IL1AssetTracker.requestPauseDepositsForChainOnGateway.selector, chainId),
+            abi.encode()
+        );
+
+        vm.startPrank(admin);
+        migratorFacet.pauseDepositsBeforeInitiatingMigration();
+
+        // L1's pausedDepositsTimestamp must be untouched: same value as before the retry.
+        uint256 pausedDepositsTimestampAfter = uint256(
+            vm.load(address(migratorFacet), pausedDepositsTimestampSlot)
+        );
+        assertEq(pausedDepositsTimestampAfter, originalPauseTimestamp);
+    }
+
     function test_successfulCall_settlementLayerSet_withPriorityTxs() public {
         // Set up: settlementLayer is non-zero, totalPriorityTxs > 0
         // This should call requestPauseDepositsForChainOnGateway (line 341)
