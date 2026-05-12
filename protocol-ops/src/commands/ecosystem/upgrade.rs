@@ -40,6 +40,8 @@ use crate::config::forge_interface::script_params::{
     UPGRADE_V31_CORE_OUTPUT_PATH, UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH,
 };
 
+const SKIP_PUH_ENV_VAR: &str = "SKIP_PUH";
+
 // ── upgrade-governance (stages 0 + 1 + 2 on one fork) ─────────────────────
 
 /// Run governance stages 0, 1, and 2 on the same anvil fork. Forge's
@@ -634,7 +636,10 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         .as_ref()
         .map(|c| c.governance_kind())
         .unwrap_or_default();
-    let puh_outcome = if governance_kind == crate::common::env_config::GovernanceKind::Puh {
+    // TEMPORARY -- do remove
+    let is_puh_governed = governance_kind == crate::common::env_config::GovernanceKind::Puh;
+    let skip_puh = std::env::var_os(SKIP_PUH_ENV_VAR).is_some();
+    let puh_outcome = if is_puh_governed && !skip_puh {
         Some(
             crate::commands::ecosystem::puh_guardians::deploy_puh_guardians(
                 &mut runner,
@@ -648,9 +653,15 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             .context("PUH/Guardians redeploy step")?,
         )
     } else {
-        logger::info(
-            "Skipping PUH/Guardians redeploy (governance_kind != \"puh\" — env uses legacy Governance.sol)",
-        );
+        if is_puh_governed {
+            logger::info(format!(
+                "Skipping PUH/Guardians redeploy ({SKIP_PUH_ENV_VAR} is set)"
+            ));
+        } else {
+            logger::info(
+                "Skipping PUH/Guardians redeploy (governance_kind != \"puh\" — env uses legacy Governance.sol)",
+            );
+        }
         None
     };
 
