@@ -126,10 +126,14 @@ produced by `upgrade-prepare-all`:
   --l1-rpc-url "$ANVIL_RPC" \
   --era-chain-id 270 \
   --executed-bundles /tmp/v31-stage/executed.json \
-  --create2-salt 0x88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5
+  --create2-salt 0x88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5 \
+  --zk-token-asset-id 0xd7912bfd25000ee1b3355167866f960a61787b79cd2c7e791036fe6e85a73823
 ```
 
 (The salt above is `--env stage`'s `permanent_contracts.create2_factory_salt`; substitute your env's value.)
+
+`--zk-token-asset-id` is recommended for production verification runs. When omitted, `zkTokenAssetId`
+is only checked to be non-zero and a warning is emitted.
 
 The `--create2-factory` flag defaults to the standard Foundry CREATE2
 factory (`0x4e59b44847b379578588920cA78FbF26c0B4956C`) used by the v31
