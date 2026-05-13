@@ -57,6 +57,13 @@ pub struct UpgradeBroadcastArgs {
     /// safety net to avoid accidental impersonation attempts on real prod.
     #[clap(long)]
     pub unlocked: bool,
+
+    /// Optional path to accumulate executed-tx logs across every bundle in the
+    /// manifest. Same shape `dev execute-safe --out` produces. Consumed by
+    /// `ecosystem verify-upgrade --executed-bundles <path>` so the verifier
+    /// can reconstruct CREATE2 / TUPP deployments from a fork rehearsal.
+    #[clap(long)]
+    pub out: Option<PathBuf>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -136,6 +143,7 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
         },
     ));
 
+    let out_path = args.out.as_deref();
     for bundle in &manifest.bundles {
         let bundle_path = manifest_dir.join(&bundle.file);
         logger::info(format!(
@@ -146,12 +154,12 @@ pub async fn run(args: UpgradeBroadcastArgs) -> anyhow::Result<()> {
             bundle.file,
         ));
         if args.unlocked {
-            execute_one_bundle_unlocked(&bundle_path, &args.l1_rpc_url, bundle.target)
+            execute_one_bundle_unlocked(&bundle_path, &args.l1_rpc_url, bundle.target, out_path)
                 .await
                 .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
         } else {
             let key = &key_map[&bundle.target];
-            execute_one_bundle(&bundle_path, &args.l1_rpc_url, key, None)
+            execute_one_bundle(&bundle_path, &args.l1_rpc_url, key, out_path)
                 .await
                 .with_context(|| format!("bundle #{} ({})", bundle.index, bundle.file))?;
         }

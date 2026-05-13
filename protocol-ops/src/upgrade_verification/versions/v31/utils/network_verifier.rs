@@ -137,7 +137,7 @@ impl NetworkVerifier {
         &mut self,
         bundle: &ExecutedBundle,
         create2_factory: &Address,
-        create2_salt: &FixedBytes<32>,
+        create2_salts: &[FixedBytes<32>],
         bytecode_verifier: &BytecodeVerifier,
     ) {
         for tx in &bundle.transactions {
@@ -151,7 +151,7 @@ impl NetworkVerifier {
                 to,
                 &input,
                 create2_factory,
-                create2_salt,
+                create2_salts,
                 bytecode_verifier,
             ) {
                 self.create2_constructor_params.insert(addr, params);
@@ -471,7 +471,7 @@ async fn check_create2_deploy(
         to,
         tx.input(),
         expected_create2_address,
-        expected_create2_salt,
+        std::slice::from_ref(expected_create2_salt),
         bytecode_verifier,
     )
 }
@@ -484,7 +484,7 @@ fn check_create2_deploy_from_input(
     to: Address,
     input: &[u8],
     expected_create2_address: &Address,
-    expected_create2_salt: &FixedBytes<32>,
+    expected_create2_salts: &[FixedBytes<32>],
     bytecode_verifier: &BytecodeVerifier,
 ) -> Option<(Address, String, Vec<u8>)> {
     if to != *expected_create2_address {
@@ -500,7 +500,7 @@ fn check_create2_deploy_from_input(
     // We will try both here.
 
     let salt = &input[0..32];
-    if salt != expected_create2_salt.as_slice() {
+    if !expected_create2_salts.iter().any(|s| salt == s.as_slice()) {
         return None;
     }
 

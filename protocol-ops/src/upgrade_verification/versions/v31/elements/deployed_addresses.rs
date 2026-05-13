@@ -1273,6 +1273,185 @@ async fn verify_v31_ctm_permissionless_validator(
     }
 }
 
+/// Per-CTM, per-flavor provenance for the contracts that ship one copy per
+/// CTM (verifiers, DiamondInit, default_upgrade, genesis_upgrade, getters/
+/// executor/admin facets). The v31 upgrade deploys these once for Era and
+/// once for ZKsyncOS; the single `--genesis-config` CLI hint can only
+/// describe one flavor, so iterating per CTM and using each CTM's own
+/// `flavor` is the only correct way to verify both.
+///
+/// All addresses come from the CTM's own `[ctms.<flavor>]` section via
+/// `required_ctm_address`. Optional addresses are silently skipped (some
+/// older artifacts don't populate every field).
+fn verify_ctm_flavored_provenance(
+    artifact: &EcosystemUpgradeArtifact,
+    ctm: &CtmArtifact,
+    verifiers: &Verifiers,
+    l1_chain_id: u64,
+    result: &mut VerificationResult,
+) {
+    let label = ctm.flavor.label();
+    let is_zksync_os = matches!(ctm.flavor, CtmFlavor::ZksyncOs);
+
+    // Per-flavor verifier file names. `AllContractsHashes.json` ships
+    // per-flavor verifiers since v30, so we match each CTM's deploys
+    // against the matching set.
+    let (verifier_plonk_file, verifier_fflonk_file, dual_verifier_file, testnet_verifier_file) =
+        match ctm.flavor {
+            CtmFlavor::Era => (
+                "l1-contracts/EraVerifierPlonk",
+                "l1-contracts/EraVerifierFflonk",
+                "l1-contracts/EraDualVerifier",
+                "l1-contracts/EraTestnetVerifier",
+            ),
+            CtmFlavor::ZksyncOs => (
+                "l1-contracts/ZKsyncOSVerifierPlonk",
+                "l1-contracts/ZKsyncOSVerifierFflonk",
+                "l1-contracts/ZKsyncOSDualVerifier",
+                "l1-contracts/ZKsyncOSTestnetVerifier",
+            ),
+        };
+    // Per-flavor SettlementLayerV31Upgrade variant. `default_upgrade_addr`
+    // holds the new settlement-layer upgrade contract for the CTM.
+    let default_upgrade_file = match ctm.flavor {
+        CtmFlavor::Era => "l1-contracts/EraSettlementLayerV31Upgrade",
+        CtmFlavor::ZksyncOs => "l1-contracts/ZKsyncOSSettlementLayerV31Upgrade",
+    };
+
+    let try_get = |path: &[&str]| -> Option<Address> {
+        // Look up an optional field without reporting an error for missing.
+        let mut current = &ctm.value;
+        for segment in path {
+            current = current.get(*segment)?;
+        }
+        let raw = current.as_str()?;
+        Address::from_str(raw).ok()
+    };
+
+    // Constants with no constructor args.
+    for (path, expected_file) in [
+        (
+            &["deployed_addresses", "l1_genesis_upgrade"][..],
+            "l1-contracts/L1GenesisUpgrade",
+        ),
+        (
+            &["state_transition", "genesis_upgrade_addr"],
+            "l1-contracts/L1GenesisUpgrade",
+        ),
+        (
+            &["state_transition", "getters_facet_addr"],
+            "l1-contracts/GettersFacet",
+        ),
+        (
+            &["state_transition", "default_upgrade_addr"],
+            default_upgrade_file,
+        ),
+        (
+            &["state_transition", "verifier_plonk_addr"],
+            verifier_plonk_file,
+        ),
+        (
+            &["state_transition", "verifier_fflonk_addr"],
+            verifier_fflonk_file,
+        ),
+    ] {
+        if let Some(addr) = try_get(path) {
+            result.expect_create2_params(verifiers, &addr, Vec::<u8>::new(), expected_file);
+        }
+    }
+
+    // DiamondInit(bool _isZKsyncOS) — encoded as a single 32-byte word.
+    if let Some(diamond_init) = try_get(&["state_transition", "diamond_init_addr"]) {
+        let mut encoded = vec![0u8; 32];
+        if is_zksync_os {
+            encoded[31] = 1;
+        }
+        result.expect_create2_params(
+            verifiers,
+            &diamond_init,
+            encoded,
+            "l1-contracts/DiamondInit",
+        );
+    }
+
+    // ExecutorFacet(l1ChainId) — file is shared across flavors, but the
+    // address is per-CTM (different CREATE2 init+args between CTMs only when
+    // the deploy salt differs; both end up at the same logical contract
+    // file).
+    if let Some(executor) = try_get(&["state_transition", "executor_facet_addr"]) {
+        result.expect_create2_params(
+            verifiers,
+            &executor,
+            V31ExecutorFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
+            "l1-contracts/ExecutorFacet",
+        );
+    }
+
+    // AdminFacet(l1ChainId, rollupDAManager) — rollupDAManager is per-CTM.
+    let rollup_da_manager = try_get(&["deployed_addresses", "rollup_da_manager"])
+        .or_else(|| try_get(&["state_transition", "rollup_da_manager"]))
+        .or_else(|| try_get(&["rollup_da_manager"]));
+    if let (Some(admin), Some(rollup_da_manager)) = (
+        try_get(&["state_transition", "admin_facet_addr"]),
+        rollup_da_manager,
+    ) {
+        result.expect_create2_params(
+            verifiers,
+            &admin,
+            V31AdminFacet::constructorCall::new((U256::from(l1_chain_id), rollup_da_manager))
+                .abi_encode(),
+            "l1-contracts/AdminFacet",
+        );
+    }
+
+    // DualVerifier(fflonk, plonk) / *TestnetVerifier.
+    // Stage / testnet environments deploy the `*TestnetVerifier` flavor
+    // instead of `*DualVerifier`; pick whichever the CREATE2 deploy was
+    // actually identified as.
+    //
+    // ZKsyncOS verifiers take a third `_initialOwner` constructor arg
+    // (the deployer EOA — `DeployCTMUtils.verifierOwner = getBroadcasterAddress()`)
+    // and `DeployCTML1OrGateway.verifierCreationArgs` extends the encoding
+    // accordingly. We don't have a canonical "expected owner" in the
+    // artifact, but the deployed args are recoverable from
+    // `create2_constructor_params`. Read them, extract the actual owner
+    // (with format sanity checks), and reuse it as the expected arg —
+    // effectively asserting `(fflonk, plonk)` match the artifact while
+    // accepting whatever `_initialOwner` the broadcaster supplied.
+    if let (Some(verifier), Some(fflonk), Some(plonk)) = (
+        try_get(&["state_transition", "verifier_addr"]),
+        try_get(&["state_transition", "verifier_fflonk_addr"]),
+        try_get(&["state_transition", "verifier_plonk_addr"]),
+    ) {
+        let resolved_file = verifiers
+            .network_verifier
+            .create2_known_bytecodes
+            .get(&verifier)
+            .cloned();
+        let expected_file = match resolved_file.as_deref() {
+            Some(file) if file == testnet_verifier_file => testnet_verifier_file,
+            _ => dual_verifier_file,
+        };
+        let encoded = if is_zksync_os {
+            let initial_owner = verifiers
+                .network_verifier
+                .create2_constructor_params
+                .get(&verifier)
+                .and_then(|params| {
+                    (params.len() == 96).then(|| Address::from_slice(&params[76..96]))
+                })
+                .unwrap_or(Address::ZERO);
+            V31ZKsyncOSDualVerifier::constructorCall::new((fflonk, plonk, initial_owner))
+                .abi_encode()
+        } else {
+            V31DualVerifier::constructorCall::new((fflonk, plonk)).abi_encode()
+        };
+        result.expect_create2_params(verifiers, &verifier, encoded, expected_file);
+    }
+
+    let _ = (artifact, label); // hooks for future per-CTM checks
+}
+
 fn required_ctm_address(
     ctm: &CtmArtifact,
     path: &[&str],
@@ -1378,6 +1557,9 @@ sol! {
     contract V31DualVerifier {
         constructor(address _fflonkVerifier, address _plonkVerifier);
     }
+    contract V31ZKsyncOSDualVerifier {
+        constructor(address _fflonkVerifier, address _plonkVerifier, address _initialOwner);
+    }
     contract V31MigratorFacet {
         constructor(uint256 _l1ChainId, bool _isTestnet);
     }
@@ -1439,22 +1621,6 @@ pub(crate) async fn verify_v31_provenance(
         .await
         .unwrap_or_else(|err| panic!("Failed to fetch L1 chain id for provenance: {err}"));
 
-    // Era / ZKsync OS file-name split for the v31 verifier contracts.
-    // `AllContractsHashes.json` ships per-flavour verifiers since v30.
-    let (verifier_plonk_file, verifier_fflonk_file, dual_verifier_file) = match genesis_config_kind
-    {
-        GenesisConfigKind::Era => (
-            "l1-contracts/EraVerifierPlonk",
-            "l1-contracts/EraVerifierFflonk",
-            "l1-contracts/EraDualVerifier",
-        ),
-        GenesisConfigKind::ZksyncOs => (
-            "l1-contracts/ZKsyncOSVerifierPlonk",
-            "l1-contracts/ZKsyncOSVerifierFflonk",
-            "l1-contracts/ZKsyncOSDualVerifier",
-        ),
-    };
-
     // Convenience lookups against the artifact-derived address verifier.
     // Each address used as a constructor input has to come from somewhere;
     // we tolerate missing entries because not every operator scenario
@@ -1467,97 +1633,20 @@ pub(crate) async fn verify_v31_provenance(
             .copied()
     };
 
-    let is_zksync_os = matches!(genesis_config_kind, GenesisConfigKind::ZksyncOs);
     let is_testnet = artifact.contracts_config.is_testnet;
 
-    // Contracts with no constructor args — `expect_create2_params(addr, &[],
-    // expected_file)` works as-is.
-    for (name, expected_file) in [
-        ("genesis_upgrade_addr", "l1-contracts/L1GenesisUpgrade"),
-        ("getters_facet_addr", "l1-contracts/GettersFacet"),
-        // v31 settlement-layer upgrade contract; takes the slot of the
-        // legacy `DefaultUpgrade` in `state_transition.default_upgrade_addr`.
-        // No constructor args.
-        (
-            "default_upgrade",
-            "l1-contracts/EraSettlementLayerV31Upgrade",
-        ),
-        ("verifier_plonk_addr", verifier_plonk_file),
-        ("verifier_fflonk_addr", verifier_fflonk_file),
-    ] {
-        if let Some(addr) = lookup(name) {
-            result.expect_create2_params(verifiers, &addr, Vec::<u8>::new(), expected_file);
-        }
-    }
-    // DiamondInit takes `(bool _isZKsyncOS)` per
-    // `DeployCTML1OrGateway.getCreationCalldata`. The encoded value is a
-    // single 32-byte word.
-    if let Some(diamond_init) = lookup("diamond_init_addr") {
-        let mut encoded = vec![0u8; 32];
-        if is_zksync_os {
-            encoded[31] = 1;
-        }
-        result.expect_create2_params(
-            verifiers,
-            &diamond_init,
-            encoded,
-            "l1-contracts/DiamondInit",
-        );
-    }
+    // The per-CTM (verifier, diamond_init, default_upgrade, getters_facet,
+    // l1_genesis_upgrade, executor_facet, admin_facet) provenance moved into
+    // a per-CTM loop below — each CTM ships its own copies of those, with
+    // file names + constructor args parameterized by the CTM flavor.
+    // `genesis_config_kind` is kept on the signature for legacy callers but
+    // is no longer consulted: every flavored decision is now taken per-CTM
+    // from `ctm.flavor`, so a single CLI hint cannot describe both Era and
+    // ZKsyncOS CTMs in a multi-CTM upgrade.
+    let _ = genesis_config_kind;
 
-    // Single-uint constructors.
-    if let Some(executor) = lookup("executor_facet_addr") {
-        result.expect_create2_params(
-            verifiers,
-            &executor,
-            V31ExecutorFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
-            "l1-contracts/ExecutorFacet",
-        );
-    }
-
-    // AdminFacet(l1ChainId, rollupDAManager).
-    if let (Some(admin), Some(rollup_da_manager)) =
-        (lookup("admin_facet_addr"), lookup("rollup_da_manager"))
-    {
-        result.expect_create2_params(
-            verifiers,
-            &admin,
-            V31AdminFacet::constructorCall::new((U256::from(l1_chain_id), rollup_da_manager))
-                .abi_encode(),
-            "l1-contracts/AdminFacet",
-        );
-    }
-
-    // DualVerifier(fflonk, plonk). Stage / testnet environments deploy the
-    // `*TestnetVerifier` flavour instead of `*DualVerifier`; legacy PUVT
-    // gated this on a `--testnet-contracts` flag, but for v31 we accept
-    // either name (the constructor args are identical). Pick whichever
-    // file the deployment was actually identified as before calling
-    // `expect_create2_params`, so we don't double-report on a name miss.
-    if let (Some(verifier), Some(fflonk), Some(plonk)) = (
-        lookup("verifier"),
-        lookup("verifier_fflonk_addr"),
-        lookup("verifier_plonk_addr"),
-    ) {
-        let testnet_verifier_file = match genesis_config_kind {
-            GenesisConfigKind::Era => "l1-contracts/EraTestnetVerifier",
-            GenesisConfigKind::ZksyncOs => "l1-contracts/ZKsyncOSTestnetVerifier",
-        };
-        let resolved_file = verifiers
-            .network_verifier
-            .create2_known_bytecodes
-            .get(&verifier)
-            .cloned();
-        let expected_file = match resolved_file.as_deref() {
-            Some(file) if file == testnet_verifier_file => testnet_verifier_file,
-            _ => dual_verifier_file,
-        };
-        result.expect_create2_params(
-            verifiers,
-            &verifier,
-            V31DualVerifier::constructorCall::new((fflonk, plonk)).abi_encode(),
-            expected_file,
-        );
+    for ctm in &artifact.ctms {
+        verify_ctm_flavored_provenance(artifact, ctm, verifiers, l1_chain_id, result);
     }
 
     // The remaining contracts pull constructor args from the live
@@ -1788,10 +1877,28 @@ pub(crate) async fn verify_v31_provenance(
     // distinct gateway chain id, so the deployed bytecode's
     // `_eraGatewayChainId` immutable equals the L1 chain id; mirror that
     // encoding here.
+    //
+    // Stage Sepolia deploys the `L1MessageRootStageSepolia` variant (which
+    // skips chain 270's still-on-GW-123 settlement check during
+    // `_v31InitializeInner`) — its constructor signature is identical, but
+    // the bytecode hash differs. Pick whichever file the CREATE2 deploy was
+    // identified as, matching the same pattern the DualVerifier branch uses
+    // for the testnet variant.
     if let (Some(message_root_impl), Some(chain_asset_handler)) = (
         lookup("message_root_implementation_addr"),
         chain_asset_handler_proxy,
     ) {
+        let resolved_file = verifiers
+            .network_verifier
+            .create2_known_bytecodes
+            .get(&message_root_impl)
+            .cloned();
+        let expected_file = match resolved_file.as_deref() {
+            Some("l1-contracts/L1MessageRootStageSepolia") => {
+                "l1-contracts/L1MessageRootStageSepolia"
+            }
+            _ => "l1-contracts/L1MessageRoot",
+        };
         result.expect_create2_params(
             verifiers,
             &message_root_impl,
@@ -1801,7 +1908,7 @@ pub(crate) async fn verify_v31_provenance(
                 chain_asset_handler,
             ))
             .abi_encode(),
-            "l1-contracts/L1MessageRoot",
+            expected_file,
         );
     }
 

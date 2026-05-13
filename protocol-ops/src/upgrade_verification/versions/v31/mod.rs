@@ -70,7 +70,7 @@ pub(crate) async fn verify(
     genesis_config_kind: GenesisConfigKind,
     executed_bundle: &ExecutedBundle,
     create2_factory: Address,
-    create2_salt: FixedBytes<32>,
+    create2_salts: Vec<FixedBytes<32>>,
     zk_token_asset_id: Option<FixedBytes<32>>,
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
@@ -100,7 +100,7 @@ pub(crate) async fn verify(
         network_verifier.populate_create2_from_executed_bundle(
             executed_bundle,
             &create2_factory,
-            &create2_salt,
+            &create2_salts,
             bytecode_verifier,
         );
         network_verifier.create2_known_bytecodes.len()

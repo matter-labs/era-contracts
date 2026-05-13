@@ -22,6 +22,33 @@ pub(crate) struct EcosystemUpgradeArtifact {
     /// order encountered. `era` always sorts before `zksync_os` for
     /// deterministic ordering.
     pub(crate) ctms: Vec<CtmArtifact>,
+    /// Optional `[new_gateway]` table from `write_merged_ecosystem_toml` —
+    /// present when the env config carried a `[new_gateway]` block. Stage-2
+    /// verification uses this to know how many GW bring-up calls to expect
+    /// past the canonical 5 (unpauseMigration + per-CTM checks) and which
+    /// deployed-GW-CTM address to cross-check.
+    pub(crate) new_gateway: Option<NewGatewayArtifact>,
+}
+
+#[derive(Debug)]
+pub(crate) struct NewGatewayArtifact {
+    /// `gateway_state_transition.chain_type_manager_proxy_addr` — the L1
+    /// address of the deployed GW CTM. The `addChainTypeManager` L1→L2
+    /// priority tx whose calldata gets baked into stage 2 references this
+    /// address as the CTM being added to the L2 Bridgehub on the gateway.
+    pub(crate) gateway_chain_type_manager_addr: alloy::primitives::Address,
+    /// Deployed GW RollupDAManager (L1 address). Stage-2 GW bring-up sends
+    /// an `acceptOwnership` priority tx targeting this contract on L2 via
+    /// the new gateway — used to cross-check the priority-tx's `dstAddress`.
+    pub(crate) gateway_rollup_da_manager_addr: Option<alloy::primitives::Address>,
+    /// Deployed GW ServerNotifier proxy (L1 address). Same use as above —
+    /// the second `acceptOwnership` priority tx targets this contract.
+    pub(crate) gateway_server_notifier_addr: Option<alloy::primitives::Address>,
+    /// Raw `[new_gateway]` table, kept for downstream verifiers that want
+    /// to read additional fields (multicall3_addr, validators, diamond cut)
+    /// without re-parsing the artifact.
+    #[allow(dead_code)]
+    pub(crate) value: toml::Value,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -165,12 +192,60 @@ impl EcosystemUpgradeArtifact {
             }
         }
 
+        // `[new_gateway]` is optional. Its presence flags GW-bring-up stage-2
+        // calls — and we extract the deployed GW CTM proxy address while
+        // we're here so the stage-2 verifier doesn't have to re-walk the
+        // toml tree later.
+        let new_gateway = match root.remove("new_gateway") {
+            Some(value) => {
+                let table = expect_table(value, "new_gateway")?;
+                let gst = table
+                    .get("gateway_state_transition")
+                    .and_then(toml::Value::as_table)
+                    .context(
+                        "[new_gateway.gateway_state_transition] is required when [new_gateway] is present",
+                    )?;
+                let parse_required = |field: &str| -> anyhow::Result<alloy::primitives::Address> {
+                    let raw = gst
+                        .get(field)
+                        .and_then(toml::Value::as_str)
+                        .with_context(|| {
+                            format!(
+                                "[new_gateway.gateway_state_transition.{field}] is required when [new_gateway] is present"
+                            )
+                        })?;
+                    use std::str::FromStr;
+                    alloy::primitives::Address::parse_checksummed(raw, None)
+                        .or_else(|_| alloy::primitives::Address::from_str(raw))
+                        .with_context(|| format!("invalid address for `{field}`: `{raw}`"))
+                };
+                let parse_optional = |field: &str| -> Option<alloy::primitives::Address> {
+                    let raw = gst.get(field).and_then(toml::Value::as_str)?;
+                    use std::str::FromStr;
+                    alloy::primitives::Address::parse_checksummed(raw, None)
+                        .or_else(|_| alloy::primitives::Address::from_str(raw))
+                        .ok()
+                        .filter(|a| *a != alloy::primitives::Address::ZERO)
+                };
+                Some(NewGatewayArtifact {
+                    gateway_chain_type_manager_addr: parse_required(
+                        "chain_type_manager_proxy_addr",
+                    )?,
+                    gateway_rollup_da_manager_addr: parse_optional("rollup_da_manager_addr"),
+                    gateway_server_notifier_addr: parse_optional("server_notifier_proxy_addr"),
+                    value: toml::Value::Table(table),
+                })
+            }
+            None => None,
+        };
+
         Ok(Self {
             value: toml::Value::Table(flat),
             chain_upgrade_diamond_cut: ctms[0].chain_upgrade_diamond_cut.clone(),
             contracts_config: ctms[0].contracts_config.clone(),
             governance_calls,
             ctms,
+            new_gateway,
         })
     }
 }

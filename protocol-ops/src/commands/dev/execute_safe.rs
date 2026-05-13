@@ -307,6 +307,7 @@ pub(crate) async fn execute_one_bundle_unlocked(
     safe_file: &Path,
     l1_rpc_url: &str,
     sender: Address,
+    out_path: Option<&Path>,
 ) -> anyhow::Result<()> {
     logger::step(format!(
         "Execute Safe file (unlocked): {}",
@@ -341,6 +342,27 @@ pub(crate) async fn execute_one_bundle_unlocked(
         .get_transaction_count(sender, Some(BlockNumber::Pending.into()))
         .await
         .context("eth_getTransactionCount(pending)")?;
+
+    // Same accumulating-write shape as `execute_one_bundle`: load any
+    // existing log so multiple bundles into the same `--out` path stack in
+    // execution order (consumed by `ecosystem verify-upgrade --executed-bundles`).
+    let mut executed: ExecutedBundle = match out_path {
+        Some(path) if path.exists() => {
+            let raw = fs::read_to_string(path).with_context(|| {
+                format!(
+                    "failed to read existing executed-bundle file {}",
+                    path.display()
+                )
+            })?;
+            serde_json::from_str(&raw).with_context(|| {
+                format!(
+                    "failed to parse existing executed-bundle file {}",
+                    path.display()
+                )
+            })?
+        }
+        _ => ExecutedBundle::default(),
+    };
 
     for (idx, tx) in safe_txs.iter().enumerate() {
         let to: Address = tx
@@ -403,6 +425,17 @@ pub(crate) async fn execute_one_bundle_unlocked(
             status == 1.into(),
             "Safe tx #{idx} (hash {tx_hash:#x}) reverted (status=0)",
         );
+
+        if let Some(path) = out_path {
+            executed.transactions.push(ExecutedTx {
+                tx_hash: format!("{tx_hash:#x}"),
+                to: format!("{to:#x}"),
+                data: format!("0x{}", ethers::utils::hex::encode(receipt_input(tx)?)),
+                value: format!("{value}"),
+                status: status.as_u64(),
+            });
+            persist_executed_bundle(path, &executed)?;
+        }
     }
 
     logger::success("Safe file executed");

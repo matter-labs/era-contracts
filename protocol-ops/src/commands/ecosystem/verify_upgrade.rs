@@ -61,10 +61,16 @@ pub struct VerifyUpgradeArgs {
     #[clap(long, default_value = "0x4e59b44847b379578588920cA78FbF26c0B4956C")]
     pub create2_factory: String,
 
-    /// CREATE2 salt used by the prepare scripts. This must match the value
-    /// passed to `ecosystem upgrade-prepare --create2-factory-salt`. Required.
-    #[clap(long)]
-    pub create2_salt: String,
+    /// CREATE2 salt(s) used by the prepare scripts. Accept multiple via repeated
+    /// `--create2-salt 0xAA --create2-salt 0xBB ...` or a comma-separated list
+    /// `--create2-salt 0xAA,0xBB,0xCC`. Multiple salts are required when the
+    /// prepare flow generates a fresh random salt per sub-script
+    /// (`v31_upgrade_inner.rs` defaults to `H256::random()` per core / per-CTM /
+    /// per-GW-prep when no `--create2-factory-salt` is pinned). PUVT accepts
+    /// any CREATE2 factory tx whose salt matches one of the provided values.
+    /// Required.
+    #[clap(long, value_delimiter = ',', num_args = 1..)]
+    pub create2_salt: Vec<String>,
 
     /// Expected ZK token asset ID (`keccak256(abi.encode(l1ChainId, 0x10004, zkTokenL1Address))`).
     /// When provided, `FixedForceDeploymentsData.zkTokenAssetId` is verified against this value
@@ -122,8 +128,17 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
 
     let create2_factory = alloy::primitives::Address::from_str(&args.create2_factory)
         .map_err(|err| anyhow::anyhow!("invalid --create2-factory address: {err}"))?;
-    let create2_salt = FixedBytes::<32>::from_str(&args.create2_salt)
-        .map_err(|err| anyhow::anyhow!("invalid --create2-salt: {err}"))?;
+    if args.create2_salt.is_empty() {
+        anyhow::bail!("at least one --create2-salt is required");
+    }
+    let create2_salts: Vec<FixedBytes<32>> = args
+        .create2_salt
+        .iter()
+        .map(|s| {
+            FixedBytes::<32>::from_str(s)
+                .map_err(|err| anyhow::anyhow!("invalid --create2-salt `{s}`: {err}"))
+        })
+        .collect::<anyhow::Result<_>>()?;
 
     let mut result = VerificationResult::default();
 
@@ -135,7 +150,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         args.genesis_config.into(),
         &executed_bundle,
         create2_factory,
-        create2_salt,
+        create2_salts,
         args.zk_token_asset_id,
         &mut result,
     )
@@ -144,7 +159,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     result.result = if result.errors == 0 && result.warnings == 0 {
         "upgrade calldata verified".to_string()
     } else if result.errors == 0 {
-        format!("upgrade calldata verified with {} warning(s)", result.warnings)
+        format!(
+            "upgrade calldata verified with {} warning(s)",
+            result.warnings
+        )
     } else {
         format!(
             "verification failed: {} error(s), {} warning(s)",

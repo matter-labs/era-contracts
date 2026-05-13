@@ -331,8 +331,14 @@ pub struct UpgradePrepareAllArgs {
     #[serde(flatten)]
     pub topology: crate::common::EcosystemArgs,
 
-    /// Deployer EOA. Required for new envs; defaults to the
-    /// `owner_address` field of the v31 upgrade input TOML when `--env` is set.
+    /// Deployer EOA — the address whose private key you'll later use to
+    /// sign the deployer bundle via `ecosystem upgrade-broadcast --key`. The
+    /// prepare phase doesn't need the key itself (it's all simulation), but
+    /// it does need the address so the emitted Safe bundle's filename / the
+    /// in-bundle tx `from` field match the eventual broadcaster. Always
+    /// required: we intentionally do not fall back to the env's
+    /// `owner_address` because on stage/mainnet that's the
+    /// ProtocolUpgradeHandler contract, which isn't a signable EOA.
     #[clap(long)]
     pub deployer_address: Option<Address>,
 
@@ -528,10 +534,16 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)?.join("prepare"),
             );
         }
-        // Default --deployer-address to the env's owner_address.
-        if args.deployer_address.is_none() {
-            args.deployer_address = cfg.owner_address();
-        }
+        // Note: we intentionally do *not* default `--deployer-address` from
+        // the env's `owner_address`. On stage / mainnet the env's
+        // `owner_address` is the ProtocolUpgradeHandler (a contract owned by
+        // governance) — it's the *semantic* owner of the ecosystem, not the
+        // EOA that signs deployment txs. Using it as the broadcaster only
+        // works on a fork via `anvil_impersonateAccount`; on a real chain
+        // nobody can sign as that contract. The caller must pass
+        // `--deployer-address <real-EOA>` (or derive it from the broadcast
+        // signer's private key — see `regen-and-verify-stage.sh` for an
+        // example using `cast wallet address`).
         // Default --upgrade-input-path to upgrade-envs/v0.31.0-interopB/<env>.toml
         // when running with `--env`. The CLI default is `local.toml` (for
         // local-anvil fixtures). On stage / mainnet / testnet the per-env
@@ -548,10 +560,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 .join("l1-contracts")
                 .join(per_env_rel.trim_start_matches('/'));
             if per_env_abs.exists() {
-                logger::info(format!(
-                    "Using per-env upgrade input: {}",
-                    per_env_rel
-                ));
+                logger::info(format!("Using per-env upgrade input: {}", per_env_rel));
                 args.upgrade_input_path = per_env_rel;
             } else {
                 logger::info(format!(
@@ -562,9 +571,14 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             }
         }
     }
-    let deployer_address = args
-        .deployer_address
-        .ok_or_else(|| anyhow::anyhow!("--deployer-address (or --env <name> with owner_address in the v31 input TOML) is required"))?;
+    let deployer_address = args.deployer_address.ok_or_else(|| {
+        anyhow::anyhow!(
+            "--deployer-address is required. Pass an EOA whose private key you control \
+             (e.g. derive it with `cast wallet address --private-key $(cat ~/.test_pk)`); \
+             we no longer auto-fall back to the env's `owner_address` because that is the \
+             ecosystem's governance contract on stage/mainnet — not a signable EOA."
+        )
+    })?;
 
     // ── CTM list resolution ─────────────────────────────────────────
     let (ctms, core_is_zk_sync_os_override) = if let Some(cfg_path) = &args.ctm_config {
@@ -650,9 +664,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         .as_ref()
         .map(|cfg| cfg.ownable_proxies().to_vec())
         .unwrap_or_default();
-    let new_gateway_cfg = env_cfg
-        .as_ref()
-        .and_then(|cfg| cfg.new_gateway().cloned());
+    let new_gateway_cfg = env_cfg.as_ref().and_then(|cfg| cfg.new_gateway().cloned());
     let full = V31UpgradeFull::new(V31UpgradeInner::new(&contracts_path, bridgehub))
         .with_ownable_proxies(proxies)
         .with_new_gateway(new_gateway_cfg);
@@ -896,8 +908,7 @@ fn write_merged_ecosystem_toml(
         }];
         stage2.push(format!("0x{}", hex::encode(encode_calls(&prefix))));
 
-        let raw =
-            fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+        let raw = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
         let mut value: Table =
             toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
         let gov_hex = value
@@ -982,10 +993,10 @@ fn read_asset_tracker_proxy_from_core(core_toml: &Path) -> anyhow::Result<Addres
     struct Top {
         asset_tracker_proxy_addr: String,
     }
-    let raw = fs::read_to_string(core_toml)
-        .with_context(|| format!("read {}", core_toml.display()))?;
-    let top: Top = toml::from_str(&raw)
-        .with_context(|| format!("parse {}", core_toml.display()))?;
+    let raw =
+        fs::read_to_string(core_toml).with_context(|| format!("read {}", core_toml.display()))?;
+    let top: Top =
+        toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
     top.asset_tracker_proxy_addr.parse().with_context(|| {
         format!(
             "asset_tracker_proxy_addr in {} is not a valid address: {}",

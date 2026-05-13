@@ -46,6 +46,34 @@ sol! {
     function initializeL1V31Upgrade();
     function setAssetTracker(address _l1AssetTracker);
     function setAddresses();
+    function updateGuardians(address _newGuardians);
+
+    // L2-side selectors carried as `l2Calldata` inside the new-Gateway
+    // bring-up priority txs. Decoded by `verify_gateway_bring_up_calls` to
+    // cross-check each priority tx targets the right contract on L2.
+    function addChainTypeManager(address _chainTypeManager);
+    function acceptOwnership();
+    function setGatewaySettlementFee(uint256 _newFee);
+
+    // Outer `requestL2TransactionDirect((...))` priority-tx struct. Layout
+    // matches `L2TransactionRequestDirect` in `IBridgehubBase.sol`.
+    struct L2TransactionRequestDirect {
+        uint256 chainId;
+        uint256 mintValue;
+        address l2Contract;
+        uint256 l2Value;
+        bytes l2Calldata;
+        uint256 l2GasLimit;
+        uint256 l2GasPerPubdataByteLimit;
+        bytes[] factoryDeps;
+        address refundRecipient;
+    }
+    function requestL2TransactionDirect(L2TransactionRequestDirect _request);
+
+    #[sol(rpc)]
+    contract BridgehubOwnerView {
+        function owner() external view returns (address);
+    }
 
     #[derive(Debug, PartialEq)]
     enum Action {
@@ -101,7 +129,7 @@ pub(crate) async fn verify_governance_stage_calls(
     let stage0 = GovernanceStage0Calls {
         calls: CallList::parse(&artifact.governance_calls.stage0_calls),
     };
-    stage0.verify_artifact(artifact, verifiers, result)?;
+    stage0.verify_artifact(artifact, verifiers, result).await?;
 
     let stage1 = GovernanceStage1Calls {
         calls: CallList::parse(&artifact.governance_calls.stage1_calls),
@@ -111,7 +139,7 @@ pub(crate) async fn verify_governance_stage_calls(
     let stage2 = GovernanceStage2Calls {
         calls: CallList::parse(&artifact.governance_calls.stage2_calls),
     };
-    stage2.verify_artifact(artifact, verifiers, result)?;
+    stage2.verify_artifact(artifact, verifiers, result).await?;
 
     Ok(())
 }
@@ -1337,7 +1365,7 @@ async fn find_representative_chain_diamond(
     if ctm.flavor == CtmFlavor::Era {
         if let Some(era_chain_id) = verifiers.representative_era_chain_id {
             let chain_id = U256::from(era_chain_id);
-            match inspect_chain_for_facet_cut_reconstruction(
+            if let Some(representative) = inspect_chain_for_facet_cut_reconstruction(
                 chain_id,
                 ctm_proxy,
                 expected_protocol,
@@ -1345,8 +1373,7 @@ async fn find_representative_chain_diamond(
             )
             .await?
             {
-                Some(representative) => return Ok(Some(representative)),
-                None => {}
+                return Ok(Some(representative));
             }
         }
     }
@@ -1859,7 +1886,20 @@ impl GovernanceStage0Calls {
     }
 
     /// Stage0 is executed before the main upgrade starts.
-    pub(crate) fn verify_artifact(
+    ///
+    /// Stage-0 shape:
+    ///   `[ pauseMigration, startTimer (×N CTMs), <optional PUH-redeploy pair> ]`
+    ///
+    /// The trailing pair is only emitted on **PUH-governed envs**
+    /// (`governance_kind = "puh"` in permanent-values — stage / mainnet today).
+    /// `upgrade-prepare-all` appends it via `puh_guardians::deploy_puh_guardians`
+    /// when bridgehub.owner() is a ProtocolUpgradeHandler proxy: first call
+    /// upgrades the PUH implementation on its ProxyAdmin, second call rewires
+    /// the new Guardians on the proxy itself. We detect PUH governance by
+    /// reading `bridgehub.owner()` and probing its EIP-1967 admin slot — a
+    /// non-zero admin means the owner is a TUPP-style proxy (= PUH on our
+    /// envs), and we then expect the two extra calls.
+    pub(crate) async fn verify_artifact(
         &self,
         artifact: &EcosystemUpgradeArtifact,
         verifiers: &Verifiers,
@@ -1898,7 +1938,115 @@ impl GovernanceStage0Calls {
             }
         }
 
-        let expected_call_count = 1 + artifact.ctms.len();
+        // Probe for PUH-governed env.
+        let bridgehub_owner = BridgehubOwnerView::new(
+            verifiers.bridgehub_address,
+            verifiers.network_verifier.get_l1_provider(),
+        )
+        .owner()
+        .call()
+        .await
+        .context("read Bridgehub.owner() to detect PUH-governed env")?;
+        let bridgehub_owner_admin = verifiers
+            .network_verifier
+            .get_proxy_admin(bridgehub_owner)
+            .await;
+        let puh_governed = bridgehub_owner_admin != Address::ZERO;
+
+        let base_count = 1 + artifact.ctms.len();
+        let expected_call_count = if puh_governed {
+            base_count + 2
+        } else {
+            base_count
+        };
+
+        if puh_governed {
+            let upgrade_idx = base_count;
+            let update_guardians_idx = base_count + 1;
+            // OZ v5 `TransparentUpgradeableProxyAdmin.upgradeAndCall` is the
+            // selector used by `puh_guardians::encode_proxy_admin_upgrade` —
+            // the v4 `upgrade(address,address)` selector reverts on the v5
+            // admin. Data arg is empty (no follow-on call).
+            errors += verify_call_by_address(
+                &self.calls,
+                upgrade_idx,
+                bridgehub_owner_admin,
+                "puh_proxy_admin",
+                "upgradeAndCall(address,address,bytes)",
+                verifiers,
+                result,
+            );
+            if let Some(call) = self.calls.elems.get(upgrade_idx) {
+                match upgradeAndCallCall::abi_decode(&call.data) {
+                    Ok(decoded) => {
+                        if decoded.proxy != bridgehub_owner {
+                            result.report_error(&format!(
+                                "PUH upgrade call #{upgrade_idx} proxy arg {} does not match bridgehub.owner() {}",
+                                decoded.proxy, bridgehub_owner
+                            ));
+                            errors += 1;
+                        } else if !decoded.data.is_empty() {
+                            result.report_error(&format!(
+                                "PUH upgradeAndCall #{upgrade_idx} data arg should be empty for a bare impl swap, got {} bytes",
+                                decoded.data.len()
+                            ));
+                            errors += 1;
+                        } else {
+                            result.report_ok(&format!(
+                                "PUH upgradeAndCall(proxy=bridgehub.owner()) → new impl {}",
+                                decoded.implementation
+                            ));
+                            errors += verify_address_has_code(
+                                &decoded.implementation,
+                                "PUH new implementation",
+                                verifiers,
+                                result,
+                            )
+                            .await;
+                        }
+                    }
+                    Err(err) => {
+                        result.report_error(&format!(
+                            "Failed to decode upgradeAndCall(...) at call #{upgrade_idx}: {err}"
+                        ));
+                        errors += 1;
+                    }
+                }
+            }
+            errors += verify_call_by_address(
+                &self.calls,
+                update_guardians_idx,
+                bridgehub_owner,
+                "puh_proxy",
+                "updateGuardians(address)",
+                verifiers,
+                result,
+            );
+            if let Some(call) = self.calls.elems.get(update_guardians_idx) {
+                match updateGuardiansCall::abi_decode(&call.data) {
+                    Ok(decoded) => {
+                        result.report_ok(&format!(
+                            "PUH updateGuardians(new={})",
+                            decoded._newGuardians
+                        ));
+                        errors += verify_address_has_code(
+                            &decoded._newGuardians,
+                            "PUH new Guardians",
+                            verifiers,
+                            result,
+                        )
+                        .await;
+                    }
+                    Err(err) => {
+                        result.report_error(&format!(
+                            "Failed to decode updateGuardians(...) at call #{update_guardians_idx}: {err}"
+                        ));
+                        errors += 1;
+                    }
+                }
+            }
+        }
+
         match self.calls.elems.len().cmp(&expected_call_count) {
             std::cmp::Ordering::Less => {
                 result.report_error(&format!(
@@ -1925,6 +2073,294 @@ impl GovernanceStage0Calls {
     }
 }
 
+/// Lightweight cross-check that `addr` has runtime code on L1. PUVT's
+/// `create2_known_bytecodes` only maps addresses for which the deploy's
+/// init bytecode matched a known contract in `AllContractsHashes.json` —
+/// PUH/Guardians come from the `zk-governance` repo whose artifacts aren't
+/// in that file, so we can't bytecode-verify them. The minimum useful
+/// invariant is "the address actually has code" — proves the new impl /
+/// guardians address wasn't a typo / dangling address.
+async fn verify_address_has_code(
+    addr: &Address,
+    label: &str,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> usize {
+    use alloy::providers::Provider;
+    let provider = verifiers.network_verifier.get_l1_provider();
+    match provider.get_code_at(*addr).await {
+        Ok(code) if !code.is_empty() => {
+            result.report_ok(&format!(
+                "{label} {addr} is deployed (code size {} bytes)",
+                code.len()
+            ));
+            0
+        }
+        Ok(_) => {
+            result.report_error(&format!(
+                "{label} {addr} has no code — governance call references an undeployed address"
+            ));
+            1
+        }
+        Err(err) => {
+            result.report_warn(&format!(
+                "Skipping code-presence check for {label} {addr}: {err}"
+            ));
+            0
+        }
+    }
+}
+
+/// Verify the 15-call new-Gateway bring-up block that `write_merged_ecosystem_toml`
+/// appends to stage 2 when the env has a `[new_gateway]` config. See the
+/// docstring on `GovernanceStage2Calls::verify_artifact` for the call shape.
+///
+/// The verifier checks each call's (target, selector). Approve calls have
+/// dynamic targets (the ZK base-token address resolved on-chain from
+/// `NTV.tokenAddress(zkAssetId)`); we don't bother re-resolving here, but
+/// we *do* assert every approve in the block targets the same address (any
+/// inconsistency would mean the prepare emitted approvals against different
+/// tokens — a serious shape break).
+#[allow(clippy::too_many_arguments)]
+async fn verify_gateway_bring_up_calls(
+    calls: &CallList,
+    base: usize,
+    artifact: &EcosystemUpgradeArtifact,
+    _new_gw: &crate::upgrade_verification::artifacts::NewGatewayArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> usize {
+    result.print_info("== Gov stage 2 new-Gateway bring-up ===");
+
+    // (offset, target_name, method_signature)
+    let direct = "requestL2TransactionDirect((uint256,uint256,address,uint256,bytes,uint256,uint256,bytes[],address))";
+    let two_bridges =
+        "requestL2TransactionTwoBridges((uint256,uint256,uint256,uint256,uint256,address,address,uint256,bytes))";
+    let expected: &[(usize, &str, &str)] = &[
+        // L1AssetTracker.registerLegacyToken(zkAssetId) — prefix prepended
+        // by `write_merged_ecosystem_toml` when `[new_gateway]` is present.
+        (0, "asset_tracker_proxy", "registerLegacyToken(bytes32)"),
+        // addChainTypeManager L1→L2 (priority tx) — approve + direct.
+        (2, "bridgehub_proxy", direct),
+        // setAssetDeploymentTracker on L1AssetRouter (L1-side, no approve).
+        (
+            3,
+            "l1_asset_router_proxy",
+            "setAssetDeploymentTracker(bytes32,address)",
+        ),
+        // registerCTMAssetOnL1 on L1CTMDeploymentTracker (L1-side).
+        (
+            4,
+            "ctm_deployment_tracker_proxy",
+            "registerCTMAssetOnL1(address)",
+        ),
+        // setAssetHandler for chain assetId — approve + two-bridges.
+        (6, "bridgehub_proxy", two_bridges),
+        // chain-asset-handler registration for GW CTM — approve + two-bridges.
+        (8, "bridgehub_proxy", two_bridges),
+        // acceptOwnership on RollupDAManager — approve + direct.
+        (10, "bridgehub_proxy", direct),
+        // acceptOwnership on ServerNotifier — approve + direct.
+        (12, "bridgehub_proxy", direct),
+        // setGatewaySettlementFee on GW_ASSET_TRACKER_ADDR — approve + direct.
+        (14, "bridgehub_proxy", direct),
+    ];
+
+    let mut errors = 0;
+    for (offset, target_name, method) in expected {
+        errors += verify_call_by_name(calls, base + offset, target_name, method, verifiers, result);
+    }
+
+    // All approve calls in this block target the same ZK base-token address.
+    // Their selector is `approve(address,uint256)` (0x095ea7b3) and the
+    // spender is the L1AssetRouter — we check selector + cross-call target
+    // consistency. The token's absolute address would need an extra RPC
+    // round-trip (NTV.tokenAddress(zkAssetId)); cross-call consistency is
+    // a sufficient shape check.
+    let approve_selector = compute_selector("approve(address,uint256)");
+    let approve_offsets = [1usize, 5, 7, 9, 11, 13];
+    let mut approve_target: Option<Address> = None;
+    for off in &approve_offsets {
+        let idx = base + *off;
+        let Some(call) = calls.elems.get(idx) else {
+            result.report_error(&format!("Expected approve call #{idx} not found"));
+            errors += 1;
+            continue;
+        };
+        if call.data.len() < 4 || hex::encode(&call.data[0..4]) != approve_selector {
+            result.report_error(&format!(
+                "Call #{idx}: expected approve(address,uint256) selector 0x{approve_selector}, got 0x{}",
+                hex::encode(&call.data[0..4.min(call.data.len())])
+            ));
+            errors += 1;
+            continue;
+        }
+        match approve_target {
+            None => approve_target = Some(call.target),
+            Some(t) if t != call.target => {
+                result.report_error(&format!(
+                    "Approve call #{idx} target {} differs from earlier approve target {} — GW bring-up should approve a single base token",
+                    call.target, t,
+                ));
+                errors += 1;
+            }
+            _ => {}
+        }
+    }
+    if let Some(t) = approve_target {
+        result.report_ok(&format!(
+            "All 6 GW priority-tx approve calls target the same base token {t}"
+        ));
+    }
+
+    // `chainId` is the first 32-byte field of every priority-tx struct
+    // (both L2TransactionRequestDirect and L2TransactionRequestTwoBridgesOuter).
+    // Decode + cross-check that every priority tx targets the SAME L2 chain.
+    let priority_offsets = [2usize, 6, 8, 10, 12, 14];
+    let mut priority_chain_id: Option<U256> = None;
+    for off in &priority_offsets {
+        let idx = base + *off;
+        let Some(call) = calls.elems.get(idx) else {
+            continue; // already counted as missing above
+        };
+        // ABI: 4-byte selector, then 32-byte offset to struct, then the
+        // struct's first word = `chainId`.
+        if call.data.len() < 4 + 32 + 32 {
+            continue;
+        }
+        let chain_id_bytes: [u8; 32] = call.data[4 + 32..4 + 32 + 32]
+            .try_into()
+            .expect("32-byte chainId slice");
+        let chain_id = U256::from_be_bytes(chain_id_bytes);
+        match priority_chain_id {
+            None => priority_chain_id = Some(chain_id),
+            Some(prior) if prior != chain_id => {
+                result.report_error(&format!(
+                    "Priority tx #{idx} chainId {chain_id} differs from earlier priority tx chainId {prior} — GW bring-up should target a single L2 (the new gateway)",
+                ));
+                errors += 1;
+            }
+            _ => {}
+        }
+    }
+    if let Some(cid) = priority_chain_id {
+        result.report_ok(&format!(
+            "All 6 GW priority txs target the same L2 chain id {cid}"
+        ));
+    }
+
+    // Deep cross-check on the three `requestL2TransactionDirect` priority
+    // txs whose targets/args we know how to derive from the artifact:
+    //   - offset 2:  L2 Bridgehub ← addChainTypeManager(new_gw_ctm)
+    //   - offset 10: GW RollupDAManager ← acceptOwnership()
+    //   - offset 12: GW ServerNotifier ← acceptOwnership()
+    // The remaining priority txs (offsets 6/8 two-bridges, 14 setSettlementFee)
+    // are *not* deep-decoded yet — see follow-up note at the end of this fn.
+    // L2 Bridgehub lives at the system-contract slot 0x10002 (see
+    // `set_new_version_upgrade.rs::L2_BRIDGEHUB_ADDR`).
+    let l2_bridgehub_addr = Address::from_str("0x0000000000000000000000000000000000010002").ok();
+    let check_direct_inner = |idx_offset: usize,
+                              expected_target_label: &str,
+                              expected_target: Option<Address>,
+                              expected_selector_sig: &str,
+                              expected_arg: Option<Address>,
+                              errors: &mut usize,
+                              result: &mut VerificationResult| {
+        let idx = base + idx_offset;
+        let Some(call) = calls.elems.get(idx) else {
+            return;
+        };
+        // Skip the 4-byte requestL2TransactionDirect selector + 32-byte
+        // tuple offset.
+        let payload = match call.data.len().checked_sub(4) {
+            Some(n) if n > 0 => &call.data[4..],
+            _ => return,
+        };
+        let Ok(req) = L2TransactionRequestDirect::abi_decode(payload) else {
+            result.report_warn(&format!(
+                "Could not decode L2TransactionRequestDirect for GW priority tx #{idx}; skipping inner cross-check"
+            ));
+            return;
+        };
+        if let Some(expected) = expected_target {
+            if req.l2Contract != expected {
+                result.report_error(&format!(
+                    "GW priority tx #{idx} ({expected_target_label}) l2Contract mismatch: expected {expected}, got {}",
+                    req.l2Contract
+                ));
+                *errors += 1;
+            } else {
+                result.report_ok(&format!(
+                    "GW priority tx #{idx} ({expected_target_label}) l2Contract matches"
+                ));
+            }
+        }
+        if req.l2Calldata.len() < 4 {
+            return;
+        }
+        let actual_sel = hex::encode(&req.l2Calldata[0..4]);
+        let expected_sel = compute_selector(expected_selector_sig);
+        if actual_sel != expected_sel {
+            result.report_error(&format!(
+                "GW priority tx #{idx} ({expected_target_label}) inner selector mismatch: expected {expected_selector_sig} (0x{expected_sel}), got 0x{actual_sel}"
+            ));
+            *errors += 1;
+            return;
+        }
+        if let Some(expected_arg) = expected_arg {
+            if req.l2Calldata.len() >= 4 + 32 {
+                let arg_bytes: [u8; 32] = req.l2Calldata[4..36].try_into().unwrap();
+                let actual_arg = Address::from_slice(&arg_bytes[12..]);
+                if actual_arg != expected_arg {
+                    result.report_error(&format!(
+                        "GW priority tx #{idx} ({expected_target_label}) {expected_selector_sig} arg mismatch: expected {expected_arg}, got {actual_arg}"
+                    ));
+                    *errors += 1;
+                } else {
+                    result.report_ok(&format!(
+                        "GW priority tx #{idx} ({expected_target_label}) {expected_selector_sig}({actual_arg}) matches"
+                    ));
+                }
+            }
+        }
+    };
+
+    let new_gw_ctm = _new_gw.gateway_chain_type_manager_addr;
+    check_direct_inner(
+        2,
+        "addChainTypeManager",
+        l2_bridgehub_addr,
+        "addChainTypeManager(address)",
+        Some(new_gw_ctm),
+        &mut errors,
+        result,
+    );
+    check_direct_inner(
+        10,
+        "acceptOwnership RollupDAManager",
+        _new_gw.gateway_rollup_da_manager_addr,
+        "acceptOwnership()",
+        None,
+        &mut errors,
+        result,
+    );
+    check_direct_inner(
+        12,
+        "acceptOwnership ServerNotifier",
+        _new_gw.gateway_server_notifier_addr,
+        "acceptOwnership()",
+        None,
+        &mut errors,
+        result,
+    );
+
+    // Touch the artifact so future extensions (e.g. cross-checking
+    // setSettlementFee's fee value, decoding the two-bridges payloads) can
+    // pull additional context from it without churn.
+    let _ = artifact;
+    errors
+}
+
 impl GovernanceStage2Calls {
     /// Legacy single-CTM stage2 verifier retained for copied PUVT scaffolding.
     pub(crate) fn verify(
@@ -1946,7 +2382,28 @@ impl GovernanceStage2Calls {
     }
 
     /// Stage2 is executed after all chains have upgraded.
-    pub(crate) fn verify_artifact(
+    ///
+    /// Stage-2 shape (canonical):
+    ///   `[ unpauseMigration, (checkProtocolUpgradePresence, checkMigrationsUnpaused) × N CTMs ]`
+    ///
+    /// When `[new_gateway]` is present in the merged ecosystem TOML,
+    /// `write_merged_ecosystem_toml` prepends a `registerLegacyToken` prefix
+    /// and appends the `GatewayVotePreparation` bring-up bundle. That extra
+    /// section's expected shape is:
+    ///   `[ registerLegacyToken,
+    ///      approve + requestL2TransactionDirect      (addChainTypeManager on L2 BH),
+    ///      setAssetDeploymentTracker,
+    ///      registerCTMAssetOnL1,
+    ///      approve + requestL2TransactionTwoBridges  (setAssetHandler for chain assetId),
+    ///      approve + requestL2TransactionTwoBridges  (chain-asset-handler registration for GW CTM),
+    ///      approve + requestL2TransactionDirect      (acceptOwnership RollupDAManager),
+    ///      approve + requestL2TransactionDirect      (acceptOwnership ServerNotifier),
+    ///      approve + requestL2TransactionDirect      (setGatewaySettlementFee on GW_ASSET_TRACKER_ADDR) ]`
+    ///
+    /// = 15 calls. `setSettlementLayerStatus` is *only* emitted when
+    /// `ctm_representative_chain_id == gateway_chain_id` — that branch isn't
+    /// configured for stage today, so this verifier does not expect it.
+    pub(crate) async fn verify_artifact(
         &self,
         artifact: &EcosystemUpgradeArtifact,
         verifiers: &Verifiers,
@@ -1955,26 +2412,13 @@ impl GovernanceStage2Calls {
         result.print_info("== Gov stage 2 calls ===");
 
         let mut errors = 0;
-        let expected_call_count = 1 + artifact.ctms.len() * 2;
-        match self.calls.elems.len().cmp(&expected_call_count) {
-            std::cmp::Ordering::Less => {
-                result.report_error(&format!(
-                    "Too few calls: expected {} but got {}.",
-                    expected_call_count,
-                    self.calls.elems.len()
-                ));
-                errors += 1;
-            }
-            std::cmp::Ordering::Greater => {
-                result.report_error(&format!(
-                    "Too many calls: expected {} but got {}.",
-                    expected_call_count,
-                    self.calls.elems.len()
-                ));
-                errors += 1;
-            }
-            std::cmp::Ordering::Equal => {}
-        }
+        let canonical_count = 1 + artifact.ctms.len() * 2;
+        let gw_count = if artifact.new_gateway.is_some() {
+            15
+        } else {
+            0
+        };
+        let expected_call_count = canonical_count + gw_count;
 
         errors += verify_call_by_name(
             &self.calls,
@@ -2015,6 +2459,38 @@ impl GovernanceStage2Calls {
                 verifiers,
                 result,
             );
+        }
+
+        if let Some(new_gw) = artifact.new_gateway.as_ref() {
+            errors += verify_gateway_bring_up_calls(
+                &self.calls,
+                canonical_count,
+                artifact,
+                new_gw,
+                verifiers,
+                result,
+            )
+            .await;
+        }
+
+        match self.calls.elems.len().cmp(&expected_call_count) {
+            std::cmp::Ordering::Less => {
+                result.report_error(&format!(
+                    "Too few calls: expected {} but got {}.",
+                    expected_call_count,
+                    self.calls.elems.len()
+                ));
+                errors += 1;
+            }
+            std::cmp::Ordering::Greater => {
+                result.report_error(&format!(
+                    "Too many calls: expected {} but got {}.",
+                    expected_call_count,
+                    self.calls.elems.len()
+                ));
+                errors += 1;
+            }
+            std::cmp::Ordering::Equal => {}
         }
 
         if errors > 0 {
