@@ -47,8 +47,7 @@ use crate::common::wallets::Wallet;
 /// its output. Lives under `script-out/` because forge's `fs_permissions` only
 /// allows writes there. The ecosystem prepare flow reads from this same path
 /// to extract `governance_calls_to_execute`.
-const VOTE_PREP_OUTPUT_REL: &str =
-    "script-out/v31-new-gateway-vote-preparation.toml";
+const VOTE_PREP_OUTPUT_REL: &str = "script-out/v31-new-gateway-vote-preparation.toml";
 
 /// Run `GatewayVotePreparation` for the env's configured new-gateway, returning
 /// the absolute path to the output TOML so the caller can merge its
@@ -72,7 +71,10 @@ pub async fn prepare_new_gateway(
         "Running new-Gateway vote-prepare (GW chain {}, source CTM via chain {})",
         new_gw.chain_id, new_gw.ctm_representative_chain_id
     ));
-    logger::info(format!("Settlement fee:   {} (wrapped-ZK wei)", new_gw.settlement_fee));
+    logger::info(format!(
+        "Settlement fee:   {} (wrapped-ZK wei)",
+        new_gw.settlement_fee
+    ));
     logger::info(format!(
         "Refund recipient: {refund_recipient:#x}{}",
         if new_gw.refund_recipient.is_some() {

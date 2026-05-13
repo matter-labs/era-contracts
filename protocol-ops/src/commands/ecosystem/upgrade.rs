@@ -619,9 +619,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         .as_ref()
         .map(|cfg| cfg.ownable_proxies().to_vec())
         .unwrap_or_default();
-    let new_gateway_cfg = env_cfg
-        .as_ref()
-        .and_then(|cfg| cfg.new_gateway().cloned());
+    let new_gateway_cfg = env_cfg.as_ref().and_then(|cfg| cfg.new_gateway().cloned());
     let full = V31UpgradeFull::new(V31UpgradeInner::new(&contracts_path, bridgehub))
         .with_ownable_proxies(proxies)
         .with_new_gateway(new_gateway_cfg);
@@ -828,8 +826,7 @@ fn write_merged_ecosystem_toml(
     // the rest (per-contract addresses + diamond cut data) under a top-level
     // `[new_gateway]` block so reviewers can still audit the deployed addresses.
     let new_gateway_body: Option<Table> = if let Some(path) = new_gateway_toml {
-        let raw =
-            fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+        let raw = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
         let mut value: Table =
             toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
         let gov_hex = value
