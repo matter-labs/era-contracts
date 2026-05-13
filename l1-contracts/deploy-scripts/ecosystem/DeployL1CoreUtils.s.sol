@@ -102,7 +102,9 @@ contract DeployL1CoreUtils is DeployUtils {
         } else if (compareStrings(contractName, "L1Bridgehub")) {
             return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
         } else if (
-            compareStrings(contractName, "L1MessageRoot") || compareStrings(contractName, "DummyL1MessageRoot")
+            compareStrings(contractName, "L1MessageRoot") ||
+            compareStrings(contractName, "DummyL1MessageRoot") ||
+            compareStrings(contractName, "L1MessageRootStageSepolia")
         ) {
             return
                 abi.encode(
