@@ -6,6 +6,7 @@ use std::{
 use anyhow::Context;
 use chrono::Utc;
 use ethers::core::abi::Tokenize;
+use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use xshell::{cmd, Shell};
@@ -111,7 +112,7 @@ impl ForgeRunner {
     /// ChainAdmin contract itself has no private key.
     pub async fn prepare_chain_admin_owner(
         &self,
-        bridgehub: ethers::types::Address,
+        bridgehub: Address,
         chain_id: u64,
     ) -> anyhow::Result<Wallet> {
         let owner = crate::common::l1_contracts::resolve_chain_admin_owner(
@@ -122,6 +123,33 @@ impl ForgeRunner {
         .await
         .context("resolving chain admin owner EOA from L1")?;
         self.prepare_sender(owner).await
+    }
+
+    /// Resolve the address that `Utils.adminExecuteCalls` will broadcast from
+    /// for a chain-admin operation and prepare it as a sender.
+    pub async fn prepare_chain_admin_broadcaster(
+        &self,
+        bridgehub: Address,
+        chain_id: u64,
+        access_control_restriction: Address,
+    ) -> anyhow::Result<Wallet> {
+        let sender = if access_control_restriction == Address::zero() {
+            crate::common::l1_contracts::resolve_chain_admin_owner(
+                &self.rpc_url,
+                bridgehub,
+                chain_id,
+            )
+            .await
+            .context("resolving chain admin owner EOA from L1")?
+        } else {
+            crate::common::l1_contracts::resolve_access_control_default_admin(
+                &self.rpc_url,
+                access_control_restriction,
+            )
+            .await
+            .context("resolving AccessControlRestriction default admin from L1")?
+        };
+        self.prepare_sender(sender).await
     }
 
     /// Resolve the governance contract's owner EOA via
