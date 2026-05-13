@@ -2098,13 +2098,6 @@
   },
   {
     "type": "function",
-    "name": "unpauseDepositsOnGateway",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "upgradeChainFromVersion",
     "inputs": [
       {

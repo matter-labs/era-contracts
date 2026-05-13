@@ -81,7 +81,6 @@ import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IMailboxLegacy} from "../../state-transition/chain-interfaces/IMailboxLegacy.sol";
-import {IMigrator} from "../../state-transition/chain-interfaces/IMigrator.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {LegacySharedBridgeAddresses, SharedBridgeOnChainId} from "./LegacySharedBridgeAddresses.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";

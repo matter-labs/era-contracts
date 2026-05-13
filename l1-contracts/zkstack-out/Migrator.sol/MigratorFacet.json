@@ -218,13 +218,6 @@
     "stateMutability": "nonpayable"
   },
   {
-    "type": "function",
-    "name": "unpauseDepositsOnGateway",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
     "type": "event",
     "name": "DepositsPaused",
     "inputs": [

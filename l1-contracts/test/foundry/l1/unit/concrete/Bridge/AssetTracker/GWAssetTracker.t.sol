@@ -30,7 +30,6 @@ import {
 import {ChainIdNotRegistered, SlotOccupied, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandlerBase} from "contracts/core/chain-asset-handler/IChainAssetHandler.sol";
 import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
-import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {ProcessLogsInput} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {ProcessLogsTestHelper} from "./ProcessLogsTestHelper.sol";
 import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
@@ -650,10 +649,6 @@ contract GWAssetTrackerTest is Test {
             isL1ToGateway: false
         });
 
-        // confirmMigrationOnGateway (Gateway -> L1) calls IMigrator.unpauseDepositsOnGateway
-        // on the migrating chain's ZK chain; mockZKChain has no code so mock the call.
-        vm.mockCall(mockZKChain, abi.encodeWithSelector(IMigrator.unpauseDepositsOnGateway.selector), abi.encode());
-
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.confirmMigrationOnGateway(data);
 
@@ -676,10 +671,6 @@ contract GWAssetTrackerTest is Test {
 
         uint256 initialBalance = gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID);
         uint256 initialAssetMigrationNumber = gwAssetTracker.assetMigrationNumber(CHAIN_ID, ASSET_ID);
-
-        // confirmMigrationOnGateway (Gateway -> L1) calls IMigrator.unpauseDepositsOnGateway
-        // on the migrating chain's ZK chain; mockZKChain has no code so mock the call.
-        vm.mockCall(mockZKChain, abi.encodeWithSelector(IMigrator.unpauseDepositsOnGateway.selector), abi.encode());
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.confirmMigrationOnGateway(data);
