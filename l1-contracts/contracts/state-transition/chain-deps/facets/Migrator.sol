@@ -136,12 +136,6 @@ contract MigratorFacet is ZKChainBase, IMigrator {
         _unpauseDeposits();
     }
 
-    /// @inheritdoc IMigrator
-    function unpauseDepositsOnGateway() external onlyGatewayAssetTracker onlyGateway {
-        require(s.pausedDepositsTimestamp != 0, DepositsNotPaused());
-        _unpauseDeposits();
-    }
-
     function _unpauseDeposits() internal {
         s.pausedDepositsTimestamp = 0;
         emit DepositsUnpaused(s.chainId);
