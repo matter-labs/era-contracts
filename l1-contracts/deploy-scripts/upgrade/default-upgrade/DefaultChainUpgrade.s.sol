@@ -49,8 +49,10 @@ contract DefaultChainUpgrade is Script {
 
     function run(address ctm, uint256 chainChainId) public virtual {
         setupConfigFromOnchain(ctm, chainChainId);
-        Diamond.DiamondCutData memory diamondCutData =
-            GetDiamondCutData.getDiamondCutData(ctm, config.oldProtocolVersion);
+        Diamond.DiamondCutData memory diamondCutData = GetDiamondCutData.getDiamondCutData(
+            ctm,
+            config.oldProtocolVersion
+        );
         upgradeChain(diamondCutData);
     }
 
@@ -95,7 +97,8 @@ contract DefaultChainUpgrade is Script {
             target: serverNotifier,
             value: 0,
             data: abi.encodeCall(
-                ServerNotifier.setUpgradeTimestamp, (config.chainChainId, newProtocolVersion, timestamp)
+                ServerNotifier.setUpgradeTimestamp,
+                (config.chainChainId, newProtocolVersion, timestamp)
             )
         });
 
