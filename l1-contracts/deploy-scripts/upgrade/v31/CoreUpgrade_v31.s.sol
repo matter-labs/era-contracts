@@ -169,10 +169,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         string memory contractName,
         bool isZkBytecode
     ) internal virtual override returns (bytes memory) {
-        if (
-            compareStrings(contractName, "L1MessageRoot") ||
-            compareStrings(contractName, _messageRootContractName())
-        ) {
+        if (compareStrings(contractName, "L1MessageRoot") || compareStrings(contractName, _messageRootContractName())) {
             return abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ());
         } else if (compareStrings(contractName, "L1AssetTracker")) {
             // Initialize AssetTracker with config.deployerAddress which is now properly set

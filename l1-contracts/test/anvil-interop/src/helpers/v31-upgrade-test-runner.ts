@@ -490,9 +490,7 @@ async function fundDeployerZkForBundleReplay(params: {
   }
   const targets = bundleTargetsFromManifest(params.prepareOutDir);
   if (targets.length === 0) {
-    throw new Error(
-      `Cannot fund bundle senders ZK: no usable bundle targets in ${params.prepareOutDir}/manifest.json`
-    );
+    throw new Error(`Cannot fund bundle senders ZK: no usable bundle targets in ${params.prepareOutDir}/manifest.json`);
   }
 
   const provider = new ethers.providers.JsonRpcProvider(params.rpcUrl);
