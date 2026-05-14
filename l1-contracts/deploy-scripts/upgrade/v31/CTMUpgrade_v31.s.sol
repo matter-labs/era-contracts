@@ -12,6 +12,7 @@ import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisFo
 
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
+import {Call} from "contracts/governance/Common.sol";
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CTMUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
@@ -74,7 +75,15 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         console.log("Deploying ChainTypeManager:", ctmContractName);
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
 
+        // Deploy new ServerNotifier implementation
+        ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier", false);
+
         deployStateTransitionDiamondFacets();
+    }
+
+    /// @notice Include the ServerNotifier proxy upgrade in stage 1 governance calls.
+    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory) {
+        return prepareUpgradeServerNotifierCall();
     }
 
     /// @notice Override to deploy the correct v31 upgrade contract based on chain type.
