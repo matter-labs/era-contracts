@@ -9,6 +9,8 @@ contract DummyChainTypeManager {
 
     mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
 
+    mapping(uint256 protocolVersion => bytes32 cutHash) public upgradeCutHash;
+
     // solhint-disable-next-line var-name-mixedcase
     address public BRIDGE_HUB;
 
@@ -16,6 +18,10 @@ contract DummyChainTypeManager {
 
     function setProtocolVersionDeadline(uint256 _protocolVersion, uint256 _timestamp) external {
         protocolVersionDeadline[_protocolVersion] = _timestamp;
+    }
+
+    function setUpgradeCutHash(uint256 _oldProtocolVersion, bytes32 _upgradeCutHash) external {
+        upgradeCutHash[_oldProtocolVersion] = _upgradeCutHash;
     }
 
     function protocolVersionIsActive(uint256 _protocolVersion) external view returns (bool) {

@@ -11,7 +11,12 @@ import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainType
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DummyChainAssetHandler} from "contracts/dev-contracts/test/DummyChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {InvalidProtocolVersion, Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {
+    CutDataForProtocolVersionNotAvailable,
+    InvalidProtocolVersion,
+    Unauthorized,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
 
 contract ServerNotifierTest is Test {
     ServerNotifier internal serverNotifier;
@@ -59,6 +64,7 @@ contract ServerNotifierTest is Test {
         uint protocolVersion = 42;
         uint deadline = block.timestamp + 7 days;
 
+        chainTypeManager.setUpgradeCutHash(protocolVersion, keccak256("upgradeCutHash"));
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
 
         vm.startPrank(chainAdmin);
@@ -75,6 +81,19 @@ contract ServerNotifierTest is Test {
 
         vm.startPrank(chainAdmin);
         vm.expectRevert(InvalidProtocolVersion.selector);
+        serverNotifier.setUpgradeTimestamp(chainId, protocolVersion, deadline);
+    }
+
+    function test_setUpgradeTimestampCutDataForProtocolVersionNotAvailableReverts() public {
+        uint protocolVersion = 42;
+        uint deadline = block.timestamp + 7 days;
+
+        chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
+
+        vm.startPrank(chainAdmin);
+        vm.expectRevert(
+            abi.encodeWithSelector(CutDataForProtocolVersionNotAvailable.selector, protocolVersion)
+        );
         serverNotifier.setUpgradeTimestamp(chainId, protocolVersion, deadline);
     }
 
