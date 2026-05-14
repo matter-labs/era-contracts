@@ -70,3 +70,13 @@ diamond_init_addr = "0x793cbd3E57A5B0Bf5dc1CaEDc2390C738A45c9a1"
 executor_facet_addr = "0x1099487f403574BF163A60A1bE5e9a2D025964Bb"
 genesis_upgrade_addr = "0xE7b5f9f47A0Bb9Dd3C11bfD30fE251D50D04A2D6"
 getters_facet_addr = "0x00e4C7066107B6E5E81320793BCee38D2f85CC03"
+
+# Per-CTM CREATE2 salts. Each CTM prepare deploys a `GovernanceUpgradeTimer`
+# whose constructor args are env-wide constants — without a CTM-distinct
+# salt every CTM would land the timer at the same CREATE2 address, and
+# gov-replay's second `startTimer()` would revert.
+[create2_factory_salts]
+# Era CTM
+"0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b" = "0x0d983b9a9d3d12f7c5efd3987e52d553c006a0336a4e3e94de07146edc266ca0"
+# ZKsync OS (Atlas) CTM
+"0x73bee414c6e006525f3cceedf6d8004c0370502e" = "0x3fb730df7d955a9c3979eda38b54deb6aa59c6af0b3b3c3d1443d8b1ca673b6d"

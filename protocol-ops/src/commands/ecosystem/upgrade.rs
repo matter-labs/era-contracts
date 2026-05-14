@@ -560,9 +560,33 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             }
         }
     }
-    let deployer_address = args
-        .deployer_address
-        .ok_or_else(|| anyhow::anyhow!("--deployer-address (or --env <name> with owner_address in the v31 input TOML) is required"))?;
+    // Auto-fill the CREATE2 salt from the per-version upgrade input
+    // (`upgrade-envs/v0.31.0-interopB/<env>.toml [contracts]
+    // create2_factory_salt`). Recording the salt in version control makes
+    // re-prepares reproducible (same addresses every run regardless of who
+    // runs it), so deployer-bundle broadcasts can land at addresses that
+    // match a later re-prepare's references. Caller can still override
+    // with explicit `--create2-factory-salt`.
+    if args.create2_factory_salt.is_none() {
+        if let Some(cfg) = env_cfg.as_ref() {
+            if let Some(salt) = cfg.v31_create2_factory_salt()? {
+                logger::info(format!(
+                    "Using create2_factory_salt from {}: {salt:#x}",
+                    cfg.v31_input_path.display(),
+                ));
+                args.create2_factory_salt = Some(salt);
+            }
+        }
+    }
+
+    let deployer_address = args.deployer_address.ok_or_else(|| {
+        anyhow::anyhow!(
+            "--deployer-address is required. Pass an EOA whose private key you control \
+             (e.g. derive it with `cast wallet address --private-key $(cat ~/.test_pk)`); \
+             we no longer auto-fall back to the env's `owner_address` because that is the \
+             ecosystem's governance contract on stage/mainnet — not a signable EOA."
+        )
+    })?;
 
     // ── CTM list resolution ─────────────────────────────────────────
     let (ctms, core_is_zk_sync_os_override) = if let Some(cfg_path) = &args.ctm_config {
@@ -634,9 +658,27 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 
     let contracts_path = resolve_l1_contracts_path(&paths::contracts_root())?;
 
+    let create2_factory_salt_per_ctm = match env_cfg.as_ref() {
+        Some(cfg) => {
+            let map = cfg.v31_create2_factory_salt_per_ctm()?;
+            if map.is_empty() {
+                None
+            } else {
+                logger::info(format!(
+                    "Using {} per-CTM create2 salts from {}",
+                    map.len(),
+                    cfg.v31_input_path.display()
+                ));
+                Some(map)
+            }
+        }
+        None => None,
+    };
+
     let inputs = V31PrepareInputs {
         ctms,
         create2_factory_salt: args.create2_factory_salt,
+        create2_factory_salt_per_ctm,
         upgrade_input_path: args.upgrade_input_path.clone(),
         core_output_path: args.core_output_path.clone(),
         core_script_path: args.core_script_path.clone(),
