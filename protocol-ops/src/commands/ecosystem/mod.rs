@@ -1,9 +1,10 @@
 //! Ecosystem-level commands. The v31 upgrade flow lives entirely under here:
 //!
 //! ```text
-//! Phase 1  ecosystem upgrade-prepare-all   (deployer EOA + Atlas-CTM-owner Safe)
+//! Phase 1  ecosystem upgrade-prepare-all   (deployer EOA + operational admin owner Safes)
 //!     ├── CoreUpgrade_v31.noGovernancePrepare        (deploy core L1 contracts)
 //!     ├── CTMUpgrade_v31.noGovernancePrepare         (per --ctm-proxy)
+//!     ├── ServerNotifier ProxyAdmin upgrade           (per CTM admin owner)
 //!     └── DeployPUHAndGuardians                       (zk-governance redeploy)
 //!     emits: <out>/prepare/governance.toml            (merged stage 0/1/2 calls,
 //!                                                      including the PUH+Guardians
@@ -69,8 +70,9 @@ pub enum EcosystemCommands {
     Init(EcosystemInitArgs),
     /// Phase 1 of the ecosystem upgrade: deploys all new ecosystem contracts
     /// (core + per-CTM impls + new ProtocolUpgradeHandler + new Guardians) on
-    /// a single anvil fork, signed by the deployer EOA, and emits the merged
-    /// `<out>/prepare/governance.toml` for Phase 2 to replay.
+    /// a single anvil fork, emits operational admin bundles for CTM-owned
+    /// surfaces, and writes the merged `<out>/prepare/governance.toml` for
+    /// Phase 2 to replay.
     #[command(name = "upgrade-prepare-all")]
     UpgradePrepareAll(UpgradePrepareAllArgs),
     /// Phase 2 of the ecosystem upgrade: replays governance stages 0+1+2 on

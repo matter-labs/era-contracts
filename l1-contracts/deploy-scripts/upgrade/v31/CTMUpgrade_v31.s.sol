@@ -12,7 +12,6 @@ import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisFo
 
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
 
-import {Call} from "contracts/governance/Common.sol";
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CTMUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
 import {CoreContract} from "../../ecosystem/CoreContract.sol";
@@ -22,9 +21,9 @@ import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     /// @notice Single-call entry point invoked by the protocol-ops CLI's `ecosystem upgrade-prepare-all`.
     ///         Mirrors `CoreUpgrade_v31.noGovernancePrepare`: drives the full CTM-side prepare phase
-    ///         (deploy + bytecode publish + upgrade-cut generation + governance call serialization)
+    ///         (deploy + bytecode publish + upgrade-cut generation + governance/admin call serialization)
     ///         in one shot so the caller doesn't need to chain `initializeWithArgs` → `prepareCTMUpgrade`
-    ///         → `prepareDefaultGovernanceCalls` over forge-script invocations.
+    ///         → call-serialization helpers over forge-script invocations.
     function noGovernancePrepare(CTMUpgradeParams memory _params) public {
         initializeWithArgs(
             _params.ctmProxy,
@@ -39,6 +38,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         );
         prepareCTMUpgrade();
         prepareDefaultGovernanceCalls();
+        prepareDefaultCTMAdminCalls();
     }
 
     /// @notice Deploy everything that should be deployed
@@ -79,11 +79,6 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier", false);
 
         deployStateTransitionDiamondFacets();
-    }
-
-    /// @notice Include the ServerNotifier proxy upgrade in stage 1 governance calls.
-    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory) {
-        return prepareUpgradeServerNotifierCall();
     }
 
     /// @notice Override to deploy the correct v31 upgrade contract based on chain type.

@@ -245,14 +245,6 @@ contract AdminFunctions is Script, IAdminFunctions {
             }
 
             _ensureProxyAdminOwnedByGovernance(ctm, _governance, _wraps);
-
-            // The ServerNotifier proxy has its own ProxyAdmin (owned by chainAdmin, not governance).
-            // Stage 1 governance calls include a ProxyAdmin.upgrade() for the ServerNotifier,
-            // so its ProxyAdmin must be owned by governance before stage 1 executes.
-            address serverNotifier = IChainTypeManager(ctm).serverNotifierAddress();
-            if (serverNotifier != address(0)) {
-                _ensureProxyAdminOwnedByGovernance(serverNotifier, _governance, _wraps);
-            }
         }
 
         // Bridgehub-discoverable ecosystem proxies. Mirrors the contracts visited
@@ -288,6 +280,43 @@ contract AdminFunctions is Script, IAdminFunctions {
         _issueAsOwner(paOwner, proxyAdmin, abi.encodeCall(IOwnableSingleStep.transferOwnership, (_governance)), _wraps);
     }
 
+    /// Execute zero-value calls against Ownable targets as their current
+    /// owners. This is used for operational admin surfaces that intentionally
+    /// stay outside governance ownership, such as the ServerNotifier
+    /// ProxyAdmin. Contract owners without an explicit registry entry are
+    /// treated as ChainAdmin-style wrappers, matching the ServerNotifier
+    /// ownership model used by CTM deployments.
+    function executeOwnableCallsWithWraps(bytes memory _callsToExecute, OwnerWrap[] memory _wraps) public {
+        Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
+        for (uint256 i = 0; i < calls.length; i++) {
+            require(calls[i].value == 0, "ownable call value not supported");
+            address currentOwner = IOwnableSingleStep(calls[i].target).owner();
+            _issueAsOperationalOwner(currentOwner, calls[i].target, calls[i].data, _wraps);
+        }
+    }
+
+    function _issueAsOperationalOwner(
+        address _currentOwner,
+        address _target,
+        bytes memory _data,
+        OwnerWrap[] memory _wraps
+    ) private {
+        if (_currentOwner.code.length == 0) {
+            _anvilFund(_currentOwner);
+            vm.startBroadcast(_currentOwner);
+            (bool ok, bytes memory ret) = _target.call(_data);
+            vm.stopBroadcast();
+            require(ok, _wrapDecodeRevert(ret));
+            return;
+        }
+        uint8 kind = _ownerWrapKind(_currentOwner, _wraps);
+        if (kind == OWNER_KIND_LEGACY_GOVERNANCE) {
+            _wrapLegacyGovernance(_currentOwner, _target, _data);
+        } else {
+            _wrapOzChainAdmin(_currentOwner, _target, _data);
+        }
+    }
+
     /// Issue `_data` against `_target` on behalf of `_currentOwner`. EOAs are
     /// broadcast directly via `vm.startBroadcast`. Contract owners are looked
     /// up in `_wraps` and routed through their wrapping shape (legacy
@@ -308,13 +337,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             require(ok, _wrapDecodeRevert(ret));
             return;
         }
-        uint8 kind = OWNER_KIND_NONE;
-        for (uint256 i = 0; i < _wraps.length; i++) {
-            if (_wraps[i].ownableContract == _currentOwner) {
-                kind = _wraps[i].kind;
-                break;
-            }
-        }
+        uint8 kind = _ownerWrapKind(_currentOwner, _wraps);
         if (kind == OWNER_KIND_LEGACY_GOVERNANCE) {
             _wrapLegacyGovernance(_currentOwner, _target, _data);
         } else if (kind == OWNER_KIND_OZ_CHAIN_ADMIN) {
@@ -327,6 +350,15 @@ contract AdminFunctions is Script, IAdminFunctions {
                     " - add it to permanent-values/<env>.toml [[ownable_proxies]]"
                 )
             );
+        }
+    }
+
+    function _ownerWrapKind(address _currentOwner, OwnerWrap[] memory _wraps) private pure returns (uint8 kind) {
+        kind = OWNER_KIND_NONE;
+        for (uint256 i = 0; i < _wraps.length; i++) {
+            if (_wraps[i].ownableContract == _currentOwner) {
+                return _wraps[i].kind;
+            }
         }
     }
 

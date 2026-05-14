@@ -357,6 +357,36 @@
   },
   {
     "type": "function",
+    "name": "executeOwnableCallsWithWraps",
+    "inputs": [
+      {
+        "name": "_callsToExecute",
+        "type": "bytes",
+        "internalType": "bytes"
+      },
+      {
+        "name": "_wraps",
+        "type": "tuple[]",
+        "internalType": "struct OwnerWrap[]",
+        "components": [
+          {
+            "name": "ownableContract",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "kind",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "governanceAcceptAdmin",
     "inputs": [
       {
