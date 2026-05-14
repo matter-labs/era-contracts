@@ -91,6 +91,8 @@ error ConstructorsNotSupported();
 error CTMAlreadyRegistered();
 // 0xc630ef3c
 error CTMNotRegistered();
+// 0x13df796c
+error CutDataForProtocolVersionNotAvailable(uint256 oldProtocolVersion);
 // 0x907f8e51
 error DeadlineNotYetPassed();
 // 0xf2885eb3

@@ -154,7 +154,7 @@
         "internalType": "uint256"
       },
       {
-        "name": "_newProtocolVersion",
+        "name": "_oldProtocolVersion",
         "type": "uint256",
         "internalType": "uint256"
       },
