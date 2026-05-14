@@ -91,9 +91,7 @@ contract ServerNotifierTest is Test {
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
 
         vm.startPrank(chainAdmin);
-        vm.expectRevert(
-            abi.encodeWithSelector(CutDataForProtocolVersionNotAvailable.selector, protocolVersion)
-        );
+        vm.expectRevert(abi.encodeWithSelector(CutDataForProtocolVersionNotAvailable.selector, protocolVersion));
         serverNotifier.setUpgradeTimestamp(chainId, protocolVersion, deadline);
     }
 
