@@ -197,6 +197,22 @@ contract UpgradeIntegrationTest_Local is
         console.log("setUp: Paths configured");
         setupUpgrade(true);
         console.log("setUp: Upgrade setup complete");
+
+        // Transfer the ServerNotifier ProxyAdmin ownership to governance so that stage 1
+        // governance calls can execute ProxyAdmin.upgrade() for the ServerNotifier proxy.
+        // In a freshly deployed local fixture the ProxyAdmin is owned by chainAdmin (not governance).
+        // See the fork-only-violation note at the top of this file.
+        address serverNotifierProxy = ctmUpgrade.getAddresses().stateTransition.proxies.serverNotifier;
+        if (serverNotifierProxy != address(0)) {
+            bytes32 eip1967AdminSlot = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+            address serverNotifierProxyAdmin = address(
+                uint160(uint256(vm.load(serverNotifierProxy, eip1967AdminSlot)))
+            );
+            // ProxyAdmin is OZ v4 Ownable: _owner is packed in slot 0.
+            vm.store(serverNotifierProxyAdmin, bytes32(0), bytes32(uint256(uint160(coreUpgrade.getOwnerAddress()))));
+        }
+        console.log("setUp: Transferred ServerNotifier ProxyAdmin ownership to governance");
+
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         console.log("setUp: Got bridgehub address", bridgehub);
         bytes32 eraBaseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(eraZKChainId);

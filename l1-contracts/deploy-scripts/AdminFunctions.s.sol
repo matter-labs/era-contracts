@@ -245,6 +245,14 @@ contract AdminFunctions is Script, IAdminFunctions {
             }
 
             _ensureProxyAdminOwnedByGovernance(ctm, _governance, _wraps);
+
+            // The ServerNotifier proxy has its own ProxyAdmin (owned by chainAdmin, not governance).
+            // Stage 1 governance calls include a ProxyAdmin.upgrade() for the ServerNotifier,
+            // so its ProxyAdmin must be owned by governance before stage 1 executes.
+            address serverNotifier = IChainTypeManager(ctm).serverNotifierAddress();
+            if (serverNotifier != address(0)) {
+                _ensureProxyAdminOwnedByGovernance(serverNotifier, _governance, _wraps);
+            }
         }
 
         // Bridgehub-discoverable ecosystem proxies. Mirrors the contracts visited
