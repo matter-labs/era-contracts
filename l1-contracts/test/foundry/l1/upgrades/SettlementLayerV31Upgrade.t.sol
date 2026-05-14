@@ -670,10 +670,7 @@ contract SettlementLayerV31UpgradeZKsyncOSV30Test is BaseUpgrade {
     function test_RevertWhen_ZKsyncOSExistingTxSelectorIsUnexpected() public {
         bytes memory unexpectedUpgradeTxData = abi.encodeCall(
             IComplexUpgrader.upgrade,
-            (
-                L2_VERSION_SPECIFIC_UPGRADER_ADDR,
-                abi.encodeCall(IL2V31Upgrade.upgrade, (true, address(0), "", ""))
-            )
+            (L2_VERSION_SPECIFIC_UPGRADER_ADDR, abi.encodeCall(IL2V31Upgrade.upgrade, (true, address(0), "", "")))
         );
 
         vm.expectRevert(UnexpectedUpgradeSelector.selector);

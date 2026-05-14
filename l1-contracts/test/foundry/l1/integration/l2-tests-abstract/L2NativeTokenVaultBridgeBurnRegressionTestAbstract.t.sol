@@ -68,14 +68,14 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
         // Deal ETH to the asset router (needed because bridgeBurn is called with msg.value)
         vm.deal(L2_ASSET_ROUTER_ADDR, depositAmount);
 
-        // Initialize the asset tracker as it would be during upgrade so the real
-        // BaseTokenHolder path can account for the base token correctly.
-        vm.startPrank(L2_COMPLEX_UPGRADER_ADDR);
-        IL2AssetTracker(L2_ASSET_TRACKER_ADDR).initL2(L1_CHAIN_ID, baseTokenAssetIdLocal, false);
+        // The asset tracker is already initialized via L2UtilsBase.setUp, but with bytes32(0)
+        // as the base token asset id. Overwrite BASE_TOKEN_ASSET_ID to the actual local value
+        // and then register it via the upgrade path so the BaseTokenHolder accounting works.
+        stdstore.target(L2_ASSET_TRACKER_ADDR).sig("BASE_TOKEN_ASSET_ID()").checked_write(baseTokenAssetIdLocal);
         if (!IAssetTrackerBase(L2_ASSET_TRACKER_ADDR).isAssetRegistered(baseTokenAssetIdLocal)) {
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
             IL2AssetTracker(L2_ASSET_TRACKER_ADDR).registerBaseTokenDuringUpgrade();
         }
-        vm.stopPrank();
         vm.mockCall(
             address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
             abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
@@ -89,8 +89,10 @@ abstract contract L2NativeTokenVaultBridgeBurnRegressionTestAbstract is Test, Sh
 
         // Record the BaseTokenHolder balance before
         uint256 holderBalanceBefore = L2_BASE_TOKEN_HOLDER_ADDR.balance;
-        uint256 chainBalanceBefore =
-            IAssetTrackerBase(L2_ASSET_TRACKER_ADDR).chainBalance(block.chainid, baseTokenAssetIdLocal);
+        uint256 chainBalanceBefore = IAssetTrackerBase(L2_ASSET_TRACKER_ADDR).chainBalance(
+            block.chainid,
+            baseTokenAssetIdLocal
+        );
         uint256 totalWithdrawalsBefore = _readTotalWithdrawalsToL1(baseTokenAssetIdLocal);
 
         // Call bridgeBurn from the asset router (which is the only allowed caller)

@@ -126,7 +126,8 @@ library InteroperableAddress {
     ) internal pure returns (bool success, bytes2 chainType, bytes calldata chainReference, bytes calldata addr) {
         unchecked {
             success = true;
-            if (self.length < ERC7930_V1_MIN_LENGTH) return (false, 0x0000, Calldata.emptyBytes(), Calldata.emptyBytes());
+            if (self.length < ERC7930_V1_MIN_LENGTH)
+                return (false, 0x0000, Calldata.emptyBytes(), Calldata.emptyBytes());
 
             bytes2 version = _readBytes2Calldata(self, 0x00);
             if (version != bytes2(0x0001)) return (false, 0x0000, Calldata.emptyBytes(), Calldata.emptyBytes());

@@ -1104,6 +1104,22 @@
   },
   {
     "type": "error",
+    "name": "OnlyChainAssetHandler",
+    "inputs": [
+      {
+        "name": "sender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainAssetHandler",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "OnlyL1",
     "inputs": []
   },

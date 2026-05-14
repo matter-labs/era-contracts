@@ -144,10 +144,7 @@ abstract contract L2AssetRouterAttributesEncodingRegressionTestAbstract is Test,
         attributes[0] = abi.encodeCall(IERC7786Attributes.unbundlerAddress, hex"00010000000100");
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                InteroperableAddress.InteroperableAddressParsingError.selector,
-                hex"00010000000100"
-            )
+            abi.encodeWithSelector(InteroperableAddress.InteroperableAddressParsingError.selector, hex"00010000000100")
         );
         InteropCenter(L2_INTEROP_CENTER_ADDR).parseAttributes(
             attributes,

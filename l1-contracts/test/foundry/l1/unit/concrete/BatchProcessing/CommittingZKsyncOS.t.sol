@@ -546,5 +546,4 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
         committer.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
-
 }

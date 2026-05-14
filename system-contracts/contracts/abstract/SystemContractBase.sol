@@ -66,5 +66,4 @@ abstract contract SystemContractBase {
         }
         _;
     }
-
 }
