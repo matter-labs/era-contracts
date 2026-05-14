@@ -544,7 +544,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         address _accessControlRestriction,
         address _bridgehub,
         uint256 _chainId,
-        uint256 _newProtocolVersion,
+        uint256 _oldProtocolVersion,
         uint256 _timestamp
     ) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
@@ -555,14 +555,14 @@ contract AdminFunctions is Script, IAdminFunctions {
         calls[0] = Call({
             target: _adminAddr,
             value: 0,
-            data: abi.encodeCall(ChainAdmin.setUpgradeTimestamp, (_newProtocolVersion, _timestamp))
+            data: abi.encodeCall(ChainAdmin.setUpgradeTimestamp, (_oldProtocolVersion, _timestamp))
         });
         // ServerNotifier.setUpgradeTimestamp validates protocolVersionIsActive, eliminating
         // the race between timestamp and diamond-cut availability that exists on ChainAdmin alone.
         calls[1] = Call({
             target: chainInfo.serverNotifier,
             value: 0,
-            data: abi.encodeCall(ServerNotifier.setUpgradeTimestamp, (_chainId, _newProtocolVersion, _timestamp))
+            data: abi.encodeCall(ServerNotifier.setUpgradeTimestamp, (_chainId, _oldProtocolVersion, _timestamp))
         });
 
         Utils.adminExecuteCalls(_adminAddr, _accessControlRestriction, calls);

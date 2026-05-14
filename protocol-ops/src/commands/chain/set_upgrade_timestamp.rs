@@ -29,7 +29,7 @@ pub struct ChainSetUpgradeTimestampArgs {
     pub access_control_restriction: Address,
     /// New packed protocol version (uint256)
     #[clap(long)]
-    pub new_protocol_version: String,
+    pub old_protocol_version: String,
     /// Upgrade timestamp (unix seconds)
     #[clap(long)]
     pub upgrade_timestamp: String,
@@ -42,7 +42,7 @@ pub struct ChainSetUpgradeTimestampArgs {
 pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
-    let new_protocol_version = parse_u256_arg(&args.new_protocol_version)?;
+    let old_protocol_version = parse_u256_arg(&args.old_protocol_version)?;
     let upgrade_timestamp = parse_u256_arg(&args.upgrade_timestamp)?;
 
     let admin_address =
@@ -64,7 +64,7 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
                 args.access_control_restriction,
                 bridgehub,
                 chain_id,
-                new_protocol_version,
+                old_protocol_version,
                 upgrade_timestamp,
             ),
         )?
@@ -85,8 +85,8 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     logger::info(format!("Bridgehub: {:#x}", bridgehub));
     logger::info(format!("Chain ID: {}", chain_id));
     logger::info(format!(
-        "New protocol version: {}",
-        args.new_protocol_version
+        "Old protocol version: {}",
+        args.old_protocol_version
     ));
     logger::info(format!("Upgrade timestamp: {}", args.upgrade_timestamp));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
@@ -105,7 +105,7 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
             "access_control_restriction": format!("{:#x}", args.access_control_restriction),
             "bridgehub": format!("{:#x}", bridgehub),
             "chain_id": chain_id,
-            "new_protocol_version": &args.new_protocol_version,
+            "old_protocol_version": &args.old_protocol_version,
             "upgrade_timestamp": &args.upgrade_timestamp,
         }),
     )

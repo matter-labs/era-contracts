@@ -83,7 +83,7 @@ contract DefaultChainUpgrade is Script {
         );
     }
 
-    function setUpgradeTimestamp(uint256 newProtocolVersion, uint256 timestamp) public {
+    function setUpgradeTimestamp(uint256 oldProtocolVersion, uint256 timestamp) public {
         address admin = IZKChain(config.chainDiamondProxyAddress).getAdmin();
         address serverNotifier = IChainTypeManager(config.ctm).serverNotifierAddress();
 
@@ -91,14 +91,14 @@ contract DefaultChainUpgrade is Script {
         calls[0] = Call({
             target: admin,
             value: 0,
-            data: abi.encodeCall(IChainAdminOwnable.setUpgradeTimestamp, (newProtocolVersion, timestamp))
+            data: abi.encodeCall(IChainAdminOwnable.setUpgradeTimestamp, (oldProtocolVersion, timestamp))
         });
         calls[1] = Call({
             target: serverNotifier,
             value: 0,
             data: abi.encodeCall(
                 ServerNotifier.setUpgradeTimestamp,
-                (config.chainChainId, newProtocolVersion, timestamp)
+                (config.chainChainId, oldProtocolVersion, timestamp)
             )
         });
 

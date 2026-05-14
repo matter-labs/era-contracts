@@ -20,7 +20,7 @@ on:
         description: "Chain name (key in ecosystem.yaml `chains:`)"
         required: true
         type: string
-      new_protocol_version:
+      old_protocol_version:
         description: "Packed protocol version (uint256 as decimal or 0x-prefixed hex)"
         required: true
         type: string
