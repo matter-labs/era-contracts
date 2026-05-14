@@ -14,9 +14,10 @@
 //! `v31UpgradeChainBatchNumber` (per-chain upgrade) gates are cleared back
 //! to back instead of leaving an extra registration freeze afterwards.
 //!
-//! Any signer can run this (no governance privileges needed); we default to
-//! the env's `owner_address` since that EOA is the one already used for the
-//! deployer phase.
+//! Any signer can run this — no governance privileges needed. The caller
+//! must pass `--sender <EOA>`. We deliberately do not fall back to the
+//! env's `owner_address` because on stage / mainnet that's the
+//! ProtocolUpgradeHandler contract (governance), not a signable EOA.
 
 use anyhow::Context;
 use clap::Parser;
@@ -43,8 +44,9 @@ pub struct Stage3Args {
     #[serde(flatten)]
     pub topology: crate::common::EcosystemArgs,
 
-    /// Sender for the stage-3 forge script. Defaults to the env's
-    /// `owner_address`.
+    /// Sender for the stage-3 forge script. Required: any signable EOA
+    /// works (no governance privileges needed). Pass the same EOA whose
+    /// key you used for the deployer bundle, or any other holder.
     #[clap(long)]
     pub sender: Option<Address>,
 }
@@ -62,13 +64,12 @@ pub async fn run(mut args: Stage3Args) -> anyhow::Result<()> {
         if args.shared.out.is_none() {
             args.shared.out = Some(default_protocol_ops_out_dir(&cfg.env)?.join("stage3"));
         }
-        if args.sender.is_none() {
-            args.sender = cfg.owner_address();
-        }
     }
     let sender_address = args.sender.ok_or_else(|| {
         anyhow::anyhow!(
-            "--sender (or --env <name> with owner_address in the v31 input TOML) is required"
+            "--sender is required. Stage 3 takes any signable EOA — pass the same address you \
+             used for `--deployer-address` in `upgrade-prepare-all`, derived from your broadcast \
+             signer's private key (`cast wallet address --private-key …`)."
         )
     })?;
 

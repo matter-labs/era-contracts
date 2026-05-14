@@ -69,3 +69,73 @@ Commands that support **`--out`** write a **`CommandEnvelope`** snapshot after a
 ## Requirements
 
 You need a working Foundry toolchain (`forge`, `cast`, etc.) and repo contract artifacts as expected by the scripts this tool wraps. From the repo root, `l1-contracts` must be built (`forge build`).
+
+### Running the Protocol Upgrade Verification Tool (PUVT)
+
+The PUVT requires we have already run the upgrade scripts that deploy all new protocol contracts. We can run the PUVT in local (development) mode or against a live chain.
+
+#### PUVT in Local Mode
+
+Start an anvil fork of the L1:
+
+```bash
+anvil --fork-url <l1-rpc-url>
+```
+
+Open a new terminal and run the protocol-ops upgrade tool. `upgrade-prepare` always runs the
+Foundry script against its own temporary fork and writes replayable bundles to `--out`; it does
+not leave its temporary fork running. For local PUVT testing, use an Anvil default account as the
+deployer so the emitted bundles can be replayed with the matching private key:
+
+```bash
+export SKIP_PUH=1
+export ANVIL_RPC=http://127.0.0.1:8545
+export ANVIL_DEPLOYER=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+export ANVIL_DEPLOYER_PK=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+
+rm -rf /tmp/v31-stage
+mkdir -p /tmp/v31-stage/prepare
+
+./target/release/protocol_ops ecosystem upgrade-prepare-all \
+  --l1-rpc-url "$ANVIL_RPC" \
+  --env stage \
+  --deployer-address "$ANVIL_DEPLOYER" \
+  --out /tmp/v31-stage/prepare \
+  --create2-factory-salt 0x0000000000000000000000000000000000000000000000000000000000000000
+```
+
+Replay the generated deployment bundles into the persistent Anvil fork:
+
+```bash
+rm -f /tmp/v31-stage/executed.json
+for bundle in /tmp/v31-stage/prepare/*.safe.json; do
+  ./target/release/protocol_ops dev execute-safe \
+    --l1-rpc-url "$ANVIL_RPC" \
+    --safe-file "$bundle" \
+    --private-key "$ANVIL_DEPLOYER_PK" \
+    --out /tmp/v31-stage/executed.json
+done
+```
+
+Then run the verifier against the same Anvil fork and the merged TOML
+produced by `upgrade-prepare-all`:
+
+```bash
+./target/release/protocol_ops ecosystem verify-upgrade \
+  --ecosystem-toml /tmp/v31-stage/prepare/ecosystem.toml \
+  --l1-rpc-url "$ANVIL_RPC" \
+  --era-chain-id 270 \
+  --executed-bundles /tmp/v31-stage/executed.json \
+  --create2-salt 0x88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5 \
+  --zk-token-asset-id 0xd7912bfd25000ee1b3355167866f960a61787b79cd2c7e791036fe6e85a73823
+```
+
+(The salt above is `--env stage`'s `permanent_contracts.create2_factory_salt`; substitute your env's value.)
+
+`--zk-token-asset-id` is recommended for production verification runs. When omitted, `zkTokenAssetId`
+is only checked to be non-zero and a warning is emitted.
+
+The `--create2-factory` flag defaults to the standard Foundry CREATE2
+factory (`0x4e59b44847b379578588920cA78FbF26c0B4956C`) used by the v31
+prepare scripts; override only if your prepare run targeted a different
+factory.

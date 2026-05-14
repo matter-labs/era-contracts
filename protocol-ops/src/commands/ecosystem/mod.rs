@@ -48,6 +48,7 @@ use crate::{
     commands::ecosystem::simulator::GovernanceTomlToSimulatorArgs,
     commands::ecosystem::stage3::Stage3Args,
     commands::ecosystem::upgrade::{ListCtmsArgs, UpgradeGovernanceArgs, UpgradePrepareAllArgs},
+    commands::ecosystem::verify_upgrade::VerifyUpgradeArgs,
 };
 
 pub(crate) mod broadcast;
@@ -59,6 +60,7 @@ pub(crate) mod stage3;
 pub(crate) mod upgrade;
 pub(crate) mod v31_upgrade_full;
 pub(crate) mod v31_upgrade_inner;
+pub(crate) mod verify_upgrade;
 
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]
@@ -78,6 +80,9 @@ pub enum EcosystemCommands {
     /// `--governance-toml` explicitly.
     #[command(name = "upgrade-governance")]
     UpgradeGovernance(UpgradeGovernanceArgs),
+    /// Verify ecosystem upgrade artifacts produced by upgrade-prepare.
+    #[command(name = "verify-upgrade")]
+    VerifyUpgrade(VerifyUpgradeArgs),
     /// Broadcast the bundles produced by `upgrade-prepare-all` to a real (or
     /// fork) RPC under the supplied EOA keys. Multi-bundle dispatcher around
     /// `dev execute-safe`: reads `manifest.json`, replays each bundle in order
@@ -107,6 +112,7 @@ pub(crate) async fn run(args: EcosystemCommands) -> anyhow::Result<()> {
         EcosystemCommands::Init(args) => init::run(args).await,
         EcosystemCommands::UpgradePrepareAll(args) => upgrade::run_upgrade_prepare_all(args).await,
         EcosystemCommands::UpgradeGovernance(args) => upgrade::run_upgrade_governance(args).await,
+        EcosystemCommands::VerifyUpgrade(args) => verify_upgrade::run(args).await,
         EcosystemCommands::UpgradeBroadcast(args) => broadcast::run(args).await,
         EcosystemCommands::Stage3(args) => stage3::run(args).await,
         EcosystemCommands::ListCtms(args) => upgrade::run_list_ctms(args).await,
