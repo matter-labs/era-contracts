@@ -516,6 +516,11 @@
   },
   {
     "type": "error",
+    "name": "RemovingPermanentRestriction",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "TotalPriorityTxsIsZero",
     "inputs": []
   },

@@ -150,15 +150,15 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     }
 
     function getChainBalanceLocation(bytes32 _assetId, uint256 _chainId) internal pure returns (bytes32) {
-        return computeNestedMappingSlot(uint256(_assetId), _chainId, 0 + 151);
+        return computeNestedMappingSlot(uint256(_assetId), _chainId, 0 + 201);
     }
 
     function getAssetMigrationNumberLocation(bytes32 _assetId, uint256 _chainId) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(_assetId, keccak256(abi.encodePacked(_chainId, uint256(1 + 151)))));
+        return keccak256(abi.encodePacked(_assetId, keccak256(abi.encodePacked(_chainId, uint256(1 + 201)))));
     }
 
     function getTotalSupplyAcrossAllChainsLocation(bytes32 _assetId) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(_assetId, uint256(2 + 151)));
+        return keccak256(abi.encodePacked(_assetId, uint256(2 + 201)));
     }
 
     function computeNestedMappingSlot(

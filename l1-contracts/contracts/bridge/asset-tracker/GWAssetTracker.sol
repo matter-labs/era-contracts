@@ -31,6 +31,7 @@ import {
     L2_MESSAGE_ROOT,
     L2_NATIVE_TOKEN_VAULT,
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
     MAX_BUILT_IN_CONTRACT_ADDR,
     L2_ASSET_ROUTER,
     L2_BRIDGEHUB_ADDR
@@ -475,10 +476,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function _handleInteropCenterMessage(
         uint256 _chainId,
         bytes calldata _message
-    ) internal returns (uint256 chargeableCallCount) {
+    ) internal whenNotPaused returns (uint256 chargeableCallCount) {
         if (_message[0] != BUNDLE_IDENTIFIER) {
-            // This should not be possible in V31. In V31 this will be a trigger.
-            return 0;
+            revert InvalidMessage();
         }
 
         InteropBundle memory interopBundle = abi.decode(_message[1:], (InteropBundle));
@@ -523,7 +523,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// from pendingInteropBalance to chainBalance.
     /// @param _chainId The chain ID that is settling (destination chain of the interop bundle).
     /// @param _message The message data from InteropHandler.
-    function _handleInteropHandlerMessage(uint256 _chainId, bytes calldata _message) internal {
+    function _handleInteropHandlerMessage(uint256 _chainId, bytes calldata _message) internal whenNotPaused {
         bytes4 functionSignature = DataEncoding.getSelector(_message);
         require(
             functionSignature == IAssetTrackerDataEncoding.receiveInteropCallExecuted.selector,
@@ -601,20 +601,18 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         (uint256 tokenOriginalChainId, , , ) = this.parseTokenData(erc20Metadata);
         DataEncoding.assetIdCheck(tokenOriginalChainId, _assetId, originalToken);
         _registerToken(_assetId, originalToken, tokenOriginalChainId);
+        _decreaseChainBalance(_sourceChainId, _assetId, amount);
 
         if (_isInteropCall) {
             // Interop calls can not be used to L1.
             // This error should never be triggered, it is just an invariant check.
             require(_destinationChainId != L1_CHAIN_ID, CanNotSendInteropToL1(_destinationChainId));
 
-            _decreaseChainBalance(_sourceChainId, _assetId, amount);
             _increasePendingInteropBalance(_destinationChainId, _assetId, amount);
         } else {
             // When it is not an interop call, we expect it to be a withdrawal to L1
             // This error should never be triggered, it is just an invariant check.
             require(_destinationChainId == L1_CHAIN_ID, MustBeWithdrawalToL1(_destinationChainId));
-
-            _decreaseChainBalance(_sourceChainId, _assetId, amount);
         }
     }
 
@@ -706,6 +704,15 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         assetMigrationNumber[_chainId][_assetId] = chainMigrationNumber;
 
         emit GatewayToL1MigrationInitiated(_assetId, _chainId, amount);
+    }
+
+    /// @notice Sends Gateway -> L1 migration data to L1 through the L2->L1 messenger.
+    /// @param _data The migration payload.
+    function _sendGatewayToL1MigrationDataToL1(GatewayToL1TokenBalanceMigrationData memory _data) internal {
+        // slither-disable-next-line unused-return,reentrancy-no-eth
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            abi.encodeCall(IAssetTrackerDataEncoding.receiveGatewayToL1MigrationOnL1, _data)
+        );
     }
 
     function _calculatePreviousChainMigrationNumber(uint256 _chainId) internal view returns (uint256) {
