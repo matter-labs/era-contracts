@@ -1,6 +1,7 @@
 .DS_Store
 .idea
-.vscode
+.vscode/*
+!.vscode/settings.json
 artifacts-forge/
 artifacts-zk/
 artifacts/
