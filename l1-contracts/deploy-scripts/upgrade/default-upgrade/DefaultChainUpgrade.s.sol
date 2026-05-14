@@ -98,7 +98,7 @@ contract DefaultChainUpgrade is Script {
             value: 0,
             data: abi.encodeCall(
                 ServerNotifier.setUpgradeTimestamp,
-                (config.chainChainId, oldProtocolVersion, timestamp)
+                (config.chainChainId, timestamp)
             )
         });
 

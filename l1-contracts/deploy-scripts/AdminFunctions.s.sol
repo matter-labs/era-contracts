@@ -557,12 +557,12 @@ contract AdminFunctions is Script, IAdminFunctions {
             value: 0,
             data: abi.encodeCall(ChainAdmin.setUpgradeTimestamp, (_oldProtocolVersion, _timestamp))
         });
-        // ServerNotifier.setUpgradeTimestamp validates protocolVersionIsActive, eliminating
+        // ServerNotifier.setUpgradeTimestamp validates upgrade cut data exists, eliminating
         // the race between timestamp and diamond-cut availability that exists on ChainAdmin alone.
         calls[1] = Call({
             target: chainInfo.serverNotifier,
             value: 0,
-            data: abi.encodeCall(ServerNotifier.setUpgradeTimestamp, (_chainId, _oldProtocolVersion, _timestamp))
+            data: abi.encodeCall(ServerNotifier.setUpgradeTimestamp, (_chainId, _timestamp))
         });
 
         Utils.adminExecuteCalls(_adminAddr, _accessControlRestriction, calls);
