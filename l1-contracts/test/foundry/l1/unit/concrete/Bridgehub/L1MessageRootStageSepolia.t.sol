@@ -95,6 +95,10 @@ contract L1MessageRootStageSepoliaTest is Test {
         address impl = address(new L1MessageRootStageSepolia(bridgehub, 123, chainAssetHandler));
 
         vm.expectRevert(NotAllChainsOnL1.selector);
-        new TransparentUpgradeableProxy(impl, address(uint160(1)), abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ()));
+        new TransparentUpgradeableProxy(
+            impl,
+            address(uint160(1)),
+            abi.encodeCall(L1MessageRoot.initializeL1V31Upgrade, ())
+        );
     }
 }

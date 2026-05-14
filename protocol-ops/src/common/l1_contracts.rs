@@ -12,7 +12,8 @@ use ethers::providers::{Http, Provider};
 use ethers::types::Address;
 
 use crate::abi::{
-    BridgehubAbi, ChainTypeManagerBaseAbi, IChainTypeManagerAbi, TestnetVerifierAbi, ZkChainAbi,
+    AccessControlDefaultAdminRulesAbi, BridgehubAbi, ChainTypeManagerBaseAbi, IChainTypeManagerAbi,
+    TestnetVerifierAbi, ZkChainAbi,
 };
 
 fn provider(rpc_url: &str) -> anyhow::Result<Arc<Provider<Http>>> {
@@ -219,6 +220,22 @@ pub async fn resolve_chain_admin_owner(
         .await
         .with_context(|| format!("ChainAdmin({admin:#x}).owner() call failed"))?;
     ensure_nonzero(eoa, "ChainAdmin.owner()")
+}
+
+/// Resolve `AccessControlDefaultAdminRules.defaultAdmin()` for the ACR-backed
+/// ChainAdmin path used by `Utils.adminExecuteCalls`.
+pub async fn resolve_access_control_default_admin(
+    l1_rpc_url: &str,
+    access_control_restriction: Address,
+) -> anyhow::Result<Address> {
+    let acr =
+        AccessControlDefaultAdminRulesAbi::new(access_control_restriction, provider(l1_rpc_url)?);
+    let admin = acr.default_admin().call().await.with_context(|| {
+        format!(
+            "AccessControlRestriction({access_control_restriction:#x}).defaultAdmin() call failed"
+        )
+    })?;
+    ensure_nonzero(admin, "AccessControlRestriction.defaultAdmin()")
 }
 
 /// Resolve `Governance(bridgehub.owner()).owner()` → EOA that controls the

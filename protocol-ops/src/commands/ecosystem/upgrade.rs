@@ -546,10 +546,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
                 .join("l1-contracts")
                 .join(per_env_rel.trim_start_matches('/'));
             if per_env_abs.exists() {
-                logger::info(format!(
-                    "Using per-env upgrade input: {}",
-                    per_env_rel
-                ));
+                logger::info(format!("Using per-env upgrade input: {}", per_env_rel));
                 args.upgrade_input_path = per_env_rel;
             } else {
                 logger::info(format!(
@@ -648,9 +645,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         .as_ref()
         .map(|cfg| cfg.ownable_proxies().to_vec())
         .unwrap_or_default();
-    let new_gateway_cfg = env_cfg
-        .as_ref()
-        .and_then(|cfg| cfg.new_gateway().cloned());
+    let new_gateway_cfg = env_cfg.as_ref().and_then(|cfg| cfg.new_gateway().cloned());
     let full = V31UpgradeFull::new(V31UpgradeInner::new(&contracts_path, bridgehub))
         .with_ownable_proxies(proxies)
         .with_new_gateway(new_gateway_cfg);
@@ -885,8 +880,7 @@ fn write_merged_ecosystem_toml(
         }];
         stage2.push(format!("0x{}", hex::encode(encode_calls(&prefix))));
 
-        let raw =
-            fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+        let raw = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
         let mut value: Table =
             toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
         let gov_hex = value
@@ -971,10 +965,10 @@ fn read_asset_tracker_proxy_from_core(core_toml: &Path) -> anyhow::Result<Addres
     struct Top {
         asset_tracker_proxy_addr: String,
     }
-    let raw = fs::read_to_string(core_toml)
-        .with_context(|| format!("read {}", core_toml.display()))?;
-    let top: Top = toml::from_str(&raw)
-        .with_context(|| format!("parse {}", core_toml.display()))?;
+    let raw =
+        fs::read_to_string(core_toml).with_context(|| format!("read {}", core_toml.display()))?;
+    let top: Top =
+        toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
     top.asset_tracker_proxy_addr.parse().with_context(|| {
         format!(
             "asset_tracker_proxy_addr in {} is not a valid address: {}",

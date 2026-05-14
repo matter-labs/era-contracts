@@ -84,6 +84,14 @@ abigen!(
 );
 
 abigen!(
+    AccessControlDefaultAdminRulesAbi,
+    r#"[
+        function defaultAdmin() view returns (address)
+    ]"#,
+    event_derives(serde::Deserialize, serde::Serialize)
+);
+
+abigen!(
     IRegisterZKChainAbi,
     "../l1-contracts/zkstack-out/IRegisterZKChain.sol/IRegisterZKChain.json",
     event_derives(serde::Deserialize, serde::Serialize)

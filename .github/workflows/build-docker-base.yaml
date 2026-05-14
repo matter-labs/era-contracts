@@ -8,8 +8,8 @@ on:
   push:
     branches: [main, kl/anvil-hardening]
     paths:
-      - 'docker/protocol/Dockerfile.base'
-      - '.github/workflows/build-docker-base.yaml'
+      - "docker/protocol/Dockerfile.base"
+      - ".github/workflows/build-docker-base.yaml"
   workflow_dispatch:
     inputs:
       tag_override:
@@ -19,7 +19,7 @@ on:
   schedule:
     # Weekly Monday 06:00 UTC — picks up apt/Node/foundry CVE patches without
     # requiring the team to remember to rebuild manually.
-    - cron: '0 6 * * 1'
+    - cron: "0 6 * * 1"
 
 jobs:
   build-base:

@@ -131,6 +131,16 @@
         "internalType": "address"
       },
       {
+        "name": "bridgehub",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
         "name": "newProtocolVersion",
         "type": "uint256",
         "internalType": "uint256"
