@@ -287,8 +287,8 @@ async function main(): Promise<void> {
     // env-preset mode emits a merged `ecosystem.toml` (top-level
     // [governance_calls]); the synthetic v30→v31 harness still writes
     // `governance.toml`. Pick whichever exists.
-    const govTomlPath = [path.join(prepareDir, "ecosystem.toml"), path.join(prepareDir, "governance.toml")].find(
-      (p) => fs.existsSync(p)
+    const govTomlPath = [path.join(prepareDir, "ecosystem.toml"), path.join(prepareDir, "governance.toml")].find((p) =>
+      fs.existsSync(p)
     );
     if (!govTomlPath) {
       throw new Error(`No governance/ecosystem TOML emitted by upgrade-prepare-all under ${prepareDir}`);

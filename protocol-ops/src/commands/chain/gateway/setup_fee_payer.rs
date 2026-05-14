@@ -97,7 +97,9 @@ pub async fn run(args: SetupFeePayerArgs) -> anyhow::Result<()> {
     let calldata = IGWAssetTrackerAbi::new(asset_tracker_addr, client.provider().clone().into())
         .set_settlement_fee_payer_agreement(args.chain_id.into(), agreed)
         .calldata()
-        .ok_or_else(|| anyhow::anyhow!("failed to encode setSettlementFeePayerAgreement calldata"))?;
+        .ok_or_else(|| {
+            anyhow::anyhow!("failed to encode setSettlementFeePayerAgreement calldata")
+        })?;
 
     logger::step(format!(
         "{} settlement-fee-payer agreement for chain {} on GW (chainId {})",

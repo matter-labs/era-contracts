@@ -12,6 +12,8 @@ import {CoreUpgradeParams, CTMUpgradeParams} from "deploy-scripts/upgrade/defaul
 ///         forge invocations directly via `upgrade-prepare-all`.
 interface ICoreUpgradeV31 {
     function noGovernancePrepare(CoreUpgradeParams memory _params) external;
+
+    function stage3(address bridgehubProxy) external;
 }
 
 /// @notice Standalone CTM upgrade entry point. Invoked once per CTM proxy when the

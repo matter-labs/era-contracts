@@ -917,11 +917,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         // Serialize newly deployed upgrade addresses
         vm.serializeAddress("deployed_addresses", "chain_admin", discoveredEraZkChain.chainAdmin);
         vm.serializeAddress("deployed_addresses", "access_control_restriction_addr", address(0));
-        vm.serializeAddress(
-            "deployed_addresses",
-            "transparent_proxy_admin",
-            ctmAddresses.admin.transparentProxyAdmin
-        );
+        vm.serializeAddress("deployed_addresses", "transparent_proxy_admin", ctmAddresses.admin.transparentProxyAdmin);
         vm.serializeAddress("deployed_addresses", "rollup_l1_da_validator_addr", discoveredEraZkChain.l1DAValidator);
         vm.serializeAddress("deployed_addresses", "validium_l1_da_validator_addr", address(0));
         vm.serializeAddress(

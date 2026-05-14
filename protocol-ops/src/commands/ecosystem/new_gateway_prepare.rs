@@ -56,8 +56,7 @@ use crate::common::wallets::Wallet;
 /// its output. Lives under `script-out/` because forge's `fs_permissions` only
 /// allows writes there. The ecosystem prepare flow reads from this same path
 /// to extract `governance_calls_to_execute`.
-const VOTE_PREP_OUTPUT_REL: &str =
-    "script-out/v31-new-gateway-vote-preparation.toml";
+const VOTE_PREP_OUTPUT_REL: &str = "script-out/v31-new-gateway-vote-preparation.toml";
 
 /// Run `GatewayVotePreparation` for the env's configured new-gateway, returning
 /// the absolute path to the output TOML so the caller can merge its
@@ -105,8 +104,8 @@ pub async fn prepare_new_gateway(
                 source_ctm, new_gw.ctm_representative_chain_id
             )
         })?;
-    let force_deployments_data =
-        read_ctm_force_deployments_data(&source_ctm_entry.toml).with_context(|| {
+    let force_deployments_data = read_ctm_force_deployments_data(&source_ctm_entry.toml)
+        .with_context(|| {
             format!(
                 "reading force_deployments_data from CTM prepare TOML: {}",
                 source_ctm_entry.toml.display()
@@ -160,10 +159,9 @@ pub async fn prepare_new_gateway(
     //      land at the same addresses, so downstream stage-2 calls
     //      (which reference those addresses) still resolve when governance
     //      stage 2 runs against this fork later.
-    let governance =
-        crate::common::l1_contracts::resolve_governance(&runner.rpc_url, bridgehub)
-            .await
-            .context("resolve governance address for gov-0+1 replay")?;
+    let governance = crate::common::l1_contracts::resolve_governance(&runner.rpc_url, bridgehub)
+        .await
+        .context("resolve governance address for gov-0+1 replay")?;
     // Fund the impersonated governance EOA so its eth_sendTransaction calls
     // have gas headroom (governance is typically a contract on stage/mainnet,
     // so anvil's auto-impersonated account starts with zero ETH).
@@ -187,12 +185,8 @@ pub async fn prepare_new_gateway(
     // In production this registration happens in stage3 (post-governance),
     // but our prepare-time replay needs it earlier. The function is public
     // (anyone can call), so a direct ethers tx is enough.
-    let asset_tracker = read_asset_tracker_proxy(core_toml).with_context(|| {
-        format!(
-            "read asset_tracker_proxy_addr from {}",
-            core_toml.display()
-        )
-    })?;
+    let asset_tracker = read_asset_tracker_proxy(core_toml)
+        .with_context(|| format!("read asset_tracker_proxy_addr from {}", core_toml.display()))?;
     prime_zk_token_registration(&runner.rpc_url, asset_tracker, zk_token_asset_id)
         .await
         .context("prime ZK-token registration in L1AssetTracker")?;
@@ -337,13 +331,16 @@ fn read_asset_tracker_proxy(core_toml: &Path) -> anyhow::Result<Address> {
     struct Top {
         asset_tracker_proxy_addr: String,
     }
-    let raw =
-        std::fs::read_to_string(core_toml).with_context(|| format!("read {}", core_toml.display()))?;
-    let top: Top = toml::from_str(&raw)
-        .with_context(|| format!("parse {}", core_toml.display()))?;
-    top.asset_tracker_proxy_addr
-        .parse()
-        .with_context(|| format!("asset_tracker_proxy_addr is not a valid address: {}", top.asset_tracker_proxy_addr))
+    let raw = std::fs::read_to_string(core_toml)
+        .with_context(|| format!("read {}", core_toml.display()))?;
+    let top: Top =
+        toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
+    top.asset_tracker_proxy_addr.parse().with_context(|| {
+        format!(
+            "asset_tracker_proxy_addr is not a valid address: {}",
+            top.asset_tracker_proxy_addr
+        )
+    })
 }
 
 /// 1e30 wei (1B tokens for an 18-decimal token) — comfortably above the
@@ -412,7 +409,9 @@ async fn fund_zk_via_bridge_mint(
 
     // NTV is a contract — give it ETH for gas (anvil_setBalance is a balance
     // override, not a storage write to the token).
-    set_balance(rpc_url, ntv).await.context("anvil_setBalance(NTV)")?;
+    set_balance(rpc_url, ntv)
+        .await
+        .context("anvil_setBalance(NTV)")?;
 
     // ABI-encode bridgeMint(address,uint256) and send as the NTV via auto-impersonate.
     let selector = &ethers::utils::id("bridgeMint(address,uint256)")[..4];
@@ -511,10 +510,8 @@ fn read_gov_stage_hex(path: &Path, stage: u8) -> anyhow::Result<String> {
         stage1_calls: String,
         stage2_calls: String,
     }
-    let raw =
-        std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
-    let top: Top =
-        toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
+    let raw = std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+    let top: Top = toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
     Ok(match stage {
         0 => top.governance_calls.stage0_calls,
         1 => top.governance_calls.stage1_calls,
@@ -545,10 +542,8 @@ fn read_ctm_force_deployments_data(path: &Path) -> anyhow::Result<Bytes> {
         force_deployments_data: String,
     }
 
-    let raw =
-        std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
-    let parsed: Top =
-        toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
+    let raw = std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+    let parsed: Top = toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
     let trimmed = parsed
         .contracts_config
         .force_deployments_data
