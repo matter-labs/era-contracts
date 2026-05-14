@@ -22,6 +22,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/message-root/IMessageRoot.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 
 /// @notice Test-only CTM upgrade that mocks large bytecode reads to avoid MemoryOOG
 contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
@@ -204,9 +205,8 @@ contract UpgradeIntegrationTest_Local is
         // See the fork-only-violation note at the top of this file.
         address serverNotifierProxy = ctmUpgrade.getAddresses().stateTransition.proxies.serverNotifier;
         if (serverNotifierProxy != address(0)) {
-            bytes32 eip1967AdminSlot = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
             address serverNotifierProxyAdmin = address(
-                uint160(uint256(vm.load(serverNotifierProxy, eip1967AdminSlot)))
+                uint160(uint256(vm.load(serverNotifierProxy, Utils.ADMIN_SLOT)))
             );
             // ProxyAdmin is OZ v4 Ownable: _owner is packed in slot 0.
             vm.store(serverNotifierProxyAdmin, bytes32(0), bytes32(uint256(uint160(coreUpgrade.getOwnerAddress()))));

@@ -277,8 +277,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         address _governance,
         OwnerWrap[] memory _wraps
     ) private {
-        bytes32 eip1967AdminSlot = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
-        address proxyAdmin = address(uint160(uint256(vm.load(_proxy, eip1967AdminSlot))));
+        address proxyAdmin = address(uint160(uint256(vm.load(_proxy, Utils.ADMIN_SLOT))));
         if (proxyAdmin == address(0)) {
             return;
         }
