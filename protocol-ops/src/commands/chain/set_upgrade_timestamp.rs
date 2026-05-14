@@ -12,7 +12,7 @@ use crate::config::forge_interface::script_params::ADMIN_FUNCTIONS_INVOCATION;
 
 /// Set chain-upgrade timestamp, prepare-only.
 ///
-/// Drives `AdminFunctions.s.sol::adminScheduleUpgrade(admin, acr, version, ts)`
+/// Drives `AdminFunctions.s.sol::adminScheduleUpgrade(acr, bridgehub, chainId, ts)`
 /// against a forked anvil, emits a Gnosis Safe Transaction Builder JSON bundle
 /// via `--out`, and never broadcasts. Apply the bundle via
 /// `protocol-ops dev execute-safe` (or any Safe-bundle-aware executor).
@@ -27,9 +27,6 @@ pub struct ChainSetUpgradeTimestampArgs {
     /// Pass explicitly when the chain uses an access-control-restriction.
     #[clap(long, default_value = ZERO_ADDRESS)]
     pub access_control_restriction: Address,
-    /// New packed protocol version (uint256)
-    #[clap(long)]
-    pub old_protocol_version: String,
     /// Upgrade timestamp (unix seconds)
     #[clap(long)]
     pub upgrade_timestamp: String,
@@ -42,15 +39,10 @@ pub struct ChainSetUpgradeTimestampArgs {
 pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
-    let old_protocol_version = parse_u256_arg(&args.old_protocol_version)?;
     let upgrade_timestamp = parse_u256_arg(&args.upgrade_timestamp)?;
 
-    let admin_address =
-        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
-            .await
-            .context("resolving chain admin from L1")?;
     // The Solidity helper executes through ChainAdmin, but broadcasts from
-    // ChainAdmin.owner() or the AccessControlRestriction default admin inside adminExecuteCalls.
+    // ChainAdmin.owner() or the AccessControlRestriction default admin inside Utils.adminExecute.
     let sender = runner
         .prepare_chain_admin_broadcaster(bridgehub, chain_id, args.access_control_restriction)
         .await?;
@@ -60,11 +52,9 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
             &ADMIN_FUNCTIONS_INVOCATION,
             "adminScheduleUpgrade",
             (
-                admin_address,
                 args.access_control_restriction,
                 bridgehub,
                 chain_id,
-                old_protocol_version,
                 upgrade_timestamp,
             ),
         )?
@@ -77,17 +67,12 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     logger::step(
         "Preparing set-upgrade-timestamp Safe bundle via AdminFunctions.s.sol (simulation)",
     );
-    logger::info(format!("Admin address: {:#x}", admin_address));
     logger::info(format!(
         "Access control restriction: {:#x}",
         args.access_control_restriction
     ));
     logger::info(format!("Bridgehub: {:#x}", bridgehub));
     logger::info(format!("Chain ID: {}", chain_id));
-    logger::info(format!(
-        "Old protocol version: {}",
-        args.old_protocol_version
-    ));
     logger::info(format!("Upgrade timestamp: {}", args.upgrade_timestamp));
     logger::info(format!("RPC URL: {}", args.shared.l1_rpc_url));
 
@@ -101,11 +86,9 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         &runner,
         &serde_json::json!({}),
         &serde_json::json!({
-            "admin_address": format!("{:#x}", admin_address),
             "access_control_restriction": format!("{:#x}", args.access_control_restriction),
             "bridgehub": format!("{:#x}", bridgehub),
             "chain_id": chain_id,
-            "old_protocol_version": &args.old_protocol_version,
             "upgrade_timestamp": &args.upgrade_timestamp,
         }),
     )
