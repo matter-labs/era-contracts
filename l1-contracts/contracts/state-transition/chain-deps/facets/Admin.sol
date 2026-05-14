@@ -491,7 +491,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // The timestamp is keyed on _oldProtocolVersion (the version we are upgrading *from*), because
         // the new version is not known until the diamond cut is executed.
         if (msg.sender != s.admin && msg.sender != s.chainTypeManager) {
-            IServerNotifier serverNotifier = IServerNotifier(IChainTypeManager(s.chainTypeManager).serverNotifierAddress());
+            IServerNotifier serverNotifier = IServerNotifier(
+                IChainTypeManager(s.chainTypeManager).serverNotifierAddress()
+            );
             uint256 timestamp = serverNotifier.protocolVersionToUpgradeTimestamp(s.chainId, _oldProtocolVersion);
             if (timestamp == 0 || block.timestamp < timestamp) {
                 revert UpgradeTimestampNotReached(timestamp, block.timestamp);

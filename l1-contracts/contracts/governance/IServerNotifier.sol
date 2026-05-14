@@ -26,7 +26,10 @@ interface IServerNotifier {
     /// @param _chainId The ID of the chain to query.
     /// @param _oldProtocolVersion The protocol version to query.
     /// @return The timestamp at which the upgrade is expected.
-    function protocolVersionToUpgradeTimestamp(uint256 _chainId, uint256 _oldProtocolVersion) external view returns (uint256);
+    function protocolVersionToUpgradeTimestamp(
+        uint256 _chainId,
+        uint256 _oldProtocolVersion
+    ) external view returns (uint256);
 
     function setChainTypeManager(IChainTypeManager _chainTypeManager) external;
 
