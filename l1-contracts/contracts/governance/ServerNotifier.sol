@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
-import {InvalidProtocolVersion, CutDataForProtocolVersionNotAvailable, Unauthorized, ZeroAddress, ZeroUpgradeTimestamp} from "../common/L1ContractErrors.sol";
+import {CutDataForProtocolVersionNotAvailable, Unauthorized, ZeroAddress, ZeroUpgradeTimestamp} from "../common/L1ContractErrors.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IServerNotifier} from "./IServerNotifier.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
@@ -96,19 +96,15 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable, IServer
 
     /// @notice Set the expected upgrade timestamp for a specific protocol version. Only allowed to be called by ChainAdmin.
     /// @param _chainId The chainId of the ZKsync chain for which the upgrade timestamp is being set.
-    /// @param _oldProtocolVersion The ZKsync chain protocol version.
     /// @param _upgradeTimestamp The timestamp at which the chain node should expect the upgrade to happen.
     function setUpgradeTimestamp(
         uint256 _chainId,
-        uint256 _oldProtocolVersion,
         uint256 _upgradeTimestamp
     ) external onlyChainAdmin(_chainId) {
         if (_upgradeTimestamp == 0) {
             revert ZeroUpgradeTimestamp();
         }
-        if (!chainTypeManager.protocolVersionIsActive(_oldProtocolVersion)) {
-            revert InvalidProtocolVersion();
-        }
+        uint256 _oldProtocolVersion = chainTypeManager.getProtocolVersion(_chainId);
         if (chainTypeManager.upgradeCutHash(_oldProtocolVersion) == bytes32(0)) {
             revert CutDataForProtocolVersionNotAvailable(_oldProtocolVersion);
         }

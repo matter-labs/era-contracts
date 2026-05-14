@@ -72,11 +72,6 @@
         "internalType": "uint256"
       },
       {
-        "name": "_oldProtocolVersion",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
         "name": "_upgradeTimestamp",
         "type": "uint256",
         "internalType": "uint256"

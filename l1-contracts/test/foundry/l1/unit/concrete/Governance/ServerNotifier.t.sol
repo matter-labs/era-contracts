@@ -27,9 +27,11 @@ contract ServerNotifierTest is Test {
     address internal owner;
     address internal chainAdmin;
     uint256 internal chainId;
+    uint256 internal protocolVersion;
 
     function setUp() public {
         chainId = 1;
+        protocolVersion = 42;
         owner = makeAddr("owner");
         chainAdmin = makeAddr("chainAdmin");
 
@@ -42,6 +44,7 @@ contract ServerNotifierTest is Test {
         chainTypeManager.setBridgeHub(address(bridgehub));
 
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
+        chainTypeManager._setChainProtocolVersion(chainId, protocolVersion);
 
         ServerNotifier implementation = new ServerNotifier();
 
@@ -61,7 +64,6 @@ contract ServerNotifierTest is Test {
     }
 
     function test_setUpgradeTimestampValidProtocolVersionSucceeds() public {
-        uint protocolVersion = 42;
         uint deadline = block.timestamp + 7 days;
 
         chainTypeManager.setUpgradeCutHash(protocolVersion, keccak256("upgradeCutHash"));
@@ -70,22 +72,12 @@ contract ServerNotifierTest is Test {
         vm.startPrank(chainAdmin);
         vm.expectEmit(true, true, true, true, address(serverNotifier));
         emit IServerNotifier.UpgradeTimestampUpdated(chainId, protocolVersion, deadline);
-        serverNotifier.setUpgradeTimestamp(chainId, protocolVersion, deadline);
+        serverNotifier.setUpgradeTimestamp(chainId, deadline);
         uint256 stored = serverNotifier.protocolVersionToUpgradeTimestamp(chainId, protocolVersion);
         assertEq(stored, deadline);
     }
 
-    function test_setUpgradeTimestampInvalidProtocolVersionReverts() public {
-        uint protocolVersion = 42;
-        uint deadline = block.timestamp + 7 days;
-
-        vm.startPrank(chainAdmin);
-        vm.expectRevert(InvalidProtocolVersion.selector);
-        serverNotifier.setUpgradeTimestamp(chainId, protocolVersion, deadline);
-    }
-
     function test_setUpgradeTimestampCutDataForProtocolVersionNotAvailableReverts() public {
-        uint protocolVersion = 42;
         uint deadline = block.timestamp + 7 days;
 
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
@@ -94,11 +86,10 @@ contract ServerNotifierTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(CutDataForProtocolVersionNotAvailable.selector, protocolVersion)
         );
-        serverNotifier.setUpgradeTimestamp(chainId, protocolVersion, deadline);
+        serverNotifier.setUpgradeTimestamp(chainId, deadline);
     }
 
     function test_setUpgradeTimestampInvalidCallerReverts() public {
-        uint protocolVersion = 42;
         uint deadline = block.timestamp + 7 days;
 
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
@@ -106,7 +97,7 @@ contract ServerNotifierTest is Test {
         address alice = makeAddr("alice");
         vm.startPrank(alice);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, alice));
-        serverNotifier.setUpgradeTimestamp(chainId, protocolVersion, deadline);
+        serverNotifier.setUpgradeTimestamp(chainId, deadline);
     }
 
     function test_migrateToGatewayEmitsEvent() public {
