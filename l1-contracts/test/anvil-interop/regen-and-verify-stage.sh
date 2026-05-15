@@ -25,7 +25,14 @@ fi
 
 PORT=29545
 RPC="http://localhost:$PORT"
-OUT="$(pwd)/outputs/regen-stage"
+# Stash all per-run artifacts (prepare bundles, executed.json, anvil log)
+# under the env's own `upgrade-envs/v0.31.0-interopB/output/<env>/regen/`,
+# alongside the canonical config that drove them and matching the layout
+# `default_protocol_ops_out_dir` uses for production `--out`. The existing
+# repo `.gitignore` already excludes `output/**/*.safe.json` +
+# `output/**/manifest.json`, so the per-run artifacts stay untracked.
+L1_CONTRACTS_DIR="$(cd "$(dirname "$0")"/../.. && pwd)"
+OUT="$L1_CONTRACTS_DIR/upgrade-envs/v0.31.0-interopB/output/stage/regen"
 BRIDGEHUB="0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
 # Deployer EOA — derived from the broadcast signer's private key, supplied
 # by the caller. We deliberately *don't* pull this from the env config: the
@@ -52,7 +59,6 @@ DEPLOYER="$(cast wallet address --private-key "$DEPLOYER_PK")"
 echo "Deployer EOA: $DEPLOYER"
 # Pull env-specific values from the canonical config TOMLs so this script
 # doesn't drift from the source of truth when stage/mainnet/testnet update.
-L1_CONTRACTS_DIR="$(cd "$(dirname "$0")"/../.. && pwd)"
 PERMANENT_VALUES="$L1_CONTRACTS_DIR/upgrade-envs/permanent-values/stage.toml"
 V31_INPUT="$L1_CONTRACTS_DIR/upgrade-envs/v0.31.0-interopB/stage.toml"
 read_toml_str() {
@@ -78,15 +84,16 @@ FUND_AMOUNT="1000000000000000000000000000000"
 
 PROTOCOL_OPS="$(cd "$(dirname "$0")"/../../../protocol-ops && pwd)/target/debug/protocol_ops"
 
-# Extract every distinct CREATE2 salt used by the prepare run. Each prepare
-# sub-script (core / per-CTM / GW-prep) generates its own `H256::random()`
-# salt when `--create2-factory-salt` isn't pinned (v31_upgrade_inner.rs:199),
-# so a stage run emits ~4 distinct salts. PUVT's `--create2-salt` accepts a
-# comma-separated list and matches each CREATE2 factory tx against the set.
-# Pinning a single salt at prepare time would be cleaner, but the canonical
-# stage salt currently breaks the gov-replay step inside `prepare_new_gateway`
-# (the in-process v31-rehearsal `GatewayVotePreparation` depends on) for
-# reasons unrelated to this script — sniff for now, revisit later.
+# Extract every distinct CREATE2 salt used by the prepare run. For named
+# envs we pin salts in version control (`upgrade-envs/v0.31.0-interopB/
+# <env>.toml` → top-level `[contracts] create2_factory_salt` for Core and
+# `[create2_factory_salts]` for per-CTM), so a stage prepare emits the
+# pinned salt for Core + one pinned salt per CTM + the GW-prep salt
+# (still `H256::random` for now — `GatewayVotePreparation` doesn't read
+# the upgrade input). PUVT's `--create2-salt` accepts a comma-separated
+# list and matches each CREATE2 factory tx against the set; sniffing from
+# the executed bundle stays correct regardless of how many salts are
+# pinned vs random.
 sniff_create2_salts() {
   local executed_path="$1"
   python3 - "$executed_path" <<'PY'

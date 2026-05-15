@@ -92,6 +92,8 @@ contract SetTokenMultiplierTest is AdminTest {
     }
 
     function test_revertWhen_setTokenMultiplierPriceIncreaseTooLarge() public {
+        utilsFacet.util_setPriorityModeCanBeActivated(true);
+
         address chainTypeManager = utilsFacet.util_getChainTypeManager();
         uint128 nominator = 100;
         uint128 denominator = 1;
@@ -99,5 +101,17 @@ contract SetTokenMultiplierTest is AdminTest {
         vm.startPrank(chainTypeManager);
         vm.expectPartialRevert(FeeParamsChangeTooLarge.selector);
         adminFacet.setTokenMultiplier(nominator, denominator);
+    }
+
+    function test_successWhen_setTokenMultiplierPriceIncreaseTooLargeButPriorityModeCannotBeActivated() public {
+        address chainTypeManager = utilsFacet.util_getChainTypeManager();
+        uint128 nominator = 100;
+        uint128 denominator = 1;
+
+        vm.startPrank(chainTypeManager);
+        adminFacet.setTokenMultiplier(nominator, denominator);
+
+        assertEq(utilsFacet.util_getBaseTokenGasPriceMultiplierNominator(), nominator);
+        assertEq(utilsFacet.util_getBaseTokenGasPriceMultiplierDenominator(), denominator);
     }
 }

@@ -81,10 +81,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         return IBridgehubBase(L2_BRIDGEHUB_ADDR);
     }
 
-    /// @notice Checks that the message sender is the L1 Asset Router.
+    /// @notice Checks that the message sender is the asset-router counterpart for messages originating on L1.
     modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
         if (_originChainId == L1_CHAIN_ID) {
-            // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
+            // For messages originating on L1, only the L1 Asset Router counterpart may call this function.
             require(
                 AddressAliasHelper.undoL1ToL2Alias(msg.sender) == address(L1_ASSET_ROUTER),
                 Unauthorized(msg.sender)
@@ -95,10 +95,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _;
     }
 
-    /// @notice Checks that the message sender is the L1 Asset Router.
+    /// @notice Checks that the message sender is the L1 asset-router counterpart or this contract itself.
+    /// @dev Self-calls are used for interop flows where the destination L2AssetRouter re-enters its own finalize path.
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
         if (_chainId == L1_CHAIN_ID) {
-            // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
+            // For messages originating on L1, only the L1 Asset Router counterpart may call this function.
             if (
                 (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(L1_ASSET_ROUTER)) &&
                 msg.sender != address(this)
@@ -263,7 +264,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     }
 
     /*//////////////////////////////////////////////////////////////
-                            INITIATE DEPOSIT Functions
+                            INITIATE BRIDGE Functions
     //////////////////////////////////////////////////////////////*/
 
     function bridgehubDepositBaseToken(
@@ -279,9 +280,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Finalize the deposit and mint funds
+    /// @notice Finalizes a bridge request and mints funds.
     /// @param _assetId The encoding of the asset on L2
-    /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken)
+    /// @param _transferData The encoded data required for finalization
+    /// (address _sender, uint256 _amount, address _receiver, bytes memory erc20Data, address originToken)
     function finalizeDeposit(
         // solhint-disable-next-line no-unused-vars
         uint256 _originChainId,
@@ -303,7 +305,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     ) external payable onlyL2InteropCenter returns (InteropCallStarter memory interopCallStarter) {
         // This function is called by the InteropCenter when processing indirect interop calls.
         // It prepares the bridge operation for cross-chain execution through these steps:
-        // 1. Processing the deposit through the standard bridgehub flow
+        // 1. Processing the bridge request through the standard bridgehub flow
         // 2. Encoding the call for interop execution with proper attributes
         // 3. Returning an InteropCallStarter struct for the InteropCenter to process
         // COMPLETE L2->L2 BRIDGE FLOW:

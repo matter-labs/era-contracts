@@ -455,7 +455,7 @@ library L2GenesisForceDeploymentsHelper {
         }
 
         // Initialize L2BaseToken: sets L1_CHAIN_ID and initializes the BaseTokenHolder balance.
-        // For Era: reads __DEPRECATED_totalSupply and computes holder balance.
+        // For Era: initializes holder balance, with __DEPRECATED_totalSupply kept in totalSupply().
         // For ZKOS: mints via MINT_BASE_TOKEN_HOOK and transfers to holder.
         IL2BaseTokenBase(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR).initL2(_fixedForceDeploymentsData.l1ChainId);
     }

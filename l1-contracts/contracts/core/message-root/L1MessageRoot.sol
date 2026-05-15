@@ -88,16 +88,11 @@ contract L1MessageRoot is MessageRootBase, IL1MessageRoot {
         _v31InitializeInner(allZKChains);
     }
 
-    /// @dev Iterates the bridgehub's chain set and stamps every chain's
-    ///      `v31UpgradeChainBatchNumber` slot with the placeholder. Subclasses can
-    ///      override to skip chains that are knowingly mid-migration on a given
-    ///      L1 (see `L1MessageRootStageSepolia`).
     function _v31InitializeInner(uint256[] memory _allZKChains) internal virtual {
         uint256 allZKChainsLength = _allZKChains.length;
         for (uint256 i = 0; i < allZKChainsLength; ++i) {
-            uint256 chainId = _allZKChains[i];
-            require(IBridgehubBase(_bridgehub()).settlementLayer(chainId) == block.chainid, NotAllChainsOnL1());
-            v31UpgradeChainBatchNumber[chainId] = V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE;
+            require(IBridgehubBase(_bridgehub()).settlementLayer(_allZKChains[i]) == block.chainid, NotAllChainsOnL1());
+            v31UpgradeChainBatchNumber[_allZKChains[i]] = V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE;
         }
     }
 

@@ -53,6 +53,8 @@ error BaseTokenTransferFailed();
 error BatchHashMismatch(bytes32 expected, bytes32 actual);
 // 0xbd4455ff
 error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumber);
+// 0x41c329f7
+error BatchTimestampGreaterThanLastL2BlockTimestamp();
 // 0x6cf12312
 error BridgeHubAlreadyRegistered();
 // 0xdb538614
@@ -412,6 +414,8 @@ error SystemLogsSizeTooBig();
 error TimeNotReached(uint256 expectedTimestamp, uint256 actualTimestamp);
 // 0x7a4902ad
 error TimerAlreadyStarted();
+// 0xf511412f
+error TimerNotStarted();
 // 0x2d50c33b
 error TimestampError();
 // 0xa51fa558

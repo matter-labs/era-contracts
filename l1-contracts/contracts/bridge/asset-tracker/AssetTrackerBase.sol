@@ -3,23 +3,21 @@
 pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
 import {IAssetTrackerBase} from "./IAssetTrackerBase.sol";
-import {GatewayToL1TokenBalanceMigrationData, L1ToGatewayTokenBalanceMigrationData} from "../../common/Messaging.sol";
-
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractInterfaces.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {InsufficientChainBalance} from "./AssetTrackerErrors.sol";
-import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 
 abstract contract AssetTrackerBase is
     IAssetTrackerBase,
     Ownable2StepUpgradeable,
+    PausableUpgradeable,
     AssetHandlerModifiers,
     ReentrancyGuard
 {
@@ -128,26 +126,23 @@ abstract contract AssetTrackerBase is
         chainBalance[_chainId][_assetId] -= _amount;
     }
 
-    /// @notice Sends L1 -> Gateway migration data to L1 through the L2->L1 messenger.
-    /// @param _data The migration payload.
-    function _sendL1ToGatewayMigrationDataToL1(L1ToGatewayTokenBalanceMigrationData memory _data) internal {
-        // slither-disable-next-line unused-return,reentrancy-no-eth
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            abi.encodeCall(IAssetTrackerDataEncoding.receiveL1ToGatewayMigrationOnL1, _data)
-        );
-    }
-
-    /// @notice Sends Gateway -> L1 migration data to L1 through the L2->L1 messenger.
-    /// @param _data The migration payload.
-    function _sendGatewayToL1MigrationDataToL1(GatewayToL1TokenBalanceMigrationData memory _data) internal {
-        // slither-disable-next-line unused-return,reentrancy-no-eth
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            abi.encodeCall(IAssetTrackerDataEncoding.receiveGatewayToL1MigrationOnL1, _data)
-        );
-    }
-
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
+
     function _getChainMigrationNumber(uint256 _chainId) internal view virtual returns (uint256);
+
+    /*//////////////////////////////////////////////////////////////
+                            PAUSE
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Pauses interop-related functionality in trackers that explicitly check `whenNotPaused`.
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /// @notice Unpauses interop-related functionality in trackers that explicitly check `whenNotPaused`.
+    function unpause() external onlyOwner {
+        _unpause();
+    }
 }

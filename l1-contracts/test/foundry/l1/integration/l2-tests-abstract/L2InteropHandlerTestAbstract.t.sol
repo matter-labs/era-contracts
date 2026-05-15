@@ -763,6 +763,13 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(0))
         );
+        // executeBundle now reads the settlement layer from SystemContext, not L2_BRIDGEHUB.
+        // Return a non-L1 chain id so the require(... != L1_CHAIN_ID) check passes.
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.currentSettlementLayerChainId.selector),
+            abi.encode(block.chainid)
+        );
 
         // Record deposits before
         uint256 depositsBefore = _readTotalSuccessfulDepositsFromL1(_baseTokenAssetId);
@@ -818,9 +825,10 @@ abstract contract L2InteropHandlerTestAbstract is Test, SharedL2ContractDeployer
 
         // Verify BaseTokenBurntInterop event is emitted
         vm.expectEmit(true, false, false, true, L2_BASE_TOKEN_HOLDER_ADDR);
-        emit IBaseTokenHolder.BaseTokenBurntInterop(L2_INTEROP_HANDLER_ADDR, toChainId, burnAmount);
+        emit IBaseTokenHolder.BaseTokenBurntInterop(L2_INTEROP_CENTER_ADDR, toChainId, burnAmount);
 
-        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        vm.deal(L2_INTEROP_CENTER_ADDR, burnAmount);
+        vm.prank(L2_INTEROP_CENTER_ADDR);
         L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: burnAmount}(toChainId);
 
         // Verify asset tracker storage was actually updated

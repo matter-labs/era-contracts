@@ -19,6 +19,7 @@
 //! 0x1d…`) which `toml-rs` chokes on, so we parse it line-by-line for the
 //! handful of fields we need.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -173,6 +174,11 @@ pub struct PermanentContracts {
 
 /// Fields read from the v31 upgrade input TOML (best-effort regex parse —
 /// the file has unquoted hex literals that the TOML crate rejects).
+///
+/// CREATE2 salts are *not* stored here; `EnvConfig::v31_create2_factory_salt`
+/// and `v31_create2_factory_salt_per_ctm` re-read them from
+/// `v31_input_path` on demand. That way the salt-keyed entries are not
+/// duplicated in Rust state — the TOML is the only source of truth.
 #[derive(Debug, Default, Clone)]
 pub struct V31UpgradeInputs {
     pub owner_address: Option<Address>,
@@ -250,6 +256,38 @@ impl EnvConfig {
             .and_then(|p| p.create2_factory_salt)
     }
 
+    /// Per-upgrade-version CREATE2 salt from
+    /// `upgrade-envs/v0.31.0-interopB/<env>.toml [contracts]
+    /// create2_factory_salt`. Distinct from `create2_factory_salt()` (which
+    /// reads the chain-permanent salt out of `permanent-values/`); this one
+    /// is the salt used to deploy *this upgrade*'s implementations, recorded
+    /// alongside the rest of the v31 inputs so re-prepares are reproducible.
+    /// Re-reads the TOML each call rather than caching, so editing the file
+    /// between commands is reflected without restarting the CLI.
+    pub fn v31_create2_factory_salt(&self) -> anyhow::Result<Option<H256>> {
+        if !self.v31_input_path.exists() {
+            return Ok(None);
+        }
+        let content = fs::read_to_string(&self.v31_input_path)
+            .with_context(|| format!("read {}", self.v31_input_path.display()))?;
+        Ok(read_core_create2_salt(&content))
+    }
+
+    /// Per-CTM CREATE2 salts from
+    /// `upgrade-envs/v0.31.0-interopB/<env>.toml [create2_factory_salts]`,
+    /// keyed by CTM proxy. Empty if the env doesn't declare any (legacy
+    /// local-fixture path — `v31_upgrade_inner` will fall back to random
+    /// salts in that case). Re-reads the TOML each call (see
+    /// `v31_create2_factory_salt`).
+    pub fn v31_create2_factory_salt_per_ctm(&self) -> anyhow::Result<HashMap<Address, H256>> {
+        if !self.v31_input_path.exists() {
+            return Ok(HashMap::new());
+        }
+        let content = fs::read_to_string(&self.v31_input_path)
+            .with_context(|| format!("read {}", self.v31_input_path.display()))?;
+        Ok(read_create2_salts_per_ctm(&content))
+    }
+
     pub fn owner_address(&self) -> Option<Address> {
         self.v31.owner_address
     }
@@ -299,6 +337,77 @@ fn parse_v31_upgrade_input(content: &str) -> V31UpgradeInputs {
     out
 }
 
+/// Read `[contracts] create2_factory_salt` from a v31 input TOML.
+fn read_core_create2_salt(content: &str) -> Option<H256> {
+    let mut in_contracts = false;
+    for raw in content.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Some(section) = parse_section_header(line) {
+            in_contracts = section == "contracts";
+            continue;
+        }
+        if in_contracts {
+            if let Some(h) = match_quoted_h256(line, "create2_factory_salt") {
+                return Some(h);
+            }
+        }
+    }
+    None
+}
+
+/// Read every `"0x<addr>" = "0x<h256>"` entry under `[create2_factory_salts]`.
+fn read_create2_salts_per_ctm(content: &str) -> HashMap<Address, H256> {
+    let mut out = HashMap::new();
+    let mut current_section: Option<String> = None;
+    for raw in content.lines() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Some(section) = parse_section_header(line) {
+            current_section = Some(section);
+            continue;
+        }
+        if current_section.as_deref() == Some("create2_factory_salts") {
+            if let Some((addr, salt)) = match_addr_keyed_h256(line) {
+                out.insert(addr, salt);
+            }
+        }
+    }
+    out
+}
+
+fn parse_section_header(line: &str) -> Option<String> {
+    let line = line.split('#').next()?.trim();
+    if !line.starts_with('[') || !line.ends_with(']') {
+        return None;
+    }
+    Some(line[1..line.len() - 1].trim().to_string())
+}
+
+/// Match a TOML line of the form `"0x<addr>" = "0x<h256>"` (with optional
+/// trailing comment). Returns the parsed address + salt.
+fn match_addr_keyed_h256(line: &str) -> Option<(Address, H256)> {
+    let line = line.split('#').next()?.trim();
+    if !line.starts_with('"') {
+        return None;
+    }
+    let rest = &line[1..];
+    let key_end = rest.find('"')?;
+    let key = &rest[..key_end];
+    let after_key = rest[key_end + 1..].trim_start();
+    let after_eq = after_key.strip_prefix('=')?.trim_start();
+    let after_quote = after_eq.strip_prefix('"')?;
+    let val_end = after_quote.find('"')?;
+    let val = &after_quote[..val_end];
+    let addr: Address = key.parse().ok()?;
+    let salt: H256 = val.parse().ok()?;
+    Some((addr, salt))
+}
+
 fn match_quoted_address(line: &str, key: &str) -> Option<Address> {
     let prefix = format!("{key} = \"");
     if !line.starts_with(&prefix) {
@@ -318,6 +427,16 @@ fn match_unquoted_uint(line: &str, key: &str) -> Option<u64> {
     // Strip optional trailing comment.
     let value = rest.split('#').next()?.trim();
     value.parse().ok()
+}
+
+fn match_quoted_h256(line: &str, key: &str) -> Option<H256> {
+    let prefix = format!("{key} = \"");
+    if !line.starts_with(&prefix) {
+        return None;
+    }
+    let rest = &line[prefix.len()..];
+    let end = rest.find('"')?;
+    rest[..end].parse().ok()
 }
 
 #[cfg(test)]
@@ -348,5 +467,31 @@ mod tests {
         assert_eq!(ng.settlement_fee, U256::from(200_000_000_000_000_000u128));
         // GW 2708 is a ZKsync OS chain → CTM source is Atlas (witness 2702).
         assert_eq!(ng.ctm_representative_chain_id, 2702);
+    }
+
+    /// Confirms `EnvConfig`'s on-demand readers pick up the
+    /// `[create2_factory_salts]` table and `[contracts] create2_factory_salt`
+    /// — gov-replay relies on distinct per-CTM salts to keep
+    /// `GovernanceUpgradeTimer` deploys at different CREATE2 addresses
+    /// across Era and ZKsyncOS CTMs.
+    #[test]
+    fn stage_env_config_reads_create2_salts() {
+        let cfg = EnvConfig::load("stage").expect("load stage env config");
+
+        let core_salt = cfg
+            .v31_create2_factory_salt()
+            .expect("read core salt")
+            .expect("stage.toml must declare [contracts] create2_factory_salt");
+        assert_ne!(core_salt, H256::zero());
+
+        let per_ctm = cfg
+            .v31_create2_factory_salt_per_ctm()
+            .expect("read per-CTM salts");
+        assert_eq!(per_ctm.len(), 2);
+        let era: Address = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b".parse().unwrap();
+        let atlas: Address = "0x73bee414c6e006525f3cceedf6d8004c0370502e".parse().unwrap();
+        let era_salt = per_ctm.get(&era).expect("Era CTM salt");
+        let atlas_salt = per_ctm.get(&atlas).expect("ZKsyncOS CTM salt");
+        assert_ne!(era_salt, atlas_salt, "per-CTM salts must be distinct");
     }
 }

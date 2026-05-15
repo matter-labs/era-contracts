@@ -38,6 +38,11 @@ l1-contracts/script-out/*
 # stays tracked.
 l1-contracts/upgrade-envs/**/output/**/*.safe.json
 l1-contracts/upgrade-envs/**/output/**/manifest.json
+# Regen / broadcast scratch artifacts (executed.json, anvil.log, raw forge
+# script outputs). Not the canonical governance.toml.
+l1-contracts/upgrade-envs/**/output/**/regen/
+l1-contracts/upgrade-envs/**/output/**/executed.json
+l1-contracts/upgrade-envs/**/output/**/anvil.log
 l1-contracts/test/foundry/l1/integration/deploy-scripts/script-out/*.toml
 !l1-contracts/script-out/.gitkeep
 *.timestamp

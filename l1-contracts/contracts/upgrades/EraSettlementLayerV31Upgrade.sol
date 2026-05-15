@@ -23,6 +23,9 @@ contract EraSettlementLayerV31Upgrade is SettlementLayerV31UpgradeBase {
         bool _zksyncOS,
         bytes memory _existingTxData
     ) public view override returns (bytes memory) {
+        L2UpgradeTxLib.validateZKsyncOSFlag(_zksyncOS, false);
+        L2UpgradeTxLib.validateUpgradeSelector(_existingTxData, IComplexUpgrader.forceDeployAndUpgrade.selector);
+
         (
             IL2ContractDeployer.ForceDeployment[] memory forceDeployments,
             address delegateTo,

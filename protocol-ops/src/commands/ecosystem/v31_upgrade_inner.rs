@@ -13,6 +13,7 @@
 //! [`super::upgrade`] because it has no state of its own (just file IO + ABI
 //! passthrough).
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -44,8 +45,17 @@ pub struct CtmInputs {
 pub struct V31PrepareInputs {
     /// Target CTMs. One forge invocation per entry.
     pub ctms: Vec<CtmInputs>,
-    /// Optional CREATE2 salt; random if `None`.
+    /// Optional CREATE2 salt for the Core prepare; random if `None`.
     pub create2_factory_salt: Option<H256>,
+    /// Optional per-CTM CREATE2 salts. Keyed by CTM proxy address. Each CTM
+    /// prepare must use a distinct salt because the contracts it deploys
+    /// (notably `GovernanceUpgradeTimer`) have env-wide identical constructor
+    /// args — same salt + same factory + same init code → same address →
+    /// gov-replay's second `startTimer()` would revert. Supplied via the
+    /// `[create2_factory_salts]` table in `upgrade-envs/v0.31.0-interopB/
+    /// <env>.toml`; missing entries fall back to a random salt (legacy
+    /// local-fixture path).
+    pub create2_factory_salt_per_ctm: Option<HashMap<Address, H256>>,
     /// Upgrade config TOML path relative to `l1-contracts/`.
     pub upgrade_input_path: String,
     /// Output TOML path for the core forge call (relative to l1-contracts/).
@@ -334,7 +344,25 @@ impl<'a> V31UpgradeInner<'a> {
                 .context("Failed to auto-resolve governance address from bridgehub")?;
         logger::info(format!("Governance (auto-resolved): {governance:#x}"));
 
-        let create2_salt = inputs.create2_factory_salt.unwrap_or_else(H256::random);
+        // Per-CTM CREATE2 salt. Each CTM prepare deploys a few contracts
+        // whose constructor args are env-wide constants — notably
+        // `GovernanceUpgradeTimer(initialDelay, 2 weeks, ownerAddress,
+        // ecosystemAdminAddress)` — so without per-CTM differentiation
+        // Era's and Atlas's CTM-prepare CREATE2 calls would land at the
+        // same address. The downstream gov-replay then calls
+        // `startTimer()` twice on the same contract and the second one
+        // reverts. The CLI / env config plumbs a distinct salt per CTM
+        // proxy from `upgrade-envs/v0.31.0-interopB/<env>.toml
+        // [create2_salts.per_ctm]`; if not provided we fall back to a
+        // fresh random (legacy local-fixture path).
+        let create2_salt = inputs
+            .create2_factory_salt_per_ctm
+            .as_ref()
+            .and_then(|m| m.get(&ctm_proxy).copied())
+            .unwrap_or_else(H256::random);
+        logger::info(format!(
+            "Per-CTM create2 salt: {create2_salt:#x} (ctm={ctm_proxy:#x})"
+        ));
 
         // Per-CTM output path so back-to-back prepares don't clobber each other.
         let output_path_str = format!("/script-out/v31-upgrade-ctm-{ctm_proxy:#x}.toml");
