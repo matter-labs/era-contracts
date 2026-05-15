@@ -128,6 +128,10 @@ contract UpgradeIntegrationTest_Local is
 {
     using stdToml for string;
 
+    address private _serverNotifierProxy;
+    address private _serverNotifierProxyAdmin;
+    address private _expectedServerNotifierProxyAdminOwner;
+
     /// @notice Override to inject the mocked Core upgrade (skips setAssetTracker call).
     function createCoreUpgrade() internal override returns (CoreUpgrade_v31) {
         return new CoreUpgrade_v31_Test();
@@ -199,19 +203,12 @@ contract UpgradeIntegrationTest_Local is
         setupUpgrade(true);
         console.log("setUp: Upgrade setup complete");
 
-        // Transfer the ServerNotifier ProxyAdmin ownership to governance so that stage 1
-        // governance calls can execute ProxyAdmin.upgrade() for the ServerNotifier proxy.
-        // In a freshly deployed local fixture the ProxyAdmin is owned by chainAdmin (not governance).
-        // See the fork-only-violation note at the top of this file.
-        address serverNotifierProxy = ctmUpgrade.getAddresses().stateTransition.proxies.serverNotifier;
-        if (serverNotifierProxy != address(0)) {
-            address serverNotifierProxyAdmin = address(
-                uint160(uint256(vm.load(serverNotifierProxy, Utils.ADMIN_SLOT)))
-            );
-            // ProxyAdmin is OZ v4 Ownable: _owner is packed in slot 0.
-            vm.store(serverNotifierProxyAdmin, bytes32(0), bytes32(uint256(uint160(coreUpgrade.getOwnerAddress()))));
+        _serverNotifierProxy = ctmUpgrade.getAddresses().stateTransition.proxies.serverNotifier;
+        if (_serverNotifierProxy != address(0)) {
+            _serverNotifierProxyAdmin = address(uint160(uint256(vm.load(_serverNotifierProxy, Utils.ADMIN_SLOT))));
+            _expectedServerNotifierProxyAdminOwner = getOwnableOwner(_serverNotifierProxyAdmin);
         }
-        console.log("setUp: Transferred ServerNotifier ProxyAdmin ownership to governance");
+        console.log("setUp: Snapshotted ServerNotifier ProxyAdmin ownership");
 
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         console.log("setUp: Got bridgehub address", bridgehub);
@@ -278,5 +275,18 @@ contract UpgradeIntegrationTest_Local is
             IBridgehubBase(bridgehub).assetIdIsRegistered(_expectedBaseTokenAssetId),
             "Base token assetId not registered"
         );
+
+        if (_serverNotifierProxy != address(0)) {
+            assertEq(
+                getOwnableOwner(_serverNotifierProxyAdmin),
+                _expectedServerNotifierProxyAdminOwner,
+                "ServerNotifier ProxyAdmin owner changed"
+            );
+            assertEq(
+                address(uint160(uint256(vm.load(_serverNotifierProxy, Utils.IMPLEMENTATION_SLOT)))),
+                ctmUpgrade.getAddresses().stateTransition.implementations.serverNotifier,
+                "ServerNotifier implementation not upgraded"
+            );
+        }
     }
 }
