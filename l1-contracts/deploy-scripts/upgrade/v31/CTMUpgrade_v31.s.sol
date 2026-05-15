@@ -5,12 +5,17 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+
 import {L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {Utils} from "../../utils/Utils.sol";
 import {L2GenesisForceDeploymentsHelper} from "contracts/l2-upgrades/L2GenesisForceDeploymentsHelper.sol";
 
 import {IL2V31Upgrade} from "contracts/upgrades/IL2V31Upgrade.sol";
+
+import {Call} from "contracts/governance/Common.sol";
 
 import {DefaultCTMUpgrade} from "../default-upgrade/DefaultCTMUpgrade.s.sol";
 import {CTMUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
@@ -78,7 +83,40 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         // Deploy new ServerNotifier implementation
         ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier", false);
 
+        // v31 adds `UPGRADER_ROLE` + `upgradeChainFromVersion()` (IChainUpgrader) to ValidatorTimelock;
+        // existing chains' proxy still points at the v30 impl, so swap it under the same CREATE2 flow.
+        ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract(
+            "ValidatorTimelock",
+            false
+        );
+
         deployStateTransitionDiamondFacets();
+    }
+
+    /// @notice Append the ValidatorTimelock proxy-admin upgrade to the stage-1 governance bundle.
+    /// @dev The new impl has no reinitializer — `ProxyAdmin.upgrade` (not `upgradeAndCall`) is enough.
+    function prepareVersionSpecificStage1GovernanceCallsL1()
+        public
+        virtual
+        override
+        returns (Call[] memory calls)
+    {
+        address validatorTimelockProxy = ctmAddresses.stateTransition.proxies.validatorTimelock;
+        address newImpl = ctmAddresses.stateTransition.implementations.validatorTimelock;
+        require(validatorTimelockProxy != address(0), "v31: validatorTimelock proxy not set");
+        require(newImpl != address(0), "v31: validatorTimelock impl not deployed");
+
+        address proxyAdminAddr = Utils.getProxyAdminAddress(validatorTimelockProxy);
+
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: proxyAdminAddr,
+            data: abi.encodeCall(
+                ProxyAdmin.upgrade,
+                (ITransparentUpgradeableProxy(payable(validatorTimelockProxy)), newImpl)
+            ),
+            value: 0
+        });
     }
 
     /// @notice Override to deploy the correct v31 upgrade contract based on chain type.

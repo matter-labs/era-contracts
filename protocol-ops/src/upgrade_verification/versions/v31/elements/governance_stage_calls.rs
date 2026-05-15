@@ -294,12 +294,12 @@ pub(crate) async fn verify_per_chain_protocol_versions(
     Ok(())
 }
 
-/// Stage 1 call layout: 10 ecosystem-wide core calls (indices 0..=9), then 5
+/// Stage 1 call layout: 10 ecosystem-wide core calls (indices 0..=9), then 6
 /// per-CTM calls repeated once per `[ctms.<flavor>]` section in artifact order:
 /// timer deadline check, migrations-paused check, CTM proxy upgrade,
-/// setChainCreationParams, setNewVersionUpgrade.
+/// setChainCreationParams, setNewVersionUpgrade, ValidatorTimelock proxy upgrade.
 const STAGE1_PREFIX_LEN: usize = 10;
-const STAGE1_PER_CTM_LEN: usize = 5;
+const STAGE1_PER_CTM_LEN: usize = 6;
 
 /// Index of the per-CTM `ChainTypeManager` proxy upgrade within the
 /// per-CTM block (offset relative to the start of that block).
@@ -308,6 +308,7 @@ const PER_CTM_OFFSET_CHECK_MIGRATIONS_PAUSED: usize = 1;
 const PER_CTM_OFFSET_UPGRADE_CTM: usize = 2;
 const PER_CTM_OFFSET_SET_CHAIN_CREATION_PARAMS: usize = 3;
 const PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE: usize = 4;
+const PER_CTM_OFFSET_UPGRADE_VALIDATOR_TIMELOCK: usize = 5;
 
 fn ctm_block_start(ctm_index: usize) -> usize {
     STAGE1_PREFIX_LEN + ctm_index * STAGE1_PER_CTM_LEN
@@ -445,6 +446,31 @@ impl GovernanceStage1Calls {
                 );
             } else {
                 errors += 3;
+            }
+
+            // v31 swaps the per-CTM ValidatorTimelock implementation in-place
+            // (the impl gains UPGRADER_ROLE + upgradeChainFromVersion). The
+            // governance call routes through the same TUPP ProxyAdmin the
+            // CTM proxy uses (they share a transparent proxy admin per CTM).
+            if let Some(vt_proxy) = required_ctm_address(
+                ctm,
+                &["state_transition", "validator_timelock_addr"],
+                result,
+            ) {
+                let vt_proxy_admin = verifiers.network_verifier.get_proxy_admin(vt_proxy).await;
+                let vt_proxy_admin_label =
+                    format!("{}.validator_timelock_proxy_admin", ctm.flavor.label());
+                errors += verify_call_by_address(
+                    &self.calls,
+                    block + PER_CTM_OFFSET_UPGRADE_VALIDATOR_TIMELOCK,
+                    vt_proxy_admin,
+                    &vt_proxy_admin_label,
+                    "upgrade(address,address)",
+                    verifiers,
+                    result,
+                );
+            } else {
+                errors += 1;
             }
         }
 
@@ -606,6 +632,13 @@ impl GovernanceStage1Calls {
                 result,
             )
             .await?;
+            errors += verify_validator_timelock_upgrade_call_args(
+                &self.calls,
+                block + PER_CTM_OFFSET_UPGRADE_VALIDATOR_TIMELOCK,
+                ctm,
+                verifiers,
+                result,
+            );
         }
 
         if errors > 0 {
@@ -857,6 +890,71 @@ fn verify_ctm_upgrade_call_args(
         Err(err) => {
             result.report_error(&format!(
                 "Failed to decode ChainTypeManager upgrade call: {err}"
+            ));
+            1
+        }
+    }
+}
+
+fn verify_validator_timelock_upgrade_call_args(
+    calls: &CallList,
+    index: usize,
+    ctm: &CtmArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> usize {
+    let Some(call) = calls.elems.get(index) else {
+        result.report_error("Missing ValidatorTimelock upgrade call");
+        return 1;
+    };
+
+    match upgradeCall::abi_decode(&call.data) {
+        Ok(decoded) => {
+            let mut errors = 0;
+            if let Some(expected_proxy) = required_ctm_address(
+                ctm,
+                &["state_transition", "validator_timelock_addr"],
+                result,
+            ) {
+                errors += expect_address_equal(
+                    result,
+                    verifiers,
+                    &decoded.proxy,
+                    expected_proxy,
+                    &format!("{}.validator_timelock_proxy", ctm.flavor.label()),
+                );
+            } else {
+                errors += 1;
+            }
+            if let Some(expected_impl) = required_ctm_address(
+                ctm,
+                &["state_transition", "validator_timelock_implementation_addr"],
+                result,
+            ) {
+                errors += expect_address_equal(
+                    result,
+                    verifiers,
+                    &decoded.implementation,
+                    expected_impl,
+                    &format!(
+                        "{}.validator_timelock_implementation_addr",
+                        ctm.flavor.label()
+                    ),
+                );
+            } else {
+                errors += 1;
+            }
+            if errors == 0 {
+                result.report_ok(&format!(
+                    "{} ValidatorTimelock upgrade payload uses expected proxy and implementation",
+                    ctm.flavor.label()
+                ));
+            }
+            errors
+        }
+        Err(err) => {
+            result.report_error(&format!(
+                "Failed to decode ValidatorTimelock upgrade call: {err}"
             ));
             1
         }
