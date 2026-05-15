@@ -488,8 +488,12 @@ mod tests {
             .v31_create2_factory_salt_per_ctm()
             .expect("read per-CTM salts");
         assert_eq!(per_ctm.len(), 2);
-        let era: Address = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b".parse().unwrap();
-        let atlas: Address = "0x73bee414c6e006525f3cceedf6d8004c0370502e".parse().unwrap();
+        let era: Address = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"
+            .parse()
+            .unwrap();
+        let atlas: Address = "0x73bee414c6e006525f3cceedf6d8004c0370502e"
+            .parse()
+            .unwrap();
         let era_salt = per_ctm.get(&era).expect("Era CTM salt");
         let atlas_salt = per_ctm.get(&atlas).expect("ZKsyncOS CTM salt");
         assert_ne!(era_salt, atlas_salt, "per-CTM salts must be distinct");
