@@ -37,5 +37,5 @@ interface IServerNotifier {
 
     function migrateFromGateway(uint256 _chainId) external;
 
-    function setUpgradeTimestamp(uint256 _chainId, uint256 _oldProtocolVersion, uint256 _upgradeTimestamp) external;
+    function setUpgradeTimestamp(uint256 _chainId, uint256 _upgradeTimestamp) external;
 }
