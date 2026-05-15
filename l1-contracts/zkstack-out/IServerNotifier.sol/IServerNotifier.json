@@ -27,6 +27,30 @@
   },
   {
     "type": "function",
+    "name": "protocolVersionToUpgradeTimestamp",
+    "inputs": [
+      {
+        "name": "_chainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_oldProtocolVersion",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "setChainTypeManager",
     "inputs": [
       {
@@ -44,11 +68,6 @@
     "inputs": [
       {
         "name": "_chainId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "_protocolVersion",
         "type": "uint256",
         "internalType": "uint256"
       },
