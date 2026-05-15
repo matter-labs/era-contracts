@@ -10,7 +10,9 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
+import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+import {Call} from "contracts/governance/Common.sol";
 
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -81,17 +83,26 @@ contract DefaultChainUpgrade is Script {
         );
     }
 
-    function setUpgradeTimestamp(uint256 timestamp) public {
+    function setUpgradeTimestamp(uint256 newProtocolVersion, uint256 timestamp) public {
         address admin = IZKChain(config.chainDiamondProxyAddress).getAdmin();
         address serverNotifier = IChainTypeManager(config.ctm).serverNotifierAddress();
 
-        Utils.adminExecute(
-            admin,
-            address(0),
-            serverNotifier,
-            abi.encodeCall(ServerNotifier.setUpgradeTimestamp, (config.chainChainId, timestamp)),
-            0
-        );
+        Call[] memory calls = new Call[](2);
+        calls[0] = Call({
+            target: admin,
+            value: 0,
+            data: abi.encodeCall(IChainAdminOwnable.setUpgradeTimestamp, (newProtocolVersion, timestamp))
+        });
+        calls[1] = Call({
+            target: serverNotifier,
+            value: 0,
+            data: abi.encodeCall(
+                ServerNotifier.setUpgradeTimestamp,
+                (config.chainChainId, timestamp)
+            )
+        });
+
+        Utils.adminExecuteCalls(admin, address(0), calls);
     }
 
     function executeUpgrade(address ctm, uint256 chainChainId) public {

@@ -20,6 +20,10 @@ on:
         description: "Chain name (key in ecosystem.yaml `chains:`)"
         required: true
         type: string
+      new_protocol_version:
+        description: "Packed protocol version (uint256 as decimal or 0x-prefixed hex)"
+        required: true
+        type: string
       upgrade_timestamp:
         description: "Upgrade timestamp (unix seconds)"
         required: true
@@ -51,6 +55,7 @@ jobs:
             --l1-rpc-url                 "${{ inputs.l1_rpc_url }}" \
             --ecosystem                  /contracts/env/ecosystem.yaml \
             --chain                      "${{ inputs.chain_name }}" \
+            --new-protocol-version       "${{ inputs.new_protocol_version }}" \
             --upgrade-timestamp          "${{ inputs.upgrade_timestamp }}" \
             --access-control-restriction "${{ inputs.access_control_restriction }}" \
             --out /contracts/work/session/safe
