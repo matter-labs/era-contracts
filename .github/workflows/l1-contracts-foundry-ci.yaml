@@ -89,10 +89,13 @@ jobs:
         run: |
           # `forge build --sizes` prints a table and exits with error if any contract
           # exceeds 24,576 bytes. We exclude test/dev/mock contracts and known data-only
-          # contracts that are never deployed standalone.
+          # contracts that are never deployed standalone. `forge build --sizes` prints
+          # bare contract names when they are unique, so the filter must match by name as
+          # well as by path (e.g. GWAssetTrackerDev and GWAssetTrackerTestHelper live under
+          # dev-contracts/ and test/ respectively but their bare names are shown).
           forge build --sizes 2>&1 \
             | grep -E '^\|' \
-            | grep -v 'test/\|Test \|Mock\|dev-contracts/\|L2AssetTrackerData' \
+            | grep -v 'test/\|Test \|Mock\|dev-contracts/\|L2AssetTrackerData\|Dev \|TestHelper ' \
             | tee /tmp/sizes.txt
 
           # Check for any negative runtime margin (= over the limit)

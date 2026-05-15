@@ -6,8 +6,6 @@ pragma solidity ^0.8.20;
 error CallerMustBeBootloader();
 // 0xbe4bf9e4
 error CallerMustBeEvmContract();
-// 0x95ae848f
-error CallerMustBeInteropCenterOrNTV();
 // 0x9eedbd2b
 error CallerMustBeSystemContract();
 // 0xee455381

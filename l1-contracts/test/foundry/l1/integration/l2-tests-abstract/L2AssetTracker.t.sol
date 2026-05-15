@@ -128,10 +128,10 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
 
             // Loop over l1TxHashes in testData[i] and for each mark balanceChange version number as 1
             // Note: balanceChange is internal, so we calculate storage slot manually
-            // balanceChange is at slot 155 in GWAssetTracker
+            // balanceChange is at slot 205 in GWAssetTracker
             for (uint256 j = 0; j < txHashes.length; j++) {
-                // Calculate storage slot: keccak256(txHash, keccak256(chainId, 155))
-                bytes32 innerSlot = keccak256(abi.encode(testData[i].chainId, uint256(155)));
+                // Calculate storage slot: keccak256(txHash, keccak256(chainId, 205))
+                bytes32 innerSlot = keccak256(abi.encode(testData[i].chainId, uint256(205)));
                 bytes32 structSlot = keccak256(abi.encode(txHashes[j], innerSlot));
                 // Write 1 to the version field (first byte of the struct)
                 vm.store(address(GW_ASSET_TRACKER), structSlot, bytes32(uint256(1)));

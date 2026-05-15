@@ -29,7 +29,7 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  * ## Initial Balance
  *
  * During migration, this contract is initialized with 2^127 - 1 base tokens.
- * On Era, the existing total supply is deducted from the initial balance.
+ * On Era, the existing total supply is tracked separately in L2BaseTokenEra.__DEPRECATED_totalSupply.
  * On ZK OS, the full amount is minted since balances are tracked natively.
  * This is sufficient for any reasonable base token, as no token has a total supply greater than 2^127.
  *
@@ -49,7 +49,7 @@ import {Unauthorized} from "../common/L1ContractErrors.sol";
  * ## Force-received funds caveat
  *
  * The implicit meaning of this contract's balance is "funds that the chain can still mint".
- * On Era, totalSupply is computed as INITIAL_BASE_TOKEN_HOLDER_BALANCE - eraAccountBalance[BaseTokenHolder].
+ * On Era, totalSupply is computed as __DEPRECATED_totalSupply + INITIAL_BASE_TOKEN_HOLDER_BALANCE - eraAccountBalance[BaseTokenHolder].
  * On ZK OS, totalSupply is computed as zkosPreV31TotalSupply + (INITIAL - holder.balance).
  * If funds are force-sent to this contract (bypassing access controls), the holder balance
  * would increase, causing totalSupply() to undercount. This can happen via:
@@ -69,13 +69,11 @@ contract BaseTokenHolder is IBaseTokenHolder {
     }
 
     /// @notice Modifier that restricts access to callers that can bridge base tokens.
-    /// @dev InteropHandler: returns burned tokens during interop operations
     /// @dev InteropCenter: returns burned tokens during interop operations
     /// @dev NativeTokenVault: returns tokens during bridged base token burns
     /// @dev L2BaseToken: returns burned tokens during withdrawals
     modifier onlyBridgingCaller() {
         if (
-            msg.sender != L2_INTEROP_HANDLER_ADDR &&
             msg.sender != L2_INTEROP_CENTER_ADDR &&
             msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR &&
             msg.sender != L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
@@ -116,7 +114,7 @@ contract BaseTokenHolder is IBaseTokenHolder {
     }
 
     /// @notice Receives base tokens and initiates bridging by notifying L2AssetTracker.
-    /// @dev Called by InteropHandler, InteropCenter, NativeTokenVault, and L2BaseToken during bridging operations.
+    /// @dev Called by InteropCenter, NativeTokenVault, and L2BaseToken during bridging operations.
     /// @dev This function notifies L2AssetTracker to track the bridging operation.
     /// @param _toChainId The chain ID which the funds are sent to.
     function burnAndStartBridging(uint256 _toChainId) external payable onlyBridgingCaller {
