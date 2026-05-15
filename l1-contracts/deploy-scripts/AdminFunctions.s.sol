@@ -562,7 +562,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         calls[1] = Call({
             target: chainInfo.serverNotifier,
             value: 0,
-            data: abi.encodeCall(ServerNotifier.setUpgradeTimestamp, (_chainId, _newProtocolVersion, _timestamp))
+            data: abi.encodeCall(ServerNotifier.setUpgradeTimestamp, (_chainId, _timestamp))
         });
 
         Utils.adminExecuteCalls(_adminAddr, _accessControlRestriction, calls);

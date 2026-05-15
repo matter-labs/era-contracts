@@ -96,10 +96,7 @@ contract DefaultChainUpgrade is Script {
         calls[1] = Call({
             target: serverNotifier,
             value: 0,
-            data: abi.encodeCall(
-                ServerNotifier.setUpgradeTimestamp,
-                (config.chainChainId, newProtocolVersion, timestamp)
-            )
+            data: abi.encodeCall(ServerNotifier.setUpgradeTimestamp, (config.chainChainId, timestamp))
         });
 
         Utils.adminExecuteCalls(admin, address(0), calls);
