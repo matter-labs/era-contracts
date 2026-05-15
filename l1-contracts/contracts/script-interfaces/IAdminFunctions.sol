@@ -45,6 +45,8 @@ interface IAdminFunctions {
         OwnerWrap[] calldata wraps
     ) external;
 
+    function executeOwnableCallsWithWraps(bytes calldata _callsToExecute, OwnerWrap[] calldata _wraps) external;
+
     function governanceAcceptAdmin(address governor, address target) external;
 
     function chainAdminAcceptAdmin(ChainAdmin chainAdmin, address target) external;

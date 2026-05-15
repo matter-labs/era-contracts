@@ -269,8 +269,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         address _governance,
         OwnerWrap[] memory _wraps
     ) private {
-        bytes32 eip1967AdminSlot = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
-        address proxyAdmin = address(uint160(uint256(vm.load(_proxy, eip1967AdminSlot))));
+        address proxyAdmin = address(uint160(uint256(vm.load(_proxy, Utils.ADMIN_SLOT))));
         if (proxyAdmin == address(0)) {
             return;
         }
@@ -279,6 +278,43 @@ contract AdminFunctions is Script, IAdminFunctions {
             return;
         }
         _issueAsOwner(paOwner, proxyAdmin, abi.encodeCall(IOwnableSingleStep.transferOwnership, (_governance)), _wraps);
+    }
+
+    /// Execute zero-value calls against Ownable targets as their current
+    /// owners. This is used for operational admin surfaces that intentionally
+    /// stay outside governance ownership, such as the ServerNotifier
+    /// ProxyAdmin. Contract owners without an explicit registry entry are
+    /// treated as ChainAdmin-style wrappers, matching the ServerNotifier
+    /// ownership model used by CTM deployments.
+    function executeOwnableCallsWithWraps(bytes memory _callsToExecute, OwnerWrap[] memory _wraps) public {
+        Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
+        for (uint256 i = 0; i < calls.length; i++) {
+            require(calls[i].value == 0, "ownable call value not supported");
+            address currentOwner = IOwnableSingleStep(calls[i].target).owner();
+            _issueAsOperationalOwner(currentOwner, calls[i].target, calls[i].data, _wraps);
+        }
+    }
+
+    function _issueAsOperationalOwner(
+        address _currentOwner,
+        address _target,
+        bytes memory _data,
+        OwnerWrap[] memory _wraps
+    ) private {
+        if (_currentOwner.code.length == 0) {
+            _anvilFund(_currentOwner);
+            vm.startBroadcast(_currentOwner);
+            (bool ok, bytes memory ret) = _target.call(_data);
+            vm.stopBroadcast();
+            require(ok, _wrapDecodeRevert(ret));
+            return;
+        }
+        uint8 kind = _ownerWrapKind(_currentOwner, _wraps);
+        if (kind == OWNER_KIND_LEGACY_GOVERNANCE) {
+            _wrapLegacyGovernance(_currentOwner, _target, _data);
+        } else {
+            _wrapOzChainAdmin(_currentOwner, _target, _data);
+        }
     }
 
     /// Issue `_data` against `_target` on behalf of `_currentOwner`. EOAs are
@@ -301,13 +337,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             require(ok, _wrapDecodeRevert(ret));
             return;
         }
-        uint8 kind = OWNER_KIND_NONE;
-        for (uint256 i = 0; i < _wraps.length; i++) {
-            if (_wraps[i].ownableContract == _currentOwner) {
-                kind = _wraps[i].kind;
-                break;
-            }
-        }
+        uint8 kind = _ownerWrapKind(_currentOwner, _wraps);
         if (kind == OWNER_KIND_LEGACY_GOVERNANCE) {
             _wrapLegacyGovernance(_currentOwner, _target, _data);
         } else if (kind == OWNER_KIND_OZ_CHAIN_ADMIN) {
@@ -320,6 +350,15 @@ contract AdminFunctions is Script, IAdminFunctions {
                     " - add it to permanent-values/<env>.toml [[ownable_proxies]]"
                 )
             );
+        }
+    }
+
+    function _ownerWrapKind(address _currentOwner, OwnerWrap[] memory _wraps) private pure returns (uint8 kind) {
+        kind = OWNER_KIND_NONE;
+        for (uint256 i = 0; i < _wraps.length; i++) {
+            if (_wraps[i].ownableContract == _currentOwner) {
+                return _wraps[i].kind;
+            }
         }
     }
 
@@ -557,7 +596,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             value: 0,
             data: abi.encodeCall(ChainAdmin.setUpgradeTimestamp, (_newProtocolVersion, _timestamp))
         });
-        // ServerNotifier.setUpgradeTimestamp validates protocolVersionIsActive, eliminating
+        // ServerNotifier.setUpgradeTimestamp validates upgrade cut data exists, eliminating
         // the race between timestamp and diamond-cut availability that exists on ChainAdmin alone.
         calls[1] = Call({
             target: chainInfo.serverNotifier,

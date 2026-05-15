@@ -11,6 +11,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
 import {CoreUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CoreUpgrade_v31.s.sol";
 import {CTMUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/CTMUpgrade_v31.s.sol";
+import {IOwnableSingleStep, IChainAdminMulticall} from "../../../../deploy-scripts/AdminFunctions.s.sol";
 import {EcosystemUpgradeParams} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeParams.sol";
 import {ChainUpgrade_v31} from "../../../../deploy-scripts/upgrade/v31/ChainUpgrade_v31.s.sol";
 import {UpgradeUtils} from "../../../../deploy-scripts/upgrade/default-upgrade/UpgradeUtils.sol";
@@ -52,6 +53,8 @@ contract UpgradeIntegrationTestBase is Test {
     bytes32 internal _expectedUpgradeCutHash;
     address internal _expectedNewChainAdmin;
     bytes32 internal _expectedBaseTokenAssetId;
+    Call[] internal _ctmAdminCalls;
+    bool internal _ctmAdminCallsPrepared;
 
     function setupUpgrade(bool skipFactoryDepsCheck) public virtual {
         console.log("setupUpgrade: Creating CoreUpgrade_v31 and CTMUpgrade_v31");
@@ -101,6 +104,10 @@ contract UpgradeIntegrationTestBase is Test {
         coreUpgrade.prepareEcosystemUpgrade();
         ctmUpgrade.prepareCTMUpgrade();
 
+        console.log("setupUpgrade: Preparing CTM admin calls");
+        _cacheCTMAdminCalls(ctmUpgrade.prepareDefaultCTMAdminCalls());
+        _ctmAdminCallsPrepared = true;
+
         console.log("setupUpgrade: Preparing chain for the upgrade");
         chainUpgrade.prepareChainWithBridgehub(chainId, params.bridgehubProxyAddress);
         console.log("setupUpgrade: Complete");
@@ -138,6 +145,9 @@ contract UpgradeIntegrationTestBase is Test {
         // Cached for migration-pause outcome checks across stages 0..2.
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         address chainAssetHandler = IBridgehubBase(bridgehub).chainAssetHandler();
+
+        console.log("Executing CTM admin calls through the current operational owner");
+        executeCTMAdminCalls();
 
         console.log("Starting upgrade stage 0 (core + CTM merged)!");
         governanceMulticall(coreUpgrade.getOwnerAddress(), upgradeStage0Calls);
@@ -267,6 +277,59 @@ contract UpgradeIntegrationTestBase is Test {
         s2[0] = coreStage2;
         s2[1] = ctmStage2;
         stage2 = UpgradeUtils.mergeCallsArray(s2);
+    }
+
+    function executeCTMAdminCalls() internal virtual {
+        require(_ctmAdminCallsPrepared, "CTM admin calls not prepared");
+        executeOwnableCallsAsCurrentOwner(_ctmAdminCalls);
+    }
+
+    function _cacheCTMAdminCalls(Call[] memory _calls) private {
+        delete _ctmAdminCalls;
+        for (uint256 i = 0; i < _calls.length; i++) {
+            _ctmAdminCalls.push();
+            Call storage cachedCall = _ctmAdminCalls[_ctmAdminCalls.length - 1];
+            cachedCall.target = _calls[i].target;
+            cachedCall.value = _calls[i].value;
+            cachedCall.data = _calls[i].data;
+        }
+    }
+
+    function executeOwnableCallsAsCurrentOwner(Call[] storage _calls) internal {
+        for (uint256 i = 0; i < _calls.length; i++) {
+            Call memory call = _calls[i];
+            address owner = getOwnableOwner(call.target);
+
+            if (owner.code.length == 0) {
+                vm.startBroadcast(owner);
+                (bool success, ) = payable(call.target).call{value: call.value}(call.data);
+                assertTrue(success, "Ownable admin call failed");
+                vm.stopBroadcast();
+            } else {
+                Call[] memory singleCall = new Call[](1);
+                singleCall[0] = call;
+
+                address ownerAdmin = _chainAdminMulticallOwner(owner);
+                vm.startBroadcast(ownerAdmin);
+                IChainAdminMulticall(owner).multicall(singleCall, true);
+                vm.stopBroadcast();
+            }
+        }
+    }
+
+    function getOwnableOwner(address _target) internal view returns (address) {
+        return IOwnableSingleStep(_target).owner();
+    }
+
+    function _chainAdminMulticallOwner(address _owner) private returns (address ownerAdmin) {
+        // This harness exercises the no-wrap production path. Legacy governance owners require explicit wraps.
+        require(
+            _owner != ctmUpgrade.getOwnerAddress() && _owner != coreUpgrade.getOwnerAddress(),
+            "Legacy governance CTM admin owner unsupported"
+        );
+
+        ownerAdmin = getOwnableOwner(_owner);
+        require(ownerAdmin != address(0), "CTM admin owner has zero owner");
     }
 
     function _readEcosystemParams(

@@ -1401,13 +1401,13 @@
   },
   {
     "contractName": "l1-contracts/L1MessageRootStageSepolia",
-    "zkBytecodeHash": "0x010007a119abda2803df188ee359df48244e809853b93471c915a9359d76205d",
+    "zkBytecodeHash": "0x0100079b2c31ebc46e89dc1b320995949179b30f53aeceb462624ea113ae4f00",
     "zkBytecodePath": "/l1-contracts/zkout/L1MessageRootStageSepolia.sol/L1MessageRootStageSepolia.json",
-    "evmBytecodeHash": "0xc19912a687c8d48e07e420cbe32b00b5030701c6948fe891710e4f9d95c69a0d",
+    "evmBytecodeHash": "0xc08bf3c93a11ad850ca79bbe1212086c170caca0517188ffbb275e73f4ea911c",
     "evmBytecodePath": "/l1-contracts/out/L1MessageRootStageSepolia.sol/L1MessageRootStageSepolia.json",
-    "evmDeployedBytecodeHash": "0xbdfa25fed4d63a59e810163297bf86ed3455eff617241372ac65e7435cebe697",
-    "evmDeployedBytecodeBlakeHash": "0xcfffc1def20c8d50ca3fae4fb00e090859bb265b06dac66f3c3509065cd02ca1",
-    "evmDeployedBytecodeLength": 15192
+    "evmDeployedBytecodeHash": "0x6b1efe2c868b1490e2678e9266d64ce5697117cf9122cfc532fee43d065332bf",
+    "evmDeployedBytecodeBlakeHash": "0x9212d96840b063851167d79e18cde2b90d3633eb96e69397b78f1e10d9eb0b25",
+    "evmDeployedBytecodeLength": 15190
   },
   {
     "contractName": "l1-contracts/L1MessengerZKOS",

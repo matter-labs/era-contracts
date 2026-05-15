@@ -21,9 +21,9 @@ import {CTMContract, DeployCTML1OrGateway} from "../../ctm/DeployCTML1OrGateway.
 contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     /// @notice Single-call entry point invoked by the protocol-ops CLI's `ecosystem upgrade-prepare-all`.
     ///         Mirrors `CoreUpgrade_v31.noGovernancePrepare`: drives the full CTM-side prepare phase
-    ///         (deploy + bytecode publish + upgrade-cut generation + governance call serialization)
+    ///         (deploy + bytecode publish + upgrade-cut generation + governance/admin call serialization)
     ///         in one shot so the caller doesn't need to chain `initializeWithArgs` → `prepareCTMUpgrade`
-    ///         → `prepareDefaultGovernanceCalls` over forge-script invocations.
+    ///         → call-serialization helpers over forge-script invocations.
     function noGovernancePrepare(CTMUpgradeParams memory _params) public {
         initializeWithArgs(
             _params.ctmProxy,
@@ -38,6 +38,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         );
         prepareCTMUpgrade();
         prepareDefaultGovernanceCalls();
+        prepareDefaultCTMAdminCalls();
     }
 
     /// @notice Deploy everything that should be deployed
@@ -73,6 +74,9 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         );
         console.log("Deploying ChainTypeManager:", ctmContractName);
         ctmAddresses.stateTransition.implementations.chainTypeManager = deploySimpleContract(ctmContractName, false);
+
+        // Deploy new ServerNotifier implementation
+        ctmAddresses.stateTransition.implementations.serverNotifier = deploySimpleContract("ServerNotifier", false);
 
         deployStateTransitionDiamondFacets();
     }

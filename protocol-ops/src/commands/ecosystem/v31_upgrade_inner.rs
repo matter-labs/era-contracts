@@ -5,8 +5,8 @@
 //! the supplied `ForgeRunner` so deployer broadcasts merge into one Safe
 //! bundle.
 //!
-//! Real-world ecosystems also need a precondition (`ensureCtmsAndProxyAdmins
-//! OwnedByGovernance`) before prepare; that lives in
+//! Real-world ecosystems also need governance-owned proxy preconditions and
+//! operational admin call execution around prepare; those live in
 //! [`super::v31_upgrade_full::V31UpgradeFull`], which composes this.
 //!
 //! The governance phase is not on this struct — it's a free helper in
@@ -122,8 +122,8 @@ impl<'a> V31UpgradeInner<'a> {
     ///
     /// `pub(super)` so production callers must go through
     /// [`super::v31_upgrade_full::V31UpgradeFull::prepare`] — that wrapper
-    /// runs the `ensureCtmsAndProxyAdminsOwnedByGovernance` precondition
-    /// first, which stage 1 of the upgrade depends on.
+    /// runs the governance-owned proxy precondition first and executes
+    /// operational admin calls afterwards.
     pub(super) async fn prepare(
         &self,
         runner: &mut ForgeRunner,

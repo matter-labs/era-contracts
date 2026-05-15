@@ -4,8 +4,10 @@
 //!
 //!   `upgrade-prepare-all` deploys new ecosystem contracts (deployer EOA signs)
 //!                         by running `CoreUpgrade_v31` once + `CTMUpgrade_v31`
-//!                         once per `--ctm-proxy` on a single anvil fork. Emits
-//!                         per-script governance TOMLs.
+//!                         once per `--ctm-proxy` on a single anvil fork, then
+//!                         executes operational CTM-admin calls such as
+//!                         ServerNotifier ProxyAdmin upgrades. Emits per-script
+//!                         governance TOMLs.
 //!   `upgrade-governance`  runs governance stages 0 + 1 + 2 on one anvil fork
 //!                         and emits one Safe bundle (governance owner signs).
 //!                         Accepts multiple `--governance-toml` args and orders
@@ -318,9 +320,9 @@ pub fn resolve_l1_contracts_path(repo_root: &Path) -> anyhow::Result<PathBuf> {
 
 /// Unified split-flow prepare. Runs `CoreUpgrade_v31.noGovernancePrepare` once
 /// and `CTMUpgrade_v31.noGovernancePrepare` once per `--ctm-proxy`, all on a
-/// single anvil fork so deployer broadcasts merge into one Safe bundle. The
-/// downstream `upgrade-governance` consumes the per-step TOMLs (passed as
-/// `--governance-toml` once each).
+/// single anvil fork so deployer and operational admin broadcasts emit as one
+/// prepare bundle set. The downstream `upgrade-governance` consumes the
+/// per-step TOMLs (passed as `--governance-toml` once each).
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct UpgradePrepareAllArgs {
     #[clap(flatten)]

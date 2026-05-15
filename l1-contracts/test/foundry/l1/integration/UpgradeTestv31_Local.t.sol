@@ -22,6 +22,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {V31_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "contracts/core/message-root/IMessageRoot.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {Utils} from "../../../../deploy-scripts/utils/Utils.sol";
 
 /// @notice Test-only CTM upgrade that mocks large bytecode reads to avoid MemoryOOG
 contract CTMUpgrade_v31_Test is CTMUpgrade_v31 {
@@ -127,6 +128,10 @@ contract UpgradeIntegrationTest_Local is
 {
     using stdToml for string;
 
+    address private _serverNotifierProxy;
+    address private _serverNotifierProxyAdmin;
+    address private _expectedServerNotifierProxyAdminOwner;
+
     /// @notice Override to inject the mocked Core upgrade (skips setAssetTracker call).
     function createCoreUpgrade() internal override returns (CoreUpgrade_v31) {
         return new CoreUpgrade_v31_Test();
@@ -197,6 +202,14 @@ contract UpgradeIntegrationTest_Local is
         console.log("setUp: Paths configured");
         setupUpgrade(true);
         console.log("setUp: Upgrade setup complete");
+
+        _serverNotifierProxy = ctmUpgrade.getAddresses().stateTransition.proxies.serverNotifier;
+        if (_serverNotifierProxy != address(0)) {
+            _serverNotifierProxyAdmin = address(uint160(uint256(vm.load(_serverNotifierProxy, Utils.ADMIN_SLOT))));
+            _expectedServerNotifierProxyAdminOwner = getOwnableOwner(_serverNotifierProxyAdmin);
+        }
+        console.log("setUp: Snapshotted ServerNotifier ProxyAdmin ownership");
+
         address bridgehub = coreUpgrade.getDiscoveredBridgehub().proxies.bridgehub;
         console.log("setUp: Got bridgehub address", bridgehub);
         bytes32 eraBaseTokenAssetId = IBridgehubBase(bridgehub).baseTokenAssetId(eraZKChainId);
@@ -262,5 +275,18 @@ contract UpgradeIntegrationTest_Local is
             IBridgehubBase(bridgehub).assetIdIsRegistered(_expectedBaseTokenAssetId),
             "Base token assetId not registered"
         );
+
+        if (_serverNotifierProxy != address(0)) {
+            assertEq(
+                getOwnableOwner(_serverNotifierProxyAdmin),
+                _expectedServerNotifierProxyAdminOwner,
+                "ServerNotifier ProxyAdmin owner changed"
+            );
+            assertEq(
+                address(uint160(uint256(vm.load(_serverNotifierProxy, Utils.IMPLEMENTATION_SLOT)))),
+                ctmUpgrade.getAddresses().stateTransition.implementations.serverNotifier,
+                "ServerNotifier implementation not upgraded"
+            );
+        }
     }
 }
