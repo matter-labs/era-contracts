@@ -8,7 +8,11 @@ import {Vm} from "forge-std/Vm.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {IGatewayUtils, FinishMigrateChainToGatewayParams} from "contracts/script-interfaces/IGatewayUtils.sol";
+import {
+    IGatewayUtils,
+    FinishMigrateChainToGatewayParams,
+    FinishMigrateChainToGatewayWithCutDataParams
+} from "contracts/script-interfaces/IGatewayUtils.sol";
 
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
@@ -30,21 +34,43 @@ import {GetDiamondCutData} from "../utils/GetDiamondCutData.sol";
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayUtils is Script, IGatewayUtils {
     function finishMigrateChainToGateway(FinishMigrateChainToGatewayParams calldata params) external {
+        IL1Bridgehub bridgehub = IL1Bridgehub(params.bridgehubAddr);
+        bytes32 assetId = bridgehub.ctmAssetIdFromChainId(params.migratingChainId);
+        bytes memory gatewayDiamondCutData = GetDiamondCutData.readFromGateway(params.gatewayRpcUrl, assetId);
+
+        _finishMigrateChainToGatewayInner(
+            FinishMigrateChainToGatewayWithCutDataParams({
+                bridgehubAddr: params.bridgehubAddr,
+                l2TxNumberInBatch: params.l2TxNumberInBatch,
+                txStatus: params.txStatus,
+                l2TxHash: params.l2TxHash,
+                migratingChainId: params.migratingChainId,
+                gatewayChainId: params.gatewayChainId,
+                l2BatchNumber: params.l2BatchNumber,
+                l2MessageIndex: params.l2MessageIndex,
+                gatewayDiamondCutData: gatewayDiamondCutData,
+                merkleProof: params.merkleProof
+            })
+        );
+    }
+
+    function finishMigrateChainToGatewayWithCutData(
+        FinishMigrateChainToGatewayWithCutDataParams calldata params
+    ) external {
         _finishMigrateChainToGatewayInner(params);
     }
 
-    function _finishMigrateChainToGatewayInner(FinishMigrateChainToGatewayParams calldata data) private {
+    function _finishMigrateChainToGatewayInner(FinishMigrateChainToGatewayWithCutDataParams memory data) private {
         IL1Bridgehub bridgehub = IL1Bridgehub(data.bridgehubAddr);
         address assetRouter = address(bridgehub.assetRouter());
         IL1Nullifier l1Nullifier = L1AssetRouter(assetRouter).L1_NULLIFIER();
 
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(data.migratingChainId);
         address chainAdmin = IZKChain(bridgehub.getZKChain(data.migratingChainId)).getAdmin();
-        bytes memory gatewayDiamondCutData = GetDiamondCutData.readFromGateway(data.gatewayRpcUrl, assetId);
         bytes memory transferData = abi.encode(
             BridgehubBurnCTMAssetData({
                 chainId: data.migratingChainId,
-                ctmData: abi.encode(AddressAliasHelper.applyL1ToL2Alias(chainAdmin), gatewayDiamondCutData),
+                ctmData: abi.encode(AddressAliasHelper.applyL1ToL2Alias(chainAdmin), data.gatewayDiamondCutData),
                 chainData: abi.encode(IZKChain(bridgehub.getZKChain(data.migratingChainId)).getProtocolVersion())
             })
         );

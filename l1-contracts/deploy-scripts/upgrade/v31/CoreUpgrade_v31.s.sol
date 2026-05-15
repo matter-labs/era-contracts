@@ -35,6 +35,7 @@ import {
 } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {DefaultCoreUpgrade} from "../default-upgrade/DefaultCoreUpgrade.s.sol";
+import {ICoreUpgradeV31} from "contracts/script-interfaces/IUpgradeV31.sol";
 import {UpgradeUtils} from "../default-upgrade/UpgradeUtils.sol";
 import {CoreUpgradeParams} from "../default-upgrade/UpgradeParams.sol";
 import {TokenMigrationUtils} from "./TokenMigrationUtils.s.sol";
@@ -45,7 +46,7 @@ import {TokenMigrationUtils} from "./TokenMigrationUtils.s.sol";
 ///      - stage 1: AssetTracker.acceptOwnership, NTV.setAssetTracker, ChainAssetHandler.setAddresses
 ///      - stage 2: legacy-GW historical migration intervals + old-GW blacklist (read from upgrade input TOML)
 ///      - stage3 (post-governance): bridged-token registration + balance migration
-contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade {
+contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     using stdToml for string;
 
     /// @notice Path to the upgrade input TOML, captured from `initializeWithArgs`

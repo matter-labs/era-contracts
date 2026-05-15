@@ -326,6 +326,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         return gatewayConfig;
     }
 
+    function getGovernanceUpgradeTimerInitialDelay() public view virtual returns (uint256) {
+        return newConfig.governanceUpgradeTimerInitialDelay;
+    }
+
+    function getTestnetVerifier() public view virtual returns (bool) {
+        return config.testnetVerifier;
+    }
+
     /// @notice This function is meant to only be used in tests
     function prepareCreateNewChainCall(uint256 chainId) public view virtual returns (Call[] memory result) {
         require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehubProxyAddress is zero in newConfig");
@@ -837,6 +845,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             "chain_type_manager_implementation_addr",
             ctmAddresses.stateTransition.implementations.chainTypeManager
         );
+        vm.serializeAddress(
+            "state_transition",
+            "chain_type_manager_proxy",
+            ctmAddresses.stateTransition.proxies.chainTypeManager
+        );
         // Also save as state_transition_implementation_addr for backwards compatibility with zkstack CLI
         vm.serializeAddress(
             "state_transition",
@@ -852,6 +865,16 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             ctmAddresses.stateTransition.facets.executorFacet
         );
         vm.serializeAddress("state_transition", "getters_facet_addr", ctmAddresses.stateTransition.facets.gettersFacet);
+        vm.serializeAddress(
+            "state_transition",
+            "migrator_facet_addr",
+            ctmAddresses.stateTransition.facets.migratorFacet
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "committer_facet_addr",
+            ctmAddresses.stateTransition.facets.committerFacet
+        );
         vm.serializeAddress("state_transition", "diamond_init_addr", ctmAddresses.stateTransition.facets.diamondInit);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", ctmAddresses.stateTransition.genesisUpgrade);
         vm.serializeAddress(
@@ -878,6 +901,12 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             "state_transition",
             "bytecodes_supplier_addr",
             ctmAddresses.stateTransition.proxies.bytecodesSupplier
+        );
+        vm.serializeAddress("state_transition", "eip7702_checker_addr", ctmAddresses.admin.eip7702Checker);
+        vm.serializeAddress(
+            "state_transition",
+            "permissionless_validator_addr",
+            ctmAddresses.stateTransition.proxies.permissionlessValidator
         );
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
@@ -910,6 +939,12 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
         // Serialize protocol version info (needed for upgrade)
         vm.serializeUint("contracts_newConfig", "new_protocol_version", getNewProtocolVersion());
+        vm.serializeUint(
+            "contracts_newConfig",
+            "governance_upgrade_timer_initial_delay",
+            newConfig.governanceUpgradeTimerInitialDelay
+        );
+        vm.serializeBool("contracts_newConfig", "is_testnet", config.testnetVerifier);
         string memory contractsConfig = vm.serializeUint(
             "contracts_newConfig",
             "old_protocol_version",

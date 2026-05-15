@@ -542,17 +542,30 @@ contract AdminFunctions is Script, IAdminFunctions {
     function adminScheduleUpgrade(
         address _adminAddr,
         address _accessControlRestriction,
+        address _bridgehub,
+        uint256 _chainId,
         uint256 _newProtocolVersion,
         uint256 _timestamp
     ) public {
-        Utils.adminExecute(
-            _adminAddr,
-            _accessControlRestriction,
-            _adminAddr,
-            // Instant upgrade — production should pass a non-zero `_timestamp`.
-            abi.encodeCall(ChainAdmin.setUpgradeTimestamp, (_newProtocolVersion, _timestamp)),
-            0
-        );
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](2);
+        // Admin.sol's upgradeChainFromVersion reads protocolVersionToUpgradeTimestamp from
+        // ChainAdmin for non-admin/non-CTM callers, so we must keep this write.
+        calls[0] = Call({
+            target: _adminAddr,
+            value: 0,
+            data: abi.encodeCall(ChainAdmin.setUpgradeTimestamp, (_newProtocolVersion, _timestamp))
+        });
+        // ServerNotifier.setUpgradeTimestamp validates protocolVersionIsActive, eliminating
+        // the race between timestamp and diamond-cut availability that exists on ChainAdmin alone.
+        calls[1] = Call({
+            target: chainInfo.serverNotifier,
+            value: 0,
+            data: abi.encodeCall(ServerNotifier.setUpgradeTimestamp, (_chainId, _newProtocolVersion, _timestamp))
+        });
+
+        Utils.adminExecuteCalls(_adminAddr, _accessControlRestriction, calls);
     }
 
     function makePermanentRollup(ChainAdmin _chainAdmin, address _target) public {

@@ -19,11 +19,28 @@ struct FinishMigrateChainToGatewayParams {
     bytes32[] merkleProof;
 }
 
+struct FinishMigrateChainToGatewayWithCutDataParams {
+    address bridgehubAddr;
+    uint16 l2TxNumberInBatch;
+    TxStatus txStatus;
+    bytes32 l2TxHash;
+    uint256 migratingChainId;
+    uint256 gatewayChainId;
+    uint256 l2BatchNumber;
+    uint256 l2MessageIndex;
+    bytes gatewayDiamondCutData;
+    bytes32[] merkleProof;
+}
+
 /// @title IGatewayUtils
 /// @notice Interface for GatewayUtils.s.sol script
 /// @dev This interface ensures selector visibility for gateway utility functions
 interface IGatewayUtils {
     function finishMigrateChainToGateway(FinishMigrateChainToGatewayParams calldata params) external;
+
+    function finishMigrateChainToGatewayWithCutData(
+        FinishMigrateChainToGatewayWithCutDataParams calldata params
+    ) external;
 
     function finishMigrateChainFromGateway(
         address bridgehubAddr,

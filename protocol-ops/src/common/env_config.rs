@@ -455,19 +455,16 @@ mod tests {
             .expect("resolve l1-contracts")
             .join(PERMANENT_VALUES_DIR)
             .join("stage.toml");
-        let raw = fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-        let pv: PermanentValues = toml::from_str(&raw)
-            .unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
+        let raw =
+            fs::read_to_string(&path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        let pv: PermanentValues =
+            toml::from_str(&raw).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()));
         let ng = pv
             .new_gateway
             .expect("permanent-values/stage.toml must carry [new_gateway]");
         assert_eq!(ng.chain_id, 2708);
         // 0.2 ZK = 2e17 wei, sized for ~$0.01 per interop call at ZK ≈ $0.05.
-        assert_eq!(
-            ng.settlement_fee,
-            U256::from(200_000_000_000_000_000u128)
-        );
+        assert_eq!(ng.settlement_fee, U256::from(200_000_000_000_000_000u128));
         // GW 2708 is a ZKsync OS chain → CTM source is Atlas (witness 2702).
         assert_eq!(ng.ctm_representative_chain_id, 2702);
     }

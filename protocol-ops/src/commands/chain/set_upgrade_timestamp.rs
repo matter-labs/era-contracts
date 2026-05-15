@@ -45,9 +45,15 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     let new_protocol_version = parse_u256_arg(&args.new_protocol_version)?;
     let upgrade_timestamp = parse_u256_arg(&args.upgrade_timestamp)?;
 
-    // Sender is always the chain admin.
-    let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
-    let admin_address = sender.address;
+    let admin_address =
+        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
+            .await
+            .context("resolving chain admin from L1")?;
+    // The Solidity helper executes through ChainAdmin, but broadcasts from
+    // ChainAdmin.owner() or the AccessControlRestriction default admin inside adminExecuteCalls.
+    let sender = runner
+        .prepare_chain_admin_broadcaster(bridgehub, chain_id, args.access_control_restriction)
+        .await?;
 
     let forge = runner
         .with_script_call(
@@ -56,6 +62,8 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
             (
                 admin_address,
                 args.access_control_restriction,
+                bridgehub,
+                chain_id,
                 new_protocol_version,
                 upgrade_timestamp,
             ),
@@ -74,6 +82,8 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         "Access control restriction: {:#x}",
         args.access_control_restriction
     ));
+    logger::info(format!("Bridgehub: {:#x}", bridgehub));
+    logger::info(format!("Chain ID: {}", chain_id));
     logger::info(format!(
         "New protocol version: {}",
         args.new_protocol_version
@@ -93,6 +103,8 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         &serde_json::json!({
             "admin_address": format!("{:#x}", admin_address),
             "access_control_restriction": format!("{:#x}", args.access_control_restriction),
+            "bridgehub": format!("{:#x}", bridgehub),
+            "chain_id": chain_id,
             "new_protocol_version": &args.new_protocol_version,
             "upgrade_timestamp": &args.upgrade_timestamp,
         }),
