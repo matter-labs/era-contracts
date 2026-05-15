@@ -9,12 +9,12 @@ import {IL1MessageRoot} from "./IL1MessageRoot.sol";
 import {
     CurrentBatchNumberAlreadySet,
     InvalidSettlementLayerForBatch,
-    NotAllChainsOnL1,
     OnlyOnSettlementLayer,
     TotalBatchesExecutedLessThanV31UpgradeChainBatchNumber,
     TotalBatchesExecutedZero,
     LocallyNoChainsAtGenesis,
-    V31UpgradeChainBatchNumberAlreadySet
+    V31UpgradeChainBatchNumberAlreadySet,
+    NotAllChainsOnL1
 } from "../bridgehub/L1BridgehubErrors.sol";
 import {IGetters} from "../../state-transition/chain-interfaces/IGetters.sol";
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
