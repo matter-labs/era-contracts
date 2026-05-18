@@ -43,12 +43,73 @@ Reviewers diff it; downstream tools (PUVT, the simulator converter) read it.
 - For Option A (Docker): a built image tag at
   `ghcr.io/matter-labs/protocol-ops:<tag>`.
 
+## Phases
+
+Mental model — each phase has one job and produces one canonical artifact.
+The wrapper script `regen-and-verify-stage.sh` currently bundles **1 + 1.5**
+together; phases **2** and **3** are explicit follow-up scripts. Phase **1.5**
+is the only rehearsal step we run — phase **3**'s tx-simulator CI doubles as
+the post-broadcast rehearsal, so no need to duplicate.
+
+| Phase   | What runs                                                                                    | Touches real chain? | Output                                                            |
+| ------- | -------------------------------------------------------------------------------------------- | ------------------- | ----------------------------------------------------------------- |
+| **1**   | `protocol_ops ecosystem upgrade-prepare-all` (deterministic from `stage.toml`)               | no                  | `output/stage/ecosystem.toml` + `manifest.json` + `*.safe.json`   |
+| **1.5** | anvil fork + replay prepare bundles via impersonation + `protocol_ops verify-upgrade` (PUVT) | no                  | `executed.json` (fork-replay log), PUVT report                    |
+| **2**   | `broadcast-deployer-bundle-to-sepolia.sh` — push CREATE2 deploys to **real Sepolia**         | yes (deployer EOA)  | bytecode lives at the CREATE2 addresses on real Sepolia           |
+| **3**   | `protocol_ops ecosystem governance-toml-to-simulator --include-manifest`                     | no                  | tx-simulator scenario JSON (push to `transaction-simulator` repo) |
+
+Phase boundaries matter for state contamination: each broadcast in phase 2
+diverges real Sepolia from the fork state phase 1.5 used as its baseline.
+The fix is to rotate CREATE2 salts before the next regen — see the pre-flight
+section below.
+
 ## Option A — Docker (preferred)
 
 `docker/protocol/Dockerfile` builds a runtime image with `forge`, `cast`,
 `anvil`, `protocol_ops`, `node`, and all compiled contract artifacts under
 `/contracts/`. Trigger a fresh build, then run the wrapper scripts inside
 the container with `/contracts/.../output/` bind-mounted from the host.
+
+### Pre-flight: rotate CREATE2 salts when re-running against contaminated state
+
+The biggest footgun: `regen-and-verify-stage.sh` forks **current Sepolia tip**,
+and Sepolia state diverges every time you broadcast deployer-setup bundles
+(steps 4 below: `addVerifier`, `transferOwnership`, ChainTypeManager init,
+ServerNotifier ProxyAdmin upgrade, etc.). The prepare's Solidity isn't
+idempotent against that state, so subsequent regens revert with
+`AddressAlreadySet(...)`, `OperationMustBePending()`, or `Ownable: caller is
+not the new owner` depending on which step the chain has already moved past.
+
+Symptom-to-cause map:
+
+| Revert in prepare                              | What's already on chain                                             |
+| ---------------------------------------------- | ------------------------------------------------------------------- |
+| `AddressAlreadySet(<verifier-addr>)`           | `ZKsyncOSDualVerifier.addVerifier(version, fflonk, plonk)` ran      |
+| `OperationMustBePending()` on `executeInstant` | the legacy-Gov ceremony already ran (op is Done)                    |
+| `OperationExists()` on `scheduleTransparent`   | the legacy-Gov ceremony is scheduled (Pending) but not yet executed |
+| `Ownable2Step: caller is not the new owner`    | `transferOwnership(PUH)` didn't run on chain (or already accepted)  |
+
+**Fix**: mint **fresh CREATE2 salts** in
+`l1-contracts/upgrade-envs/v0.31.0-interopB/stage.toml` so the new prepare
+deploys _new_ contracts (DualVerifier, ChainTypeManager impl, ServerNotifier,
+…) that don't collide with the on-chain state of their predecessors.
+
+```bash
+# Generate three fresh 32-byte salts and paste them into stage.toml:
+#   [contracts] create2_factory_salt = "0x…"         ← core
+#   [create2_factory_salts]
+#   "0x<Era CTM proxy>"      = "0x…"                 ← Era CTM
+#   "0x<ZKsyncOS CTM proxy>" = "0x…"                 ← ZKsyncOS CTM
+for i in 1 2 3; do python3 -c "import secrets; print('0x' + secrets.token_hex(32))"; done
+```
+
+Rotation is cheap — it just produces new deploy addresses; reviewers re-diff
+the new `output/stage/ecosystem.toml` like any normal regen. Don't rotate
+mid-broadcast (i.e. between `regen-and-verify-stage.sh` and
+`broadcast-deployer-bundle-to-sepolia.sh`) — the broadcast script reads the
+fresh salts from the freshly-emitted prepare output.
+
+### Run the regen
 
 ```bash
 # 0. Build (or pull) an image for your branch. Manual dispatch lets you
@@ -57,13 +118,26 @@ gh workflow run build-docker.yaml \
   --ref <branch> \
   -f image_tag_override=<branch>-regen
 gh run watch
-docker pull ghcr.io/matter-labs/protocol-ops:<branch>-regen
+# Pulling on arm64 hosts: the image is built linux/amd64 only and runs under
+# qemu emulation (1.5-3× slower than native). Add --platform linux/amd64 to
+# `docker pull` and `docker run` calls.
+docker pull --platform linux/amd64 ghcr.io/matter-labs/protocol-ops:<branch>-regen
 
 # 1+2. Regen prepare/* + PUVT inside the container, writing directly to
 #      the tracked path on the host via a bind mount.
-docker run --rm \
+#
+#      Three bind mounts matter:
+#        1. l1-contracts/test/anvil-interop  (ro) — so script fixes in your
+#           working tree override the image's snapshot
+#        2. l1-contracts/upgrade-envs/.../stage.toml (ro) — so salt rotations
+#           and any other env edits go through
+#        3. l1-contracts/upgrade-envs/.../output (rw) — so regen output
+#           persists on the host for the commit step
+docker run --rm --platform linux/amd64 \
   -e DEPLOYER_PK="$(tr -d '[:space:]' < ~/.test_pk)" \
   -e L1_FORK_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
+  -v "$PWD/contracts/l1-contracts/test/anvil-interop:/contracts/l1-contracts/test/anvil-interop:ro" \
+  -v "$PWD/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/stage.toml:/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/stage.toml:ro" \
   -v "$PWD/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output:/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output" \
   -w /contracts/l1-contracts \
   ghcr.io/matter-labs/protocol-ops:<branch>-regen \
@@ -78,7 +152,7 @@ cp l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/regen/prepare/ecosyst
 yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix
 cd l1-contracts && yarn selectors --fix && ts-node scripts/copy-to-zkstack-out.ts
 cd .. && yarn calculate-hashes:fix
-cd protocol-ops && cargo fmt && cd ..
+cd protocol-ops && cargo +stable fmt && cd ..  # CI uses stable; nightly fmt produces drift
 git add l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml \
         l1-contracts/selectors l1-contracts/zkstack-out AllContractsHashes.json
 git commit -m "Regenerate v31 stage calldata"
@@ -156,12 +230,12 @@ cd protocol-ops
 Anything missed here makes CI red. See `docs/ai-review/docs/ci-green.md` for the
 full check ↔ workflow mapping.
 
-| Check               | Fix command                                              |
-| ------------------- | -------------------------------------------------------- |
-| solhint / eslint    | `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix`  |
-| prettier            | `yarn prettier:fix`                                      |
-| cargo fmt           | `cd protocol-ops && cargo fmt`                           |
-| selectors file      | `cd l1-contracts && yarn selectors --fix`                |
-| zkstack-out JSON    | `cd l1-contracts && ts-node scripts/copy-to-zkstack-out.ts` |
-| AllContractsHashes  | `yarn calculate-hashes:fix`                              |
-| codespell           | local prose fix to the file flagged in CI                |
+| Check              | Fix command                                                 |
+| ------------------ | ----------------------------------------------------------- |
+| solhint / eslint   | `yarn lint:sol --fix --noPrompt && yarn lint:ts --fix`      |
+| prettier           | `yarn prettier:fix`                                         |
+| cargo fmt          | `cd protocol-ops && cargo +stable fmt`                      |
+| selectors file     | `cd l1-contracts && yarn selectors --fix`                   |
+| zkstack-out JSON   | `cd l1-contracts && ts-node scripts/copy-to-zkstack-out.ts` |
+| AllContractsHashes | `yarn calculate-hashes:fix`                                 |
+| codespell          | local prose fix to the file flagged in CI                   |

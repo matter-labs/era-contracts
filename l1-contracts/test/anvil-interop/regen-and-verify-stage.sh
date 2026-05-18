@@ -83,7 +83,23 @@ echo "Era chain id: $ERA_CHAIN_ID"
 # 1e30 wei
 FUND_AMOUNT="1000000000000000000000000000000"
 
-PROTOCOL_OPS="$(cd "$(dirname "$0")"/../../../protocol-ops && pwd)/target/debug/protocol_ops"
+# Locate the protocol_ops binary. Prefer the local debug build (devs iterate
+# on this), then the release build, then anything on PATH (Docker image puts
+# it on PATH via /contracts/protocol-ops/).
+_PO_DIR="$(cd "$(dirname "$0")"/../../../protocol-ops && pwd)"
+if [[ -x "$_PO_DIR/target/debug/protocol_ops" ]]; then
+  PROTOCOL_OPS="$_PO_DIR/target/debug/protocol_ops"
+elif [[ -x "$_PO_DIR/target/release/protocol_ops" ]]; then
+  PROTOCOL_OPS="$_PO_DIR/target/release/protocol_ops"
+elif [[ -x "$_PO_DIR/protocol_ops" ]]; then
+  PROTOCOL_OPS="$_PO_DIR/protocol_ops"
+elif command -v protocol_ops >/dev/null 2>&1; then
+  PROTOCOL_OPS="$(command -v protocol_ops)"
+else
+  echo "protocol_ops binary not found — build it with 'cd protocol-ops && cargo build'" >&2
+  exit 1
+fi
+echo "Using protocol_ops at: $PROTOCOL_OPS"
 
 # Extract every distinct CREATE2 salt used by the prepare run. For named
 # envs we pin salts in version control (`upgrade-envs/v0.31.0-interopB/

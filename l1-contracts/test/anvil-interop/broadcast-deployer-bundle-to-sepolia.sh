@@ -47,9 +47,26 @@ echo "Deployer EOA: $DEPLOYER"
 
 # Read regen artifacts from the same env-scoped location regen-and-verify-stage.sh writes to.
 L1_CONTRACTS_DIR="$(cd "$(dirname "$0")"/../.. && pwd)"
-OUT="$L1_CONTRACTS_DIR/upgrade-envs/v0.31.0-interopB/output/stage/regen"
+# Layout matches `regen-and-verify-stage.sh`: prepare output lives at
+# `output/stage/prepare/`, the executed-bundles log alongside at
+# `output/stage/`. Both scripts share `$OUT` so SKIP_PREPARE iteration works.
+OUT="$L1_CONTRACTS_DIR/upgrade-envs/v0.31.0-interopB/output/stage"
 PREPARE_DIR="$OUT/prepare"
-PROTOCOL_OPS="$(cd "$(dirname "$0")"/../../../protocol-ops && pwd)/target/debug/protocol_ops"
+# Locate the protocol_ops binary. Same lookup order as `regen-and-verify-stage.sh`:
+# local debug build, then release, then anything on PATH (Docker image case).
+_PO_DIR="$(cd "$(dirname "$0")"/../../../protocol-ops && pwd)"
+if [[ -x "$_PO_DIR/target/debug/protocol_ops" ]]; then
+  PROTOCOL_OPS="$_PO_DIR/target/debug/protocol_ops"
+elif [[ -x "$_PO_DIR/target/release/protocol_ops" ]]; then
+  PROTOCOL_OPS="$_PO_DIR/target/release/protocol_ops"
+elif [[ -x "$_PO_DIR/protocol_ops" ]]; then
+  PROTOCOL_OPS="$_PO_DIR/protocol_ops"
+elif command -v protocol_ops >/dev/null 2>&1; then
+  PROTOCOL_OPS="$(command -v protocol_ops)"
+else
+  echo "protocol_ops binary not found — build it with 'cd protocol-ops && cargo build'" >&2
+  exit 1
+fi
 
 # Locate every deployer bundle in $PREPARE_DIR. Upstream's `upgrade-prepare-all`
 # can split the deployer's txs across multiple bundles (e.g. one per orchestration

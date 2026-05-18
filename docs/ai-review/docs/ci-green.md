@@ -154,7 +154,7 @@ For `protocol-ops` (Rust):
 
 ```bash
 cd protocol-ops
-cargo fmt --check
+cargo +stable fmt --check  # nightly disagrees with CI on edge cases
 cargo clippy --all-targets -- -D warnings
 ```
 
@@ -280,7 +280,7 @@ yarn lint:sol --fix --noPrompt
 yarn lint:ts --fix
 yarn prettier:fix
 yarn l1 errors-lint --check
-( cd protocol-ops && cargo fmt --check && cargo clippy --all-targets -- -D warnings )
+( cd protocol-ops && cargo +stable fmt --check && cargo clippy --all-targets -- -D warnings )
 
 # 4. Selectors
 ( cd l1-contracts && yarn selectors --fix )

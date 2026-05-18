@@ -56,3 +56,6 @@ l1-contracts/zkout/*
 # Foundry binary
 foundry-zksync/
 l1-contracts/foundry-zksync/
+
+# Local secrets (never commit)
+.env
