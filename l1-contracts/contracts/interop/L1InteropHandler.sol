@@ -123,13 +123,13 @@ contract L1InteropHandler {
         if (p.l2Sender != L2_INTEROP_CENTER) revert WrongL2Sender(p.l2Sender);
 
         // 3. Verify L2->L1 message inclusion against the canonical Bridgehub.
-        bool ok = BRIDGE_HUB.proveL2MessageInclusion(
-            p.chainId,
-            p.l2BatchNumber,
-            p.l2MessageIndex,
-            L2Message({txNumberInBatch: p.l2TxNumberInBatch, sender: p.l2Sender, data: p.message}),
-            p.merkleProof
-        );
+        bool ok = BRIDGE_HUB.proveL2MessageInclusion({
+            _chainId: p.chainId,
+            _batchNumber: p.l2BatchNumber,
+            _index: p.l2MessageIndex,
+            _message: L2Message({txNumberInBatch: p.l2TxNumberInBatch, sender: p.l2Sender, data: p.message}),
+            _proof: p.merkleProof
+        });
         if (!ok) revert InvalidProof();
 
         // 4. Decode the InteropBundle directly from the message bytes.
@@ -149,11 +149,25 @@ contract L1InteropHandler {
             if (c.shadowAccount) {
                 address sa = _ensureShadowAccount(bundle.sourceChainId, c.from);
                 L1ShadowAccount(payable(sa)).executeFromHandler(c.to, c.value, c.data);
-                emit CallExecuted(bundleMsgHash, i, sa, c.to, c.value, true);
+                emit CallExecuted({
+                    bundleMsgHash: bundleMsgHash,
+                    callIndex: i,
+                    via: sa,
+                    target: c.to,
+                    value: c.value,
+                    shadowAccount: true
+                });
             } else {
                 (bool success, bytes memory ret) = c.to.call{value: c.value}(c.data);
                 if (!success) revert CallFailed(i, ret);
-                emit CallExecuted(bundleMsgHash, i, address(this), c.to, c.value, false);
+                emit CallExecuted({
+                    bundleMsgHash: bundleMsgHash,
+                    callIndex: i,
+                    via: address(this),
+                    target: c.to,
+                    value: c.value,
+                    shadowAccount: false
+                });
             }
         }
 

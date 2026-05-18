@@ -59,7 +59,15 @@ contract BridgeRegistry is AccessControl, Pausable {
         uint256 newUsed = used + amount;
         _usedOnDay[msg.sender][dayIndex] = newUsed;
 
-        emit BridgeAnnounced(msg.sender, direction, amount, opsHash, delegate, dayIndex, newUsed);
+        emit BridgeAnnounced({
+            user: msg.sender,
+            direction: direction,
+            amount: amount,
+            opsHash: opsHash,
+            delegate: delegate,
+            dayIndex: dayIndex,
+            usedAfter: newUsed
+        });
     }
 
     function usedToday(address user) external view returns (uint256) {
