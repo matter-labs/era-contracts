@@ -125,7 +125,7 @@ skipped = []
 for tx in create2:
     addr = addr_for(tx["data"])
     if addr is None:
-        # Unparseable — keep, let the broadcaster fail loudly
+        # Unparsable — keep, let the broadcaster fail loudly
         to_send.append(tx)
         continue
     if has_code(addr):
