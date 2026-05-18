@@ -25,14 +25,15 @@ fi
 
 PORT=29545
 RPC="http://localhost:$PORT"
-# Stash all per-run artifacts (prepare bundles, executed.json, anvil log)
-# under the env's own `upgrade-envs/v0.31.0-interopB/output/<env>/regen/`,
-# alongside the canonical config that drove them and matching the layout
-# `default_protocol_ops_out_dir` uses for production `--out`. The existing
-# repo `.gitignore` already excludes `output/**/*.safe.json` +
-# `output/**/manifest.json`, so the per-run artifacts stay untracked.
+# Write per-run artifacts (prepare bundles, executed.json, anvil log)
+# directly to `upgrade-envs/v0.31.0-interopB/output/<env>/` so the merged
+# `ecosystem.toml` produced by `upgrade-prepare-all` lands at the tracked
+# path (`output/stage/ecosystem.toml`) — the canonical artifact reviewers
+# diff. `.gitignore` already excludes `output/**/*.safe.json` +
+# `output/**/manifest.json`, so the per-run safe bundles + manifest stay
+# untracked; only the merged TOML is committed.
 L1_CONTRACTS_DIR="$(cd "$(dirname "$0")"/../.. && pwd)"
-OUT="$L1_CONTRACTS_DIR/upgrade-envs/v0.31.0-interopB/output/stage/regen"
+OUT="$L1_CONTRACTS_DIR/upgrade-envs/v0.31.0-interopB/output/stage"
 BRIDGEHUB="0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
 # Deployer EOA — derived from the broadcast signer's private key, supplied
 # by the caller. We deliberately *don't* pull this from the env config: the
