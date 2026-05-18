@@ -95,7 +95,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         Ownable2Step adminContract = Ownable2Step(_target);
         Utils.executeUpgrade({
             _governor: _governor,
-            _salt: bytes32(0),
+            _salt: Utils.currentLegacyGovSalt(),
             _target: _target,
             _data: abi.encodeCall(adminContract.acceptOwnership, ()),
             _value: 0,
@@ -418,7 +418,7 @@ contract AdminFunctions is Script, IAdminFunctions {
         IZKChain adminContract = IZKChain(_target);
         Utils.executeUpgrade({
             _governor: _governor,
-            _salt: bytes32(0),
+            _salt: Utils.currentLegacyGovSalt(),
             _target: _target,
             _data: abi.encodeCall(adminContract.acceptAdmin, ()),
             _value: 0,
@@ -487,7 +487,7 @@ contract AdminFunctions is Script, IAdminFunctions {
 
     function governanceExecuteCalls(bytes memory _callsToExecute, address _governanceAddr) public {
         Call[] memory calls = abi.decode(_callsToExecute, (Call[]));
-        Utils.executeCalls(_governanceAddr, bytes32(0), 0, calls);
+        Utils.executeCalls(_governanceAddr, Utils.currentLegacyGovSalt(), 0, calls);
     }
 
     /// Fork-only governance replay: impersonate `_governanceAddr` and forward

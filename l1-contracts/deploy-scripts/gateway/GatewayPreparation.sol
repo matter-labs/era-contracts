@@ -222,7 +222,7 @@ contract GatewayPreparation is Script {
             bytes memory data = abi.encodeCall(bridgehub.setSettlementLayerStatus, (config.gatewayChainId, true));
             Utils.executeUpgrade({
                 _governor: config.governance,
-                _salt: bytes32(0),
+                _salt: Utils.currentLegacyGovSalt(),
                 _target: address(bridgehub),
                 _data: data,
                 _value: 0,
@@ -266,7 +266,7 @@ contract GatewayPreparation is Script {
         );
         Utils.executeUpgrade({
             _governor: config.governance,
-            _salt: bytes32(0),
+            _salt: Utils.currentLegacyGovSalt(),
             _target: address(config.sharedBridgeProxy),
             _data: data,
             _value: 0,
@@ -277,7 +277,7 @@ contract GatewayPreparation is Script {
         data = abi.encodeCall(tracker.registerCTMAssetOnL1, (config.chainTypeManagerProxy));
         Utils.executeUpgrade({
             _governor: config.governance,
-            _salt: bytes32(0),
+            _salt: Utils.currentLegacyGovSalt(),
             _target: address(config.ctmDeploymentTracker),
             _data: data,
             _value: 0,

@@ -1026,6 +1026,17 @@ library Utils {
         hashedBytecode = bytes32(vm.ffi(input));
     }
 
+    /// Per-regen salt for legacy `Governance.sol` ceremonies. The op id is
+    /// `hash(targets, values, calldatas, predecessor, salt)`; rotating the salt
+    /// each regen prevents collisions with prior op ids that may still sit in
+    /// the legacy Gov's `Done` map from earlier broadcasts. Set via the
+    /// `LEGACY_GOV_SALT` env var (protocol-ops reads it from `stage.toml`'s
+    /// `legacy_gov_salt` field). Defaults to `bytes32(0)` so existing
+    /// non-regen flows keep working unchanged.
+    function currentLegacyGovSalt() internal view returns (bytes32) {
+        return vm.envOr("LEGACY_GOV_SALT", bytes32(0));
+    }
+
     function executeUpgrade(
         address _governor,
         bytes32 _salt,
