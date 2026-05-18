@@ -95,12 +95,7 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
     /// @notice Append the ValidatorTimelock proxy-admin upgrade to the stage-1 governance bundle.
     /// @dev The new impl has no reinitializer — `ProxyAdmin.upgrade` (not `upgradeAndCall`) is enough.
-    function prepareVersionSpecificStage1GovernanceCallsL1()
-        public
-        virtual
-        override
-        returns (Call[] memory calls)
-    {
+    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         address validatorTimelockProxy = ctmAddresses.stateTransition.proxies.validatorTimelock;
         address newImpl = ctmAddresses.stateTransition.implementations.validatorTimelock;
         require(validatorTimelockProxy != address(0), "v31: validatorTimelock proxy not set");
