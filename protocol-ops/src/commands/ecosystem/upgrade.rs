@@ -786,6 +786,28 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             inputs.zk_token_asset_id,
             &merged_path,
         )?;
+
+        // Promote the merged TOML to the canonical tracked path so reviewers
+        // diff a stable location. The prepare's `--out` always points at
+        // `<env-out>/prepare/`; the canonical path lives one directory up
+        // (`<env-out>/ecosystem.toml`). The `prepare/` subtree's *.safe.json
+        // + manifest.json stay untracked; only the merged ecosystem.toml is
+        // committed.
+        if let Some(canonical_dir) = out_dir.parent() {
+            let canonical_path = canonical_dir.join("ecosystem.toml");
+            std::fs::copy(&merged_path, &canonical_path).with_context(|| {
+                format!(
+                    "failed to promote merged ecosystem.toml from {} to canonical path {}",
+                    merged_path.display(),
+                    canonical_path.display(),
+                )
+            })?;
+            logger::info(format!(
+                "Promoted merged ecosystem.toml → {}",
+                canonical_path.display()
+            ));
+        }
+
         Some(merged_path)
     } else {
         None

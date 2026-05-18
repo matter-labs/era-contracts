@@ -81,6 +81,17 @@ impl ForgeScript {
         self
     }
 
+    /// Skip forge's post-run label collection. After every script run forge
+    /// queries Sourcify (+ Etherscan if a key is configured) to map every
+    /// traced address to its contract name. Those lookups frequently hang
+    /// for 5–30+ minutes per CTM today, even though the underlying script
+    /// work has finished. `--disable-labels` skips the lookups entirely;
+    /// `--silent` only suppresses the printout (the work still runs).
+    pub fn with_disable_labels(mut self) -> Self {
+        self.args.add_arg(ForgeScriptArg::DisableLabels);
+        self
+    }
+
     /// Add an environment variable that will be set when running the script.
     pub fn with_env(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.envs.push((key.into(), value.into()));
@@ -175,6 +186,8 @@ pub enum ForgeScriptArg {
     GasLimit {
         gas_limit: u64,
     },
+    DisableLabels,
+    Silent,
     Unlocked,
     Zksync,
     #[strum(to_string = "skip={skip_path}")]

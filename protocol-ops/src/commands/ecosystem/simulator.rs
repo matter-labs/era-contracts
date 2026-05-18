@@ -36,18 +36,38 @@ pub struct GovernanceTomlToSimulatorArgs {
     #[clap(long)]
     pub out: Option<PathBuf>,
 
-    /// Optional `prepare/manifest.json` path. When set, every bundle from the
-    /// manifest is appended to the simulator output (one entry per inner Safe
-    /// tx), tagged `bundle_<index>` with `from = bundle.target`. Use this when
-    /// the upgrade ceremony involves Safe bundles outside the governance
-    /// (`[governance_calls]`) bundle — e.g. CTM-admin operations like the
-    /// ServerNotifier `ProxyAdmin.upgrade` that lands in its own per-CTM
-    /// bundle signed by that CTM's admin owner.
+    /// Optional `prepare/manifest.json` path. When set, every **Camp-B**
+    /// bundle from the manifest is prepended to the simulator output: one
+    /// entry per surviving Safe tx, tagged `bundle_<index>`,
+    /// `from = bundle.target` (impersonated by the sim). Camp-B = signer
+    /// we don't hold a key for.
+    ///
+    /// **Camp-A bundles are dropped entirely** — those are signed by an EOA
+    /// we hold (passed via `--camp-a-signers`). Phase 2 of the regen pipeline
+    /// broadcasts them to real Sepolia; the sim's fork inherits their effects
+    /// from chain tip. Re-running them in the sim would revert (legacy-Gov
+    /// `OperationMustBePending()`, already-deployed CREATE2 collisions, …).
+    /// See `contracts/.claude/skills/regenerate-v31-stage-calldata/SKILL.md`
+    /// ("Core principle") for the full reasoning.
     ///
     /// Defaults to `<env-out>/prepare/manifest.json` when `--env` is set and
     /// the manifest exists. Pass an explicit path to override.
+    ///
+    /// Per-tx filter still applied to Camp-B bundles ([`is_funded_call`]):
+    /// `approve(address,uint256)` and `requestL2TransactionDirect(...)` need
+    /// ZK base-token balance the local fork can't conjure.
     #[clap(long)]
     pub include_manifest: Option<PathBuf>,
+
+    /// EOAs we hold private keys for. Bundles whose `target` (Safe signer) is
+    /// in this set are classified Camp A and dropped from the sim — phase 2
+    /// broadcasts them to real Sepolia. Comma-separated, e.g.
+    /// `--camp-a-signers 0xAAA...,0xBBB...`. When omitted, we fall back to
+    /// detecting Camp A as "any signer that signs at least one CREATE2-factory
+    /// call" (heuristic — fine for v31 stage where our only EOA happens to be
+    /// the CREATE2 deployer, but an explicit list is safer).
+    #[clap(long, value_delimiter = ',', num_args = 1..)]
+    pub camp_a_signers: Vec<Address>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -93,6 +113,35 @@ const CHECK_DEADLINE_SELECTOR: &str = "0x43bf9936";
 /// mainnet: 172800s). Use a value comfortably larger than every env's delay
 /// so the local fork always clears the gate.
 const CHECK_DEADLINE_TIME_INCREASE_SECS: u64 = 200_000;
+
+/// Canonical Arachnid CREATE2 factory — same on every chain. A bundle whose
+/// signer issues even one call to this address is a deployer ("Camp-A")
+/// bundle; its signer is presumed to be an EOA we hold a key for and
+/// belongs to phase 2 (real-chain broadcast), not the sim.
+const CREATE2_FACTORY: &str = "0x4e59b44847b379578588920ca78fbf26c0b4956c";
+
+/// Selectors of calls an impersonated signer can't satisfy on the local fork
+/// because they require ZK base-token balance:
+///
+/// - `0x095ea7b3` = `approve(address,uint256)` — ZK approves before priority
+///   requests.
+/// - `0xd52471c1` = `requestL2TransactionDirect(...)` — Gateway L1→L2 priority
+///   requests that burn ZK.
+/// - `0x24fd57fb` = `requestL2TransactionTwoBridges(...)` — same family as
+///   above, used for two-bridges priority flows; also burns ZK.
+///
+/// Dropping these keeps the sim entries to L1-side state writes the fork can
+/// actually execute. The sim doesn't need the GW-side L2 state.
+const FUNDED_SELECTORS: &[&str] = &["0x095ea7b3", "0xd52471c1", "0x24fd57fb"];
+
+fn is_funded_call(data_hex: &str) -> bool {
+    FUNDED_SELECTORS.iter().any(|s| {
+        data_hex
+            .get(..s.len())
+            .map(|prefix| prefix.eq_ignore_ascii_case(s))
+            .unwrap_or(false)
+    })
+}
 
 /// Subset of `prepare/manifest.json` needed to walk every Safe bundle.
 #[derive(Debug, Deserialize)]
@@ -169,19 +218,16 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
         }),
     };
 
-    // Manifest bundles are emitted FIRST (deployer CREATE2 deploys + ownership
-    // accepts), then governance stages 0/1/2. Order matters: the simulator's
-    // local sim runs `eth_getCode` on every tx target, so the deployer's
-    // CREATE2-deploys must land before stage0 calls them — otherwise stage0's
-    // `startTimer()` against the new GovernanceUpgradeTimer reverts with
-    // "EOA with non-empty calldata".
+    // Manifest bundles come FIRST (Camp-B setup the sim impersonates), then
+    // governance stages 0/1/2. Order matters: setup writes the state
+    // (pendingOwner, verifier registry, etc.) that the gov calls then read.
     let mut transactions = Vec::new();
     if let Some(ref manifest) = manifest_path {
         logger::info(format!(
             "Including manifest bundles from {}",
             manifest.display()
         ));
-        let extra = manifest_to_simulator_transactions(manifest, &network)
+        let extra = manifest_to_simulator_transactions(manifest, &network, &args.camp_a_signers)
             .with_context(|| format!("failed to expand manifest bundles {}", manifest.display()))?;
         transactions.extend(extra);
     }
@@ -209,50 +255,22 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Canonical Arachnid CREATE2 factory — same on every chain. Used to recognise
-/// "deployer bundles" (any bundle with at least one tx whose `.to` is this
-/// address) and to filter their non-CREATE2 txs out of the simulator scenario.
-const CREATE2_FACTORY: &str = "0x4e59b44847b379578588920ca78fbf26c0b4956c";
-
-/// Selectors of calls we drop from manifest-bundle expansion:
+/// Walk `manifest.json`, drop every Camp-A bundle entirely, then emit one
+/// [`SimulatorTransaction`] per surviving Camp-B tx with
+/// `from = bundle.target` (sim impersonates) and `tag = "bundle_<index>"`.
+/// Bundle and intra-bundle order are preserved. Camp-B txs go through the
+/// [`is_funded_call`] filter so approve / GW priority calls (which need ZK
+/// balance the fork can't conjure) get dropped.
 ///
-/// - `0x2c431917` = `scheduleTransparent(((address,uint256,bytes)[],bytes32,bytes32),uint256)`
-///   on legacy `Governance.sol`. On a real-Sepolia-forked sim these would
-///   always revert with `OperationExists()` because the schedule already
-///   landed in a prior broadcast; the corresponding `executeInstant` still
-///   runs and clears the gate using the schedule already on chain.
-/// - `0x095ea7b3` = `approve(address,uint256)` — ZK base-token approves in
-///   the deployer's bundle 7 priority-tx setup; the deployer EOA holds no
-///   ZK on real Sepolia so these revert with insufficient balance.
-/// - `0xd52471c1` = `requestL2TransactionDirect(...)` — Gateway L1→L2
-///   priority requests that burn ZK base-token; same fund-availability
-///   problem as the approves above, and the sim's L1-side checks don't
-///   need the GW-side L2 state anyway.
-const SKIPPED_SELECTORS: &[&str] = &["0x2c431917", "0x095ea7b3", "0xd52471c1"];
-
-fn is_skipped_selector(data_hex: &str) -> bool {
-    SKIPPED_SELECTORS.iter().any(|s| {
-        data_hex
-            .get(..s.len())
-            .map(|prefix| prefix.eq_ignore_ascii_case(s))
-            .unwrap_or(false)
-    })
-}
-
-/// Walk `manifest.json`, open each `bundles[].file` (resolved relative to the
-/// manifest directory), and emit one [`SimulatorTransaction`] per surviving
-/// Safe tx with `from = bundle.target` and `tag = "bundle_<index>"`. Bundle
-/// order is preserved; intra-bundle tx order is preserved.
-///
-/// **Deployer-bundle filtering**: any bundle that contains at least one call
-/// to the CREATE2 factory is treated as a "deployer bundle" and its
-/// non-CREATE2 txs (token approves, GW priority requests, …) are dropped from
-/// the scenario. Those txs need real ZK base-token balance on the deployer
-/// EOA, which the local-fork sim cannot conjure, and they are not preconditions
-/// for the governance bundle anyway — only the CREATE2 deploys are.
+/// Camp-A classification:
+/// - explicit list via `--camp-a-signers` when non-empty, or
+/// - fallback heuristic: "any signer that signs at least one CREATE2-factory
+///   call". Fine for v31 stage where the only key we hold is the same EOA
+///   that signs all CREATE2 deploys; for other envs pass the list explicitly.
 fn manifest_to_simulator_transactions(
     manifest_path: &Path,
     network: &str,
+    explicit_camp_a: &[Address],
 ) -> anyhow::Result<Vec<SimulatorTransaction>> {
     let manifest_dir = manifest_path.parent().ok_or_else(|| {
         anyhow::anyhow!("manifest path has no parent: {}", manifest_path.display())
@@ -262,51 +280,87 @@ fn manifest_to_simulator_transactions(
     let manifest: PrepareManifest = serde_json::from_str(&manifest_str)
         .with_context(|| format!("failed to parse {}", manifest_path.display()))?;
 
-    let mut out = Vec::new();
+    // Pre-load every bundle file once — we may walk twice (signer auto-detect
+    // + emission), and second-pass disk reads would be wasted I/O.
+    let mut loaded: Vec<(&ManifestBundle, SafeBundleFile)> =
+        Vec::with_capacity(manifest.bundles.len());
     for bundle in &manifest.bundles {
         let bundle_path = manifest_dir.join(&bundle.file);
         let bundle_str = fs::read_to_string(&bundle_path)
             .with_context(|| format!("failed to read bundle {}", bundle_path.display()))?;
         let bundle_file: SafeBundleFile = serde_json::from_str(&bundle_str)
             .with_context(|| format!("failed to parse bundle {}", bundle_path.display()))?;
+        loaded.push((bundle, bundle_file));
+    }
 
-        let is_deployer_bundle = bundle_file
+    // Resolve Camp-A signers — explicit list wins. Fallback heuristic:
+    // "signs at least one CREATE2-factory call" classifies the address that
+    // appears as `target` in any deployer bundle.
+    let camp_a_signers: std::collections::HashSet<Address> = if !explicit_camp_a.is_empty() {
+        explicit_camp_a.iter().copied().collect()
+    } else {
+        let mut auto: std::collections::HashSet<Address> = std::collections::HashSet::new();
+        for (bundle, bundle_file) in &loaded {
+            let touches_create2 = bundle_file
+                .transactions
+                .iter()
+                .any(|tx| format!("{:#x}", tx.to) == CREATE2_FACTORY);
+            if touches_create2 {
+                auto.insert(bundle.target);
+            }
+        }
+        auto
+    };
+
+    if !camp_a_signers.is_empty() {
+        let pretty: Vec<String> = camp_a_signers.iter().map(|a| format!("{a:#x}")).collect();
+        let source = if explicit_camp_a.is_empty() {
+            "auto-detected via CREATE2-presence"
+        } else {
+            "from --camp-a-signers"
+        };
+        logger::info(format!(
+            "Camp-A signers ({source}, broadcast in phase 2, dropped from sim): {}",
+            pretty.join(", ")
+        ));
+    }
+
+    // Emit Camp-B bundles, post-filtering funded calls. Track which signers
+    // we've already minted ETH for so the first tx of each impersonated
+    // signer carries a small `valueToMint` — without it the fork's account
+    // for that address is empty and tx-simulator reverts with
+    // `Insufficient funds for gas * price + value`.
+    let mut funded_signers: std::collections::HashSet<Address> = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for (bundle, bundle_file) in &loaded {
+        if camp_a_signers.contains(&bundle.target) {
+            continue;
+        }
+        let kept: Vec<&SafeBundleTx> = bundle_file
             .transactions
             .iter()
-            .any(|tx| format!("{:#x}", tx.to) == CREATE2_FACTORY);
-
-        let kept: Vec<&SafeBundleTx> = if is_deployer_bundle {
-            bundle_file
-                .transactions
-                .iter()
-                .filter(|tx| format!("{:#x}", tx.to) == CREATE2_FACTORY)
-                .filter(|tx| !is_skipped_selector(&tx.data))
-                .collect()
-        } else {
-            bundle_file
-                .transactions
-                .iter()
-                .filter(|tx| !is_skipped_selector(&tx.data))
-                .collect()
-        };
+            .filter(|tx| !is_funded_call(&tx.data))
+            .collect();
+        if kept.is_empty() {
+            continue;
+        }
         let kept_total = kept.len();
         let label = if bundle.steps.is_empty() {
             "(no steps)".to_string()
         } else {
             bundle.steps.join(",")
         };
-        let suffix = if is_deployer_bundle {
-            ", create2-only"
-        } else {
-            ""
-        };
         for (idx, tx) in kept.into_iter().enumerate() {
+            let value_to_mint = if funded_signers.insert(bundle.target) {
+                Some("1".to_string())
+            } else {
+                None
+            };
             out.push(SimulatorTransaction {
                 description: format!(
-                    "protocol-ops manifest bundle {} ({}{}) tx {}/{}",
+                    "protocol-ops manifest bundle {} ({}) tx {}/{}",
                     bundle.index,
                     label,
-                    suffix,
                     idx + 1,
                     kept_total
                 ),
@@ -315,7 +369,7 @@ fn manifest_to_simulator_transactions(
                 to: format!("{:#x}", tx.to),
                 data: tx.data.clone(),
                 value: tx.value.clone().unwrap_or_else(|| "0".to_string()),
-                value_to_mint: None,
+                value_to_mint,
                 time_increase: None,
                 tag: format!("bundle_{}", bundle.index),
             });
@@ -345,9 +399,15 @@ fn governance_toml_to_simulator_transactions(
         let calls = decode_calls(encoded_calls)
             .with_context(|| format!("failed to decode stage{stage}_calls"))?;
         for (idx, call) in calls.into_iter().enumerate() {
+            let data_hex = format!("0x{}", hex::encode(&call.data));
+            // Funded calls (approves + GW priority requests) need ZK
+            // base-token balance the local fork can't conjure for PUH; drop
+            // them. The real-chain ceremony funds PUH ahead of these.
+            if is_funded_call(&data_hex) {
+                continue;
+            }
             let value_to_mint = should_fund_sender.then(|| "1".to_string());
             should_fund_sender = false;
-            let data_hex = format!("0x{}", hex::encode(&call.data));
             let time_increase = if data_hex
                 .get(..CHECK_DEADLINE_SELECTOR.len())
                 .map(|prefix| prefix.eq_ignore_ascii_case(CHECK_DEADLINE_SELECTOR))

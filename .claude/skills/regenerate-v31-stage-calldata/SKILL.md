@@ -20,7 +20,7 @@ Reviewers diff it; downstream tools (PUVT, the simulator converter) read it.
 
 - `l1-contracts/test/anvil-interop/regen-and-verify-stage.sh` — wraps prepare
   → fork-broadcast → PUVT in one script.
-- `l1-contracts/test/anvil-interop/broadcast-deployer-bundle-to-sepolia.sh` —
+- `l1-contracts/test/anvil-interop/broadcast-deployer-bundle-to-sepolia.ts` —
   idempotent CREATE2 broadcaster that pre-filters against on-chain `eth_getCode`.
 - `protocol-ops/src/commands/ecosystem/simulator.rs` — `governance-toml-to-simulator`.
   Emits **only** the governance ceremony (PUH stages 0/1/2). No deployer
@@ -98,7 +98,7 @@ fails with one of:
 - `AddressAlreadySet(...)` — state contamination from a prior partial
   broadcast; rotate salts (pre-flight section below).
 
-The current `broadcast-deployer-bundle-to-sepolia.sh` only handles the
+The current `broadcast-deployer-bundle-to-sepolia.ts` only handles the
 deployer-signed bundles (phase 2). The per-CTM-admin bundles (phase 2b)
 must be pushed separately, one for each admin EOA in the manifest
 (`prepare/*_0x<admin-lc>.safe.json`). The local sim (phase 3.5) is what
@@ -108,7 +108,7 @@ catches a missing phase 2b — see the troubleshooting table below.
 | --------- | -------------------------------------------------------------------------------------------- | ------------------- | ----------------------------------------------------------------- |
 | **1**     | `protocol_ops ecosystem upgrade-prepare-all` (deterministic from `stage.toml`)               | no                  | `output/stage/ecosystem.toml` + `manifest.json` + `*.safe.json`   |
 | **1.5**   | anvil fork + replay prepare bundles via impersonation + `protocol_ops verify-upgrade` (PUVT) | no                  | `executed.json` (fork-replay log), PUVT report                    |
-| **2**     | `broadcast-deployer-bundle-to-sepolia.sh` — push CREATE2 deploys to **real Sepolia**         | yes (deployer EOA)  | bytecode lives at the CREATE2 addresses on real Sepolia           |
+| **2**     | `broadcast-deployer-bundle-to-sepolia.ts` — push CREATE2 deploys to **real Sepolia**         | yes (deployer EOA)  | bytecode lives at the CREATE2 addresses on real Sepolia           |
 | **2b**    | broadcast **per-CTM admin** setup bundles (`*_0x343ee72…safe.json`, `*_0xd66949…safe.json`)  | yes (each CTM admin EOA) | `transferOwnership(PUH)`, `addVerifier`, `setNewVersionUpgrade`, ServerNotifier `ProxyAdmin.upgrade` land on Sepolia so stage1 `acceptOwnership` etc. don't revert |
 | **3**     | `protocol_ops ecosystem governance-toml-to-simulator`                                        | no                  | tx-simulator scenario JSON (one entry per PUH stage 0/1/2 call)   |
 | **3.5**   | `yarn simulate --file <sim.json>` from a local `transaction-simulator` clone                 | no (forks Sepolia)  | local pass/fail before pushing — same code path as tx-simulator CI |
@@ -161,7 +161,7 @@ for i in 1 2 3; do python3 -c "import secrets; print('0x' + secrets.token_hex(32
 Rotation is cheap — it just produces new deploy addresses; reviewers re-diff
 the new `output/stage/ecosystem.toml` like any normal regen. Don't rotate
 mid-broadcast (i.e. between `regen-and-verify-stage.sh` and
-`broadcast-deployer-bundle-to-sepolia.sh`) — the broadcast script reads the
+`broadcast-deployer-bundle-to-sepolia.ts`) — the broadcast script reads the
 fresh salts from the freshly-emitted prepare output.
 
 ### Run the regen
@@ -220,7 +220,7 @@ docker run --rm \
   -v "$PWD/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output:/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output" \
   -w /contracts/l1-contracts \
   ghcr.io/matter-labs/protocol-ops:<branch>-regen \
-  bash test/anvil-interop/broadcast-deployer-bundle-to-sepolia.sh
+  yarn --cwd test/anvil-interop ts-node broadcast-deployer-bundle-to-sepolia.ts
 
 # 5. Emit the matching tx-simulator scenario. Only the governance ceremony
 #    — phase 2 must already be done so the fork has the deployer's contracts.
@@ -263,7 +263,7 @@ cp upgrade-envs/v0.31.0-interopB/output/stage/regen/prepare/ecosystem.toml \
 # 4. Broadcast CREATE2 deploys to real Sepolia.
 DEPLOYER_PK_FILE=~/.test_pk \
 L1_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
-bash test/anvil-interop/broadcast-deployer-bundle-to-sepolia.sh
+yarn --cwd test/anvil-interop ts-node broadcast-deployer-bundle-to-sepolia.ts
 
 # 5. Emit the tx-simulator scenario (governance ceremony only).
 cd protocol-ops
@@ -311,7 +311,7 @@ git push
 
 | Symptom in `yarn simulate` output                                  | Likely cause                                                                            |
 | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `EOA with non-empty calldata` on `stage0` `startTimer` or similar  | Phase 2 wasn't run after the most recent salt rotation. Re-run `broadcast-deployer-bundle-to-sepolia.sh`. |
+| `EOA with non-empty calldata` on `stage0` `startTimer` or similar  | Phase 2 wasn't run after the most recent salt rotation. Re-run `broadcast-deployer-bundle-to-sepolia.ts`. |
 | `OperationMustBePending()` / `OperationExists()` on legacy Gov     | Stale sim JSON that still includes deployer/legacy-Gov bundles. Re-emit with a fresh `protocol_ops` build — the simulator emitter must not include manifest. |
 | `DeadlineNotYetPassed()` on stage1                                 | `checkDeadline()` `timeIncrease` injection missed. Confirm `simulator.rs` `CHECK_DEADLINE_SELECTOR` matches the actual stage1 selector, or extend the list.   |
 | `Ownable: caller is not the owner` on a CTM call                   | Ownership ceremony for that CTM never landed on Sepolia. Either the legacy-Gov bundle wasn't broadcast or the wrong PUH address is in `stage.toml`.            |
