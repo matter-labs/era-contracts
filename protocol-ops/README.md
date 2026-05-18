@@ -154,7 +154,75 @@ diff it; downstream tools (PUVT, the simulator converter) read it.
 
 The full prepare → fork-broadcast → PUVT cycle is wrapped in
 `l1-contracts/test/anvil-interop/regen-and-verify-stage.sh`. Use it whenever
-contracts or upgrade scripts change. Steps:
+contracts or upgrade scripts change. Two flavors below — Docker (preferred,
+toolchain-free) and a from-source local build.
+
+#### Option A — Docker (preferred)
+
+`docker/protocol/Dockerfile` builds a runtime image with `forge`, `cast`,
+`anvil`, `protocol_ops`, `node`, and all compiled contract artifacts at
+`/contracts/`. The `Build Docker Image` workflow
+(`.github/workflows/build-docker.yaml`) publishes the image to
+`ghcr.io/matter-labs/protocol-ops:<tag>`.
+
+```bash
+# 0. Build (or pull) an image for your branch.
+#    Manual dispatch: bake one with a predictable tag.
+gh workflow run build-docker.yaml \
+  --ref <branch> \
+  -f image_tag_override=<branch>-regen
+#    Then: gh run watch  ⟶  wait for the run to finish, then:
+docker pull ghcr.io/matter-labs/protocol-ops:<branch>-regen
+
+# 1+2. Regen prepare/* + PUVT inside the container, writing directly to
+#      the tracked path on the host via a bind mount. Same DEPLOYER_PK +
+#      L1_FORK_URL inputs as the local run, just passed via `-e`.
+docker run --rm \
+  -e DEPLOYER_PK="$(tr -d '[:space:]' < ~/.test_pk)" \
+  -e L1_FORK_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
+  -v "$PWD/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output:/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output" \
+  -w /contracts/l1-contracts \
+  ghcr.io/matter-labs/protocol-ops:<branch>-regen \
+  bash test/anvil-interop/regen-and-verify-stage.sh
+
+# 3. Promote regen output → tracked path + regenerate every CI-checked
+#    derived artifact on the host (these checks run outside Docker so the
+#    yarn/foundry workspaces need a real local checkout). Then commit.
+cd contracts
+cp l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/regen/prepare/ecosystem.toml \
+   l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml
+yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix
+cd l1-contracts && yarn selectors --fix && ts-node scripts/copy-to-zkstack-out.ts
+cd .. && yarn calculate-hashes:fix
+git add l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml \
+        l1-contracts/selectors l1-contracts/zkstack-out AllContractsHashes.json
+git commit -m "Regenerate v31 stage calldata"
+
+# 4. Broadcast CREATE2 deploys to real Sepolia (idempotent — pre-filters
+#    against on-chain `eth_getCode`).
+docker run --rm \
+  -e DEPLOYER_PK="$(tr -d '[:space:]' < ~/.test_pk)" \
+  -e L1_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
+  -v "$PWD/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output:/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output" \
+  -w /contracts/l1-contracts \
+  ghcr.io/matter-labs/protocol-ops:<branch>-regen \
+  bash test/anvil-interop/broadcast-deployer-bundle-to-sepolia.sh
+
+# 5. Emit the tx-simulator scenario (also in Docker since protocol_ops + the
+#    --include-manifest helper live there).
+docker run --rm \
+  -v "$PWD/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output:/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output" \
+  -v "$PWD/transaction-simulator/transactions:/out" \
+  -w /contracts \
+  ghcr.io/matter-labs/protocol-ops:<branch>-regen \
+  protocol_ops ecosystem governance-toml-to-simulator \
+    --env stage \
+    --governance-toml /contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml \
+    --include-manifest /contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/regen/prepare/manifest.json \
+    --out /out/$(date +%F)-v31-interopB-stage.json
+```
+
+#### Option B — Local toolchain (no Docker)
 
 ```bash
 # 0. Rebuild artifacts that the prepare phase reads.
