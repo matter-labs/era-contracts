@@ -51,30 +51,97 @@ OUT="$L1_CONTRACTS_DIR/upgrade-envs/v0.31.0-interopB/output/stage/regen"
 PREPARE_DIR="$OUT/prepare"
 PROTOCOL_OPS="$(cd "$(dirname "$0")"/../../../protocol-ops && pwd)/target/debug/protocol_ops"
 
-# Locate the deployer bundle in $PREPARE_DIR. The filename suffix is the
-# deployer EOA (lowercased), which we derived above from the PK.
+# Locate every deployer bundle in $PREPARE_DIR. Upstream's `upgrade-prepare-all`
+# can split the deployer's txs across multiple bundles (e.g. one per orchestration
+# step), so we need to broadcast CREATE2 deploys from ALL of them — not just the
+# last-sorted one. The filename suffix is the deployer EOA (lowercased), which we
+# derived above from the PK.
 DEPLOYER_LC="$(echo "$DEPLOYER" | tr '[:upper:]' '[:lower:]')"
-SOURCE_BUNDLE=$(ls "$PREPARE_DIR"/*"$DEPLOYER_LC".safe.json 2>/dev/null | tail -1)
-if [[ -z "$SOURCE_BUNDLE" ]]; then
+shopt -s nullglob
+SOURCE_BUNDLES=("$PREPARE_DIR"/*"$DEPLOYER_LC".safe.json)
+shopt -u nullglob
+if [[ ${#SOURCE_BUNDLES[@]} -eq 0 ]]; then
   echo "No deployer bundle for $DEPLOYER under $PREPARE_DIR — run regen-and-verify-stage.sh first" >&2
   exit 1
 fi
-echo "Source deployer bundle: $SOURCE_BUNDLE"
+echo "Source deployer bundles (${#SOURCE_BUNDLES[@]}):"
+for b in "${SOURCE_BUNDLES[@]}"; do echo "  $b"; done
 
-# Filter the bundle to CREATE2-factory calls only.
+# Merge all bundles, keep CREATE2-factory calls only, then drop any CREATE2
+# whose computed deploy address already has code on $L1_RPC_URL. The script
+# is idempotent: re-running after a partial broadcast or after a prior
+# upgrade-ceremony broadcast only sends the deploys that are net-new for
+# this regen. Skipping non-CREATE2 txs is intentional too — token approves
+# and GW priority requests in the deployer bundles need ZK base-token the
+# deployer EOA doesn't hold on $L1_RPC_URL, and the simulator only needs
+# `eth_getCode` to find bytecode at CREATE2-derived targets.
 FILTERED="$OUT/deployer-bundle-create2-only.safe.json"
-python3 <<PY
-import json
-src = "$SOURCE_BUNDLE"
-dst = "$FILTERED"
-d = json.load(open(src))
+python3 - "$FILTERED" "$L1_RPC_URL" "${SOURCE_BUNDLES[@]}" <<'PY'
+import json, subprocess, sys, re
+dst = sys.argv[1]
+rpc = sys.argv[2]
+srcs = sys.argv[3:]
 factory = "0x4e59b44847b379578588920cA78FbF26c0B4956C".lower()
-all_txs = d.get("transactions", [])
-create2_txs = [tx for tx in all_txs if tx["to"].lower() == factory]
-out = {**d, "transactions": create2_txs}
-json.dump(out, open(dst, "w"), indent=2)
-print(f"Filtered bundle: {len(all_txs)} → {len(create2_txs)} CREATE2 deploys")
+
+# 1) Merge + filter to CREATE2-factory calls
+merged = None
+total_in = 0
+create2 = []
+for src in srcs:
+    d = json.load(open(src))
+    if merged is None:
+        merged = {k: v for k, v in d.items() if k != "transactions"}
+    txs = d.get("transactions", [])
+    total_in += len(txs)
+    create2.extend(tx for tx in txs if tx["to"].lower() == factory)
+
+# 2) Drop CREATE2 calls whose target address already has code on chain.
+# data layout: 0x | salt(32) | initcode. CREATE2 addr = keccak(0xff || factory
+# || salt || keccak(initcode))[12:]. Use `cast keccak` + `cast create2` so we
+# don't pull a python keccak/keccak deps in.
+def addr_for(tx_data: str) -> str:
+    salt = "0x" + tx_data[2:66]
+    init = "0x" + tx_data[66:]
+    init_hash = subprocess.check_output(
+        ["cast", "keccak", init], stderr=subprocess.DEVNULL
+    ).decode().strip()
+    out = subprocess.check_output(
+        ["cast", "create2", "--salt", salt, "--init-code-hash", init_hash,
+         "--deployer", "0x4e59b44847b379578588920cA78FbF26c0B4956C"],
+        stderr=subprocess.DEVNULL,
+    ).decode()
+    m = re.search(r"(0x[0-9a-fA-F]{40})", out)
+    return m.group(1) if m else None
+
+def has_code(addr: str) -> bool:
+    out = subprocess.check_output(
+        ["cast", "code", addr, "--rpc-url", rpc],
+        stderr=subprocess.DEVNULL,
+    ).decode().strip()
+    return len(out) > 2  # "0x" alone = no code
+
+to_send = []
+skipped = []
+for tx in create2:
+    addr = addr_for(tx["data"])
+    if addr is None:
+        # Unparseable — keep, let the broadcaster fail loudly
+        to_send.append(tx)
+        continue
+    if has_code(addr):
+        skipped.append(addr)
+    else:
+        to_send.append(tx)
+
+merged["transactions"] = to_send
+json.dump(merged, open(dst, "w"), indent=2)
+print(f"Merged: {total_in} txs across {len(srcs)} bundle(s) → "
+      f"{len(create2)} CREATE2 → {len(to_send)} new, {len(skipped)} already deployed")
 PY
+if [[ "$(jq '.transactions | length' "$FILTERED")" == "0" ]]; then
+  echo "All CREATE2 targets already deployed on $L1_RPC_URL — nothing to broadcast."
+  exit 0
+fi
 
 EXECUTED_OUT="$OUT/sepolia-deployer-deploys.json"
 echo "Executing $FILTERED against $L1_RPC_URL …"
