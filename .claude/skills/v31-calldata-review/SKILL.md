@@ -16,7 +16,7 @@ the provided bytes.
 
 Before semantic review, read:
 
-- `ai-review/docs/v31-calldata-review.md`
+- `docs/ai-review/docs/v31-calldata-review.md`
 - `protocol-ops/README.md`, section "Running the Protocol Upgrade Verification Tool (PUVT)"
 
 ## Minimal Inputs
@@ -44,7 +44,7 @@ or chain inventories up front if they can be derived.
 5. Run `protocol_ops ecosystem verify-upgrade` against the reviewed package,
    replay log, RPC, chain ID, genesis mode, CREATE2 salt set, and ZK token
    asset ID.
-6. Follow `ai-review/docs/v31-calldata-review.md` step by step.
+6. Follow `docs/ai-review/docs/v31-calldata-review.md` step by step.
 7. Produce an evidence table, exact commands/RPC calls, PUVT output summary,
    blockers/gaps, and a sign-off statement only if justified.
 

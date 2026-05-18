@@ -181,21 +181,17 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
             "Including manifest bundles from {}",
             manifest.display()
         ));
-        let extra =
-            manifest_to_simulator_transactions(manifest, &network).with_context(|| {
-                format!("failed to expand manifest bundles {}", manifest.display())
-            })?;
+        let extra = manifest_to_simulator_transactions(manifest, &network)
+            .with_context(|| format!("failed to expand manifest bundles {}", manifest.display()))?;
         transactions.extend(extra);
     }
-    let governance =
-        governance_toml_to_simulator_transactions(&governance_toml, &network, from).with_context(
-            || {
-                format!(
-                    "failed to convert governance TOML {}",
-                    governance_toml.display()
-                )
-            },
-        )?;
+    let governance = governance_toml_to_simulator_transactions(&governance_toml, &network, from)
+        .with_context(|| {
+            format!(
+                "failed to convert governance TOML {}",
+                governance_toml.display()
+            )
+        })?;
     transactions.extend(governance);
     let body = serde_json::to_string_pretty(&transactions)?;
 
