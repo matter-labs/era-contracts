@@ -273,6 +273,22 @@ impl EnvConfig {
         Ok(read_core_create2_salt(&content))
     }
 
+    /// Per-regen salt for legacy `Governance.sol` ceremonies, read from
+    /// `upgrade-envs/v0.31.0-interopB/<env>.toml [contracts] legacy_gov_salt`.
+    /// Op ids in the legacy Gov state machine are content-addressed
+    /// (`hash(targets, values, calldatas, predecessor, salt)`); rotating this
+    /// salt every regen prevents the broadcaster from colliding with previously
+    /// executed op ids that still sit in the on-chain `Done` map. When absent,
+    /// returns `None` and the forge scripts default to `bytes32(0)`.
+    pub fn v31_legacy_gov_salt(&self) -> anyhow::Result<Option<H256>> {
+        if !self.v31_input_path.exists() {
+            return Ok(None);
+        }
+        let content = fs::read_to_string(&self.v31_input_path)
+            .with_context(|| format!("read {}", self.v31_input_path.display()))?;
+        Ok(read_core_legacy_gov_salt(&content))
+    }
+
     /// Per-CTM CREATE2 salts from
     /// `upgrade-envs/v0.31.0-interopB/<env>.toml [create2_factory_salts]`,
     /// keyed by CTM proxy. Empty if the env doesn't declare any (legacy
@@ -339,6 +355,14 @@ fn parse_v31_upgrade_input(content: &str) -> V31UpgradeInputs {
 
 /// Read `[contracts] create2_factory_salt` from a v31 input TOML.
 fn read_core_create2_salt(content: &str) -> Option<H256> {
+    read_h256_under_contracts(content, "create2_factory_salt")
+}
+
+fn read_core_legacy_gov_salt(content: &str) -> Option<H256> {
+    read_h256_under_contracts(content, "legacy_gov_salt")
+}
+
+fn read_h256_under_contracts(content: &str, key: &str) -> Option<H256> {
     let mut in_contracts = false;
     for raw in content.lines() {
         let line = raw.trim();
@@ -350,7 +374,7 @@ fn read_core_create2_salt(content: &str) -> Option<H256> {
             continue;
         }
         if in_contracts {
-            if let Some(h) = match_quoted_h256(line, "create2_factory_salt") {
+            if let Some(h) = match_quoted_h256(line, key) {
                 return Some(h);
             }
         }

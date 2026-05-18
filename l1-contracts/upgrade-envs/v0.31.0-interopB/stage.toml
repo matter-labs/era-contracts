@@ -24,6 +24,9 @@ governance_min_delay = 0
 max_number_of_chains = 100
 create2_factory_salt = "0xe97933790abddcaac347598ed2d61dbafc0a82f7f94f2a98fb840de7ead481ae"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+# Per-regen salt for legacy `Governance.sol` ceremonies (scheduleTransparent +
+# executeInstant).
+legacy_gov_salt = "0x7574de3ea376223f7276a7e3637339c6e6046ee4d3fbf5d9b1905839943c57c5"
 validator_timelock_execution_delay = 0
 genesis_root = "0xe167dcb28722cee8fc953ea70d8fb2adaffe2806d9fd194da79bd84e19adbae3"
 genesis_rollup_leaf_index = 84

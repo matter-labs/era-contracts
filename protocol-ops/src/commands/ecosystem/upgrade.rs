@@ -592,6 +592,23 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         }
     }
 
+    // Plumb the per-regen legacy-Gov ceremony salt down to every forge
+    // script the prepare flow spawns. `Utils.executeCalls` / `executeUpgrade`
+    // read this via `vm.envOr("LEGACY_GOV_SALT", bytes32(0))`. Child
+    // processes inherit env vars from this process, so a single `set_var`
+    // here covers every script in the pipeline. See
+    // `contracts/.claude/skills/regenerate-v31-stage-calldata/SKILL.md`
+    // ("Core principle") for why a per-regen salt is required.
+    if let Some(cfg) = env_cfg.as_ref() {
+        if let Some(salt) = cfg.v31_legacy_gov_salt()? {
+            logger::info(format!(
+                "Using legacy_gov_salt from {}: {salt:#x}",
+                cfg.v31_input_path.display(),
+            ));
+            std::env::set_var("LEGACY_GOV_SALT", format!("{salt:#x}"));
+        }
+    }
+
     let deployer_address = args.deployer_address.ok_or_else(|| {
         anyhow::anyhow!(
             "--deployer-address is required. Pass an EOA whose private key you control \
