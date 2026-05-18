@@ -139,3 +139,80 @@ The `--create2-factory` flag defaults to the standard Foundry CREATE2
 factory (`0x4e59b44847b379578588920cA78FbF26c0B4956C`) used by the v31
 prepare scripts; override only if your prepare run targeted a different
 factory.
+
+### Regenerating the committed v31 stage calldata
+
+The repo tracks one canonical artifact for the v31 stage upgrade:
+
+```
+l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml
+```
+
+It carries the merged `[governance_calls]` (PUH stage 0/1/2 hex), `[core]`,
+`[ctms.<flavor>]` (Era + ZKsyncOS), and `[new_gateway]` sections. Reviewers
+diff it; downstream tools (PUVT, the simulator converter) read it.
+
+The full prepare → fork-broadcast → PUVT cycle is wrapped in
+`l1-contracts/test/anvil-interop/regen-and-verify-stage.sh`. Use it whenever
+contracts or upgrade scripts change. Steps:
+
+```bash
+# 0. Rebuild artifacts that the prepare phase reads.
+cd contracts
+yarn sc build:foundry                       # zkout/ — genesis hashes
+cd l1-contracts && forge build              # out/  — l1 artifacts
+cd ../protocol-ops && cargo build           # target/debug/protocol_ops
+
+# 1. Regen against a Sepolia fork. Writes prepare/* + executed.json under
+#    upgrade-envs/v0.31.0-interopB/output/stage/regen/ and runs PUVT.
+cd ../l1-contracts
+DEPLOYER_PK_FILE=~/.test_pk \
+L1_FORK_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
+bash test/anvil-interop/regen-and-verify-stage.sh
+
+# 2. Promote the regen output to the tracked path.
+cp upgrade-envs/v0.31.0-interopB/output/stage/regen/prepare/ecosystem.toml \
+   upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml
+
+# 3. Regenerate every derived artifact CI checks, then commit.
+cd ..
+yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix
+cd l1-contracts && yarn selectors --fix
+ts-node scripts/copy-to-zkstack-out.ts
+cd .. && yarn calculate-hashes:fix
+git add l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml \
+        l1-contracts/selectors l1-contracts/zkstack-out AllContractsHashes.json
+git commit -m "Regenerate v31 stage calldata"
+
+# 4. Broadcast CREATE2 deploys to real Sepolia so the simulator's local fork
+#    finds bytecode at every CREATE2-derived address governance touches.
+#    The script is idempotent: it pre-filters against on-chain `eth_getCode`
+#    and only sends contracts not already deployed.
+DEPLOYER_PK_FILE=~/.test_pk \
+L1_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
+bash test/anvil-interop/broadcast-deployer-bundle-to-sepolia.sh
+
+# 5. Emit the matching tx-simulator scenario (Safe-bundle JSON shape).
+#    --include-manifest pulls in deployer + SC + CTM-admin Safe bundles so
+#    the simulator's local fork has everything it needs in execution order;
+#    `protocol-ops` filters out non-broadcastable selectors (ZK approves,
+#    GW priority requests, already-executed scheduleTransparent).
+cd protocol-ops
+./target/debug/protocol_ops ecosystem governance-toml-to-simulator \
+  --env stage \
+  --governance-toml ../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml \
+  --include-manifest ../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/regen/prepare/manifest.json \
+  --out <transaction-simulator>/transactions/$(date +%F)-v31-interopB-stage.json
+```
+
+The script can be iterated quickly with two env flags:
+
+| Flag               | Effect                                                              |
+| ------------------ | ------------------------------------------------------------------- |
+| `SKIP_PREPARE=1`   | Reuse the existing `regen/prepare/` (skip step 1's forge scripts)   |
+| `SKIP_BROADCAST=1` | Reuse `regen/executed.json` (skip funding + bundle replay)          |
+| `KEEP_ANVIL=1`     | Leave the fork anvil running on port 29545 for ad-hoc `cast` probes |
+
+CI checks that fail if any step in (3) is missed: `solhint`, `eslint`,
+`prettier:check`, the `selectors` file, `AllContractsHashes.json`, the
+`zkstack-out/*.json` set, and `codespell` on prose.
