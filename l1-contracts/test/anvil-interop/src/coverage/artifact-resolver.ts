@@ -122,6 +122,11 @@ const KNOWN_CONTRACT_NAMES: Record<string, string[]> = {
   mailboxFacet: ["MailboxFacet"],
   executorFacet: ["ExecutorFacet"],
   migratorFacet: ["MigratorFacet"],
+  // L1 interop contracts (l1-interop-contracts branch)
+  l1InteropHandler: ["L1InteropHandler"],
+  bridgeRegistry: ["BridgeRegistry"],
+  shadowAccountFactory: ["ShadowAccountFactory"],
+  stealthSender: ["StealthSender"],
 };
 
 /**
@@ -182,6 +187,7 @@ export async function resolveContracts(
   // Build list of known addresses from deployment state
   const l1Addresses = deploymentState.l1Addresses as Record<string, string> | undefined;
   const ctmAddresses = deploymentState.ctmAddresses as Record<string, string> | undefined;
+  const l1InteropContracts = deploymentState.l1InteropContracts as Record<string, string> | undefined;
 
   const knownAddresses: Array<{ address: string; fieldName: string }> = [];
 
@@ -194,6 +200,13 @@ export async function resolveContracts(
   }
   if (ctmAddresses) {
     for (const [field, addr] of Object.entries(ctmAddresses)) {
+      if (typeof addr === "string" && addr.startsWith("0x")) {
+        knownAddresses.push({ address: addr, fieldName: field });
+      }
+    }
+  }
+  if (l1InteropContracts) {
+    for (const [field, addr] of Object.entries(l1InteropContracts)) {
       if (typeof addr === "string" && addr.startsWith("0x")) {
         knownAddresses.push({ address: addr, fieldName: field });
       }

@@ -19,7 +19,7 @@ import type {
 } from "./core/types";
 import { getChainIdsByRole, timeIt } from "./core/utils";
 import { getAbi, getCreationBytecode } from "./core/contracts";
-import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./core/const";
+import { ANVIL_DEFAULT_ACCOUNT_ADDR, ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./core/const";
 import { encodeNtvAssetId } from "./core/data-encoding";
 import { deployTestTokens } from "./helpers/deploy-test-token";
 import { depositERC20ToL2 } from "./helpers/l1-deposit-helper";
@@ -29,6 +29,7 @@ import {
   registerRemoteRouters,
   PRIVATE_DEPLOYER_KEY,
 } from "./helpers/private-interop-deployer";
+import { deployL1InteropContracts } from "./helpers/l1-interop-contracts-deployer";
 import type { PrivateInteropAddresses } from "./core/types";
 import { L1_CHAIN_ID } from "./core/const";
 
@@ -502,8 +503,16 @@ export class DeploymentRunner {
       throw new Error(`addresses.json not found in ${stateDir}`);
     }
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
-    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, privateInteropAddresses, customBaseTokens, zkToken } =
-      addresses;
+    const {
+      l1Addresses,
+      ctmAddresses,
+      chainAddresses,
+      testTokens,
+      privateInteropAddresses,
+      customBaseTokens,
+      zkToken,
+      l1InteropContracts,
+    } = addresses;
 
     // Decompress hex-gzip state files to native JSON for --load-state CLI.
     // This is more portable than anvil_loadState RPC across anvil versions.
@@ -567,6 +576,9 @@ export class DeploymentRunner {
     if (zkToken) {
       state.zkToken = zkToken;
     }
+    if (l1InteropContracts) {
+      state.l1InteropContracts = l1InteropContracts;
+    }
     this.saveState(state);
 
     console.log(`  L1: chain ${l1Chain?.chainId} at ${l1Chain?.rpcUrl}`);
@@ -574,6 +586,13 @@ export class DeploymentRunner {
       console.log(`  L2: chain ${l2.chainId} at ${l2.rpcUrl}`);
     }
     console.log("\n=== Chain States Loaded ===\n");
+
+    // Pre-generated chain states predate the l1-interop-contracts branch and don't
+    // include BridgeRegistry/L1InteropHandler/etc. Deploy them on top of the loaded
+    // state so the new specs (and their coverage) can find the contracts.
+    if (l1Chain) {
+      await this.ensureL1InteropContractsDeployed(l1Chain.rpcUrl, l1Addresses.bridgehub);
+    }
 
     return { chains: chainInfo, l1Addresses, ctmAddresses, chainAddresses };
   }
@@ -685,7 +704,42 @@ export class DeploymentRunner {
       chainAddresses
     );
 
+    // Step 7: Deploy the L1-side interop contracts (BridgeRegistry, L1InteropHandler,
+    // ShadowAccountFactory, StealthSender). Independent of L2 chain registration —
+    // the handler just binds to the L1 Bridgehub and the L2 InteropCenter system addr.
+    await this.ensureL1InteropContractsDeployed(chains.l1.rpcUrl, l1Addresses.bridgehub);
+
     return { chains, l1Addresses, ctmAddresses, chainAddresses };
+  }
+
+  /**
+   * Deploy the L1-side interop contracts (added on the l1-interop-contracts branch)
+   * and persist their addresses to deployment state. Coverage picks them up
+   * automatically via bytecode matching once any test exercises them.
+   *
+   * Idempotent: if state already has fresh addresses with bytecode present on chain,
+   * the deploy is skipped. Pre-generated chain states don't include these contracts,
+   * so the first run after a state load always deploys them.
+   */
+  async ensureL1InteropContractsDeployed(_l1RpcUrl: string, _bridgehubAddr: string): Promise<void> {
+    const state = this.loadState();
+    if (state.l1InteropContracts) {
+      const provider = new providers.JsonRpcProvider(_l1RpcUrl);
+      const code = await provider.getCode(state.l1InteropContracts.l1InteropHandler);
+      if (code && code !== "0x") {
+        // Already deployed on this chain — nothing to do.
+        return;
+      }
+    }
+    console.log("\n=== Deploying L1 Interop Contracts ===\n");
+    const done = timeIt("deployL1InteropContracts");
+    const addrs = await deployL1InteropContracts(_l1RpcUrl, _bridgehubAddr, ANVIL_DEFAULT_ACCOUNT_ADDR, (line) =>
+      console.log(`  ${line}`)
+    );
+    done();
+    const refreshed = this.loadState();
+    refreshed.l1InteropContracts = addrs;
+    this.saveState(refreshed);
   }
 
   async step5SetupGateway(

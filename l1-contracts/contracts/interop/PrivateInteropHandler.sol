@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 import {InteropHandler} from "./InteropHandler.sol";
 import {IL2NativeTokenVault} from "../bridge/ntv/IL2NativeTokenVault.sol";
 
-import {PRIVATE_BUNDLE_IDENTIFIER, BundleStatus, InteropBundle, MessageInclusionProof} from "../common/Messaging.sol";
+import {PRIVATE_BUNDLE_IDENTIFIER, InteropBundle} from "../common/Messaging.sol";
 
 /// @title PrivateInteropHandler
 /// @author Matter Labs
