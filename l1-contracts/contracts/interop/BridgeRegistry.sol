@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {AccessControl} from "@openzeppelin/contracts-v4/access/AccessControl.sol";
+import {Pausable} from "@openzeppelin/contracts-v4/security/Pausable.sol";
 
 /**
  * @title BridgeRegistry

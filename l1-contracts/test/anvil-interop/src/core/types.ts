@@ -119,6 +119,17 @@ export interface PrivateInteropAddresses {
   interopHandler: string;
 }
 
+/**
+ * Addresses for the L1-side interop stack added on the l1-interop-contracts branch.
+ * Deployed once per anvil-setup run on the L1 Anvil chain.
+ */
+export interface L1InteropContractAddresses {
+  l1InteropHandler: string;
+  bridgeRegistry: string;
+  shadowAccountFactory: string;
+  stealthSender: string;
+}
+
 export interface DeploymentState {
   chains?: ChainInfo;
   l1Addresses?: CoreDeployedAddresses;
@@ -126,6 +137,8 @@ export interface DeploymentState {
   chainAddresses?: ChainAddresses[];
   testTokens?: Record<number, string>;
   privateInteropAddresses?: Record<number, PrivateInteropAddresses>;
+  /** L1-side interop stack (L1InteropHandler, BridgeRegistry, etc.) from the l1-interop-contracts branch. */
+  l1InteropContracts?: L1InteropContractAddresses;
   /** L1 address of the custom ERC20 base token, keyed by chain ID. */
   customBaseTokens?: Record<number, string>;
   zkToken?: {
