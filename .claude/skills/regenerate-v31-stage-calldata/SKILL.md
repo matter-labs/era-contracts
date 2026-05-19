@@ -62,12 +62,13 @@ Every tx in a regen has a sender. There are exactly two camps:
 
 **The rule**: never put a Camp-A bundle's txs into the sim JSON. Re-running
 sender work that already happened on chain hits one of:
+
 - `OperationExists()` / `OperationMustBePending()` for legacy-Gov ceremonies,
 - `Ownable: caller is not the new owner` for an Ownable2Step `acceptOwnership`
   whose `transferOwnership` already cleared,
 - `AddressAlreadySet(...)` for deploys whose target has code.
 
-The fix is structural — execute all Camp-A work on real chain *before* the
+The fix is structural — execute all Camp-A work on real chain _before_ the
 sim runs. Filters in `simulator.rs` should select by **signer**, not by
 selector or `to`. Per-call selector skips (the old `SKIPPED_SELECTORS`,
 CREATE2-factory carveout, etc.) are signal that we're encoding a Camp-A bundle
@@ -104,14 +105,14 @@ must be pushed separately, one for each admin EOA in the manifest
 (`prepare/*_0x<admin-lc>.safe.json`). The local sim (phase 3.5) is what
 catches a missing phase 2b — see the troubleshooting table below.
 
-| Phase     | What runs                                                                                    | Touches real chain? | Output                                                            |
-| --------- | -------------------------------------------------------------------------------------------- | ------------------- | ----------------------------------------------------------------- |
-| **1**     | `protocol_ops ecosystem upgrade-prepare-all` (deterministic from `stage.toml`)               | no                  | `output/stage/ecosystem.toml` + `manifest.json` + `*.safe.json`   |
-| **1.5**   | anvil fork + replay prepare bundles via impersonation + `protocol_ops verify-upgrade` (PUVT) | no                  | `executed.json` (fork-replay log), PUVT report                    |
-| **2**     | `broadcast-deployer-bundle-to-sepolia.ts` — push CREATE2 deploys to **real Sepolia**         | yes (deployer EOA)  | bytecode lives at the CREATE2 addresses on real Sepolia           |
-| **2b**    | broadcast **per-CTM admin** setup bundles (`*_0x343ee72…safe.json`, `*_0xd66949…safe.json`)  | yes (each CTM admin EOA) | `transferOwnership(PUH)`, `addVerifier`, `setNewVersionUpgrade`, ServerNotifier `ProxyAdmin.upgrade` land on Sepolia so stage1 `acceptOwnership` etc. don't revert |
-| **3**     | `protocol_ops ecosystem governance-toml-to-simulator`                                        | no                  | tx-simulator scenario JSON (one entry per PUH stage 0/1/2 call)   |
-| **3.5**   | `yarn simulate --file <sim.json>` from a local `transaction-simulator` clone                 | no (forks Sepolia)  | local pass/fail before pushing — same code path as tx-simulator CI |
+| Phase   | What runs                                                                                    | Touches real chain?      | Output                                                                                                                                                             |
+| ------- | -------------------------------------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **1**   | `protocol_ops ecosystem upgrade-prepare-all` (deterministic from `stage.toml`)               | no                       | `output/stage/ecosystem.toml` + `manifest.json` + `*.safe.json`                                                                                                    |
+| **1.5** | anvil fork + replay prepare bundles via impersonation + `protocol_ops verify-upgrade` (PUVT) | no                       | `executed.json` (fork-replay log), PUVT report                                                                                                                     |
+| **2**   | `broadcast-deployer-bundle-to-sepolia.ts` — push CREATE2 deploys to **real Sepolia**         | yes (deployer EOA)       | bytecode lives at the CREATE2 addresses on real Sepolia                                                                                                            |
+| **2b**  | broadcast **per-CTM admin** setup bundles (`*_0x343ee72…safe.json`, `*_0xd66949…safe.json`)  | yes (each CTM admin EOA) | `transferOwnership(PUH)`, `addVerifier`, `setNewVersionUpgrade`, ServerNotifier `ProxyAdmin.upgrade` land on Sepolia so stage1 `acceptOwnership` etc. don't revert |
+| **3**   | `protocol_ops ecosystem governance-toml-to-simulator`                                        | no                       | tx-simulator scenario JSON (one entry per PUH stage 0/1/2 call)                                                                                                    |
+| **3.5** | `yarn simulate --file <sim.json>` from a local `transaction-simulator` clone                 | no (forks Sepolia)       | local pass/fail before pushing — same code path as tx-simulator CI                                                                                                 |
 
 Phase boundaries matter for state contamination: each broadcast in phase 2
 diverges real Sepolia from the fork state phase 1.5 used as its baseline.
@@ -309,14 +310,14 @@ git push
 
 ### Local-rehearsal troubleshooting
 
-| Symptom in `yarn simulate` output                                  | Likely cause                                                                            |
-| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `EOA with non-empty calldata` on `stage0` `startTimer` or similar  | Phase 2 wasn't run after the most recent salt rotation. Re-run `broadcast-deployer-bundle-to-sepolia.ts`. |
-| `OperationMustBePending()` / `OperationExists()` on legacy Gov     | Stale sim JSON that still includes deployer/legacy-Gov bundles. Re-emit with a fresh `protocol_ops` build — the simulator emitter must not include manifest. |
-| `DeadlineNotYetPassed()` on stage1                                 | `checkDeadline()` `timeIncrease` injection missed. Confirm `simulator.rs` `CHECK_DEADLINE_SELECTOR` matches the actual stage1 selector, or extend the list.   |
-| `Ownable: caller is not the owner` on a CTM call                   | Ownership ceremony for that CTM never landed on Sepolia. Either the legacy-Gov bundle wasn't broadcast or the wrong PUH address is in `stage.toml`.            |
+| Symptom in `yarn simulate` output                                       | Likely cause                                                                                                                                                                                                                                     |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `EOA with non-empty calldata` on `stage0` `startTimer` or similar       | Phase 2 wasn't run after the most recent salt rotation. Re-run `broadcast-deployer-bundle-to-sepolia.ts`.                                                                                                                                        |
+| `OperationMustBePending()` / `OperationExists()` on legacy Gov          | Stale sim JSON that still includes deployer/legacy-Gov bundles. Re-emit with a fresh `protocol_ops` build — the simulator emitter must not include manifest.                                                                                     |
+| `DeadlineNotYetPassed()` on stage1                                      | `checkDeadline()` `timeIncrease` injection missed. Confirm `simulator.rs` `CHECK_DEADLINE_SELECTOR` matches the actual stage1 selector, or extend the list.                                                                                      |
+| `Ownable: caller is not the owner` on a CTM call                        | Ownership ceremony for that CTM never landed on Sepolia. Either the legacy-Gov bundle wasn't broadcast or the wrong PUH address is in `stage.toml`.                                                                                              |
 | `Ownable2Step: caller is not the new owner` on stage1 `acceptOwnership` | Phase 2b gap — the CTM admin EOA never broadcast its `transferOwnership(PUH)` setup. Grep `prepare/manifest.json` for the failing target address, find the bundle that contains the `0xf2fde38b` call, broadcast it from the matching admin key. |
-| `AddressAlreadySet(...)`                                           | State contamination from prior broadcasts — rotate CREATE2 salts (pre-flight section above) and re-run from phase 1.                                          |
+| `AddressAlreadySet(...)`                                                | State contamination from prior broadcasts — rotate CREATE2 salts (pre-flight section above) and re-run from phase 1.                                                                                                                             |
 
 ## Iteration flags on `regen-and-verify-stage.sh`
 
