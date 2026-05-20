@@ -481,10 +481,13 @@ library Utils {
         // A 2x buffer was insufficient when L1 gas tripled between prepare
         // (e.g. 1 gwei) and broadcast (e.g. 3 gwei) — `MsgValueTooLow` reverts.
         // 10x absorbs the typical 1→10 gwei swings on Sepolia.
+        // Cap `l1GasPrice` at `block.basefee` so we never compute below the
+        // current floor.
+        uint256 effectiveGasPrice = params.l1GasPrice > block.basefee ? params.l1GasPrice : block.basefee;
         requiredValueToDeploy =
             bridgehub.l2TransactionBaseCost(
                 params.chainId,
-                block.basefee,
+                effectiveGasPrice,
                 params.l2GasLimit,
                 REQUIRED_L2_GAS_PRICE_PER_PUBDATA
             ) *

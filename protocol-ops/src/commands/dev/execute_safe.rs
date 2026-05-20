@@ -380,9 +380,12 @@ pub(crate) async fn execute_one_bundle_unlocked(
         .await
         .context("eth_getTransactionCount(pending)")?;
 
-    let gas_price = resolve_gas_price(&provider)
-        .await
-        .context("resolve gas price")?;
+    // In unlocked (anvil-impersonate) mode, use a fixed low gas price
+    // instead of querying the node. Anvil's EIP-1559 base fee escalation
+    // can push `eth_gasPrice` 200x+ above prepare-time levels, causing
+    // MsgValueTooLow on priority deposit txs whose mintValue was baked
+    // in during prepare with a much lower gas price.
+    let gas_price = U256::from(GAS_PRICE_FLOOR_WEI);
     logger::info(format!(
         "Using gas price {} gwei",
         ethers::utils::format_units(gas_price, "gwei").unwrap_or_else(|_| gas_price.to_string()),
