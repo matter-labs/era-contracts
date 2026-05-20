@@ -17,8 +17,9 @@ pub struct GovernanceTomlToSimulatorArgs {
     pub topology: crate::common::EcosystemArgs,
 
     /// Path to a protocol-ops governance TOML. Defaults to
-    /// `upgrade-envs/v0.31.0-interopB/output/<env>/prepare/governance.toml`
-    /// when `--env` is set.
+    /// `upgrade-envs/v0.31.0-interopB/output/<env>/ecosystem.toml`
+    /// when `--env` is set — that's where `upgrade-prepare-all` writes the
+    /// merged TOML (canonical tracked path).
     #[clap(long)]
     pub governance_toml: Option<PathBuf>,
 
@@ -120,18 +121,18 @@ const CHECK_DEADLINE_TIME_INCREASE_SECS: u64 = 200_000;
 /// belongs to phase 2 (real-chain broadcast), not the sim.
 const CREATE2_FACTORY: &str = "0x4e59b44847b379578588920ca78fbf26c0b4956c";
 
-/// Selectors of calls an impersonated signer can't satisfy on the local fork
-/// because they require ZK base-token balance:
+/// Selectors of L1→L2 priority-request calls that may revert on a local fork
+/// without ZK base-token balance. Currently used only by the bundle filter
+/// (`manifest_to_simulator_transactions`) — governance stage emission keeps
+/// these in the JSON for security-review visibility. The `STAGE2_PUH_FUND_WEI`
+/// top-up below covers msg.value for these calls; ERC20 `approve` succeeds
+/// without balance, but `requestL2TransactionDirect`/`...TwoBridges` may
+/// still revert at execution time because PUH lacks the ZK ERC20 balance the
+/// Bridgehub `transferFrom`s. Reviewers see the intent regardless.
 ///
-/// - `0x095ea7b3` = `approve(address,uint256)` — ZK approves before priority
-///   requests.
-/// - `0xd52471c1` = `requestL2TransactionDirect(...)` — Gateway L1→L2 priority
-///   requests that burn ZK.
-/// - `0x24fd57fb` = `requestL2TransactionTwoBridges(...)` — same family as
-///   above, used for two-bridges priority flows; also burns ZK.
-///
-/// Dropping these keeps the sim entries to L1-side state writes the fork can
-/// actually execute. The sim doesn't need the GW-side L2 state.
+/// - `0x095ea7b3` = `approve(address,uint256)`
+/// - `0xd52471c1` = `requestL2TransactionDirect(...)`
+/// - `0x24fd57fb` = `requestL2TransactionTwoBridges(...)`
 const FUNDED_SELECTORS: &[&str] = &["0x095ea7b3", "0xd52471c1", "0x24fd57fb"];
 
 fn is_funded_call(data_hex: &str) -> bool {
@@ -142,6 +143,13 @@ fn is_funded_call(data_hex: &str) -> bool {
             .unwrap_or(false)
     })
 }
+
+/// ETH (wei) minted to the governance sender (PUH) at the first stage-2 call
+/// so the `requestL2TransactionDirect{value: y}` / `...TwoBridges{value: y}`
+/// priority requests have msg.value coverage. 10 ETH is well above the
+/// aggregate `priority_txs_l2_gas_limit * max_expected_l1_gas_price` budget
+/// across the v31 stage's stage-2 L1→L2 chain.
+const STAGE2_PUH_FUND_WEI: &str = "10000000000000000000";
 
 /// Subset of `prepare/manifest.json` needed to walk every Safe bundle.
 #[derive(Debug, Deserialize)]
@@ -183,8 +191,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
                 anyhow::anyhow!("--governance-toml is required unless --env is set")
             })?;
             crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)?
-                .join("prepare")
-                .join("governance.toml")
+                .join("ecosystem.toml")
         }
     };
 
@@ -395,19 +402,28 @@ fn governance_toml_to_simulator_transactions(
     ];
     let mut out = Vec::new();
     let mut should_fund_sender = true;
+    let mut stage2_topup_pending = true;
     for (stage, encoded_calls) in stages {
         let calls = decode_calls(encoded_calls)
             .with_context(|| format!("failed to decode stage{stage}_calls"))?;
         for (idx, call) in calls.into_iter().enumerate() {
             let data_hex = format!("0x{}", hex::encode(&call.data));
-            // Funded calls (approves + GW priority requests) need ZK
-            // base-token balance the local fork can't conjure for PUH; drop
-            // them. The real-chain ceremony funds PUH ahead of these.
-            if is_funded_call(&data_hex) {
-                continue;
-            }
-            let value_to_mint = should_fund_sender.then(|| "1".to_string());
-            should_fund_sender = false;
+            // Mint logic:
+            //   - First stage-2 call → top up PUH with `STAGE2_PUH_FUND_WEI`
+            //     so subsequent L1→L2 priority requests have msg.value.
+            //   - Otherwise, first-ever call → seed PUH with 1 wei so the
+            //     anvil account exists.
+            //   - All later calls → no mint.
+            let value_to_mint = if stage == 2 && stage2_topup_pending {
+                stage2_topup_pending = false;
+                should_fund_sender = false;
+                Some(STAGE2_PUH_FUND_WEI.to_string())
+            } else if should_fund_sender {
+                should_fund_sender = false;
+                Some("1".to_string())
+            } else {
+                None
+            };
             let time_increase = if data_hex
                 .get(..CHECK_DEADLINE_SELECTOR.len())
                 .map(|prefix| prefix.eq_ignore_ascii_case(CHECK_DEADLINE_SELECTOR))

@@ -59,3 +59,4 @@ l1-contracts/foundry-zksync/
 
 # Local secrets (never commit)
 .env
+protocol-ops/target-linux/

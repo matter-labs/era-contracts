@@ -20,7 +20,7 @@ Reviewers diff it; downstream tools (PUVT, the simulator converter) read it.
 
 - `l1-contracts/test/anvil-interop/regen-and-verify-stage.sh` — wraps prepare
   → fork-broadcast → PUVT in one script.
-- `l1-contracts/test/anvil-interop/broadcast-deployer-bundle-to-sepolia.ts` —
+- `l1-contracts/test/anvil-interop/yarn ts-node scripts/regen-via-docker.ts broadcast` —
   idempotent CREATE2 broadcaster that pre-filters against on-chain `eth_getCode`.
 - `protocol-ops/src/commands/ecosystem/simulator.rs` — `governance-toml-to-simulator`.
   Emits **only** the governance ceremony (PUH stages 0/1/2). No deployer
@@ -44,8 +44,11 @@ Reviewers diff it; downstream tools (PUVT, the simulator converter) read it.
 - The deployer EOA's private key (`DEPLOYER_PK` or `DEPLOYER_PK_FILE`). The
   deployer's `owner_address` is governance (PUH on stage/mainnet) which is a
   contract — pass an EOA the deployer bundle's signer matches.
-- For Option A (Docker): a built image tag at
-  `ghcr.io/matter-labs/protocol-ops:<tag>`.
+- A `ghcr.io/matter-labs/protocol-ops:<tag>` image (use the default
+  `v31-camp-split` or trigger `build-docker.yaml` for a fresh tag).
+- Mode 1 (local Rust) needs no host cross-toolchain — the build happens
+  inside `ghcr.io/matter-labs/protocol-ops-base:latest`. See "How to run"
+  below.
 
 ## Core principle: split senders by key custody
 
@@ -98,7 +101,7 @@ fails with one of:
 - `AddressAlreadySet(...)` — state contamination from a prior partial
   broadcast; rotate salts (pre-flight section below).
 
-The current `broadcast-deployer-bundle-to-sepolia.ts` only handles the
+The current `yarn ts-node scripts/regen-via-docker.ts broadcast` only handles the
 deployer-signed bundles (phase 2). The per-CTM-admin bundles (phase 2b)
 must be pushed separately, one for each admin EOA in the manifest
 (`prepare/*_0x<admin-lc>.safe.json`). The local sim (phase 3.5) is what
@@ -108,7 +111,7 @@ catches a missing phase 2b — see the troubleshooting table below.
 | --------- | -------------------------------------------------------------------------------------------- | ------------------- | ----------------------------------------------------------------- |
 | **1**     | `protocol_ops ecosystem upgrade-prepare-all` (deterministic from `stage.toml`)               | no                  | `output/stage/ecosystem.toml` + `manifest.json` + `*.safe.json`   |
 | **1.5**   | anvil fork + replay prepare bundles via impersonation + `protocol_ops verify-upgrade` (PUVT) | no                  | `executed.json` (fork-replay log), PUVT report                    |
-| **2**     | `broadcast-deployer-bundle-to-sepolia.ts` — push CREATE2 deploys to **real Sepolia**         | yes (deployer EOA)  | bytecode lives at the CREATE2 addresses on real Sepolia           |
+| **2**     | `yarn ts-node scripts/regen-via-docker.ts broadcast` — push CREATE2 deploys to **real Sepolia**         | yes (deployer EOA)  | bytecode lives at the CREATE2 addresses on real Sepolia           |
 | **2b**    | broadcast **per-CTM admin** setup bundles (`*_0x343ee72…safe.json`, `*_0xd66949…safe.json`)  | yes (each CTM admin EOA) | `transferOwnership(PUH)`, `addVerifier`, `setNewVersionUpgrade`, ServerNotifier `ProxyAdmin.upgrade` land on Sepolia so stage1 `acceptOwnership` etc. don't revert |
 | **3**     | `protocol_ops ecosystem governance-toml-to-simulator`                                        | no                  | tx-simulator scenario JSON (one entry per PUH stage 0/1/2 call)   |
 | **3.5**   | `yarn simulate --file <sim.json>` from a local `transaction-simulator` clone                 | no (forks Sepolia)  | local pass/fail before pushing — same code path as tx-simulator CI |
@@ -118,12 +121,78 @@ diverges real Sepolia from the fork state phase 1.5 used as its baseline.
 The fix is to rotate CREATE2 salts before the next regen — see the pre-flight
 section below.
 
-## Option A — Docker (preferred)
+## How to run — only Docker, two modes
 
-`docker/protocol/Dockerfile` builds a runtime image with `forge`, `cast`,
-`anvil`, `protocol_ops`, `node`, and all compiled contract artifacts under
-`/contracts/`. Trigger a fresh build, then run the wrapper scripts inside
-the container with `/contracts/.../output/` bind-mounted from the host.
+Every regen, broadcast, and sim-emit step runs inside the published image so
+Foundry + Solidity artifacts are bit-identical run-to-run. There is **no
+fully-local mode** — macOS-built Foundry artifacts diverge from Linux ones
+just enough to break reproducibility. The single entry point is
+`scripts/regen-via-docker.ts` with two binary-source modes:
+
+| Mode | When | What's mounted | Per-iteration cost |
+| --- | --- | --- | --- |
+| **Mode 1 — Iteration**: local cross-built `protocol_ops` + bundled Foundry/contracts | Rust changes only (sim filter, emitter, broadcaster, prepare wrapper) | host binary → `/contracts/protocol-ops/protocol_ops` (override) | ~30 s cross-cargo + prepare time |
+| **Mode 2 — Canonical**: everything from the image | Solidity changed, or you're producing the final regen you commit/push | nothing overridden — image has everything | trigger `build-docker.yaml` (~12 min CI build) + prepare time |
+
+Both modes use the same `stage.toml`, `permanent-values/`, and
+`test/anvil-interop/` bind-mounts so config/script edits land without a
+rebuild. Sourcify is blocked at the container level (`--add-host
+sourcify.dev:127.0.0.1`) so forge's post-success `ExternalIdentifier` lookup
+fails fast — foundry-zksync v0.1.5 silently ignores `--disable-labels` for
+`forge script`, so this is currently the only way to keep prepare under 15
+min per CTM.
+
+### Mode 1 — local Rust + Docker contracts
+
+No host cross-toolchain needed: `regen-via-docker.ts` cross-builds
+`protocol_ops` by running `cargo build --release` inside the
+`protocol-ops-base` image (which already has the right Rust nightly).
+Output lands at `protocol-ops/target-linux/release/protocol_ops` (separate
+from the host's macOS `target/`). A named Docker volume
+(`protocol-ops-cargo-cache`) holds the crates registry/git cache between
+runs, so subsequent builds are incremental (~30 s typical, ~5 min cold).
+
+Per-iteration:
+
+```bash
+# phase 1 — regen against Sepolia fork (cross-builds protocol_ops first)
+DEPLOYER_PK_FILE=~/.test_pk \
+L1_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
+yarn ts-node scripts/regen-via-docker.ts regen
+
+# phase 2 — broadcast Camp-A bundles to real Sepolia
+DEPLOYER_PK_FILE=~/.test_pk \
+L1_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
+yarn ts-node scripts/regen-via-docker.ts broadcast
+
+# phase 3 — emit tx-simulator JSON
+DEPLOYER_PK_FILE=~/.test_pk \
+yarn ts-node scripts/regen-via-docker.ts sim-emit \
+  ../transaction-simulator/transactions/$(date +%F)-v31-interopB-stage.json
+
+# phase 3.5 — local rehearsal (host, not in docker)
+SEPOLIA_RPC=$L1_RPC_URL \
+yarn --cwd ../transaction-simulator simulate --file transactions/<dated>.json
+```
+
+Toggles:
+
+| Env var | Effect |
+| --- | --- |
+| `USE_BUNDLED_BIN=1` | Skip the binary mount; use the image's bundled `protocol_ops` (drops the cross-build entirely — config/Solidity-only iteration). |
+| `SKIP_BUILD=1` | Reuse `protocol-ops/target/x86_64-unknown-linux-gnu/release/protocol_ops` without re-running cargo zigbuild. |
+| `PROTOCOL_OPS_BIN_HOST=<path>` | Mount this binary explicitly (skips cross-build). |
+| `PROTOCOL_OPS_IMAGE=<ref>` | Override the default image ref (`ghcr.io/matter-labs/protocol-ops:v31-camp-split`). |
+
+### Mode 2 — canonical regen from a fresh image
+
+When you're producing the final regen that you'll commit and push, build a
+new image first (so the bundled `protocol_ops` is from a tagged commit, not
+a developer's local cargo state). The Dockerfile under `docker/protocol/`
+bundles `forge`, `cast`, `anvil`, `protocol_ops`, `node`, and all compiled
+contract artifacts. After the workflow finishes, invoke the same
+`scripts/regen-via-docker.ts` entry points with `USE_BUNDLED_BIN=1` so the
+image's binary is used and no host cross-build runs.
 
 ### Pre-flight: rotate CREATE2 salts when re-running against contaminated state
 
@@ -161,119 +230,60 @@ for i in 1 2 3; do python3 -c "import secrets; print('0x' + secrets.token_hex(32
 Rotation is cheap — it just produces new deploy addresses; reviewers re-diff
 the new `output/stage/ecosystem.toml` like any normal regen. Don't rotate
 mid-broadcast (i.e. between `regen-and-verify-stage.sh` and
-`broadcast-deployer-bundle-to-sepolia.ts`) — the broadcast script reads the
+`yarn ts-node scripts/regen-via-docker.ts broadcast`) — the broadcast script reads the
 fresh salts from the freshly-emitted prepare output.
 
-### Run the regen
+Build the image, then run the same three subcommands as Mode 1 with
+`USE_BUNDLED_BIN=1`:
 
 ```bash
-# 0. Build (or pull) an image for your branch. Manual dispatch lets you
-#    pick a predictable tag via image_tag_override.
+# 0. Build (or pull) the image. Manual dispatch lets you pick a predictable
+#    tag via image_tag_override.
 gh workflow run build-docker.yaml \
   --ref <branch> \
   -f image_tag_override=<branch>-regen
 gh run watch
-# Pulling on arm64 hosts: the image is built linux/amd64 only and runs under
-# qemu emulation (1.5-3× slower than native). Add --platform linux/amd64 to
-# `docker pull` and `docker run` calls.
 docker pull --platform linux/amd64 ghcr.io/matter-labs/protocol-ops:<branch>-regen
 
-# 1+2. Regen prepare/* + PUVT inside the container, writing directly to
-#      the tracked path on the host via a bind mount.
-#
-#      Three bind mounts matter:
-#        1. l1-contracts/test/anvil-interop  (ro) — so script fixes in your
-#           working tree override the image's snapshot
-#        2. l1-contracts/upgrade-envs/.../stage.toml (ro) — so salt rotations
-#           and any other env edits go through
-#        3. l1-contracts/upgrade-envs/.../output (rw) — so regen output
-#           persists on the host for the commit step
-docker run --rm --platform linux/amd64 \
-  -e DEPLOYER_PK="$(tr -d '[:space:]' < ~/.test_pk)" \
-  -e L1_FORK_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
-  -v "$PWD/contracts/l1-contracts/test/anvil-interop:/contracts/l1-contracts/test/anvil-interop:ro" \
-  -v "$PWD/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/stage.toml:/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/stage.toml:ro" \
-  -v "$PWD/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output:/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output" \
-  -w /contracts/l1-contracts \
-  ghcr.io/matter-labs/protocol-ops:<branch>-regen \
-  bash test/anvil-interop/regen-and-verify-stage.sh
+# 1. Phase 1 — regen against a Sepolia fork.
+PROTOCOL_OPS_IMAGE=ghcr.io/matter-labs/protocol-ops:<branch>-regen \
+USE_BUNDLED_BIN=1 \
+DEPLOYER_PK_FILE=~/.test_pk \
+L1_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
+yarn ts-node scripts/regen-via-docker.ts regen
 
-# 3. Promote regen output to tracked path, regenerate every CI-checked
-#    derived artifact on the host, commit. These checks run outside Docker
-#    so the yarn/foundry workspaces need a real local checkout.
-cd contracts
-cp l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/regen/prepare/ecosystem.toml \
-   l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml
+# 2. Refresh CI-derived artifacts and commit (host tools — yarn/foundry).
 yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix
 cd l1-contracts && yarn selectors --fix && ts-node scripts/copy-to-zkstack-out.ts
 cd .. && yarn calculate-hashes:fix
-cd protocol-ops && cargo +stable fmt && cd ..  # CI uses stable; nightly fmt produces drift
+cd protocol-ops && cargo +stable fmt && cd ..  # CI uses stable; nightly fmt drifts
 git add l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml \
         l1-contracts/selectors l1-contracts/zkstack-out AllContractsHashes.json
 git commit -m "Regenerate v31 stage calldata"
 
-# 4. Broadcast CREATE2 deploys to real Sepolia (idempotent — pre-filters
-#    against on-chain `eth_getCode`).
-docker run --rm \
-  -e DEPLOYER_PK="$(tr -d '[:space:]' < ~/.test_pk)" \
-  -e L1_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
-  -v "$PWD/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output:/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output" \
-  -w /contracts/l1-contracts \
-  ghcr.io/matter-labs/protocol-ops:<branch>-regen \
-  yarn --cwd test/anvil-interop ts-node broadcast-deployer-bundle-to-sepolia.ts
-
-# 5. Emit the matching tx-simulator scenario. Only the governance ceremony
-#    — phase 2 must already be done so the fork has the deployer's contracts.
-docker run --rm \
-  -v "$PWD/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output:/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output" \
-  -v "$PWD/transaction-simulator/transactions:/out" \
-  -w /contracts \
-  ghcr.io/matter-labs/protocol-ops:<branch>-regen \
-  protocol_ops ecosystem governance-toml-to-simulator \
-    --env stage \
-    --governance-toml /contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml \
-    --out /out/$(date +%F)-v31-interopB-stage.json
-
-# 6. Rehearse locally before pushing — see "Phase 3.5" below.
-```
-
-## Option B — Local toolchain (no Docker)
-
-```bash
-# 0. Rebuild artifacts the prepare phase reads.
-cd contracts
-yarn sc build:foundry                       # zkout/ — genesis hashes
-cd l1-contracts && forge build              # out/  — l1 artifacts
-cd ../protocol-ops && cargo build           # target/debug/protocol_ops
-
-# 1. Regen against a Sepolia fork. Writes prepare/* + executed.json under
-#    upgrade-envs/v0.31.0-interopB/output/stage/regen/ and runs PUVT.
-cd ../l1-contracts
-DEPLOYER_PK_FILE=~/.test_pk \
-L1_FORK_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
-bash test/anvil-interop/regen-and-verify-stage.sh
-
-# 2. Promote the regen output to the tracked path.
-cp upgrade-envs/v0.31.0-interopB/output/stage/regen/prepare/ecosystem.toml \
-   upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml
-
-# 3. Regenerate every derived artifact CI checks, then commit (same as
-#    Option A step 3 above).
-
-# 4. Broadcast CREATE2 deploys to real Sepolia.
+# 3. Phase 2 — broadcast Camp-A bundles to real Sepolia.
+PROTOCOL_OPS_IMAGE=ghcr.io/matter-labs/protocol-ops:<branch>-regen \
+USE_BUNDLED_BIN=1 \
 DEPLOYER_PK_FILE=~/.test_pk \
 L1_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
-yarn --cwd test/anvil-interop ts-node broadcast-deployer-bundle-to-sepolia.ts
+yarn ts-node scripts/regen-via-docker.ts broadcast
 
-# 5. Emit the tx-simulator scenario (governance ceremony only).
-cd protocol-ops
-./target/debug/protocol_ops ecosystem governance-toml-to-simulator \
-  --env stage \
-  --governance-toml ../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml \
-  --out <transaction-simulator>/transactions/$(date +%F)-v31-interopB-stage.json
+# 4. Phase 3 — emit tx-simulator JSON.
+PROTOCOL_OPS_IMAGE=ghcr.io/matter-labs/protocol-ops:<branch>-regen \
+USE_BUNDLED_BIN=1 \
+DEPLOYER_PK_FILE=~/.test_pk \
+yarn ts-node scripts/regen-via-docker.ts sim-emit \
+  ../transaction-simulator/transactions/$(date +%F)-v31-interopB-stage.json
 
-# 6. Rehearse locally before pushing — see "Phase 3.5" below.
+# 5. Phase 3.5 — local rehearsal (see below).
 ```
+
+Notes:
+- The image is published linux/amd64 only; arm64 Macs run it under qemu
+  emulation (1.5–3× slower than native). The wrapper passes
+  `--platform linux/amd64` automatically.
+- `ecosystem.toml` is auto-promoted to its canonical tracked path by
+  `upgrade-prepare-all` — no `cp` step needed in user workflow.
 
 ## Phase 3.5 — Rehearse the sim JSON locally before pushing
 
@@ -311,7 +321,7 @@ git push
 
 | Symptom in `yarn simulate` output                                  | Likely cause                                                                            |
 | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `EOA with non-empty calldata` on `stage0` `startTimer` or similar  | Phase 2 wasn't run after the most recent salt rotation. Re-run `broadcast-deployer-bundle-to-sepolia.ts`. |
+| `EOA with non-empty calldata` on `stage0` `startTimer` or similar  | Phase 2 wasn't run after the most recent salt rotation. Re-run `yarn ts-node scripts/regen-via-docker.ts broadcast`. |
 | `OperationMustBePending()` / `OperationExists()` on legacy Gov     | Stale sim JSON that still includes deployer/legacy-Gov bundles. Re-emit with a fresh `protocol_ops` build — the simulator emitter must not include manifest. |
 | `DeadlineNotYetPassed()` on stage1                                 | `checkDeadline()` `timeIncrease` injection missed. Confirm `simulator.rs` `CHECK_DEADLINE_SELECTOR` matches the actual stage1 selector, or extend the list.   |
 | `Ownable: caller is not the owner` on a CTM call                   | Ownership ceremony for that CTM never landed on Sepolia. Either the legacy-Gov bundle wasn't broadcast or the wrong PUH address is in `stage.toml`.            |

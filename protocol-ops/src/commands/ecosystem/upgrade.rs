@@ -94,12 +94,13 @@ pub async fn run_upgrade_governance(mut args: UpgradeGovernanceArgs) -> anyhow::
             args.shared.out = Some(env_out_base.join("governance"));
         }
         // Auto-discover the merged ecosystem TOML from the prepare phase
-        // output. `upgrade-prepare-all` emits a single `ecosystem.toml`
+        // output. `upgrade-prepare-all` writes a single `ecosystem.toml`
+        // directly at `<env-out>/ecosystem.toml` (canonical tracked path)
         // whose top-level `[governance_calls]` table carries the merged
         // stage 0/1/2 calls (core + per-CTM + PUH/Guardians stage-0), so
         // we no longer need to merge multiple files at replay time.
         if args.governance_toml.is_empty() {
-            let candidate = env_out_base.join("prepare").join("ecosystem.toml");
+            let candidate = env_out_base.join("ecosystem.toml");
             if candidate.is_file() {
                 logger::info(format!(
                     "Auto-discovered ecosystem TOML at {}",
@@ -440,7 +441,7 @@ struct CtmConfigEntry {
 struct UpgradePrepareAllOutput {
     core_governance_toml: String,
     ctm_governance_tomls: Vec<CtmGovernanceTomlEntry>,
-    /// Merged ecosystem TOML written to `<out>/prepare/ecosystem.toml`, when
+    /// Merged ecosystem TOML written to `<env-out>/ecosystem.toml`, when
     /// `--out` is set. Contains top-level `[governance_calls]` (merged stage
     /// 0/1/2 hex), `[core]` (the CTM-agnostic core prepare output), and one
     /// `[ctms.<flavor>]` table per CTM (`era` or `zksync_os`, keyed off
@@ -768,50 +769,52 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
 
     // Merge core + per-CTM governance calls + (when present) the in-memory
     // PUH/Guardians stage-0 calls + (when present) the new-Gateway bring-up
-    // bundle into a single `<out>/prepare/ecosystem.toml`. The Solidity
+    // bundle into a single `<env-out>/ecosystem.toml`. The Solidity
     // scripts each emit their own toml under `script-out/` (forge
     // requirement), but downstream (PUVT + governance replay) only consumes
     // the merged file.
-    let merged_ecosystem = if let Some(out_dir) = args.shared.out.clone() {
-        let merged_path = out_dir.join("ecosystem.toml");
-        let extra_stage0 = puh_outcome
-            .as_ref()
-            .map(|o| o.stage0_calls.as_slice())
-            .unwrap_or(&[]);
-        write_merged_ecosystem_toml(
-            &prepared.core_toml,
-            &prepared.ctm_tomls,
-            extra_stage0,
-            prepared.new_gateway_toml.as_deref(),
-            inputs.zk_token_asset_id,
-            &merged_path,
-        )?;
-
-        // Promote the merged TOML to the canonical tracked path so reviewers
-        // diff a stable location. The prepare's `--out` always points at
-        // `<env-out>/prepare/`; the canonical path lives one directory up
-        // (`<env-out>/ecosystem.toml`). The `prepare/` subtree's *.safe.json
-        // + manifest.json stay untracked; only the merged ecosystem.toml is
-        // committed.
-        if let Some(canonical_dir) = out_dir.parent() {
-            let canonical_path = canonical_dir.join("ecosystem.toml");
-            std::fs::copy(&merged_path, &canonical_path).with_context(|| {
-                format!(
-                    "failed to promote merged ecosystem.toml from {} to canonical path {}",
-                    merged_path.display(),
-                    canonical_path.display(),
-                )
+    // Write the merged TOML straight to the canonical tracked path
+    // (`<env-out>/ecosystem.toml`) — that's the file reviewers diff and the
+    // path every downstream consumer (PUVT, simulator emitter, fork tests)
+    // reads from. The `prepare/` subtree under `--out` keeps the per-bundle
+    // intermediates (safe.json + manifest.json + executed.json) which stay
+    // untracked.
+    let puh_address: Option<Address> = env_cfg.as_ref().and_then(|cfg| cfg.owner_address());
+    let (merged_ecosystem, pending_transfer_rewrites) =
+        if let Some(out_dir) = args.shared.out.clone() {
+            let canonical_dir = out_dir.parent().ok_or_else(|| {
+                anyhow::anyhow!(
+                "--out ({}) has no parent directory; cannot derive canonical ecosystem.toml path",
+                out_dir.display()
+            )
             })?;
+            let merged_path = canonical_dir.join("ecosystem.toml");
+            let extra_stage0 = puh_outcome
+                .as_ref()
+                .map(|o| o.stage0_calls.as_slice())
+                .unwrap_or(&[]);
+            let accept_targets = write_merged_ecosystem_toml(
+                &prepared.core_toml,
+                &prepared.ctm_tomls,
+                extra_stage0,
+                prepared.new_gateway_toml.as_deref(),
+                inputs.zk_token_asset_id,
+                &merged_path,
+                puh_address,
+            )?;
             logger::info(format!(
-                "Promoted merged ecosystem.toml → {}",
-                canonical_path.display()
+                "Wrote merged ecosystem.toml → {}",
+                merged_path.display()
             ));
-        }
 
-        Some(merged_path)
-    } else {
-        None
-    };
+            let pending = match (accept_targets.is_empty(), puh_address) {
+                (false, Some(puh)) => Some((out_dir, accept_targets, puh)),
+                _ => None,
+            };
+            (Some(merged_path), pending)
+        } else {
+            (None, None)
+        };
 
     let ctm_governance_tomls: Vec<CtmGovernanceTomlEntry> = prepared
         .ctm_tomls
@@ -851,6 +854,23 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         &out_payload,
     )
     .await?;
+
+    // `write_merged_ecosystem_toml` already folded
+    // `ecosystem_admin_calls_to_execute` into stage-2 governance (PUH calls).
+    // To make the `acceptOwnership()` calls in there actually work, the
+    // matching `transferOwnership(...)` txs that `GatewayVotePreparation`
+    // emits in the deployer-signed safe.json bundles must put PUH on the
+    // pendingOwner slot — not the ChainAdmin contract the script defaults
+    // to. We rewrite those targets here, after `write_output_if_requested`
+    // has persisted the bundles.
+    if let Some((prepare_dir, accept_targets, puh)) = pending_transfer_rewrites {
+        let rewrites = rewrite_transfer_ownership_targets(&prepare_dir, &accept_targets, puh)?;
+        if rewrites > 0 {
+            logger::info(format!(
+                "Rewrote {rewrites} transferOwnership(...) target(s) → PUH {puh:#x} so stage-2 acceptOwnership can succeed"
+            ));
+        }
+    }
 
     logger::success("upgrade-prepare-all completed");
     Ok(())
@@ -895,6 +915,18 @@ fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> 
 /// [new_gateway]                   # only when present: GatewayVotePreparation
 /// ...                             # output minus governance_calls_to_execute.
 /// ```
+/// Returns the set of `acceptOwnership` targets that came from the new-gateway
+/// prepare's `ecosystem_admin_calls_to_execute`. For each such target, the
+/// caller must rewrite the matching `transferOwnership(...)` call in the
+/// deployer-signed safe.json bundle so the pendingOwner becomes `puh_address`
+/// instead of the ChainAdmin. Once that's done — and once those rewritten
+/// bundles broadcast in phase 2 — PUH can accept ownership directly as a
+/// stage-2 governance call (already injected into stage2 here).
+///
+/// `puh_address` is the env's `owner_address` (PUH proxy on stage/mainnet).
+/// When `None`, the ecosystem-admin fold is skipped entirely — the calls
+/// remain orphan TOML fields (useful for local/test envs that don't have
+/// a PUH).
 fn write_merged_ecosystem_toml(
     core_toml: &Path,
     ctm_entries: &[crate::commands::ecosystem::v31_upgrade_inner::CtmPrepareEntry],
@@ -902,7 +934,8 @@ fn write_merged_ecosystem_toml(
     new_gateway_toml: Option<&Path>,
     zk_token_asset_id: ethers::types::H256,
     dst: &Path,
-) -> anyhow::Result<()> {
+    puh_address: Option<Address>,
+) -> anyhow::Result<Vec<Address>> {
     use crate::common::governance_calls::{
         empty_calls_hex, encode_calls, merge_call_array_hex, GovernanceCall,
     };
@@ -935,6 +968,10 @@ fn write_merged_ecosystem_toml(
     let mut stage0: Vec<String> = vec![core_gov.stage0_calls];
     let mut stage1: Vec<String> = vec![core_gov.stage1_calls];
     let mut stage2: Vec<String> = vec![core_gov.stage2_calls];
+    // Collected from the new-gateway prepare's `ecosystem_admin_calls_to_execute`.
+    // Caller uses these to rewrite `transferOwnership(...)` targets in the
+    // deployer-signed safe.json bundles so PUH becomes the pendingOwner.
+    let mut accept_ownership_targets: Vec<Address> = Vec::new();
 
     for entry in ctm_entries {
         let (body, gov) = load_and_split(&entry.toml)?;
@@ -1003,6 +1040,69 @@ fn write_merged_ecosystem_toml(
             ),
         };
         stage2.push(gov_hex);
+
+        // Decode `ecosystem_admin_calls_to_execute` (abi-encoded `Call[]`) and
+        // fold it into stage-2 governance instead of leaving it as an orphan
+        // TOML field. The new-gateway prepare emits these expecting a
+        // `ChainAdmin`-signed executor — but `setServerNotifier` is
+        // `onlyOwnerOrAdmin` and PUH is the owner after stage 1, so PUH can
+        // call it directly. `acceptOwnership` on the new ServerNotifier
+        // requires `pendingOwner` to be PUH; the matching `transferOwnership`
+        // tx in the deployer-signed safe.json bundle still points at the
+        // ChainAdmin contract, so we collect the targets here and the caller
+        // rewrites them post `write_output_if_requested`.
+        //
+        // Skip the fold entirely when no `puh_address` is supplied (e.g. local
+        // anvil-interop fixtures with no PUH-owned governance).
+        if let Some(eco_admin_value) = value.remove("ecosystem_admin_calls_to_execute") {
+            let eco_admin_hex = match eco_admin_value {
+                Value::String(s) => s,
+                other => anyhow::bail!(
+                    "ecosystem_admin_calls_to_execute in {} is not a string (got {})",
+                    path.display(),
+                    other.type_str()
+                ),
+            };
+            let decoded = crate::common::governance_calls::decode_calls(&eco_admin_hex)
+                .with_context(|| {
+                    format!(
+                        "decode ecosystem_admin_calls_to_execute from {}",
+                        path.display()
+                    )
+                })?;
+            if !decoded.is_empty() {
+                if puh_address.is_some() {
+                    // PUH executes these in stage 2 — re-encode the same
+                    // `Call[]` as a stage-2 chunk so the merge picks them up
+                    // alongside the existing GW bring-up calls.
+                    stage2.push(format!("0x{}", hex::encode(encode_calls(&decoded))));
+
+                    // Collect targets of every `acceptOwnership()` call.
+                    // Their matching `transferOwnership(...)` in the deployer
+                    // safe.json bundle must be rewritten to put PUH (the
+                    // stage-2 executor) as pendingOwner instead of the
+                    // ChainAdmin contract emitted by the new-gateway prepare.
+                    let accept_sel: [u8; 4] = ethers::utils::id("acceptOwnership()")[..4]
+                        .try_into()
+                        .expect("4-byte selector");
+                    for call in &decoded {
+                        if call.data.len() >= 4 && call.data[..4] == accept_sel {
+                            accept_ownership_targets.push(call.target);
+                        }
+                    }
+                    logger::info(format!(
+                        "Folded {} ecosystem_admin_calls into stage-2 governance; {} acceptOwnership target(s) queued for transferOwnership rewrite",
+                        decoded.len(),
+                        accept_ownership_targets.len(),
+                    ));
+                } else {
+                    logger::info(format!(
+                        "Skipping ecosystem_admin_calls_to_execute fold ({} call(s)): no puh_address available",
+                        decoded.len()
+                    ));
+                }
+            }
+        }
         Some(value)
     } else {
         None
@@ -1058,7 +1158,100 @@ fn write_merged_ecosystem_toml(
         "Merged ecosystem TOML written to: {}",
         dst.display()
     ));
-    Ok(())
+    Ok(accept_ownership_targets)
+}
+
+/// Walk every safe.json bundle under `prepare_dir` and rewrite each
+/// `transferOwnership(address)` tx whose `to` is in `targets` so the address
+/// argument points at `new_pending_owner` instead of whatever ChainAdmin
+/// `GatewayVotePreparation` emitted. After phase 2 broadcasts those bundles
+/// the new pendingOwner becomes `new_pending_owner`; stage-2 governance's
+/// `acceptOwnership()` (also routed to PUH by the merge step) then succeeds.
+///
+/// Selector match: `0xf2fde38b` = `transferOwnership(address)`. Calldata
+/// shape is `selector (4) | abi.encode(address) (32)` — we replace the last
+/// 20 bytes of the 32-byte word.
+fn rewrite_transfer_ownership_targets(
+    prepare_dir: &Path,
+    targets: &[Address],
+    new_pending_owner: Address,
+) -> anyhow::Result<usize> {
+    use serde_json::Value as JsonValue;
+
+    if targets.is_empty() {
+        return Ok(0);
+    }
+    let target_set: std::collections::HashSet<String> = targets
+        .iter()
+        .map(|a| format!("{a:#x}").to_lowercase())
+        .collect();
+    let transfer_selector = "0xf2fde38b";
+    let new_owner_hex_padded = format!(
+        "000000000000000000000000{}",
+        format!("{new_pending_owner:#x}").trim_start_matches("0x")
+    );
+
+    let mut rewrites = 0;
+    for entry in fs::read_dir(prepare_dir)
+        .with_context(|| format!("read prepare dir {}", prepare_dir.display()))?
+    {
+        let path = entry?.path();
+        let name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) if n.ends_with(".safe.json") => n.to_string(),
+            _ => continue,
+        };
+
+        let raw = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+        let mut bundle: JsonValue =
+            serde_json::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
+        let mut bundle_changed = false;
+
+        if let Some(txs) = bundle
+            .get_mut("transactions")
+            .and_then(|t| t.as_array_mut())
+        {
+            for tx in txs.iter_mut() {
+                let to = tx
+                    .get("to")
+                    .and_then(|t| t.as_str())
+                    .unwrap_or("")
+                    .to_lowercase();
+                let data = tx.get("data").and_then(|d| d.as_str()).unwrap_or("");
+                if !target_set.contains(&to) {
+                    continue;
+                }
+                if !data
+                    .get(..transfer_selector.len())
+                    .map(|p| p.eq_ignore_ascii_case(transfer_selector))
+                    .unwrap_or(false)
+                {
+                    continue;
+                }
+                // selector(4) + address-padded(32) = 4 + 64 hex chars + leading "0x"
+                if data.len() < 2 + 8 + 64 {
+                    continue;
+                }
+                let new_data = format!(
+                    "{}{}{}",
+                    &data[..10], // "0x" + 8-char selector
+                    new_owner_hex_padded,
+                    &data[2 + 8 + 64..]
+                );
+                tx["data"] = JsonValue::String(new_data);
+                rewrites += 1;
+                bundle_changed = true;
+                logger::info(format!(
+                    "  {name}: rewrote transferOwnership({to}, …) → ({to}, {new_pending_owner:#x})"
+                ));
+            }
+        }
+
+        if bundle_changed {
+            fs::write(&path, serde_json::to_string_pretty(&bundle)?)
+                .with_context(|| format!("write {}", path.display()))?;
+        }
+    }
+    Ok(rewrites)
 }
 
 /// Pull `asset_tracker_proxy_addr` off the core prepare TOML. Same data

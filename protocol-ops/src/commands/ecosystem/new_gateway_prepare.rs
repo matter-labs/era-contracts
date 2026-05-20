@@ -18,7 +18,7 @@
 //! The script writes its bundle as abi-encoded `Call[]` into the
 //! `governance_calls_to_execute` field of an output TOML; the ecosystem
 //! merge in [`super::upgrade::write_merged_ecosystem_toml`] decodes that
-//! field and appends it to stage 2 of `<out>/prepare/ecosystem.toml`.
+//! field and appends it to stage 2 of `<env-out>/ecosystem.toml`.
 //!
 //! Two real-fork caveats worth flagging:
 //!

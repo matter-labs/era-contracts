@@ -135,11 +135,12 @@ export async function runV31UpgradeScenario(scenario: V31UpgradeScenario): Promi
       executeBundles: true,
     });
 
-    // `upgrade-prepare-all` writes a single merged `ecosystem.toml` directly
-    // under `<out>/prepare/`. It already contains stage-0/1/2 calls from core
-    // + every CTM concatenated in source-order — no per-script split anymore.
+    // `upgrade-prepare-all` writes a single merged `ecosystem.toml` at the
+    // canonical tracked path (`<env-out>/ecosystem.toml`, one level above
+    // `prepare/`). It already contains stage-0/1/2 calls from core + every
+    // CTM concatenated in source-order — no per-script split anymore.
     const prepareDir = path.join(upgradeHarnessInputs.protocolOpsOutDir, "prepare");
-    const mergedEcosystemToml = path.join(prepareDir, "ecosystem.toml");
+    const mergedEcosystemToml = path.join(upgradeHarnessInputs.protocolOpsOutDir, "ecosystem.toml");
     if (!fs.existsSync(mergedEcosystemToml)) {
       throw new Error(`Merged ecosystem TOML not emitted by upgrade-prepare-all: ${mergedEcosystemToml}`);
     }

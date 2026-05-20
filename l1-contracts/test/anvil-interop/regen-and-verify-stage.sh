@@ -200,7 +200,7 @@ if [[ "$SKIP_BROADCAST" == "1" && -f "$OUT/executed.json" ]]; then
   echo "=== Step 4: verify-upgrade (PUVT) ==="
   SNIFFED_SALT="$(sniff_create2_salts "$OUT/executed.json")"
   "$PROTOCOL_OPS" ecosystem verify-upgrade \
-    --ecosystem-toml "$OUT/prepare/ecosystem.toml" \
+    --ecosystem-toml "$OUT/ecosystem.toml" \
     --era-chain-id "$ERA_CHAIN_ID" \
     --executed-bundles "$OUT/executed.json" \
     --create2-salt "$SNIFFED_SALT" \
@@ -247,7 +247,7 @@ echo "=== Step 4: verify-upgrade (PUVT) ==="
 SNIFFED_SALT="$(sniff_create2_salts "$OUT/executed.json")"
 echo "  Using sniffed CREATE2 salt: $SNIFFED_SALT"
 "$PROTOCOL_OPS" ecosystem verify-upgrade \
-  --ecosystem-toml "$OUT/prepare/ecosystem.toml" \
+  --ecosystem-toml "$OUT/ecosystem.toml" \
   --era-chain-id "$ERA_CHAIN_ID" \
   --executed-bundles "$OUT/executed.json" \
   --create2-salt "$SNIFFED_SALT" \

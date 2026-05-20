@@ -206,7 +206,7 @@ docker run --rm \
   -v "$PWD/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output:/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output" \
   -w /contracts/l1-contracts \
   ghcr.io/matter-labs/protocol-ops:<branch>-regen \
-  yarn --cwd test/anvil-interop ts-node broadcast-deployer-bundle-to-sepolia.ts
+  yarn ts-node scripts/regen-via-docker.ts broadcast
 
 # 5. Emit the tx-simulator scenario (also in Docker since protocol_ops + the
 #    --include-manifest helper live there).
@@ -258,7 +258,7 @@ git commit -m "Regenerate v31 stage calldata"
 #    and only sends contracts not already deployed.
 DEPLOYER_PK_FILE=~/.test_pk \
 L1_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
-yarn --cwd test/anvil-interop ts-node broadcast-deployer-bundle-to-sepolia.ts
+yarn ts-node scripts/regen-via-docker.ts broadcast
 
 # 5. Emit the matching tx-simulator scenario (Safe-bundle JSON shape).
 #    --include-manifest pulls in deployer + SC + CTM-admin Safe bundles so

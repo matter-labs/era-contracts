@@ -2501,6 +2501,18 @@ impl GovernanceStage2Calls {
     /// = 15 calls. `setSettlementLayerStatus` is *only* emitted when
     /// `ctm_representative_chain_id == gateway_chain_id` — that branch isn't
     /// configured for stage today, so this verifier does not expect it.
+    ///
+    /// On top of those, when `[new_gateway].ecosystem_admin_calls_to_execute`
+    /// is non-empty, `write_merged_ecosystem_toml` folds those entries into
+    /// stage 2 too. For v31 stage that's a 2-call appendix:
+    ///   `[ setServerNotifier (on the source CTM, e.g. Atlas),
+    ///      acceptOwnership   (on the newly deployed GW ServerNotifier) ]`
+    /// Both are executed by PUH directly (no ChainAdmin wrap): the source
+    /// CTM's `setServerNotifier` is `onlyOwnerOrAdmin` (PUH owns the CTM
+    /// after stage 1), and bundle 07's `transferOwnership(...)` is rewritten
+    /// to put PUH on the pendingOwner slot so the acceptOwnership goes
+    /// through. See `protocol-ops/src/commands/ecosystem/upgrade.rs`
+    /// (`rewrite_transfer_ownership_targets`).
     pub(crate) async fn verify_artifact(
         &self,
         artifact: &EcosystemUpgradeArtifact,
@@ -2516,7 +2528,12 @@ impl GovernanceStage2Calls {
         } else {
             0
         };
-        let expected_call_count = canonical_count + gw_count;
+        // 2-call appendix folded in by `write_merged_ecosystem_toml` when the
+        // new-gateway prepare emits `ecosystem_admin_calls_to_execute` (PUH
+        // executes them directly post-bring-up): setServerNotifier on the
+        // source CTM + acceptOwnership on the new GW ServerNotifier.
+        let eco_admin_count = if artifact.new_gateway.is_some() { 2 } else { 0 };
+        let expected_call_count = canonical_count + gw_count + eco_admin_count;
 
         errors += verify_call_by_name(
             &self.calls,

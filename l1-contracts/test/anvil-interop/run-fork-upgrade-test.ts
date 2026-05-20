@@ -284,12 +284,16 @@ async function main(): Promise<void> {
     // After folding gov-upgrade.toml into governance.toml (#0dd085d53), this
     // is one TOML, not two.
     console.log(`\n=== Step 6: Executing governance calls (${elapsed()}) ===\n`);
-    // env-preset mode emits a merged `ecosystem.toml` (top-level
-    // [governance_calls]); the synthetic v30→v31 harness still writes
-    // `governance.toml`. Pick whichever exists.
-    const govTomlPath = [path.join(prepareDir, "ecosystem.toml"), path.join(prepareDir, "governance.toml")].find((p) =>
-      fs.existsSync(p)
-    );
+    // env-preset mode emits a merged `ecosystem.toml` at the canonical
+    // tracked path (`<env-out>/ecosystem.toml`, one level above `prepare/`).
+    // The synthetic v30→v31 harness still writes `governance.toml` inside
+    // `prepare/`. Pick whichever exists.
+    const envOutDir = path.dirname(prepareDir);
+    const govTomlPath = [
+      path.join(envOutDir, "ecosystem.toml"),
+      path.join(prepareDir, "ecosystem.toml"),
+      path.join(prepareDir, "governance.toml"),
+    ].find((p) => fs.existsSync(p));
     if (!govTomlPath) {
       throw new Error(`No governance/ecosystem TOML emitted by upgrade-prepare-all under ${prepareDir}`);
     }
