@@ -1,0 +1,317 @@
+# Human-readable descriptions for the v31-interopB stage simulator JSON.
+#
+# Loaded by `protocol_ops ecosystem governance-toml-to-simulator`. Each
+# `[[entries]]` block matches a tx by `(target, selector)` plus optional
+# discriminators. First match wins; unmatched txs keep their
+# auto-generated description (e.g. "protocol-ops governance stage1 call 14").
+#
+# Discriminators:
+#   - `arg0_address`: first 32-byte word after selector, interpreted as
+#     address. Used for `TPA.upgrade(<proxy>, <impl>)` variants.
+#   - `inner_target` / `inner_selector`: for wrappers — `ChainAdmin.multicall`
+#     (`0x69340beb`), legacy `Governance.scheduleTransparent` (`0x2c431917`),
+#     legacy `Governance.executeInstant` (`0x95218ecd`) — match against the
+#     FIRST inner call. Lets us distinguish bundle 1's four schedule/execute
+#     pairs and the per-CTM ChainAdmin multicalls.
+#
+# Address legend (Sepolia):
+#   0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE  Bridgehub proxy
+#   0xfD3130Ea0e8B7Dd61Ac3663328a66d97eb02f84b  L1AssetRouter proxy
+#   0x257CE1e946c9C6531E2C9deBF7fcf821F9467f73  NativeTokenVault proxy
+#   0xbC24BCE56929905B496dF21108708f138166Eb66  L1AssetTracker proxy (v31)
+#   0xCEe1A9d2FE1c587B72F115974d33296C1F9ac35d  ChainAssetHandler proxy
+#   0x25E04b7d1fC963aB8e5fEB0797f7a943E260e8b6  CTMDeploymentTracker (L1CtmDeployer)
+#   0x280D3AD9fbDE5daAaA8A5Df0EB7bA6E2bd5bc39f  MessageRoot proxy
+#   0x6F03861D12E6401623854E494beACd66BC46e6F0  L1Nullifier proxy
+#   0x73Bee414c6e006525F3CcEedf6d8004C0370502e  Atlas CTM (ZKsync OS) proxy
+#   0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b  Era CTM proxy
+#   0xc1f68A53695B55B346e0B136356D8fAbf798B629  New GW CTM proxy (chain 2708)
+#   0xBfaa733261500101996A10A231794263567d52ab  Existing ServerNotifier (in-place upgrade)
+#   0xc66f0b45c05cf654eec093650fd67865e85e8566  Legacy Governance (scheduleTransparent/executeInstant)
+#   0x8f08627524aeD610192132A425D6b9C32a1727EF  PUH (ProtocolUpgradeHandler proxy)
+#   0x191dE414bB2ed2A2EE895C5CE6Fa629EB93A79F1  PUH ProxyAdmin (OZ v5)
+#   0xcb7F8e556EF02771ea32F54e767D6f9742eD31c2  Ecosystem TransparentProxyAdmin (owned by PUH)
+#   0xff3582a0310916cd62442A4CA88Bf1C757D68938  Atlas CTM's standalone ProxyAdmin
+#   0xa6ed12b87d2e6ea039d27e1ffbdc24915ffd3042  Era ChainAdmin
+#   0x933dea2c4241b1537fdd6da277ea62841b490172  Atlas ChainAdmin
+#   0xe7b4bc7594ea29cf85748fec306b7255e8dc729b  GW ChainAdmin
+#   0xcc7F8449F7654FC6Ff0E7Cc90e4a759565624072  Era GovernanceUpgradeTimer
+#   0xEa77FE8D0742e28ef75b61968789D7cBAcb82978  ZKsync OS GovernanceUpgradeTimer
+#   0xD075f006Ebd3a677F88A8395883f884201106418  Era UpgradeStageValidator
+#   0xC46a13B4a633C8b64Bd5f64DF9391AB05Df1bEc8  ZKsync OS UpgradeStageValidator
+#   0xe5f57E8791281920C1E1FFBb0Bd70e3Bd4c18a4b  Existing ServerNotifier's ProxyAdmin (under Atlas ChainAdmin)
+#   0xf41D4478F1D6b8A096c0369B05C0b24ae00CC2dF  L1 ZK token (BridgedStandardERC20)
+#   0x7E38a259C353e72eEd3F5136c6E6534eb15C7199  Era ValidatorTimelock
+#   0x1E4299F7a19597E09bD8593AB7B68277183e9778  Atlas ValidatorTimelock
+
+# ─── Bundle 1: Legacy-Gov ceremony (from 0x5555…, target 0xc66f0b45…) ───
+
+[[entries]]
+target = "0xc66f0b45c05cf654eec093650fd67865e85e8566"
+selector = "0x2c431917"  # scheduleTransparent
+inner_target = "0x73Bee414c6e006525F3CcEedf6d8004C0370502e"  # Atlas CTM
+inner_selector = "0xf2fde38b"  # transferOwnership
+desc = "Legacy Gov: scheduleTransparent — Atlas CTM.transferOwnership(PUH). Queues setting Atlas CTM.pendingOwner = PUH (Ownable2Step; actual transfer happens via stage-0 acceptOwnership)."
+
+[[entries]]
+target = "0xc66f0b45c05cf654eec093650fd67865e85e8566"
+selector = "0x95218ecd"  # executeInstant
+inner_target = "0x73Bee414c6e006525F3CcEedf6d8004C0370502e"
+inner_selector = "0xf2fde38b"
+desc = "Legacy Gov: executeInstant — Atlas CTM.pendingOwner = PUH. Flushes the queued transferOwnership now (delay=0)."
+
+[[entries]]
+target = "0xc66f0b45c05cf654eec093650fd67865e85e8566"
+selector = "0x2c431917"
+inner_target = "0xff3582a0310916cd62442A4CA88Bf1C757D68938"  # Atlas CTM's ProxyAdmin
+inner_selector = "0xf2fde38b"
+desc = "Legacy Gov: scheduleTransparent — Atlas CTM ProxyAdmin.transferOwnership(PUH). Queues handing the PA (single-step Ownable v4) to PUH."
+
+[[entries]]
+target = "0xc66f0b45c05cf654eec093650fd67865e85e8566"
+selector = "0x95218ecd"
+inner_target = "0xff3582a0310916cd62442A4CA88Bf1C757D68938"
+inner_selector = "0xf2fde38b"
+desc = "Legacy Gov: executeInstant — Atlas CTM ProxyAdmin is now owned by PUH. PUH can now upgrade Atlas CTM impl in stage 1."
+
+# ─── Bundle 3: Era ChainAdmin multicall (from 0xd66949…) ───
+
+[[entries]]
+target = "0xa6ed12b87d2e6ea039d27e1ffbdc24915ffd3042"  # Era ChainAdmin
+selector = "0x69340beb"  # multicall
+desc = "Era ChainAdmin: multicall — administrative work on Era-owned proxies (e.g. ProxyAdmin or BytecodesSupplier upgrade) signed by Era ChainAdmin's owner (0xd66949…)."
+
+# ─── Bundle 4: Atlas ChainAdmin multicall — in-place ServerNotifier upgrade ───
+
+[[entries]]
+target = "0x933dea2c4241b1537fdd6da277ea62841b490172"  # Atlas ChainAdmin
+selector = "0x69340beb"  # multicall
+inner_target = "0xe5f57E8791281920C1E1FFBb0Bd70e3Bd4c18a4b"  # ProxyAdmin of existing ServerNotifier
+inner_selector = "0x99a88ec4"  # upgrade(address,address)
+desc = "Atlas ChainAdmin: multicall → ProxyAdmin(0xe5f57E87…).upgrade(ServerNotifier proxy 0xBfaa7332…, newImpl). IN-PLACE ServerNotifier upgrade — proxy address stays stable, off-chain server config doesn't need to change."
+
+# ─── Stage 0: PUH governance (timers + PUH/Guardians redeploy + acceptOwnership) ───
+
+[[entries]]
+target = "0xCEe1A9d2FE1c587B72F115974d33296C1F9ac35d"  # ChainAssetHandler
+selector = "0xac700e63"  # pauseMigration()
+desc = "PUH stage 0: ChainAssetHandler.pauseMigration() — freezes cross-chain migrations during the upgrade window so chain state can't move."
+
+[[entries]]
+target = "0xcc7F8449F7654FC6Ff0E7Cc90e4a759565624072"  # Era GovernanceUpgradeTimer
+selector = "0xa39f7449"  # startTimer()
+desc = "PUH stage 0: Era GovernanceUpgradeTimer.startTimer() — starts the Era-side deadline. Stage 1 will checkDeadline() against this."
+
+[[entries]]
+target = "0xEa77FE8D0742e28ef75b61968789D7cBAcb82978"  # ZKsyncOS GovernanceUpgradeTimer
+selector = "0xa39f7449"
+desc = "PUH stage 0: ZKsync OS GovernanceUpgradeTimer.startTimer() — same as above, for Atlas (ZKsync OS) chains."
+
+[[entries]]
+target = "0x191dE414bB2ed2A2EE895C5CE6Fa629EB93A79F1"  # PUH ProxyAdmin
+selector = "0x9623609d"  # upgradeAndCall(address,address,bytes)
+desc = "PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH_proxy, new_PUH_impl, empty) — upgrades the ProtocolUpgradeHandler proxy itself to a new impl (PUH/Guardians redeploy)."
+
+[[entries]]
+target = "0x8f08627524aeD610192132A425D6b9C32a1727EF"  # PUH (self)
+selector = "0x691616c5"  # updateGuardians(address)
+desc = "PUH stage 0: PUH.updateGuardians(new_guardians) — after impl swap, point PUH at the freshly deployed Guardians contract."
+
+[[entries]]
+target = "0x73Bee414c6e006525F3CcEedf6d8004C0370502e"  # Atlas CTM
+selector = "0x79ba5097"  # acceptOwnership()
+desc = "PUH stage 0: Atlas CTM.acceptOwnership() — completes the Ownable2Step transfer; PUH is now Atlas CTM owner. Deferred from AdminFunctions' pre-gov-accept-ownership TOML."
+
+# ─── Stage 1: PUH governance (per-CTM impl swaps, timer checks, version registration) ───
+
+# Ecosystem TPA upgrade calls — disambiguate by `arg0_address` (the proxy arg).
+# Resolved from the actual stage-1 calldata in 2026-05-20-v31-interopB-stage.json.
+[[entries]]
+target = "0xcb7F8e556EF02771ea32F54e767D6f9742eD31c2"  # Ecosystem TPA
+selector = "0x99a88ec4"  # upgrade(address,address)
+arg0_address = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"  # Bridgehub
+desc = "PUH stage 1: Ecosystem TPA.upgrade(Bridgehub 0x236d1c3f…, newImpl) — swaps Bridgehub impl to v31."
+
+[[entries]]
+target = "0xcb7F8e556EF02771ea32F54e767D6f9742eD31c2"
+selector = "0x99a88ec4"
+arg0_address = "0x6F03861D12E6401623854E494beACd66BC46e6F0"  # L1Nullifier
+desc = "PUH stage 1: Ecosystem TPA.upgrade(L1Nullifier 0x6f03861d…, newImpl) — swaps L1Nullifier impl to v31."
+
+[[entries]]
+target = "0xcb7F8e556EF02771ea32F54e767D6f9742eD31c2"
+selector = "0x99a88ec4"
+arg0_address = "0xfD3130Ea0e8B7Dd61Ac3663328a66d97eb02f84b"  # L1AssetRouter
+desc = "PUH stage 1: Ecosystem TPA.upgrade(L1AssetRouter 0xfd3130ea…, newImpl) — swaps L1AssetRouter impl to v31."
+
+[[entries]]
+target = "0xcb7F8e556EF02771ea32F54e767D6f9742eD31c2"
+selector = "0x99a88ec4"
+arg0_address = "0x257CE1e946c9C6531E2C9deBF7fcf821F9467f73"  # NTV
+desc = "PUH stage 1: Ecosystem TPA.upgrade(NativeTokenVault 0x257ce1e9…, newImpl) — swaps NTV impl to v31."
+
+[[entries]]
+target = "0xcb7F8e556EF02771ea32F54e767D6f9742eD31c2"
+selector = "0x9623609d"  # upgradeAndCall(address,address,bytes)
+arg0_address = "0x280D3AD9fbDE5daAaA8A5Df0EB7bA6E2bd5bc39f"  # MessageRoot
+desc = "PUH stage 1: Ecosystem TPA.upgradeAndCall(MessageRoot 0x280d3ad9…, newImpl, initData) — swaps MessageRoot impl + runs reinitializer."
+
+[[entries]]
+target = "0xcb7F8e556EF02771ea32F54e767D6f9742eD31c2"
+selector = "0x99a88ec4"
+arg0_address = "0x25E04b7d1fC963aB8e5fEB0797f7a943E260e8b6"  # CTMDeploymentTracker
+desc = "PUH stage 1: Ecosystem TPA.upgrade(CTMDeploymentTracker 0x25e04b7d…, newImpl) — swaps CTMDeploymentTracker impl to v31."
+
+[[entries]]
+target = "0xcb7F8e556EF02771ea32F54e767D6f9742eD31c2"
+selector = "0x99a88ec4"
+arg0_address = "0xCEe1A9d2FE1c587B72F115974d33296C1F9ac35d"  # ChainAssetHandler
+desc = "PUH stage 1: Ecosystem TPA.upgrade(ChainAssetHandler 0xcee1a9d2…, newImpl) — swaps ChainAssetHandler impl to v31."
+
+[[entries]]
+target = "0xcb7F8e556EF02771ea32F54e767D6f9742eD31c2"
+selector = "0x99a88ec4"
+arg0_address = "0xbC24BCE56929905B496dF21108708f138166Eb66"  # L1AssetTracker
+desc = "PUH stage 1: Ecosystem TPA.upgrade(L1AssetTracker 0xbc24bce5…, newImpl) — swaps L1AssetTracker impl to v31."
+
+[[entries]]
+target = "0xcb7F8e556EF02771ea32F54e767D6f9742eD31c2"
+selector = "0x99a88ec4"
+arg0_address = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"  # Era CTM
+desc = "PUH stage 1: Ecosystem TPA.upgrade(Era CTM 0x8b448ac7…, newImpl) — swaps Era CTM impl to v31."
+
+[[entries]]
+target = "0xcb7F8e556EF02771ea32F54e767D6f9742eD31c2"
+selector = "0x99a88ec4"
+arg0_address = "0x7E38a259C353e72eEd3F5136c6E6534eb15C7199"  # Era ValidatorTimelock
+desc = "PUH stage 1: Ecosystem TPA.upgrade(Era ValidatorTimelock 0x7e38a259…, newImpl) — swaps Era ValidatorTimelock impl to v31."
+
+# Atlas CTM has its OWN ProxyAdmin (0xff3582a0…), not the ecosystem TPA.
+# It's used to upgrade both the Atlas CTM diamond AND the Atlas ValidatorTimelock.
+[[entries]]
+target = "0xff3582a0310916cd62442A4CA88Bf1C757D68938"  # Atlas CTM ProxyAdmin
+selector = "0x99a88ec4"
+arg0_address = "0x73Bee414c6e006525F3CcEedf6d8004C0370502e"  # Atlas CTM
+desc = "PUH stage 1: Atlas CTM ProxyAdmin.upgrade(Atlas CTM 0x73bee414…, newImpl). PUH owns this PA now (bundle 1 + stage 0 set it up)."
+
+[[entries]]
+target = "0xff3582a0310916cd62442A4CA88Bf1C757D68938"
+selector = "0x99a88ec4"
+arg0_address = "0x1E4299F7a19597E09bD8593AB7B68277183e9778"  # Atlas ValidatorTimelock
+desc = "PUH stage 1: Atlas CTM ProxyAdmin.upgrade(Atlas ValidatorTimelock 0x1e4299f7…, newImpl) — swaps Atlas ValidatorTimelock impl to v31."
+
+# PUH ProxyAdmin upgradeAndCall on PUH itself (stage 0 call 4).
+[[entries]]
+target = "0x191dE414bB2ed2A2EE895C5CE6Fa629EB93A79F1"  # PUH ProxyAdmin
+selector = "0x9623609d"  # upgradeAndCall
+arg0_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"  # PUH proxy
+desc = "PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH proxy 0x8f086275…, newImpl, empty) — upgrades the ProtocolUpgradeHandler proxy itself (PUH/Guardians redeploy)."
+
+# L1AssetTracker.acceptOwnership — PUH accepts ownership of L1AT that the deployer created+transferred in phase 2.
+[[entries]]
+target = "0xbC24BCE56929905B496dF21108708f138166Eb66"  # L1AssetTracker
+selector = "0x79ba5097"  # acceptOwnership
+desc = "PUH stage 1: L1AssetTracker.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns L1AT."
+
+[[entries]]
+target = "0x257CE1e946c9C6531E2C9deBF7fcf821F9467f73"  # NTV
+selector = "0x39d44b2c"  # placeholder selector for setAssetTracker (replace if different)
+desc = "PUH stage 1: NTV.setAssetTracker(L1AssetTracker) — wires NTV to push balance updates to the L1AT."
+
+[[entries]]
+target = "0xCEe1A9d2FE1c587B72F115974d33296C1F9ac35d"  # CAH
+selector = "0xc4d66de8"  # initialize / setAddresses (replace if needed)
+desc = "PUH stage 1: ChainAssetHandler.setAddresses(...) — post-upgrade pointer fixups for bridgehub/AR/AT/etc."
+
+[[entries]]
+target = "0xcc7F8449F7654FC6Ff0E7Cc90e4a759565624072"  # Era GovUpgradeTimer
+selector = "0x43bf9936"  # checkDeadline()
+desc = "PUH stage 1: Era GovernanceUpgradeTimer.checkDeadline() — asserts the deadline window started in stage 0 has elapsed (sim injects evm_increaseTime)."
+
+[[entries]]
+target = "0xEa77FE8D0742e28ef75b61968789D7cBAcb82978"  # ZKsyncOS GovUpgradeTimer
+selector = "0x43bf9936"
+desc = "PUH stage 1: ZKsync OS GovernanceUpgradeTimer.checkDeadline() — same as above for Atlas chains."
+
+[[entries]]
+target = "0xD075f006Ebd3a677F88A8395883f884201106418"  # Era UpgradeStageValidator
+selector = "0x386584cf"  # checkMigrationsPaused
+desc = "PUH stage 1: Era UpgradeStageValidator.checkMigrationsPaused() — sanity check that stage-0 pauseMigration took effect on Era chains."
+
+[[entries]]
+target = "0xC46a13B4a633C8b64Bd5f64DF9391AB05Df1bEc8"  # ZKsyncOS UpgradeStageValidator
+selector = "0x386584cf"
+desc = "PUH stage 1: ZKsync OS UpgradeStageValidator.checkMigrationsPaused() — same as above for Atlas chains."
+
+# Era CTM admin work.
+[[entries]]
+target = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"  # Era CTM
+selector = "0x9b016b8b"  # setChainCreationParams
+desc = "PUH stage 1: Era CTM.setChainCreationParams(...) — sets v31 chain-creation params (bootloader, defaultAA, genesis, evmEmulator)."
+
+[[entries]]
+target = "0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b"
+selector = "0x8265f458"  # setNewVersionUpgrade
+desc = "PUH stage 1: Era CTM.setNewVersionUpgrade(diamondCut, oldVer, oldEnd, newVer) — registers the v31 upgrade hash on Era CTM. Era chains roll forward when they next call upgradeChainFromVersion."
+
+[[entries]]
+target = "0x73Bee414c6e006525F3CcEedf6d8004C0370502e"  # Atlas CTM
+selector = "0x9b016b8b"
+desc = "PUH stage 1: Atlas CTM.setChainCreationParams(...) — sets v31 chain-creation params for Atlas (ZKsync OS)."
+
+[[entries]]
+target = "0x73Bee414c6e006525F3CcEedf6d8004C0370502e"
+selector = "0x8265f458"
+desc = "PUH stage 1: Atlas CTM.setNewVersionUpgrade(...) — registers v31 upgrade hash on Atlas CTM."
+
+# ─── Stage 2: PUH governance (activation + new-Gateway bring-up) ───
+
+[[entries]]
+target = "0xCEe1A9d2FE1c587B72F115974d33296C1F9ac35d"  # CAH
+selector = "0xf7c7eb92"  # unpauseMigration
+desc = "PUH stage 2: ChainAssetHandler.unpauseMigration() — re-enables cross-chain migrations now that all impls are swapped."
+
+[[entries]]
+target = "0xD075f006Ebd3a677F88A8395883f884201106418"
+selector = "0x386584cf"  # also used for checkProtocolUpgradePresence variant — exact sel may differ
+desc = "PUH stage 2: Era UpgradeStageValidator post-upgrade sanity (protocol-upgrade-presence or migrations-unpaused)."
+
+[[entries]]
+target = "0xC46a13B4a633C8b64Bd5f64DF9391AB05Df1bEc8"
+selector = "0x386584cf"
+desc = "PUH stage 2: ZKsync OS UpgradeStageValidator post-upgrade sanity."
+
+# L1AssetTracker.registerLegacyToken(ZK_ASSET_ID) — must run BEFORE any GW priority deposit.
+[[entries]]
+target = "0xbC24BCE56929905B496dF21108708f138166Eb66"  # L1AssetTracker
+selector = "0xf711f28a"  # registerLegacyToken(bytes32)
+desc = "PUH stage 2: L1AssetTracker.registerLegacyToken(ZK_ASSET_ID) — registers the ZK token so subsequent priority deposits using ZK as base token pass _requireRegistered. Prepended automatically by write_merged_ecosystem_toml when [new_gateway] is present."
+
+# ZK token approvals before each GW-priority deposit.
+[[entries]]
+target = "0xf41D4478F1D6b8A096c0369B05C0b24ae00CC2dF"  # L1 ZK token
+selector = "0x095ea7b3"  # approve(address,uint256)
+desc = "PUH stage 2: ZK.approve(L1AssetRouter, mintValue) — approves the upcoming requestL2TransactionDirect/TwoBridges to burn ZK from PUH as base-token."
+
+# requestL2TransactionDirect — direct L1→L2 priority deposit on GW (chain 2708).
+[[entries]]
+target = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"  # Bridgehub
+selector = "0xd52471c1"  # requestL2TransactionDirect
+desc = "PUH stage 2: Bridgehub.requestL2TransactionDirect — L1→L2 priority deposit on GW (chain 2708) carrying an admin call on the L2 (e.g. addChainTypeManager, acceptOwnership, setChainBatchOverheadL1Gas)."
+
+# requestL2TransactionTwoBridges — L1→L2 priority via second bridge (AR or CTMDeploymentTracker).
+[[entries]]
+target = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
+selector = "0x24fd57fb"  # requestL2TransactionTwoBridges
+desc = "PUH stage 2: Bridgehub.requestL2TransactionTwoBridges — L1→L2 priority via a second bridge (L1AssetRouter for setAssetHandler / CTMDeploymentTracker for CTM asset registration)."
+
+# L1-side asset/CTM registrations.
+[[entries]]
+target = "0xfD3130Ea0e8B7Dd61Ac3663328a66d97eb02f84b"  # L1AssetRouter
+selector = "0x12f43dab"  # setAssetDeploymentTracker(bytes32,address) — replace if exact sel differs
+desc = "PUH stage 2: L1AssetRouter.setAssetDeploymentTracker(GW CTM assetId, ctmDeploymentTracker) — L1-side wiring for CTM asset dispatch."
+
+[[entries]]
+target = "0x25E04b7d1fC963aB8e5fEB0797f7a943E260e8b6"  # CTMDeploymentTracker
+selector = "0x12f43dab"  # registerCTMAssetOnL1(address) — replace if exact sel differs
+desc = "PUH stage 2: CTMDeploymentTracker.registerCTMAssetOnL1(GW CTM proxy) — registers the new GW CTM as an asset L1 can route to."

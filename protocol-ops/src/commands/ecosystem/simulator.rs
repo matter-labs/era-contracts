@@ -3,12 +3,179 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use clap::Parser;
+use ethers::abi::{decode as abi_decode, ParamType};
 use ethers::types::Address;
 use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 
 use crate::common::governance_calls::decode_calls;
 use crate::common::logger;
+
+/// Optional human-description registry. Loaded from a TOML at
+/// `<env>/sim-descriptions.toml` (auto-discovered from `--env`) or via an
+/// explicit `--descriptions` flag. Each `[[entries]]` matches a sim tx by
+/// `(target, selector)` plus an optional discriminator — first matching
+/// entry wins; non-matching txs keep their auto-generated description.
+///
+/// Discriminators:
+/// - `arg0_address`: the first 32-byte word after the selector, decoded as
+///   an address. Disambiguates same-`(target, selector)` calls with
+///   different first args (e.g. `TPA.upgrade(<proxy>, <impl>)` across
+///   multiple proxies in stage 1).
+/// - `inner_target` + `inner_selector`: for *wrapper* selectors
+///   (`ChainAdmin.multicall`, legacy `Governance.scheduleTransparent` /
+///   `executeInstant`), match against the FIRST inner call's target and/or
+///   selector. Used for the bundle-1 legacy-Gov ceremony pairs and the
+///   ChainAdmin multicalls in bundles 3/4.
+#[derive(Debug, Default, Deserialize)]
+struct SimDescriptionRegistry {
+    #[serde(default)]
+    entries: Vec<SimDescriptionEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SimDescriptionEntry {
+    target: Address,
+    selector: String,
+    #[serde(default)]
+    arg0_address: Option<Address>,
+    #[serde(default)]
+    inner_target: Option<Address>,
+    #[serde(default)]
+    inner_selector: Option<String>,
+    desc: String,
+}
+
+impl SimDescriptionRegistry {
+    fn lookup(&self, target: Address, data_hex: &str) -> Option<String> {
+        let selector = data_hex.get(..10)?;
+        let inner = parse_first_inner_call(data_hex);
+        for entry in &self.entries {
+            if entry.target != target {
+                continue;
+            }
+            if !entry.selector.eq_ignore_ascii_case(selector) {
+                continue;
+            }
+            if let Some(want) = entry.arg0_address {
+                let arg0_hex = data_hex.get(10..74)?;
+                let parsed: Address = format!("0x{}", &arg0_hex[24..]).parse().ok()?;
+                if parsed != want {
+                    continue;
+                }
+            }
+            if entry.inner_target.is_some() || entry.inner_selector.is_some() {
+                let (inner_target, inner_selector) = inner.as_ref()?;
+                if let Some(want) = entry.inner_target {
+                    if *inner_target != want {
+                        continue;
+                    }
+                }
+                if let Some(ref want_sel) = entry.inner_selector {
+                    if !want_sel.eq_ignore_ascii_case(inner_selector) {
+                        continue;
+                    }
+                }
+            }
+            return Some(entry.desc.clone());
+        }
+        None
+    }
+}
+
+/// For wrapper calls — `ChainAdmin.multicall`, `Governance.scheduleTransparent`,
+/// `Governance.executeInstant` — return the first inner `Call`'s target and
+/// 4-byte selector. Returns `None` for unrecognised wrappers (the registry
+/// then falls back to plain `(target, selector)` matching).
+fn parse_first_inner_call(data_hex: &str) -> Option<(Address, String)> {
+    let bytes = hex::decode(data_hex.trim_start_matches("0x")).ok()?;
+    if bytes.len() < 4 {
+        return None;
+    }
+    let selector = u32::from_be_bytes(bytes[..4].try_into().ok()?);
+    let body = &bytes[4..];
+
+    let call_type = ParamType::Tuple(vec![
+        ParamType::Address,
+        ParamType::Uint(256),
+        ParamType::Bytes,
+    ]);
+    let operation_type = ParamType::Tuple(vec![
+        ParamType::Array(Box::new(call_type.clone())),
+        ParamType::FixedBytes(32),
+        ParamType::FixedBytes(32),
+    ]);
+
+    let calls_array = match selector {
+        // multicall((address,uint256,bytes)[], bool)
+        0x69340beb => {
+            let tokens = abi_decode(
+                &[ParamType::Array(Box::new(call_type)), ParamType::Bool],
+                body,
+            )
+            .ok()?;
+            tokens.into_iter().next()?.into_array()?
+        }
+        // scheduleTransparent((Call[], bytes32, bytes32), uint256)
+        0x2c431917 => {
+            let tokens = abi_decode(&[operation_type, ParamType::Uint(256)], body).ok()?;
+            tokens.into_iter().next()?.into_tuple()?.into_iter().next()?.into_array()?
+        }
+        // executeInstant((Call[], bytes32, bytes32))
+        0x95218ecd => {
+            let tokens = abi_decode(&[operation_type], body).ok()?;
+            tokens.into_iter().next()?.into_tuple()?.into_iter().next()?.into_array()?
+        }
+        _ => return None,
+    };
+
+    let first = calls_array.into_iter().next()?.into_tuple()?;
+    let mut it = first.into_iter();
+    let target = it.next()?.into_address()?;
+    let _value = it.next()?;
+    let inner_data = it.next()?.into_bytes()?;
+    if inner_data.len() < 4 {
+        return None;
+    }
+    Some((target, format!("0x{}", hex::encode(&inner_data[..4]))))
+}
+
+fn load_descriptions(path: Option<&Path>) -> SimDescriptionRegistry {
+    let path = match path {
+        Some(p) => p,
+        None => return SimDescriptionRegistry::default(),
+    };
+    if !path.exists() {
+        return SimDescriptionRegistry::default();
+    }
+    let raw = match fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(err) => {
+            logger::info(format!(
+                "Couldn't read {} ({err}); using auto-generated descriptions",
+                path.display()
+            ));
+            return SimDescriptionRegistry::default();
+        }
+    };
+    match toml::from_str::<SimDescriptionRegistry>(&raw) {
+        Ok(reg) => {
+            logger::info(format!(
+                "Loaded {} sim description override(s) from {}",
+                reg.entries.len(),
+                path.display()
+            ));
+            reg
+        }
+        Err(err) => {
+            logger::info(format!(
+                "Couldn't parse {} ({err}); using auto-generated descriptions",
+                path.display()
+            ));
+            SimDescriptionRegistry::default()
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct GovernanceTomlToSimulatorArgs {
@@ -65,6 +232,14 @@ pub struct GovernanceTomlToSimulatorArgs {
     /// the CREATE2 deployer, but an explicit list is safer).
     #[clap(long, value_delimiter = ',', num_args = 1..)]
     pub camp_a_signers: Vec<Address>,
+
+    /// Optional path to a `sim-descriptions.toml` that overrides each
+    /// emitted tx's `description` field with a human-readable string keyed by
+    /// `(target, selector)` (+ optional discriminators). Auto-discovered at
+    /// `upgrade-envs/v0.31.0-interopB/<env>/sim-descriptions.toml` when
+    /// `--env` is set and the file exists.
+    #[clap(long)]
+    pub descriptions: Option<PathBuf>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -198,6 +373,22 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
         }),
     };
 
+    // Resolve descriptions registry: explicit `--descriptions` wins; otherwise
+    // auto-discover the file alongside the env config TOML (one level up from
+    // `<env-out>/`). For the v31 stage env that's
+    // `upgrade-envs/v0.31.0-interopB/sim-descriptions.toml`.
+    let descriptions_path = args.descriptions.or_else(|| {
+        env_cfg.as_ref().and_then(|cfg| {
+            crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)
+                .ok()
+                .and_then(|out| out.parent().map(|p| p.to_path_buf()))
+                .and_then(|out_parent| out_parent.parent().map(|p| p.to_path_buf()))
+                .map(|root| root.join("sim-descriptions.toml"))
+                .filter(|p| p.is_file())
+        })
+    });
+    let descriptions = load_descriptions(descriptions_path.as_deref());
+
     // Manifest bundles come FIRST (Camp-B setup the sim impersonates), then
     // governance stages 0/1/2. Order matters: setup writes the state
     // (pendingOwner, verifier registry, etc.) that the gov calls then read.
@@ -207,11 +398,11 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
             "Including manifest bundles from {}",
             manifest.display()
         ));
-        let extra = manifest_to_simulator_transactions(manifest, &network, &args.camp_a_signers)
+        let extra = manifest_to_simulator_transactions(manifest, &network, &args.camp_a_signers, &descriptions)
             .with_context(|| format!("failed to expand manifest bundles {}", manifest.display()))?;
         transactions.extend(extra);
     }
-    let governance = governance_toml_to_simulator_transactions(&governance_toml, &network, from)
+    let governance = governance_toml_to_simulator_transactions(&governance_toml, &network, from, &descriptions)
         .with_context(|| {
             format!(
                 "failed to convert governance TOML {}",
@@ -250,6 +441,7 @@ fn manifest_to_simulator_transactions(
     manifest_path: &Path,
     network: &str,
     explicit_camp_a: &[Address],
+    descriptions: &SimDescriptionRegistry,
 ) -> anyhow::Result<Vec<SimulatorTransaction>> {
     let manifest_dir = manifest_path.parent().ok_or_else(|| {
         anyhow::anyhow!("manifest path has no parent: {}", manifest_path.display())
@@ -338,14 +530,15 @@ fn manifest_to_simulator_transactions(
             } else {
                 None
             };
+            let _ = (label.as_str(), kept_total); // kept for `tag` parity; not used in description
+            let description = descriptions
+                .lookup(tx.to, &tx.data)
+                .unwrap_or_else(|| {
+                    let selector = tx.data.get(..10).unwrap_or("0x");
+                    format!("[unlabelled] to={:#x} sel={selector} (bundle {} tx {})", tx.to, bundle.index, idx + 1)
+                });
             out.push(SimulatorTransaction {
-                description: format!(
-                    "protocol-ops manifest bundle {} ({}) tx {}/{}",
-                    bundle.index,
-                    label,
-                    idx + 1,
-                    kept_total
-                ),
+                description,
                 network: network.to_string(),
                 from: format!("{:#x}", bundle.target),
                 to: format!("{:#x}", tx.to),
@@ -364,6 +557,7 @@ fn governance_toml_to_simulator_transactions(
     path: &PathBuf,
     network: &str,
     from: Address,
+    descriptions: &SimDescriptionRegistry,
 ) -> anyhow::Result<Vec<SimulatorTransaction>> {
     let content =
         fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
@@ -408,8 +602,14 @@ fn governance_toml_to_simulator_transactions(
             } else {
                 None
             };
+            let description = descriptions
+                .lookup(call.target, &data_hex)
+                .unwrap_or_else(|| {
+                    let selector = data_hex.get(..10).unwrap_or("0x");
+                    format!("[unlabelled] stage{stage} call {} to={:#x} sel={selector}", idx + 1, call.target)
+                });
             out.push(SimulatorTransaction {
-                description: format!("protocol-ops governance stage{stage} call {}", idx + 1),
+                description,
                 network: network.to_string(),
                 from: format!("{from:#x}"),
                 to: format!("{:#x}", call.target),
