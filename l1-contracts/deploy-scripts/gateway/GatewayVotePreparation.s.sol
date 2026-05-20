@@ -23,6 +23,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
@@ -65,6 +66,17 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
     GatewayCTMOutput internal output;
 
     uint256 constant EXPECTED_MAX_L1_GAS_PRICE = 50 gwei;
+
+    /// Packed protocol version of v31.0.0 — anything `>=` this exposes the
+    /// `serverNotifierAddress()` getter directly. Pre-v31 CTMs predate the
+    /// getter, so we fall back to a raw storage load. Temporary shim: once
+    /// every active CTM is upgraded past v31 this branch can be deleted.
+    uint256 constant MIN_V31_PROTOCOL_VERSION = 0x1F00000000;
+    /// Storage slot of `ChainTypeManagerBase.serverNotifierAddress`. Confirmed
+    /// via `forge inspect ChainTypeManagerBase storage-layout`. Stays at the
+    /// same slot across v30 → v31 (verified by reading the slot on both Atlas
+    /// (v30.1) and Era (older) CTM on Sepolia). Drop with the version branch.
+    bytes32 constant SERVER_NOTIFIER_ADDRESS_SLOT = bytes32(uint256(164));
 
     uint256 internal eraChainId;
 
@@ -255,6 +267,19 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin, false);
     }
 
+    /// Read the CTM's existing ServerNotifier proxy from chain. v31+ CTMs
+    /// expose a `serverNotifierAddress()` getter; pre-v31 CTMs hold the same
+    /// field at slot 164 but lack the getter, so we read storage directly.
+    /// Returns `address(0)` when the CTM never had one — caller takes the
+    /// deploy-new path in that case.
+    function _resolveExistingServerNotifier(address _ctm) internal view returns (address existing) {
+        if (IChainTypeManager(_ctm).protocolVersion() >= MIN_V31_PROTOCOL_VERSION) {
+            existing = IChainTypeManager(_ctm).serverNotifierAddress();
+        } else {
+            existing = address(uint160(uint256(vm.load(_ctm, SERVER_NOTIFIER_ADDRESS_SLOT))));
+        }
+    }
+
     function prepareForGWVoting(address bridgehubProxy, uint256 ctmRepresentativeChainId) public {
         console.log("Setting up the Gateway script");
 
@@ -271,6 +296,12 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 gatewayChainId: gatewayChainId
             })
         );
+
+        // If a ServerNotifier is already deployed for this CTM, upgrade it in
+        // place so the proxy address stays stable for off-chain services (the
+        // server polls a hardcoded address). Only deploy a fresh proxy when
+        // the CTM has never had one — initial gateway-setup case.
+        serverNotifier = _resolveExistingServerNotifier(ctm);
 
         Call[] memory ecosystemAdminCalls;
         if (serverNotifier == address(0)) {
@@ -293,6 +324,11 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
             });
         }
+        // else: existing ServerNotifier proxy stays in place. The per-CTM
+        // upgrade flow (`DefaultCTMUpgrade.prepareUpgradeServerNotifierCall`)
+        // already emits a `ProxyAdmin.upgrade(existing, newImpl)` for it, so
+        // GatewayVotePreparation has no extra work to do — `ecosystemAdminCalls`
+        // is left empty (length 0).
 
         // Firstly, we deploy Gateway CTM
         deployGatewayCTM();

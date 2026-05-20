@@ -43,6 +43,31 @@ const GAS_ESTIMATE_BUFFER_BPS: u64 = 12_500;
 /// ~30M on a quiet chain; we cap below that so a single tx can never equal
 /// or exceed the block limit (which reth rejects with `gas limit too high`).
 const PER_TX_GAS_LIMIT_CAP: u64 = 20_000_000;
+/// Floor gas price (1 gwei). Used when the node returns `eth_gasPrice` below
+/// it (anvil/reth on a quiet local chain reports near-zero).
+const GAS_PRICE_FLOOR_WEI: u64 = 1_000_000_000;
+/// Multiplier (in basis points) applied to live `eth_gasPrice` so our txs
+/// outbid the base-fee floor on a busy public chain (Sepolia / mainnet). 300%
+/// gives us ~3x headroom over chain median which is what gets txs included
+/// within 1-2 blocks instead of hanging in the mempool for 30+ minutes.
+const GAS_PRICE_MULTIPLIER_BPS: u64 = 30_000;
+
+/// Returns a legacy `gasPrice` that's high enough to land within ~1-2 blocks
+/// on busy public chains, but never below `GAS_PRICE_FLOOR_WEI` so local
+/// chains (anvil/reth at 0 base fee) still get a non-zero price. We use
+/// legacy (type-0) txs throughout this binary so an EIP-1559 split isn't
+/// needed.
+async fn resolve_gas_price<M: Middleware>(client: &M) -> anyhow::Result<U256>
+where
+    M::Error: std::error::Error + Send + Sync + 'static,
+{
+    let live = client
+        .get_gas_price()
+        .await
+        .map_err(|e| anyhow::anyhow!("eth_gasPrice failed: {e}"))?;
+    let bumped = live.saturating_mul(U256::from(GAS_PRICE_MULTIPLIER_BPS)) / U256::from(10_000);
+    Ok(std::cmp::max(bumped, U256::from(GAS_PRICE_FLOOR_WEI)))
+}
 
 /// Execute a Gnosis Safe Transaction Builder JSON bundle: parse the
 /// `transactions` array, sign each call locally under `--private-key`, and
@@ -159,6 +184,18 @@ pub(crate) async fn execute_one_bundle(
         .await
         .context("eth_getTransactionCount(pending)")?;
 
+    // Resolve gas price once for the whole bundle. We dispatch back-to-back
+    // so a single snapshot is fine; if Sepolia gas spikes mid-bundle we'll
+    // see slow blocks rather than dropped txs (still better than the old
+    // hardcoded 1-gwei sub-base-fee behaviour).
+    let gas_price = resolve_gas_price(&client)
+        .await
+        .context("resolve gas price")?;
+    logger::info(format!(
+        "Using gas price {} gwei",
+        ethers::utils::format_units(gas_price, "gwei").unwrap_or_else(|_| gas_price.to_string()),
+    ));
+
     // Per-bundle tx log, persisted to `--out` after every tx so that even
     // a partial run leaves usable data behind for verify-upgrade.
     let mut executed: ExecutedBundle = match out_path {
@@ -236,7 +273,7 @@ pub(crate) async fn execute_one_bundle(
             .value(value)
             .chain_id(chain_id)
             .gas(gas_limit)
-            .gas_price(1_000_000_000u64)
+            .gas_price(gas_price)
             .nonce(base_nonce + idx);
 
         let pending = client
@@ -343,6 +380,14 @@ pub(crate) async fn execute_one_bundle_unlocked(
         .await
         .context("eth_getTransactionCount(pending)")?;
 
+    let gas_price = resolve_gas_price(&provider)
+        .await
+        .context("resolve gas price")?;
+    logger::info(format!(
+        "Using gas price {} gwei",
+        ethers::utils::format_units(gas_price, "gwei").unwrap_or_else(|_| gas_price.to_string()),
+    ));
+
     // Same accumulating-write shape as `execute_one_bundle`: load any
     // existing log so multiple bundles into the same `--out` path stack in
     // execution order (consumed by `ecosystem verify-upgrade --executed-bundles`).
@@ -408,7 +453,7 @@ pub(crate) async fn execute_one_bundle_unlocked(
             .value(value)
             .chain_id(chain_id)
             .gas(gas_limit)
-            .gas_price(1_000_000_000u64)
+            .gas_price(gas_price)
             .nonce(base_nonce + idx);
 
         let pending = provider

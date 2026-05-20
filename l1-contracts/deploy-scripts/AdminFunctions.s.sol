@@ -216,6 +216,16 @@ contract AdminFunctions is Script, IAdminFunctions {
         uint256[] memory chainIds = IL1Bridgehub(_bridgehub).getAllZKChainChainIDs();
         address[] memory seenCtms = new address[](chainIds.length);
         uint256 seenCtmCount = 0;
+
+        // `acceptOwnership()` on each Ownable2Step CTM whose pendingOwner is
+        // `_governance` must execute as PUH on real chain — which means going
+        // through PUH's governance flow, not impersonation. We collect these
+        // calls here and persist them so protocol-ops folds them into stage 0
+        // of governance_calls in the merged ecosystem.toml. Sized to
+        // chainIds.length (max possible), trimmed before serialization.
+        Call[] memory acceptCalls = new Call[](chainIds.length);
+        uint256 acceptCount = 0;
+
         for (uint256 i = 0; i < chainIds.length; i++) {
             address ctm = IL1Bridgehub(_bridgehub).chainTypeManager(chainIds[i]);
             bool already = false;
@@ -234,18 +244,17 @@ contract AdminFunctions is Script, IAdminFunctions {
                 _issueAsOwner(ctmOwner, ctm, abi.encodeCall(Ownable2Step.transferOwnership, (_governance)), _wraps);
             }
             if (ctmOwnable.pendingOwner() == _governance) {
-                // `_governance` (PUH on stage/mainnet) has no key — on a fork
-                // we impersonate it, on a real chain this acceptOwnership must
-                // become a stage-0 governance call. The fork case is the only
-                // one this helper supports today.
-                _anvilFund(_governance);
-                vm.startBroadcast(_governance);
-                ctmOwnable.acceptOwnership();
-                vm.stopBroadcast();
+                acceptCalls[acceptCount++] = Call({
+                    target: ctm,
+                    value: 0,
+                    data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
+                });
             }
 
             _ensureProxyAdminOwnedByGovernance(ctm, _governance, _wraps);
         }
+
+        _savePreGovernanceAcceptOwnershipCalls(acceptCalls, acceptCount);
 
         // Bridgehub-discoverable ecosystem proxies. Mirrors the contracts visited
         // by `governanceAcceptOwnerAggregated`, since the same ProxyAdmins gate
@@ -278,6 +287,27 @@ contract AdminFunctions is Script, IAdminFunctions {
             return;
         }
         _issueAsOwner(paOwner, proxyAdmin, abi.encodeCall(IOwnableSingleStep.transferOwnership, (_governance)), _wraps);
+    }
+
+    /// Persist the trimmed `acceptOwnership()` Call list to a TOML so
+    /// `protocol_ops ecosystem upgrade-prepare-all` can fold it into stage 0
+    /// of the merged governance_calls. Always written (even when empty) so
+    /// the Rust side can `vm.readFile` unconditionally.
+    function _savePreGovernanceAcceptOwnershipCalls(Call[] memory _calls, uint256 _count) private {
+        Call[] memory trimmed = new Call[](_count);
+        for (uint256 i = 0; i < _count; i++) {
+            trimmed[i] = _calls[i];
+        }
+        string memory toml = vm.serializeBytes(
+            "pre_governance_accept_ownerships",
+            "calls",
+            abi.encode(trimmed)
+        );
+        string memory path = string.concat(
+            vm.projectRoot(),
+            "/script-out/pre-governance-accept-ownerships.toml"
+        );
+        vm.writeToml(toml, path);
     }
 
     /// Execute zero-value calls against Ownable targets as their current

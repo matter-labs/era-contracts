@@ -271,6 +271,99 @@ function computeCreate2Address(txData: string): string | null {
   }
 }
 
+/**
+ * Custom-error selectors that mean "this on-chain state is already what the
+ * call would set" — i.e. the tx is a no-op against current state and would
+ * revert if broadcast. Keep this small and additive: each entry corresponds
+ * to a v31-flow setter where re-broadcasting is benign (the registry holds
+ * the same `(slot → value)` mapping the call wants to write). Don't add
+ * generic Ownable reverts here — those can also mean "wrong caller".
+ *
+ * Resolved by `cast 4byte` / l1-contracts/selectors:
+ * - 0x0dfb42bf = AddressAlreadySet(address)         (DualVerifier.addVerifier)
+ * - 0x1a21feed = OperationExists()                  (legacy Gov scheduleTransparent)
+ * - 0xeda2fbb1 = OperationMustBePending()           (legacy Gov executeInstant after Done)
+ * - 0x883fc41b = V31UpgradeChainBatchNumberAlreadySet()
+ * - 0x5d03f19d = CurrentBatchNumberAlreadySet()
+ * - 0x7d769244 = MemberAlreadyExists(address)
+ * - 0x24591d89 = ChainIdAlreadyExists()
+ * - 0x7f9159de = BaseTokenPreV31TotalSupplyAlreadySet()
+ */
+const IDEMPOTENT_ERROR_SELECTORS: Record<string, string> = {
+  "0x0dfb42bf": "AddressAlreadySet",
+  "0x1a21feed": "OperationExists",
+  "0xeda2fbb1": "OperationMustBePending",
+  "0x883fc41b": "V31UpgradeChainBatchNumberAlreadySet",
+  "0x5d03f19d": "CurrentBatchNumberAlreadySet",
+  "0x7d769244": "MemberAlreadyExists",
+  "0x24591d89": "ChainIdAlreadyExists",
+  "0x7f9159de": "BaseTokenPreV31TotalSupplyAlreadySet",
+};
+
+/**
+ * Returns a short reason string when this tx looks already-applied on chain
+ * (so the broadcaster should skip it). Returns `null` when the tx should be
+ * sent normally — either it would succeed, or it would revert with something
+ * we DON'T recognise as idempotency (and prefer to fail loudly).
+ *
+ * Mechanism: `eth_call` from the signer EOA; inspect the revert data. We
+ * never simulate funded calls (those are dropped earlier by `isFundedCall`).
+ */
+async function probeIdempotentSkip(
+  provider: ethers.providers.JsonRpcProvider,
+  from: string,
+  tx: SafeTx
+): Promise<string | null> {
+  let raw: string;
+  try {
+    raw = await provider.call({
+      from,
+      to: tx.to,
+      data: tx.data,
+      value: ethers.BigNumber.from(tx.value ?? "0"),
+    });
+  } catch (err: unknown) {
+    // String-revert path (`require(false, "msg")`) — ethers v5 throws here.
+    // Custom-error reverts (Solidity 0.8+) take the RESOLVED branch below
+    // because ethers v5 only decodes `Error(string)`/`Panic` shapes.
+    const e = err as {
+      data?: string | { data?: string };
+      error?: { data?: string; error?: { data?: string } };
+      message?: string;
+    };
+    let data: string | undefined;
+    if (typeof e.data === "string") data = e.data;
+    else if (e.data && typeof e.data === "object") data = e.data.data;
+    if (!data && e.error?.data) data = e.error.data;
+    if (!data && e.error?.error?.data) data = e.error.error.data;
+    if (!data && e.message) {
+      const m = e.message.match(/0x[0-9a-fA-F]{8,}/);
+      if (m) data = m[0];
+    }
+    return matchIdempotentSelector(data);
+  }
+  // Successful path or custom-error revert: ethers v5 returns the raw
+  // returndata as a hex string. Inspect for known revert selectors.
+  return matchIdempotentSelector(raw);
+}
+
+async function checkDeployedWithRetry(
+  provider: ethers.providers.JsonRpcProvider,
+  addr: string
+): Promise<boolean> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const code = await provider.getCode(addr);
+    if (code && code !== "0x") return true;
+  }
+  return false;
+}
+
+function matchIdempotentSelector(data: string | undefined): string | null {
+  if (!data || data.length < 10) return null;
+  const sel = data.slice(0, 10).toLowerCase();
+  return IDEMPOTENT_ERROR_SELECTORS[sel] ?? null;
+}
+
 async function cmdBroadcast(pk: string, rpc: string, binMount: string[]): Promise<number> {
   const wallet = new ethers.Wallet(pk);
   console.log(`Deployer EOA: ${wallet.address}`);
@@ -315,13 +408,20 @@ async function cmdBroadcast(pk: string, rpc: string, binMount: string[]): Promis
   }
   if (merged === null) die("Internal: no bundles loaded");
 
-  // 2) Skip CREATE2 deploys already on chain; pass everything else through.
+  // 2) Skip txs that are already-done on chain. CREATE2: target has code.
+  //    Non-CREATE2: probe via `eth_call` from the signer; if it reverts with
+  //    a known idempotency error (the registry already holds this exact
+  //    state), skip. The registry-style reverts are emitted by Atlas/Era CTM
+  //    setters that refuse to re-set the same `(version → verifier)` mapping,
+  //    by legacy `Governance.sol` for ops already scheduled/done, and by
+  //    a few v31-introduced "X already initialised" guards.
   const provider = new ethers.providers.JsonRpcProvider(rpc);
   const factoryLc = CREATE2_FACTORY.toLowerCase();
   const toSend: SafeTx[] = [];
   let create2Total = 0;
   const create2Skipped: string[] = [];
-  let nonCreate2Kept = 0;
+  let nonCreate2Total = 0;
+  const nonCreate2Skipped: { to: string; sel: string; reason: string }[] = [];
   for (const tx of toConsider) {
     if (tx.to.toLowerCase() === factoryLc) {
       create2Total += 1;
@@ -330,15 +430,28 @@ async function cmdBroadcast(pk: string, rpc: string, binMount: string[]): Promis
         toSend.push(tx);
         continue;
       }
-      const code = await provider.getCode(addr);
-      if (code && code !== "0x") {
+      // Alchemy load-balances across nodes; a single eth_getCode can hit a
+      // stale node and return "0x" for an address that's been deployed for
+      // hours. Re-probe up to 2 extra times to make false-negatives vanishingly
+      // unlikely. We only retry on empty — non-empty responses are trusted.
+      const codeIsDeployed = await checkDeployedWithRetry(provider, addr);
+      if (codeIsDeployed) {
         create2Skipped.push(addr);
       } else {
         toSend.push(tx);
       }
     } else {
-      nonCreate2Kept += 1;
-      toSend.push(tx);
+      nonCreate2Total += 1;
+      const skipReason = await probeIdempotentSkip(provider, wallet.address, tx);
+      if (skipReason) {
+        nonCreate2Skipped.push({
+          to: tx.to,
+          sel: tx.data.slice(0, 10),
+          reason: skipReason,
+        });
+      } else {
+        toSend.push(tx);
+      }
     }
   }
 
@@ -350,8 +463,12 @@ async function cmdBroadcast(pk: string, rpc: string, binMount: string[]): Promis
       `${fundedDropped} funded dropped, ` +
       `${create2Total} CREATE2 → ${create2Total - create2Skipped.length} new ` +
       `(${create2Skipped.length} already deployed), ` +
-      `${nonCreate2Kept} other → keep all`
+      `${nonCreate2Total} other → ${nonCreate2Total - nonCreate2Skipped.length} new ` +
+      `(${nonCreate2Skipped.length} already done)`
   );
+  for (const s of nonCreate2Skipped) {
+    console.log(`  skipped: to=${s.to} sel=${s.sel} (${s.reason})`);
+  }
 
   if (toSend.length === 0) {
     console.log(
