@@ -37,10 +37,25 @@ struct SimDescriptionRegistry {
 struct SimDescriptionEntry {
     target: Address,
     selector: String,
+    /// First 32-byte word after the selector, interpreted as `address`.
+    /// Used for plain `f(address, ...)` calls (e.g. `TPA.upgrade(proxy, impl)`).
     #[serde(default)]
     arg0_address: Option<Address>,
+    /// `Bridgehub.requestL2TransactionDirect(L2TransactionRequestDirect)` —
+    /// `l2Contract` is word 3 of the tuple (after offset/chainId/mintValue).
+    /// Only meaningful when `selector = 0xd52471c1`.
+    #[serde(default)]
+    l2_contract: Option<Address>,
+    /// `Bridgehub.requestL2TransactionTwoBridges(L2TransactionRequestTwoBridgesOuter)` —
+    /// `secondBridgeAddress` is word 7 of the tuple.
+    /// Only meaningful when `selector = 0x24fd57fb`.
+    #[serde(default)]
+    second_bridge_address: Option<Address>,
+    /// For wrapper selectors (`multicall`, `scheduleTransparent`,
+    /// `executeInstant`) — match the first inner call's target.
     #[serde(default)]
     inner_target: Option<Address>,
+    /// For wrapper selectors — match the first inner call's 4-byte selector.
     #[serde(default)]
     inner_selector: Option<String>,
     desc: String,
@@ -60,6 +75,24 @@ impl SimDescriptionRegistry {
             if let Some(want) = entry.arg0_address {
                 let arg0_hex = data_hex.get(10..74)?;
                 let parsed: Address = format!("0x{}", &arg0_hex[24..]).parse().ok()?;
+                if parsed != want {
+                    continue;
+                }
+            }
+            // requestL2TransactionDirect: l2Contract at word 3 after the selector.
+            if let Some(want) = entry.l2_contract {
+                let word_start = 10 + 3 * 64;
+                let word_hex = data_hex.get(word_start..word_start + 64)?;
+                let parsed: Address = format!("0x{}", &word_hex[24..]).parse().ok()?;
+                if parsed != want {
+                    continue;
+                }
+            }
+            // requestL2TransactionTwoBridges: secondBridgeAddress at word 7.
+            if let Some(want) = entry.second_bridge_address {
+                let word_start = 10 + 7 * 64;
+                let word_hex = data_hex.get(word_start..word_start + 64)?;
+                let parsed: Address = format!("0x{}", &word_hex[24..]).parse().ok()?;
                 if parsed != want {
                     continue;
                 }
