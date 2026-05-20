@@ -110,15 +110,28 @@ pub struct NetworkVerifier {
 }
 
 impl NetworkVerifier {
-    pub fn new_v31(l1_rpc: String) -> anyhow::Result<Self> {
+    pub async fn new_v31(
+        l1_rpc: String,
+        gw_rpc: String,
+        representative_era_chain_id: u64,
+    ) -> anyhow::Result<Self> {
         let l1_provider = RootProvider::new_http(l1_rpc.parse().context("invalid L1 RPC URL")?);
-        let gw_provider = l1_provider.clone();
+        let l1_chain_id = l1_provider
+            .get_chain_id()
+            .await
+            .context("failed to fetch L1 chain id")?;
+        let gw_provider =
+            RootProvider::new_http(gw_rpc.parse().context("invalid gateway RPC URL")?);
+        let gateway_chain_id = gw_provider
+            .get_chain_id()
+            .await
+            .context("failed to fetch gateway chain id")?;
 
         Ok(Self {
             l1_provider,
-            l2_chain_id: 0,
-            l1_chain_id: 0,
-            gateway_chain_id: 0,
+            l2_chain_id: representative_era_chain_id,
+            l1_chain_id,
+            gateway_chain_id,
             gw_provider,
             create2_constructor_params: HashMap::new(),
             create2_known_bytecodes: HashMap::new(),

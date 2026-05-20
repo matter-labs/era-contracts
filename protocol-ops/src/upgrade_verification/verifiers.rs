@@ -67,15 +67,18 @@ impl Verifiers {
     pub async fn new_v31(
         artifact: &EcosystemUpgradeArtifact,
         l1_rpc: impl Into<String>,
+        gw_rpc: impl Into<String>,
         contracts_commit: Option<&str>,
-        representative_era_chain_id: Option<u64>,
+        representative_era_chain_id: u64,
     ) -> anyhow::Result<Self> {
         let bridgehub_address = AddressVerifier::address_from_artifact(
             artifact,
             &["deployed_addresses", "bridgehub", "bridgehub_proxy_addr"],
         )?;
         let bytecode_verifier = BytecodeVerifier::init_v31(contracts_commit).await?;
-        let network_verifier = NetworkVerifier::new_v31(l1_rpc.into())?;
+        let network_verifier =
+            NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into(), representative_era_chain_id)
+                .await?;
         let address_verifier = AddressVerifier::new_v31_from_artifact(artifact)?;
 
         let era_genesis_config =
@@ -93,7 +96,7 @@ impl Verifiers {
             zksync_os_genesis_config,
             fee_param_verifier: FeeParamVerifier::empty(),
             gateway_bridgehub_address: address_from_short_hex("10002"),
-            representative_era_chain_id,
+            representative_era_chain_id: Some(representative_era_chain_id),
             zk_token_asset_id: None,
         })
     }

@@ -65,6 +65,7 @@ pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static
 pub(crate) async fn verify(
     artifact: &EcosystemUpgradeArtifact,
     l1_rpc_url: &str,
+    gw_rpc_url: &str,
     contracts_commit: Option<&str>,
     era_chain_id: u64,
     executed_bundle: &ExecutedBundle,
@@ -77,14 +78,19 @@ pub(crate) async fn verify(
     let mut verifiers = Verifiers::new_v31(
         artifact,
         l1_rpc_url,
+        gw_rpc_url,
         contracts_commit,
-        Some(era_chain_id),
+        era_chain_id,
     )
     .await?;
     verifiers.zk_token_asset_id = zk_token_asset_id;
     result.report_ok(&format!(
         "v31 verifier context loaded with {} named addresses",
         verifiers.address_verifier.name_to_address.len()
+    ));
+    result.report_ok(&format!(
+        "Gateway RPC chain ID: {}",
+        verifiers.network_verifier.get_gateway_chain_id()
     ));
 
     // Populate the create2 maps so Phase 6 (deployment provenance) can match

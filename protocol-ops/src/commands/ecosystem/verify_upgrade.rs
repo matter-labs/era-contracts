@@ -8,9 +8,7 @@ use crate::{
     commands::dev::execute_safe::ExecutedBundle,
     common::logger,
     upgrade_verification::{
-        artifact_shape,
-        artifacts::EcosystemUpgradeArtifact,
-        verifiers::VerificationResult,
+        artifact_shape, artifacts::EcosystemUpgradeArtifact, verifiers::VerificationResult,
     },
 };
 
@@ -24,6 +22,10 @@ pub struct VerifyUpgradeArgs {
     /// L1 RPC URL used by later verification phases for read-only on-chain checks.
     #[clap(long, default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
+
+    /// Gateway RPC URL used by read-only gateway-side checks.
+    #[clap(long, alias = "gw-rpc")]
+    pub gw_rpc_url: String,
 
     /// Path to the v31 ecosystem upgrade TOML produced by `upgrade-prepare`.
     #[clap(long)]
@@ -79,6 +81,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     logger::step("Verifying ecosystem upgrade artifacts");
     logger::info(format!("Ecosystem TOML: {}", args.ecosystem_toml.display()));
     logger::info(format!("L1 RPC URL: {}", args.l1_rpc_url));
+    logger::info(format!("Gateway RPC URL: {}", args.gw_rpc_url));
     if let Some(contracts_commit) = &args.contracts_commit {
         logger::info(format!("Contracts commit: {contracts_commit}"));
     } else {
@@ -125,6 +128,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     let verification_result = crate::upgrade_verification::versions::v31::verify(
         &artifact,
         &args.l1_rpc_url,
+        &args.gw_rpc_url,
         args.contracts_commit.as_deref(),
         args.era_chain_id,
         &executed_bundle,
