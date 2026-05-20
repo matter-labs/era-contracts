@@ -47,6 +47,7 @@ pub struct ForgeRunner {
     /// Keeps the anvil instance alive while this runner exists.
     _anvil: AnvilInstance,
     runs: Vec<ForgeScriptRun>,
+    extra_verification_logs: Vec<String>,
 }
 
 impl ForgeRunner {
@@ -71,6 +72,7 @@ impl ForgeRunner {
             foundry_scripts_path: paths::path_to_foundry_scripts(),
             _anvil: anvil,
             runs: Vec::new(),
+            extra_verification_logs: Vec::new(),
         })
     }
 
@@ -246,10 +248,10 @@ impl ForgeRunner {
     }
 
     fn execute(
-        &self,
+        &mut self,
         script: &ForgeScript,
         args: &[String],
-        for_resume: bool,
+        _for_resume: bool,
     ) -> anyhow::Result<CmdResult<()>> {
         let script_path = script.script_name().as_os_str();
         let _dir_guard = self.shell.push_dir(script.base_path());
@@ -260,10 +262,12 @@ impl ForgeRunner {
         for (key, value) in &script.envs {
             cmd = cmd.env(key, value);
         }
-        if for_resume {
-            cmd = cmd.with_piped_std_err();
+        let result = cmd.run();
+        if let Ok(output) = &result {
+            self.extra_verification_logs
+                .extend(extract_extra_verification_logs(output));
         }
-        Ok(cmd.run())
+        Ok(result.map(|_| ()))
     }
 
     /// Record the broadcast run produced by `script`.
@@ -357,6 +361,35 @@ impl ForgeRunner {
     pub fn runs(&self) -> &[ForgeScriptRun] {
         &self.runs
     }
+
+    pub fn write_extra_verification_logs(&self, path: &Path) -> anyhow::Result<()> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("failed to create {}", parent.display()))?;
+        }
+
+        let mut content = String::new();
+        for line in &self.extra_verification_logs {
+            content.push_str(line);
+            content.push('\n');
+        }
+        fs::write(path, content).with_context(|| format!("failed to write {}", path.display()))?;
+        Ok(())
+    }
+}
+
+fn extract_extra_verification_logs(output: &str) -> Vec<String> {
+    output
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim();
+            is_extra_verification_log_line(trimmed).then(|| trimmed.to_string())
+        })
+        .collect()
+}
+
+fn is_extra_verification_log_line(line: &str) -> bool {
+    line.contains("forge verify-contract")
 }
 
 // Trait for handling forge errors. Required for implementing method for CmdResult
