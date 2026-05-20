@@ -3,7 +3,7 @@ use anyhow::{ensure, Context, Result};
 use super::protocol_version::ProtocolVersion;
 use crate::upgrade_verification::{
     artifacts::{CtmArtifact, CtmFlavor, EcosystemUpgradeArtifact},
-    verifiers::{GenesisConfigKind, VerificationResult, Verifiers},
+    verifiers::{VerificationResult, Verifiers},
     versions::v31::MAX_NUMBER_OF_ZK_CHAINS,
 };
 
@@ -1276,9 +1276,8 @@ async fn verify_v31_ctm_permissionless_validator(
 /// Per-CTM, per-flavor provenance for the contracts that ship one copy per
 /// CTM (verifiers, DiamondInit, default_upgrade, genesis_upgrade, getters/
 /// executor/admin facets). The v31 upgrade deploys these once for Era and
-/// once for ZKsyncOS; the single `--genesis-config` CLI hint can only
-/// describe one flavor, so iterating per CTM and using each CTM's own
-/// `flavor` is the only correct way to verify both.
+/// once for ZKsyncOS, so verification iterates per CTM and uses each CTM's
+/// own `flavor`.
 ///
 /// All addresses come from the CTM's own `[ctms.<flavor>]` section via
 /// `required_ctm_address`. Optional addresses are silently skipped (some
@@ -1609,7 +1608,6 @@ pub(crate) async fn verify_v31_provenance(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     era_chain_id: u64,
-    genesis_config_kind: GenesisConfigKind,
     result: &mut VerificationResult,
 ) -> Result<()> {
     result.print_info("== Deployment provenance ==");
@@ -1634,16 +1632,6 @@ pub(crate) async fn verify_v31_provenance(
     };
 
     let is_testnet = artifact.contracts_config.is_testnet;
-
-    // The per-CTM (verifier, diamond_init, default_upgrade, getters_facet,
-    // l1_genesis_upgrade, executor_facet, admin_facet) provenance moved into
-    // a per-CTM loop below — each CTM ships its own copies of those, with
-    // file names + constructor args parameterized by the CTM flavor.
-    // `genesis_config_kind` is kept on the signature for legacy callers but
-    // is no longer consulted: every flavored decision is now taken per-CTM
-    // from `ctm.flavor`, so a single CLI hint cannot describe both Era and
-    // ZKsyncOS CTMs in a multi-CTM upgrade.
-    let _ = genesis_config_kind;
 
     for ctm in &artifact.ctms {
         verify_ctm_flavored_provenance(artifact, ctm, verifiers, l1_chain_id, result);

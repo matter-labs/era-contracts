@@ -8,7 +8,7 @@ use crate::{
     commands::dev::execute_safe::ExecutedBundle,
     upgrade_verification::{
         artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
-        verifiers::{GenesisConfigKind, VerificationResult, Verifiers},
+        verifiers::{VerificationResult, Verifiers},
     },
 };
 
@@ -67,7 +67,6 @@ pub(crate) async fn verify(
     l1_rpc_url: &str,
     contracts_commit: Option<&str>,
     era_chain_id: u64,
-    genesis_config_kind: GenesisConfigKind,
     executed_bundle: &ExecutedBundle,
     create2_factory: Address,
     create2_salts: Vec<FixedBytes<32>>,
@@ -80,7 +79,6 @@ pub(crate) async fn verify(
         l1_rpc_url,
         contracts_commit,
         Some(era_chain_id),
-        genesis_config_kind,
     )
     .await?;
     verifiers.zk_token_asset_id = zk_token_asset_id;
@@ -116,14 +114,7 @@ pub(crate) async fn verify(
 
     verify_v31_artifact_state(artifact, &verifiers, create2_factory, result).await?;
 
-    verify_v31_provenance(
-        artifact,
-        &verifiers,
-        era_chain_id,
-        genesis_config_kind,
-        result,
-    )
-    .await?;
+    verify_v31_provenance(artifact, &verifiers, era_chain_id, result).await?;
 
     Ok(())
 }

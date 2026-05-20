@@ -35,7 +35,6 @@ pub(crate) struct Verifiers {
     pub address_verifier: AddressVerifier,
     pub bytecode_verifier: BytecodeVerifier,
     pub network_verifier: NetworkVerifier,
-    pub genesis_config: GenesisConfig,
     pub era_genesis_config: GenesisConfig,
     pub zksync_os_genesis_config: GenesisConfig,
     pub fee_param_verifier: FeeParamVerifier,
@@ -70,7 +69,6 @@ impl Verifiers {
         l1_rpc: impl Into<String>,
         contracts_commit: Option<&str>,
         representative_era_chain_id: Option<u64>,
-        genesis_config_kind: GenesisConfigKind,
     ) -> anyhow::Result<Self> {
         let bridgehub_address = AddressVerifier::address_from_artifact(
             artifact,
@@ -84,10 +82,6 @@ impl Verifiers {
             GenesisConfig::init_v31(GenesisConfigKind::Era, contracts_commit).await?;
         let zksync_os_genesis_config =
             GenesisConfig::init_v31(GenesisConfigKind::ZksyncOs, contracts_commit).await?;
-        let genesis_config = match genesis_config_kind {
-            GenesisConfigKind::Era => era_genesis_config.clone(),
-            GenesisConfigKind::ZksyncOs => zksync_os_genesis_config.clone(),
-        };
 
         Ok(Self {
             testnet_contracts: false,
@@ -95,7 +89,6 @@ impl Verifiers {
             address_verifier,
             bytecode_verifier,
             network_verifier,
-            genesis_config,
             era_genesis_config,
             zksync_os_genesis_config,
             fee_param_verifier: FeeParamVerifier::empty(),
@@ -157,7 +150,6 @@ impl Verifiers {
             address_verifier,
             bytecode_verifier,
             network_verifier,
-            genesis_config: genesis_config.clone(),
             era_genesis_config: genesis_config.clone(),
             zksync_os_genesis_config: genesis_config,
             fee_param_verifier,

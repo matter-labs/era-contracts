@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use alloy::primitives::FixedBytes;
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 
 use crate::{
     commands::dev::execute_safe::ExecutedBundle,
@@ -10,7 +10,7 @@ use crate::{
     upgrade_verification::{
         artifact_shape,
         artifacts::EcosystemUpgradeArtifact,
-        verifiers::{GenesisConfigKind, VerificationResult},
+        verifiers::VerificationResult,
     },
 };
 
@@ -41,10 +41,6 @@ pub struct VerifyUpgradeArgs {
     /// diamond to inspect.
     #[clap(long, alias = "chain-id")]
     pub era_chain_id: u64,
-
-    /// Which local v31 genesis config to load.
-    #[clap(long, value_enum, default_value_t = VerifyUpgradeGenesisConfig::Era)]
-    pub genesis_config: VerifyUpgradeGenesisConfig,
 
     /// Path to the executed-bundle JSON written by `dev execute-safe --out`.
     /// Phase 6 (deployment provenance) replays this log to reconstruct
@@ -79,26 +75,10 @@ pub struct VerifyUpgradeArgs {
     pub zk_token_asset_id: Option<FixedBytes<32>>,
 }
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
-pub enum VerifyUpgradeGenesisConfig {
-    Era,
-    ZksyncOs,
-}
-
-impl From<VerifyUpgradeGenesisConfig> for GenesisConfigKind {
-    fn from(value: VerifyUpgradeGenesisConfig) -> Self {
-        match value {
-            VerifyUpgradeGenesisConfig::Era => Self::Era,
-            VerifyUpgradeGenesisConfig::ZksyncOs => Self::ZksyncOs,
-        }
-    }
-}
-
 pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     logger::step("Verifying ecosystem upgrade artifacts");
     logger::info(format!("Ecosystem TOML: {}", args.ecosystem_toml.display()));
     logger::info(format!("L1 RPC URL: {}", args.l1_rpc_url));
-    logger::info(format!("Genesis config: {:?}", args.genesis_config));
     if let Some(contracts_commit) = &args.contracts_commit {
         logger::info(format!("Contracts commit: {contracts_commit}"));
     } else {
@@ -147,7 +127,6 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         &args.l1_rpc_url,
         args.contracts_commit.as_deref(),
         args.era_chain_id,
-        args.genesis_config.into(),
         &executed_bundle,
         create2_factory,
         create2_salts,

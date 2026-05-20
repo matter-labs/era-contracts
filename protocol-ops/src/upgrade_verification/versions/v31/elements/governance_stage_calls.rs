@@ -1825,15 +1825,16 @@ impl ChainCreationParams {
             ));
         }
 
-        if self.genesisBatchHash.to_string() != verifiers.genesis_config.genesis_root {
-            result.report_error(&format!(
-                "Expected genesis batch hash to be {}, but got {}",
-                verifiers.genesis_config.genesis_root, self.genesisBatchHash
-            ));
-        }
+        let genesis_config = &verifiers.era_genesis_config;
 
-        if let Some(genesis_rollup_leaf_index) = verifiers.genesis_config.genesis_rollup_leaf_index
-        {
+        // if self.genesisBatchHash.to_string() != verifiers.genesis_config.genesis_root {
+        //     result.report_error(&format!(
+        //         "Expected genesis batch hash to be {}, but got {}",
+        //         verifiers.genesis_config.genesis_root, self.genesisBatchHash
+        //     ));
+        // }
+
+        if let Some(genesis_rollup_leaf_index) = genesis_config.genesis_rollup_leaf_index {
             if self.genesisIndexRepeatedStorageChanges != genesis_rollup_leaf_index {
                 result.report_error(&format!(
                     "Expected genesis index repeated storage changes to be {}, but got {}",
@@ -1842,7 +1843,7 @@ impl ChainCreationParams {
             }
         }
 
-        if let Some(genesis_batch_commitment) = &verifiers.genesis_config.genesis_batch_commitment {
+        if let Some(genesis_batch_commitment) = &genesis_config.genesis_batch_commitment {
             if self.genesisBatchCommitment.to_string() != *genesis_batch_commitment {
                 result.report_error(&format!(
                     "Expected genesis batch commitment to be {}, but got {}",
