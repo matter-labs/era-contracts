@@ -220,21 +220,16 @@ function cmdRegen(pk: string, rpc: string, binMount: string[]): number {
  * Phase 2 broadcaster. The work splits into two halves:
  *
  *   1. **Filter** — read every prepare bundle signed by our EOA, merge them,
- *      drop `approve` + GW-priority calls (we can't fund them on Sepolia),
- *      drop CREATE2 deploys whose target already has code on chain. Pure
- *      host-side work, no Docker needed.
+ *      drop CREATE2 deploys whose target already has code on chain. Funded
+ *      calls (`approve` + `requestL2TransactionDirect/TwoBridges`) are kept
+ *      so the deployer's bundle-05 L1→L2 GW-CTM deploys actually broadcast;
+ *      this requires pre-funding the deployer EOA with the chain-2708 base
+ *      token (ZK) for the approve amounts to clear.
  *   2. **Broadcast** — invoke `protocol_ops dev execute-safe` on the
  *      filtered bundle via Docker so the linux `protocol_ops` binary + linux
  *      Foundry inside the image run the signed txs reproducibly.
- *
- * Keep `FUNDED_SELECTORS` in sync with `protocol-ops/src/commands/ecosystem/simulator.rs`.
  */
 const CREATE2_FACTORY = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
-const FUNDED_SELECTORS = [
-  "0x095ea7b3", // approve(address,uint256)
-  "0xd52471c1", // requestL2TransactionDirect(...)
-  "0x24fd57fb", // requestL2TransactionTwoBridges(...)
-];
 
 interface SafeTx {
   to: string;
@@ -244,11 +239,6 @@ interface SafeTx {
 interface SafeBundle {
   transactions: SafeTx[];
   [k: string]: unknown;
-}
-
-function isFundedCall(dataHex: string): boolean {
-  const d = dataHex.toLowerCase();
-  return FUNDED_SELECTORS.some((s) => d.startsWith(s));
 }
 
 /**
@@ -306,8 +296,7 @@ const IDEMPOTENT_ERROR_SELECTORS: Record<string, string> = {
  * sent normally — either it would succeed, or it would revert with something
  * we DON'T recognise as idempotency (and prefer to fail loudly).
  *
- * Mechanism: `eth_call` from the signer EOA; inspect the revert data. We
- * never simulate funded calls (those are dropped earlier by `isFundedCall`).
+ * Mechanism: `eth_call` from the signer EOA; inspect the revert data.
  */
 async function probeIdempotentSkip(
   provider: ethers.providers.JsonRpcProvider,
@@ -388,11 +377,14 @@ async function cmdBroadcast(pk: string, rpc: string, binMount: string[]): Promis
   console.log(`Source deployer bundles (${sourceBundles.length}):`);
   for (const b of sourceBundles) console.log(`  ${b}`);
 
-  // 1) Merge bundles, drop funded calls.
+  // 1) Merge bundles into one tx list. Funded calls (`approve` +
+  //    `requestL2TransactionDirect/TwoBridges`) used to be dropped here
+  //    because the deployer EOA had no ZK base-token balance to pay for
+  //    them. Now that the deployer is pre-funded with ZK on Sepolia, the
+  //    L1→L2 GW-CTM deploys in bundle 05 broadcast through unchanged.
   let merged: SafeBundle | null = null;
   const toConsider: SafeTx[] = [];
   let totalIn = 0;
-  let fundedDropped = 0;
   for (const src of sourceBundles) {
     const parsed = JSON.parse(fs.readFileSync(src, "utf8")) as SafeBundle;
     if (merged === null) {
@@ -401,10 +393,7 @@ async function cmdBroadcast(pk: string, rpc: string, binMount: string[]): Promis
     }
     const txs = parsed.transactions ?? [];
     totalIn += txs.length;
-    for (const tx of txs) {
-      if (isFundedCall(tx.data ?? "0x")) fundedDropped += 1;
-      else toConsider.push(tx);
-    }
+    for (const tx of txs) toConsider.push(tx);
   }
   if (merged === null) die("Internal: no bundles loaded");
 
@@ -460,7 +449,6 @@ async function cmdBroadcast(pk: string, rpc: string, binMount: string[]): Promis
   fs.writeFileSync(filteredPath, JSON.stringify(merged, null, 2));
   console.log(
     `Merged: ${totalIn} txs across ${sourceBundles.length} bundle(s) → ` +
-      `${fundedDropped} funded dropped, ` +
       `${create2Total} CREATE2 → ${create2Total - create2Skipped.length} new ` +
       `(${create2Skipped.length} already deployed), ` +
       `${nonCreate2Total} other → ${nonCreate2Total - nonCreate2Skipped.length} new ` +

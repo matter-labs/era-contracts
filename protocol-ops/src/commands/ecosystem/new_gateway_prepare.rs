@@ -282,7 +282,39 @@ async fn replay_gov_stages_0_and_1(
         .chain(ctm_tomls.iter().map(|e| e.toml.as_path()))
         .collect();
 
-    let mut total = 0usize;
+    // `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps`
+    // now defers each CTM's `acceptOwnership()` to a stage-0 governance call
+    // (recorded in `script-out/pre-governance-accept-ownerships.toml`)
+    // instead of executing it directly on the fork. The fork's CTM owners
+    // therefore still sit at `pendingOwner = governance` until those calls
+    // run. Stage-1 contains `onlyOwner` calls (`setChainCreationParams`,
+    // etc.), so apply the deferred acceptOwnerships HERE before the regular
+    // stage 0 — same impersonated-`from = governance` envelope, identical
+    // end state.
+    let contracts_path = crate::common::paths::resolve_l1_contracts_path()?;
+    let pre_gov_accept_calls =
+        crate::commands::ecosystem::upgrade::read_pre_governance_accept_ownership_calls(
+            &contracts_path,
+        )
+        .context("read pre-governance-accept-ownerships.toml for replay")?;
+    for (idx, call) in pre_gov_accept_calls.iter().enumerate() {
+        send_impersonated_tx(
+            rpc_url,
+            governance,
+            call.target,
+            Bytes::from(call.data.clone()),
+            GOV_REPLAY_GAS_LIMIT,
+        )
+        .await
+        .with_context(|| {
+            format!(
+                "pre-gov acceptOwnership #{idx} → {:#x} (deferred by AdminFunctions)",
+                call.target
+            )
+        })?;
+        let _ = call.value; // always 0 for acceptOwnership()
+    }
+    let mut total = pre_gov_accept_calls.len();
     for stage in [0u8, 1, 2] {
         if stage == 1 {
             evm_increase_time_and_mine(rpc_url, GOV_DEADLINE_BUMP_SECONDS)

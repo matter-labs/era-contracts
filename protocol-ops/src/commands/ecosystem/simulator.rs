@@ -53,10 +53,6 @@ pub struct GovernanceTomlToSimulatorArgs {
     ///
     /// Defaults to `<env-out>/prepare/manifest.json` when `--env` is set and
     /// the manifest exists. Pass an explicit path to override.
-    ///
-    /// Per-tx filter still applied to Camp-B bundles ([`is_funded_call`]):
-    /// `approve(address,uint256)` and `requestL2TransactionDirect(...)` need
-    /// ZK base-token balance the local fork can't conjure.
     #[clap(long)]
     pub include_manifest: Option<PathBuf>,
 
@@ -120,29 +116,6 @@ const CHECK_DEADLINE_TIME_INCREASE_SECS: u64 = 200_000;
 /// bundle; its signer is presumed to be an EOA we hold a key for and
 /// belongs to phase 2 (real-chain broadcast), not the sim.
 const CREATE2_FACTORY: &str = "0x4e59b44847b379578588920ca78fbf26c0b4956c";
-
-/// Selectors of L1→L2 priority-request calls that may revert on a local fork
-/// without ZK base-token balance. Currently used only by the bundle filter
-/// (`manifest_to_simulator_transactions`) — governance stage emission keeps
-/// these in the JSON for security-review visibility. The `STAGE2_PUH_FUND_WEI`
-/// top-up below covers msg.value for these calls; ERC20 `approve` succeeds
-/// without balance, but `requestL2TransactionDirect`/`...TwoBridges` may
-/// still revert at execution time because PUH lacks the ZK ERC20 balance the
-/// Bridgehub `transferFrom`s. Reviewers see the intent regardless.
-///
-/// - `0x095ea7b3` = `approve(address,uint256)`
-/// - `0xd52471c1` = `requestL2TransactionDirect(...)`
-/// - `0x24fd57fb` = `requestL2TransactionTwoBridges(...)`
-const FUNDED_SELECTORS: &[&str] = &["0x095ea7b3", "0xd52471c1", "0x24fd57fb"];
-
-fn is_funded_call(data_hex: &str) -> bool {
-    FUNDED_SELECTORS.iter().any(|s| {
-        data_hex
-            .get(..s.len())
-            .map(|prefix| prefix.eq_ignore_ascii_case(s))
-            .unwrap_or(false)
-    })
-}
 
 /// ETH (wei) minted to the governance sender (PUH) at the first stage-2 call
 /// so the `requestL2TransactionDirect{value: y}` / `...TwoBridges{value: y}`
@@ -263,11 +236,10 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
 }
 
 /// Walk `manifest.json`, drop every Camp-A bundle entirely, then emit one
-/// [`SimulatorTransaction`] per surviving Camp-B tx with
-/// `from = bundle.target` (sim impersonates) and `tag = "bundle_<index>"`.
-/// Bundle and intra-bundle order are preserved. Camp-B txs go through the
-/// [`is_funded_call`] filter so approve / GW priority calls (which need ZK
-/// balance the fork can't conjure) get dropped.
+/// [`SimulatorTransaction`] per Camp-B tx with `from = bundle.target` (sim
+/// impersonates) and `tag = "bundle_<index>"`. Bundle and intra-bundle order
+/// are preserved. No per-tx filter — L1→L2 priority calls stay in the JSON
+/// for sec-review visibility even if they revert at execution.
 ///
 /// Camp-A classification:
 /// - explicit list via `--camp-a-signers` when non-empty, or
@@ -332,10 +304,17 @@ fn manifest_to_simulator_transactions(
         ));
     }
 
-    // Emit Camp-B bundles, post-filtering funded calls. Track which signers
-    // we've already minted ETH for so the first tx of each impersonated
-    // signer carries a small `valueToMint` — without it the fork's account
-    // for that address is empty and tx-simulator reverts with
+    // Emit Camp-B bundles in full — including any L1→L2 priority requests.
+    // Earlier behavior dropped `approve` / `requestL2TransactionDirect` /
+    // `...TwoBridges` on the grounds that the impersonated signer can't have
+    // ZK base-token balance on a local fork, but that hid governance intent
+    // from the sec-review surface. Keep them in the JSON; execution may
+    // revert without a `tokenMint`-style primitive, but the record is what
+    // reviewers need.
+    //
+    // Track which signers we've already minted ETH for so the first tx of
+    // each impersonated signer carries a small `valueToMint` — without it
+    // the fork's account is empty and tx-simulator reverts with
     // `Insufficient funds for gas * price + value`.
     let mut funded_signers: std::collections::HashSet<Address> = std::collections::HashSet::new();
     let mut out = Vec::new();
@@ -343,11 +322,7 @@ fn manifest_to_simulator_transactions(
         if camp_a_signers.contains(&bundle.target) {
             continue;
         }
-        let kept: Vec<&SafeBundleTx> = bundle_file
-            .transactions
-            .iter()
-            .filter(|tx| !is_funded_call(&tx.data))
-            .collect();
+        let kept: Vec<&SafeBundleTx> = bundle_file.transactions.iter().collect();
         if kept.is_empty() {
             continue;
         }

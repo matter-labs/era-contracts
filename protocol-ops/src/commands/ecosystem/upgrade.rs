@@ -1079,7 +1079,7 @@ fn write_merged_ecosystem_toml(
 /// Returns an empty vector when the file doesn't exist (e.g. a prior regen
 /// without this step) — the merge step then has nothing to fold and the
 /// behavior matches the pre-refactor "no extra stage-0 calls" path.
-fn read_pre_governance_accept_ownership_calls(
+pub(super) fn read_pre_governance_accept_ownership_calls(
     contracts_path: &Path,
 ) -> anyhow::Result<Vec<crate::common::governance_calls::GovernanceCall>> {
     let path = contracts_path
@@ -1091,17 +1091,14 @@ fn read_pre_governance_accept_ownership_calls(
     let raw = fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
     let parsed: toml::Table =
         toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
+    // foundry's `vm.serializeBytes(objectKey, valueKey, value)` + `vm.writeToml(_, path)`
+    // emits `valueKey = "0x..."` at the root of the TOML — the `objectKey`
+    // is just the serialization identifier, not a nested table. So the
+    // file's top-level key is `calls`, not `pre_governance_accept_ownerships.calls`.
     let hex_str = parsed
-        .get("pre_governance_accept_ownerships")
-        .and_then(|v| v.as_table())
-        .and_then(|t| t.get("calls"))
+        .get("calls")
         .and_then(|v| v.as_str())
-        .with_context(|| {
-            format!(
-                "missing pre_governance_accept_ownerships.calls in {}",
-                path.display()
-            )
-        })?;
+        .with_context(|| format!("missing calls in {}", path.display()))?;
     crate::common::governance_calls::decode_calls(hex_str).with_context(|| {
         format!(
             "decode pre_governance_accept_ownerships.calls from {}",

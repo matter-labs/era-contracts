@@ -2528,12 +2528,7 @@ impl GovernanceStage2Calls {
         } else {
             0
         };
-        // 2-call appendix folded in by `write_merged_ecosystem_toml` when the
-        // new-gateway prepare emits `ecosystem_admin_calls_to_execute` (PUH
-        // executes them directly post-bring-up): setServerNotifier on the
-        // source CTM + acceptOwnership on the new GW ServerNotifier.
-        let eco_admin_count = if artifact.new_gateway.is_some() { 2 } else { 0 };
-        let expected_call_count = canonical_count + gw_count + eco_admin_count;
+        let expected_call_count = canonical_count + gw_count;
 
         errors += verify_call_by_name(
             &self.calls,
