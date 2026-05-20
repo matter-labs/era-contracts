@@ -810,6 +810,12 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             "Wrote merged ecosystem.toml → {}",
             merged_path.display()
         ));
+        let extra_verification_logs_path = canonical_dir.join("extra-verification-logs.txt");
+        runner.write_extra_verification_logs(&extra_verification_logs_path)?;
+        logger::info(format!(
+            "Wrote extra verification logs → {}",
+            extra_verification_logs_path.display()
+        ));
         Some(merged_path)
     } else {
         None
