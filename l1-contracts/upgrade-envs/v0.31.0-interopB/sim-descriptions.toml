@@ -215,12 +215,12 @@ desc = "PUH stage 1: L1AssetTracker.acceptOwnership() — completes the deployer
 
 [[entries]]
 target = "0x257CE1e946c9C6531E2C9deBF7fcf821F9467f73"  # NTV
-selector = "0x39d44b2c"  # placeholder selector for setAssetTracker (replace if different)
+selector = "0xe26daa7e"  # setAssetTracker
 desc = "PUH stage 1: NTV.setAssetTracker(L1AssetTracker) — wires NTV to push balance updates to the L1AT."
 
 [[entries]]
-target = "0xCEe1A9d2FE1c587B72F115974d33296C1F9ac35d"  # CAH
-selector = "0xc4d66de8"  # initialize / setAddresses (replace if needed)
+target = "0xCEe1A9d2FE1c587B72F115974d33296C1F9ac35d"  # ChainAssetHandler
+selector = "0xbc3a429b"  # setAddresses
 desc = "PUH stage 1: ChainAssetHandler.setAddresses(...) — post-upgrade pointer fixups for bridgehub/AR/AT/etc."
 
 [[entries]]
