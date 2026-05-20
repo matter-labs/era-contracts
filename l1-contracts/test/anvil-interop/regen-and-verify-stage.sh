@@ -236,6 +236,21 @@ for TARGET in $TARGETS; do
     --rpc-url "$RPC" >/dev/null
 done
 
+# Register the ZK token assetId in L1AssetTracker so bundle 5's GW priority
+# deposits (which burn ZK as the new-GW base token) pass the
+# `_requireRegistered` check on `handleChainBalanceIncreaseOnL1`. In production
+# this registration lands as stage-2 call 6 (`registerLegacyToken`), but Step 3
+# replays the prepare bundles BEFORE governance, so we prime it here directly.
+# `registerLegacyToken` is public — anyone can call it.
+ASSET_TRACKER=$(awk -F'"' '/^asset_tracker_proxy_addr[ \t]*=/{print $2; exit}' "$OUT/ecosystem.toml")
+if [ -n "$ASSET_TRACKER" ]; then
+  echo "  registerLegacyToken($ZK_ASSET_ID) on $ASSET_TRACKER"
+  cast send "$ASSET_TRACKER" "registerLegacyToken(bytes32)" "$ZK_ASSET_ID" \
+    --from "$DEPLOYER" --unlocked --rpc-url "$RPC" >/dev/null || true
+else
+  echo "  WARNING: asset_tracker_proxy_addr not found in $OUT/ecosystem.toml — skipping registerLegacyToken"
+fi
+
 echo "=== Step 3: upgrade-broadcast --unlocked --out ==="
 "$PROTOCOL_OPS" ecosystem upgrade-broadcast \
   --manifest "$OUT/prepare/manifest.json" \

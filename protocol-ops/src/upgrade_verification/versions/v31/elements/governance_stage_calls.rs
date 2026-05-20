@@ -2052,10 +2052,22 @@ impl GovernanceStage0Calls {
         let puh_governed = bridgehub_owner_admin != Address::ZERO;
 
         let base_count = 1 + artifact.ctms.len();
+        // `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps`
+        // defers `acceptOwnership()` for each CTM whose pendingOwner is PUH
+        // into stage 0 (via `pre-governance-accept-ownerships.toml`). Count
+        // them by selector so PUVT doesn't false-error when the prior
+        // transferOwnership ceremony left pendingOwners outstanding.
+        let accept_ownership_selector: [u8; 4] = [0x79, 0xba, 0x50, 0x97];
+        let pre_gov_accept_count = self
+            .calls
+            .elems
+            .iter()
+            .filter(|c| c.data.len() >= 4 && c.data[..4] == accept_ownership_selector)
+            .count();
         let expected_call_count = if puh_governed {
-            base_count + 2
+            base_count + 2 + pre_gov_accept_count
         } else {
-            base_count
+            base_count + pre_gov_accept_count
         };
 
         if puh_governed {
