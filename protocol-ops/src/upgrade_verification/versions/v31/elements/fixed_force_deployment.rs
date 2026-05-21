@@ -148,13 +148,13 @@ impl FixedForceDeploymentsData {
                     ));
                 } else {
                     result.report_ok(&format!(
-                        "FixedForceDeploymentsData eraChainId matches --era-chain-id ({era_chain_id})"
+                        "FixedForceDeploymentsData eraChainId matches env era_chain_id ({era_chain_id})"
                     ));
                 }
             }
             _ => {
                 result.report_warn(&format!(
-                    "Skipping FixedForceDeploymentsData eraChainId check (got {}): pass --era-chain-id to enable it",
+                    "Skipping FixedForceDeploymentsData eraChainId check (got {}): env era_chain_id was not loaded",
                     self.eraChainId
                 ));
             }
@@ -325,29 +325,14 @@ impl FixedForceDeploymentsData {
             result.report_error("dangerousTestOnlyForcedBeacon must be 0");
         }
 
-        match verifiers.zk_token_asset_id {
-            Some(expected) => {
-                if self.zkTokenAssetId == expected {
-                    result.report_ok(&format!(
-                        "zkTokenAssetId matches --zk-token-asset-id ({expected})"
-                    ));
-                } else {
-                    result.report_error(&format!(
-                        "zkTokenAssetId mismatch: expected {expected}, got {}",
-                        self.zkTokenAssetId
-                    ));
-                }
-            }
-            None => {
-                if self.zkTokenAssetId == FixedBytes::<32>::ZERO {
-                    result.report_error("zkTokenAssetId must not be zero");
-                } else {
-                    result.report_warn(&format!(
-                        "zkTokenAssetId not fully verified (pass --zk-token-asset-id to enable): {}",
-                        self.zkTokenAssetId
-                    ));
-                }
-            }
+        let expected = verifiers.zk_token_asset_id;
+        if self.zkTokenAssetId == expected {
+            result.report_ok(&format!("zkTokenAssetId matches env value ({expected})"));
+        } else {
+            result.report_error(&format!(
+                "zkTokenAssetId mismatch: expected {expected}, got {}",
+                self.zkTokenAssetId
+            ));
         }
 
         Ok(())

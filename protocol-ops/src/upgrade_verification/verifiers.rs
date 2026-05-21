@@ -40,7 +40,7 @@ pub(crate) struct Verifiers {
     pub fee_param_verifier: FeeParamVerifier,
     pub gateway_bridgehub_address: Address,
     pub representative_era_chain_id: Option<u64>,
-    pub zk_token_asset_id: Option<FixedBytes<32>>,
+    pub zk_token_asset_id: FixedBytes<32>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -70,6 +70,7 @@ impl Verifiers {
         gw_rpc: impl Into<String>,
         contracts_commit: Option<&str>,
         representative_era_chain_id: u64,
+        zk_token_asset_id: FixedBytes<32>,
     ) -> anyhow::Result<Self> {
         let bridgehub_address = AddressVerifier::address_from_artifact(
             artifact,
@@ -97,11 +98,12 @@ impl Verifiers {
             fee_param_verifier: FeeParamVerifier::empty(),
             gateway_bridgehub_address: address_from_short_hex("10002"),
             representative_era_chain_id: Some(representative_era_chain_id),
-            zk_token_asset_id: None,
+            zk_token_asset_id,
         })
     }
 
     /// Creates a new `Verifiers` instance.
+    /// TODO: not used? remove
     #[allow(clippy::too_many_arguments)]
     pub async fn new(
         testnet_contracts: bool,
@@ -158,7 +160,7 @@ impl Verifiers {
             fee_param_verifier,
             gateway_bridgehub_address: address_from_short_hex("10002"),
             representative_era_chain_id: Some(era_chain_id),
-            zk_token_asset_id: None,
+            zk_token_asset_id: FixedBytes::ZERO,
         }
     }
 

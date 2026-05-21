@@ -1586,7 +1586,7 @@ sol! {
 /// runtime bytecode.
 ///
 /// Scope is the contracts whose constructor arguments are fully derivable
-/// from the artifact + live RPC + the `--era-chain-id` CLI flag. Contracts
+/// from the artifact + live RPC + the env `era_chain_id`. Contracts
 /// with constructor args that are awkward to derive without additional
 /// inputs (e.g. `MailboxFacet._eip7702Checker` / `_isTestnet`,
 /// `MessageRoot._eraGatewayChainId`,
@@ -1709,8 +1709,8 @@ pub(crate) async fn verify_v31_provenance(
     }
 
     // The era_chain_id-dependent constructors (L1AssetRouter / L1Nullifier)
-    // require both the chain id and the chain's diamond proxy. The CLI requires
-    // `--era-chain-id`; the diamond proxy must resolve from Bridgehub.
+    // require both the chain id and the chain's diamond proxy. The env provides
+    // era_chain_id; the diamond proxy must resolve from Bridgehub.
     let era_diamond_proxy = verifiers
         .network_verifier
         .try_get_chain_diamond_from_bridgehub(bridgehub_addr, U256::from(era_chain_id))

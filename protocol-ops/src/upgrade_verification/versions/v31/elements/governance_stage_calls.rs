@@ -1315,7 +1315,7 @@ async fn verify_v31_upgrade_facet_cuts(
         }
         None if verifiers.representative_era_chain_id.is_none() => {
             result.report_warn(
-                "Skipped exact chain upgrade facet-cut reconstruction; pass --era-chain-id to inspect a live chain diamond",
+                "Skipped exact chain upgrade facet-cut reconstruction; env era_chain_id was not loaded",
             );
         }
         None => {}

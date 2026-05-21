@@ -2,8 +2,9 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use alloy::primitives::FixedBytes;
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 
+use crate::common::env_config::EnvConfig;
 use crate::{
     commands::dev::execute_safe::ExecutedBundle,
     common::logger,
@@ -19,6 +20,10 @@ use crate::{
 /// forge scripts or creating an anvil fork.
 #[derive(Debug, Clone, Parser)]
 pub struct VerifyUpgradeArgs {
+    /// Environment whose permanent-values and v31 input TOMLs define verification constants.
+    #[clap(long, value_enum)]
+    pub env: VerifyUpgradeEnv,
+
     /// L1 RPC URL used by later verification phases for read-only on-chain checks.
     #[clap(long, default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
@@ -35,14 +40,6 @@ pub struct VerifyUpgradeArgs {
     /// If omitted, AllContractsHashes.json is read from the repository root.
     #[clap(long)]
     pub contracts_commit: Option<String>,
-
-    /// Existing ZK chain id used for live chain-specific checks.
-    ///
-    /// This mirrors the legacy PUVT `--era-chain-id` argument: the L1 RPC is
-    /// used to read Bridgehub/diamond state, while this id selects which chain's
-    /// diamond to inspect.
-    #[clap(long, alias = "chain-id")]
-    pub era_chain_id: u64,
 
     /// Path to the executed-bundle JSON written by `dev execute-safe --out`.
     /// Phase 6 (deployment provenance) replays this log to reconstruct
@@ -69,16 +66,49 @@ pub struct VerifyUpgradeArgs {
     /// Required.
     #[clap(long, value_delimiter = ',', num_args = 1..)]
     pub create2_salt: Vec<String>,
+}
 
-    /// Expected ZK token asset ID (`keccak256(abi.encode(l1ChainId, 0x10004, zkTokenL1Address))`).
-    /// When provided, `FixedForceDeploymentsData.zkTokenAssetId` is verified against this value
-    /// instead of only checked for non-zero. Recommended for production verification runs.
-    #[clap(long)]
-    pub zk_token_asset_id: Option<FixedBytes<32>>,
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum VerifyUpgradeEnv {
+    Stage,
+    Testnet,
+    Mainnet,
+}
+
+impl VerifyUpgradeEnv {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Stage => "stage",
+            Self::Testnet => "testnet",
+            Self::Mainnet => "mainnet",
+        }
+    }
 }
 
 pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
+    let env = args.env.as_str();
+    let env_cfg = EnvConfig::load(env)?;
+    let era_chain_id = env_cfg.era_chain_id().ok_or_else(|| {
+        anyhow::anyhow!(
+            "{} is missing top-level `era_chain_id`",
+            env_cfg.v31_input_path.display()
+        )
+    })?;
+    let zk_token_asset_id = env_cfg.zk_token_asset_id().ok_or_else(|| {
+        anyhow::anyhow!(
+            "{} is missing top-level `zk_token_asset_id`",
+            env_cfg.permanent_values_path.display()
+        )
+    })?;
+    let zk_token_asset_id = FixedBytes::<32>::from_slice(zk_token_asset_id.as_bytes());
+
     logger::step("Verifying ecosystem upgrade artifacts");
+    logger::info(format!("Env: {env}"));
+    logger::info(format!(
+        "Permanent values: {}",
+        env_cfg.permanent_values_path.display()
+    ));
+    logger::info(format!("V31 input: {}", env_cfg.v31_input_path.display()));
     logger::info(format!("Ecosystem TOML: {}", args.ecosystem_toml.display()));
     logger::info(format!("L1 RPC URL: {}", args.l1_rpc_url));
     logger::info(format!("Gateway RPC URL: {}", args.gw_rpc_url));
@@ -87,7 +117,8 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     } else {
         logger::info("Contracts hashes: local repository AllContractsHashes.json");
     }
-    logger::info(format!("Representative ZK chain ID: {}", args.era_chain_id));
+    logger::info(format!("Representative ZK chain ID: {era_chain_id}"));
+    logger::info(format!("ZK token asset ID: {zk_token_asset_id}"));
 
     let artifact = EcosystemUpgradeArtifact::read(&args.ecosystem_toml)?;
     artifact_shape::verify(&artifact)?;
@@ -130,11 +161,11 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         &args.l1_rpc_url,
         &args.gw_rpc_url,
         args.contracts_commit.as_deref(),
-        args.era_chain_id,
+        era_chain_id,
         &executed_bundle,
         create2_factory,
         create2_salts,
-        args.zk_token_asset_id,
+        zk_token_asset_id,
         &mut result,
     )
     .await;
