@@ -16,9 +16,10 @@ use crate::upgrade_verification::{
     artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
     versions::v31::{
         utils::{
-            address_from_short_hex, address_verifier::AddressVerifier,
-            bytecode_verifier::BytecodeVerifier, fee_param_verifier::FeeParamVerifier,
-            get_contents_from_github, network_verifier::NetworkVerifier, repo_relative_path,
+            address_verifier::AddressVerifier, bytecode_verifier::BytecodeVerifier,
+            fee_param_verifier::FeeParamVerifier, get_contents_from_github,
+            l2_system_addresses::L2_BRIDGEHUB_ADDR, network_verifier::NetworkVerifier,
+            repo_relative_path,
         },
         UpgradeOutput,
     },
@@ -96,7 +97,7 @@ impl Verifiers {
             era_genesis_config,
             zksync_os_genesis_config,
             fee_param_verifier: FeeParamVerifier::empty(),
-            gateway_bridgehub_address: address_from_short_hex("10002"),
+            gateway_bridgehub_address: L2_BRIDGEHUB_ADDR,
             representative_era_chain_id: Some(representative_era_chain_id),
             zk_token_asset_id,
         })
@@ -158,7 +159,7 @@ impl Verifiers {
             era_genesis_config: genesis_config.clone(),
             zksync_os_genesis_config: genesis_config,
             fee_param_verifier,
-            gateway_bridgehub_address: address_from_short_hex("10002"),
+            gateway_bridgehub_address: L2_BRIDGEHUB_ADDR,
             representative_era_chain_id: Some(era_chain_id),
             zk_token_asset_id: FixedBytes::ZERO,
         }

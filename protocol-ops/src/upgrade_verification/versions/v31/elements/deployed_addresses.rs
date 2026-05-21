@@ -12,6 +12,7 @@ use super::{
         address_from_short_hex,
         address_verifier::AddressVerifier,
         facet_cut_set::{self, FacetCutSet, FacetInfo},
+        l2_system_addresses::L2_INTEROP_CENTER_ADDR,
         network_verifier::{Bridgehub as BridgehubSol, BridgehubInfo},
     },
     UpgradeOutput,
@@ -29,8 +30,6 @@ use std::str::FromStr;
 const MAINNET_CHAIN_ID: u64 = 1;
 // TODO: remove this name here
 const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
-// TODO: surely there is a way to not hardcode this
-const L2_INTEROP_CENTER_ADDR: &str = "0x000000000000000000000000000000000001000d";
 
 sol! {
     contract L1NativeTokenVault {
@@ -1027,9 +1026,6 @@ async fn verify_per_ctm_v31_provenance(
     result: &mut VerificationResult,
     bridgehub_addr: Address,
 ) -> Result<()> {
-    let interop_center = Address::from_str(L2_INTEROP_CENTER_ADDR)
-        .context("invalid L2_INTEROP_CENTER_ADDR literal")?;
-
     for ctm in &artifact.ctms {
         let label = ctm.flavor.label();
         result.print_info(&format!("-- CTM deployment provenance: {label} --"));
@@ -1065,7 +1061,7 @@ async fn verify_per_ctm_v31_provenance(
             &ctm_impl,
             V31ChainTypeManager::constructorCall::new((
                 bridgehub_addr,
-                interop_center,
+                L2_INTEROP_CENTER_ADDR,
                 bytecodes_supplier,
                 permissionless_validator,
             ))
@@ -1487,6 +1483,9 @@ sol! {
     contract V31ExecutorFacet {
         constructor(uint256 _l1ChainId);
     }
+    contract V31CommitterFacet {
+        constructor(uint256 _l1ChainId);
+    }
     contract V31MailboxFacet {
         constructor(
             uint256 _eraChainId,
@@ -1497,15 +1496,7 @@ sol! {
         );
     }
     contract V31L1Bridgehub {
-        // The L1Bridgehub source on the contracts side declares
-        // `(address _owner, uint256 _maxNumberOfZKChains)` as of v31, but the
-        // deploy-script `DeployL1CoreUtils.getCreationCalldata("L1Bridgehub")`
-        // encodes three args `(uint256 _l1ChainId, address _owner, uint256
-        // _maxNumberOfZKChains)`; the bytecode actually deployed by the
-        // prepare scripts therefore carries the 3-arg ABI tail. We mirror
-        // that encoding here so `expect_create2_params` matches the bytes
-        // already present in the executed bundle.
-        constructor(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains);
+        constructor(address _owner, uint256 _maxNumberOfZKChains);
     }
     contract V31L1NativeTokenVault {
         constructor(address _wethToken, address _assetRouter, address _l1Nullifier);
@@ -1527,7 +1518,7 @@ sol! {
             address _eraDiamondProxy
         );
     }
-    contract V31MessageRoot {
+    contract V31L1MessageRoot {
         constructor(address _bridgehub, uint256 _eraGatewayChainId, address _chainAssetHandler);
     }
     contract V31L1AssetTracker {
@@ -1573,6 +1564,9 @@ sol! {
     contract V31UpgradeStageValidator {
         constructor(address chainTypeManager, uint256 newProtocolVersion);
     }
+    contract V31ChainRegistrationSender {
+        constructor(address _bridgehub);
+    }
 }
 
 /// Deployment provenance.
@@ -1584,16 +1578,6 @@ sol! {
 /// immutables-aware check: it verifies the contract was *produced* from
 /// the right inputs, regardless of how immutables get baked into the
 /// runtime bytecode.
-///
-/// Scope is the contracts whose constructor arguments are fully derivable
-/// from the artifact + live RPC + the env `era_chain_id`. Contracts
-/// with constructor args that are awkward to derive without additional
-/// inputs (e.g. `MailboxFacet._eip7702Checker` / `_isTestnet`,
-/// `MessageRoot._eraGatewayChainId`,
-/// `ChainTypeManager._interopCenter` / `_permissionlessValidator`,
-/// `L1ChainAssetHandler._owner`, `L1Bridgehub._owner`) are deliberately
-/// not yet wired — adding each is mechanical: append a constructor abi via
-/// `sol!` above and a new `expect_create2_params(...)` call here.
 ///
 /// The per-CTM TUPPs (`BytecodesSupplier` and `PermissionlessValidator`)
 /// are verified with `expect_create2_params_proxy_with_bytecode`, using the
@@ -1763,7 +1747,7 @@ pub(crate) async fn verify_v31_provenance(
         result.expect_create2_params(
             verifiers,
             &committer,
-            V31ExecutorFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
+            V31CommitterFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
             "l1-contracts/CommitterFacet",
         );
     }
@@ -1778,7 +1762,6 @@ pub(crate) async fn verify_v31_provenance(
                 verifiers,
                 &bridgehub_impl,
                 V31L1Bridgehub::constructorCall::new((
-                    U256::from(l1_chain_id),
                     governance,
                     U256::from(MAX_NUMBER_OF_ZK_CHAINS),
                 ))
@@ -1860,11 +1843,6 @@ pub(crate) async fn verify_v31_provenance(
     }
 
     // L1MessageRoot(_bridgehub, _eraGatewayChainId, _chainAssetHandler).
-    // The deploy script (`DeployL1CoreUtils.getCreationCalldata`)
-    // populates the second arg from `config.l1ChainId` rather than a
-    // distinct gateway chain id, so the deployed bytecode's
-    // `_eraGatewayChainId` immutable equals the L1 chain id; mirror that
-    // encoding here.
     //
     // Stage Sepolia deploys the `L1MessageRootStageSepolia` variant (which
     // skips chain 270's still-on-GW-123 settlement check during
@@ -1890,9 +1868,9 @@ pub(crate) async fn verify_v31_provenance(
         result.expect_create2_params(
             verifiers,
             &message_root_impl,
-            V31MessageRoot::constructorCall::new((
+            V31L1MessageRoot::constructorCall::new((
                 bridgehub_addr,
-                U256::from(l1_chain_id),
+                U256::from(era_chain_id),
                 chain_asset_handler,
             ))
             .abi_encode(),
