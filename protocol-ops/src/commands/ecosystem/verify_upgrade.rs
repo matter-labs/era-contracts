@@ -1,30 +1,33 @@
 use std::path::PathBuf;
-use std::str::FromStr;
 
-use alloy::primitives::FixedBytes;
+use alloy::primitives::{Address, FixedBytes};
 use clap::{Parser, ValueEnum};
 
-use crate::common::env_config::EnvConfig;
+use crate::common::env_config::{default_protocol_ops_out_dir, EnvConfig};
 use crate::{
-    commands::dev::execute_safe::ExecutedBundle,
     common::logger,
     upgrade_verification::{
-        artifact_shape, artifacts::EcosystemUpgradeArtifact, verifiers::VerificationResult,
+        artifact_shape,
+        artifacts::EcosystemUpgradeArtifact,
+        verifiers::VerificationResult,
+        versions::v31::utils::transactions_log,
     },
 };
 
 /// Verify prepared ecosystem upgrade artifacts.
 ///
 /// This command is intentionally read-only. It consumes the TOML produced by
-/// `ecosystem upgrade-prepare` and performs validation locally without running
-/// forge scripts or creating an anvil fork.
+/// `ecosystem upgrade-prepare`, walks the append-only `transactions.txt`
+/// emitted alongside, and performs validation locally without running forge
+/// scripts or creating an anvil fork.
 #[derive(Debug, Clone, Parser)]
 pub struct VerifyUpgradeArgs {
     /// Environment whose permanent-values and v31 input TOMLs define verification constants.
     #[clap(long, value_enum)]
     pub env: VerifyUpgradeEnv,
 
-    /// L1 RPC URL used by later verification phases for read-only on-chain checks.
+    /// L1 RPC URL used by deployment provenance to fetch each CREATE2 deployment tx
+    /// and by later phases for read-only on-chain checks.
     #[clap(long, default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
 
@@ -41,31 +44,18 @@ pub struct VerifyUpgradeArgs {
     #[clap(long)]
     pub contracts_commit: Option<String>,
 
-    /// Path to the executed-bundle JSON written by `dev execute-safe --out`.
-    /// Phase 6 (deployment provenance) replays this log to reconstruct
-    /// CREATE2 / TUPP deployments and verify each named v31 implementation
-    /// was deployed from the expected init bytecode + constructor args (the
-    /// immutables-aware check that Phase 5's runtime-hash comparison cannot
-    /// do). Required.
+    /// Path to the append-only `transactions.txt` emitted by every prepare
+    /// broadcast (see `dev execute-safe::append_transaction_hash`). Each
+    /// non-blank line is a 0x-prefixed L1 tx hash. We fetch each tx
+    /// via L1 RPC, filter successful CREATE2-factory deploys, identify the
+    /// deployed contract via `AllContractsHashes.json`, and feed the
+    /// `(addr → name, ctor_args)` map that `expect_create2_params` consumes.
+    /// Stale entries (from older regens whose bytecode is no longer in
+    /// AllContractsHashes) are silently skipped.
+    ///
+    /// Defaults to `<l1-contracts>/upgrade-envs/v0.31.0-interopB/output/<env>/transactions.txt`
     #[clap(long)]
-    pub executed_bundles: PathBuf,
-
-    /// Address of the Create2Factory used by the prepare scripts. The
-    /// default matches the factory address used by the v31 stage env
-    /// (`environments/stage/stage.yaml`).
-    #[clap(long, default_value = "0x4e59b44847b379578588920cA78FbF26c0B4956C")]
-    pub create2_factory: String,
-
-    /// CREATE2 salt(s) used by the prepare scripts. Accept multiple via repeated
-    /// `--create2-salt 0xAA --create2-salt 0xBB ...` or a comma-separated list
-    /// `--create2-salt 0xAA,0xBB,0xCC`. Multiple salts are required when the
-    /// prepare flow generates a fresh random salt per sub-script
-    /// (`v31_upgrade_inner.rs` defaults to `H256::random()` per core / per-CTM /
-    /// per-GW-prep when no `--create2-factory-salt` is pinned). PUVT accepts
-    /// any CREATE2 factory tx whose salt matches one of the provided values.
-    /// Required.
-    #[clap(long, value_delimiter = ',', num_args = 1..)]
-    pub create2_salt: Vec<String>,
+    pub transactions_log: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -101,6 +91,30 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         )
     })?;
     let zk_token_asset_id = FixedBytes::<32>::from_slice(zk_token_asset_id.as_bytes());
+    let create2_factory_eth = env_cfg.create2_factory().ok_or_else(|| {
+        anyhow::anyhow!(
+            "{} is missing `[permanent_contracts] create2_factory_addr`",
+            env_cfg.permanent_values_path.display()
+        )
+    })?;
+    let create2_factory = Address::from_slice(create2_factory_eth.as_bytes());
+
+    // Collect every pinned CREATE2 salt declared in the env config — the Core
+    // salt from `[contracts] create2_factory_salt` plus the per-CTM salts under
+    // `[create2_factory_salts]`. PUVT hard-errors per deploy whose salt isn't
+    // in this set.
+    let mut expected_salts: Vec<FixedBytes<32>> = Vec::new();
+    if let Some(core_salt) = env_cfg.v31_create2_factory_salt()? {
+        expected_salts.push(FixedBytes::<32>::from_slice(core_salt.as_bytes()));
+    }
+    for salt in env_cfg.v31_create2_factory_salt_per_ctm()?.values() {
+        expected_salts.push(FixedBytes::<32>::from_slice(salt.as_bytes()));
+    }
+
+    let transactions_log_path = match args.transactions_log.clone() {
+        Some(path) => path,
+        None => default_protocol_ops_out_dir(env)?.join("transactions.txt"),
+    };
 
     logger::step("Verifying ecosystem upgrade artifacts");
     logger::info(format!("Env: {env}"));
@@ -110,6 +124,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     ));
     logger::info(format!("V31 input: {}", env_cfg.v31_input_path.display()));
     logger::info(format!("Ecosystem TOML: {}", args.ecosystem_toml.display()));
+    logger::info(format!("Transactions log: {}", transactions_log_path.display()));
     logger::info(format!("L1 RPC URL: {}", args.l1_rpc_url));
     logger::info(format!("Gateway RPC URL: {}", args.gw_rpc_url));
     if let Some(contracts_commit) = &args.contracts_commit {
@@ -118,41 +133,18 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         logger::info("Contracts hashes: local repository AllContractsHashes.json");
     }
     logger::info(format!("Representative ZK chain ID: {era_chain_id}"));
+    logger::info(format!("CREATE2 factory: {create2_factory}"));
     logger::info(format!("ZK token asset ID: {zk_token_asset_id}"));
 
     let artifact = EcosystemUpgradeArtifact::read(&args.ecosystem_toml)?;
     artifact_shape::verify(&artifact)?;
 
-    // Read the executed-bundle log produced by `dev execute-safe --out`.
-    // Multiple invocations of `dev execute-safe` against the same path
-    // accumulate into a single file, so we only need to read one path here.
+    let tx_hashes = transactions_log::read(&transactions_log_path)?;
     logger::info(format!(
-        "Executed bundle: {}",
-        args.executed_bundles.display()
+        "Loaded {} transaction hash(es) from {}",
+        tx_hashes.len(),
+        transactions_log_path.display()
     ));
-    let raw = std::fs::read_to_string(&args.executed_bundles).map_err(|err| {
-        anyhow::anyhow!("failed to read {}: {err}", args.executed_bundles.display())
-    })?;
-    let executed_bundle: ExecutedBundle = serde_json::from_str(&raw).map_err(|err| {
-        anyhow::anyhow!(
-            "failed to parse executed-bundle JSON {}: {err}",
-            args.executed_bundles.display()
-        )
-    })?;
-
-    let create2_factory = alloy::primitives::Address::from_str(&args.create2_factory)
-        .map_err(|err| anyhow::anyhow!("invalid --create2-factory address: {err}"))?;
-    if args.create2_salt.is_empty() {
-        anyhow::bail!("at least one --create2-salt is required");
-    }
-    let create2_salts: Vec<FixedBytes<32>> = args
-        .create2_salt
-        .iter()
-        .map(|s| {
-            FixedBytes::<32>::from_str(s)
-                .map_err(|err| anyhow::anyhow!("invalid --create2-salt `{s}`: {err}"))
-        })
-        .collect::<anyhow::Result<_>>()?;
 
     let mut result = VerificationResult::default();
 
@@ -162,9 +154,9 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         &args.gw_rpc_url,
         args.contracts_commit.as_deref(),
         era_chain_id,
-        &executed_bundle,
+        &tx_hashes,
         create2_factory,
-        create2_salts,
+        &expected_salts,
         zk_token_asset_id,
         &mut result,
     )

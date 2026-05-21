@@ -4,12 +4,9 @@ use std::str::FromStr;
 
 use alloy::primitives::{Address, FixedBytes};
 
-use crate::{
-    commands::dev::execute_safe::ExecutedBundle,
-    upgrade_verification::{
-        artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
-        verifiers::{VerificationResult, Verifiers},
-    },
+use crate::upgrade_verification::{
+    artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
+    verifiers::{VerificationResult, Verifiers},
 };
 
 pub(crate) mod elements;
@@ -68,9 +65,9 @@ pub(crate) async fn verify(
     gw_rpc_url: &str,
     contracts_commit: Option<&str>,
     era_chain_id: u64,
-    executed_bundle: &ExecutedBundle,
+    tx_hashes: &[FixedBytes<32>],
     create2_factory: Address,
-    create2_salts: Vec<FixedBytes<32>>,
+    expected_salts: &[FixedBytes<32>],
     zk_token_asset_id: FixedBytes<32>,
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
@@ -95,22 +92,29 @@ pub(crate) async fn verify(
 
     // Populate the create2 maps so Phase 6 (deployment provenance) can match
     // deployed addresses against expected init bytecode + constructor args.
+    // Each tx is fetched from L1 RPC; stale entries (whose bytecode no longer
+    // matches AllContractsHashes after a regen) are silently skipped — the
+    // address-book lookup in `expect_create2_params` hard-errors only if a
+    // load-bearing deployment is missing.
     let count = {
         let Verifiers {
             bytecode_verifier,
             network_verifier,
             ..
         } = &mut verifiers;
-        network_verifier.populate_create2_from_executed_bundle(
-            executed_bundle,
-            &create2_factory,
-            &create2_salts,
-            bytecode_verifier,
-        );
+        network_verifier
+            .populate_create2_from_transactions_log(
+                tx_hashes,
+                &create2_factory,
+                expected_salts,
+                bytecode_verifier,
+                result,
+            )
+            .await;
         network_verifier.create2_known_bytecodes.len()
     };
     result.report_ok(&format!(
-        "Loaded {} CREATE2 deployments from executed bundle",
+        "Loaded {} CREATE2 deployments from transactions log",
         count,
     ));
 

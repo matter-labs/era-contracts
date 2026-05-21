@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use Bridgehub::requestL2TransactionDirectCall;
 
-use crate::commands::dev::execute_safe::ExecutedBundle;
+use crate::common::logger;
 
 use super::super::elements::UpgradeOutput;
 
@@ -138,38 +138,158 @@ impl NetworkVerifier {
         })
     }
 
-    /// Replay the executed-bundle log produced by `dev execute-safe --out`
-    /// to populate the legacy `create2_known_bytecodes` /
-    /// `create2_constructor_params` maps that
-    /// `VerificationResult::expect_create2_params` consumes. Each tx that
-    /// targets the configured Create2Factory with the configured salt is
-    /// turned into a `(deployed address → contract file + constructor args)`
-    /// entry. Same recognition rules as the legacy `check_create2_deploy`
-    /// (raw CREATE2 + Create2AndTransfer).
-    pub fn populate_create2_from_executed_bundle(
+    /// Walk a `transactions.txt`-style hash list and turn each successful
+    /// CREATE2-factory tx into a `(deployed address → contract file +
+    /// constructor args)` entry.
+    ///
+    /// `transactions.txt` is append-only across regens, so we silently skip
+    /// txs that:
+    ///   - aren't on the RPC (wrong network, or stale-file warning)
+    ///   - reverted on-chain (status != 1)
+    ///   - don't target the configured Create2Factory
+    ///   - have <32 bytes of input
+    ///   - whose bytecode hash no longer matches any contract in
+    ///     `AllContractsHashes.json` (stale deploy from a prior regen — the
+    ///     natural filter for the append-only file)
+    ///
+    /// Surfaces two classes of issue via `result`:
+    ///   - Salt sanity (`expected_salts`): every recognized deploy whose salt
+    ///     isn't in the env-declared set is a hard ERROR.
+    ///   - Duplicate metadata: if the same deployed address shows up twice
+    ///     with different `(name, ctor_args)`, that's a hard ERROR.
+    pub async fn populate_create2_from_transactions_log(
         &mut self,
-        bundle: &ExecutedBundle,
+        tx_hashes: &[FixedBytes<32>],
         create2_factory: &Address,
-        create2_salts: &[FixedBytes<32>],
+        expected_salts: &[FixedBytes<32>],
         bytecode_verifier: &BytecodeVerifier,
+        result: &mut crate::upgrade_verification::verifiers::VerificationResult,
     ) {
-        for tx in &bundle.transactions {
-            let Some(to) = parse_hex_address(&tx.to) else {
+        let mut fetch_failures = 0_usize;
+        let mut reverted = 0_usize;
+
+        for tx_hash in tx_hashes {
+            let hash = TxHash::from(*tx_hash);
+
+            let tx = match self.l1_provider.get_transaction_by_hash(hash).await {
+                Ok(Some(tx)) => tx,
+                Ok(None) => {
+                    fetch_failures += 1;
+                    continue;
+                }
+                Err(err) => {
+                    logger::warn(format!(
+                        "eth_getTransactionByHash({hash:#x}) failed: {err}"
+                    ));
+                    fetch_failures += 1;
+                    continue;
+                }
+            };
+
+            let Some(to) = tx.to() else {
                 continue;
             };
-            let Some(input) = parse_hex_bytes(&tx.data) else {
+            if to != *create2_factory {
                 continue;
-            };
-            if let Some((addr, name, params)) = check_create2_deploy_from_input(
-                to,
-                &input,
-                create2_factory,
-                create2_salts,
-                bytecode_verifier,
-            ) {
-                self.create2_constructor_params.insert(addr, params);
-                self.create2_known_bytecodes.insert(addr, name);
             }
+            let input = tx.input();
+            if input.len() < 32 {
+                continue;
+            }
+
+            match self.l1_provider.get_transaction_receipt(hash).await {
+                Ok(Some(receipt)) => {
+                    if !receipt.status() {
+                        reverted += 1;
+                        continue;
+                    }
+                }
+                Ok(None) => {
+                    logger::warn(format!(
+                        "eth_getTransactionReceipt({hash:#x}) returned null"
+                    ));
+                    fetch_failures += 1;
+                    continue;
+                }
+                Err(err) => {
+                    logger::warn(format!(
+                        "eth_getTransactionReceipt({hash:#x}) failed: {err}"
+                    ));
+                    fetch_failures += 1;
+                    continue;
+                }
+            }
+
+            let salt_bytes = &input[..32];
+            let rest = &input[32..];
+
+            let Some((name, params)) = bytecode_verifier.try_parse_bytecode(rest) else {
+                // Bytecode hash isn't in AllContractsHashes — stale deploy
+                // from a prior regen, or a non-v31 deploy that happened to
+                // hit the factory. Silently skip; the address-book lookup
+                // in `expect_create2_params` will hard-error if this would
+                // have been a load-bearing deployment.
+                continue;
+            };
+
+            let salt_fb = FixedBytes::<32>::from_slice(salt_bytes);
+            let addr = compute_create2_address_evm(
+                *create2_factory,
+                salt_fb,
+                keccak256(rest),
+            );
+
+            // Salt sanity: only enforced after recognition, so non-deploy tx
+            // first-32 bytes (which aren't salts at all) don't trigger errors.
+            // Hard ERROR per offending deploy — `ensure_success` rejects the
+            // run, but the entry is still inserted into the map below so
+            // downstream address-book lookups in `expect_create2_params` are
+            // unaffected.
+            if !expected_salts.contains(&salt_fb) {
+                result.report_error(&format!(
+                    "Deployment of {name} at {addr} (tx {hash:#x}) used salt {salt_fb} \
+                     which is not in the env-declared salt set"
+                ));
+            }
+
+            // Duplicate detection: same address showing up twice with
+            // mismatched metadata is a hard error.
+            if let Some(existing_name) = self.create2_known_bytecodes.get(&addr) {
+                if existing_name != &name {
+                    result.report_error(&format!(
+                        "Duplicate CREATE2 deployment at {addr}: name conflict — \
+                         existing={existing_name}, new={name}"
+                    ));
+                    continue;
+                }
+                if let Some(existing_params) = self.create2_constructor_params.get(&addr) {
+                    if existing_params != &params {
+                        result.report_error(&format!(
+                            "Duplicate CREATE2 deployment at {addr} ({name}): ctor args differ. \
+                             existing=0x{}, new=0x{}",
+                            hex::encode(existing_params),
+                            hex::encode(&params),
+                        ));
+                        continue;
+                    }
+                }
+                // Same address, same metadata — idempotent re-deploy. Skip.
+                continue;
+            }
+
+            self.create2_known_bytecodes.insert(addr, name);
+            self.create2_constructor_params.insert(addr, params);
+        }
+
+        if fetch_failures > 0 {
+            logger::warn(format!(
+                "transactions.txt: {fetch_failures} tx(s) not found on the RPC — wrong network, or stale file?"
+            ));
+        }
+        if reverted > 0 {
+            logger::warn(format!(
+                "transactions.txt: {reverted} tx(s) reverted (status=0) — skipped"
+            ));
         }
     }
 
