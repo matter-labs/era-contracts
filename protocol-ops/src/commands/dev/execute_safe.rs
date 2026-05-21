@@ -1,4 +1,5 @@
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -300,6 +301,7 @@ pub(crate) async fn execute_one_bundle(
                 status: status.as_u64(),
             });
             persist_executed_bundle(path, &executed)?;
+            append_transaction_hash(path, tx_hash)?;
         }
     }
 
@@ -331,6 +333,31 @@ fn persist_executed_bundle(path: &Path, bundle: &ExecutedBundle) -> anyhow::Resu
         serde_json::to_string_pretty(bundle).context("failed to serialise executed bundle")?;
     fs::write(path, serialized)
         .with_context(|| format!("failed to write executed-bundle file {}", path.display()))?;
+    Ok(())
+}
+
+fn append_transaction_hash(out_path: &Path, tx_hash: H256) -> anyhow::Result<()> {
+    let Some(parent) = out_path.parent() else {
+        return Ok(());
+    };
+    if parent.as_os_str().is_empty() {
+        return Ok(());
+    }
+
+    fs::create_dir_all(parent).with_context(|| {
+        format!(
+            "failed to create transactions.txt output dir {}",
+            parent.display()
+        )
+    })?;
+    let path = parent.join("transactions.txt");
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .with_context(|| format!("failed to open transaction hash log {}", path.display()))?;
+    writeln!(file, "{tx_hash:#x}")
+        .with_context(|| format!("failed to append transaction hash to {}", path.display()))?;
     Ok(())
 }
 
@@ -480,6 +507,7 @@ pub(crate) async fn execute_one_bundle_unlocked(
                 status: status.as_u64(),
             });
             persist_executed_bundle(path, &executed)?;
+            append_transaction_hash(path, tx_hash)?;
         }
     }
 
