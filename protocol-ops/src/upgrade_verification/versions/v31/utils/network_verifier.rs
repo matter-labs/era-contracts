@@ -6,12 +6,9 @@ use alloy::sol;
 use alloy::sol_types::SolCall;
 use anyhow::Context;
 use std::collections::HashMap;
-use std::str::FromStr;
 use Bridgehub::requestL2TransactionDirectCall;
 
 use crate::common::logger;
-
-use super::super::elements::UpgradeOutput;
 
 use super::bytecode_verifier::BytecodeVerifier;
 use super::{address_from_short_hex, compute_create2_address_evm, compute_create2_address_zk};
@@ -80,23 +77,6 @@ sol! {
 const EIP1967_PROXY_ADMIN_SLOT: &str =
     "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
 
-#[derive(Debug)]
-pub struct BridgehubInfo {
-    pub shared_bridge: Address,
-    pub legacy_bridge: Address,
-    pub stm_address: Address,
-    pub transparent_proxy_admin: Address,
-    pub l1_weth_token_address: Address,
-    pub ecosystem_admin: Address,
-    pub bridgehub_addr: Address,
-    pub validator_timelock: Address,
-    pub era_address: Address,
-    pub native_token_vault: Address,
-    pub l1_nullifier: Address,
-    pub l1_asset_router_proxy_addr: Address,
-    pub gateway_base_token_addr: Address,
-}
-
 pub struct NetworkVerifier {
     pub l1_provider: RootProvider,
     pub l2_chain_id: u64,
@@ -122,10 +102,11 @@ impl NetworkVerifier {
             .context("failed to fetch L1 chain id")?;
         let gw_provider =
             RootProvider::new_http(gw_rpc.parse().context("invalid gateway RPC URL")?);
-        let gateway_chain_id = gw_provider
-            .get_chain_id()
-            .await
-            .context("failed to fetch gateway chain id")?;
+        let gateway_chain_id = 0;
+        // let gateway_chain_id = gw_provider
+        //     .get_chain_id()
+        //     .await
+        //     .context("failed to fetch gateway chain id")?;
 
         Ok(Self {
             l1_provider,
@@ -293,97 +274,6 @@ impl NetworkVerifier {
         }
     }
 
-    pub async fn new(
-        l1_rpc: String,
-        l2_chain_id: u64,
-        gateway_chain_id: u64,
-        gateway_rpc: String,
-        bytecode_verifier: &BytecodeVerifier,
-        config: &UpgradeOutput,
-        bridgehub_address: &Address,
-    ) -> Self {
-        let mut create2_constructor_params = HashMap::new();
-        let mut create2_known_bytecodes = HashMap::new();
-        let l1_provider = RootProvider::new_http(l1_rpc.parse().unwrap());
-        let gw_provider = RootProvider::new_http(gateway_rpc.parse().unwrap());
-
-        if gw_provider.get_chain_id().await.unwrap() != gateway_chain_id {
-            panic!("Incorrect gateway provider")
-        }
-
-        println!(
-            "Adding {} transactions from create2",
-            config.transactions.len()
-        );
-
-        for transaction in &config.transactions {
-            if let Some((address, contract, constructor_param)) = check_create2_deploy(
-                l1_provider.clone(),
-                transaction,
-                &config.create2_factory_addr,
-                &config.create2_factory_salt,
-                bytecode_verifier,
-            )
-            .await
-            {
-                if create2_constructor_params
-                    .insert(address, constructor_param)
-                    .is_some()
-                {
-                    panic!("Duplicate deployment for {:#?}", address)
-                }
-
-                if create2_known_bytecodes
-                    .insert(address, contract.clone())
-                    .is_some()
-                {
-                    panic!("Duplicate deployment for {:#?}", address)
-                }
-            }
-
-            if let Some((address, contract, constructor_param)) = check_gw_create2_deploy(
-                l1_provider.clone(),
-                bridgehub_address,
-                transaction,
-                bytecode_verifier,
-            )
-            .await
-            {
-                if create2_constructor_params
-                    .insert(address, constructor_param)
-                    .is_some()
-                {
-                    panic!("Duplicate deployment for {:#?}", address)
-                }
-
-                if create2_known_bytecodes
-                    .insert(address, contract.clone())
-                    .is_some()
-                {
-                    panic!("Duplicate deployment for {:#?}", address)
-                }
-            }
-        }
-
-        Self {
-            l1_chain_id: l1_provider.get_chain_id().await.unwrap(),
-            l1_provider,
-            l2_chain_id,
-            gateway_chain_id,
-            gw_provider,
-            create2_constructor_params,
-            create2_known_bytecodes,
-        }
-    }
-
-    pub fn get_era_chain_id(&self) -> u64 {
-        self.l2_chain_id
-    }
-
-    pub fn get_l1_chain_id(&self) -> u64 {
-        self.l1_chain_id
-    }
-
     pub fn get_gateway_chain_id(&self) -> u64 {
         self.gateway_chain_id
     }
@@ -396,15 +286,6 @@ impl NetworkVerifier {
         } else {
             keccak256(&code)
         }
-    }
-
-    pub async fn get_chain_diamond_proxy(&self, stm_addr: Address, era_chain_id: u64) -> Address {
-        let ctm = ChainTypeManager::new(stm_addr, self.l1_provider.clone());
-
-        ctm.getHyperchain(U256::from(era_chain_id))
-            .call()
-            .await
-            .unwrap()
     }
 
     pub async fn storage_at(&self, address: &Address, key: &FixedBytes<32>) -> FixedBytes<32> {
@@ -429,10 +310,6 @@ impl NetworkVerifier {
 
     pub fn get_l1_provider(&self) -> RootProvider {
         self.l1_provider.clone()
-    }
-
-    pub fn get_gw_provider(&self) -> RootProvider {
-        self.gw_provider.clone()
     }
 
     pub async fn try_get_l1_chain_id(&self) -> anyhow::Result<u64> {
@@ -518,96 +395,12 @@ impl NetworkVerifier {
         Address::from_slice(&addr_as_bytes[12..])
     }
 
-    pub async fn get_bridgehub_info(&self, bridgehub_addr: Address) -> BridgehubInfo {
-        let l1_provider = &self.get_l1_provider();
-
-        let bridgehub = Bridgehub::new(bridgehub_addr, l1_provider);
-
-        let shared_bridge_address = bridgehub.sharedBridge().call().await.unwrap();
-
-        let shared_bridge = L1AssetRouter::new(shared_bridge_address, l1_provider);
-
-        let era_chain_id = self.get_era_chain_id();
-
-        let stm_address = bridgehub
-            .chainTypeManager(era_chain_id.try_into().unwrap())
-            .call()
-            .await
-            .unwrap();
-        let chain_type_manager = ChainTypeManager::new(stm_address, l1_provider);
-        let era_address = chain_type_manager
-            .getHyperchain(U256::from(era_chain_id))
-            .call()
-            .await
-            .unwrap();
-        let validator_timelock = chain_type_manager.validatorTimelock().call().await.unwrap();
-
-        let ecosystem_admin = bridgehub.admin().call().await.unwrap();
-
-        let transparent_proxy_admin = self.get_proxy_admin(bridgehub_addr).await;
-
-        let legacy_bridge = shared_bridge.legacyBridge().call().await.unwrap();
-
-        let l1_weth_token_address = shared_bridge.L1_WETH_TOKEN().call().await.unwrap();
-
-        let native_token_vault = shared_bridge.nativeTokenVault().call().await.unwrap();
-
-        let l1_nullifier = shared_bridge.L1_NULLIFIER().call().await.unwrap();
-
-        let l1_asset_router_proxy_addr = bridgehub.assetRouter().call().await.unwrap();
-
-        let gateway_base_token_addr = bridgehub
-            .baseToken(U256::from(self.get_gateway_chain_id()))
-            .call()
-            .await
-            .unwrap();
-
-        BridgehubInfo {
-            shared_bridge: shared_bridge_address,
-            legacy_bridge,
-            stm_address,
-            transparent_proxy_admin,
-            l1_weth_token_address,
-            ecosystem_admin,
-            bridgehub_addr,
-            validator_timelock,
-            era_address,
-            native_token_vault,
-            l1_nullifier,
-            l1_asset_router_proxy_addr,
-            gateway_base_token_addr,
-        }
-    }
 }
 
 /// Fetches the `transaction` and tries to parse it as a CREATE2 deployment
 /// transaction.
 /// If successful, it returns a tuple of three items: the address of the deployed contract,
 /// the path to the contract and its constructor params.
-async fn check_create2_deploy(
-    l1_provider: RootProvider,
-    transaction: &str,
-    expected_create2_address: &Address,
-    expected_create2_salt: &FixedBytes<32>,
-    bytecode_verifier: &BytecodeVerifier,
-) -> Option<(Address, String, Vec<u8>)> {
-    let tx_hash: TxHash = transaction.parse().unwrap();
-
-    let tx = l1_provider
-        .get_transaction_by_hash(tx_hash)
-        .await
-        .unwrap()
-        .unwrap();
-
-    let to = tx.to()?;
-    check_create2_deploy_from_input(
-        to,
-        tx.input(),
-        expected_create2_address,
-        std::slice::from_ref(expected_create2_salt),
-        bytecode_verifier,
-    )
-}
 
 /// Same logic as `check_create2_deploy` but operates on raw `(to, input)`
 /// instead of a tx hash → useful for replaying the bundle that
@@ -673,14 +466,6 @@ fn check_create2_deploy_from_input(
     None
 }
 
-fn parse_hex_address(s: &str) -> Option<Address> {
-    Address::from_str(s.trim()).ok()
-}
-
-fn parse_hex_bytes(s: &str) -> Option<Vec<u8>> {
-    let trimmed = s.trim().strip_prefix("0x").unwrap_or(s.trim());
-    hex::decode(trimmed).ok()
-}
 
 async fn check_gw_create2_deploy(
     l1_provider: RootProvider,

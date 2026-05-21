@@ -1,3 +1,6 @@
+// TODO: drop once D13 cleanup lands (legacy `GovernanceStage{0,1,2}Calls::verify`
+// + `impl ChainCreationParams::verify` + their helpers) and the scaffolding
+// kept for R2 (fee-params) and S2d (`check_gw_create2_deploy`) is resolved.
 #![allow(dead_code, private_interfaces)]
 
 use std::str::FromStr;
@@ -12,7 +15,6 @@ use crate::upgrade_verification::{
 pub(crate) mod elements;
 pub(crate) mod utils;
 
-pub(crate) use elements::UpgradeOutput;
 use elements::{
     deployed_addresses::{verify_v31_artifact_state, verify_v31_provenance},
     governance_stage_calls::{verify_governance_stage_calls, verify_per_chain_protocol_versions},
@@ -29,7 +31,8 @@ pub(crate) fn get_expected_new_protocol_version() -> ProtocolVersion {
     ProtocolVersion::from_str(EXPECTED_NEW_PROTOCOL_VERSION_STR).unwrap()
 }
 
-// TODO: cleanup, remove
+// TODO: Used only by the dead legacy `GovernanceStage{0,1,2}Calls::verify`
+// (D13). Will go away when that tree is removed in the next dead-code sweep.
 pub(crate) fn get_expected_old_protocol_version() -> ProtocolVersion {
     get_expected_old_protocol_version_for_ctm_flavor(CtmFlavor::Era)
 }

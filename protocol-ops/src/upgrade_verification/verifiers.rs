@@ -1,3 +1,5 @@
+// TODO: drop once R2 (fee-params) scaffolding lands or is deleted, alongside
+// the D13 cleanup (legacy `GovernanceStage{0,1,2}Calls::verify` etc.).
 #![allow(dead_code)]
 
 use alloy::{
@@ -21,7 +23,6 @@ use crate::upgrade_verification::{
             l2_system_addresses::L2_BRIDGEHUB_ADDR, network_verifier::NetworkVerifier,
             repo_relative_path,
         },
-        UpgradeOutput,
     },
 };
 
@@ -103,87 +104,6 @@ impl Verifiers {
         })
     }
 
-    /// Creates a new `Verifiers` instance.
-    /// TODO: not used? remove
-    #[allow(clippy::too_many_arguments)]
-    pub async fn new(
-        testnet_contracts: bool,
-        bridgehub_address: impl AsRef<str>,
-        era_commit: &str,
-        contracts_commit: &str,
-        l1_rpc: String,
-        gw_rpc: String,
-        era_chain_id: u64,
-        gateway_chain_id: u64,
-        config: &UpgradeOutput,
-    ) -> Self {
-        let bridgehub_address =
-            Address::from_hex(bridgehub_address.as_ref()).expect("Bridgehub address");
-
-        let bytecode_verifier = BytecodeVerifier::init_from_github(contracts_commit).await;
-        let network_verifier = NetworkVerifier::new(
-            l1_rpc,
-            era_chain_id,
-            gateway_chain_id,
-            gw_rpc,
-            &bytecode_verifier,
-            config,
-            &bridgehub_address,
-        )
-        .await;
-
-        if testnet_contracts && network_verifier.get_l1_chain_id() == 1 {
-            panic!("Testnet contracts are not expected to be deployed on L1 mainnet - you passed --testnet-contracts flag.");
-        }
-
-        let address_verifier = AddressVerifier::new(
-            bridgehub_address,
-            &network_verifier,
-            &bytecode_verifier,
-            config,
-        )
-        .await;
-
-        let fee_param_verifier =
-            FeeParamVerifier::safe_init(&bridgehub_address, &network_verifier, contracts_commit)
-                .await;
-        let genesis_config = GenesisConfig::init_from_github(era_commit)
-            .await
-            .expect("Failed to init");
-        Self {
-            testnet_contracts,
-            bridgehub_address,
-            address_verifier,
-            bytecode_verifier,
-            network_verifier,
-            era_genesis_config: genesis_config.clone(),
-            zksync_os_genesis_config: genesis_config,
-            fee_param_verifier,
-            gateway_bridgehub_address: L2_BRIDGEHUB_ADDR,
-            representative_era_chain_id: Some(era_chain_id),
-            zk_token_asset_id: FixedBytes::ZERO,
-        }
-    }
-
-    /// Fetches extra addresses from the network and appends them to the internal verifier.
-    pub async fn append_addresses(&mut self) -> anyhow::Result<()> {
-        let info = self
-            .network_verifier
-            .get_bridgehub_info(self.bridgehub_address)
-            .await;
-
-        self.address_verifier
-            .add_address(self.bridgehub_address, "bridgehub_proxy");
-        self.address_verifier
-            .add_address(info.stm_address, "state_transition_manager");
-        self.address_verifier
-            .add_address(info.transparent_proxy_admin, "transparent_proxy_admin");
-        self.address_verifier
-            .add_address(info.shared_bridge, "old_shared_bridge_proxy");
-        self.address_verifier
-            .add_address(info.legacy_bridge, "legacy_erc20_bridge_proxy");
-        Ok(())
-    }
 
     pub(crate) fn genesis_config_for_ctm(&self, flavor: CtmFlavor) -> &GenesisConfig {
         match flavor {
@@ -230,18 +150,6 @@ impl GenesisConfig {
         })
     }
 
-    /// Initializes the genesis configuration from a file on GitHub.
-    pub async fn init_from_github(commit: &str) -> anyhow::Result<Self> {
-        println!("init from github {}", commit);
-        let data = get_contents_from_github(
-            commit,
-            "matter-labs/zksync-era",
-            "etc/env/file_based/genesis.yaml",
-        )
-        .await;
-        serde_yaml::from_str(&data)
-            .map_err(|e| anyhow::anyhow!("Failed to parse genesis.yaml: {}", e))
-    }
 }
 
 #[derive(Default)]
