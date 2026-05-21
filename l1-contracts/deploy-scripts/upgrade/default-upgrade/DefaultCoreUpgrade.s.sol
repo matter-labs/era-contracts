@@ -132,6 +132,13 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         // Protocol version comes from genesis config
         additionalConfig.newProtocolVersion = loadProtocolVersionFromGenesis();
 
+        // Legacy Era gateway chain ID — baked into L1MessageRoot as immutable
+        // ERA_GATEWAY_CHAIN_ID. Read from the upgrade input TOML ([gateway] section)
+        // so the constructor gets the right value. Optional: absent on fresh/local.
+        if (upgradeToml.keyExists("$.gateway.chain_id")) {
+            config.legacyGatewayChainId = upgradeToml.readUint("$.gateway.chain_id");
+        }
+
         coreAddresses.bridgehub.proxies.bridgehub = bridgehubProxyAddress;
         require(coreAddresses.bridgehub.proxies.bridgehub != address(0), "bridgehub_proxy_addr is zero");
         setAddressesBasedOnBridgehub();
