@@ -61,6 +61,14 @@ const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
         &[
             "deployed_addresses",
             "bridgehub",
+            "chain_registration_sender_implementation_addr",
+        ],
+        "chain_registration_sender_implementation_addr",
+    ),
+    (
+        &[
+            "deployed_addresses",
+            "bridgehub",
             "ctm_deployment_tracker_proxy_addr",
         ],
         "ctm_deployment_tracker_proxy",

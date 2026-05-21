@@ -1110,6 +1110,22 @@ async fn verify_per_ctm_v31_provenance(
                 "l1-contracts/PermissionlessValidator",
             )
             .await;
+
+        // ServerNotifier impl (no ctor args). One deployed per CTM by
+        // `CTMUpgrade_v31`; surfaced as
+        // `[ctms.<flavor>.state_transition] server_notifier_implementation_addr`.
+        if let Some(server_notifier_impl) = required_ctm_address(
+            ctm,
+            &["state_transition", "server_notifier_implementation_addr"],
+            result,
+        ) {
+            result.expect_create2_params(
+                verifiers,
+                &server_notifier_impl,
+                Vec::<u8>::new(),
+                "l1-contracts/ServerNotifier",
+            );
+        }
     }
 
     Ok(())
@@ -1929,6 +1945,18 @@ pub(crate) async fn verify_v31_provenance(
             &eip7702,
             Vec::<u8>::new(),
             "da-contracts/EIP7702Checker",
+        );
+    }
+
+    // ChainRegistrationSender(bridgehub). Deployed once by `CoreUpgrade_v31`
+    // and surfaced as `[core.upgrade_addresses.bridgehub]
+    // chain_registration_sender_implementation_addr`.
+    if let Some(crs) = lookup("chain_registration_sender_implementation_addr") {
+        result.expect_create2_params(
+            verifiers,
+            &crs,
+            V31ChainRegistrationSender::constructorCall::new((bridgehub_addr,)).abi_encode(),
+            "l1-contracts/ChainRegistrationSender",
         );
     }
 

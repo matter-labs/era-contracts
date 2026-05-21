@@ -908,6 +908,13 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             "permissionless_validator_addr",
             ctmAddresses.stateTransition.proxies.permissionlessValidator
         );
+        if (ctmAddresses.stateTransition.implementations.serverNotifier != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "server_notifier_implementation_addr",
+                ctmAddresses.stateTransition.implementations.serverNotifier
+            );
+        }
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
