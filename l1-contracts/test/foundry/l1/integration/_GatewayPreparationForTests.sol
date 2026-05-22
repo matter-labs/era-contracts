@@ -159,7 +159,6 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
                 _gatewayValidatorTimelock: gatewayValidatorTimelock,
                 _gatewayServerNotifier: gatewayServerNotifier,
                 _refundRecipient: msg.sender,
-                _ctmRepresentativeChainId: 0,
                 _gatewaySettlementFee: 0
             })
         );

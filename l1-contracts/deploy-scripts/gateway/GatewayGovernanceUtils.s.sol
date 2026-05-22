@@ -53,7 +53,6 @@ abstract contract GatewayGovernanceUtils is Script {
         address _gatewayValidatorTimelock;
         address _gatewayServerNotifier;
         address _refundRecipient;
-        uint256 _ctmRepresentativeChainId;
         uint256 _gatewaySettlementFee;
     }
 
@@ -75,10 +74,13 @@ abstract contract GatewayGovernanceUtils is Script {
     function _prepareGatewayGovernanceCalls(
         PrepareGatewayGovernanceCalls memory prepareGWGovCallsStruct
     ) internal view returns (Call[] memory calls) {
-        {
-            if (prepareGWGovCallsStruct._ctmRepresentativeChainId == _gatewayGovernanceConfig.gatewayChainId) {
-                calls = _getSetSettlementLayerCalls();
-            }
+        // Whitelist the new GW on the L1 Bridgehub iff it isn't already.
+        // Mirrors GatewayPreparation.sol's idempotent check on the same setter.
+        if (
+            !IL1Bridgehub(_gatewayGovernanceConfig.bridgehubProxy)
+                .whitelistedSettlementLayers(_gatewayGovernanceConfig.gatewayChainId)
+        ) {
+            calls = _getSetSettlementLayerCalls();
         }
 
         // Registration of the new chain type manager inside the ZK Gateway chain
