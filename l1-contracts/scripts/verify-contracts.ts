@@ -25,6 +25,11 @@ const ZKSYNC_VERIFIER_URLS: Record<string, string> = {
   testnet: "https://rpc-explorer-verify.era-gateway-testnet.zksync.dev/contract_verification",
 };
 
+// GW (EVM gateway) explorer API URLs — standard Etherscan-compatible
+const GW_EXPLORER_URLS: Record<string, string> = {
+  stage: "https://block-explorer-api.zksync-os-stage-gateway.zksync.dev/api",
+};
+
 // -----------------------------
 // Fallback name mappings
 // -----------------------------
@@ -44,6 +49,10 @@ function fallbackFor(name: string): string[] {
       return ["L1VerifierPlonk", "L2VerifierPlonk"];
     case "Verifier":
       return ["DualVerifier", "EraTestnetVerifier"];
+    case "MigratorFacet":
+      return ["Migrator"];
+    case "CommitterFacet":
+      return ["Committer"];
     default:
       return [];
   }
@@ -134,9 +143,16 @@ function findContractAndRoot(name: string): { solPath: string; root: string; res
 // -----------------------------
 // Run a single forge verify attempt
 // -----------------------------
-function tryVerify(chain: string, addr: string, name: string, rest: string, root: string, isZksync: boolean): boolean {
+function tryVerify(chain: string, addr: string, name: string, rest: string, root: string, isZksync: boolean, gwMode: boolean): boolean {
   let cmd: string;
-  if (isZksync) {
+  if (gwMode) {
+    const url = GW_EXPLORER_URLS[chain];
+    if (!url) {
+      console.error(`❌ Unsupported chain "${chain}" for GW explorer`);
+      return false;
+    }
+    cmd = `forge verify-contract ${addr} ${name} ${rest} --verifier etherscan --verifier-url "${url}" --etherscan-api-key "dummy" --watch`;
+  } else if (isZksync) {
     const url = ZKSYNC_VERIFIER_URLS[chain];
     if (!url) {
       console.error(`❌ Unsupported chain "${chain}" for zksync verifier`);
@@ -172,8 +188,10 @@ async function main() {
     .description("Automates contract verification from deployment logs")
     .argument("<log_file>", "Path to deployment log containing forge verify-contract commands")
     .option("-c, --chain <chain>", "Target chain (stage|testnet|mainnet)", "stage")
+    .option("--gw", "Verify on GW (EVM gateway) explorer instead of Etherscan/ZKsync")
     .action(async (logFile, options) => {
       const chain = (options.chain || "stage").toLowerCase();
+      const gwMode = !!options.gw;
       if (!existsSync(logFile)) {
         console.error(`❌ Error: File '${logFile}' not found.`);
         process.exit(1);
@@ -216,14 +234,14 @@ async function main() {
         const { solPath, root, resolvedName } = found;
         console.log(`📂 ${resolvedName} found: ${solPath} (project root: ${root})`);
 
-        let success = tryVerify(chain, addr, resolvedName, rest, root, isZksync);
+        let success = tryVerify(chain, addr, resolvedName, rest, root, isZksync, gwMode);
         if (!success && resolvedName !== name) {
           console.log(`🔁 Retry with original contract name: ${name}`);
-          success = tryVerify(chain, addr, name, rest, root, isZksync);
+          success = tryVerify(chain, addr, name, rest, root, isZksync, gwMode);
         }
         if (!success) {
           console.log("🔁 Final attempt with TransparentUpgradeableProxy");
-          success = tryVerify(chain, addr, "TransparentUpgradeableProxy", rest, root, isZksync);
+          success = tryVerify(chain, addr, "TransparentUpgradeableProxy", rest, root, isZksync, gwMode);
         }
 
         if (success) {

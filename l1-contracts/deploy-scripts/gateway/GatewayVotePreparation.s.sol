@@ -341,7 +341,6 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
                 _gatewayValidatorTimelock: output.gatewayStateTransition.proxies.validatorTimelock,
                 _gatewayServerNotifier: output.gatewayStateTransition.proxies.serverNotifier,
                 _refundRecipient: refundRecipient,
-                _ctmRepresentativeChainId: ctmRepresentativeChainId,
                 _gatewaySettlementFee: gatewaySettlementFee
             })
         );
