@@ -283,7 +283,16 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridges.implementations.l1NativeTokenVault
         );
 
-        string memory toml = vm.serializeString("root", "upgrade_addresses", deployedAddresses);
+        string memory shared = vm.serializeAddress(
+            "shared",
+            "transparent_proxy_admin",
+            coreAddresses.shared.transparentProxyAdmin
+        );
+        deployedAddresses = vm.serializeString("deployed_addresses", "shared", shared);
+
+        string memory misc = vm.serializeAddress("misc", "deployer_addr", config.deployerAddress);
+        vm.serializeString("root", "upgrade_addresses", deployedAddresses);
+        string memory toml = vm.serializeString("root", "misc", misc);
 
         vm.writeToml(toml, outputPath);
 

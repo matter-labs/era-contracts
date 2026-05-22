@@ -937,7 +937,16 @@ fn write_merged_ecosystem_toml(
         Ok((value, gov))
     }
 
-    let (core_body, core_gov) = load_and_split(core_toml)?;
+    let (mut core_body, core_gov) = load_and_split(core_toml)?;
+    let misc_body = match core_body.remove("misc") {
+        Some(Value::Table(table)) => Some(table),
+        Some(other) => anyhow::bail!(
+            "[misc] in {} must be a table (got {})",
+            core_toml.display(),
+            other.type_str()
+        ),
+        None => None,
+    };
 
     let mut ctms_table: Table = Table::new();
     let mut stage0: Vec<String> = vec![core_gov.stage0_calls];
@@ -1040,8 +1049,8 @@ fn write_merged_ecosystem_toml(
     governance_calls_table.insert("stage2_calls".into(), Value::String(s2));
 
     // Build the document with [governance_calls] first, then [core], then
-    // [ctms.*], then optional [new_gateway]. `toml::to_string` orders keys as
-    // inserted.
+    // [ctms.*], optional [new_gateway], and [misc] last. `toml::to_string`
+    // orders keys as inserted.
     let mut doc = Table::new();
     doc.insert(
         "governance_calls".into(),
@@ -1052,6 +1061,9 @@ fn write_merged_ecosystem_toml(
     if let Some(body) = new_gateway_body {
         doc.insert("new_gateway".into(), Value::Table(body));
     }
+    if let Some(body) = misc_body {
+        doc.insert("misc".into(), Value::Table(body));
+    }
 
     let new_gateway_count = if new_gateway_toml.is_some() { 1 } else { 0 };
     let body = format!(
@@ -1060,7 +1072,8 @@ fn write_merged_ecosystem_toml(
          # the combined stage 0/1/2 hex from {} prepare TOML(s); [core] mirrors the\n\
          # core prepare output (minus its own [governance_calls]); [ctms.<flavor>]\n\
          # mirrors each per-CTM prepare output (one section per `is_zk_sync_os`\n\
-         # value) for downstream verification. When [new_gateway] is present, it\n\
+         # value) for downstream verification. [misc] carries shared metadata used\n\
+         # by verification. When [new_gateway] is present, it\n\
          # mirrors GatewayVotePreparation's output (deployed GW CTM addresses +\n\
          # diamond cut data) — its `governance_calls_to_execute` has already been\n\
          # folded into stage 2 above.\n\n{}",

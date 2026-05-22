@@ -36,6 +36,7 @@ sol! {
     #[sol(rpc)]
     contract V31ChainTypeManagerView {
         function PERMISSIONLESS_VALIDATOR() external view returns (address);
+        function owner() external view returns (address);
     }
     /// @notice Faсet structure compatible with the EIP-2535 diamond loupe
     /// @param addr The address of the facet contract
@@ -90,6 +91,7 @@ sol! {
     }
     contract V31L1AssetTracker {
         constructor(address _bridgehub, address _nativeTokenVault, address _messageRoot);
+        function initialize(address _owner);
     }
     contract V31L1ChainAssetHandler {
         constructor(address _owner, address _bridgehub);
@@ -354,7 +356,8 @@ pub(crate) async fn verify_v31_provenance(
         legacy_gateway_chain_id,
         result,
         core_context,
-    )?;
+    )
+    .await?;
 
     for ctm in &artifact.ctms {
         verify_ctm_provenance(
@@ -383,7 +386,7 @@ struct CoreProvenanceContext {
     governance: Address,
 }
 
-fn verify_core_provenance(
+async fn verify_core_provenance(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     era_chain_id: u64,
@@ -508,17 +511,43 @@ fn verify_core_provenance(
         artifact,
         &["upgrade_addresses", "bridgehub", "message_root_proxy_addr"],
     )?;
+    let tracker_constructor_params = V31L1AssetTracker::constructorCall::new((
+        context.bridgehub_addr,
+        context.ntv_proxy,
+        message_root_proxy,
+    ))
+    .abi_encode();
     result.expect_create2_params(
         verifiers,
         &tracker_impl,
-        V31L1AssetTracker::constructorCall::new((
-            context.bridgehub_addr,
-            context.ntv_proxy,
-            message_root_proxy,
-        ))
-        .abi_encode(),
+        &tracker_constructor_params,
         "l1-contracts/L1AssetTracker",
     );
+
+    // L1AssetTracker TransparentUpgradeableProxy(impl, proxyAdmin, initialize(deployer)).
+    let tracker_proxy = required_core_address(
+        artifact,
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "l1_asset_tracker_proxy_addr",
+        ],
+    )?;
+    let deployer = required_misc_address(artifact, &["deployer_addr"])?;
+    let core_proxy_admin = required_core_address(
+        artifact,
+        &["upgrade_addresses", "shared", "transparent_proxy_admin"],
+    )?;
+    result
+        .expect_create2_params_proxy_with_bytecode(
+            verifiers,
+            &tracker_proxy,
+            V31L1AssetTracker::initializeCall::new((deployer,)).abi_encode(),
+            core_proxy_admin,
+            &tracker_constructor_params,
+            "l1-contracts/L1AssetTracker",
+        )
+        .await;
 
     // L1AssetRouter impl(weth, bridgehub, nullifier, eraChainId, eraDiamondProxy).
     let asset_router_impl = required_core_address(
@@ -619,7 +648,7 @@ async fn verify_ctm_provenance(
     result: &mut VerificationResult,
     context: CoreProvenanceContext,
 ) -> Result<()> {
-    verify_ctm_base_provenance(ctm, verifiers, l1_chain_id, result)?;
+    verify_ctm_base_provenance(artifact, ctm, verifiers, l1_chain_id, result)?;
 
     let bridgehub_addr = context.bridgehub_addr;
     let label = ctm.flavor.label();
@@ -674,6 +703,17 @@ async fn verify_ctm_provenance(
 
     // GovernanceUpgradeTimer(initialDelay, maxAdditionalDelay, timerGovernance, initialOwner).
     let timer = required_ctm_address(ctm, &["deployed_addresses", "l1_governance_upgrade_timer"])?;
+    let ctm_proxy = required_ctm_address(ctm, &["state_transition", "chain_type_manager_proxy"])?;
+    let ctm_owner = V31ChainTypeManagerView::new(
+        ctm_proxy,
+        verifiers.network_verifier.get_l1_provider().clone(),
+    )
+    .owner()
+    .call()
+    .await
+    .with_context(|| {
+        format!("calling {label}.chain_type_manager_proxy.owner() for GovernanceUpgradeTimer provenance")
+    })?;
     result.expect_create2_params(
         verifiers,
         &timer,
@@ -681,7 +721,7 @@ async fn verify_ctm_provenance(
             U256::from(ctm.contracts_config.governance_upgrade_timer_initial_delay),
             U256::from(GOVERNANCE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS),
             context.governance,
-            context.governance,
+            ctm_owner,
         ))
         .abi_encode(),
         "l1-contracts/GovernanceUpgradeTimer",
@@ -690,7 +730,6 @@ async fn verify_ctm_provenance(
     // UpgradeStageValidator(chainTypeManager, newProtocolVersion).
     let stage_validator =
         required_ctm_address(ctm, &["deployed_addresses", "upgrade_stage_validator"])?;
-    let ctm_proxy = required_ctm_address(ctm, &["state_transition", "chain_type_manager_proxy"])?;
     result.expect_create2_params(
         verifiers,
         &stage_validator,
@@ -801,13 +840,9 @@ async fn verify_v31_proxy_admins(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
 ) -> Result<()> {
-    let Some(primary_ctm) = artifact.ctms.first() else {
-        result.report_warn("Skipping proxy-admin checks: no CTM section present in artifact");
-        return Ok(());
-    };
-    let expected_core_admin = required_ctm_address(
-        primary_ctm,
-        &["deployed_addresses", "transparent_proxy_admin"],
+    let expected_core_admin = required_core_address(
+        artifact,
+        &["upgrade_addresses", "shared", "transparent_proxy_admin"],
     )?;
 
     result
@@ -980,6 +1015,7 @@ async fn verify_v31_ctm_permissionless_validator(
 /// All required addresses come from the CTM's own `[ctms.<flavor>]`
 /// section via `required_ctm_address`.
 fn verify_ctm_base_provenance(
+    artifact: &EcosystemUpgradeArtifact,
     ctm: &CtmArtifact,
     verifiers: &Verifiers,
     l1_chain_id: u64,
@@ -1081,15 +1117,8 @@ fn verify_ctm_base_provenance(
     // instead of `*DualVerifier`; pick whichever the CREATE2 deploy was
     // actually identified as.
     //
-    // ZKsyncOS verifiers take a third `_initialOwner` constructor arg
-    // (the deployer EOA — `DeployCTMUtils.verifierOwner = getBroadcasterAddress()`)
-    // and `DeployCTML1OrGateway.verifierCreationArgs` extends the encoding
-    // accordingly. We don't have a canonical "expected owner" in the
-    // artifact, but the deployed args are recoverable from
-    // `create2_constructor_params`. Read them, extract the actual owner
-    // (with format sanity checks), and reuse it as the expected arg —
-    // effectively asserting `(fflonk, plonk)` match the artifact while
-    // accepting whatever `_initialOwner` the broadcaster supplied.
+    // ZKsyncOS verifiers take a third `_initialOwner` constructor arg: the
+    // deployer EOA from `DeployCTMUtils.verifierOwner = getBroadcasterAddress()`.
     let verifier = required_ctm_address(ctm, &["state_transition", "verifier_addr"])?;
     let fflonk = required_ctm_address(ctm, &["state_transition", "verifier_fflonk_addr"])?;
     let plonk = required_ctm_address(ctm, &["state_transition", "verifier_plonk_addr"])?;
@@ -1103,12 +1132,7 @@ fn verify_ctm_base_provenance(
         _ => dual_verifier_file,
     };
     let encoded = if is_zksync_os {
-        let initial_owner = verifiers
-            .network_verifier
-            .create2_constructor_params
-            .get(&verifier)
-            .and_then(|params| (params.len() == 96).then(|| Address::from_slice(&params[76..96])))
-            .unwrap_or(Address::ZERO);
+        let initial_owner = required_misc_address(artifact, &["deployer_addr"])?;
         V31ZKsyncOSDualVerifier::constructorCall::new((fflonk, plonk, initial_owner)).abi_encode()
     } else {
         V31DualVerifier::constructorCall::new((fflonk, plonk)).abi_encode()
@@ -1124,6 +1148,10 @@ fn required_ctm_address(ctm: &CtmArtifact, path: &[&str]) -> Result<Address> {
 
 fn required_core_address(artifact: &EcosystemUpgradeArtifact, path: &[&str]) -> Result<Address> {
     required_address_in_value(&artifact.core, "core", path)
+}
+
+fn required_misc_address(artifact: &EcosystemUpgradeArtifact, path: &[&str]) -> Result<Address> {
+    required_address_in_value(&artifact.misc, "misc", path)
 }
 
 fn required_address_in_value(value: &toml::Value, scope: &str, path: &[&str]) -> Result<Address> {

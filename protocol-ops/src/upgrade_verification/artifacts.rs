@@ -19,6 +19,9 @@ pub(crate) struct EcosystemUpgradeArtifact {
     /// past the canonical 5 (unpauseMigration + per-CTM checks) and which
     /// deployed-GW-CTM address to cross-check.
     pub(crate) new_gateway: Option<NewGatewayArtifact>,
+    /// Raw top-level `[misc]` table for shared metadata that does not belong to
+    /// core or a particular CTM.
+    pub(crate) misc: toml::Value,
 }
 
 #[derive(Debug)]
@@ -187,11 +190,17 @@ impl EcosystemUpgradeArtifact {
             None => None,
         };
 
+        let misc = match root.remove("misc") {
+            Some(value) => toml::Value::Table(expect_table(value, "misc")?),
+            None => toml::Value::Table(Table::new()),
+        };
+
         Ok(Self {
             core: toml::Value::Table(core_table),
             governance_calls,
             ctms,
             new_gateway,
+            misc,
         })
     }
 }
