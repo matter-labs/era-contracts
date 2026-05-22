@@ -59,11 +59,21 @@ sol! {
         address public validatorTimelock;
         function protocolVersion() external view returns (uint256);
         function isZKsyncOS() external view returns (bool);
+        function owner() external view returns (address);
+        function PERMISSIONLESS_VALIDATOR() external view returns (address);
     }
 
     #[sol(rpc)]
     contract ZKChain {
         function getProtocolVersion() external view returns (uint256);
+    }
+
+    /// Minimal `Ownable` view — usable against any contract that exposes a
+    /// public `owner()` getter (TransparentUpgradeableProxy admins, plain
+    /// Ownable proxies, etc.).
+    #[sol(rpc)]
+    contract Ownable {
+        function owner() external view returns (address);
     }
 
     function create2AndTransferParams(bytes memory bytecode, bytes32 salt, address owner);
