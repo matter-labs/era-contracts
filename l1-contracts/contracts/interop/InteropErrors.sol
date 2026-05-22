@@ -54,3 +54,7 @@ error ZKTokenNotAvailable();
 error PrivateInteropValueNotZero();
 error InteropRouteMismatch(bytes32 assetId, uint8 current, uint8 expected);
 error ShadowAccountDeploymentFailed();
+error SimulationAlreadyActive();
+error SimulationNotActive();
+error ZeroFlowId();
+error UnexpectedSimulatedBundle(bytes32 verifyHash);

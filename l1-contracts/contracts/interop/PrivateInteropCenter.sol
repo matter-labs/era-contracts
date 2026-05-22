@@ -93,10 +93,12 @@ contract PrivateInteropCenter is InteropCenter {
     }
 
     /// @notice Sends only hash + callCount to L1 instead of full bundle data.
-    function _sendBundleToL1(bytes memory _interopBundleBytes, uint256 _callCount) internal override returns (bytes32) {
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+    function _sendBundleToL1(
+        bytes memory _interopBundleBytes,
+        uint256 _callCount
+    ) internal override returns (bytes32 msgHash) {
+        msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
             abi.encodePacked(PRIVATE_BUNDLE_IDENTIFIER, keccak256(_interopBundleBytes), _callCount)
         );
-        return bytes32(0);
     }
 }

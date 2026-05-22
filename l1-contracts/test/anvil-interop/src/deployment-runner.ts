@@ -502,8 +502,15 @@ export class DeploymentRunner {
       throw new Error(`addresses.json not found in ${stateDir}`);
     }
     const addresses = JSON.parse(fs.readFileSync(addressesPath, "utf-8"));
-    const { l1Addresses, ctmAddresses, chainAddresses, testTokens, privateInteropAddresses, customBaseTokens, zkToken } =
-      addresses;
+    const {
+      l1Addresses,
+      ctmAddresses,
+      chainAddresses,
+      testTokens,
+      privateInteropAddresses,
+      customBaseTokens,
+      zkToken,
+    } = addresses;
 
     // Decompress hex-gzip state files to native JSON for --load-state CLI.
     // This is more portable than anvil_loadState RPC across anvil versions.
@@ -815,7 +822,9 @@ export class DeploymentRunner {
     // Cross-register remote routers
     if (chainsInfo.length > 1) {
       console.log("\nRegistering remote routers...");
-      await registerRemoteRouters(chainsInfo, privateAddresses, PRIVATE_DEPLOYER_KEY, (line) => console.log(`  ${line}`));
+      await registerRemoteRouters(chainsInfo, privateAddresses, PRIVATE_DEPLOYER_KEY, (line) =>
+        console.log(`  ${line}`)
+      );
     }
 
     state.privateInteropAddresses = privateAddresses;
