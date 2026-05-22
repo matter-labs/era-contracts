@@ -5,7 +5,9 @@ use crate::upgrade_verification::{
     constants::{EIP1967_PROXY_ADMIN_SLOT, L2_INTEROP_CENTER_ADDR},
     verifiers::{VerificationResult, Verifiers},
     versions::v31::{
-        utils::network_verifier::{ChainTypeManager, L1AssetRouter, Ownable},
+        utils::network_verifier::{
+            Bridgehub as BridgehubContract, ChainTypeManager, L1AssetRouter, Ownable,
+        },
         MAX_NUMBER_OF_ZK_CHAINS,
     },
 };
@@ -245,6 +247,7 @@ pub(crate) async fn verify_v31_artifact_state(
         .await;
     verify_v31_proxy_admins(artifact, verifiers, result).await?;
     verify_v31_core_wiring(verifiers, result).await;
+    verify_v31_timer_admin_state(artifact, verifiers, result).await?;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
 
     Ok(())
@@ -289,8 +292,7 @@ pub(crate) async fn verify_v31_provenance(
     // read from live contracts. The artifact is still the source for the
     // deployed implementation/proxy addresses being checked.
     let bridgehub_addr = verifiers.bridgehub_address;
-    let bridgehub =
-        super::super::utils::network_verifier::Bridgehub::new(bridgehub_addr, provider.clone());
+    let bridgehub = BridgehubContract::new(bridgehub_addr, provider.clone());
     let asset_router_proxy = bridgehub.assetRouter().call().await.unwrap_or_else(|err| {
         panic!("Failed to call Bridgehub.assetRouter() for provenance: {err}")
     });
@@ -583,6 +585,9 @@ async fn verify_ctm_provenance(
     let timer = in_dep("l1_governance_upgrade_timer")?;
     let ctm_proxy = in_st("chain_type_manager_proxy")?;
     let stage_validator = in_dep("upgrade_stage_validator")?;
+    let timer_governance =
+        required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
+    let ecosystem_admin = required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?;
     let bytecodes_supplier = in_st("bytecodes_supplier_addr")?;
     let permissionless_validator = in_st("permissionless_validator_addr")?;
     let ctm_impl = in_st("chain_type_manager_implementation_addr")?;
@@ -597,19 +602,6 @@ async fn verify_ctm_provenance(
             "chain_asset_handler_proxy_addr",
         ],
     )?;
-
-    // GovernanceUpgradeTimer._initialOwner is the current CTM proxy owner —
-    // read live so we can encode the expected ctor args.
-    let ctm_owner =
-        ChainTypeManager::new(ctm_proxy, verifiers.network_verifier.get_l1_provider().clone())
-            .owner()
-            .call()
-            .await
-            .with_context(|| {
-                format!(
-                    "calling {label}.chain_type_manager_proxy.owner() for GovernanceUpgradeTimer provenance"
-                )
-            })?;
 
     let ctm_file = match ctm.flavor {
         CtmFlavor::Era => "l1-contracts/EraChainTypeManager",
@@ -647,15 +639,14 @@ async fn verify_ctm_provenance(
             .abi_encode(),
             "l1-contracts/MigratorFacet",
         ),
-        // GovernanceUpgradeTimer(initialDelay, maxAdditionalDelay, timerGovernance=governance,
-        // initialOwner=ctm_proxy.owner()).
+        // GovernanceUpgradeTimer(initialDelay, maxAdditionalDelay, timerGovernance, initialOwner).
         (
             timer,
             V31GovernanceUpgradeTimer::constructorCall::new((
                 U256::from(ctm.contracts_config.governance_upgrade_timer_initial_delay),
                 U256::from(GOVERNANCE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS),
-                context.governance,
-                ctm_owner,
+                timer_governance,
+                ecosystem_admin,
             ))
             .abi_encode(),
             "l1-contracts/GovernanceUpgradeTimer",
@@ -871,6 +862,75 @@ async fn verify_v31_core_wiring(verifiers: &Verifiers, result: &mut Verification
             )),
         }
     }
+}
+
+/// Sanity-check the live ownership state that should match the timer
+/// constructor addresses recorded under `[ctms.<flavor>.admin]`.
+///
+/// `CtmArtifact.value` is the raw `[ctms.<flavor>]` TOML table, so these
+/// fields do not need a dedicated typed artifact struct to be loadable.
+async fn verify_v31_timer_admin_state(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    let provider = verifiers.network_verifier.get_l1_provider();
+    let bridgehub = BridgehubContract::new(verifiers.bridgehub_address, provider.clone());
+    let bridgehub_owner = match bridgehub.owner().call().await {
+        Ok(owner) => Some(owner),
+        Err(err) => {
+            result.report_error(&format!(
+                "Failed to call Bridgehub.owner() for GovernanceUpgradeTimer admin checks: {err}"
+            ));
+            None
+        }
+    };
+
+    for ctm in &artifact.ctms {
+        let label = ctm.flavor.label();
+        let scope = format!("ctms.{label}");
+        let expected_timer_governance =
+            required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
+        let expected_ecosystem_admin =
+            required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?;
+
+        if let Some(actual_timer_governance) = bridgehub_owner {
+            if actual_timer_governance == expected_timer_governance {
+                result.report_ok(&format!(
+                    "{label}.admin.timer_governance_addr matches Bridgehub.owner()"
+                ));
+            } else {
+                result.report_error(&format!(
+                    "{label}.admin.timer_governance_addr mismatch: artifact {expected_timer_governance}, Bridgehub.owner() {actual_timer_governance}"
+                ));
+            }
+        }
+
+        let ctm_proxy = required_address(
+            &ctm.value,
+            &scope,
+            &["state_transition", "chain_type_manager_proxy"],
+        )?;
+        let ctm_owner = ChainTypeManager::new(ctm_proxy, provider.clone())
+            .owner()
+            .call()
+            .await;
+        match ctm_owner {
+            Ok(actual_ecosystem_admin) if actual_ecosystem_admin == expected_ecosystem_admin => {
+                result.report_ok(&format!(
+                    "{label}.admin.ecosystem_admin_addr matches chain_type_manager_proxy.owner()"
+                ));
+            }
+            Ok(actual_ecosystem_admin) => result.report_error(&format!(
+                "{label}.admin.ecosystem_admin_addr mismatch: artifact {expected_ecosystem_admin}, chain_type_manager_proxy.owner() {actual_ecosystem_admin}"
+            )),
+            Err(err) => result.report_error(&format!(
+                "Failed to call {label}.chain_type_manager_proxy.owner() for GovernanceUpgradeTimer admin checks: {err}"
+            )),
+        }
+    }
+
+    Ok(())
 }
 
 async fn verify_v31_ctm_permissionless_validator(

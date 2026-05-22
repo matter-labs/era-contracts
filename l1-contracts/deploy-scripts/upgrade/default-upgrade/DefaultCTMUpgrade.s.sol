@@ -940,6 +940,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             upgradeAddresses.upgradeTimer
         );
 
+        vm.serializeAddress("admin", "timer_governance_addr", config.ownerAddress);
+        string memory admin = vm.serializeAddress("admin", "ecosystem_admin_addr", newConfig.ecosystemAdminAddress);
+
         // Serialize generated upgrade data
         vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
         vm.serializeBytes("contracts_newConfig", "force_deployments_data", generatedData.forceDeploymentsData);
@@ -962,6 +965,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "state_transition", stateTransition);
         vm.serializeString("root", "contracts_config", contractsConfig);
+        vm.serializeString("root", "admin", admin);
         string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
 
         vm.writeToml(toml, outputPath);
