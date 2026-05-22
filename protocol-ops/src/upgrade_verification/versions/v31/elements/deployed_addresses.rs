@@ -396,7 +396,7 @@ async fn verify_core_provenance(
 ) -> Result<()> {
     result.print_info("-- Core deployment provenance --");
 
-    // L1ChainAssetHandler(_owner=governance, _bridgehub).
+    // L1ChainAssetHandler impl(_owner=governance, _bridgehub).
     let chain_asset_handler_impl = required_core_address(
         artifact,
         &[
@@ -741,7 +741,7 @@ async fn verify_ctm_provenance(
         "l1-contracts/UpgradeStageValidator",
     );
 
-    // EIP7702Checker is part of the da-contracts package.
+    // EIP7702Checker() — no constructor args; artifact comes from da-contracts.
     let eip7702 = required_ctm_address(ctm, &["state_transition", "eip7702_checker_addr"])?;
     result.expect_create2_params(
         verifiers,
@@ -753,6 +753,7 @@ async fn verify_ctm_provenance(
     let transparent_proxy_admin =
         required_ctm_address(ctm, &["deployed_addresses", "transparent_proxy_admin"])?;
 
+    // BytecodesSupplier TransparentUpgradeableProxy(impl, proxyAdmin, initialize()).
     let bytecodes_supplier =
         required_ctm_address(ctm, &["state_transition", "bytecodes_supplier_addr"])?;
     result
@@ -766,6 +767,7 @@ async fn verify_ctm_provenance(
         )
         .await;
 
+    // PermissionlessValidator TransparentUpgradeableProxy(impl, proxyAdmin, initialize()).
     let permissionless_validator =
         required_ctm_address(ctm, &["state_transition", "permissionless_validator_addr"])?;
     result
@@ -779,6 +781,7 @@ async fn verify_ctm_provenance(
         )
         .await;
 
+    // ChainTypeManager impl(bridgehub, interopCenter, bytecodesSupplier, permissionlessValidator).
     let ctm_impl = required_ctm_address(
         ctm,
         &["state_transition", "chain_type_manager_implementation_addr"],
@@ -800,7 +803,7 @@ async fn verify_ctm_provenance(
         ctm_file,
     );
 
-    // ServerNotifier impl (no ctor args).
+    // ServerNotifier impl() — no constructor args.
     let server_notifier_impl = required_ctm_address(
         ctm,
         &["state_transition", "server_notifier_implementation_addr"],
@@ -812,7 +815,7 @@ async fn verify_ctm_provenance(
         "l1-contracts/ServerNotifier",
     );
 
-    // ValidatorTimelock impl (ctor: bridgehub). Deployed once per CTM by
+    // ValidatorTimelock impl(bridgehub). Deployed once per CTM by
     // `CTMUpgrade_v31`; the stage 1 governance call swaps this address
     // behind the per-CTM ValidatorTimelock proxy.
     let validator_timelock_impl = required_ctm_address(
@@ -1048,7 +1051,7 @@ fn verify_ctm_base_provenance(
         CtmFlavor::ZksyncOs => "l1-contracts/ZKsyncOSSettlementLayerV31Upgrade",
     };
 
-    // Constants with no constructor args.
+    // No-arg CTM contracts.
     for (path, expected_file) in [
         (
             &["state_transition", "genesis_upgrade_addr"],
