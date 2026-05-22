@@ -1,10 +1,10 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use crate::upgrade_verification::{
     artifacts::{CtmArtifact, CtmFlavor, EcosystemUpgradeArtifact},
+    constants::{EIP1967_PROXY_ADMIN_SLOT, L2_INTEROP_CENTER_ADDR},
     verifiers::{VerificationResult, Verifiers},
     versions::v31::MAX_NUMBER_OF_ZK_CHAINS,
-    constants::{EIP1967_PROXY_ADMIN_SLOT, L2_INTEROP_CENTER_ADDR},
 };
 
 use alloy::{
@@ -18,6 +18,7 @@ use serde::Deserialize;
 use std::str::FromStr;
 
 const MAINNET_CHAIN_ID: u64 = 1;
+const GOVERNANCE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS: u64 = 14 * 24 * 60 * 60;
 // TODO: remove this name here
 const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
 
@@ -196,9 +197,10 @@ sol! {
     }
 }
 
-/// Proxies whose EIP-1967 admin slot must match `transparent_proxy_admin`.
+/// Core proxies whose EIP-1967 admin slot must match the ecosystem
+/// `transparent_proxy_admin`.
 /// These are the proxies that the v31 governance stage 1 calls upgrade.
-const PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
+const CORE_PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
     "bridgehub_proxy",
     "l1_nullifier_proxy",
     "l1_asset_router_proxy",
@@ -206,7 +208,6 @@ const PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
     "message_root_proxy",
     "ctm_deployment_tracker_proxy",
     "chain_asset_handler_proxy",
-    "chain_type_manager_proxy",
     "asset_tracker_proxy",
 ];
 
@@ -246,9 +247,9 @@ pub(crate) async fn verify_v31_artifact_state(
     result
         .expect_deployed_bytecode(verifiers, &create2_factory, CREATE2_FACTORY_CONTRACT_NAME)
         .await;
-    verify_v31_proxy_admins(verifiers, result).await;
+    verify_v31_proxy_admins(artifact, verifiers, result).await?;
     verify_v31_core_wiring(verifiers, result).await;
-    verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await;
+    verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
 
     Ok(())
 }
@@ -288,29 +289,9 @@ pub(crate) async fn verify_v31_provenance(
         .await
         .unwrap_or_else(|err| panic!("Failed to fetch L1 chain id for provenance: {err}"));
 
-    // Convenience lookups against the artifact-derived address verifier.
-    // Each address used as a constructor input has to come from somewhere;
-    // we tolerate missing entries because not every operator scenario
-    // populates every named address.
-    let lookup = |name: &str| {
-        verifiers
-            .address_verifier
-            .name_to_address
-            .get(name)
-            .copied()
-    };
-
-    let is_testnet = artifact.contracts_config.is_testnet;
-
-    for ctm in &artifact.ctms {
-        verify_ctm_flavored_provenance(artifact, ctm, verifiers, l1_chain_id, result);
-    }
-
-    // The remaining contracts pull constructor args from the live
-    // Bridgehub: weth, asset router, nullifier, era diamond proxy, etc.
-    // The legacy `NetworkVerifier::get_bridgehub_info` is geared toward the
-    // legacy (UpgradeOutput) flow and assumes a populated era chain id; in
-    // the v31 artifact flow we read only the fields Phase 6 actually uses.
+    // Constructor args that are not directly present in the artifact are
+    // read from live contracts. The artifact is still the source for the
+    // deployed implementation/proxy addresses being checked.
     let bridgehub_addr = verifiers.bridgehub_address;
     let bridgehub =
         super::super::utils::network_verifier::Bridgehub::new(bridgehub_addr, provider.clone());
@@ -337,46 +318,6 @@ pub(crate) async fn verify_v31_provenance(
         .await
         .unwrap_or_else(|err| panic!("Failed to call L1AssetRouter.nativeTokenVault(): {err}"));
 
-    // L1NativeTokenVault impl(weth, assetRouter, nullifier).
-    if let Some(ntv_impl) = lookup("native_token_vault_implementation_addr") {
-        result.expect_create2_params(
-            verifiers,
-            &ntv_impl,
-            V31L1NativeTokenVault::constructorCall::new((weth, asset_router_proxy, nullifier))
-                .abi_encode(),
-            "l1-contracts/L1NativeTokenVault",
-        );
-    }
-
-    // CTMDeploymentTracker impl(bridgehub, l1AssetRouter).
-    if let Some(ctmdt_impl) = lookup("ctm_deployment_tracker_implementation_addr") {
-        result.expect_create2_params(
-            verifiers,
-            &ctmdt_impl,
-            V31CTMDeploymentTracker::constructorCall::new((bridgehub_addr, asset_router_proxy))
-                .abi_encode(),
-            "l1-contracts/CTMDeploymentTracker",
-        );
-    }
-
-    // L1AssetTracker impl(bridgehub, ntv, messageRoot).
-    if let (Some(tracker_impl), Some(message_root_proxy)) = (
-        lookup("l1_asset_tracker_implementation_addr"),
-        lookup("message_root_proxy"),
-    ) {
-        result.expect_create2_params(
-            verifiers,
-            &tracker_impl,
-            V31L1AssetTracker::constructorCall::new((
-                bridgehub_addr,
-                ntv_proxy,
-                message_root_proxy,
-            ))
-            .abi_encode(),
-            "l1-contracts/L1AssetTracker",
-        );
-    }
-
     // The era_chain_id-dependent constructors (L1AssetRouter / L1Nullifier)
     // require both the chain id and the chain's diamond proxy. The env provides
     // era_chain_id; the diamond proxy must resolve from Bridgehub.
@@ -391,141 +332,83 @@ pub(crate) async fn verify_v31_provenance(
         panic!("Bridgehub.getZKChain({era_chain_id}) returned address(0) for provenance");
     }
 
-    // L1AssetRouter impl(weth, bridgehub, nullifier, eraChainId, eraDiamondProxy).
-    if let Some(asset_router_impl) = lookup("l1_asset_router_implementation_addr") {
-        result.expect_create2_params(
-            verifiers,
-            &asset_router_impl,
-            V31L1AssetRouter::constructorCall::new((
-                weth,
-                bridgehub_addr,
-                nullifier,
-                U256::from(era_chain_id),
-                era_diamond_proxy,
-            ))
-            .abi_encode(),
-            "l1-contracts/L1AssetRouter",
-        );
-    }
+    let governance = bridgehub
+        .owner()
+        .call()
+        .await
+        .context("calling Bridgehub.owner() for v31 provenance")?;
 
-    // L1Nullifier impl(bridgehub, messageRoot, eraChainId, eraDiamondProxy).
-    if let (Some(nullifier_impl), Some(message_root_proxy)) = (
-        lookup("l1_nullifier_implementation_addr"),
-        lookup("message_root_proxy"),
-    ) {
-        result.expect_create2_params(
-            verifiers,
-            &nullifier_impl,
-            V31L1Nullifier::constructorCall::new((
-                bridgehub_addr,
-                message_root_proxy,
-                U256::from(era_chain_id),
-                era_diamond_proxy,
-            ))
-            .abi_encode(),
-            "l1-contracts/L1Nullifier",
-        );
-    }
-
-    // CommitterFacet(uint256 _l1ChainId).
-    if let Some(committer) = lookup("committer_facet_addr") {
-        result.expect_create2_params(
-            verifiers,
-            &committer,
-            V31CommitterFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
-            "l1-contracts/CommitterFacet",
-        );
-    }
-
-    // L1Bridgehub impl(_owner, _maxNumberOfZKChains). Owner is governance,
-    // readable from `bridgehub.owner()`; max chains is the well-known v31
-    // constant 100. Use file-match when the constructor-arg encoding drifts
-    // between deploy script and contract source.
-    if let Some(bridgehub_impl) = lookup("bridgehub_implementation_addr") {
-        match bridgehub.owner().call().await {
-            Ok(governance) => result.expect_create2_params(
-                verifiers,
-                &bridgehub_impl,
-                V31L1Bridgehub::constructorCall::new((
-                    governance,
-                    U256::from(MAX_NUMBER_OF_ZK_CHAINS),
-                ))
-                .abi_encode(),
-                "l1-contracts/L1Bridgehub",
-            ),
-            Err(err) => {
-                result.report_warn(&format!(
-                    "Skipping owner-dependent provenance checks; bridgehub.owner() failed: {err}"
-                ));
-            }
-        }
-    }
-
-    // The remaining v31 contracts. Constructor args come from a mix of
-    // RPC reads (governance owner, l1ChainId), the artifact's address
-    // map (chainAssetHandler, bytecodesSupplier, eip7702Checker),
-    // the artifact's `[verifier_inputs]`
-    // section (initialDelay, isTestnet), well-known constants
-    // (`L2_INTEROP_CENTER_ADDR`, the GovernanceUpgradeTimer 2-week
-    // window, MAX_NUMBER_OF_CHAINS = 100), and the prepare-time
-    // governance owner (= `bridgehub.owner()` = the protocol upgrade
-    // handler).
-    let chain_asset_handler_proxy = lookup("chain_asset_handler_proxy");
-    let eip7702_checker = lookup("eip7702_checker_addr");
-    let governance = match bridgehub.owner().call().await {
-        Ok(owner) => Some(owner),
-        Err(err) => {
-            result.report_warn(&format!(
-                "Skipping owner-dependent provenance checks; bridgehub.owner() failed: {err}"
-            ));
-            None
-        }
+    let core_context = CoreProvenanceContext {
+        bridgehub_addr,
+        asset_router_proxy,
+        weth,
+        nullifier,
+        ntv_proxy,
+        era_diamond_proxy,
+        governance,
     };
+    verify_core_provenance(
+        artifact,
+        verifiers,
+        era_chain_id,
+        legacy_gateway_chain_id,
+        result,
+        core_context,
+    )?;
 
-    // MailboxFacet(eraChainId, l1ChainId, chainAssetHandler, eip7702Checker, isTestnet).
-    if let (Some(mailbox), Some(chain_asset_handler), Some(eip7702)) = (
-        lookup("mailbox_facet_addr"),
-        chain_asset_handler_proxy,
-        eip7702_checker,
-    ) {
-        result.expect_create2_params(
+    for ctm in &artifact.ctms {
+        verify_ctm_provenance(
+            artifact,
+            ctm,
             verifiers,
-            &mailbox,
-            V31MailboxFacet::constructorCall::new((
-                U256::from(era_chain_id),
-                U256::from(l1_chain_id),
-                chain_asset_handler,
-                eip7702,
-                is_testnet,
-            ))
-            .abi_encode(),
-            "l1-contracts/MailboxFacet",
-        );
+            era_chain_id,
+            l1_chain_id,
+            result,
+            core_context,
+        )
+        .await?;
     }
 
-    // MigratorFacet(_l1ChainId, _isTestnet).
-    if let Some(migrator) = lookup("migrator_facet_addr") {
-        result.expect_create2_params(
-            verifiers,
-            &migrator,
-            V31MigratorFacet::constructorCall::new((U256::from(l1_chain_id), is_testnet))
-                .abi_encode(),
-            "l1-contracts/MigratorFacet",
-        );
-    }
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+struct CoreProvenanceContext {
+    bridgehub_addr: Address,
+    asset_router_proxy: Address,
+    weth: Address,
+    nullifier: Address,
+    ntv_proxy: Address,
+    era_diamond_proxy: Address,
+    governance: Address,
+}
+
+fn verify_core_provenance(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    era_chain_id: u64,
+    legacy_gateway_chain_id: u64,
+    result: &mut VerificationResult,
+    context: CoreProvenanceContext,
+) -> Result<()> {
+    result.print_info("-- Core deployment provenance --");
 
     // L1ChainAssetHandler(_owner=governance, _bridgehub).
-    if let (Some(chain_asset_handler_impl), Some(governance)) = (
-        lookup("chain_asset_handler_implementation_addr"),
-        governance,
-    ) {
-        result.expect_create2_params(
-            verifiers,
-            &chain_asset_handler_impl,
-            V31L1ChainAssetHandler::constructorCall::new((governance, bridgehub_addr)).abi_encode(),
-            "l1-contracts/L1ChainAssetHandler",
-        );
-    }
+    let chain_asset_handler_impl = required_core_address(
+        artifact,
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "chain_asset_handler_implementation_addr",
+        ],
+    )?;
+    result.expect_create2_params(
+        verifiers,
+        &chain_asset_handler_impl,
+        V31L1ChainAssetHandler::constructorCall::new((context.governance, context.bridgehub_addr))
+            .abi_encode(),
+        "l1-contracts/L1ChainAssetHandler",
+    );
 
     // L1MessageRoot(_bridgehub, _eraGatewayChainId, _chainAssetHandler).
     //
@@ -535,227 +418,374 @@ pub(crate) async fn verify_v31_provenance(
     // the bytecode hash differs. Pick whichever file the CREATE2 deploy was
     // identified as, matching the same pattern the DualVerifier branch uses
     // for the testnet variant.
-    if let (Some(message_root_impl), Some(chain_asset_handler)) = (
-        lookup("message_root_implementation_addr"),
-        chain_asset_handler_proxy,
-    ) {
-        let resolved_file = verifiers
-            .network_verifier
-            .create2_known_bytecodes
-            .get(&message_root_impl)
-            .cloned();
-        let expected_file = match resolved_file.as_deref() {
-            Some("l1-contracts/L1MessageRootStageSepolia") => {
-                "l1-contracts/L1MessageRootStageSepolia"
-            }
-            _ => "l1-contracts/L1MessageRoot",
-        };
-        result.expect_create2_params(
-            verifiers,
-            &message_root_impl,
-            V31L1MessageRoot::constructorCall::new((
-                bridgehub_addr,
-                U256::from(legacy_gateway_chain_id),
-                chain_asset_handler,
-            ))
-            .abi_encode(),
-            expected_file,
-        );
-    }
+    let message_root_impl = required_core_address(
+        artifact,
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "message_root_implementation_addr",
+        ],
+    )?;
+    let chain_asset_handler = required_core_address(
+        artifact,
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "chain_asset_handler_proxy_addr",
+        ],
+    )?;
+    let resolved_file = verifiers
+        .network_verifier
+        .create2_known_bytecodes
+        .get(&message_root_impl)
+        .cloned();
+    let expected_file = match resolved_file.as_deref() {
+        Some("l1-contracts/L1MessageRootStageSepolia") => "l1-contracts/L1MessageRootStageSepolia",
+        _ => "l1-contracts/L1MessageRoot",
+    };
+    result.expect_create2_params(
+        verifiers,
+        &message_root_impl,
+        V31L1MessageRoot::constructorCall::new((
+            context.bridgehub_addr,
+            U256::from(legacy_gateway_chain_id),
+            chain_asset_handler,
+        ))
+        .abi_encode(),
+        expected_file,
+    );
 
-    // GovernanceUpgradeTimer(initialDelay, maxAdditionalDelay = 2 weeks,
-    // timerGovernance = governance, initialOwner = governance).
-    if let (Some(timer), Some(governance), initial_delay) = (
-        lookup("l1_governance_upgrade_timer"),
-        governance,
-        artifact
-            .contracts_config
-            .governance_upgrade_timer_initial_delay,
-    ) {
-        const TWO_WEEKS_SECONDS: u64 = 2 * 7 * 24 * 60 * 60;
-        result.expect_create2_params(
-            verifiers,
-            &timer,
-            V31GovernanceUpgradeTimer::constructorCall::new((
-                U256::from(initial_delay),
-                U256::from(TWO_WEEKS_SECONDS),
-                governance,
-                governance,
-            ))
-            .abi_encode(),
-            "l1-contracts/GovernanceUpgradeTimer",
-        );
-    }
+    // L1NativeTokenVault impl(weth, assetRouter, nullifier).
+    let ntv_impl = required_core_address(
+        artifact,
+        &[
+            "upgrade_addresses",
+            "native_token_vault_implementation_addr",
+        ],
+    )?;
+    result.expect_create2_params(
+        verifiers,
+        &ntv_impl,
+        V31L1NativeTokenVault::constructorCall::new((
+            context.weth,
+            context.asset_router_proxy,
+            context.nullifier,
+        ))
+        .abi_encode(),
+        "l1-contracts/L1NativeTokenVault",
+    );
 
-    // UpgradeStageValidator(chainTypeManager, newProtocolVersion).
-    if let Some(stage_validator) = lookup("upgrade_stage_validator") {
-        if let Some(ctm_proxy) = lookup("chain_type_manager_proxy") {
-            result.expect_create2_params(
-                verifiers,
-                &stage_validator,
-                V31UpgradeStageValidator::constructorCall::new((
-                    ctm_proxy,
-                    U256::from(artifact.contracts_config.new_protocol_version),
-                ))
-                .abi_encode(),
-                "l1-contracts/UpgradeStageValidator",
-            );
-        }
-    }
+    // CTMDeploymentTracker impl(bridgehub, l1AssetRouter).
+    let ctmdt_impl = required_core_address(
+        artifact,
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "ctm_deployment_tracker_implementation_addr",
+        ],
+    )?;
+    result.expect_create2_params(
+        verifiers,
+        &ctmdt_impl,
+        V31CTMDeploymentTracker::constructorCall::new((
+            context.bridgehub_addr,
+            context.asset_router_proxy,
+        ))
+        .abi_encode(),
+        "l1-contracts/CTMDeploymentTracker",
+    );
 
-    verify_per_ctm_v31_provenance(artifact, verifiers, result, bridgehub_addr).await?;
+    // L1AssetTracker impl(bridgehub, ntv, messageRoot).
+    let tracker_impl = required_core_address(
+        artifact,
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "l1_asset_tracker_implementation_addr",
+        ],
+    )?;
+    let message_root_proxy = required_core_address(
+        artifact,
+        &["upgrade_addresses", "bridgehub", "message_root_proxy_addr"],
+    )?;
+    result.expect_create2_params(
+        verifiers,
+        &tracker_impl,
+        V31L1AssetTracker::constructorCall::new((
+            context.bridgehub_addr,
+            context.ntv_proxy,
+            message_root_proxy,
+        ))
+        .abi_encode(),
+        "l1-contracts/L1AssetTracker",
+    );
 
-    // EIP7702Checker is part of the da-contracts package (not
-    // l1-contracts) — `AllContractsHashes.json` records it as
-    // `da-contracts/EIP7702Checker`.
-    if let Some(eip7702) = eip7702_checker {
-        result.expect_create2_params(
-            verifiers,
-            &eip7702,
-            Vec::<u8>::new(),
-            "da-contracts/EIP7702Checker",
-        );
-    }
+    // L1AssetRouter impl(weth, bridgehub, nullifier, eraChainId, eraDiamondProxy).
+    let asset_router_impl = required_core_address(
+        artifact,
+        &[
+            "upgrade_addresses",
+            "bridges",
+            "l1_asset_router_implementation_addr",
+        ],
+    )?;
+    result.expect_create2_params(
+        verifiers,
+        &asset_router_impl,
+        V31L1AssetRouter::constructorCall::new((
+            context.weth,
+            context.bridgehub_addr,
+            context.nullifier,
+            U256::from(era_chain_id),
+            context.era_diamond_proxy,
+        ))
+        .abi_encode(),
+        "l1-contracts/L1AssetRouter",
+    );
+
+    // L1Nullifier impl(bridgehub, messageRoot, eraChainId, eraDiamondProxy).
+    let nullifier_impl = required_core_address(
+        artifact,
+        &[
+            "upgrade_addresses",
+            "bridges",
+            "l1_nullifier_implementation_addr",
+        ],
+    )?;
+    let message_root_proxy = required_core_address(
+        artifact,
+        &["upgrade_addresses", "bridgehub", "message_root_proxy_addr"],
+    )?;
+    result.expect_create2_params(
+        verifiers,
+        &nullifier_impl,
+        V31L1Nullifier::constructorCall::new((
+            context.bridgehub_addr,
+            message_root_proxy,
+            U256::from(era_chain_id),
+            context.era_diamond_proxy,
+        ))
+        .abi_encode(),
+        "l1-contracts/L1Nullifier",
+    );
+
+    // L1Bridgehub impl(_owner, _maxNumberOfZKChains).
+    let bridgehub_impl = required_core_address(
+        artifact,
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "bridgehub_implementation_addr",
+        ],
+    )?;
+    result.expect_create2_params(
+        verifiers,
+        &bridgehub_impl,
+        V31L1Bridgehub::constructorCall::new((
+            context.governance,
+            U256::from(MAX_NUMBER_OF_ZK_CHAINS),
+        ))
+        .abi_encode(),
+        "l1-contracts/L1Bridgehub",
+    );
 
     // ChainRegistrationSender(bridgehub). Deployed once by `CoreUpgrade_v31`
     // and surfaced as `[core.upgrade_addresses.bridgehub]
     // chain_registration_sender_implementation_addr`.
-    if let Some(crs) = lookup("chain_registration_sender_implementation_addr") {
-        result.expect_create2_params(
-            verifiers,
-            &crs,
-            V31ChainRegistrationSender::constructorCall::new((bridgehub_addr,)).abi_encode(),
-            "l1-contracts/ChainRegistrationSender",
-        );
-    }
+    let crs = required_core_address(
+        artifact,
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "chain_registration_sender_implementation_addr",
+        ],
+    )?;
+    result.expect_create2_params(
+        verifiers,
+        &crs,
+        V31ChainRegistrationSender::constructorCall::new((context.bridgehub_addr,)).abi_encode(),
+        "l1-contracts/ChainRegistrationSender",
+    );
 
     Ok(())
 }
 
-async fn verify_per_ctm_v31_provenance(
+async fn verify_ctm_provenance(
     artifact: &EcosystemUpgradeArtifact,
+    ctm: &CtmArtifact,
     verifiers: &Verifiers,
+    era_chain_id: u64,
+    l1_chain_id: u64,
     result: &mut VerificationResult,
-    bridgehub_addr: Address,
+    context: CoreProvenanceContext,
 ) -> Result<()> {
-    for ctm in &artifact.ctms {
-        let label = ctm.flavor.label();
-        result.print_info(&format!("-- CTM deployment provenance: {label} --"));
+    verify_ctm_base_provenance(ctm, verifiers, l1_chain_id, result)?;
 
-        let Some(ctm_impl) = required_ctm_address(
-            ctm,
-            &["state_transition", "chain_type_manager_implementation_addr"],
-            result,
-        ) else {
-            continue;
-        };
-        let Some(bytecodes_supplier) = required_ctm_address(
-            ctm,
-            &["state_transition", "bytecodes_supplier_addr"],
-            result,
-        ) else {
-            continue;
-        };
-        let Some(permissionless_validator) = required_ctm_address(
-            ctm,
-            &["state_transition", "permissionless_validator_addr"],
-            result,
-        ) else {
-            continue;
-        };
+    let bridgehub_addr = context.bridgehub_addr;
+    let label = ctm.flavor.label();
+    result.print_info(&format!("-- CTM deployment provenance: {label} --"));
 
-        let ctm_file = match ctm.flavor {
-            CtmFlavor::Era => "l1-contracts/EraChainTypeManager",
-            CtmFlavor::ZksyncOs => "l1-contracts/ZKsyncOSChainTypeManager",
-        };
-        result.expect_create2_params(
+    // CommitterFacet(uint256 _l1ChainId).
+    let committer = required_ctm_address(ctm, &["state_transition", "committer_facet_addr"])?;
+    result.expect_create2_params(
+        verifiers,
+        &committer,
+        V31CommitterFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
+        "l1-contracts/CommitterFacet",
+    );
+
+    // MailboxFacet(eraChainId, l1ChainId, chainAssetHandler, eip7702Checker, isTestnet).
+    let mailbox = required_ctm_address(ctm, &["state_transition", "mailbox_facet_addr"])?;
+    let chain_asset_handler = required_core_address(
+        artifact,
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "chain_asset_handler_proxy_addr",
+        ],
+    )?;
+    let eip7702 = required_ctm_address(ctm, &["state_transition", "eip7702_checker_addr"])?;
+    result.expect_create2_params(
+        verifiers,
+        &mailbox,
+        V31MailboxFacet::constructorCall::new((
+            U256::from(era_chain_id),
+            U256::from(l1_chain_id),
+            chain_asset_handler,
+            eip7702,
+            ctm.contracts_config.is_testnet,
+        ))
+        .abi_encode(),
+        "l1-contracts/MailboxFacet",
+    );
+
+    // MigratorFacet(_l1ChainId, _isTestnet).
+    let migrator = required_ctm_address(ctm, &["state_transition", "migrator_facet_addr"])?;
+    result.expect_create2_params(
+        verifiers,
+        &migrator,
+        V31MigratorFacet::constructorCall::new((
+            U256::from(l1_chain_id),
+            ctm.contracts_config.is_testnet,
+        ))
+        .abi_encode(),
+        "l1-contracts/MigratorFacet",
+    );
+
+    // GovernanceUpgradeTimer(initialDelay, maxAdditionalDelay, timerGovernance, initialOwner).
+    let timer = required_ctm_address(ctm, &["deployed_addresses", "l1_governance_upgrade_timer"])?;
+    result.expect_create2_params(
+        verifiers,
+        &timer,
+        V31GovernanceUpgradeTimer::constructorCall::new((
+            U256::from(ctm.contracts_config.governance_upgrade_timer_initial_delay),
+            U256::from(GOVERNANCE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS),
+            context.governance,
+            context.governance,
+        ))
+        .abi_encode(),
+        "l1-contracts/GovernanceUpgradeTimer",
+    );
+
+    // UpgradeStageValidator(chainTypeManager, newProtocolVersion).
+    let stage_validator =
+        required_ctm_address(ctm, &["deployed_addresses", "upgrade_stage_validator"])?;
+    let ctm_proxy = required_ctm_address(ctm, &["state_transition", "chain_type_manager_proxy"])?;
+    result.expect_create2_params(
+        verifiers,
+        &stage_validator,
+        V31UpgradeStageValidator::constructorCall::new((
+            ctm_proxy,
+            U256::from(ctm.contracts_config.new_protocol_version),
+        ))
+        .abi_encode(),
+        "l1-contracts/UpgradeStageValidator",
+    );
+
+    // EIP7702Checker is part of the da-contracts package.
+    let eip7702 = required_ctm_address(ctm, &["state_transition", "eip7702_checker_addr"])?;
+    result.expect_create2_params(
+        verifiers,
+        &eip7702,
+        Vec::<u8>::new(),
+        "da-contracts/EIP7702Checker",
+    );
+
+    let transparent_proxy_admin =
+        required_ctm_address(ctm, &["deployed_addresses", "transparent_proxy_admin"])?;
+
+    let bytecodes_supplier =
+        required_ctm_address(ctm, &["state_transition", "bytecodes_supplier_addr"])?;
+    result
+        .expect_create2_params_proxy_with_bytecode(
             verifiers,
-            &ctm_impl,
-            V31ChainTypeManager::constructorCall::new((
-                bridgehub_addr,
-                L2_INTEROP_CENTER_ADDR,
-                bytecodes_supplier,
-                permissionless_validator,
-            ))
-            .abi_encode(),
-            ctm_file,
-        );
+            &bytecodes_supplier,
+            V31BytecodesSupplier::initializeCall::new(()).abi_encode(),
+            transparent_proxy_admin,
+            Vec::<u8>::new(),
+            "l1-contracts/BytecodesSupplier",
+        )
+        .await;
 
-        let Some(transparent_proxy_admin) = required_ctm_address(
-            ctm,
-            &["deployed_addresses", "transparent_proxy_admin"],
-            result,
-        ) else {
-            continue;
-        };
+    let permissionless_validator =
+        required_ctm_address(ctm, &["state_transition", "permissionless_validator_addr"])?;
+    result
+        .expect_create2_params_proxy_with_bytecode(
+            verifiers,
+            &permissionless_validator,
+            V31PermissionlessValidator::initializeCall::new(()).abi_encode(),
+            transparent_proxy_admin,
+            Vec::<u8>::new(),
+            "l1-contracts/PermissionlessValidator",
+        )
+        .await;
 
-        if bytecodes_supplier == Address::ZERO {
-            result.report_warn(&format!(
-                "Skipping {label} BytecodesSupplier provenance check; bytecodes_supplier_addr is address(0) in artifact"
-            ));
-        } else {
-            result
-                .expect_create2_params_proxy_with_bytecode(
-                    verifiers,
-                    &bytecodes_supplier,
-                    V31BytecodesSupplier::initializeCall::new(()).abi_encode(),
-                    transparent_proxy_admin,
-                    Vec::<u8>::new(),
-                    "l1-contracts/BytecodesSupplier",
-                )
-                .await;
-        }
+    let ctm_impl = required_ctm_address(
+        ctm,
+        &["state_transition", "chain_type_manager_implementation_addr"],
+    )?;
+    let ctm_file = match ctm.flavor {
+        CtmFlavor::Era => "l1-contracts/EraChainTypeManager",
+        CtmFlavor::ZksyncOs => "l1-contracts/ZKsyncOSChainTypeManager",
+    };
+    result.expect_create2_params(
+        verifiers,
+        &ctm_impl,
+        V31ChainTypeManager::constructorCall::new((
+            bridgehub_addr,
+            L2_INTEROP_CENTER_ADDR,
+            bytecodes_supplier,
+            permissionless_validator,
+        ))
+        .abi_encode(),
+        ctm_file,
+    );
 
-        if permissionless_validator == Address::ZERO {
-            result.report_warn(&format!(
-                "Skipping {label} PermissionlessValidator provenance check; permissionless_validator_addr is address(0) in artifact"
-            ));
-            continue;
-        }
-        result
-            .expect_create2_params_proxy_with_bytecode(
-                verifiers,
-                &permissionless_validator,
-                V31PermissionlessValidator::initializeCall::new(()).abi_encode(),
-                transparent_proxy_admin,
-                Vec::<u8>::new(),
-                "l1-contracts/PermissionlessValidator",
-            )
-            .await;
+    // ServerNotifier impl (no ctor args).
+    let server_notifier_impl = required_ctm_address(
+        ctm,
+        &["state_transition", "server_notifier_implementation_addr"],
+    )?;
+    result.expect_create2_params(
+        verifiers,
+        &server_notifier_impl,
+        Vec::<u8>::new(),
+        "l1-contracts/ServerNotifier",
+    );
 
-        // ServerNotifier impl (no ctor args). One deployed per CTM by
-        // `CTMUpgrade_v31`; surfaced as
-        // `[ctms.<flavor>.state_transition] server_notifier_implementation_addr`.
-        if let Some(server_notifier_impl) = required_ctm_address(
-            ctm,
-            &["state_transition", "server_notifier_implementation_addr"],
-            result,
-        ) {
-            result.expect_create2_params(
-                verifiers,
-                &server_notifier_impl,
-                Vec::<u8>::new(),
-                "l1-contracts/ServerNotifier",
-            );
-        }
-
-        // ValidatorTimelock impl (ctor: bridgehub). Deployed once per CTM by
-        // `CTMUpgrade_v31`; the stage 1 governance call swaps this address
-        // behind the per-CTM ValidatorTimelock proxy.
-        if let Some(validator_timelock_impl) = required_ctm_address(
-            ctm,
-            &["state_transition", "validator_timelock_implementation_addr"],
-            result,
-        ) {
-            result.expect_create2_params(
-                verifiers,
-                &validator_timelock_impl,
-                V31ValidatorTimelock::constructorCall::new((bridgehub_addr,)).abi_encode(),
-                "l1-contracts/ValidatorTimelock",
-            );
-        }
-    }
-
+    // ValidatorTimelock impl (ctor: bridgehub). Deployed once per CTM by
+    // `CTMUpgrade_v31`; the stage 1 governance call swaps this address
+    // behind the per-CTM ValidatorTimelock proxy.
+    let validator_timelock_impl = required_ctm_address(
+        ctm,
+        &["state_transition", "validator_timelock_implementation_addr"],
+    )?;
+    result.expect_create2_params(
+        verifiers,
+        &validator_timelock_impl,
+        V31ValidatorTimelock::constructorCall::new((bridgehub_addr,)).abi_encode(),
+        "l1-contracts/ValidatorTimelock",
+    );
     Ok(())
 }
 
@@ -766,32 +796,34 @@ async fn verify_l1_chain_id(verifiers: &Verifiers, result: &mut VerificationResu
     }
 }
 
-async fn verify_v31_proxy_admins(verifiers: &Verifiers, result: &mut VerificationResult) {
-    let Some(expected_admin) = verifiers
-        .address_verifier
-        .name_to_address
-        .get("transparent_proxy_admin")
-    else {
-        result.report_warn(
-            "Skipping proxy-admin checks: transparent_proxy_admin not present in artifact",
-        );
-        return;
+async fn verify_v31_proxy_admins(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    let Some(primary_ctm) = artifact.ctms.first() else {
+        result.report_warn("Skipping proxy-admin checks: no CTM section present in artifact");
+        return Ok(());
     };
+    let expected_core_admin = required_ctm_address(
+        primary_ctm,
+        &["deployed_addresses", "transparent_proxy_admin"],
+    )?;
 
     result
-        .expect_deployed_bytecode(verifiers, expected_admin, "TransparentProxyAdmin")
+        .expect_deployed_bytecode(verifiers, &expected_core_admin, "TransparentProxyAdmin")
         .await;
 
     let admin_slot = match FixedBytes::<32>::from_hex(EIP1967_PROXY_ADMIN_SLOT) {
         Ok(slot) => slot,
         Err(err) => {
             result.report_error(&format!("Invalid EIP-1967 admin slot literal: {err}"));
-            return;
+            return Ok(());
         }
     };
 
     let provider = verifiers.network_verifier.get_l1_provider();
-    for proxy_name in PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN {
+    for proxy_name in CORE_PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN {
         let Some(proxy_addr) = verifiers.address_verifier.name_to_address.get(*proxy_name) else {
             result.report_warn(&format!(
                 "Skipping proxy-admin check for {proxy_name}: address not present in artifact"
@@ -811,16 +843,49 @@ async fn verify_v31_proxy_admins(verifiers: &Verifiers, result: &mut Verificatio
             }
         };
         let actual_admin = Address::from_slice(&raw[12..]);
-        if actual_admin == *expected_admin {
+        if actual_admin == expected_core_admin {
             result.report_ok(&format!(
                 "Proxy admin for {proxy_name} matches transparent_proxy_admin"
             ));
         } else {
             result.report_error(&format!(
-                "Proxy admin mismatch for {proxy_name}: expected {expected_admin}, got {actual_admin}"
+                "Proxy admin mismatch for {proxy_name}: expected {expected_core_admin}, got {actual_admin}"
             ));
         }
     }
+
+    for ctm in &artifact.ctms {
+        let label = ctm.flavor.label();
+        let expected_admin =
+            required_ctm_address(ctm, &["deployed_addresses", "transparent_proxy_admin"])?;
+        let proxy_addr =
+            required_ctm_address(ctm, &["state_transition", "chain_type_manager_proxy"])?;
+
+        let raw = match provider
+            .get_storage_at(proxy_addr, U256::from_be_bytes(admin_slot.0))
+            .await
+        {
+            Ok(value) => value.to_be_bytes::<32>(),
+            Err(err) => {
+                result.report_warn(&format!(
+                    "Skipping proxy-admin check for {label}.chain_type_manager_proxy; eth_getStorageAt failed: {err}"
+                ));
+                continue;
+            }
+        };
+        let actual_admin = Address::from_slice(&raw[12..]);
+        if actual_admin == expected_admin {
+            result.report_ok(&format!(
+                "Proxy admin for {label}.chain_type_manager_proxy matches {label}.transparent_proxy_admin"
+            ));
+        } else {
+            result.report_error(&format!(
+                "Proxy admin mismatch for {label}.chain_type_manager_proxy: expected {expected_admin}, got {actual_admin}"
+            ));
+        }
+    }
+
+    Ok(())
 }
 
 async fn verify_v31_core_wiring(verifiers: &Verifiers, result: &mut VerificationResult) {
@@ -872,24 +937,16 @@ async fn verify_v31_ctm_permissionless_validator(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
-) {
+) -> Result<()> {
     let provider = verifiers.network_verifier.get_l1_provider();
     for ctm in &artifact.ctms {
         let label = ctm.flavor.label();
-        let Some(ctm_impl) = required_ctm_address(
+        let ctm_impl = required_ctm_address(
             ctm,
             &["state_transition", "chain_type_manager_implementation_addr"],
-            result,
-        ) else {
-            continue;
-        };
-        let Some(expected_permissionless_validator) = required_ctm_address(
-            ctm,
-            &["state_transition", "permissionless_validator_addr"],
-            result,
-        ) else {
-            continue;
-        };
+        )?;
+        let expected_permissionless_validator =
+            required_ctm_address(ctm, &["state_transition", "permissionless_validator_addr"])?;
 
         if expected_permissionless_validator == Address::ZERO {
             result.report_error(&format!(
@@ -911,6 +968,7 @@ async fn verify_v31_ctm_permissionless_validator(
             )),
         }
     }
+    Ok(())
 }
 
 /// Per-CTM, per-flavor provenance for the contracts that ship one copy per
@@ -919,17 +977,14 @@ async fn verify_v31_ctm_permissionless_validator(
 /// once for ZKsyncOS, so verification iterates per CTM and uses each CTM's
 /// own `flavor`.
 ///
-/// All addresses come from the CTM's own `[ctms.<flavor>]` section via
-/// `required_ctm_address`. Optional addresses are silently skipped (some
-/// older artifacts don't populate every field).
-fn verify_ctm_flavored_provenance(
-    artifact: &EcosystemUpgradeArtifact,
+/// All required addresses come from the CTM's own `[ctms.<flavor>]`
+/// section via `required_ctm_address`.
+fn verify_ctm_base_provenance(
     ctm: &CtmArtifact,
     verifiers: &Verifiers,
     l1_chain_id: u64,
     result: &mut VerificationResult,
-) {
-    let label = ctm.flavor.label();
+) -> Result<()> {
     let is_zksync_os = matches!(ctm.flavor, CtmFlavor::ZksyncOs);
 
     // Per-flavor verifier file names. `AllContractsHashes.json` ships
@@ -957,22 +1012,8 @@ fn verify_ctm_flavored_provenance(
         CtmFlavor::ZksyncOs => "l1-contracts/ZKsyncOSSettlementLayerV31Upgrade",
     };
 
-    let try_get = |path: &[&str]| -> Option<Address> {
-        // Look up an optional field without reporting an error for missing.
-        let mut current = &ctm.value;
-        for segment in path {
-            current = current.get(*segment)?;
-        }
-        let raw = current.as_str()?;
-        Address::from_str(raw).ok()
-    };
-
     // Constants with no constructor args.
     for (path, expected_file) in [
-        (
-            &["deployed_addresses", "l1_genesis_upgrade"][..],
-            "l1-contracts/L1GenesisUpgrade",
-        ),
         (
             &["state_transition", "genesis_upgrade_addr"],
             "l1-contracts/L1GenesisUpgrade",
@@ -994,54 +1035,46 @@ fn verify_ctm_flavored_provenance(
             verifier_fflonk_file,
         ),
     ] {
-        if let Some(addr) = try_get(path) {
-            result.expect_create2_params(verifiers, &addr, Vec::<u8>::new(), expected_file);
-        }
+        let addr = required_ctm_address(ctm, path)?;
+        result.expect_create2_params(verifiers, &addr, Vec::<u8>::new(), expected_file);
     }
 
     // DiamondInit(bool _isZKsyncOS) — encoded as a single 32-byte word.
-    if let Some(diamond_init) = try_get(&["state_transition", "diamond_init_addr"]) {
-        let mut encoded = vec![0u8; 32];
-        if is_zksync_os {
-            encoded[31] = 1;
-        }
-        result.expect_create2_params(
-            verifiers,
-            &diamond_init,
-            encoded,
-            "l1-contracts/DiamondInit",
-        );
+    let diamond_init = required_ctm_address(ctm, &["state_transition", "diamond_init_addr"])?;
+    let mut encoded = vec![0u8; 32];
+    if is_zksync_os {
+        encoded[31] = 1;
     }
+    result.expect_create2_params(
+        verifiers,
+        &diamond_init,
+        encoded,
+        "l1-contracts/DiamondInit",
+    );
 
     // ExecutorFacet(l1ChainId) — file is shared across flavors, but the
     // address is per-CTM (different CREATE2 init+args between CTMs only when
     // the deploy salt differs; both end up at the same logical contract
     // file).
-    if let Some(executor) = try_get(&["state_transition", "executor_facet_addr"]) {
-        result.expect_create2_params(
-            verifiers,
-            &executor,
-            V31ExecutorFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
-            "l1-contracts/ExecutorFacet",
-        );
-    }
+    let executor = required_ctm_address(ctm, &["state_transition", "executor_facet_addr"])?;
+    result.expect_create2_params(
+        verifiers,
+        &executor,
+        V31ExecutorFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
+        "l1-contracts/ExecutorFacet",
+    );
 
     // AdminFacet(l1ChainId, rollupDAManager) — rollupDAManager is per-CTM.
-    let rollup_da_manager = try_get(&["deployed_addresses", "rollup_da_manager"])
-        .or_else(|| try_get(&["state_transition", "rollup_da_manager"]))
-        .or_else(|| try_get(&["rollup_da_manager"]));
-    if let (Some(admin), Some(rollup_da_manager)) = (
-        try_get(&["state_transition", "admin_facet_addr"]),
-        rollup_da_manager,
-    ) {
-        result.expect_create2_params(
-            verifiers,
-            &admin,
-            V31AdminFacet::constructorCall::new((U256::from(l1_chain_id), rollup_da_manager))
-                .abi_encode(),
-            "l1-contracts/AdminFacet",
-        );
-    }
+    let admin = required_ctm_address(ctm, &["state_transition", "admin_facet_addr"])?;
+    let rollup_da_manager =
+        required_ctm_address(ctm, &["deployed_addresses", "l1_rollup_da_manager"])?;
+    result.expect_create2_params(
+        verifiers,
+        &admin,
+        V31AdminFacet::constructorCall::new((U256::from(l1_chain_id), rollup_da_manager))
+            .abi_encode(),
+        "l1-contracts/AdminFacet",
+    );
 
     // DualVerifier(fflonk, plonk) / *TestnetVerifier.
     // Stage / testnet environments deploy the `*TestnetVerifier` flavor
@@ -1057,65 +1090,55 @@ fn verify_ctm_flavored_provenance(
     // (with format sanity checks), and reuse it as the expected arg —
     // effectively asserting `(fflonk, plonk)` match the artifact while
     // accepting whatever `_initialOwner` the broadcaster supplied.
-    if let (Some(verifier), Some(fflonk), Some(plonk)) = (
-        try_get(&["state_transition", "verifier_addr"]),
-        try_get(&["state_transition", "verifier_fflonk_addr"]),
-        try_get(&["state_transition", "verifier_plonk_addr"]),
-    ) {
-        let resolved_file = verifiers
+    let verifier = required_ctm_address(ctm, &["state_transition", "verifier_addr"])?;
+    let fflonk = required_ctm_address(ctm, &["state_transition", "verifier_fflonk_addr"])?;
+    let plonk = required_ctm_address(ctm, &["state_transition", "verifier_plonk_addr"])?;
+    let resolved_file = verifiers
+        .network_verifier
+        .create2_known_bytecodes
+        .get(&verifier)
+        .cloned();
+    let expected_file = match resolved_file.as_deref() {
+        Some(file) if file == testnet_verifier_file => testnet_verifier_file,
+        _ => dual_verifier_file,
+    };
+    let encoded = if is_zksync_os {
+        let initial_owner = verifiers
             .network_verifier
-            .create2_known_bytecodes
+            .create2_constructor_params
             .get(&verifier)
-            .cloned();
-        let expected_file = match resolved_file.as_deref() {
-            Some(file) if file == testnet_verifier_file => testnet_verifier_file,
-            _ => dual_verifier_file,
-        };
-        let encoded = if is_zksync_os {
-            let initial_owner = verifiers
-                .network_verifier
-                .create2_constructor_params
-                .get(&verifier)
-                .and_then(|params| {
-                    (params.len() == 96).then(|| Address::from_slice(&params[76..96]))
-                })
-                .unwrap_or(Address::ZERO);
-            V31ZKsyncOSDualVerifier::constructorCall::new((fflonk, plonk, initial_owner))
-                .abi_encode()
-        } else {
-            V31DualVerifier::constructorCall::new((fflonk, plonk)).abi_encode()
-        };
-        result.expect_create2_params(verifiers, &verifier, encoded, expected_file);
-    }
+            .and_then(|params| (params.len() == 96).then(|| Address::from_slice(&params[76..96])))
+            .unwrap_or(Address::ZERO);
+        V31ZKsyncOSDualVerifier::constructorCall::new((fflonk, plonk, initial_owner)).abi_encode()
+    } else {
+        V31DualVerifier::constructorCall::new((fflonk, plonk)).abi_encode()
+    };
+    result.expect_create2_params(verifiers, &verifier, encoded, expected_file);
 
-    let _ = (artifact, label); // hooks for future per-CTM checks
+    Ok(())
 }
 
-fn required_ctm_address(
-    ctm: &CtmArtifact,
-    path: &[&str],
-    result: &mut VerificationResult,
-) -> Option<Address> {
-    let path_label = format!("ctms.{}.{}", ctm.flavor.label(), path.join("."));
-    let mut current = &ctm.value;
+fn required_ctm_address(ctm: &CtmArtifact, path: &[&str]) -> Result<Address> {
+    required_address_in_value(&ctm.value, &format!("ctms.{}", ctm.flavor.label()), path)
+}
+
+fn required_core_address(artifact: &EcosystemUpgradeArtifact, path: &[&str]) -> Result<Address> {
+    required_address_in_value(&artifact.core, "core", path)
+}
+
+fn required_address_in_value(value: &toml::Value, scope: &str, path: &[&str]) -> Result<Address> {
+    let path_label = format!("{scope}.{}", path.join("."));
+    let mut current = value;
     for segment in path {
         let Some(next) = current.get(*segment) else {
-            result.report_error(&format!("{path_label} is required"));
-            return None;
+            anyhow::bail!("{path_label} is required");
         };
         current = next;
     }
 
     let Some(raw) = current.as_str() else {
-        result.report_error(&format!("{path_label} must be an address string"));
-        return None;
+        anyhow::bail!("{path_label} must be an address string");
     };
 
-    match Address::from_str(raw) {
-        Ok(address) => Some(address),
-        Err(err) => {
-            result.report_error(&format!("{path_label} is not a valid address: {err}"));
-            None
-        }
-    }
+    Address::from_str(raw).with_context(|| format!("{path_label} is not a valid address"))
 }

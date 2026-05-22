@@ -6,17 +6,8 @@ use toml::value::Table;
 
 #[derive(Debug)]
 pub(crate) struct EcosystemUpgradeArtifact {
-    /// Synthetic flat view used by single-CTM-aware verifier code: the
-    /// merged ecosystem TOML's top-level `[governance_calls]` plus a
-    /// deep-merge of `[core]` and the *first* `[ctms.<flavor>]` section.
-    /// Code that needs per-CTM resolution should iterate [`Self::ctms`]
-    /// directly.
-    pub(crate) value: toml::Value,
-    /// Diamond cut from the first `[ctms.<flavor>]` section. Multi-CTM
-    /// callers must walk [`Self::ctms`] for per-CTM cuts.
-    pub(crate) chain_upgrade_diamond_cut: String,
-    /// Contracts config from the first `[ctms.<flavor>]` section.
-    pub(crate) contracts_config: ContractsConfig,
+    /// Raw `[core]` table from the merged ecosystem TOML.
+    pub(crate) core: toml::Value,
     pub(crate) governance_calls: GovernanceCalls,
     /// One entry per `[ctms.<flavor>]` section in the merged TOML, in the
     /// order encountered. `era` always sorts before `zksync_os` for
@@ -149,49 +140,6 @@ impl EcosystemUpgradeArtifact {
             });
         }
 
-        // Build the flat backward-compat view: deep-merge `core` then the
-        // first CTM section into a single top-level table. This keeps the
-        // single-CTM-aware verifier code (address lookups against
-        // `state_transition`, `deployed_addresses`, `upgrade_addresses`,
-        // and top-level fields like `chain_upgrade_diamond_cut`) working
-        // without per-call rewrites.
-        let mut flat = Table::new();
-        flat.insert(
-            "governance_calls".to_string(),
-            toml::Value::try_from(&governance_calls)
-                .context("re-encoding governance_calls into flat view")?,
-        );
-        deep_merge_into(&mut flat, core_table.clone());
-        let primary_table = match &ctms[0].value {
-            toml::Value::Table(t) => t.clone(),
-            _ => unreachable!("validated above"),
-        };
-        deep_merge_into(&mut flat, primary_table);
-
-        // Legacy verifier code expects `deployed_addresses.{bridgehub,bridges}`
-        // at top level (the pre-split single-file ecosystem TOML had them
-        // duplicated under both `deployed_addresses.*` and `upgrade_addresses.*`).
-        // The split prepare emits bridgehub/bridges sub-tables only under
-        // `core.upgrade_addresses.*`, so synthesize the matching
-        // `deployed_addresses.*` entries from there.
-        if let Some(toml::Value::Table(core_upgrade)) = core_table.get("upgrade_addresses") {
-            let dst_dep = flat
-                .entry("deployed_addresses".to_string())
-                .or_insert_with(|| toml::Value::Table(Table::new()));
-            if let toml::Value::Table(dst_dep) = dst_dep {
-                if let Some(toml::Value::Table(bh)) = core_upgrade.get("bridgehub") {
-                    dst_dep
-                        .entry("bridgehub".to_string())
-                        .or_insert_with(|| toml::Value::Table(bh.clone()));
-                }
-                if let Some(toml::Value::Table(br)) = core_upgrade.get("bridges") {
-                    dst_dep
-                        .entry("bridges".to_string())
-                        .or_insert_with(|| toml::Value::Table(br.clone()));
-                }
-            }
-        }
-
         // `[new_gateway]` is optional. Its presence flags GW-bring-up stage-2
         // calls — and we extract the deployed GW CTM proxy address while
         // we're here so the stage-2 verifier doesn't have to re-walk the
@@ -240,9 +188,7 @@ impl EcosystemUpgradeArtifact {
         };
 
         Ok(Self {
-            value: toml::Value::Table(flat),
-            chain_upgrade_diamond_cut: ctms[0].chain_upgrade_diamond_cut.clone(),
-            contracts_config: ctms[0].contracts_config.clone(),
+            core: toml::Value::Table(core_table),
             governance_calls,
             ctms,
             new_gateway,
@@ -254,21 +200,6 @@ fn expect_table(value: toml::Value, name: &str) -> anyhow::Result<Table> {
     match value {
         toml::Value::Table(t) => Ok(t),
         _ => anyhow::bail!("[{name}] must be a table"),
-    }
-}
-
-/// Deep-merge `src` into `dst`. Sub-tables are recursed into; scalar /
-/// non-table values from `src` overwrite `dst` on conflict.
-fn deep_merge_into(dst: &mut Table, src: Table) {
-    for (k, v) in src {
-        match (dst.get_mut(&k), v) {
-            (Some(toml::Value::Table(dst_inner)), toml::Value::Table(src_inner)) => {
-                deep_merge_into(dst_inner, src_inner);
-            }
-            (_, v) => {
-                dst.insert(k, v);
-            }
-        }
     }
 }
 
@@ -324,12 +255,10 @@ mod tests {
         let a = EcosystemUpgradeArtifact::from_toml_str(toml).unwrap();
         assert_eq!(a.ctms.len(), 1);
         assert_eq!(a.ctms[0].flavor, CtmFlavor::Era);
-        assert_eq!(a.chain_upgrade_diamond_cut, "0xabcd");
-        // Flat view should expose top-level `state_transition` from the CTM
-        // and `upgrade_addresses` from core.
-        assert!(a.value.get("state_transition").is_some());
-        assert!(a.value.get("upgrade_addresses").is_some());
-        assert!(a.value.get("asset_tracker_proxy_addr").is_some());
+        assert_eq!(a.ctms[0].chain_upgrade_diamond_cut, "0xabcd");
+        assert!(a.core.get("state_transition").is_none());
+        assert!(a.core.get("upgrade_addresses").is_some());
+        assert!(a.core.get("asset_tracker_proxy_addr").is_some());
     }
 
     #[test]
@@ -366,7 +295,7 @@ mod tests {
         assert_eq!(a.ctms.len(), 2);
         assert_eq!(a.ctms[0].flavor, CtmFlavor::Era);
         assert_eq!(a.ctms[1].flavor, CtmFlavor::ZksyncOs);
-        // The flat-view falls back to the first (era) CTM.
-        assert_eq!(a.chain_upgrade_diamond_cut, "0xaa");
+        assert_eq!(a.ctms[0].chain_upgrade_diamond_cut, "0xaa");
+        assert_eq!(a.ctms[1].chain_upgrade_diamond_cut, "0xbb");
     }
 }

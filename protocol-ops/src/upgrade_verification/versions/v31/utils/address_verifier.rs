@@ -19,24 +19,31 @@ const V31_ADDRESS_TABLES: &[&str] = &[
 
 const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
     (
-        &["deployed_addresses", "l1_governance_upgrade_timer"],
-        "upgrade_timer",
-    ),
-    (
-        &["deployed_addresses", "native_token_vault_addr"],
-        "native_token_vault",
-    ),
-    (
         &["upgrade_addresses", "native_token_vault_addr"],
         "native_token_vault",
     ),
     (
-        &["deployed_addresses", "bridgehub", "bridgehub_proxy_addr"],
+        &[
+            "upgrade_addresses",
+            "native_token_vault_implementation_addr",
+        ],
+        "native_token_vault_implementation_addr",
+    ),
+    (
+        &["upgrade_addresses", "bridgehub", "bridgehub_proxy_addr"],
         "bridgehub_proxy",
     ),
     (
         &[
-            "deployed_addresses",
+            "upgrade_addresses",
+            "bridgehub",
+            "bridgehub_implementation_addr",
+        ],
+        "bridgehub_implementation_addr",
+    ),
+    (
+        &[
+            "upgrade_addresses",
             "bridgehub",
             "l1_asset_tracker_proxy_addr",
         ],
@@ -44,7 +51,15 @@ const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
     ),
     (
         &[
-            "deployed_addresses",
+            "upgrade_addresses",
+            "bridgehub",
+            "l1_asset_tracker_implementation_addr",
+        ],
+        "l1_asset_tracker_implementation_addr",
+    ),
+    (
+        &[
+            "upgrade_addresses",
             "bridgehub",
             "chain_asset_handler_proxy_addr",
         ],
@@ -52,7 +67,15 @@ const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
     ),
     (
         &[
-            "deployed_addresses",
+            "upgrade_addresses",
+            "bridgehub",
+            "chain_asset_handler_implementation_addr",
+        ],
+        "chain_asset_handler_implementation_addr",
+    ),
+    (
+        &[
+            "upgrade_addresses",
             "bridgehub",
             "chain_registration_sender_implementation_addr",
         ],
@@ -60,31 +83,74 @@ const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
     ),
     (
         &[
-            "deployed_addresses",
+            "upgrade_addresses",
             "bridgehub",
             "ctm_deployment_tracker_proxy_addr",
         ],
         "ctm_deployment_tracker_proxy",
     ),
     (
-        &["deployed_addresses", "bridgehub", "message_root_proxy_addr"],
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "ctm_deployment_tracker_implementation_addr",
+        ],
+        "ctm_deployment_tracker_implementation_addr",
+    ),
+    (
+        &["upgrade_addresses", "bridgehub", "message_root_proxy_addr"],
         "message_root_proxy",
     ),
     (
-        &["deployed_addresses", "bridgehub", "message_root_proxy_addr"],
+        &["upgrade_addresses", "bridgehub", "message_root_proxy_addr"],
         "l1_message_root",
     ),
     (
         &[
-            "deployed_addresses",
-            "bridges",
-            "l1_asset_router_proxy_addr",
+            "upgrade_addresses",
+            "bridgehub",
+            "message_root_implementation_addr",
         ],
+        "message_root_implementation_addr",
+    ),
+    (
+        &["upgrade_addresses", "bridges", "l1_asset_router_proxy_addr"],
         "l1_asset_router_proxy",
     ),
     (
-        &["deployed_addresses", "bridges", "l1_nullifier_proxy_addr"],
+        &[
+            "upgrade_addresses",
+            "bridges",
+            "l1_asset_router_implementation_addr",
+        ],
+        "l1_asset_router_implementation_addr",
+    ),
+    (
+        &["upgrade_addresses", "bridges", "l1_nullifier_proxy_addr"],
         "l1_nullifier_proxy",
+    ),
+    (
+        &[
+            "upgrade_addresses",
+            "bridges",
+            "l1_nullifier_implementation_addr",
+        ],
+        "l1_nullifier_implementation_addr",
+    ),
+];
+
+const V31_PRIMARY_CTM_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
+    (
+        &["deployed_addresses", "transparent_proxy_admin"],
+        "transparent_proxy_admin",
+    ),
+    (
+        &["deployed_addresses", "l1_governance_upgrade_timer"],
+        "upgrade_timer",
+    ),
+    (
+        &["deployed_addresses", "upgrade_stage_validator"],
+        "upgrade_stage_validator",
     ),
     (
         &["state_transition", "default_upgrade_addr"],
@@ -92,10 +158,6 @@ const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
     ),
     (
         &["state_transition", "chain_type_manager_proxy"],
-        "chain_type_manager_proxy",
-    ),
-    (
-        &["state_transition", "chain_type_manager_proxy_addr"],
         "chain_type_manager_proxy",
     ),
     (&["state_transition", "admin_facet_addr"], "admin_facet"),
@@ -144,7 +206,7 @@ impl AddressVerifier {
         path: &[&str],
     ) -> anyhow::Result<Address> {
         let path_name = path.join(".");
-        let address = optional_nested_string_field(&artifact.value, path)
+        let address = optional_nested_string_field(&artifact.core, path)
             .ok_or_else(|| anyhow::anyhow!("{path_name} is required"))?;
         parse_alloy_address(&path_name, address)
     }
@@ -175,8 +237,21 @@ fn add_addresses_from_artifact(
     artifact: &EcosystemUpgradeArtifact,
 ) -> anyhow::Result<()> {
     for table_name in V31_ADDRESS_TABLES {
-        if let Some(table) = artifact.value.get(*table_name) {
-            add_addresses_from_value(address_verifier, table_name, table)?;
+        if let Some(table) = artifact.core.get(*table_name) {
+            add_addresses_from_value(address_verifier, &format!("core.{table_name}"), table)?;
+        }
+    }
+
+    for ctm in &artifact.ctms {
+        let ctm_path = format!("ctms.{}", ctm.flavor.label());
+        for table_name in V31_ADDRESS_TABLES {
+            if let Some(table) = ctm.value.get(*table_name) {
+                add_addresses_from_value(
+                    address_verifier,
+                    &format!("{ctm_path}.{table_name}"),
+                    table,
+                )?;
+            }
         }
     }
     Ok(())
@@ -196,7 +271,7 @@ fn add_addresses_from_value(
         match field_value {
             toml::Value::String(address) => {
                 let parsed = parse_alloy_address(&field_path, address)?;
-                address_verifier.add_address(parsed, field);
+                address_verifier.add_address(parsed, &field_path);
             }
             toml::Value::Table(_) => {
                 add_addresses_from_value(address_verifier, &field_path, field_value)?;
@@ -213,10 +288,38 @@ fn add_v31_address_aliases(
     artifact: &EcosystemUpgradeArtifact,
 ) -> anyhow::Result<()> {
     for (path, alias) in V31_ADDRESS_ALIASES {
-        if let Some(address) = optional_nested_string_field(&artifact.value, path) {
-            address_verifier.add_address(parse_alloy_address(&path.join("."), address)?, alias);
-        }
+        add_v31_address_alias(address_verifier, "core", &artifact.core, path, alias)?;
     }
+
+    let primary_ctm = artifact
+        .ctms
+        .first()
+        .context("at least one CTM section is required to resolve v31 primary CTM aliases")?;
+    let root_name = format!("ctms.{}", primary_ctm.flavor.label());
+    for (path, alias) in V31_PRIMARY_CTM_ADDRESS_ALIASES {
+        add_v31_address_alias(
+            address_verifier,
+            &root_name,
+            &primary_ctm.value,
+            path,
+            alias,
+        )?;
+    }
+
+    Ok(())
+}
+
+fn add_v31_address_alias(
+    address_verifier: &mut AddressVerifier,
+    root_name: &str,
+    root: &toml::Value,
+    path: &[&str],
+    alias: &str,
+) -> anyhow::Result<()> {
+    let path_name = format!("{}.{}", root_name, path.join("."));
+    let address = optional_nested_string_field(root, path)
+        .ok_or_else(|| anyhow::anyhow!("{path_name} is required for alias {alias}"))?;
+    address_verifier.add_address(parse_alloy_address(&path_name, address)?, alias);
     Ok(())
 }
 

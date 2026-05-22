@@ -74,7 +74,7 @@ impl Verifiers {
     ) -> anyhow::Result<Self> {
         let bridgehub_address = AddressVerifier::address_from_artifact(
             artifact,
-            &["deployed_addresses", "bridgehub", "bridgehub_proxy_addr"],
+            &["upgrade_addresses", "bridgehub", "bridgehub_proxy_addr"],
         )?;
         let bytecode_verifier = BytecodeVerifier::init_v31(contracts_commit).await?;
         let network_verifier =
