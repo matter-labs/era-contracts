@@ -16,14 +16,13 @@ use std::panic::Location;
 
 use crate::upgrade_verification::{
     artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
-    versions::v31::{
-        utils::{
-            address_verifier::AddressVerifier, bytecode_verifier::BytecodeVerifier,
-            fee_param_verifier::FeeParamVerifier, get_contents_from_github,
-            l2_system_addresses::L2_BRIDGEHUB_ADDR, network_verifier::NetworkVerifier,
-            repo_relative_path,
-        },
+    versions::v31::utils::{
+        address_verifier::AddressVerifier, bytecode_verifier::BytecodeVerifier,
+        fee_param_verifier::FeeParamVerifier, get_contents_from_github,
+        network_verifier::NetworkVerifier,
+        repo_relative_path,
     },
+    constants::L2_BRIDGEHUB_ADDR
 };
 
 sol! {
@@ -104,7 +103,6 @@ impl Verifiers {
         })
     }
 
-
     pub(crate) fn genesis_config_for_ctm(&self, flavor: CtmFlavor) -> &GenesisConfig {
         match flavor {
             CtmFlavor::Era => &self.era_genesis_config,
@@ -149,7 +147,6 @@ impl GenesisConfig {
             anyhow::anyhow!("failed to parse {path} from matter-labs/era-contracts@{commit}: {e}")
         })
     }
-
 }
 
 #[derive(Default)]

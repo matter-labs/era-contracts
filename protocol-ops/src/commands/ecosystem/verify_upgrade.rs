@@ -7,9 +7,7 @@ use crate::common::env_config::{default_protocol_ops_out_dir, EnvConfig};
 use crate::{
     common::logger,
     upgrade_verification::{
-        artifact_shape,
-        artifacts::EcosystemUpgradeArtifact,
-        verifiers::VerificationResult,
+        artifact_shape, artifacts::EcosystemUpgradeArtifact, verifiers::VerificationResult,
         versions::v31::utils::transactions_log,
     },
 };
@@ -84,6 +82,12 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.v31_input_path.display()
         )
     })?;
+    let legacy_gateway_chain_id = env_cfg.legacy_gateway_chain_id().ok_or_else(|| {
+        anyhow::anyhow!(
+            "{} is missing `[legacy_gateway] chain_id`",
+            env_cfg.permanent_values_path.display()
+        )
+    })?;
     let zk_token_asset_id = env_cfg.zk_token_asset_id().ok_or_else(|| {
         anyhow::anyhow!(
             "{} is missing top-level `zk_token_asset_id`",
@@ -124,7 +128,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     ));
     logger::info(format!("V31 input: {}", env_cfg.v31_input_path.display()));
     logger::info(format!("Ecosystem TOML: {}", args.ecosystem_toml.display()));
-    logger::info(format!("Transactions log: {}", transactions_log_path.display()));
+    logger::info(format!(
+        "Transactions log: {}",
+        transactions_log_path.display()
+    ));
     logger::info(format!("L1 RPC URL: {}", args.l1_rpc_url));
     logger::info(format!("Gateway RPC URL: {}", args.gw_rpc_url));
     if let Some(contracts_commit) = &args.contracts_commit {
@@ -133,6 +140,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         logger::info("Contracts hashes: local repository AllContractsHashes.json");
     }
     logger::info(format!("Representative ZK chain ID: {era_chain_id}"));
+    logger::info(format!("Legacy Gateway chain ID: {legacy_gateway_chain_id}"));
     logger::info(format!("CREATE2 factory: {create2_factory}"));
     logger::info(format!("ZK token asset ID: {zk_token_asset_id}"));
 
@@ -154,6 +162,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         &args.gw_rpc_url,
         args.contracts_commit.as_deref(),
         era_chain_id,
+        legacy_gateway_chain_id,
         &tx_hashes,
         create2_factory,
         &expected_salts,

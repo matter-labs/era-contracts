@@ -55,6 +55,15 @@ pub struct PermanentValues {
     /// + ServerNotifier, and sets the initial interop settlement fee.
     #[serde(default)]
     pub new_gateway: Option<NewGatewayConfig>,
+    /// Historical gateway configuration for chains that settled on the legacy
+    /// Gateway before v31.
+    #[serde(default)]
+    pub legacy_gateway: Option<LegacyGatewayConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct LegacyGatewayConfig {
+    pub chain_id: u64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -312,6 +321,10 @@ impl EnvConfig {
         self.v31.era_chain_id
     }
 
+    pub fn legacy_gateway_chain_id(&self) -> Option<u64> {
+        self.permanent.legacy_gateway.as_ref().map(|gw| gw.chain_id)
+    }
+
     pub fn ownable_proxies(&self) -> &[OwnableProxyEntry] {
         &self.permanent.ownable_proxies
     }
@@ -486,6 +499,10 @@ mod tests {
         let ng = pv
             .new_gateway
             .expect("permanent-values/stage.toml must carry [new_gateway]");
+        let legacy_gateway = pv
+            .legacy_gateway
+            .expect("permanent-values/stage.toml must carry [legacy_gateway]");
+        assert_eq!(legacy_gateway.chain_id, 123);
         assert_eq!(ng.chain_id, 2708);
         // 0.2 ZK = 2e17 wei, sized for ~$0.01 per interop call at ZK ≈ $0.05.
         assert_eq!(ng.settlement_fee, U256::from(200_000_000_000_000_000u128));

@@ -4,9 +4,9 @@ use crate::upgrade_verification::{
     artifacts::{CtmArtifact, CtmFlavor, EcosystemUpgradeArtifact},
     verifiers::{VerificationResult, Verifiers},
     versions::v31::MAX_NUMBER_OF_ZK_CHAINS,
+    constants::{EIP1967_PROXY_ADMIN_SLOT, L2_INTEROP_CENTER_ADDR},
 };
 
-use super::super::utils::l2_system_addresses::L2_INTEROP_CENTER_ADDR;
 use alloy::{
     hex::FromHex,
     primitives::{Address, FixedBytes, U256},
@@ -22,51 +22,8 @@ const MAINNET_CHAIN_ID: u64 = 1;
 const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
 
 sol! {
-    contract L1NativeTokenVault {
-        constructor(
-            address _l1WethAddress,
-            address _l1AssetRouter,
-            address _l1Nullifier
-        );
-
-        function initialize(address _owner, address _bridgedTokenBeacon);
-    }
-
-    #[sol(rpc)]
-    contract ValidatorTimelock {
-        constructor(address _initialOwner, uint32 _executionDelay);
-        address public chainTypeManager;
-        address public owner;
-        uint32 public executionDelay;
-    }
-
-    #[sol(rpc)]
-    contract L2WrappedBaseTokenStore {
-        constructor(address _initialOwner, address _admin);
-        address public admin;
-        address public owner;
-        function l2WBaseTokenAddress(uint256 chainId) external view returns (address l2WBaseTokenAddress);
-    }
-
-    #[sol(rpc)]
-    contract CTMDeploymentTracker {
-        constructor(address _bridgehub, address _l1AssetRouter);
-        address public owner;
-
-        function initialize(address _owner);
-    }
-
     #[sol(rpc)]
     contract L1AssetRouter {
-        constructor(
-            address _l1WethAddress,
-            address _bridgehub,
-            address _l1Nullifier,
-            uint256 _eraChainId,
-            address _eraDiamondProxy
-        );
-        function initialize(address _owner) external;
-
         /// @dev Address of native token vault.
         address public nativeTokenVault;
 
@@ -75,34 +32,10 @@ sol! {
 
         address public owner;
     }
-
-    contract L1Nullifier {
-        constructor(address _bridgehub, uint256 _eraChainId, address _eraDiamondProxy);
-    }
-
-    contract L1ERC20Bridge {
-        constructor(
-            address _nullifier,
-            address _assetRouter,
-            address _nativeTokenVault,
-            uint256 _eraChainId
-        );
-    }
-
-    contract ChainTypeManager {
-        constructor(address _bridgehub);
-    }
-
     #[sol(rpc)]
     contract V31ChainTypeManagerView {
         function PERMISSIONLESS_VALIDATOR() external view returns (address);
     }
-
-    #[sol(rpc)]
-    contract L1SharedBridgeLegacy {
-        function l2BridgeAddress(uint256 chainId) public view override returns (address l2SharedBridgeAddress);
-    }
-
     /// @notice Faсet structure compatible with the EIP-2535 diamond loupe
     /// @param addr The address of the facet contract
     /// @param selectors The NON-sorted array with selectors associated with facet
@@ -110,75 +43,98 @@ sol! {
         address addr;
         bytes4[] selectors;
     }
-
-    #[sol(rpc)]
-    contract GettersFacet {
-        function getProtocolVersion() external view returns (uint256);
-        function facets() external view returns (Facet[] memory result);
-    }
-
-    contract AdminFacet {
+    contract V31AdminFacet {
         constructor(uint256 _l1ChainId, address _rollupDAManager);
     }
-
-    contract ExecutorFacet {
+    contract V31ExecutorFacet {
         constructor(uint256 _l1ChainId);
     }
-
-    contract MailboxFacet {
-        constructor(uint256 _eraChainId, uint256 _l1ChainId);
+    contract V31CommitterFacet {
+        constructor(uint256 _l1ChainId);
     }
-
-    contract BridgehubImpl {
-        constructor(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains);
+    contract V31MailboxFacet {
+        constructor(
+            uint256 _eraChainId,
+            uint256 _l1ChainId,
+            address _chainAssetHandler,
+            address _eip7702Checker,
+            bool _isTestnet
+        );
     }
-
-    #[sol(rpc)]
-    contract RollupDAManager{
-        function isPairAllowed(address _l1DAValidator, address _l2DAValidator) external view returns (bool);
-        address public owner;
+    contract V31L1Bridgehub {
+        constructor(address _owner, uint256 _maxNumberOfZKChains);
     }
-
-    contract TransitionaryOwner {
-        constructor(address _governanceAddress);
+    contract V31L1NativeTokenVault {
+        constructor(address _wethToken, address _assetRouter, address _l1Nullifier);
     }
-
-    contract BridgedTokenBeacon {
-        constructor(address _beacon);
+    contract V31L1AssetRouter {
+        constructor(
+            address _l1WethToken,
+            address _bridgehub,
+            address _l1Nullifier,
+            uint256 _eraChainId,
+            address _eraDiamondProxy
+        );
     }
-
-    contract MessageRoot {
-        constructor(address _bridgehub);
+    contract V31L1Nullifier {
+        constructor(
+            address _bridgehub,
+            address _messageRoot,
+            uint256 _eraChainId,
+            address _eraDiamondProxy
+        );
+    }
+    contract V31L1MessageRoot {
+        constructor(address _bridgehub, uint256 _eraGatewayChainId, address _chainAssetHandler);
+    }
+    contract V31L1AssetTracker {
+        constructor(address _bridgehub, address _nativeTokenVault, address _messageRoot);
+    }
+    contract V31L1ChainAssetHandler {
+        constructor(address _owner, address _bridgehub);
+    }
+    contract V31ChainTypeManager {
+        constructor(
+            address _bridgehub,
+            address _interopCenter,
+            address _l1BytecodesSupplier,
+            address _permissionlessValidator
+        );
+    }
+    contract V31PermissionlessValidator {
         function initialize();
     }
-
-    contract GovernanceUpgradeTimer {
-        constructor(uint256 _initialDelay, uint256 _maxAdditionalDelay, address _timerGovernance, address _initialOwner);
+    contract V31BytecodesSupplier {
+        function initialize();
     }
-
-    contract DualVerifier {
+    contract V31CTMDeploymentTracker {
+        constructor(address _bridgehub, address _l1AssetRouter);
+    }
+    contract V31DualVerifier {
         constructor(address _fflonkVerifier, address _plonkVerifier);
     }
-
-    #[sol(rpc)]
-    contract ProtocolUpgradeHandler {
-        /// @dev ZKsync smart contract that used to operate with L2 via asynchronous L2 <-> L1 communication.
-        address public immutable ZKSYNC_ERA;
-
-        /// @dev ZKsync smart contract that is responsible for creating new ZK Chains and changing parameters in existent.
-        address public immutable CHAIN_TYPE_MANAGER;
-
-        /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-        address public immutable BRIDGE_HUB;
-
-        /// @dev The nullifier contract that is used for bridging.
-        address public immutable L1_NULLIFIER;
-
-        /// @dev The asset router contract that is used for bridging.
-        address public immutable L1_ASSET_ROUTER;
-
-        /// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the ZK chains.
-        address public immutable L1_NATIVE_TOKEN_VAULT;
+    contract V31ZKsyncOSDualVerifier {
+        constructor(address _fflonkVerifier, address _plonkVerifier, address _initialOwner);
+    }
+    contract V31MigratorFacet {
+        constructor(uint256 _l1ChainId, bool _isTestnet);
+    }
+    contract V31GovernanceUpgradeTimer {
+        constructor(
+            uint256 _initialDelay,
+            uint256 _maxAdditionalDelay,
+            address _timerGovernance,
+            address _initialOwner
+        );
+    }
+    contract V31UpgradeStageValidator {
+        constructor(address chainTypeManager, uint256 newProtocolVersion);
+    }
+    contract V31ChainRegistrationSender {
+        constructor(address _bridgehub);
+    }
+    contract V31ValidatorTimelock {
+        constructor(address _bridgehubAddr);
     }
 }
 
@@ -233,17 +189,12 @@ pub struct StateTransition {
     pub verifier_plonk_addr: Address,
 }
 
-
-
 sol! {
     #[sol(rpc)]
     contract OwnableLike {
         function owner() external view returns (address);
     }
 }
-
-const EIP1967_PROXY_ADMIN_SLOT: &str =
-    "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
 
 /// Proxies whose EIP-1967 admin slot must match `transparent_proxy_admin`.
 /// These are the proxies that the v31 governance stage 1 calls upgrade.
@@ -256,6 +207,7 @@ const PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
     "ctm_deployment_tracker_proxy",
     "chain_asset_handler_proxy",
     "chain_type_manager_proxy",
+    "asset_tracker_proxy",
 ];
 
 /// Phase 5 RPC state checks (see `puvt-what-to-do.md`).
@@ -297,6 +249,385 @@ pub(crate) async fn verify_v31_artifact_state(
     verify_v31_proxy_admins(verifiers, result).await;
     verify_v31_core_wiring(verifiers, result).await;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await;
+
+    Ok(())
+}
+
+/// Deployment provenance.
+///
+/// For every named v31 implementation that the prepare scripts deploy via
+/// CREATE2 (or `Create2AndTransfer`), assert that the executed-bundle log
+/// contains a deployment whose init bytecode + abi-encoded constructor
+/// args match what we'd expect for that contract. This is the
+/// immutables-aware check: it verifies the contract was *produced* from
+/// the right inputs, regardless of how immutables get baked into the
+/// runtime bytecode.
+///
+/// The per-CTM TUPPs (`BytecodesSupplier` and `PermissionlessValidator`)
+/// are verified with `expect_create2_params_proxy_with_bytecode`, using the
+/// live implementation slot and the executed-bundle CREATE2 provenance.
+///
+/// Larger structural follow-up: unify `EcosystemUpgradeArtifact` and the
+/// legacy `UpgradeOutput` into a single v31 TOML reader. The current
+/// commit keeps both side-by-side; Phase 6 reuses only the create2
+/// machinery from `NetworkVerifier` (which does not depend on
+/// `UpgradeOutput`) so the unification can land independently.
+pub(crate) async fn verify_v31_provenance(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    era_chain_id: u64,
+    legacy_gateway_chain_id: u64,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    result.print_info("== Deployment provenance ==");
+
+    let provider = verifiers.network_verifier.get_l1_provider();
+    let l1_chain_id = verifiers
+        .network_verifier
+        .try_get_l1_chain_id()
+        .await
+        .unwrap_or_else(|err| panic!("Failed to fetch L1 chain id for provenance: {err}"));
+
+    // Convenience lookups against the artifact-derived address verifier.
+    // Each address used as a constructor input has to come from somewhere;
+    // we tolerate missing entries because not every operator scenario
+    // populates every named address.
+    let lookup = |name: &str| {
+        verifiers
+            .address_verifier
+            .name_to_address
+            .get(name)
+            .copied()
+    };
+
+    let is_testnet = artifact.contracts_config.is_testnet;
+
+    for ctm in &artifact.ctms {
+        verify_ctm_flavored_provenance(artifact, ctm, verifiers, l1_chain_id, result);
+    }
+
+    // The remaining contracts pull constructor args from the live
+    // Bridgehub: weth, asset router, nullifier, era diamond proxy, etc.
+    // The legacy `NetworkVerifier::get_bridgehub_info` is geared toward the
+    // legacy (UpgradeOutput) flow and assumes a populated era chain id; in
+    // the v31 artifact flow we read only the fields Phase 6 actually uses.
+    let bridgehub_addr = verifiers.bridgehub_address;
+    let bridgehub =
+        super::super::utils::network_verifier::Bridgehub::new(bridgehub_addr, provider.clone());
+    let asset_router_proxy = bridgehub.assetRouter().call().await.unwrap_or_else(|err| {
+        panic!("Failed to call Bridgehub.assetRouter() for provenance: {err}")
+    });
+    let l1_asset_router = super::super::utils::network_verifier::L1AssetRouter::new(
+        asset_router_proxy,
+        provider.clone(),
+    );
+    let weth = l1_asset_router
+        .L1_WETH_TOKEN()
+        .call()
+        .await
+        .unwrap_or_else(|err| panic!("Failed to call L1AssetRouter.L1_WETH_TOKEN(): {err}"));
+    let nullifier = l1_asset_router
+        .L1_NULLIFIER()
+        .call()
+        .await
+        .unwrap_or_else(|err| panic!("Failed to call L1AssetRouter.L1_NULLIFIER(): {err}"));
+    let ntv_proxy = l1_asset_router
+        .nativeTokenVault()
+        .call()
+        .await
+        .unwrap_or_else(|err| panic!("Failed to call L1AssetRouter.nativeTokenVault(): {err}"));
+
+    // L1NativeTokenVault impl(weth, assetRouter, nullifier).
+    if let Some(ntv_impl) = lookup("native_token_vault_implementation_addr") {
+        result.expect_create2_params(
+            verifiers,
+            &ntv_impl,
+            V31L1NativeTokenVault::constructorCall::new((weth, asset_router_proxy, nullifier))
+                .abi_encode(),
+            "l1-contracts/L1NativeTokenVault",
+        );
+    }
+
+    // CTMDeploymentTracker impl(bridgehub, l1AssetRouter).
+    if let Some(ctmdt_impl) = lookup("ctm_deployment_tracker_implementation_addr") {
+        result.expect_create2_params(
+            verifiers,
+            &ctmdt_impl,
+            V31CTMDeploymentTracker::constructorCall::new((bridgehub_addr, asset_router_proxy))
+                .abi_encode(),
+            "l1-contracts/CTMDeploymentTracker",
+        );
+    }
+
+    // L1AssetTracker impl(bridgehub, ntv, messageRoot).
+    if let (Some(tracker_impl), Some(message_root_proxy)) = (
+        lookup("l1_asset_tracker_implementation_addr"),
+        lookup("message_root_proxy"),
+    ) {
+        result.expect_create2_params(
+            verifiers,
+            &tracker_impl,
+            V31L1AssetTracker::constructorCall::new((
+                bridgehub_addr,
+                ntv_proxy,
+                message_root_proxy,
+            ))
+            .abi_encode(),
+            "l1-contracts/L1AssetTracker",
+        );
+    }
+
+    // The era_chain_id-dependent constructors (L1AssetRouter / L1Nullifier)
+    // require both the chain id and the chain's diamond proxy. The env provides
+    // era_chain_id; the diamond proxy must resolve from Bridgehub.
+    let era_diamond_proxy = verifiers
+        .network_verifier
+        .try_get_chain_diamond_from_bridgehub(bridgehub_addr, U256::from(era_chain_id))
+        .await
+        .unwrap_or_else(|err| {
+            panic!("Failed to call Bridgehub.getZKChain({era_chain_id}) for provenance: {err}")
+        });
+    if era_diamond_proxy == Address::ZERO {
+        panic!("Bridgehub.getZKChain({era_chain_id}) returned address(0) for provenance");
+    }
+
+    // L1AssetRouter impl(weth, bridgehub, nullifier, eraChainId, eraDiamondProxy).
+    if let Some(asset_router_impl) = lookup("l1_asset_router_implementation_addr") {
+        result.expect_create2_params(
+            verifiers,
+            &asset_router_impl,
+            V31L1AssetRouter::constructorCall::new((
+                weth,
+                bridgehub_addr,
+                nullifier,
+                U256::from(era_chain_id),
+                era_diamond_proxy,
+            ))
+            .abi_encode(),
+            "l1-contracts/L1AssetRouter",
+        );
+    }
+
+    // L1Nullifier impl(bridgehub, messageRoot, eraChainId, eraDiamondProxy).
+    if let (Some(nullifier_impl), Some(message_root_proxy)) = (
+        lookup("l1_nullifier_implementation_addr"),
+        lookup("message_root_proxy"),
+    ) {
+        result.expect_create2_params(
+            verifiers,
+            &nullifier_impl,
+            V31L1Nullifier::constructorCall::new((
+                bridgehub_addr,
+                message_root_proxy,
+                U256::from(era_chain_id),
+                era_diamond_proxy,
+            ))
+            .abi_encode(),
+            "l1-contracts/L1Nullifier",
+        );
+    }
+
+    // CommitterFacet(uint256 _l1ChainId).
+    if let Some(committer) = lookup("committer_facet_addr") {
+        result.expect_create2_params(
+            verifiers,
+            &committer,
+            V31CommitterFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
+            "l1-contracts/CommitterFacet",
+        );
+    }
+
+    // L1Bridgehub impl(_owner, _maxNumberOfZKChains). Owner is governance,
+    // readable from `bridgehub.owner()`; max chains is the well-known v31
+    // constant 100. Use file-match when the constructor-arg encoding drifts
+    // between deploy script and contract source.
+    if let Some(bridgehub_impl) = lookup("bridgehub_implementation_addr") {
+        match bridgehub.owner().call().await {
+            Ok(governance) => result.expect_create2_params(
+                verifiers,
+                &bridgehub_impl,
+                V31L1Bridgehub::constructorCall::new((
+                    governance,
+                    U256::from(MAX_NUMBER_OF_ZK_CHAINS),
+                ))
+                .abi_encode(),
+                "l1-contracts/L1Bridgehub",
+            ),
+            Err(err) => {
+                result.report_warn(&format!(
+                    "Skipping owner-dependent provenance checks; bridgehub.owner() failed: {err}"
+                ));
+            }
+        }
+    }
+
+    // The remaining v31 contracts. Constructor args come from a mix of
+    // RPC reads (governance owner, l1ChainId), the artifact's address
+    // map (chainAssetHandler, bytecodesSupplier, eip7702Checker),
+    // the artifact's `[verifier_inputs]`
+    // section (initialDelay, isTestnet), well-known constants
+    // (`L2_INTEROP_CENTER_ADDR`, the GovernanceUpgradeTimer 2-week
+    // window, MAX_NUMBER_OF_CHAINS = 100), and the prepare-time
+    // governance owner (= `bridgehub.owner()` = the protocol upgrade
+    // handler).
+    let chain_asset_handler_proxy = lookup("chain_asset_handler_proxy");
+    let eip7702_checker = lookup("eip7702_checker_addr");
+    let governance = match bridgehub.owner().call().await {
+        Ok(owner) => Some(owner),
+        Err(err) => {
+            result.report_warn(&format!(
+                "Skipping owner-dependent provenance checks; bridgehub.owner() failed: {err}"
+            ));
+            None
+        }
+    };
+
+    // MailboxFacet(eraChainId, l1ChainId, chainAssetHandler, eip7702Checker, isTestnet).
+    if let (Some(mailbox), Some(chain_asset_handler), Some(eip7702)) = (
+        lookup("mailbox_facet_addr"),
+        chain_asset_handler_proxy,
+        eip7702_checker,
+    ) {
+        result.expect_create2_params(
+            verifiers,
+            &mailbox,
+            V31MailboxFacet::constructorCall::new((
+                U256::from(era_chain_id),
+                U256::from(l1_chain_id),
+                chain_asset_handler,
+                eip7702,
+                is_testnet,
+            ))
+            .abi_encode(),
+            "l1-contracts/MailboxFacet",
+        );
+    }
+
+    // MigratorFacet(_l1ChainId, _isTestnet).
+    if let Some(migrator) = lookup("migrator_facet_addr") {
+        result.expect_create2_params(
+            verifiers,
+            &migrator,
+            V31MigratorFacet::constructorCall::new((U256::from(l1_chain_id), is_testnet))
+                .abi_encode(),
+            "l1-contracts/MigratorFacet",
+        );
+    }
+
+    // L1ChainAssetHandler(_owner=governance, _bridgehub).
+    if let (Some(chain_asset_handler_impl), Some(governance)) = (
+        lookup("chain_asset_handler_implementation_addr"),
+        governance,
+    ) {
+        result.expect_create2_params(
+            verifiers,
+            &chain_asset_handler_impl,
+            V31L1ChainAssetHandler::constructorCall::new((governance, bridgehub_addr)).abi_encode(),
+            "l1-contracts/L1ChainAssetHandler",
+        );
+    }
+
+    // L1MessageRoot(_bridgehub, _eraGatewayChainId, _chainAssetHandler).
+    //
+    // Stage Sepolia deploys the `L1MessageRootStageSepolia` variant (which
+    // skips chain 270's still-on-GW-123 settlement check during
+    // `_v31InitializeInner`) — its constructor signature is identical, but
+    // the bytecode hash differs. Pick whichever file the CREATE2 deploy was
+    // identified as, matching the same pattern the DualVerifier branch uses
+    // for the testnet variant.
+    if let (Some(message_root_impl), Some(chain_asset_handler)) = (
+        lookup("message_root_implementation_addr"),
+        chain_asset_handler_proxy,
+    ) {
+        let resolved_file = verifiers
+            .network_verifier
+            .create2_known_bytecodes
+            .get(&message_root_impl)
+            .cloned();
+        let expected_file = match resolved_file.as_deref() {
+            Some("l1-contracts/L1MessageRootStageSepolia") => {
+                "l1-contracts/L1MessageRootStageSepolia"
+            }
+            _ => "l1-contracts/L1MessageRoot",
+        };
+        result.expect_create2_params(
+            verifiers,
+            &message_root_impl,
+            V31L1MessageRoot::constructorCall::new((
+                bridgehub_addr,
+                U256::from(legacy_gateway_chain_id),
+                chain_asset_handler,
+            ))
+            .abi_encode(),
+            expected_file,
+        );
+    }
+
+    // GovernanceUpgradeTimer(initialDelay, maxAdditionalDelay = 2 weeks,
+    // timerGovernance = governance, initialOwner = governance).
+    if let (Some(timer), Some(governance), initial_delay) = (
+        lookup("l1_governance_upgrade_timer"),
+        governance,
+        artifact
+            .contracts_config
+            .governance_upgrade_timer_initial_delay,
+    ) {
+        const TWO_WEEKS_SECONDS: u64 = 2 * 7 * 24 * 60 * 60;
+        result.expect_create2_params(
+            verifiers,
+            &timer,
+            V31GovernanceUpgradeTimer::constructorCall::new((
+                U256::from(initial_delay),
+                U256::from(TWO_WEEKS_SECONDS),
+                governance,
+                governance,
+            ))
+            .abi_encode(),
+            "l1-contracts/GovernanceUpgradeTimer",
+        );
+    }
+
+    // UpgradeStageValidator(chainTypeManager, newProtocolVersion).
+    if let Some(stage_validator) = lookup("upgrade_stage_validator") {
+        if let Some(ctm_proxy) = lookup("chain_type_manager_proxy") {
+            result.expect_create2_params(
+                verifiers,
+                &stage_validator,
+                V31UpgradeStageValidator::constructorCall::new((
+                    ctm_proxy,
+                    U256::from(artifact.contracts_config.new_protocol_version),
+                ))
+                .abi_encode(),
+                "l1-contracts/UpgradeStageValidator",
+            );
+        }
+    }
+
+    verify_per_ctm_v31_provenance(artifact, verifiers, result, bridgehub_addr).await?;
+
+    // EIP7702Checker is part of the da-contracts package (not
+    // l1-contracts) — `AllContractsHashes.json` records it as
+    // `da-contracts/EIP7702Checker`.
+    if let Some(eip7702) = eip7702_checker {
+        result.expect_create2_params(
+            verifiers,
+            &eip7702,
+            Vec::<u8>::new(),
+            "da-contracts/EIP7702Checker",
+        );
+    }
+
+    // ChainRegistrationSender(bridgehub). Deployed once by `CoreUpgrade_v31`
+    // and surfaced as `[core.upgrade_addresses.bridgehub]
+    // chain_registration_sender_implementation_addr`.
+    if let Some(crs) = lookup("chain_registration_sender_implementation_addr") {
+        result.expect_create2_params(
+            verifiers,
+            &crs,
+            V31ChainRegistrationSender::constructorCall::new((bridgehub_addr,)).abi_encode(),
+            "l1-contracts/ChainRegistrationSender",
+        );
+    }
 
     Ok(())
 }
@@ -405,6 +736,22 @@ async fn verify_per_ctm_v31_provenance(
                 &server_notifier_impl,
                 Vec::<u8>::new(),
                 "l1-contracts/ServerNotifier",
+            );
+        }
+
+        // ValidatorTimelock impl (ctor: bridgehub). Deployed once per CTM by
+        // `CTMUpgrade_v31`; the stage 1 governance call swaps this address
+        // behind the per-CTM ValidatorTimelock proxy.
+        if let Some(validator_timelock_impl) = required_ctm_address(
+            ctm,
+            &["state_transition", "validator_timelock_implementation_addr"],
+            result,
+        ) {
+            result.expect_create2_params(
+                verifiers,
+                &validator_timelock_impl,
+                V31ValidatorTimelock::constructorCall::new((bridgehub_addr,)).abi_encode(),
+                "l1-contracts/ValidatorTimelock",
             );
         }
     }
@@ -771,475 +1118,4 @@ fn required_ctm_address(
             None
         }
     }
-}
-
-sol! {
-    contract V31AdminFacet {
-        constructor(uint256 _l1ChainId, address _rollupDAManager);
-    }
-    contract V31ExecutorFacet {
-        constructor(uint256 _l1ChainId);
-    }
-    contract V31CommitterFacet {
-        constructor(uint256 _l1ChainId);
-    }
-    contract V31MailboxFacet {
-        constructor(
-            uint256 _eraChainId,
-            uint256 _l1ChainId,
-            address _chainAssetHandler,
-            address _eip7702Checker,
-            bool _isTestnet
-        );
-    }
-    contract V31L1Bridgehub {
-        constructor(address _owner, uint256 _maxNumberOfZKChains);
-    }
-    contract V31L1NativeTokenVault {
-        constructor(address _wethToken, address _assetRouter, address _l1Nullifier);
-    }
-    contract V31L1AssetRouter {
-        constructor(
-            address _l1WethToken,
-            address _bridgehub,
-            address _l1Nullifier,
-            uint256 _eraChainId,
-            address _eraDiamondProxy
-        );
-    }
-    contract V31L1Nullifier {
-        constructor(
-            address _bridgehub,
-            address _messageRoot,
-            uint256 _eraChainId,
-            address _eraDiamondProxy
-        );
-    }
-    contract V31L1MessageRoot {
-        constructor(address _bridgehub, uint256 _eraGatewayChainId, address _chainAssetHandler);
-    }
-    contract V31L1AssetTracker {
-        constructor(address _bridgehub, address _nativeTokenVault, address _messageRoot);
-    }
-    contract V31L1ChainAssetHandler {
-        constructor(address _owner, address _bridgehub);
-    }
-    contract V31ChainTypeManager {
-        constructor(
-            address _bridgehub,
-            address _interopCenter,
-            address _l1BytecodesSupplier,
-            address _permissionlessValidator
-        );
-    }
-    contract V31PermissionlessValidator {
-        function initialize();
-    }
-    contract V31BytecodesSupplier {
-        function initialize();
-    }
-    contract V31CTMDeploymentTracker {
-        constructor(address _bridgehub, address _l1AssetRouter);
-    }
-    contract V31DualVerifier {
-        constructor(address _fflonkVerifier, address _plonkVerifier);
-    }
-    contract V31ZKsyncOSDualVerifier {
-        constructor(address _fflonkVerifier, address _plonkVerifier, address _initialOwner);
-    }
-    contract V31MigratorFacet {
-        constructor(uint256 _l1ChainId, bool _isTestnet);
-    }
-    contract V31GovernanceUpgradeTimer {
-        constructor(
-            uint256 _initialDelay,
-            uint256 _maxAdditionalDelay,
-            address _timerGovernance,
-            address _initialOwner
-        );
-    }
-    contract V31UpgradeStageValidator {
-        constructor(address chainTypeManager, uint256 newProtocolVersion);
-    }
-    contract V31ChainRegistrationSender {
-        constructor(address _bridgehub);
-    }
-}
-
-/// Deployment provenance.
-///
-/// For every named v31 implementation that the prepare scripts deploy via
-/// CREATE2 (or `Create2AndTransfer`), assert that the executed-bundle log
-/// contains a deployment whose init bytecode + abi-encoded constructor
-/// args match what we'd expect for that contract. This is the
-/// immutables-aware check: it verifies the contract was *produced* from
-/// the right inputs, regardless of how immutables get baked into the
-/// runtime bytecode.
-///
-/// The per-CTM TUPPs (`BytecodesSupplier` and `PermissionlessValidator`)
-/// are verified with `expect_create2_params_proxy_with_bytecode`, using the
-/// live implementation slot and the executed-bundle CREATE2 provenance.
-///
-/// Larger structural follow-up: unify `EcosystemUpgradeArtifact` and the
-/// legacy `UpgradeOutput` into a single v31 TOML reader. The current
-/// commit keeps both side-by-side; Phase 6 reuses only the create2
-/// machinery from `NetworkVerifier` (which does not depend on
-/// `UpgradeOutput`) so the unification can land independently.
-pub(crate) async fn verify_v31_provenance(
-    artifact: &EcosystemUpgradeArtifact,
-    verifiers: &Verifiers,
-    era_chain_id: u64,
-    result: &mut VerificationResult,
-) -> Result<()> {
-    result.print_info("== Deployment provenance ==");
-
-    let provider = verifiers.network_verifier.get_l1_provider();
-    let l1_chain_id = verifiers
-        .network_verifier
-        .try_get_l1_chain_id()
-        .await
-        .unwrap_or_else(|err| panic!("Failed to fetch L1 chain id for provenance: {err}"));
-
-    // Convenience lookups against the artifact-derived address verifier.
-    // Each address used as a constructor input has to come from somewhere;
-    // we tolerate missing entries because not every operator scenario
-    // populates every named address.
-    let lookup = |name: &str| {
-        verifiers
-            .address_verifier
-            .name_to_address
-            .get(name)
-            .copied()
-    };
-
-    let is_testnet = artifact.contracts_config.is_testnet;
-
-    for ctm in &artifact.ctms {
-        verify_ctm_flavored_provenance(artifact, ctm, verifiers, l1_chain_id, result);
-    }
-
-    // The remaining contracts pull constructor args from the live
-    // Bridgehub: weth, asset router, nullifier, era diamond proxy, etc.
-    // The legacy `NetworkVerifier::get_bridgehub_info` is geared toward the
-    // legacy (UpgradeOutput) flow and assumes a populated era chain id; in
-    // the v31 artifact flow we read only the fields Phase 6 actually uses.
-    let bridgehub_addr = verifiers.bridgehub_address;
-    let bridgehub =
-        super::super::utils::network_verifier::Bridgehub::new(bridgehub_addr, provider.clone());
-    let asset_router_proxy = bridgehub.assetRouter().call().await.unwrap_or_else(|err| {
-        panic!("Failed to call Bridgehub.assetRouter() for provenance: {err}")
-    });
-    let l1_asset_router = super::super::utils::network_verifier::L1AssetRouter::new(
-        asset_router_proxy,
-        provider.clone(),
-    );
-    let weth = l1_asset_router
-        .L1_WETH_TOKEN()
-        .call()
-        .await
-        .unwrap_or_else(|err| panic!("Failed to call L1AssetRouter.L1_WETH_TOKEN(): {err}"));
-    let nullifier = l1_asset_router
-        .L1_NULLIFIER()
-        .call()
-        .await
-        .unwrap_or_else(|err| panic!("Failed to call L1AssetRouter.L1_NULLIFIER(): {err}"));
-    let ntv_proxy = l1_asset_router
-        .nativeTokenVault()
-        .call()
-        .await
-        .unwrap_or_else(|err| panic!("Failed to call L1AssetRouter.nativeTokenVault(): {err}"));
-
-    // L1NativeTokenVault impl(weth, assetRouter, nullifier).
-    if let Some(ntv_impl) = lookup("native_token_vault_implementation_addr") {
-        result.expect_create2_params(
-            verifiers,
-            &ntv_impl,
-            V31L1NativeTokenVault::constructorCall::new((weth, asset_router_proxy, nullifier))
-                .abi_encode(),
-            "l1-contracts/L1NativeTokenVault",
-        );
-    }
-
-    // CTMDeploymentTracker impl(bridgehub, l1AssetRouter).
-    if let Some(ctmdt_impl) = lookup("ctm_deployment_tracker_implementation_addr") {
-        result.expect_create2_params(
-            verifiers,
-            &ctmdt_impl,
-            V31CTMDeploymentTracker::constructorCall::new((bridgehub_addr, asset_router_proxy))
-                .abi_encode(),
-            "l1-contracts/CTMDeploymentTracker",
-        );
-    }
-
-    // L1AssetTracker impl(bridgehub, ntv, messageRoot).
-    if let (Some(tracker_impl), Some(message_root_proxy)) = (
-        lookup("l1_asset_tracker_implementation_addr"),
-        lookup("message_root_proxy"),
-    ) {
-        result.expect_create2_params(
-            verifiers,
-            &tracker_impl,
-            V31L1AssetTracker::constructorCall::new((
-                bridgehub_addr,
-                ntv_proxy,
-                message_root_proxy,
-            ))
-            .abi_encode(),
-            "l1-contracts/L1AssetTracker",
-        );
-    }
-
-    // The era_chain_id-dependent constructors (L1AssetRouter / L1Nullifier)
-    // require both the chain id and the chain's diamond proxy. The env provides
-    // era_chain_id; the diamond proxy must resolve from Bridgehub.
-    let era_diamond_proxy = verifiers
-        .network_verifier
-        .try_get_chain_diamond_from_bridgehub(bridgehub_addr, U256::from(era_chain_id))
-        .await
-        .unwrap_or_else(|err| {
-            panic!("Failed to call Bridgehub.getZKChain({era_chain_id}) for provenance: {err}")
-        });
-    if era_diamond_proxy == Address::ZERO {
-        panic!("Bridgehub.getZKChain({era_chain_id}) returned address(0) for provenance");
-    }
-
-    // L1AssetRouter impl(weth, bridgehub, nullifier, eraChainId, eraDiamondProxy).
-    if let Some(asset_router_impl) = lookup("l1_asset_router_implementation_addr") {
-        result.expect_create2_params(
-            verifiers,
-            &asset_router_impl,
-            V31L1AssetRouter::constructorCall::new((
-                weth,
-                bridgehub_addr,
-                nullifier,
-                U256::from(era_chain_id),
-                era_diamond_proxy,
-            ))
-            .abi_encode(),
-            "l1-contracts/L1AssetRouter",
-        );
-    }
-
-    // L1Nullifier impl(bridgehub, messageRoot, eraChainId, eraDiamondProxy).
-    if let (Some(nullifier_impl), Some(message_root_proxy)) = (
-        lookup("l1_nullifier_implementation_addr"),
-        lookup("message_root_proxy"),
-    ) {
-        result.expect_create2_params(
-            verifiers,
-            &nullifier_impl,
-            V31L1Nullifier::constructorCall::new((
-                bridgehub_addr,
-                message_root_proxy,
-                U256::from(era_chain_id),
-                era_diamond_proxy,
-            ))
-            .abi_encode(),
-            "l1-contracts/L1Nullifier",
-        );
-    }
-
-    // CommitterFacet(uint256 _l1ChainId).
-    if let Some(committer) = lookup("committer_facet_addr") {
-        result.expect_create2_params(
-            verifiers,
-            &committer,
-            V31CommitterFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
-            "l1-contracts/CommitterFacet",
-        );
-    }
-
-    // L1Bridgehub impl(_owner, _maxNumberOfZKChains). Owner is governance,
-    // readable from `bridgehub.owner()`; max chains is the well-known v31
-    // constant 100. Use file-match when the constructor-arg encoding drifts
-    // between deploy script and contract source.
-    if let Some(bridgehub_impl) = lookup("bridgehub_implementation_addr") {
-        match bridgehub.owner().call().await {
-            Ok(governance) => result.expect_create2_params(
-                verifiers,
-                &bridgehub_impl,
-                V31L1Bridgehub::constructorCall::new((
-                    governance,
-                    U256::from(MAX_NUMBER_OF_ZK_CHAINS),
-                ))
-                .abi_encode(),
-                "l1-contracts/L1Bridgehub",
-            ),
-            Err(err) => {
-                result.report_warn(&format!(
-                    "Skipping owner-dependent provenance checks; bridgehub.owner() failed: {err}"
-                ));
-            }
-        }
-    }
-
-    // The remaining v31 contracts. Constructor args come from a mix of
-    // RPC reads (governance owner, l1ChainId), the artifact's address
-    // map (chainAssetHandler, bytecodesSupplier, eip7702Checker),
-    // the artifact's `[verifier_inputs]`
-    // section (initialDelay, isTestnet), well-known constants
-    // (`L2_INTEROP_CENTER_ADDR`, the GovernanceUpgradeTimer 2-week
-    // window, MAX_NUMBER_OF_CHAINS = 100), and the prepare-time
-    // governance owner (= `bridgehub.owner()` = the protocol upgrade
-    // handler).
-    let chain_asset_handler_proxy = lookup("chain_asset_handler_proxy");
-    let eip7702_checker = lookup("eip7702_checker_addr");
-    let governance = match bridgehub.owner().call().await {
-        Ok(owner) => Some(owner),
-        Err(err) => {
-            result.report_warn(&format!(
-                "Skipping owner-dependent provenance checks; bridgehub.owner() failed: {err}"
-            ));
-            None
-        }
-    };
-
-    // MailboxFacet(eraChainId, l1ChainId, chainAssetHandler, eip7702Checker, isTestnet).
-    if let (Some(mailbox), Some(chain_asset_handler), Some(eip7702)) = (
-        lookup("mailbox_facet_addr"),
-        chain_asset_handler_proxy,
-        eip7702_checker,
-    ) {
-        result.expect_create2_params(
-            verifiers,
-            &mailbox,
-            V31MailboxFacet::constructorCall::new((
-                U256::from(era_chain_id),
-                U256::from(l1_chain_id),
-                chain_asset_handler,
-                eip7702,
-                is_testnet,
-            ))
-            .abi_encode(),
-            "l1-contracts/MailboxFacet",
-        );
-    }
-
-    // MigratorFacet(_l1ChainId, _isTestnet).
-    if let Some(migrator) = lookup("migrator_facet_addr") {
-        result.expect_create2_params(
-            verifiers,
-            &migrator,
-            V31MigratorFacet::constructorCall::new((U256::from(l1_chain_id), is_testnet))
-                .abi_encode(),
-            "l1-contracts/MigratorFacet",
-        );
-    }
-
-    // L1ChainAssetHandler(_owner=governance, _bridgehub).
-    if let (Some(chain_asset_handler_impl), Some(governance)) = (
-        lookup("chain_asset_handler_implementation_addr"),
-        governance,
-    ) {
-        result.expect_create2_params(
-            verifiers,
-            &chain_asset_handler_impl,
-            V31L1ChainAssetHandler::constructorCall::new((governance, bridgehub_addr)).abi_encode(),
-            "l1-contracts/L1ChainAssetHandler",
-        );
-    }
-
-    // L1MessageRoot(_bridgehub, _eraGatewayChainId, _chainAssetHandler).
-    //
-    // Stage Sepolia deploys the `L1MessageRootStageSepolia` variant (which
-    // skips chain 270's still-on-GW-123 settlement check during
-    // `_v31InitializeInner`) — its constructor signature is identical, but
-    // the bytecode hash differs. Pick whichever file the CREATE2 deploy was
-    // identified as, matching the same pattern the DualVerifier branch uses
-    // for the testnet variant.
-    if let (Some(message_root_impl), Some(chain_asset_handler)) = (
-        lookup("message_root_implementation_addr"),
-        chain_asset_handler_proxy,
-    ) {
-        let resolved_file = verifiers
-            .network_verifier
-            .create2_known_bytecodes
-            .get(&message_root_impl)
-            .cloned();
-        let expected_file = match resolved_file.as_deref() {
-            Some("l1-contracts/L1MessageRootStageSepolia") => {
-                "l1-contracts/L1MessageRootStageSepolia"
-            }
-            _ => "l1-contracts/L1MessageRoot",
-        };
-        result.expect_create2_params(
-            verifiers,
-            &message_root_impl,
-            V31L1MessageRoot::constructorCall::new((
-                bridgehub_addr,
-                U256::from(era_chain_id),
-                chain_asset_handler,
-            ))
-            .abi_encode(),
-            expected_file,
-        );
-    }
-
-    // GovernanceUpgradeTimer(initialDelay, maxAdditionalDelay = 2 weeks,
-    // timerGovernance = governance, initialOwner = governance).
-    if let (Some(timer), Some(governance), initial_delay) = (
-        lookup("l1_governance_upgrade_timer"),
-        governance,
-        artifact
-            .contracts_config
-            .governance_upgrade_timer_initial_delay,
-    ) {
-        const TWO_WEEKS_SECONDS: u64 = 2 * 7 * 24 * 60 * 60;
-        result.expect_create2_params(
-            verifiers,
-            &timer,
-            V31GovernanceUpgradeTimer::constructorCall::new((
-                U256::from(initial_delay),
-                U256::from(TWO_WEEKS_SECONDS),
-                governance,
-                governance,
-            ))
-            .abi_encode(),
-            "l1-contracts/GovernanceUpgradeTimer",
-        );
-    }
-
-    // UpgradeStageValidator(chainTypeManager, newProtocolVersion).
-    if let Some(stage_validator) = lookup("upgrade_stage_validator") {
-        if let Some(ctm_proxy) = lookup("chain_type_manager_proxy") {
-            result.expect_create2_params(
-                verifiers,
-                &stage_validator,
-                V31UpgradeStageValidator::constructorCall::new((
-                    ctm_proxy,
-                    U256::from(artifact.contracts_config.new_protocol_version),
-                ))
-                .abi_encode(),
-                "l1-contracts/UpgradeStageValidator",
-            );
-        }
-    }
-
-    verify_per_ctm_v31_provenance(artifact, verifiers, result, bridgehub_addr).await?;
-
-    // EIP7702Checker is part of the da-contracts package (not
-    // l1-contracts) — `AllContractsHashes.json` records it as
-    // `da-contracts/EIP7702Checker`.
-    if let Some(eip7702) = eip7702_checker {
-        result.expect_create2_params(
-            verifiers,
-            &eip7702,
-            Vec::<u8>::new(),
-            "da-contracts/EIP7702Checker",
-        );
-    }
-
-    // ChainRegistrationSender(bridgehub). Deployed once by `CoreUpgrade_v31`
-    // and surfaced as `[core.upgrade_addresses.bridgehub]
-    // chain_registration_sender_implementation_addr`.
-    if let Some(crs) = lookup("chain_registration_sender_implementation_addr") {
-        result.expect_create2_params(
-            verifiers,
-            &crs,
-            V31ChainRegistrationSender::constructorCall::new((bridgehub_addr,)).abi_encode(),
-            "l1-contracts/ChainRegistrationSender",
-        );
-    }
-
-    Ok(())
 }

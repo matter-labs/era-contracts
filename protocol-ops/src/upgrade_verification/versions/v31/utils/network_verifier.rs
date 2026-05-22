@@ -10,6 +10,7 @@ use Bridgehub::requestL2TransactionDirectCall;
 
 use crate::common::logger;
 
+use crate::upgrade_verification::constants::EIP1967_PROXY_ADMIN_SLOT;
 use super::bytecode_verifier::BytecodeVerifier;
 use super::{address_from_short_hex, compute_create2_address_evm, compute_create2_address_zk};
 
@@ -74,9 +75,6 @@ sol! {
     ) external payable returns (address);
 }
 
-const EIP1967_PROXY_ADMIN_SLOT: &str =
-    "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
-
 pub struct NetworkVerifier {
     pub l1_provider: RootProvider,
     pub l2_chain_id: u64,
@@ -102,7 +100,8 @@ impl NetworkVerifier {
             .context("failed to fetch L1 chain id")?;
         let gw_provider =
             RootProvider::new_http(gw_rpc.parse().context("invalid gateway RPC URL")?);
-        let gateway_chain_id = 0;
+        let gateway_chain_id = 2708;
+        // TODO: restore when GW unbricked
         // let gateway_chain_id = gw_provider
         //     .get_chain_id()
         //     .await
@@ -159,9 +158,7 @@ impl NetworkVerifier {
                     continue;
                 }
                 Err(err) => {
-                    logger::warn(format!(
-                        "eth_getTransactionByHash({hash:#x}) failed: {err}"
-                    ));
+                    logger::warn(format!("eth_getTransactionByHash({hash:#x}) failed: {err}"));
                     fetch_failures += 1;
                     continue;
                 }
@@ -214,11 +211,7 @@ impl NetworkVerifier {
             };
 
             let salt_fb = FixedBytes::<32>::from_slice(salt_bytes);
-            let addr = compute_create2_address_evm(
-                *create2_factory,
-                salt_fb,
-                keccak256(rest),
-            );
+            let addr = compute_create2_address_evm(*create2_factory, salt_fb, keccak256(rest));
 
             // Salt sanity: only enforced after recognition, so non-deploy tx
             // first-32 bytes (which aren't salts at all) don't trigger errors.
@@ -394,7 +387,6 @@ impl NetworkVerifier {
             .await;
         Address::from_slice(&addr_as_bytes[12..])
     }
-
 }
 
 /// Fetches the `transaction` and tries to parse it as a CREATE2 deployment
@@ -465,7 +457,6 @@ fn check_create2_deploy_from_input(
 
     None
 }
-
 
 async fn check_gw_create2_deploy(
     l1_provider: RootProvider,

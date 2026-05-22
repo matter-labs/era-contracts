@@ -1,15 +1,7 @@
-//! L2 built-in system contract addresses.
-//!
-//! Mirrors `l1-contracts/contracts/common/l2-helpers/L2ContractAddresses.sol`.
-//! These are protocol-level constants: built-in L2 system contracts live at
-//! `BUILT_IN_CONTRACTS_OFFSET (0x10000) + <index>` and are part of the
-//! protocol spec, not deployed per-chain.
-//!
-//! Add only the constants the upgrade-verification crate actually consumes —
-//! the parser-based test below reads the Solidity source directly and will
-//! fail loudly if a name disappears or its offset drifts.
-
 use alloy::primitives::Address;
+
+pub const EIP1967_PROXY_ADMIN_SLOT: &str =
+    "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
 
 /// Builds an L2 built-in address from a 16-bit offset into the
 /// `BUILT_IN_CONTRACTS_OFFSET` range (`0x10000..=0x1ffff`).
@@ -21,6 +13,16 @@ const fn l2_addr(offset: u16) -> Address {
     Address::new(bytes)
 }
 
+/// L2 built-in system contract addresses.
+///
+/// Mirrors `l1-contracts/contracts/common/l2-helpers/L2ContractAddresses.sol`.
+/// These are protocol-level constants: built-in L2 system contracts live at
+/// `BUILT_IN_CONTRACTS_OFFSET (0x10000) + <index>` and are part of the
+/// protocol spec, not deployed per-chain.
+///
+/// Add only the constants the upgrade-verification crate actually consumes —
+/// the parser-based test below reads the Solidity source directly and will
+/// fail loudly if a name disappears or its offset drifts.
 pub const L2_BRIDGEHUB_ADDR: Address = l2_addr(0x02);
 pub const L2_INTEROP_CENTER_ADDR: Address = l2_addr(0x0d);
 
@@ -36,7 +38,7 @@ mod tests {
     #[test]
     fn matches_solidity_source() {
         const SOL: &str = include_str!(
-            "../../../../../../l1-contracts/contracts/common/l2-helpers/L2ContractAddresses.sol"
+            "../../../l1-contracts/contracts/common/l2-helpers/L2ContractAddresses.sol"
         );
 
         // Capture `<NAME> = ...address(BUILT_IN_CONTRACTS_OFFSET + 0x<hex>)...`
@@ -59,8 +61,7 @@ mod tests {
                 .unwrap_or(after_constant.len());
             let name = &after_constant[..name_len];
 
-            let after_prefix =
-                &line[offset_pos + "address(BUILT_IN_CONTRACTS_OFFSET + 0x".len()..];
+            let after_prefix = &line[offset_pos + "address(BUILT_IN_CONTRACTS_OFFSET + 0x".len()..];
             let hex_len = after_prefix
                 .find(|c: char| !c.is_ascii_hexdigit())
                 .unwrap_or(after_prefix.len());

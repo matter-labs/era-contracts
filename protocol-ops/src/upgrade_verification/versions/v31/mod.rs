@@ -68,6 +68,7 @@ pub(crate) async fn verify(
     gw_rpc_url: &str,
     contracts_commit: Option<&str>,
     era_chain_id: u64,
+    legacy_gateway_chain_id: u64,
     tx_hashes: &[FixedBytes<32>],
     create2_factory: Address,
     expected_salts: &[FixedBytes<32>],
@@ -127,7 +128,7 @@ pub(crate) async fn verify(
 
     verify_v31_artifact_state(artifact, &verifiers, create2_factory, result).await?;
 
-    verify_v31_provenance(artifact, &verifiers, era_chain_id, result).await?;
+    verify_v31_provenance(artifact, &verifiers, era_chain_id, legacy_gateway_chain_id, result).await?;
 
     Ok(())
 }

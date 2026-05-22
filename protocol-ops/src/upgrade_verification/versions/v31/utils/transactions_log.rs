@@ -113,11 +113,7 @@ mod tests {
     #[test]
     fn rejects_wrong_length() {
         let err = parse_hash("0xabcd").unwrap_err();
-        assert!(
-            err.to_string().contains("64 hex chars"),
-            "{}",
-            err
-        );
+        assert!(err.to_string().contains("64 hex chars"), "{}", err);
     }
 
     #[test]

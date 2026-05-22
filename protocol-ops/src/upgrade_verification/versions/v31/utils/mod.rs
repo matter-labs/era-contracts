@@ -13,7 +13,6 @@ pub mod address_verifier;
 pub mod bytecode_verifier;
 pub mod facet_cut_set;
 pub mod fee_param_verifier;
-pub mod l2_system_addresses;
 pub mod network_verifier;
 pub mod transactions_log;
 
