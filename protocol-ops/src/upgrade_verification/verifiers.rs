@@ -16,13 +16,12 @@ use std::panic::Location;
 
 use crate::upgrade_verification::{
     artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
+    constants::L2_BRIDGEHUB_ADDR,
     versions::v31::utils::{
         address_verifier::AddressVerifier, bytecode_verifier::BytecodeVerifier,
         fee_param_verifier::FeeParamVerifier, get_contents_from_github,
-        network_verifier::NetworkVerifier,
-        repo_relative_path,
+        network_verifier::NetworkVerifier, repo_relative_path,
     },
-    constants::L2_BRIDGEHUB_ADDR
 };
 
 sol! {

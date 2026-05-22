@@ -140,7 +140,9 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         logger::info("Contracts hashes: local repository AllContractsHashes.json");
     }
     logger::info(format!("Representative ZK chain ID: {era_chain_id}"));
-    logger::info(format!("Legacy Gateway chain ID: {legacy_gateway_chain_id}"));
+    logger::info(format!(
+        "Legacy Gateway chain ID: {legacy_gateway_chain_id}"
+    ));
     logger::info(format!("CREATE2 factory: {create2_factory}"));
     logger::info(format!("ZK token asset ID: {zk_token_asset_id}"));
 

@@ -10,9 +10,9 @@ use Bridgehub::requestL2TransactionDirectCall;
 
 use crate::common::logger;
 
-use crate::upgrade_verification::constants::EIP1967_PROXY_ADMIN_SLOT;
 use super::bytecode_verifier::BytecodeVerifier;
 use super::{address_from_short_hex, compute_create2_address_evm, compute_create2_address_zk};
+use crate::upgrade_verification::constants::EIP1967_PROXY_ADMIN_SLOT;
 
 sol! {
     #[derive(Debug)]
