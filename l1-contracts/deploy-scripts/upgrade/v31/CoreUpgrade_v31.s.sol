@@ -310,20 +310,26 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     }
 
     /// @notice Build the legacy-GW decommission calls (historical intervals + blacklist).
-    /// @dev Reads `[legacy_gateway]` from the upgrade input TOML:
+    /// @dev Reads `[legacy_gateway]` from `upgrade-envs/permanent-values/<env>.toml`
+    ///      (the historical/env-stable file), not the v31-specific upgrade input.
+    ///      The basename is extracted from `v31UpgradeInputRelPath` (e.g.
+    ///      `/upgrade-envs/v0.31.0-interopB/stage.toml` → reads
+    ///      `/upgrade-envs/permanent-values/stage.toml`).
     ///      - `legacy_gateway.chain_id` — the old GW's chain ID (required if section present)
     ///      - `[[legacy_gateway.chain_intervals]]` — one entry per (chain, migration)
-    ///      Returns an empty array if the section is missing.
+    ///      Returns an empty array if the section is missing or `v31UpgradeInputRelPath`
+    ///      is unset (local fixtures).
     function _buildLegacyGatewayDecommissionCalls() internal returns (Call[] memory calls) {
         if (bytes(v31UpgradeInputRelPath).length == 0) {
             return new Call[](0);
         }
 
         string memory root = vm.projectRoot();
-        string memory upgradeToml = vm.readFile(string.concat(root, v31UpgradeInputRelPath));
+        string memory permanentValuesRelPath = _permanentValuesPathFromV31Input();
+        string memory upgradeToml = vm.readFile(string.concat(root, permanentValuesRelPath));
 
         if (!upgradeToml.keyExists("$.legacy_gateway")) {
-            console.log("[legacy_gateway] section absent from upgrade input - skipping decommission calls");
+            console.log("[legacy_gateway] absent from permanent-values - skipping decommission calls");
             return new Call[](0);
         }
 
@@ -388,6 +394,32 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
                 data: abi.encodeCall(IL1ChainAssetHandler.setHistoricalMigrationInterval, (chainId, 0, interval))
             });
         }
+    }
+
+    /// @notice Derive the permanent-values TOML path from the v31 upgrade input
+    ///         path. The two files share a basename per env:
+    ///           v31 input:        `/upgrade-envs/v0.31.0-interopB/<env>.toml`
+    ///           permanent-values: `/upgrade-envs/permanent-values/<env>.toml`
+    ///         We extract the basename of `v31UpgradeInputRelPath` and rebuild
+    ///         the path under `permanent-values/`.
+    function _permanentValuesPathFromV31Input() internal view returns (string memory) {
+        bytes memory p = bytes(v31UpgradeInputRelPath);
+        require(p.length > 0, "v31UpgradeInputRelPath empty");
+        uint256 lastSlash = 0;
+        bool found = false;
+        for (uint256 i = p.length; i > 0; --i) {
+            if (p[i - 1] == "/") {
+                lastSlash = i;
+                found = true;
+                break;
+            }
+        }
+        require(found, "v31UpgradeInputRelPath has no `/` separator");
+        bytes memory basename = new bytes(p.length - lastSlash);
+        for (uint256 i = 0; i < basename.length; ++i) {
+            basename[i] = p[lastSlash + i];
+        }
+        return string.concat("/upgrade-envs/permanent-values/", string(basename));
     }
 
     /// @notice Probe the length of a TOML array by binary search.

@@ -481,10 +481,13 @@ library Utils {
         // A 2x buffer was insufficient when L1 gas tripled between prepare
         // (e.g. 1 gwei) and broadcast (e.g. 3 gwei) — `MsgValueTooLow` reverts.
         // 10x absorbs the typical 1→10 gwei swings on Sepolia.
+        // Cap `l1GasPrice` at `block.basefee` so we never compute below the
+        // current floor.
+        uint256 effectiveGasPrice = params.l1GasPrice > block.basefee ? params.l1GasPrice : block.basefee;
         requiredValueToDeploy =
             bridgehub.l2TransactionBaseCost(
                 params.chainId,
-                params.l1GasPrice,
+                effectiveGasPrice,
                 params.l2GasLimit,
                 REQUIRED_L2_GAS_PRICE_PER_PUBDATA
             ) *
@@ -521,8 +524,16 @@ library Utils {
         IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddress);
 
         // 10x headroom — see `prepareL1L2Transaction` comment for rationale.
+        // Cap `l1GasPrice` at `block.basefee` so mintValue covers the case
+        // where actual L1 gas at broadcast time exceeds the prepare-time
+        // snapshot.
         requiredValueToDeploy =
-            bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) * 10;
+            bridgehub.l2TransactionBaseCost(
+                chainId,
+                l1GasPrice > block.basefee ? l1GasPrice : block.basefee,
+                l2GasLimit,
+                REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+            ) * 10;
 
         l2TransactionRequest = L2TransactionRequestTwoBridgesOuter({
             chainId: chainId,

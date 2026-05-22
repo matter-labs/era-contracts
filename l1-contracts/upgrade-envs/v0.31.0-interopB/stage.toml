@@ -22,11 +22,11 @@ message_root_stage_sepolia_variant = true
 governance_min_delay = 0
 
 max_number_of_chains = 100
-create2_factory_salt = "0xe97933790abddcaac347598ed2d61dbafc0a82f7f94f2a98fb840de7ead481ae"
+create2_factory_salt = "0x681144105a6693a814eee053d7cb07a24aca1f1c5d7d10434b3f96c0b9631b3b"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 # Per-regen salt for legacy `Governance.sol` ceremonies (scheduleTransparent +
 # executeInstant).
-legacy_gov_salt = "0x8531651417b57f700a35ad75544cf565acc291452948a4e83bd9775cdd3b12bd"
+legacy_gov_salt = "0x38708b3a6240f04aafd44b2fde5efb8971358f315708b358889fd234778ed951"
 validator_timelock_execution_delay = 0
 genesis_root = "0xe167dcb28722cee8fc953ea70d8fb2adaffe2806d9fd194da79bd84e19adbae3"
 genesis_rollup_leaf_index = 84
@@ -80,6 +80,6 @@ getters_facet_addr = "0x00e4C7066107B6E5E81320793BCee38D2f85CC03"
 # gov-replay's second `startTimer()` would revert.
 [create2_factory_salts]
 # Era CTM
-"0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b" = "0x4d661d45beba87b1bafdc17f5f62159cb9d87ea21c02055bb16243e5c84dd17f"
+"0x8b448ac7cd0f18F3d8464E2645575772a26A3b6b" = "0x5bfc45913577ab64144a69b42eb40dd371dbabb6fa4db370a1bc6a48cd0800ac"
 # ZKsync OS (Atlas) CTM
-"0x73bee414c6e006525f3cceedf6d8004c0370502e" = "0x41e224a75c169e430e65004a1b5cc9421ea1511fea9031287a2c5197b1f2631e"
+"0x73bee414c6e006525f3cceedf6d8004c0370502e" = "0x36d707218fe78f44660221ad5bf045ce35779c949e2176398723fddaf9be822d"

@@ -225,6 +225,7 @@ pub(crate) async fn execute_one_bundle(
     // await-on-receipt also means later txs' estimateGas sees the
     // side-effects of earlier ones, and a revert in tx N stops the loop
     // before any tx N+1 hits the wire.
+    let mut skipped: usize = 0;
     for (idx, tx) in safe_txs.iter().enumerate() {
         let to: Address = tx
             .get("to")
@@ -259,13 +260,61 @@ pub(crate) async fn execute_one_bundle(
                 .data(data.clone())
                 .value(value)
                 .into();
-        let estimated = client
-            .estimate_gas(&estimate_req, None)
-            .await
-            .with_context(|| format!("eth_estimateGas for Safe tx #{idx} (to {to:#x})"))?;
-        let buffered =
-            estimated.saturating_mul(U256::from(GAS_ESTIMATE_BUFFER_BPS)) / U256::from(10_000);
-        let gas_limit = std::cmp::min(buffered, U256::from(PER_TX_GAS_LIMIT_CAP));
+        let gas_limit = match client.estimate_gas(&estimate_req, None).await {
+            Ok(est) => {
+                let buffered =
+                    est.saturating_mul(U256::from(GAS_ESTIMATE_BUFFER_BPS)) / U256::from(10_000);
+                std::cmp::min(buffered, U256::from(PER_TX_GAS_LIMIT_CAP))
+            }
+            Err(e) => {
+                // Idempotent skip: if estimation fails and the tx targets the
+                // CREATE2 factory, check whether the output address already has
+                // code (= already deployed in a prior partial broadcast). If so,
+                // skip this tx instead of aborting the whole bundle.
+                if should_skip_idempotent(&client, to, &data).await {
+                    logger::info(format!(
+                        "Skipping Safe tx #{idx} (to {to:#x}) — already deployed / idempotent"
+                    ));
+                    skipped += 1;
+                    continue;
+                }
+                // Check revert data for known idempotent errors from prior
+                // partial broadcasts:
+                // - OperationExists (0x876e8b23): legacy Governance.scheduleTransparent
+                // - AddressAlreadySet (0x0dfb42bf): setup call already executed
+                // - OperationMustBePending (0xb926a6b0): legacy Gov executeInstant
+                //   on an already-done operation
+                let err_str = format!("{e}");
+                let known_idempotent = [
+                    "876e8b23", // OperationExists
+                    "0dfb42bf", // AddressAlreadySet
+                    "b926a6b0", // OperationMustBePending
+                ];
+                if let Some(sig) = known_idempotent.iter().find(|s| err_str.contains(**s)) {
+                    logger::info(format!(
+                        "Skipping Safe tx #{idx} (to {to:#x}) — idempotent revert ({sig})"
+                    ));
+                    skipped += 1;
+                    continue;
+                }
+                // For CREATE2 factory calls that aren't skippable (target has
+                // no code yet), retry with a generous fixed gas limit. The
+                // estimation can fail on large initcodes or when the node's
+                // gas cap is too low for the estimate call.
+                let to_hex = format!("{to:#x}").to_lowercase();
+                const CREATE2_FALLBACK_GAS: u64 = 10_000_000;
+                if to_hex.contains(CREATE2_FACTORY) {
+                    logger::info(format!(
+                        "eth_estimateGas failed for CREATE2 tx #{idx}, using fallback gas limit {CREATE2_FALLBACK_GAS}"
+                    ));
+                    U256::from(CREATE2_FALLBACK_GAS)
+                } else {
+                    return Err(e).with_context(|| {
+                        format!("eth_estimateGas for Safe tx #{idx} (to {to:#x})")
+                    });
+                }
+            }
+        };
 
         let req = TransactionRequest::new()
             .from(from)
@@ -275,7 +324,7 @@ pub(crate) async fn execute_one_bundle(
             .chain_id(chain_id)
             .gas(gas_limit)
             .gas_price(gas_price)
-            .nonce(base_nonce + idx);
+            .nonce(base_nonce + idx - skipped);
 
         let pending = client
             .send_transaction(req, None)
@@ -307,6 +356,42 @@ pub(crate) async fn execute_one_bundle(
 
     logger::success("Safe file executed");
     Ok(())
+}
+
+/// Well-known deterministic deployment proxy (EIP-2470 style).
+const CREATE2_FACTORY: &str = "4e59b44847b379578588920ca78fbf26c0b4956c";
+
+/// Check whether a failed `eth_estimateGas` should be treated as an
+/// idempotent skip rather than a hard error. Currently handles:
+/// - CREATE2 factory calls where the output address already has code
+///   (the contract was deployed in a prior partial broadcast).
+/// - Any other tx whose target already has code and the call reverts
+///   (likely an already-executed governance operation).
+async fn should_skip_idempotent<M: Middleware>(client: &M, to: Address, data: &Bytes) -> bool
+where
+    M::Error: std::error::Error + Send + Sync + 'static,
+{
+    let to_hex = format!("{to:#x}").to_lowercase();
+    // CREATE2 factory: calldata = salt(32) + initcode.
+    // Compute the would-be CREATE2 address and check if it already has code.
+    if to_hex.contains(CREATE2_FACTORY) && data.len() >= 32 {
+        let salt: [u8; 32] = data[..32].try_into().unwrap_or([0u8; 32]);
+        let initcode = &data[32..];
+        let initcode_hash = ethers::utils::keccak256(initcode);
+        let mut buf = Vec::with_capacity(1 + 20 + 32 + 32);
+        buf.push(0xff);
+        buf.extend_from_slice(to.as_bytes());
+        buf.extend_from_slice(&salt);
+        buf.extend_from_slice(&initcode_hash);
+        let addr_hash = ethers::utils::keccak256(&buf);
+        let deployed_addr = Address::from_slice(&addr_hash[12..]);
+        if let Ok(code) = client.get_code(deployed_addr, None).await {
+            if !code.is_empty() {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 fn receipt_input(tx: &Value) -> anyhow::Result<Vec<u8>> {
@@ -407,9 +492,12 @@ pub(crate) async fn execute_one_bundle_unlocked(
         .await
         .context("eth_getTransactionCount(pending)")?;
 
-    let gas_price = resolve_gas_price(&provider)
-        .await
-        .context("resolve gas price")?;
+    // In unlocked (anvil-impersonate) mode, use a fixed low gas price
+    // instead of querying the node. Anvil's EIP-1559 base fee escalation
+    // can push `eth_gasPrice` 200x+ above prepare-time levels, causing
+    // MsgValueTooLow on priority deposit txs whose mintValue was baked
+    // in during prepare with a much lower gas price.
+    let gas_price = U256::from(GAS_PRICE_FLOOR_WEI);
     logger::info(format!(
         "Using gas price {} gwei",
         ethers::utils::format_units(gas_price, "gwei").unwrap_or_else(|_| gas_price.to_string()),

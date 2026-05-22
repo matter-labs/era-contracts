@@ -3,12 +3,297 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 use clap::Parser;
+use ethers::abi::{decode as abi_decode, ParamType};
 use ethers::types::Address;
 use ethers::utils::hex;
 use serde::{Deserialize, Serialize};
 
 use crate::common::governance_calls::decode_calls;
 use crate::common::logger;
+
+/// Optional human-description registry. Loaded from a TOML at
+/// `<env>/sim-descriptions.toml` (auto-discovered from `--env`) or via an
+/// explicit `--descriptions` flag. Each `[[entries]]` matches a sim tx by
+/// `(target, selector)` plus an optional discriminator — first matching
+/// entry wins; non-matching txs keep their auto-generated description.
+///
+/// Discriminators:
+/// - `arg0_address`: the first 32-byte word after the selector, decoded as
+///   an address. Disambiguates same-`(target, selector)` calls with
+///   different first args (e.g. `TPA.upgrade(<proxy>, <impl>)` across
+///   multiple proxies in stage 1).
+/// - `inner_target` + `inner_selector`: for *wrapper* selectors
+///   (`ChainAdmin.multicall`, legacy `Governance.scheduleTransparent` /
+///   `executeInstant`), match against the FIRST inner call's target and/or
+///   selector. Used for the bundle-1 legacy-Gov ceremony pairs and the
+///   ChainAdmin multicalls in bundles 3/4.
+/// Raw on-disk shape — address-typed fields accept either a `0x…` literal
+/// or a label from `[labels]`. Resolved to the canonical [`SimDescriptionRegistry`]
+/// at load time via [`build_registry`].
+#[derive(Debug, Default, Deserialize)]
+struct RawSimDescriptionRegistry {
+    /// `name → address` map. Lets entry targets and address-typed
+    /// discriminators refer to deployments by name so a salt rotation only
+    /// requires updating this section (not every entry that referenced the
+    /// rotated address).
+    #[serde(default)]
+    labels: std::collections::HashMap<String, Address>,
+    #[serde(default)]
+    entries: Vec<RawSimDescriptionEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawSimDescriptionEntry {
+    target: String,
+    selector: String,
+    #[serde(default)]
+    arg0_address: Option<String>,
+    #[serde(default)]
+    l2_contract: Option<String>,
+    #[serde(default)]
+    second_bridge_address: Option<String>,
+    #[serde(default)]
+    inner_target: Option<String>,
+    #[serde(default)]
+    inner_selector: Option<String>,
+    desc: String,
+}
+
+#[derive(Debug, Default)]
+struct SimDescriptionRegistry {
+    entries: Vec<SimDescriptionEntry>,
+}
+
+#[derive(Debug)]
+struct SimDescriptionEntry {
+    target: Address,
+    selector: String,
+    /// First 32-byte word after the selector, interpreted as `address`.
+    /// Used for plain `f(address, ...)` calls (e.g. `TPA.upgrade(proxy, impl)`).
+    arg0_address: Option<Address>,
+    /// `Bridgehub.requestL2TransactionDirect(L2TransactionRequestDirect)` —
+    /// `l2Contract` is word 3 of the tuple (after offset/chainId/mintValue).
+    /// Only meaningful when `selector = 0xd52471c1`.
+    l2_contract: Option<Address>,
+    /// `Bridgehub.requestL2TransactionTwoBridges(L2TransactionRequestTwoBridgesOuter)` —
+    /// `secondBridgeAddress` is word 7 of the tuple.
+    /// Only meaningful when `selector = 0x24fd57fb`.
+    second_bridge_address: Option<Address>,
+    /// For wrapper selectors (`multicall`, `scheduleTransparent`,
+    /// `executeInstant`) — match the first inner call's target.
+    inner_target: Option<Address>,
+    /// For wrapper selectors — match the first inner call's 4-byte selector.
+    inner_selector: Option<String>,
+    desc: String,
+}
+
+/// Resolve a target string (either a `0x…` address literal or a label
+/// defined in `[labels]`) to its canonical [`Address`].
+fn resolve_address(
+    value: &str,
+    labels: &std::collections::HashMap<String, Address>,
+) -> anyhow::Result<Address> {
+    if value.starts_with("0x") || value.starts_with("0X") {
+        value
+            .parse::<Address>()
+            .map_err(|err| anyhow::anyhow!("invalid address literal {value}: {err}"))
+    } else {
+        labels.get(value).copied().ok_or_else(|| {
+            anyhow::anyhow!(
+                "unknown label `{value}` — add it to [labels] in sim-descriptions.toml"
+            )
+        })
+    }
+}
+
+/// Resolve all label references in a [`RawSimDescriptionRegistry`] into
+/// canonical addresses. Returns an error on the first unknown label /
+/// malformed literal, with a context string that points at the offending
+/// entry index + field name so the developer can find it instantly.
+fn build_registry(raw: RawSimDescriptionRegistry) -> anyhow::Result<SimDescriptionRegistry> {
+    use anyhow::Context;
+    let labels = &raw.labels;
+    let mut entries = Vec::with_capacity(raw.entries.len());
+    for (i, e) in raw.entries.into_iter().enumerate() {
+        let target = resolve_address(&e.target, labels)
+            .with_context(|| format!("entries[{i}].target = `{}`", e.target))?;
+        let resolve_opt = |field: &str, v: Option<String>| -> anyhow::Result<Option<Address>> {
+            v.map(|s| resolve_address(&s, labels).with_context(|| format!("entries[{i}].{field} = `{s}`")))
+                .transpose()
+        };
+        entries.push(SimDescriptionEntry {
+            target,
+            selector: e.selector,
+            arg0_address: resolve_opt("arg0_address", e.arg0_address)?,
+            l2_contract: resolve_opt("l2_contract", e.l2_contract)?,
+            second_bridge_address: resolve_opt("second_bridge_address", e.second_bridge_address)?,
+            inner_target: resolve_opt("inner_target", e.inner_target)?,
+            inner_selector: e.inner_selector,
+            desc: e.desc,
+        });
+    }
+    Ok(SimDescriptionRegistry { entries })
+}
+
+impl SimDescriptionRegistry {
+    fn lookup(&self, target: Address, data_hex: &str) -> Option<String> {
+        let selector = data_hex.get(..10)?;
+        let inner = parse_first_inner_call(data_hex);
+        for entry in &self.entries {
+            if entry.target != target {
+                continue;
+            }
+            if !entry.selector.eq_ignore_ascii_case(selector) {
+                continue;
+            }
+            if let Some(want) = entry.arg0_address {
+                let arg0_hex = data_hex.get(10..74)?;
+                let parsed: Address = format!("0x{}", &arg0_hex[24..]).parse().ok()?;
+                if parsed != want {
+                    continue;
+                }
+            }
+            // requestL2TransactionDirect: l2Contract at word 3 after the selector.
+            if let Some(want) = entry.l2_contract {
+                let word_start = 10 + 3 * 64;
+                let word_hex = data_hex.get(word_start..word_start + 64)?;
+                let parsed: Address = format!("0x{}", &word_hex[24..]).parse().ok()?;
+                if parsed != want {
+                    continue;
+                }
+            }
+            // requestL2TransactionTwoBridges: secondBridgeAddress at word 7.
+            if let Some(want) = entry.second_bridge_address {
+                let word_start = 10 + 7 * 64;
+                let word_hex = data_hex.get(word_start..word_start + 64)?;
+                let parsed: Address = format!("0x{}", &word_hex[24..]).parse().ok()?;
+                if parsed != want {
+                    continue;
+                }
+            }
+            if entry.inner_target.is_some() || entry.inner_selector.is_some() {
+                let (inner_target, inner_selector) = inner.as_ref()?;
+                if let Some(want) = entry.inner_target {
+                    if *inner_target != want {
+                        continue;
+                    }
+                }
+                if let Some(ref want_sel) = entry.inner_selector {
+                    if !want_sel.eq_ignore_ascii_case(inner_selector) {
+                        continue;
+                    }
+                }
+            }
+            return Some(entry.desc.clone());
+        }
+        None
+    }
+}
+
+/// For wrapper calls — `ChainAdmin.multicall`, `Governance.scheduleTransparent`,
+/// `Governance.executeInstant` — return the first inner `Call`'s target and
+/// 4-byte selector. Returns `None` for unrecognised wrappers (the registry
+/// then falls back to plain `(target, selector)` matching).
+fn parse_first_inner_call(data_hex: &str) -> Option<(Address, String)> {
+    let bytes = hex::decode(data_hex.trim_start_matches("0x")).ok()?;
+    if bytes.len() < 4 {
+        return None;
+    }
+    let selector = u32::from_be_bytes(bytes[..4].try_into().ok()?);
+    let body = &bytes[4..];
+
+    let call_type = ParamType::Tuple(vec![
+        ParamType::Address,
+        ParamType::Uint(256),
+        ParamType::Bytes,
+    ]);
+    let operation_type = ParamType::Tuple(vec![
+        ParamType::Array(Box::new(call_type.clone())),
+        ParamType::FixedBytes(32),
+        ParamType::FixedBytes(32),
+    ]);
+
+    let calls_array = match selector {
+        // multicall((address,uint256,bytes)[], bool)
+        0x69340beb => {
+            let tokens = abi_decode(
+                &[ParamType::Array(Box::new(call_type)), ParamType::Bool],
+                body,
+            )
+            .ok()?;
+            tokens.into_iter().next()?.into_array()?
+        }
+        // scheduleTransparent((Call[], bytes32, bytes32), uint256)
+        0x2c431917 => {
+            let tokens = abi_decode(&[operation_type, ParamType::Uint(256)], body).ok()?;
+            tokens.into_iter().next()?.into_tuple()?.into_iter().next()?.into_array()?
+        }
+        // executeInstant((Call[], bytes32, bytes32))
+        0x95218ecd => {
+            let tokens = abi_decode(&[operation_type], body).ok()?;
+            tokens.into_iter().next()?.into_tuple()?.into_iter().next()?.into_array()?
+        }
+        _ => return None,
+    };
+
+    let first = calls_array.into_iter().next()?.into_tuple()?;
+    let mut it = first.into_iter();
+    let target = it.next()?.into_address()?;
+    let _value = it.next()?;
+    let inner_data = it.next()?.into_bytes()?;
+    if inner_data.len() < 4 {
+        return None;
+    }
+    Some((target, format!("0x{}", hex::encode(&inner_data[..4]))))
+}
+
+fn load_descriptions(path: Option<&Path>) -> SimDescriptionRegistry {
+    let path = match path {
+        Some(p) => p,
+        None => return SimDescriptionRegistry::default(),
+    };
+    if !path.exists() {
+        return SimDescriptionRegistry::default();
+    }
+    let raw = match fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(err) => {
+            logger::info(format!(
+                "Couldn't read {} ({err}); using auto-generated descriptions",
+                path.display()
+            ));
+            return SimDescriptionRegistry::default();
+        }
+    };
+    let parsed: RawSimDescriptionRegistry = match toml::from_str(&raw) {
+        Ok(r) => r,
+        Err(err) => {
+            logger::info(format!(
+                "Couldn't parse {} ({err}); using auto-generated descriptions",
+                path.display()
+            ));
+            return SimDescriptionRegistry::default();
+        }
+    };
+    let label_count = parsed.labels.len();
+    let entry_count = parsed.entries.len();
+    match build_registry(parsed) {
+        Ok(reg) => {
+            logger::info(format!(
+                "Loaded {entry_count} sim description override(s) and {label_count} label(s) from {}",
+                path.display()
+            ));
+            reg
+        }
+        Err(err) => {
+            logger::info(format!(
+                "Failed to resolve labels in {} ({err:#}); using auto-generated descriptions",
+                path.display()
+            ));
+            SimDescriptionRegistry::default()
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct GovernanceTomlToSimulatorArgs {
@@ -65,6 +350,14 @@ pub struct GovernanceTomlToSimulatorArgs {
     /// the CREATE2 deployer, but an explicit list is safer).
     #[clap(long, value_delimiter = ',', num_args = 1..)]
     pub camp_a_signers: Vec<Address>,
+
+    /// Optional path to a `sim-descriptions.toml` that overrides each
+    /// emitted tx's `description` field with a human-readable string keyed by
+    /// `(target, selector)` (+ optional discriminators). Auto-discovered at
+    /// `upgrade-envs/v0.31.0-interopB/<env>/sim-descriptions.toml` when
+    /// `--env` is set and the file exists.
+    #[clap(long)]
+    pub descriptions: Option<PathBuf>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -198,6 +491,22 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
         }),
     };
 
+    // Resolve descriptions registry: explicit `--descriptions` wins; otherwise
+    // auto-discover the file alongside the env config TOML (one level up from
+    // `<env-out>/`). For the v31 stage env that's
+    // `upgrade-envs/v0.31.0-interopB/sim-descriptions.toml`.
+    let descriptions_path = args.descriptions.or_else(|| {
+        env_cfg.as_ref().and_then(|cfg| {
+            crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)
+                .ok()
+                .and_then(|out| out.parent().map(|p| p.to_path_buf()))
+                .and_then(|out_parent| out_parent.parent().map(|p| p.to_path_buf()))
+                .map(|root| root.join("sim-descriptions.toml"))
+                .filter(|p| p.is_file())
+        })
+    });
+    let descriptions = load_descriptions(descriptions_path.as_deref());
+
     // Manifest bundles come FIRST (Camp-B setup the sim impersonates), then
     // governance stages 0/1/2. Order matters: setup writes the state
     // (pendingOwner, verifier registry, etc.) that the gov calls then read.
@@ -207,11 +516,11 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
             "Including manifest bundles from {}",
             manifest.display()
         ));
-        let extra = manifest_to_simulator_transactions(manifest, &network, &args.camp_a_signers)
+        let extra = manifest_to_simulator_transactions(manifest, &network, &args.camp_a_signers, &descriptions)
             .with_context(|| format!("failed to expand manifest bundles {}", manifest.display()))?;
         transactions.extend(extra);
     }
-    let governance = governance_toml_to_simulator_transactions(&governance_toml, &network, from)
+    let governance = governance_toml_to_simulator_transactions(&governance_toml, &network, from, &descriptions)
         .with_context(|| {
             format!(
                 "failed to convert governance TOML {}",
@@ -250,6 +559,7 @@ fn manifest_to_simulator_transactions(
     manifest_path: &Path,
     network: &str,
     explicit_camp_a: &[Address],
+    descriptions: &SimDescriptionRegistry,
 ) -> anyhow::Result<Vec<SimulatorTransaction>> {
     let manifest_dir = manifest_path.parent().ok_or_else(|| {
         anyhow::anyhow!("manifest path has no parent: {}", manifest_path.display())
@@ -338,14 +648,15 @@ fn manifest_to_simulator_transactions(
             } else {
                 None
             };
+            let _ = (label.as_str(), kept_total); // kept for `tag` parity; not used in description
+            let description = descriptions
+                .lookup(tx.to, &tx.data)
+                .unwrap_or_else(|| {
+                    let selector = tx.data.get(..10).unwrap_or("0x");
+                    format!("[unlabelled] to={:#x} sel={selector} (bundle {} tx {})", tx.to, bundle.index, idx + 1)
+                });
             out.push(SimulatorTransaction {
-                description: format!(
-                    "protocol-ops manifest bundle {} ({}) tx {}/{}",
-                    bundle.index,
-                    label,
-                    idx + 1,
-                    kept_total
-                ),
+                description,
                 network: network.to_string(),
                 from: format!("{:#x}", bundle.target),
                 to: format!("{:#x}", tx.to),
@@ -364,6 +675,7 @@ fn governance_toml_to_simulator_transactions(
     path: &PathBuf,
     network: &str,
     from: Address,
+    descriptions: &SimDescriptionRegistry,
 ) -> anyhow::Result<Vec<SimulatorTransaction>> {
     let content =
         fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
@@ -408,8 +720,14 @@ fn governance_toml_to_simulator_transactions(
             } else {
                 None
             };
+            let description = descriptions
+                .lookup(call.target, &data_hex)
+                .unwrap_or_else(|| {
+                    let selector = data_hex.get(..10).unwrap_or("0x");
+                    format!("[unlabelled] stage{stage} call {} to={:#x} sel={selector}", idx + 1, call.target)
+                });
             out.push(SimulatorTransaction {
-                description: format!("protocol-ops governance stage{stage} call {}", idx + 1),
+                description,
                 network: network.to_string(),
                 from: format!("{from:#x}"),
                 to: format!("{:#x}", call.target),

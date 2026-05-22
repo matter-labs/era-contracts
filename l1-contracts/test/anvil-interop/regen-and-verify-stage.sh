@@ -166,6 +166,7 @@ else
     --port $PORT \
     --auto-impersonate \
     --disable-block-gas-limit \
+    --gas-price 1000000000 \
     --fork-url "$L1_FORK_URL" \
     >"$OUT/anvil.log" 2>&1 &
   ANVIL_PID=$!
@@ -252,6 +253,10 @@ else
 fi
 
 echo "=== Step 3: upgrade-broadcast --unlocked --out ==="
+# Pin the base fee to 1 gwei so the EIP-1559 escalation doesn't cause
+# MsgValueTooLow on priority deposit txs whose mintValue was computed
+# at prepare-time with a lower gas price.
+cast rpc anvil_setNextBlockBaseFeePerGas 0x3B9ACA00 --rpc-url "$RPC" >/dev/null
 "$PROTOCOL_OPS" ecosystem upgrade-broadcast \
   --manifest "$OUT/prepare/manifest.json" \
   --l1-rpc-url "$RPC" \
