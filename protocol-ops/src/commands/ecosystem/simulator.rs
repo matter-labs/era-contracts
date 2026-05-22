@@ -27,38 +27,112 @@ use crate::common::logger;
 ///   `executeInstant`), match against the FIRST inner call's target and/or
 ///   selector. Used for the bundle-1 legacy-Gov ceremony pairs and the
 ///   ChainAdmin multicalls in bundles 3/4.
+/// Raw on-disk shape — address-typed fields accept either a `0x…` literal
+/// or a label from `[labels]`. Resolved to the canonical [`SimDescriptionRegistry`]
+/// at load time via [`build_registry`].
 #[derive(Debug, Default, Deserialize)]
-struct SimDescriptionRegistry {
+struct RawSimDescriptionRegistry {
+    /// `name → address` map. Lets entry targets and address-typed
+    /// discriminators refer to deployments by name so a salt rotation only
+    /// requires updating this section (not every entry that referenced the
+    /// rotated address).
     #[serde(default)]
-    entries: Vec<SimDescriptionEntry>,
+    labels: std::collections::HashMap<String, Address>,
+    #[serde(default)]
+    entries: Vec<RawSimDescriptionEntry>,
 }
 
 #[derive(Debug, Deserialize)]
+struct RawSimDescriptionEntry {
+    target: String,
+    selector: String,
+    #[serde(default)]
+    arg0_address: Option<String>,
+    #[serde(default)]
+    l2_contract: Option<String>,
+    #[serde(default)]
+    second_bridge_address: Option<String>,
+    #[serde(default)]
+    inner_target: Option<String>,
+    #[serde(default)]
+    inner_selector: Option<String>,
+    desc: String,
+}
+
+#[derive(Debug, Default)]
+struct SimDescriptionRegistry {
+    entries: Vec<SimDescriptionEntry>,
+}
+
+#[derive(Debug)]
 struct SimDescriptionEntry {
     target: Address,
     selector: String,
     /// First 32-byte word after the selector, interpreted as `address`.
     /// Used for plain `f(address, ...)` calls (e.g. `TPA.upgrade(proxy, impl)`).
-    #[serde(default)]
     arg0_address: Option<Address>,
     /// `Bridgehub.requestL2TransactionDirect(L2TransactionRequestDirect)` —
     /// `l2Contract` is word 3 of the tuple (after offset/chainId/mintValue).
     /// Only meaningful when `selector = 0xd52471c1`.
-    #[serde(default)]
     l2_contract: Option<Address>,
     /// `Bridgehub.requestL2TransactionTwoBridges(L2TransactionRequestTwoBridgesOuter)` —
     /// `secondBridgeAddress` is word 7 of the tuple.
     /// Only meaningful when `selector = 0x24fd57fb`.
-    #[serde(default)]
     second_bridge_address: Option<Address>,
     /// For wrapper selectors (`multicall`, `scheduleTransparent`,
     /// `executeInstant`) — match the first inner call's target.
-    #[serde(default)]
     inner_target: Option<Address>,
     /// For wrapper selectors — match the first inner call's 4-byte selector.
-    #[serde(default)]
     inner_selector: Option<String>,
     desc: String,
+}
+
+/// Resolve a target string (either a `0x…` address literal or a label
+/// defined in `[labels]`) to its canonical [`Address`].
+fn resolve_address(
+    value: &str,
+    labels: &std::collections::HashMap<String, Address>,
+) -> anyhow::Result<Address> {
+    if value.starts_with("0x") || value.starts_with("0X") {
+        value
+            .parse::<Address>()
+            .map_err(|err| anyhow::anyhow!("invalid address literal {value}: {err}"))
+    } else {
+        labels.get(value).copied().ok_or_else(|| {
+            anyhow::anyhow!(
+                "unknown label `{value}` — add it to [labels] in sim-descriptions.toml"
+            )
+        })
+    }
+}
+
+/// Resolve all label references in a [`RawSimDescriptionRegistry`] into
+/// canonical addresses. Returns an error on the first unknown label /
+/// malformed literal, with a context string that points at the offending
+/// entry index + field name so the developer can find it instantly.
+fn build_registry(raw: RawSimDescriptionRegistry) -> anyhow::Result<SimDescriptionRegistry> {
+    use anyhow::Context;
+    let labels = &raw.labels;
+    let mut entries = Vec::with_capacity(raw.entries.len());
+    for (i, e) in raw.entries.into_iter().enumerate() {
+        let target = resolve_address(&e.target, labels)
+            .with_context(|| format!("entries[{i}].target = `{}`", e.target))?;
+        let resolve_opt = |field: &str, v: Option<String>| -> anyhow::Result<Option<Address>> {
+            v.map(|s| resolve_address(&s, labels).with_context(|| format!("entries[{i}].{field} = `{s}`")))
+                .transpose()
+        };
+        entries.push(SimDescriptionEntry {
+            target,
+            selector: e.selector,
+            arg0_address: resolve_opt("arg0_address", e.arg0_address)?,
+            l2_contract: resolve_opt("l2_contract", e.l2_contract)?,
+            second_bridge_address: resolve_opt("second_bridge_address", e.second_bridge_address)?,
+            inner_target: resolve_opt("inner_target", e.inner_target)?,
+            inner_selector: e.inner_selector,
+            desc: e.desc,
+        });
+    }
+    Ok(SimDescriptionRegistry { entries })
 }
 
 impl SimDescriptionRegistry {
@@ -191,18 +265,29 @@ fn load_descriptions(path: Option<&Path>) -> SimDescriptionRegistry {
             return SimDescriptionRegistry::default();
         }
     };
-    match toml::from_str::<SimDescriptionRegistry>(&raw) {
+    let parsed: RawSimDescriptionRegistry = match toml::from_str(&raw) {
+        Ok(r) => r,
+        Err(err) => {
+            logger::info(format!(
+                "Couldn't parse {} ({err}); using auto-generated descriptions",
+                path.display()
+            ));
+            return SimDescriptionRegistry::default();
+        }
+    };
+    let label_count = parsed.labels.len();
+    let entry_count = parsed.entries.len();
+    match build_registry(parsed) {
         Ok(reg) => {
             logger::info(format!(
-                "Loaded {} sim description override(s) from {}",
-                reg.entries.len(),
+                "Loaded {entry_count} sim description override(s) and {label_count} label(s) from {}",
                 path.display()
             ));
             reg
         }
         Err(err) => {
             logger::info(format!(
-                "Couldn't parse {} ({err}); using auto-generated descriptions",
+                "Failed to resolve labels in {} ({err:#}); using auto-generated descriptions",
                 path.display()
             ));
             SimDescriptionRegistry::default()
