@@ -110,12 +110,10 @@ impl NetworkVerifier {
             .context("failed to fetch L1 chain id")?;
         let gw_provider =
             RootProvider::new_http(gw_rpc.parse().context("invalid gateway RPC URL")?);
-        let gateway_chain_id = 2708;
-        // TODO: restore when GW unbricked
-        // let gateway_chain_id = gw_provider
-        //     .get_chain_id()
-        //     .await
-        //     .context("failed to fetch gateway chain id")?;
+        let gateway_chain_id = gw_provider
+            .get_chain_id()
+            .await
+            .context("failed to fetch gateway chain id")?;
 
         Ok(Self {
             l1_provider,
