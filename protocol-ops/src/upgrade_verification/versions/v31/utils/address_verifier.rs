@@ -19,6 +19,10 @@ const V31_ADDRESS_TABLES: &[&str] = &[
 
 const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
     (
+        &["upgrade_addresses", "shared", "transparent_proxy_admin"],
+        "transparent_proxy_admin",
+    ),
+    (
         &["upgrade_addresses", "native_token_vault_addr"],
         "native_token_vault",
     ),
@@ -139,54 +143,6 @@ const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
     ),
 ];
 
-const V31_PRIMARY_CTM_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
-    (
-        &["deployed_addresses", "transparent_proxy_admin"],
-        "transparent_proxy_admin",
-    ),
-    (
-        &["deployed_addresses", "l1_governance_upgrade_timer"],
-        "upgrade_timer",
-    ),
-    (
-        &["deployed_addresses", "upgrade_stage_validator"],
-        "upgrade_stage_validator",
-    ),
-    (
-        &["state_transition", "default_upgrade_addr"],
-        "default_upgrade",
-    ),
-    (
-        &["state_transition", "chain_type_manager_proxy"],
-        "chain_type_manager_proxy",
-    ),
-    (&["state_transition", "admin_facet_addr"], "admin_facet"),
-    (
-        &["state_transition", "executor_facet_addr"],
-        "executor_facet",
-    ),
-    (&["state_transition", "getters_facet_addr"], "getters_facet"),
-    (&["state_transition", "mailbox_facet_addr"], "mailbox_facet"),
-    (
-        &["state_transition", "migrator_facet_addr"],
-        "migrator_facet",
-    ),
-    (
-        &["state_transition", "committer_facet_addr"],
-        "committer_facet",
-    ),
-    (&["state_transition", "diamond_init_addr"], "diamond_init"),
-    (&["state_transition", "verifier_addr"], "verifier"),
-    (
-        &["state_transition", "eip7702_checker_addr"],
-        "eip7702_checker_addr",
-    ),
-    (
-        &["state_transition", "permissionless_validator_addr"],
-        "permissionless_validator_addr",
-    ),
-];
-
 impl AddressVerifier {
     pub fn new_v31_from_artifact(artifact: &EcosystemUpgradeArtifact) -> anyhow::Result<Self> {
         let mut result = Self {
@@ -289,21 +245,6 @@ fn add_v31_address_aliases(
 ) -> anyhow::Result<()> {
     for (path, alias) in V31_ADDRESS_ALIASES {
         add_v31_address_alias(address_verifier, "core", &artifact.core, path, alias)?;
-    }
-
-    let primary_ctm = artifact
-        .ctms
-        .first()
-        .context("at least one CTM section is required to resolve v31 primary CTM aliases")?;
-    let root_name = format!("ctms.{}", primary_ctm.flavor.label());
-    for (path, alias) in V31_PRIMARY_CTM_ADDRESS_ALIASES {
-        add_v31_address_alias(
-            address_verifier,
-            &root_name,
-            &primary_ctm.value,
-            path,
-            alias,
-        )?;
     }
 
     Ok(())
