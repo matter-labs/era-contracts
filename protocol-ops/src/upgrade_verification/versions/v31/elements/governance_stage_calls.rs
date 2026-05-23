@@ -10,7 +10,7 @@ use crate::upgrade_verification::{
 
 use super::super::{
     expected_old_protocol_version_label, get_expected_new_protocol_version,
-    get_expected_old_protocol_version, get_expected_old_protocol_version_for_ctm_flavor,
+    get_expected_old_protocol_version_for_ctm_flavor,
     utils::{
         compute_selector,
         facet_cut_set::{self, FacetCutSet, FacetInfo},
@@ -660,106 +660,6 @@ impl GovernanceStage1Calls {
         }
         Ok(())
     }
-
-    pub(crate) async fn verify(
-        &self,
-        verifiers: &Verifiers,
-        result: &mut VerificationResult,
-        l1_expected_chain_creation_facets: FacetCutSet,
-        l1_expected_upgrade_facets: FacetCutSet,
-        l1_expected_chain_upgrade_diamond_cut: &str,
-        l1_bytecodes_supplier_addr: Address,
-    ) -> anyhow::Result<(String, String)> {
-        // Legacy single-CTM caller: assumes exactly one per-CTM block.
-        let expected_len = STAGE1_PREFIX_LEN + STAGE1_PER_CTM_LEN;
-        if self.calls.elems.len() != expected_len {
-            result.report_error(&format!(
-                "Legacy single-CTM stage1 shape mismatch: expected {} calls, got {}",
-                expected_len,
-                self.calls.elems.len()
-            ));
-        }
-        result.print_info("== Gov stage 1 payloads ===");
-
-        const SET_CHAIN_CREATION_PARAMS: usize =
-            STAGE1_PREFIX_LEN + PER_CTM_OFFSET_SET_CHAIN_CREATION_PARAMS;
-        const SET_NEW_VERSION_UPGRADE: usize =
-            STAGE1_PREFIX_LEN + PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE;
-
-        // Verify setNewVersionUpgrade.
-        let calldata = &self
-            .calls
-            .elems
-            .get(SET_NEW_VERSION_UPGRADE)
-            .context("missing setNewVersionUpgrade call")?
-            .data;
-        let data = set_new_version_upgrade::setNewVersionUpgradeCall::abi_decode(calldata)
-            .context("decoding setNewVersionUpgrade")?;
-
-        if data.oldProtocolVersionDeadline != U256::MAX {
-            result.report_error("Wrong old protocol version deadline for stage1 call");
-        }
-
-        if data.newProtocolVersion != Into::<U256>::into(get_expected_new_protocol_version()) {
-            result.report_error("Wrong new protocol version for stage1 call");
-        }
-        if data.oldProtocolVersion != Into::<U256>::into(get_expected_old_protocol_version()) {
-            result.report_error("Wrong old protocol version for stage1 call");
-        }
-        result.expect_address(verifiers, &data.verifier, "verifier");
-
-        let diamond_cut = data.diamondCut;
-        let expected_diamond_cut = l1_expected_chain_upgrade_diamond_cut
-            .strip_prefix("0x")
-            .unwrap_or(l1_expected_chain_upgrade_diamond_cut);
-        let actual_diamond_cut = hex::encode(diamond_cut.abi_encode());
-        if !actual_diamond_cut.eq_ignore_ascii_case(expected_diamond_cut) {
-            result.report_error(&format!(
-                "Invalid chain upgrade diamond cut. Expected: {}\n Received: {}",
-                l1_expected_chain_upgrade_diamond_cut, actual_diamond_cut
-            ));
-        }
-
-        result.expect_address(verifiers, &diamond_cut.initAddress, "default_upgrade");
-
-        verity_facet_cuts(&diamond_cut.facetCuts, result, l1_expected_upgrade_facets).await;
-
-        let upgrade =
-            super::set_new_version_upgrade::upgradeCall::abi_decode(&diamond_cut.initCalldata)
-                .context("decoding default upgrade calldata")?;
-
-        upgrade
-            ._proposedUpgrade
-            .verify(verifiers, result, l1_bytecodes_supplier_addr, false)
-            .await
-            .context("proposed upgrade")?;
-
-        // Verify setChainCreationParams.
-        let decoded = setChainCreationParamsCall::abi_decode(
-            &self
-                .calls
-                .elems
-                .get(SET_CHAIN_CREATION_PARAMS)
-                .context("missing setChainCreationParams call")?
-                .data,
-        )
-        .context("decoding setChainCreationParams")?;
-        decoded
-            ._chainCreationParams
-            .verify(verifiers, result, l1_expected_chain_creation_facets, false)
-            .await?;
-
-        let ChainCreationParams {
-            diamondCut,
-            forceDeploymentsData,
-            ..
-        } = decoded._chainCreationParams;
-
-        Ok((
-            hex::encode(diamondCut.abi_encode()),
-            hex::encode(forceDeploymentsData),
-        ))
-    }
 }
 
 fn verify_upgrade_call_args(
@@ -1065,6 +965,14 @@ async fn verify_set_chain_creation_params_payload(
         &ctm.contracts_config.force_deployments_data,
         &hex::encode(&params.forceDeploymentsData),
     );
+
+    result.print_info(&format!(
+        "-- chain creation facet cut decomposition ({} setChainCreationParams) --",
+        ctm.flavor.label()
+    ));
+    errors +=
+        verify_v31_chain_creation_facet_cuts(&params.diamondCut.facetCuts, ctm, verifiers, result)
+            .await;
 
     // Decode forceDeploymentsData and verify each field independently so the
     // artifact hex is not merely trusted as a self-referential source of truth.
@@ -1632,6 +1540,87 @@ const EXPECTED_V31_UPGRADE_FACETS: [(&str, bool); 6] = [
     ("committer_facet_addr", true),
 ];
 
+/// Independently reconstructs the expected chain-creation facet set from the
+/// v31 facet addresses in the artifact, decodes the proposed cut while
+/// enforcing the all-Add invariant, and compares the two sets. This catches
+/// drift in the artifact's `diamond_cut_data` blob itself — the blob hex
+/// check in the caller only catches gov-call ↔ artifact drift.
+///
+/// The v31 chain-creation facet list matches the v31 upgrade facet list (the
+/// same six facets, all Add), so `expected_v31_added_facets` is reused as-is.
+async fn verify_v31_chain_creation_facet_cuts(
+    facet_cuts: &[FacetCut],
+    ctm: &CtmArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> usize {
+    let expected = match expected_v31_added_facets(ctm, verifiers, result).await {
+        Ok(set) => set,
+        Err(err) => {
+            result.report_error(&format!(
+                "{} chain creation facet cut decomposition: cannot build expected set: {err}",
+                ctm.flavor.label()
+            ));
+            return 1;
+        }
+    };
+
+    let mut proposed = FacetCutSet::new();
+    let mut errors = 0;
+    for facet in facet_cuts {
+        let action = match facet.action {
+            Action::Add => facet_cut_set::Action::Add,
+            Action::Remove => {
+                result.report_error(&format!(
+                    "{} chain creation diamond cut: Remove action is unexpected",
+                    ctm.flavor.label()
+                ));
+                errors += 1;
+                continue;
+            }
+            Action::Replace => {
+                result.report_error(&format!(
+                    "{} chain creation diamond cut: Replace action is unexpected",
+                    ctm.flavor.label()
+                ));
+                errors += 1;
+                continue;
+            }
+            Action::__Invalid => {
+                result.report_error(&format!(
+                    "{} chain creation diamond cut: invalid action",
+                    ctm.flavor.label()
+                ));
+                errors += 1;
+                continue;
+            }
+        };
+        proposed.add_facet(FacetInfo {
+            facet: facet.facet,
+            action,
+            is_freezable: facet.isFreezable,
+            selectors: facet.selectors.iter().map(|x| x.0).collect(),
+        });
+    }
+
+    if expected != proposed {
+        result.report_error(&format!(
+            "{} chain creation facet cut mismatch.\nExpected: {:#?}\nReceived: {:#?}",
+            ctm.flavor.label(),
+            expected,
+            proposed
+        ));
+        errors += 1;
+    } else if errors == 0 {
+        result.report_ok(&format!(
+            "{} chain creation facet cut matches independent reconstruction (all Add)",
+            ctm.flavor.label()
+        ));
+    }
+
+    errors
+}
+
 fn facet_selectors_from_bytecode(bytecode: &[u8]) -> HashSet<[u8; 4]> {
     evmole::contract_info(evmole::ContractInfoArgs::new(bytecode).with_selectors())
         .functions
@@ -1841,192 +1830,7 @@ fn required_core_address(
     }
 }
 
-impl ChainCreationParams {
-    /// Verifies the chain creation parameters.
-    pub async fn verify(
-        &self,
-        verifiers: &crate::upgrade_verification::verifiers::Verifiers,
-        result: &mut crate::upgrade_verification::verifiers::VerificationResult,
-        expected_chain_creation_facets: FacetCutSet,
-        is_gateway: bool,
-    ) -> anyhow::Result<()> {
-        result.print_info("== Chain creation params ==");
-        let genesis_upgrade_name = verifiers
-            .address_verifier
-            .name_or_unknown(&self.genesisUpgrade);
-
-        let name = if is_gateway {
-            "gateway_genesis_upgrade_addr"
-        } else {
-            "genesis_upgrade_addr"
-        };
-
-        if genesis_upgrade_name != name {
-            result.report_error(&format!(
-                "Expected genesis upgrade address to be genesis_upgrade_addr, but got {}",
-                genesis_upgrade_name
-            ));
-        }
-
-        let genesis_config = &verifiers.era_genesis_config;
-
-        // if self.genesisBatchHash.to_string() != verifiers.genesis_config.genesis_root {
-        //     result.report_error(&format!(
-        //         "Expected genesis batch hash to be {}, but got {}",
-        //         verifiers.genesis_config.genesis_root, self.genesisBatchHash
-        //     ));
-        // }
-
-        if let Some(genesis_rollup_leaf_index) = genesis_config.genesis_rollup_leaf_index {
-            if self.genesisIndexRepeatedStorageChanges != genesis_rollup_leaf_index {
-                result.report_error(&format!(
-                    "Expected genesis index repeated storage changes to be {}, but got {}",
-                    genesis_rollup_leaf_index, self.genesisIndexRepeatedStorageChanges
-                ));
-            }
-        }
-
-        if let Some(genesis_batch_commitment) = &genesis_config.genesis_batch_commitment {
-            if self.genesisBatchCommitment.to_string() != *genesis_batch_commitment {
-                result.report_error(&format!(
-                    "Expected genesis batch commitment to be {}, but got {}",
-                    genesis_batch_commitment, self.genesisBatchCommitment
-                ));
-            }
-        }
-
-        verify_chain_creation_diamond_cut(
-            verifiers,
-            result,
-            &self.diamondCut,
-            expected_chain_creation_facets,
-            is_gateway,
-        )
-        .await?;
-
-        let fixed_force_deployments_data =
-            FixedForceDeploymentsData::abi_decode(&self.forceDeploymentsData)
-                .expect("Failed to decode FixedForceDeploymentsData");
-        fixed_force_deployments_data
-            .verify(verifiers, result)
-            .await?;
-
-        Ok(())
-    }
-}
-
-/// Verifies the diamond cut used during chain creation.
-pub async fn verify_chain_creation_diamond_cut(
-    verifiers: &crate::upgrade_verification::verifiers::Verifiers,
-    result: &mut crate::upgrade_verification::verifiers::VerificationResult,
-    diamond_cut: &DiamondCutData,
-    expected_chain_creation_facets: FacetCutSet,
-    is_gateway: bool,
-) -> anyhow::Result<()> {
-    let mut proposed_facet_cut = FacetCutSet::new();
-    for facet in &diamond_cut.facetCuts {
-        let action = match facet.action {
-            Action::Add => facet_cut_set::Action::Add,
-            Action::Remove => {
-                result.report_error("Remove action is unexpected in diamond cut");
-                continue;
-            }
-            Action::Replace => {
-                result.report_error("Replace action is unexpected in diamond cut");
-                continue;
-            }
-            Action::__Invalid => {
-                result.report_error("Invalid action in diamond cut");
-                continue;
-            }
-        };
-        proposed_facet_cut.add_facet(FacetInfo {
-            facet: facet.facet,
-            action,
-            is_freezable: facet.isFreezable,
-            selectors: facet.selectors.iter().map(|x| x.0).collect(),
-        });
-    }
-
-    if expected_chain_creation_facets != proposed_facet_cut {
-        result.report_error(&format!(
-            "Invalid chain creation facet cut. Expected: {:#?}\nReceived: {:#?}",
-            expected_chain_creation_facets, proposed_facet_cut
-        ));
-    }
-
-    let name = if is_gateway {
-        "gateway_diamond_init_addr"
-    } else {
-        "diamond_init"
-    };
-    result.expect_address(verifiers, &diamond_cut.initAddress, name);
-    let initialize_data_new_chain = InitializeDataNewChain::abi_decode(&diamond_cut.initCalldata)
-        .expect("Failed to decode InitializeDataNewChain");
-    initialize_data_new_chain.verify(verifiers, result);
-
-    Ok(())
-}
-
-pub async fn verity_facet_cuts(
-    facet_cuts: &[set_new_version_upgrade::FacetCut],
-    result: &mut crate::upgrade_verification::verifiers::VerificationResult,
-    expected_upgrade_facets: FacetCutSet,
-) {
-    // We ensure two invariants here:
-    // - Firstly we use `Remove` operations only. This is mainly for ensuring that
-    // the upgrade will pass.
-    // - Secondly, we ensure that the set of operations is identical.
-    let mut used_add = false;
-    let mut proposed_facet_cuts = FacetCutSet::new();
-    facet_cuts.iter().for_each(|facet| {
-        let action = match facet.action {
-            set_new_version_upgrade::Action::Add => {
-                used_add = true;
-                facet_cut_set::Action::Add
-            }
-            set_new_version_upgrade::Action::Remove => {
-                assert!(!used_add, "Unexpected `Remove` operation after `Add`");
-                facet_cut_set::Action::Remove
-            }
-            set_new_version_upgrade::Action::Replace => panic!("Replace unexpected"),
-            set_new_version_upgrade::Action::__Invalid => panic!("Invalid unexpected"),
-        };
-
-        proposed_facet_cuts.add_facet(FacetInfo {
-            facet: facet.facet,
-            action,
-            is_freezable: facet.isFreezable,
-            selectors: facet.selectors.iter().map(|x| x.0).collect(),
-        });
-    });
-
-    if proposed_facet_cuts != expected_upgrade_facets {
-        result.report_error(&format!(
-            "Incorrect facet cuts. Expected {:#?}\nReceived: {:#?}",
-            expected_upgrade_facets, proposed_facet_cuts
-        ));
-    }
-}
-
 impl GovernanceStage0Calls {
-    /// Legacy single-CTM stage0 verifier retained for copied PUVT scaffolding.
-    pub(crate) fn verify(
-        &self,
-        verifiers: &Verifiers,
-        result: &mut VerificationResult,
-    ) -> anyhow::Result<()> {
-        result.print_info("== Gov stage 0 calls ===");
-
-        let list_of_calls = [
-            // Pause migrations.
-            ("chain_asset_handler_proxy", "pauseMigration()"),
-            // Start the upgrade timer.
-            ("upgrade_timer", "startTimer()"),
-        ];
-        self.calls.verify(&list_of_calls, verifiers, result)
-    }
-
     /// Stage0 is executed before the main upgrade starts.
     ///
     /// Stage-0 shape:
@@ -2701,25 +2505,6 @@ async fn verify_gateway_bring_up_calls(
 }
 
 impl GovernanceStage2Calls {
-    /// Legacy single-CTM stage2 verifier retained for copied PUVT scaffolding.
-    pub(crate) fn verify(
-        &self,
-        verifiers: &Verifiers,
-        result: &mut VerificationResult,
-    ) -> anyhow::Result<()> {
-        result.print_info("== Gov stage 2 calls ===");
-
-        let list_of_calls = [
-            // Unpause migrations.
-            ("chain_asset_handler_proxy", "unpauseMigration()"),
-            // Check that the protocol upgrade is present.
-            ("upgrade_stage_validator", "checkProtocolUpgradePresence()"),
-            // Check that migrations are unpaused.
-            ("upgrade_stage_validator", "checkMigrationsUnpaused()"),
-        ];
-        self.calls.verify(&list_of_calls, verifiers, result)
-    }
-
     /// Stage2 is executed after all chains have upgraded.
     ///
     /// Stage-2 shape (canonical):

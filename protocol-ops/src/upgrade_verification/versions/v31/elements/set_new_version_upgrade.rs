@@ -13,7 +13,7 @@ use crate::upgrade_verification::{
 };
 
 use super::{
-    super::{get_expected_new_protocol_version, utils::apply_l2_to_l1_alias},
+    super::utils::apply_l2_to_l1_alias,
     fixed_force_deployment::FixedForceDeploymentsData,
     protocol_version::ProtocolVersion,
 };
@@ -739,8 +739,6 @@ sol! {
     }
 }
 
-impl upgradeCall {} // Placeholder implementation.
-
 #[derive(Debug, Clone, Copy)]
 enum FactoryDepHashKind {
     EraZkBytecode,
@@ -776,27 +774,6 @@ impl ProposedUpgrade {
             result.report_ok("DefaultUpgrade ProposedUpgrade matches v31 template");
         }
         Ok(new_errors)
-    }
-
-    pub async fn verify(
-        &self,
-        verifiers: &Verifiers,
-        result: &mut VerificationResult,
-        bytecodes_supplier_addr: Address,
-        _is_gateway: bool,
-    ) -> anyhow::Result<()> {
-        let expected_version = get_expected_new_protocol_version();
-        self.verify_v31_template(
-            verifiers,
-            result,
-            expected_version.into(),
-            "",
-            Some(bytecodes_supplier_addr),
-            CtmFlavor::Era,
-        )
-        .await?;
-
-        Ok(())
     }
 
     fn verify_static_fields(

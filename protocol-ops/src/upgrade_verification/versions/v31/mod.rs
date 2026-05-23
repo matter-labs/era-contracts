@@ -1,6 +1,5 @@
-// TODO: drop once D13 cleanup lands (legacy `GovernanceStage{0,1,2}Calls::verify`
-// + `impl ChainCreationParams::verify` + their helpers) and the scaffolding
-// kept for R2 (fee-params) and S2d (`check_gw_create2_deploy`) is resolved.
+// TODO: drop once the scaffolding kept for R2 (fee-params) and S2d
+// (`check_gw_create2_deploy`) is resolved.
 #![allow(dead_code, private_interfaces)]
 
 use std::str::FromStr;
@@ -30,12 +29,6 @@ pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
 
 pub(crate) fn get_expected_new_protocol_version() -> ProtocolVersion {
     ProtocolVersion::from_str(EXPECTED_NEW_PROTOCOL_VERSION_STR).unwrap()
-}
-
-// TODO: Used only by the dead legacy `GovernanceStage{0,1,2}Calls::verify`
-// (D13). Will go away when that tree is removed in the next dead-code sweep.
-pub(crate) fn get_expected_old_protocol_version() -> ProtocolVersion {
-    get_expected_old_protocol_version_for_ctm_flavor(CtmFlavor::Era)
 }
 
 pub(crate) fn get_expected_old_protocol_version_for_ctm_flavor(
