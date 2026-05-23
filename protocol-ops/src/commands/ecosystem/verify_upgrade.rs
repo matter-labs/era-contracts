@@ -88,6 +88,12 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
             env_cfg.permanent_values_path.display()
         )
     })?;
+    let l1_chain_id = env_cfg.l1_chain_id().ok_or_else(|| {
+        anyhow::anyhow!(
+            "{} is missing top-level `l1_chain_id`",
+            env_cfg.permanent_values_path.display()
+        )
+    })?;
     let zk_token_asset_id = env_cfg.zk_token_asset_id().ok_or_else(|| {
         anyhow::anyhow!(
             "{} is missing top-level `zk_token_asset_id`",
@@ -143,6 +149,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     logger::info(format!(
         "Legacy Gateway chain ID: {legacy_gateway_chain_id}"
     ));
+    logger::info(format!("L1 chain ID (expected): {l1_chain_id}"));
     logger::info(format!("CREATE2 factory: {create2_factory}"));
     logger::info(format!("ZK token asset ID: {zk_token_asset_id}"));
 
@@ -165,6 +172,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         args.contracts_commit.as_deref(),
         era_chain_id,
         legacy_gateway_chain_id,
+        l1_chain_id,
         &tx_hashes,
         create2_factory,
         &expected_salts,

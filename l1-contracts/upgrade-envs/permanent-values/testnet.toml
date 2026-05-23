@@ -1,3 +1,5 @@
+l1_chain_id = 11155111
+
 [permanent_contracts]
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 # this salt can be changed from run to run to. Todo: move this to input of script.

@@ -5,7 +5,8 @@ use crate::upgrade_verification::{
     constants::EIP1967_PROXY_ADMIN_SLOT,
     verifiers::{VerificationResult, Verifiers},
     versions::v31::utils::network_verifier::{
-        Bridgehub as BridgehubContract, ChainTypeManager, L1AssetRouter, Ownable,
+        Bridgehub as BridgehubContract, ChainTypeManager, L1AssetRouter, L1AssetTracker, Ownable,
+        Ownable2Step, ValidatorTimelock, ZKChainFeeParams,
     },
 };
 
@@ -16,6 +17,19 @@ use alloy::{
 };
 
 const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
+
+// `DiamondInit` writes the default fee params from `Config.sol` into
+// `ZKChainStorage.s.feeParams`; this slot matches the v31 storage layout.
+const FEE_PARAMS_STORAGE_SLOT: u64 = 38;
+const DEFAULT_PUBDATA_PRICING_MODE_ROLLUP: u8 = 0;
+const DEFAULT_BATCH_OVERHEAD_L1_GAS: u32 = 1_000_000;
+const DEFAULT_MAX_PUBDATA_PER_BATCH: u32 = 120_000;
+const DEFAULT_MAX_L2_GAS_PER_BATCH: u32 = 80_000_000;
+const DEFAULT_PRIORITY_TX_MAX_PUBDATA: u32 = 99_000;
+const DEFAULT_MINIMAL_L2_GAS_PRICE: u64 = 250_000_000;
+const DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT: u64 = 72_000_000;
+const MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 10_800;
+const TESTNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 0;
 
 /// Core proxies whose EIP-1967 admin slot must match the ecosystem
 /// `transparent_proxy_admin`.
@@ -31,6 +45,51 @@ const CORE_PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
     "asset_tracker_proxy",
 ];
 
+fn expect_address_eq(
+    result: &mut VerificationResult,
+    label: &str,
+    actual: Address,
+    expected: Address,
+) {
+    if actual == expected {
+        result.report_ok(&format!("{label} matches expected address ({expected})"));
+    } else {
+        result.report_error(&format!(
+            "{label} mismatch: expected {expected}, got {actual}"
+        ));
+    }
+}
+
+fn expect_u8_eq(result: &mut VerificationResult, label: &str, actual: u8, expected: u8) {
+    if actual == expected {
+        result.report_ok(&format!("{label} matches expected value ({expected})"));
+    } else {
+        result.report_error(&format!(
+            "{label} mismatch: expected {expected}, got {actual}"
+        ));
+    }
+}
+
+fn expect_u32_eq(result: &mut VerificationResult, label: &str, actual: u32, expected: u32) {
+    if actual == expected {
+        result.report_ok(&format!("{label} matches expected value ({expected})"));
+    } else {
+        result.report_error(&format!(
+            "{label} mismatch: expected {expected}, got {actual}"
+        ));
+    }
+}
+
+fn expect_u64_eq(result: &mut VerificationResult, label: &str, actual: u64, expected: u64) {
+    if actual == expected {
+        result.report_ok(&format!("{label} matches expected value ({expected})"));
+    } else {
+        result.report_error(&format!(
+            "{label} mismatch: expected {expected}, got {actual}"
+        ));
+    }
+}
+
 /// Phase 5 RPC state checks (see `puvt-what-to-do.md`).
 ///
 /// This is intentionally the *non-overlapping* slice of legacy PUVT's
@@ -41,8 +100,10 @@ const CORE_PROXIES_UNDER_TRANSPARENT_PROXY_ADMIN: &[&str] = &[
 /// - Runtime bytecode at the ecosystem `transparent_proxy_admin` address.
 /// - EIP-1967 proxy-admin slot for every v31 stage-1 proxy → must equal the
 ///   ecosystem `transparent_proxy_admin`.
-/// - Pre-upgrade AssetRouter → NTV wiring when the getter exists on the live
-///   proxy.
+/// - Pre-upgrade core wiring: AssetRouter owner / legacy bridge / NTV,
+///   AssetTracker pending owner and Bridgehub / ChainAssetHandler wiring.
+/// - ValidatorTimelock owner and execution delay.
+/// - Era fee params and priority-tx max gas limit.
 ///
 /// Per-implementation deployed-bytecode and constructor-arg checks live in
 /// deployment provenance: they use init bytecode + constructor args (via
@@ -68,7 +129,9 @@ pub(crate) async fn verify_v31_artifact_state(
         .expect_deployed_bytecode(verifiers, &create2_factory, CREATE2_FACTORY_CONTRACT_NAME)
         .await;
     verify_v31_proxy_admins(artifact, verifiers, result).await?;
-    verify_v31_core_wiring(verifiers, result).await;
+    verify_v31_core_wiring(artifact, verifiers, result).await?;
+    verify_v31_validator_timelocks(artifact, verifiers, result).await?;
+    verify_v31_era_fee_params(verifiers, result).await;
     verify_v31_timer_admin_state(artifact, verifiers, result).await?;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
 
@@ -77,7 +140,13 @@ pub(crate) async fn verify_v31_artifact_state(
 
 async fn verify_l1_chain_id(verifiers: &Verifiers, result: &mut VerificationResult) {
     match verifiers.network_verifier.try_get_l1_chain_id().await {
-        Ok(chain_id) => result.report_ok(&format!("L1 RPC chain id: {chain_id}")),
+        Ok(chain_id) if chain_id == verifiers.expected_l1_chain_id => result.report_ok(&format!(
+            "L1 RPC chain id matches env expected ({chain_id})"
+        )),
+        Ok(chain_id) => result.report_error(&format!(
+            "L1 RPC chain id mismatch: expected {} (from permanent-values), got {chain_id}",
+            verifiers.expected_l1_chain_id
+        )),
         Err(err) => result.report_error(&format!("Failed to fetch L1 RPC chain id: {err}")),
     }
 }
@@ -178,48 +247,339 @@ async fn verify_v31_proxy_admins(
     Ok(())
 }
 
-async fn verify_v31_core_wiring(verifiers: &Verifiers, result: &mut VerificationResult) {
+async fn verify_v31_core_wiring(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> Result<()> {
     let provider = verifiers.network_verifier.get_l1_provider();
+    let bridgehub = BridgehubContract::new(verifiers.bridgehub_address, provider.clone());
+    let bridgehub_owner = match bridgehub.owner().call().await {
+        Ok(owner) => Some(owner),
+        Err(err) => {
+            result.report_error(&format!(
+                "Failed to call Bridgehub.owner() for core wiring checks: {err}"
+            ));
+            None
+        }
+    };
 
-    if let (Some(asset_router_proxy), Some(expected_ntv)) = (
-        verifiers
-            .address_verifier
-            .name_to_address
-            .get("l1_asset_router_proxy"),
-        verifiers
-            .address_verifier
-            .name_to_address
-            .get("native_token_vault"),
-    ) {
-        let asset_router = L1AssetRouter::new(*asset_router_proxy, provider.clone());
-        match asset_router.nativeTokenVault().call().await {
-            Ok(actual) if actual == *expected_ntv => {
-                result.report_ok("L1AssetRouter.nativeTokenVault() points at native_token_vault")
+    let expected_asset_router = required_address(
+        &artifact.core,
+        "core",
+        &["upgrade_addresses", "bridges", "l1_asset_router_proxy_addr"],
+    )?;
+    let expected_legacy_bridge = required_address(
+        &artifact.core,
+        "core",
+        &["upgrade_addresses", "bridges", "erc20_bridge_proxy_addr"],
+    )?;
+    let expected_ntv = required_address(
+        &artifact.core,
+        "core",
+        &["upgrade_addresses", "native_token_vault_addr"],
+    )?;
+    let expected_tracker = required_address(
+        &artifact.core,
+        "core",
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "l1_asset_tracker_proxy_addr",
+        ],
+    )?;
+    let expected_chain_asset_handler = required_address(
+        &artifact.core,
+        "core",
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "chain_asset_handler_proxy_addr",
+        ],
+    )?;
+    let expected_message_root = required_address(
+        &artifact.core,
+        "core",
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "message_root_proxy_addr",
+        ],
+    )?;
+
+    let asset_router = L1AssetRouter::new(expected_asset_router, provider.clone());
+    let asset_router_owner = Ownable::new(expected_asset_router, provider.clone());
+    if let Some(expected_owner) = bridgehub_owner {
+        match asset_router_owner.owner().call().await {
+            Ok(actual) => {
+                expect_address_eq(result, "L1AssetRouter.owner()", actual, expected_owner)
             }
-            Ok(actual) => result.report_error(&format!(
-                "L1AssetRouter.nativeTokenVault() mismatch: expected {expected_ntv}, got {actual}"
+            Err(err) => result.report_error(&format!(
+                "Failed to call L1AssetRouter.owner() for core wiring checks: {err}"
             )),
-            Err(err) => result.report_warn(&format!(
-                "Skipping L1AssetRouter.nativeTokenVault() check; call failed: {err}"
+        }
+    }
+    match asset_router.legacyBridge().call().await {
+        Ok(actual) => expect_address_eq(
+            result,
+            "L1AssetRouter.legacyBridge()",
+            actual,
+            expected_legacy_bridge,
+        ),
+        Err(err) => result.report_error(&format!(
+            "Failed to call L1AssetRouter.legacyBridge() for core wiring checks: {err}"
+        )),
+    }
+    match asset_router.nativeTokenVault().call().await {
+        Ok(actual) => expect_address_eq(
+            result,
+            "L1AssetRouter.nativeTokenVault()",
+            actual,
+            expected_ntv,
+        ),
+        Err(err) => result.report_error(&format!(
+            "Failed to call L1AssetRouter.nativeTokenVault() for core wiring checks: {err}"
+        )),
+    }
+
+    let asset_tracker = L1AssetTracker::new(expected_tracker, provider.clone());
+    match asset_tracker.BRIDGE_HUB().call().await {
+        Ok(actual) => expect_address_eq(
+            result,
+            "AssetTracker.BRIDGE_HUB()",
+            actual,
+            verifiers.bridgehub_address,
+        ),
+        Err(err) => result.report_error(&format!(
+            "Failed to call AssetTracker.BRIDGE_HUB() for core wiring checks: {err}"
+        )),
+    }
+    if let Some(expected_pending_owner) = bridgehub_owner {
+        let tracker_ownership = Ownable2Step::new(expected_tracker, provider.clone());
+        match tracker_ownership.pendingOwner().call().await {
+            Ok(actual) => expect_address_eq(
+                result,
+                "AssetTracker.pendingOwner()",
+                actual,
+                expected_pending_owner,
+            ),
+            Err(err) => result.report_error(&format!(
+                "Failed to call AssetTracker.pendingOwner() for pre-upgrade ownership checks: {err}"
             )),
         }
     }
 
-    if let Some(expected_tracker) = verifiers
-        .address_verifier
-        .name_to_address
-        .get("asset_tracker_proxy")
-    {
-        // Stage 1 accepts the AssetTracker ownership transfer; record the
-        // current owner for context (ownership end-state validation requires
-        // governance address knowledge added later in Phase 6).
-        let tracker = Ownable::new(*expected_tracker, provider.clone());
-        match tracker.owner().call().await {
-            Ok(owner) => result.report_ok(&format!("AssetTracker owner: {owner}")),
-            Err(err) => result.report_warn(&format!(
-                "Skipping AssetTracker.owner() check; call failed: {err}"
+    match bridgehub.chainAssetHandler().call().await {
+        Ok(actual_chain_asset_handler) => {
+            expect_address_eq(
+                result,
+                "Bridgehub.chainAssetHandler()",
+                actual_chain_asset_handler,
+                expected_chain_asset_handler,
+            );
+            match asset_tracker.chainAssetHandler().call().await {
+                Ok(actual_tracker_chain_asset_handler) => expect_address_eq(
+                    result,
+                    "AssetTracker.chainAssetHandler()",
+                    actual_tracker_chain_asset_handler,
+                    actual_chain_asset_handler,
+                ),
+                Err(err) => result.report_error(&format!(
+                    "Failed to call AssetTracker.chainAssetHandler() for core wiring checks: {err}"
+                )),
+            }
+        }
+        Err(err) => result.report_error(&format!(
+            "Failed to call Bridgehub.chainAssetHandler() for core wiring checks: {err}"
+        )),
+    }
+
+    // Bridgehub.messageRoot() ↔ artifact's `message_root_proxy_addr` (L7).
+    // The L1Nullifier constructor takes this as its `messageRoot` arg, so a
+    // mismatch here means the L1Nullifier was deployed against a different
+    // MessageRoot than what the live Bridgehub points at.
+    match bridgehub.messageRoot().call().await {
+        Ok(actual) => expect_address_eq(
+            result,
+            "Bridgehub.messageRoot()",
+            actual,
+            expected_message_root,
+        ),
+        Err(err) => result.report_error(&format!(
+            "Failed to call Bridgehub.messageRoot() for core wiring checks: {err}"
+        )),
+    }
+
+    // ChainAssetHandler must already be owned by governance (PUH on stage /
+    // mainnet) before stage 0/1/2 run — `pauseMigration()`, `setAddresses()`,
+    // and `unpauseMigration()` are all owner-gated. We expect governance to be
+    // `bridgehub.owner()` (== the PUH proxy on PUH-governed envs).
+    if let Some(expected_owner) = bridgehub_owner {
+        let chain_asset_handler_owner =
+            Ownable::new(expected_chain_asset_handler, provider.clone());
+        match chain_asset_handler_owner.owner().call().await {
+            Ok(actual) => expect_address_eq(
+                result,
+                "ChainAssetHandler.owner()",
+                actual,
+                expected_owner,
+            ),
+            Err(err) => result.report_error(&format!(
+                "Failed to call ChainAssetHandler.owner() for pre-upgrade ownership checks: {err}"
             )),
         }
+    }
+
+    Ok(())
+}
+
+async fn verify_v31_validator_timelocks(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    let provider = verifiers.network_verifier.get_l1_provider();
+    for ctm in &artifact.ctms {
+        let label = ctm.flavor.label();
+        let scope = format!("ctms.{label}");
+        let validator_timelock = required_address(
+            &ctm.value,
+            &scope,
+            &["state_transition", "validator_timelock_addr"],
+        )?;
+        let expected_owner =
+            required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
+        let expected_delay = if ctm.contracts_config.is_testnet {
+            TESTNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS
+        } else {
+            MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS
+        };
+
+        let owner_view = Ownable::new(validator_timelock, provider.clone());
+        match owner_view.owner().call().await {
+            Ok(actual) => expect_address_eq(
+                result,
+                &format!("{label}.ValidatorTimelock.owner()"),
+                actual,
+                expected_owner,
+            ),
+            Err(err) => result.report_error(&format!(
+                "Failed to call {label}.ValidatorTimelock.owner(): {err}"
+            )),
+        }
+
+        let timelock_view = ValidatorTimelock::new(validator_timelock, provider.clone());
+        match timelock_view.executionDelay().call().await {
+            Ok(actual) if actual == expected_delay => result.report_ok(&format!(
+                "{label}.ValidatorTimelock.executionDelay() matches expected value ({expected_delay})"
+            )),
+            Ok(actual) => result.report_error(&format!(
+                "{label}.ValidatorTimelock.executionDelay() mismatch: expected {expected_delay}, got {actual}"
+            )),
+            Err(err) => result.report_error(&format!(
+                "Failed to call {label}.ValidatorTimelock.executionDelay(): {err}"
+            )),
+        }
+    }
+    Ok(())
+}
+
+async fn verify_v31_era_fee_params(verifiers: &Verifiers, result: &mut VerificationResult) {
+    let Some(era_chain_id) = verifiers.representative_era_chain_id else {
+        result.report_error("Cannot verify Era fee params: env era_chain_id was not loaded");
+        return;
+    };
+    let diamond = match verifiers
+        .network_verifier
+        .try_get_chain_diamond_from_bridgehub(verifiers.bridgehub_address, U256::from(era_chain_id))
+        .await
+    {
+        Ok(addr) if addr != Address::ZERO => addr,
+        Ok(_) => {
+            result.report_error(&format!(
+                "Cannot verify Era fee params: Bridgehub.getZKChain({era_chain_id}) returned address(0)"
+            ));
+            return;
+        }
+        Err(err) => {
+            result.report_error(&format!(
+                "Cannot verify Era fee params: Bridgehub.getZKChain({era_chain_id}) failed: {err}"
+            ));
+            return;
+        }
+    };
+
+    let provider = verifiers.network_verifier.get_l1_provider();
+    let raw = match provider
+        .get_storage_at(diamond, U256::from(FEE_PARAMS_STORAGE_SLOT))
+        .await
+    {
+        Ok(value) => value.to_be_bytes::<32>(),
+        Err(err) => {
+            result.report_error(&format!(
+                "Cannot verify Era fee params: eth_getStorageAt({diamond}, slot {FEE_PARAMS_STORAGE_SLOT}) failed: {err}"
+            ));
+            return;
+        }
+    };
+
+    let actual_pubdata_pricing_mode = raw[31];
+    let actual_batch_overhead_l1_gas = u32::from_be_bytes(raw[27..31].try_into().unwrap());
+    let actual_max_pubdata_per_batch = u32::from_be_bytes(raw[23..27].try_into().unwrap());
+    let actual_max_l2_gas_per_batch = u32::from_be_bytes(raw[19..23].try_into().unwrap());
+    let actual_priority_tx_max_pubdata = u32::from_be_bytes(raw[15..19].try_into().unwrap());
+    let actual_minimal_l2_gas_price = u64::from_be_bytes(raw[7..15].try_into().unwrap());
+
+    expect_u8_eq(
+        result,
+        "Era feeParams.pubdataPricingMode",
+        actual_pubdata_pricing_mode,
+        DEFAULT_PUBDATA_PRICING_MODE_ROLLUP,
+    );
+    expect_u32_eq(
+        result,
+        "Era feeParams.batchOverheadL1Gas",
+        actual_batch_overhead_l1_gas,
+        DEFAULT_BATCH_OVERHEAD_L1_GAS,
+    );
+    expect_u32_eq(
+        result,
+        "Era feeParams.maxPubdataPerBatch",
+        actual_max_pubdata_per_batch,
+        DEFAULT_MAX_PUBDATA_PER_BATCH,
+    );
+    expect_u32_eq(
+        result,
+        "Era feeParams.maxL2GasPerBatch",
+        actual_max_l2_gas_per_batch,
+        DEFAULT_MAX_L2_GAS_PER_BATCH,
+    );
+    expect_u32_eq(
+        result,
+        "Era feeParams.priorityTxMaxPubdata",
+        actual_priority_tx_max_pubdata,
+        DEFAULT_PRIORITY_TX_MAX_PUBDATA,
+    );
+    expect_u64_eq(
+        result,
+        "Era feeParams.minimalL2GasPrice",
+        actual_minimal_l2_gas_price,
+        DEFAULT_MINIMAL_L2_GAS_PRICE,
+    );
+
+    let chain_getters = ZKChainFeeParams::new(diamond, provider);
+    match chain_getters.getPriorityTxMaxGasLimit().call().await {
+        Ok(actual) if actual == U256::from(DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT) => result.report_ok(
+            &format!(
+                "Era getPriorityTxMaxGasLimit() matches expected value ({DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT})"
+            ),
+        ),
+        Ok(actual) => result.report_error(&format!(
+            "Era getPriorityTxMaxGasLimit() mismatch: expected {DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT}, got {actual}"
+        )),
+        Err(err) => result.report_error(&format!(
+            "Failed to call Era getPriorityTxMaxGasLimit(): {err}"
+        )),
     }
 }
 

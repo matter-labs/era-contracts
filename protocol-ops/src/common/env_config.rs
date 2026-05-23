@@ -34,6 +34,11 @@ const PERMANENT_VALUES_DIR: &str = "upgrade-envs/permanent-values";
 
 #[derive(Debug, Deserialize)]
 pub struct PermanentValues {
+    /// L1 chain id (e.g. 11155111 for Sepolia, 1 for mainnet). PUVT reads
+    /// this at startup and cross-checks `eth_chainId` against it as a basic
+    /// "right network" sanity check.
+    #[serde(default)]
+    pub l1_chain_id: Option<u64>,
     #[serde(default)]
     pub zk_token_asset_id: Option<H256>,
     pub core_contracts: CoreContracts,
@@ -323,6 +328,10 @@ impl EnvConfig {
 
     pub fn legacy_gateway_chain_id(&self) -> Option<u64> {
         self.permanent.legacy_gateway.as_ref().map(|gw| gw.chain_id)
+    }
+
+    pub fn l1_chain_id(&self) -> Option<u64> {
+        self.permanent.l1_chain_id
     }
 
     pub fn ownable_proxies(&self) -> &[OwnableProxyEntry] {

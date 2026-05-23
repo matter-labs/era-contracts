@@ -1,3 +1,5 @@
+l1_chain_id = 11155111
+
 # Stage fixed-fee ZK asset ID. This is the L2NativeTokenVault asset ID for the
 # stage-proofs ZkTokenV2 deployment on chain 499, not the L1 bridgehub base
 # token asset ID for chain 499.

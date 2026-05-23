@@ -70,6 +70,7 @@ pub(crate) async fn verify(
     contracts_commit: Option<&str>,
     era_chain_id: u64,
     legacy_gateway_chain_id: u64,
+    l1_chain_id: u64,
     tx_hashes: &[FixedBytes<32>],
     create2_factory: Address,
     expected_salts: &[FixedBytes<32>],
@@ -83,6 +84,8 @@ pub(crate) async fn verify(
         gw_rpc_url,
         contracts_commit,
         era_chain_id,
+        legacy_gateway_chain_id,
+        l1_chain_id,
         zk_token_asset_id,
     )
     .await?;

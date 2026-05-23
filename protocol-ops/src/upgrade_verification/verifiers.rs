@@ -40,6 +40,8 @@ pub(crate) struct Verifiers {
     pub fee_param_verifier: FeeParamVerifier,
     pub gateway_bridgehub_address: Address,
     pub representative_era_chain_id: Option<u64>,
+    pub legacy_gateway_chain_id: u64,
+    pub expected_l1_chain_id: u64,
     pub zk_token_asset_id: FixedBytes<32>,
 }
 
@@ -70,6 +72,8 @@ impl Verifiers {
         gw_rpc: impl Into<String>,
         contracts_commit: Option<&str>,
         representative_era_chain_id: u64,
+        legacy_gateway_chain_id: u64,
+        expected_l1_chain_id: u64,
         zk_token_asset_id: FixedBytes<32>,
     ) -> anyhow::Result<Self> {
         let bridgehub_address = AddressVerifier::address_from_artifact(
@@ -98,6 +102,8 @@ impl Verifiers {
             fee_param_verifier: FeeParamVerifier::empty(),
             gateway_bridgehub_address: L2_BRIDGEHUB_ADDR,
             representative_era_chain_id: Some(representative_era_chain_id),
+            legacy_gateway_chain_id,
+            expected_l1_chain_id,
             zk_token_asset_id,
         })
     }
@@ -243,7 +249,7 @@ impl VerificationResult {
                 ));
             }
             None => {
-                self.report_warn(&format!(
+                self.report_error(&format!(
                     "Cannot verify bytecode hash: {} - expected {} at {}",
                     bytecode_hash,
                     expected,

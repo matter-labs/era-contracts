@@ -37,6 +37,8 @@ sol! {
         function getHyperchain(uint256 _chainId) external view returns (address chainAddress);
         function getAllZKChainChainIDs() external view returns (uint256[] memory);
         function assetRouter() external view returns (address);
+        function messageRoot() external view returns (address);
+        function chainAssetHandler() external view returns (address);
         function getZKChain(uint256 _chainId) external view returns (address chainAddress);
         function baseToken(uint256 _chainId) external view returns (address);
         function requestL2TransactionDirect(
@@ -46,11 +48,11 @@ sol! {
 
     #[sol(rpc)]
     contract L1AssetRouter {
-        function legacyBridge() public returns (address);
-        function L1_WETH_TOKEN() public returns (address);
-        function L1_NULLIFIER() public returns (address);
+        function legacyBridge() public view returns (address);
+        function L1_WETH_TOKEN() public view returns (address);
+        function L1_NULLIFIER() public view returns (address);
 
-        function nativeTokenVault() public returns (address);
+        function nativeTokenVault() public view returns (address);
     }
 
     #[sol(rpc)]
@@ -68,12 +70,36 @@ sol! {
         function getProtocolVersion() external view returns (uint256);
     }
 
+    #[sol(rpc)]
+    contract ZKChainFeeParams {
+        function getPriorityTxMaxGasLimit() external view returns (uint256);
+    }
+
     /// Minimal `Ownable` view — usable against any contract that exposes a
     /// public `owner()` getter (TransparentUpgradeableProxy admins, plain
     /// Ownable proxies, etc.).
     #[sol(rpc)]
     contract Ownable {
         function owner() external view returns (address);
+    }
+
+    /// Minimal `Ownable2Step` view for contracts whose pending owner is a
+    /// pre-governance invariant.
+    #[sol(rpc)]
+    contract Ownable2Step {
+        function owner() external view returns (address);
+        function pendingOwner() external view returns (address);
+    }
+
+    #[sol(rpc)]
+    contract L1AssetTracker {
+        function BRIDGE_HUB() external view returns (address);
+        function chainAssetHandler() external view returns (address);
+    }
+
+    #[sol(rpc)]
+    contract ValidatorTimelock {
+        function executionDelay() external view returns (uint32);
     }
 
     function create2AndTransferParams(bytes memory bytecode, bytes32 salt, address owner);

@@ -17,7 +17,7 @@ sol! {
     #[derive(Debug)]
     struct FixedForceDeploymentsData {
         uint256 l1ChainId;
-        uint256 gatewayChainId;
+        uint256 eraGatewayChainId;
         uint256 eraChainId;
         address l1AssetRouter;
         bytes32 l2TokenProxyBytecodeHash;
@@ -102,7 +102,7 @@ fn check_zksync_os_observable(
         Some(file) => result.report_error(&format!(
             "bytecodeInfo for {expected_file}: impl observable hash maps to {file}"
         )),
-        None => result.report_warn(&format!(
+        None => result.report_error(&format!(
             "bytecodeInfo for {expected_file}: cannot verify observable hash {observable}"
         )),
     }
@@ -127,17 +127,23 @@ impl FixedForceDeploymentsData {
                     ));
                 }
             }
-            Err(err) => {
-                result.report_warn(&format!(
-                    "Could not verify FixedForceDeploymentsData l1ChainId: {err}"
-                ));
-            }
+            Err(err) => result.report_error(&format!(
+                "Could not verify FixedForceDeploymentsData l1ChainId: {err}"
+            )),
         }
 
-        result.report_warn(&format!(
-            "FixedForceDeploymentsData gatewayChainId (not verified): {}",
-            self.gatewayChainId
-        ));
+        let expected_era_gateway_chain_id = U256::from(verifiers.legacy_gateway_chain_id);
+        if self.eraGatewayChainId != expected_era_gateway_chain_id {
+            result.report_error(&format!(
+                "FixedForceDeploymentsData eraGatewayChainId mismatch: expected legacy gateway chain id {}, got {}",
+                verifiers.legacy_gateway_chain_id, self.eraGatewayChainId
+            ));
+        } else {
+            result.report_ok(&format!(
+                "FixedForceDeploymentsData eraGatewayChainId matches legacy gateway chain id ({})",
+                verifiers.legacy_gateway_chain_id
+            ));
+        }
 
         match verifiers.representative_era_chain_id {
             Some(era_chain_id) if era_chain_id != 0 => {
@@ -189,7 +195,7 @@ impl FixedForceDeploymentsData {
                 beacon_proxy_file
             ));
         } else {
-            result.report_warn(&format!(
+            result.report_error(&format!(
                 "l2TokenProxyBytecodeHash cannot be verified: {} not in AllContractsHashes",
                 self.l2TokenProxyBytecodeHash
             ));

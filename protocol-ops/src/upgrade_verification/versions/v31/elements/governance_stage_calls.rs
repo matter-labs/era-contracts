@@ -75,6 +75,20 @@ sol! {
         function owner() external view returns (address);
     }
 
+    #[sol(rpc)]
+    contract ProtocolUpgradeHandler {
+        function L2_PROTOCOL_GOVERNOR() external view returns (address);
+        function CHAIN_TYPE_MANAGER() external view returns (address);
+        function ERA_CHAIN_TYPE_MANAGER() external view returns (address);
+        function ZKSYNC_OS_CHAIN_TYPE_MANAGER() external view returns (address);
+        function BRIDGE_HUB() external view returns (address);
+        function L1_NULLIFIER() external view returns (address);
+        function L1_ASSET_ROUTER() external view returns (address);
+        function L1_NATIVE_TOKEN_VAULT() external view returns (address);
+        function CHAIN_ASSET_HANDLER() external view returns (address);
+        function ERA_CHAIN_ID() external view returns (uint256);
+    }
+
     #[derive(Debug, PartialEq)]
     enum Action {
         Add,
@@ -1798,6 +1812,35 @@ fn required_ctm_address(
     }
 }
 
+fn required_core_address(
+    artifact: &EcosystemUpgradeArtifact,
+    path: &[&str],
+    result: &mut VerificationResult,
+) -> Option<Address> {
+    let path_label = format!("core.{}", path.join("."));
+    let mut current = &artifact.core;
+    for segment in path {
+        let Some(next) = current.get(*segment) else {
+            result.report_error(&format!("{path_label} is required"));
+            return None;
+        };
+        current = next;
+    }
+
+    let Some(raw) = current.as_str() else {
+        result.report_error(&format!("{path_label} must be an address string"));
+        return None;
+    };
+
+    match Address::from_str(raw) {
+        Ok(address) => Some(address),
+        Err(err) => {
+            result.report_error(&format!("{path_label} is not a valid address: {err}"));
+            None
+        }
+    }
+}
+
 impl ChainCreationParams {
     /// Verifies the chain creation parameters.
     pub async fn verify(
@@ -1994,10 +2037,12 @@ impl GovernanceStage0Calls {
     /// `upgrade-prepare-all` appends it via `puh_guardians::deploy_puh_guardians`
     /// when bridgehub.owner() is a ProtocolUpgradeHandler proxy: first call
     /// upgrades the PUH implementation on its ProxyAdmin, second call rewires
-    /// the new Guardians on the proxy itself. We detect PUH governance by
-    /// reading `bridgehub.owner()` and probing its EIP-1967 admin slot — a
-    /// non-zero admin means the owner is a TUPP-style proxy (= PUH on our
-    /// envs), and we then expect the two extra calls.
+    /// the new Guardians on the proxy itself. The new implementation's
+    /// immutable getters are compared against the current PUH and the v31
+    /// artifact while this upgrade call is decoded. We detect PUH governance
+    /// by reading `bridgehub.owner()` and probing its EIP-1967 admin slot — a
+    /// non-zero admin means the owner is a TUPP-style proxy (= PUH on our envs),
+    /// and we then expect the two extra calls.
     pub(crate) async fn verify_artifact(
         &self,
         artifact: &EcosystemUpgradeArtifact,
@@ -2114,6 +2159,14 @@ impl GovernanceStage0Calls {
                                 result,
                             )
                             .await;
+                            errors += verify_puh_immutables(
+                                bridgehub_owner,
+                                decoded.implementation,
+                                artifact,
+                                verifiers,
+                                result,
+                            )
+                            .await?;
                         }
                     }
                     Err(err) => {
@@ -2219,6 +2272,181 @@ async fn verify_address_has_code(
             ));
             0
         }
+    }
+}
+
+async fn verify_puh_immutables(
+    current_puh_addr: Address,
+    new_impl_addr: Address,
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> anyhow::Result<usize> {
+    let initial_error_count = result.errors;
+    let provider = verifiers.network_verifier.get_l1_provider();
+    let current_puh = ProtocolUpgradeHandler::new(current_puh_addr, provider.clone());
+    let new_impl = ProtocolUpgradeHandler::new(new_impl_addr, provider.clone());
+
+    compare_puh_shared_address(
+        result,
+        "PUH.L2_PROTOCOL_GOVERNOR()",
+        current_puh.L2_PROTOCOL_GOVERNOR().call().await,
+        new_impl.L2_PROTOCOL_GOVERNOR().call().await,
+    );
+    compare_puh_shared_address(
+        result,
+        "PUH.CHAIN_TYPE_MANAGER()",
+        current_puh.CHAIN_TYPE_MANAGER().call().await,
+        new_impl.CHAIN_TYPE_MANAGER().call().await,
+    );
+    compare_puh_shared_address(
+        result,
+        "PUH.BRIDGE_HUB()",
+        current_puh.BRIDGE_HUB().call().await,
+        new_impl.BRIDGE_HUB().call().await,
+    );
+    compare_puh_shared_address(
+        result,
+        "PUH.L1_NULLIFIER()",
+        current_puh.L1_NULLIFIER().call().await,
+        new_impl.L1_NULLIFIER().call().await,
+    );
+    compare_puh_shared_address(
+        result,
+        "PUH.L1_ASSET_ROUTER()",
+        current_puh.L1_ASSET_ROUTER().call().await,
+        new_impl.L1_ASSET_ROUTER().call().await,
+    );
+    compare_puh_shared_address(
+        result,
+        "PUH.L1_NATIVE_TOKEN_VAULT()",
+        current_puh.L1_NATIVE_TOKEN_VAULT().call().await,
+        new_impl.L1_NATIVE_TOKEN_VAULT().call().await,
+    );
+
+    let expected_chain_asset_handler = required_core_address(
+        artifact,
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "chain_asset_handler_proxy_addr",
+        ],
+        result,
+    );
+    if let Some(expected) = expected_chain_asset_handler {
+        match new_impl.CHAIN_ASSET_HANDLER().call().await {
+            Ok(actual) => {
+                compare_puh_expected_address(result, "PUH.CHAIN_ASSET_HANDLER()", actual, expected)
+            }
+            Err(err) => result.report_error(&format!(
+                "Failed to call new PUH.CHAIN_ASSET_HANDLER(): {err}"
+            )),
+        }
+    }
+
+    if let Some(era_ctm) = artifact
+        .ctms
+        .iter()
+        .find(|ctm| ctm.flavor == CtmFlavor::Era)
+    {
+        let expected = required_ctm_address(
+            era_ctm,
+            &["state_transition", "chain_type_manager_proxy"],
+            result,
+        );
+        if let Some(expected) = expected {
+            match new_impl.ERA_CHAIN_TYPE_MANAGER().call().await {
+                Ok(actual) => compare_puh_expected_address(
+                    result,
+                    "PUH.ERA_CHAIN_TYPE_MANAGER()",
+                    actual,
+                    expected,
+                ),
+                Err(err) => result.report_error(&format!(
+                    "Failed to call new PUH.ERA_CHAIN_TYPE_MANAGER(): {err}"
+                )),
+            }
+        }
+    }
+
+    if let Some(zkos_ctm) = artifact
+        .ctms
+        .iter()
+        .find(|ctm| ctm.flavor == CtmFlavor::ZksyncOs)
+    {
+        let expected = required_ctm_address(
+            zkos_ctm,
+            &["state_transition", "chain_type_manager_proxy"],
+            result,
+        );
+        if let Some(expected) = expected {
+            match new_impl.ZKSYNC_OS_CHAIN_TYPE_MANAGER().call().await {
+                Ok(actual) => compare_puh_expected_address(
+                    result,
+                    "PUH.ZKSYNC_OS_CHAIN_TYPE_MANAGER()",
+                    actual,
+                    expected,
+                ),
+                Err(err) => result.report_error(&format!(
+                    "Failed to call new PUH.ZKSYNC_OS_CHAIN_TYPE_MANAGER(): {err}"
+                )),
+            }
+        }
+    }
+
+    if let Some(expected_era_chain_id) = verifiers.representative_era_chain_id {
+        match new_impl.ERA_CHAIN_ID().call().await {
+            Ok(actual) if actual == U256::from(expected_era_chain_id) => result.report_ok(
+                &format!("PUH.ERA_CHAIN_ID() matches env era_chain_id ({expected_era_chain_id})"),
+            ),
+            Ok(actual) => result.report_error(&format!(
+                "PUH.ERA_CHAIN_ID() mismatch: expected {expected_era_chain_id}, got {actual}"
+            )),
+            Err(err) => {
+                result.report_error(&format!("Failed to call new PUH.ERA_CHAIN_ID(): {err}"))
+            }
+        }
+    } else {
+        result.report_error("Cannot verify PUH.ERA_CHAIN_ID(): env era_chain_id was not loaded");
+    }
+
+    Ok((result.errors - initial_error_count) as usize)
+}
+
+fn compare_puh_shared_address(
+    result: &mut VerificationResult,
+    label: &str,
+    current: std::result::Result<Address, impl std::fmt::Display>,
+    new: std::result::Result<Address, impl std::fmt::Display>,
+) {
+    match (current, new) {
+        (Ok(current), Ok(new)) if current == new => {
+            result.report_ok(&format!("{label} is unchanged ({new})"));
+        }
+        (Ok(current), Ok(new)) => result.report_error(&format!(
+            "{label} mismatch: current PUH {current}, new implementation {new}"
+        )),
+        (Err(err), _) => result.report_error(&format!(
+            "Failed to call current {label} for PUH immutable checks: {err}"
+        )),
+        (_, Err(err)) => result.report_error(&format!(
+            "Failed to call new implementation {label} for PUH immutable checks: {err}"
+        )),
+    }
+}
+
+fn compare_puh_expected_address(
+    result: &mut VerificationResult,
+    label: &str,
+    actual: Address,
+    expected: Address,
+) {
+    if actual == expected {
+        result.report_ok(&format!("{label} matches expected address ({expected})"));
+    } else {
+        result.report_error(&format!(
+            "{label} mismatch: expected {expected}, got {actual}"
+        ));
     }
 }
 
