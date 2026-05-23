@@ -1,5 +1,6 @@
 use std::{fs, path::Path};
 
+use alloy::primitives::Address;
 use anyhow::Context;
 use serde::Deserialize;
 use toml::value::Table;
@@ -75,6 +76,31 @@ pub(crate) struct CtmArtifact {
     pub(crate) contracts_config: ContractsConfig,
     /// The raw `[ctms.<flavor>]` table, for per-CTM address lookups.
     pub(crate) value: toml::Value,
+}
+
+/// Resolves a nested address from a TOML value. `scope` is used only for
+/// error messages (e.g. `"core"`, `"misc"`, `"ctms.era"`); `path` is the
+/// chain of keys to walk into `value`.
+pub(crate) fn required_address_in_value(
+    value: &toml::Value,
+    scope: &str,
+    path: &[&str],
+) -> anyhow::Result<Address> {
+    let path_label = format!("{scope}.{}", path.join("."));
+    let mut current = value;
+    for segment in path {
+        let Some(next) = current.get(*segment) else {
+            anyhow::bail!("{path_label} is required");
+        };
+        current = next;
+    }
+
+    let Some(raw) = current.as_str() else {
+        anyhow::bail!("{path_label} must be an address string");
+    };
+
+    raw.parse::<Address>()
+        .with_context(|| format!("{path_label} is not a valid address"))
 }
 
 impl EcosystemUpgradeArtifact {

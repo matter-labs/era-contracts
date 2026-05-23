@@ -16,9 +16,10 @@ pub(crate) mod elements;
 pub(crate) mod utils;
 
 use elements::{
-    deployed_addresses::{verify_v31_artifact_state, verify_v31_provenance},
+    deployed_addresses::verify_v31_provenance,
     governance_stage_calls::{verify_governance_stage_calls, verify_per_chain_protocol_versions},
     protocol_version::ProtocolVersion,
+    rpc_state::verify_v31_artifact_state,
 };
 
 pub(crate) const EXPECTED_NEW_PROTOCOL_VERSION_STR: &str = "0.31.0";
