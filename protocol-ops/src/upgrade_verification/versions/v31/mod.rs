@@ -6,10 +6,10 @@ use std::str::FromStr;
 
 use alloy::primitives::{Address, FixedBytes};
 
-use crate::upgrade_verification::{
+use crate::{commands::ecosystem::verify_upgrade::VerifyUpgradeEnv, upgrade_verification::{
     artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
     verifiers::{VerificationResult, Verifiers},
-};
+}};
 
 pub(crate) mod elements;
 pub(crate) mod utils;
@@ -57,6 +57,7 @@ pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn verify(
+    env: VerifyUpgradeEnv,
     artifact: &EcosystemUpgradeArtifact,
     l1_rpc_url: &str,
     gw_rpc_url: &str,
@@ -72,6 +73,7 @@ pub(crate) async fn verify(
 ) -> anyhow::Result<()> {
     result.print_info("== Config verification ==");
     let mut verifiers = Verifiers::new_v31(
+        env,
         artifact,
         l1_rpc_url,
         gw_rpc_url,
@@ -91,7 +93,7 @@ pub(crate) async fn verify(
         verifiers.network_verifier.get_gateway_chain_id()
     ));
 
-    // Populate the create2 maps so Phase 6 (deployment provenance) can match
+    // Populate the create2 maps so deployment provenance can match
     // deployed addresses against expected init bytecode + constructor args.
     // Each tx is fetched from L1 RPC; stale entries (whose bytecode no longer
     // matches AllContractsHashes after a regen) are silently skipped — the

@@ -358,14 +358,14 @@ async fn verify_core_provenance(
     )?;
 
     // L1MessageRoot has a stage-sepolia variant with the same constructor
-    // signature but different runtime bytecode; pick whichever the CREATE2
-    // deploy was actually identified as.
-    let message_root_file = pick_known_variant(
-        verifiers,
-        &message_root_impl,
-        &["l1-contracts/L1MessageRootStageSepolia"],
-        "l1-contracts/L1MessageRoot",
-    );
+    // signature but different runtime bytecode. The choice is fixed by the
+    // env: mainnet expects `L1MessageRoot`; stage/testnet (on Sepolia)
+    // expect `L1MessageRootStageSepolia`.
+    let message_root_file = if verifiers.testnet_contracts {
+        "l1-contracts/L1MessageRootStageSepolia"
+    } else {
+        "l1-contracts/L1MessageRoot"
+    };
 
     // L1AssetTracker impl args are reused for the TUPP impl check below.
     let tracker_ctor_args = V31L1AssetTracker::constructorCall::new((
@@ -791,9 +791,8 @@ fn verify_ctm_base_provenance(
     );
 
     // DualVerifier(fflonk, plonk) / *TestnetVerifier.
-    // Stage / testnet environments deploy the `*TestnetVerifier` flavor
-    // instead of `*DualVerifier`; pick whichever the CREATE2 deploy was
-    // actually identified as.
+    // The choice is fixed by the env: mainnet expects `*DualVerifier`;
+    // stage/testnet expect the `*TestnetVerifier` flavor instead.
     //
     // ZKsyncOS verifiers take a third `_initialOwner` constructor arg: the
     // deployer EOA from `DeployCTMUtils.verifierOwner = getBroadcasterAddress()`.
@@ -808,12 +807,11 @@ fn verify_ctm_base_provenance(
         &scope,
         &["state_transition", "verifier_plonk_addr"],
     )?;
-    let verifier_file = pick_known_variant(
-        verifiers,
-        &verifier,
-        &[testnet_verifier_file],
-        dual_verifier_file,
-    );
+    let verifier_file = if verifiers.testnet_contracts {
+        testnet_verifier_file
+    } else {
+        dual_verifier_file
+    };
     let encoded = if is_zksync_os {
         let initial_owner = required_address(&artifact.misc, "misc", &["deployer_addr"])?;
         V31ZKsyncOSDualVerifier::constructorCall::new((fflonk, plonk, initial_owner)).abi_encode()
@@ -823,34 +821,4 @@ fn verify_ctm_base_provenance(
     result.expect_create2_params(verifiers, &verifier, encoded, verifier_file);
 
     Ok(())
-}
-
-/// Pick the file name that matches the CREATE2 deployment record at
-/// `address`. Returns the first candidate whose name equals the recorded
-/// file, falling back to `default_file` if none match (or if the address
-/// isn't in the create2 map).
-///
-/// Used where multiple Solidity contract sources share a constructor
-/// signature and only the deployed bytecode tells them apart:
-/// `L1MessageRoot` vs `L1MessageRootStageSepolia`, `DualVerifier` vs
-/// `*TestnetVerifier`.
-fn pick_known_variant<'a>(
-    verifiers: &Verifiers,
-    address: &Address,
-    candidates: &[&'a str],
-    default_file: &'a str,
-) -> &'a str {
-    let resolved = verifiers
-        .network_verifier
-        .create2_known_bytecodes
-        .get(address)
-        .cloned();
-    match resolved.as_deref() {
-        Some(file) => candidates
-            .iter()
-            .copied()
-            .find(|c| *c == file)
-            .unwrap_or(default_file),
-        None => default_file,
-    }
 }

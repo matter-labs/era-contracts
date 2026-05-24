@@ -90,7 +90,7 @@ fn expect_u64_eq(result: &mut VerificationResult, label: &str, actual: u64, expe
     }
 }
 
-/// Phase 5 RPC state checks (see `puvt-what-to-do.md`).
+/// RPC state checks
 ///
 /// This is intentionally the *non-overlapping* slice of legacy PUVT's
 /// post-deploy work — it covers checks that aren't subsumed by Phase 6

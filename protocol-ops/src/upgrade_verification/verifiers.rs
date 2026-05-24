@@ -1,7 +1,3 @@
-// TODO: drop once R2 (fee-params) scaffolding lands or is deleted, alongside
-// the D13 cleanup (legacy `GovernanceStage{0,1,2}Calls::verify` etc.).
-#![allow(dead_code)]
-
 use alloy::{
     hex::{self, FromHex},
     primitives::{Address, Bytes, FixedBytes},
@@ -14,7 +10,7 @@ use std::fmt::{self, Display};
 use std::fs;
 use std::panic::Location;
 
-use crate::upgrade_verification::{
+use crate::{commands::ecosystem::verify_upgrade::VerifyUpgradeEnv, upgrade_verification::{
     artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
     constants::L2_BRIDGEHUB_ADDR,
     versions::v31::utils::{
@@ -22,7 +18,7 @@ use crate::upgrade_verification::{
         fee_param_verifier::FeeParamVerifier, get_contents_from_github,
         network_verifier::NetworkVerifier, repo_relative_path,
     },
-};
+}};
 
 sol! {
     function transparentProxyConstructor(address impl, address initialAdmin, bytes memory initCalldata);
@@ -62,11 +58,8 @@ impl GenesisConfigKind {
 
 impl Verifiers {
     /// Creates a v31 verifier context from the single ecosystem TOML.
-    ///
-    /// This keeps the copied PUVT shape intact: as more v31 parity checks are
-    /// restored, the placeholder verifier fields below should be replaced with
-    /// their real RPC / reference-data initialization.
     pub async fn new_v31(
+        env: VerifyUpgradeEnv,
         artifact: &EcosystemUpgradeArtifact,
         l1_rpc: impl Into<String>,
         gw_rpc: impl Into<String>,
@@ -92,7 +85,7 @@ impl Verifiers {
             GenesisConfig::init_v31(GenesisConfigKind::ZksyncOs, contracts_commit).await?;
 
         Ok(Self {
-            testnet_contracts: false,
+            testnet_contracts: !env.is_mainnet(),
             bridgehub_address,
             address_verifier,
             bytecode_verifier,

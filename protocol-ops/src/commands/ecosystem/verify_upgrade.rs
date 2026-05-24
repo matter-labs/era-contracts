@@ -71,6 +71,10 @@ impl VerifyUpgradeEnv {
             Self::Mainnet => "mainnet",
         }
     }
+
+    pub fn is_mainnet(self) -> bool {
+        matches!(self, Self::Mainnet)
+    }
 }
 
 pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
@@ -166,6 +170,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     let mut result = VerificationResult::default();
 
     let verification_result = crate::upgrade_verification::versions::v31::verify(
+        args.env,
         &artifact,
         &args.l1_rpc_url,
         &args.gw_rpc_url,
