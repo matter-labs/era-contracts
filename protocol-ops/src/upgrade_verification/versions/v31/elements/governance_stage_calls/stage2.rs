@@ -72,6 +72,13 @@ use super::{
 };
 
 impl GovernanceStage2Calls {
+    /// Stage 2 — three sections in order:
+    ///   1. Decommission prefix (dynamic): `N × setHistoricalMigrationInterval`
+    ///      then one `setSettlementLayerStatus(legacy_gw, false)`.
+    ///   2. Canonical: `unpauseMigration` then per-CTM
+    ///      (`checkProtocolUpgradePresence`, `checkMigrationsUnpaused`).
+    ///   3. New-Gateway bring-up (16 calls): registerLegacyToken, whitelist
+    ///      new GW, and the GatewayVotePreparation approve/priority-tx block.
     pub(crate) async fn verify_artifact(
         &self,
         artifact: &EcosystemUpgradeArtifact,
@@ -82,7 +89,7 @@ impl GovernanceStage2Calls {
 
         let mut errors = 0;
 
-        // ── Legacy-GW decommission prefix (dynamic) ──────────────────
+        // ── Section 1: Legacy-GW decommission prefix (dynamic) ───────
         // v31 `CoreUpgrade` prepends `N × setHistoricalMigrationInterval`
         // followed by one `setSettlementLayerStatus(legacy_gw_chain_id, false)`
         // before the canonical `unpauseMigration`. N is env-dependent
@@ -175,6 +182,9 @@ impl GovernanceStage2Calls {
         let canonical_count = canonical_prefix + 1 + artifact.ctms.len() * 2;
         let expected_call_count = canonical_count + 16;
 
+        // ── Section 2: Canonical activation ─────────────────────────
+        // Call `canonical_prefix` — ChainAssetHandler.unpauseMigration()
+        // re-enables cross-chain migrations now that impls are swapped.
         errors += verify_call_by_name(
             &self.calls,
             canonical_prefix,
@@ -184,6 +194,9 @@ impl GovernanceStage2Calls {
             result,
         );
 
+        // Per-CTM (2 calls per CTM, in artifact order):
+        //   +0 stage-validator.checkProtocolUpgradePresence()
+        //   +1 stage-validator.checkMigrationsUnpaused()
         for (ctm_index, ctm) in artifact.ctms.iter().enumerate() {
             let validator_label = format!("{}.upgrade_stage_validator", ctm.flavor.label());
             let Some(validator) = required_ctm_address(
@@ -216,6 +229,7 @@ impl GovernanceStage2Calls {
             );
         }
 
+        // ── Section 3: New-Gateway bring-up (16 calls) ───────────────
         match artifact.new_gateway.as_ref() {
             Some(new_gw) => {
                 errors += verify_gateway_bring_up_calls(
@@ -328,11 +342,15 @@ async fn verify_gateway_bring_up_calls(
         (15, "bridgehub_proxy", direct),
     ];
 
+    // Pass 1 — target + selector check for every entry in the 16-call block.
     let mut errors = 0;
     for (offset, target_name, method) in expected {
         errors += verify_call_by_name(calls, base + offset, target_name, method, verifiers, result);
     }
 
+    // Pass 2 — per-call deep arg checks against env config + the live
+    // representative CTM + the derived `ctm_asset_id` triangle. Each helper
+    // decodes one or two calls and asserts the spec-anchored invariants.
     let Some(l1_asset_router) = named_address(verifiers, "l1_asset_router_proxy", result) else {
         return errors + 1;
     };

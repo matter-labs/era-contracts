@@ -38,6 +38,9 @@ use super::{
 };
 
 impl GovernanceStage0Calls {
+    /// Stage 0 — pause migrations, start per-CTM upgrade timers, and (on
+    /// PUH-governed envs) redeploy PUH/Guardians + accept deferred pendingOwner
+    /// transfers.
     pub(crate) async fn verify_artifact(
         &self,
         artifact: &EcosystemUpgradeArtifact,
@@ -47,6 +50,8 @@ impl GovernanceStage0Calls {
         result.print_info("== Gov stage 0 calls ===");
 
         let mut errors = 0;
+        // Call 0 — ChainAssetHandler.pauseMigration() freezes cross-chain
+        // migrations during the upgrade window.
         errors += verify_call_by_name(
             &self.calls,
             0,
@@ -56,6 +61,8 @@ impl GovernanceStage0Calls {
             result,
         );
 
+        // Calls 1..=N — per-CTM GovernanceUpgradeTimer.startTimer().
+        // One call per `[ctms.<flavor>]` block, in artifact order.
         for (ctm_index, ctm) in artifact.ctms.iter().enumerate() {
             let timer_label = format!("{}.upgrade_timer", ctm.flavor.label());
             if let Some(timer) = required_ctm_address(
@@ -112,6 +119,9 @@ impl GovernanceStage0Calls {
         };
 
         if puh_governed {
+            // PUH/Guardians redeploy pair — PUH-governed envs only.
+            // Call `base_count` — PUH ProxyAdmin.upgradeAndCall(PUH proxy, new impl, "").
+            // Call `base_count + 1` — PUH.updateGuardians(new guardians).
             let upgrade_idx = base_count;
             let update_guardians_idx = base_count + 1;
             // OZ v5 `TransparentUpgradeableProxyAdmin.upgradeAndCall` is the

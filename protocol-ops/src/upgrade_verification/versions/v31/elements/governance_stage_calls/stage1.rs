@@ -66,6 +66,15 @@ fn ctm_block_start(ctm_index: usize) -> usize {
 }
 
 impl GovernanceStage1Calls {
+    /// Stage 1 — proxy impl swaps for the 7 core contracts (incl. MessageRoot
+    /// reinit), AssetTracker ownership handoff, NTV wiring, ChainAssetHandler
+    /// address refresh, then per-CTM: timer checkDeadline, migrations-paused
+    /// sanity, CTM impl swap, `setChainCreationParams`, `setNewVersionUpgrade`,
+    /// VT impl swap.
+    ///
+    /// Split into two passes: `verify_call_shape` checks target+selector for
+    /// every call; `verify_artifact_payloads` decodes args and cross-checks
+    /// against the artifact's declared addresses and structs.
     pub(crate) async fn verify_artifact(
         &self,
         artifact: &EcosystemUpgradeArtifact,
@@ -119,6 +128,13 @@ impl GovernanceStage1Calls {
             errors += verify_call_by_name(&self.calls, index, target, method, verifiers, result);
         }
 
+        // Per-CTM block (6 calls per CTM, in artifact order):
+        //   +0 timer.checkDeadline()
+        //   +1 stage-validator.checkMigrationsPaused()
+        //   +2 CTM proxy admin.upgrade(CTM proxy, new impl)
+        //   +3 CTM proxy.setChainCreationParams(...)
+        //   +4 CTM proxy.setNewVersionUpgrade(...)
+        //   +5 VT proxy admin.upgrade(VT proxy, new impl)
         for (ctm_index, ctm) in ctms.iter().enumerate() {
             let block = ctm_block_start(ctm_index);
             let timer_label = format!("{}.upgrade_timer", ctm.flavor.label());
