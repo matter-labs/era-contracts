@@ -237,33 +237,34 @@ async fn verify_v31_proxy_admins(
             &scope,
             &["deployed_addresses", "transparent_proxy_admin"],
         )?;
-        let proxy_addr = required_address(
-            &ctm.value,
-            &scope,
-            &["state_transition", "chain_type_manager_proxy"],
-        )?;
-
-        let raw = match provider
-            .get_storage_at(proxy_addr, U256::from_be_bytes(admin_slot.0))
-            .await
-        {
-            Ok(value) => value.to_be_bytes::<32>(),
-            Err(err) => {
-                result.report_warn(&format!(
-                    "Skipping proxy-admin check for {label}.chain_type_manager_proxy; eth_getStorageAt failed: {err}"
+        for (proxy_label, proxy_path) in [
+            ("chain_type_manager_proxy", "chain_type_manager_proxy"),
+            ("validator_timelock_addr", "validator_timelock_addr"),
+        ] {
+            let proxy_addr =
+                required_address(&ctm.value, &scope, &["state_transition", proxy_path])?;
+            let raw = match provider
+                .get_storage_at(proxy_addr, U256::from_be_bytes(admin_slot.0))
+                .await
+            {
+                Ok(value) => value.to_be_bytes::<32>(),
+                Err(err) => {
+                    result.report_warn(&format!(
+                        "Skipping proxy-admin check for {label}.{proxy_label}; eth_getStorageAt failed: {err}"
+                    ));
+                    continue;
+                }
+            };
+            let actual_admin = Address::from_slice(&raw[12..]);
+            if actual_admin == expected_admin {
+                result.report_ok(&format!(
+                    "Proxy admin for {label}.{proxy_label} matches {label}.transparent_proxy_admin"
                 ));
-                continue;
+            } else {
+                result.report_error(&format!(
+                    "Proxy admin mismatch for {label}.{proxy_label}: expected {expected_admin}, got {actual_admin}"
+                ));
             }
-        };
-        let actual_admin = Address::from_slice(&raw[12..]);
-        if actual_admin == expected_admin {
-            result.report_ok(&format!(
-                "Proxy admin for {label}.chain_type_manager_proxy matches {label}.transparent_proxy_admin"
-            ));
-        } else {
-            result.report_error(&format!(
-                "Proxy admin mismatch for {label}.chain_type_manager_proxy: expected {expected_admin}, got {actual_admin}"
-            ));
         }
     }
 
