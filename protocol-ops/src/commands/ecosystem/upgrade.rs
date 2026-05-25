@@ -824,6 +824,12 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             "Wrote extra verification logs → {}",
             extra_verification_logs_path.display()
         ));
+        let gw_verification_logs_path = canonical_dir.join("gw-verification-logs.txt");
+        runner.write_gw_verification_logs(&gw_verification_logs_path)?;
+        logger::info(format!(
+            "Wrote GW verification logs → {}",
+            gw_verification_logs_path.display()
+        ));
         Some(merged_path)
     } else {
         None
