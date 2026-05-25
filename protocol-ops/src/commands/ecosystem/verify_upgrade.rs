@@ -55,6 +55,13 @@ pub struct VerifyUpgradeArgs {
     /// Defaults to `<l1-contracts>/upgrade-envs/v0.31.0-interopB/output/<env>/transactions.txt`
     #[clap(long)]
     pub transactions_log: Option<PathBuf>,
+
+    /// Print the ABI-encoded `UpgradeProposal { calls, executor: 0x0, salt: 0x0 }`
+    /// for each governance stage (0/1/2) so an operator can byte-compare against
+    /// the on-chain submitted governance proposal bytes. When set, the rest of
+    /// the verifier is skipped.
+    #[clap(long)]
+    pub display_upgrade_data: bool,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -177,6 +184,13 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     let artifact = EcosystemUpgradeArtifact::read(&args.ecosystem_toml)?;
     artifact_shape::verify(&artifact)?;
 
+    if args.display_upgrade_data {
+        print_encoded_upgrade_data("Stage0", &artifact.governance_calls.stage0_calls);
+        print_encoded_upgrade_data("Stage1", &artifact.governance_calls.stage1_calls);
+        print_encoded_upgrade_data("Stage2", &artifact.governance_calls.stage2_calls);
+        return Ok(());
+    }
+
     let tx_hashes = transactions_log::read(&transactions_log_path)?;
     logger::info(format!(
         "Loaded {} transaction hash(es) from {}",
@@ -228,4 +242,22 @@ fn ethers_u256_to_alloy(value: ethers::types::U256) -> U256 {
     let mut bytes = [0u8; 32];
     value.to_big_endian(&mut bytes);
     U256::from_be_bytes(bytes)
+}
+
+fn print_encoded_upgrade_data(label: &str, stage_calls_hex: &str) {
+    use crate::upgrade_verification::versions::v31::elements::call_list::{
+        CallList, UpgradeProposal,
+    };
+    use alloy::sol_types::SolValue;
+
+    let calls = CallList::parse(stage_calls_hex);
+    let proposal = UpgradeProposal {
+        calls: calls.elems,
+        executor: Address::ZERO,
+        salt: FixedBytes::<32>::ZERO,
+    };
+    println!(
+        "{label} encoded upgrade data = 0x{}",
+        alloy::hex::encode(proposal.abi_encode())
+    );
 }
