@@ -460,16 +460,19 @@ fn verify_message_root_upgrade_call_args(
                 "message_root_implementation_addr",
             );
 
-            match initializeL1V31UpgradeCall::abi_decode(&decoded.data) {
-                Ok(_) => {
-                    result.report_ok("MessageRoot upgrade payload calls initializeL1V31Upgrade")
-                }
-                Err(err) => {
-                    result.report_error(&format!(
-                        "MessageRoot upgradeAndCall payload is not initializeL1V31Upgrade(): {err}"
-                    ));
-                    errors += 1;
-                }
+            // `initializeL1V31Upgrade()` takes no args, so the inner payload
+            // must be exactly its 4-byte selector. Decoding-only would accept
+            // trailing bytes that alloy silently ignores.
+            let expected_selector = initializeL1V31UpgradeCall::SELECTOR;
+            if decoded.data.as_ref() == expected_selector.as_slice() {
+                result.report_ok("MessageRoot upgrade payload calls initializeL1V31Upgrade")
+            } else {
+                result.report_error(&format!(
+                    "MessageRoot upgradeAndCall payload must be exactly initializeL1V31Upgrade() selector 0x{}, got 0x{}",
+                    hex::encode(expected_selector),
+                    hex::encode(decoded.data.as_ref()),
+                ));
+                errors += 1;
             }
             errors
         }
