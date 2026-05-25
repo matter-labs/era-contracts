@@ -19,8 +19,8 @@ use alloy::{
 use crate::upgrade_verification::{
     artifacts::{EcosystemUpgradeArtifact, NewGatewayArtifact},
     constants::{
-        GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR,
-        L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT,
+        GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR,
+        L2_CHAIN_ASSET_HANDLER_ADDR, L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT,
     },
     verifiers::{VerificationResult, Verifiers},
     versions::v31::MAX_PRIORITY_TX_GAS_LIMIT,
@@ -770,17 +770,16 @@ fn check_set_asset_deployment_tracker(
         ));
         return 1;
     }
-    let (registration_data, tracker) = match <(FixedBytes<32>, Address)>::abi_decode(
-        &call.data[4..],
-    ) {
-        Ok(args) => args,
-        Err(err) => {
-            result.report_error(&format!(
+    let (registration_data, tracker) =
+        match <(FixedBytes<32>, Address)>::abi_decode(&call.data[4..]) {
+            Ok(args) => args,
+            Err(err) => {
+                result.report_error(&format!(
                 "Call #{idx}: failed to decode setAssetDeploymentTracker(bytes32,address): {err}"
             ));
-            return 1;
-        }
-    };
+                return 1;
+            }
+        };
     let mut errors = 0;
     if registration_data != expected_registration_data {
         result.report_error(&format!(

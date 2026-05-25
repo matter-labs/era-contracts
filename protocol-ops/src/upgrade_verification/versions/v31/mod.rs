@@ -117,6 +117,7 @@ pub(crate) async fn verify(
     // address-book lookup in `expect_create2_params` hard-errors only if a
     // load-bearing deployment is missing.
     let count = {
+        let bridgehub_address = verifiers.bridgehub_address;
         let Verifiers {
             bytecode_verifier,
             network_verifier,
@@ -126,6 +127,7 @@ pub(crate) async fn verify(
             .populate_create2_from_transactions_log(
                 tx_hashes,
                 &create2_factory,
+                &bridgehub_address,
                 expected_salts,
                 bytecode_verifier,
                 result,

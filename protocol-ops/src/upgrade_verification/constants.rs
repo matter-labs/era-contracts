@@ -1,4 +1,4 @@
-use alloy::primitives::Address;
+use alloy::primitives::{address, Address};
 
 pub const EIP1967_PROXY_ADMIN_SLOT: &str =
     "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
@@ -46,6 +46,10 @@ pub const fn literal_addr(value: u32) -> Address {
 /// The parser-based test below reads the Solidity source directly and will
 /// fail loudly if a name disappears or its offset drifts.
 pub const L2_CREATE2_FACTORY_ADDR: Address = l2_addr(0x00);
+/// EVM deterministic CREATE2 factory used by ZKsync OS L1->L2 priority
+/// deployment transactions.
+pub const ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR: Address =
+    address!("0x4e59b44847b379578588920ca78fbf26c0b4956c");
 /// Alias of `L2_GENESIS_UPGRADE_ADDR` in Solidity — same on-chain address
 /// (`BUILT_IN_CONTRACTS_OFFSET + 0x01`), exposed under the version-specific
 /// name because v31 force-deploys `L2V31Upgrade` there.
@@ -124,6 +128,7 @@ mod tests {
     /// - `address constant <NAME> = address(BUILT_IN_CONTRACTS_OFFSET + 0x<hex>);`
     /// - `address constant <NAME> = address(SYSTEM_CONTRACTS_OFFSET + 0x<hex>);`
     /// - `address constant <NAME> = address(0x<hex>);` (precompiles, KECCAK)
+    /// - `address constant <NAME> = 0x<40-hex-chars>;` (well-known deployed addresses)
     ///
     /// Also matches the `address payable constant ... = payable(address(...))`
     /// wrapper used for `L2_INTEROP_HANDLER_ADDR` / `BOOTLOADER_FORMAL_ADDRESS`.
@@ -135,6 +140,7 @@ mod tests {
             BuiltIn(usize),
             System(usize),
             Literal(usize),
+            FullLiteral(usize),
         }
         let mut out = HashMap::new();
         for line in source.lines() {
@@ -147,6 +153,9 @@ mod tests {
                 Pattern::System(p + "address(SYSTEM_CONTRACTS_OFFSET + 0x".len())
             } else if let Some(p) = line.find("address(0x") {
                 Pattern::Literal(p + "address(0x".len())
+            } else if line.contains("address") && line.find("= 0x").is_some() {
+                let p = line.find("= 0x").expect("checked above");
+                Pattern::FullLiteral(p + "= 0x".len())
             } else {
                 continue;
             };
@@ -160,10 +169,25 @@ mod tests {
                 .unwrap_or(after_constant.len());
             let name = after_constant[..name_len].to_string();
 
+            if let Pattern::FullLiteral(start) = pattern {
+                let after = &line[start..];
+                let hex_len = after
+                    .find(|c: char| !c.is_ascii_hexdigit())
+                    .unwrap_or(after.len());
+                let raw = &after[..hex_len];
+                let decoded = alloy::hex::decode(raw)
+                    .unwrap_or_else(|err| panic!("bad full address hex for {name}: {err}"));
+                let addr = Address::try_from(decoded.as_slice())
+                    .unwrap_or_else(|err| panic!("bad full address length for {name}: {err}"));
+                out.insert(name, addr);
+                continue;
+            }
+
             let (start, build): (usize, fn(u32) -> Address) = match pattern {
                 Pattern::BuiltIn(s) => (s, |v| l2_addr(v as u16)),
                 Pattern::System(s) => (s, |v| system_contract_addr(v as u16)),
                 Pattern::Literal(s) => (s, literal_addr),
+                Pattern::FullLiteral(_) => unreachable!(),
             };
             let after = &line[start..];
             let hex_len = after
@@ -201,13 +225,20 @@ mod tests {
         for (sol_name, expected) in [
             // BUILT_IN_CONTRACTS_OFFSET range
             ("L2_CREATE2_FACTORY_ADDR", L2_CREATE2_FACTORY_ADDR),
+            (
+                "ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR",
+                ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
+            ),
             ("L2_GENESIS_UPGRADE_ADDR", L2_VERSION_SPECIFIC_UPGRADER_ADDR),
             ("L2_BRIDGEHUB_ADDR", L2_BRIDGEHUB_ADDR),
             ("L2_ASSET_ROUTER_ADDR", L2_ASSET_ROUTER_ADDR),
             ("L2_NATIVE_TOKEN_VAULT_ADDR", L2_NATIVE_TOKEN_VAULT_ADDR),
             ("L2_MESSAGE_ROOT_ADDR", L2_MESSAGE_ROOT_ADDR),
             ("SLOAD_CONTRACT_ADDR", SLOAD_CONTRACT_ADDR),
-            ("L2_WRAPPED_BASE_TOKEN_IMPL_ADDR", L2_WRAPPED_BASE_TOKEN_IMPL_ADDR),
+            (
+                "L2_WRAPPED_BASE_TOKEN_IMPL_ADDR",
+                L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
+            ),
             ("L2_INTEROP_ROOT_STORAGE_ADDR", L2_INTEROP_ROOT_STORAGE_ADDR),
             ("L2_MESSAGE_VERIFICATION_ADDR", L2_MESSAGE_VERIFICATION_ADDR),
             ("L2_CHAIN_ASSET_HANDLER_ADDR", L2_CHAIN_ASSET_HANDLER_ADDR),
@@ -227,14 +258,20 @@ mod tests {
                 "L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR",
                 L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR,
             ),
-            ("L2_DEPLOYER_SYSTEM_CONTRACT_ADDR", L2_DEPLOYER_SYSTEM_CONTRACT_ADDR),
+            (
+                "L2_DEPLOYER_SYSTEM_CONTRACT_ADDR",
+                L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
+            ),
             ("L2_FORCE_DEPLOYER_ADDR", L2_FORCE_DEPLOYER_ADDR),
             (
                 "L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR",
                 L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             ),
             ("MSG_VALUE_SYSTEM_CONTRACT", MSG_VALUE_SYSTEM_CONTRACT),
-            ("L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR", L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR),
+            (
+                "L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR",
+                L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            ),
             (
                 "L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR",
                 L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
@@ -242,7 +279,10 @@ mod tests {
             ("EVENT_WRITER_CONTRACT", EVENT_WRITER_CONTRACT),
             ("L2_COMPRESSOR_ADDR", L2_COMPRESSOR_ADDR),
             ("L2_COMPLEX_UPGRADER_ADDR", L2_COMPLEX_UPGRADER_ADDR),
-            ("L2_PUBDATA_CHUNK_PUBLISHER_ADDR", L2_PUBDATA_CHUNK_PUBLISHER_ADDR),
+            (
+                "L2_PUBDATA_CHUNK_PUBLISHER_ADDR",
+                L2_PUBDATA_CHUNK_PUBLISHER_ADDR,
+            ),
             ("CODE_ORACLE_SYSTEM_CONTRACT", CODE_ORACLE_SYSTEM_CONTRACT),
             ("EVM_GAS_MANAGER", EVM_GAS_MANAGER),
             ("EVM_PREDEPLOYS_MANAGER", EVM_PREDEPLOYS_MANAGER),

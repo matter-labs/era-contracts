@@ -44,9 +44,25 @@ impl BytecodeVerifier {
     /// On success, returns a tuple of the contract file name and the extra argument
     /// bytes appended at the end of the bytecode.
     pub fn try_parse_bytecode(&self, maybe_bytecode: &[u8]) -> Option<(String, Vec<u8>)> {
+        self.try_parse_bytecode_with_max_args(maybe_bytecode, 9)
+    }
+
+    /// Same as [`Self::try_parse_bytecode`], but scans every possible 32-byte
+    /// constructor-argument suffix. Gateway ZKsync OS deployer constructors
+    /// carry dynamic structs and selector arrays, so the legacy 0..9 word scan
+    /// is too narrow for those L1->GW CREATE2 priority txs.
+    pub fn try_parse_bytecode_any_args(&self, maybe_bytecode: &[u8]) -> Option<(String, Vec<u8>)> {
+        self.try_parse_bytecode_with_max_args(maybe_bytecode, maybe_bytecode.len() / 32)
+    }
+
+    fn try_parse_bytecode_with_max_args(
+        &self,
+        maybe_bytecode: &[u8],
+        max_args: usize,
+    ) -> Option<(String, Vec<u8>)> {
         // We do not know how many extra 32-byte arguments there are,
-        // so we try all values from 0 to 9.
-        for i in 0..10 {
+        // so we try all values up to the caller-provided bound.
+        for i in 0..=max_args {
             // Skip if there isn’t even enough data for i arguments.
             if maybe_bytecode.len() < 32 * i {
                 continue;
@@ -137,7 +153,9 @@ impl BytecodeVerifier {
     /// deployments where the deployed address is fixed and can't bind the
     /// tuple via address derivation.
     pub fn evm_deployed_blake_and_length(&self, file: &str) -> Option<(FixedBytes<32>, u32)> {
-        self.evm_deployed_blake_and_length_by_file.get(file).copied()
+        self.evm_deployed_blake_and_length_by_file
+            .get(file)
+            .copied()
     }
 
     /// Inserts an entry for the given deployed bytecode hash and file name.
@@ -225,9 +243,8 @@ impl BytecodeVerifier {
                         contract.contract_name
                     )
                 });
-                let blake_hash = FixedBytes::try_from(decoded.as_slice()).expect(
-                    "Invalid length for FixedBytes (evm_deployed_bytecode_blake_hash)",
-                );
+                let blake_hash = FixedBytes::try_from(decoded.as_slice())
+                    .expect("Invalid length for FixedBytes (evm_deployed_bytecode_blake_hash)");
                 evm_deployed_blake_and_length_by_file
                     .insert(contract.contract_name, (blake_hash, length));
             }

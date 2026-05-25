@@ -5,17 +5,21 @@ use crate::upgrade_verification::{
         required_address_in_value as required_address, CtmArtifact, CtmFlavor,
         EcosystemUpgradeArtifact,
     },
-    constants::L2_INTEROP_CENTER_ADDR,
+    constants::{L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR},
     verifiers::{VerificationResult, Verifiers},
     versions::v31::{
-        utils::network_verifier::{Bridgehub as BridgehubContract, L1AssetRouter},
+        utils::{
+            apply_l2_to_l1_alias,
+            network_verifier::{Bridgehub as BridgehubContract, L1AssetRouter},
+        },
         MAX_NUMBER_OF_ZK_CHAINS,
     },
 };
 
 use alloy::{
-    primitives::{Address, U256},
-    sol_types::{SolCall, SolConstructor},
+    hex::{self, FromHex},
+    primitives::{Address, Bytes, FixedBytes, U256},
+    sol_types::{SolCall, SolConstructor, SolValue},
 };
 use serde::Deserialize;
 
@@ -136,6 +140,167 @@ mod ctm_signatures {
         }
         contract V31BytecodesSupplier {
             function initialize();
+        }
+    }
+}
+
+/// Expected constructor signatures for the contracts that the new-Gateway
+/// vote-preparation script sends to the Gateway via L1 priority txs.
+mod gateway_signatures {
+    alloy::sol! {
+        #[derive(Debug)]
+        enum Action {
+            Add,
+            Replace,
+            Remove
+        }
+
+        #[derive(Debug)]
+        struct FacetCut {
+            address facet;
+            Action action;
+            bool isFreezable;
+            bytes4[] selectors;
+        }
+
+        #[derive(Debug)]
+        struct DiamondCutData {
+            FacetCut[] facetCuts;
+            address initAddress;
+            bytes initCalldata;
+        }
+
+        #[derive(Debug)]
+        struct InitializeDataNewChain {
+            bytes32 l2BootloaderBytecodeHash;
+            bytes32 l2DefaultAccountBytecodeHash;
+            bytes32 l2EvmEmulatorBytecodeHash;
+        }
+
+        #[derive(Debug)]
+        struct GatewayDADeployerConfig {
+            bytes32 salt;
+            address aliasedGovernanceAddress;
+        }
+
+        #[derive(Debug)]
+        struct GatewayProxyAdminDeployerConfig {
+            bytes32 salt;
+            address aliasedGovernanceAddress;
+        }
+
+        #[derive(Debug)]
+        struct GatewayValidatorTimelockDeployerConfig {
+            bytes32 salt;
+            address aliasedGovernanceAddress;
+            address chainTypeManagerProxyAdmin;
+        }
+
+        #[derive(Debug)]
+        struct GatewayVerifiersDeployerConfig {
+            bytes32 salt;
+            address aliasedGovernanceAddress;
+            bool testnetVerifier;
+            bool isZKsyncOS;
+        }
+
+        #[derive(Debug)]
+        struct GatewayCTMDeployerConfig {
+            address aliasedGovernanceAddress;
+            bytes32 salt;
+            uint256 eraChainId;
+            uint256 l1ChainId;
+            bool testnetVerifier;
+            bool isZKsyncOS;
+            bytes4[] adminSelectors;
+            bytes4[] executorSelectors;
+            bytes4[] mailboxSelectors;
+            bytes4[] gettersSelectors;
+            bytes4[] migratorSelectors;
+            bytes4[] committerSelectors;
+            bytes32 bootloaderHash;
+            bytes32 defaultAccountHash;
+            bytes32 evmEmulatorHash;
+            bytes32 genesisRoot;
+            uint256 genesisRollupLeafIndex;
+            bytes32 genesisBatchCommitment;
+            bytes forceDeploymentsData;
+            uint256 protocolVersion;
+        }
+
+        #[derive(Debug)]
+        struct Facets {
+            address adminFacet;
+            address mailboxFacet;
+            address executorFacet;
+            address gettersFacet;
+            address migratorFacet;
+            address committerFacet;
+            address diamondInit;
+        }
+
+        #[derive(Debug)]
+        struct GatewayCTMFinalConfig {
+            GatewayCTMDeployerConfig baseConfig;
+            address chainTypeManagerProxyAdmin;
+            address validatorTimelockProxy;
+            Facets facets;
+            address genesisUpgrade;
+            address verifier;
+        }
+
+        struct GatewayDADeployerResult {
+            address rollupDAManager;
+            address rollupSLDAValidator;
+            address validiumDAValidator;
+        }
+
+        struct GatewayProxyAdminDeployerResult {
+            address chainTypeManagerProxyAdmin;
+        }
+
+        struct GatewayValidatorTimelockDeployerResult {
+            address validatorTimelockImplementation;
+            address validatorTimelockProxy;
+        }
+
+        struct GatewayVerifiersDeployerResult {
+            address verifierFflonk;
+            address verifierPlonk;
+            address verifier;
+        }
+
+        struct GatewayCTMFinalResult {
+            address serverNotifierImplementation;
+            address serverNotifierProxy;
+            address chainTypeManagerImplementation;
+            address chainTypeManagerProxy;
+            bytes diamondCutData;
+        }
+
+        #[sol(rpc)]
+        contract GatewayCTMDeployerDA {
+            function getResult() external view returns (GatewayDADeployerResult result);
+        }
+
+        #[sol(rpc)]
+        contract GatewayCTMDeployerProxyAdmin {
+            function getResult() external view returns (GatewayProxyAdminDeployerResult result);
+        }
+
+        #[sol(rpc)]
+        contract GatewayCTMDeployerValidatorTimelock {
+            function getResult() external view returns (GatewayValidatorTimelockDeployerResult result);
+        }
+
+        #[sol(rpc)]
+        contract GatewayCTMDeployerVerifiers {
+            function getResult() external view returns (GatewayVerifiersDeployerResult result);
+        }
+
+        #[sol(rpc)]
+        contract GatewayCTMDeployerCTM {
+            function getResult() external view returns (GatewayCTMFinalResult result);
         }
     }
 }
@@ -299,6 +464,9 @@ pub(crate) async fn verify_v31_provenance(
         )
         .await?;
     }
+
+    verify_v31_new_gateway_ctm_provenance(artifact, verifiers, era_chain_id, l1_chain_id, result)
+        .await?;
 
     Ok(())
 }
@@ -823,4 +991,552 @@ fn verify_ctm_base_provenance(
     result.expect_create2_params(verifiers, &verifier, encoded, verifier_file);
 
     Ok(())
+}
+
+async fn verify_v31_new_gateway_ctm_provenance(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    era_chain_id: u64,
+    l1_chain_id: u64,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    use ctm_signatures::*;
+    use gateway_signatures::*;
+
+    result.print_info("-- New Gateway CTM deployment provenance --");
+
+    let Some(new_gateway) = artifact.new_gateway.as_ref() else {
+        result.report_error("Missing [new_gateway] artifact block for Gateway CTM provenance");
+        return Ok(());
+    };
+    let gw_scope = "new_gateway";
+    let in_gst = |last: &str| {
+        required_address(
+            &new_gateway.value,
+            gw_scope,
+            &["gateway_state_transition", last],
+        )
+    };
+
+    let source_ctm = source_ctm_for_new_gateway(artifact, verifiers)?;
+    let is_zksync_os = matches!(source_ctm.flavor, CtmFlavor::ZksyncOs);
+    let aliased_governance = apply_l2_to_l1_alias(verifiers.bridgehub_owner);
+    let gateway_salt = FixedBytes::<32>::ZERO;
+
+    let admin = in_gst("admin_facet_addr")?;
+    let committer = in_gst("committer_facet_addr")?;
+    let ctm_impl = in_gst("chain_type_manager_implementation_addr")?;
+    let ctm_proxy = in_gst("chain_type_manager_proxy_addr")?;
+    let default_upgrade = in_gst("default_upgrade_addr")?;
+    let diamond_init = in_gst("diamond_init_addr")?;
+    let diamond_proxy = in_gst("diamond_proxy_addr")?;
+    let executor = in_gst("executor_facet_addr")?;
+    let genesis_upgrade = in_gst("genesis_upgrade_addr")?;
+    let getters = in_gst("getters_facet_addr")?;
+    let mailbox = in_gst("mailbox_facet_addr")?;
+    let migrator = in_gst("migrator_facet_addr")?;
+    let rollup_da_manager = in_gst("rollup_da_manager_addr")?;
+    let server_notifier_impl = in_gst("server_notifier_implementation_addr")?;
+    let server_notifier_proxy = in_gst("server_notifier_proxy_addr")?;
+    let validator_timelock = in_gst("validator_timelock_addr")?;
+    let verifier = in_gst("verifier_addr")?;
+    let force_deployments_data = read_gateway_force_deployments_data(new_gateway)?;
+
+    expect_zero_gateway_address(
+        result,
+        "new_gateway.gateway_state_transition.default_upgrade_addr",
+        default_upgrade,
+    );
+    expect_zero_gateway_address(
+        result,
+        "new_gateway.gateway_state_transition.diamond_proxy_addr",
+        diamond_proxy,
+    );
+
+    let (diamond_cut, diamond_cut_bytes) = decode_gateway_diamond_cut(new_gateway)?;
+    if diamond_cut.facetCuts.len() != 6 {
+        result.report_error(&format!(
+            "new_gateway.diamond_cut_data must carry exactly 6 facet cuts, got {}",
+            diamond_cut.facetCuts.len()
+        ));
+        return Ok(());
+    }
+
+    let admin_cut = &diamond_cut.facetCuts[0];
+    let getters_cut = &diamond_cut.facetCuts[1];
+    let mailbox_cut = &diamond_cut.facetCuts[2];
+    let executor_cut = &diamond_cut.facetCuts[3];
+    let migrator_cut = &diamond_cut.facetCuts[4];
+    let committer_cut = &diamond_cut.facetCuts[5];
+
+    expect_gateway_facet_cut(result, "admin", admin_cut, admin, false);
+    expect_gateway_facet_cut(result, "getters", getters_cut, getters, false);
+    expect_gateway_facet_cut(result, "mailbox", mailbox_cut, mailbox, true);
+    expect_gateway_facet_cut(result, "executor", executor_cut, executor, true);
+    expect_gateway_facet_cut(result, "migrator", migrator_cut, migrator, false);
+    expect_gateway_facet_cut(result, "committer", committer_cut, committer, true);
+
+    let initialize_data = InitializeDataNewChain::abi_decode(&diamond_cut.initCalldata)
+        .context("decode new_gateway.diamond_cut_data.initCalldata as InitializeDataNewChain")?;
+    let genesis_config = verifiers.genesis_config_for_ctm(source_ctm.flavor);
+    let gw_provider = verifiers.network_verifier.get_gw_provider();
+
+    // Direct Gateway L1->L2 CREATE2 deployments. These are present as raw
+    // priority tx calldata and therefore can be checked by address.
+    let mut diamond_init_args = vec![0u8; 32];
+    if is_zksync_os {
+        diamond_init_args[31] = 1;
+    }
+    let direct_checks: Vec<(Address, Vec<u8>, &str)> = vec![
+        (
+            admin,
+            V31AdminFacet::constructorCall::new((U256::from(l1_chain_id), rollup_da_manager))
+                .abi_encode(),
+            "l1-contracts/AdminFacet",
+        ),
+        (
+            mailbox,
+            V31MailboxFacet::constructorCall::new((
+                U256::from(era_chain_id),
+                U256::from(l1_chain_id),
+                L2_CHAIN_ASSET_HANDLER_ADDR,
+                Address::ZERO,
+                source_ctm.contracts_config.is_testnet,
+            ))
+            .abi_encode(),
+            "l1-contracts/MailboxFacet",
+        ),
+        (
+            executor,
+            V31ExecutorFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
+            "l1-contracts/ExecutorFacet",
+        ),
+        (getters, Vec::new(), "l1-contracts/GettersFacet"),
+        (
+            migrator,
+            V31MigratorFacet::constructorCall::new((
+                U256::from(l1_chain_id),
+                source_ctm.contracts_config.is_testnet,
+            ))
+            .abi_encode(),
+            "l1-contracts/MigratorFacet",
+        ),
+        (
+            committer,
+            V31CommitterFacet::constructorCall::new((U256::from(l1_chain_id),)).abi_encode(),
+            "l1-contracts/CommitterFacet",
+        ),
+        (diamond_init, diamond_init_args, "l1-contracts/DiamondInit"),
+        (genesis_upgrade, Vec::new(), "l1-contracts/L1GenesisUpgrade"),
+    ];
+    for (addr, args, file) in &direct_checks {
+        result.expect_create2_params(verifiers, addr, args.as_slice(), file);
+    }
+
+    // Wrapper deployers. Their priority txs are the provenance boundary for
+    // child contracts such as RollupDAManager, ValidatorTimelock,
+    // ServerNotifier and the Gateway CTM proxy/implementation.
+    let da_deployer = expect_create2_params_by_file(
+        verifiers,
+        result,
+        "Gateway DA deployer",
+        "l1-contracts/GatewayCTMDeployerDA",
+        GatewayDADeployerConfig {
+            salt: gateway_salt,
+            aliasedGovernanceAddress: aliased_governance,
+        }
+        .abi_encode(),
+    );
+    if let Some(da_deployer) = da_deployer {
+        let da_deployer_result = GatewayCTMDeployerDA::new(da_deployer, gw_provider.clone())
+            .getResult()
+            .call()
+            .await
+            .context("read GatewayCTMDeployerDA.getResult()")?;
+        expect_gateway_deployer_address(
+            result,
+            "Gateway DA deployer RollupDAManager",
+            rollup_da_manager,
+            da_deployer_result.rollupDAManager,
+        );
+    }
+
+    let proxy_admin_deployer = expect_create2_params_by_file(
+        verifiers,
+        result,
+        "Gateway proxy-admin deployer",
+        "l1-contracts/GatewayCTMDeployerProxyAdmin",
+        GatewayProxyAdminDeployerConfig {
+            salt: gateway_salt,
+            aliasedGovernanceAddress: aliased_governance,
+        }
+        .abi_encode(),
+    );
+    let Some(proxy_admin_deployer) = proxy_admin_deployer else {
+        return Ok(());
+    };
+    let proxy_admin_deployer_result =
+        GatewayCTMDeployerProxyAdmin::new(proxy_admin_deployer, gw_provider.clone())
+            .getResult()
+            .call()
+            .await
+            .context("read GatewayCTMDeployerProxyAdmin.getResult()")?;
+    let gateway_ctm_proxy_admin = proxy_admin_deployer_result.chainTypeManagerProxyAdmin;
+
+    let live_gateway_ctm_proxy_admin = verifiers
+        .network_verifier
+        .try_get_gateway_proxy_admin(ctm_proxy)
+        .await
+        .context("read Gateway CTM proxy admin")?;
+    expect_gateway_deployer_address(
+        result,
+        "Gateway CTM proxy admin slot",
+        gateway_ctm_proxy_admin,
+        live_gateway_ctm_proxy_admin,
+    );
+
+    let validator_timelock_deployer = expect_create2_params_by_file(
+        verifiers,
+        result,
+        "Gateway ValidatorTimelock deployer",
+        "l1-contracts/GatewayCTMDeployerValidatorTimelock",
+        GatewayValidatorTimelockDeployerConfig {
+            salt: gateway_salt,
+            aliasedGovernanceAddress: aliased_governance,
+            chainTypeManagerProxyAdmin: gateway_ctm_proxy_admin,
+        }
+        .abi_encode(),
+    );
+    if let Some(validator_timelock_deployer) = validator_timelock_deployer {
+        let validator_timelock_result = GatewayCTMDeployerValidatorTimelock::new(
+            validator_timelock_deployer,
+            gw_provider.clone(),
+        )
+        .getResult()
+        .call()
+        .await
+        .context("read GatewayCTMDeployerValidatorTimelock.getResult()")?;
+        expect_gateway_deployer_address(
+            result,
+            "Gateway ValidatorTimelock deployer proxy",
+            validator_timelock,
+            validator_timelock_result.validatorTimelockProxy,
+        );
+    }
+
+    let verifiers_file = if is_zksync_os {
+        "l1-contracts/GatewayCTMDeployerVerifiersZKsyncOS"
+    } else {
+        "l1-contracts/GatewayCTMDeployerVerifiers"
+    };
+    let verifiers_deployer = expect_create2_params_by_file(
+        verifiers,
+        result,
+        "Gateway verifiers deployer",
+        verifiers_file,
+        GatewayVerifiersDeployerConfig {
+            salt: gateway_salt,
+            aliasedGovernanceAddress: aliased_governance,
+            testnetVerifier: source_ctm.contracts_config.is_testnet,
+            isZKsyncOS: is_zksync_os,
+        }
+        .abi_encode(),
+    );
+    if let Some(verifiers_deployer) = verifiers_deployer {
+        let verifiers_result =
+            GatewayCTMDeployerVerifiers::new(verifiers_deployer, gw_provider.clone())
+                .getResult()
+                .call()
+                .await
+                .context("read GatewayCTMDeployerVerifiers.getResult()")?;
+        expect_gateway_deployer_address(
+            result,
+            "Gateway verifiers deployer verifier",
+            verifier,
+            verifiers_result.verifier,
+        );
+    }
+
+    let ctm_deployer_file = if is_zksync_os {
+        "l1-contracts/GatewayCTMDeployerCTMZKsyncOS"
+    } else {
+        "l1-contracts/GatewayCTMDeployerCTM"
+    };
+    let gateway_ctm_config = GatewayCTMFinalConfig {
+        baseConfig: GatewayCTMDeployerConfig {
+            aliasedGovernanceAddress: aliased_governance,
+            salt: gateway_salt,
+            eraChainId: U256::from(era_chain_id),
+            l1ChainId: U256::from(l1_chain_id),
+            testnetVerifier: source_ctm.contracts_config.is_testnet,
+            isZKsyncOS: is_zksync_os,
+            adminSelectors: admin_cut.selectors.clone(),
+            executorSelectors: executor_cut.selectors.clone(),
+            mailboxSelectors: mailbox_cut.selectors.clone(),
+            gettersSelectors: getters_cut.selectors.clone(),
+            migratorSelectors: migrator_cut.selectors.clone(),
+            committerSelectors: committer_cut.selectors.clone(),
+            bootloaderHash: initialize_data.l2BootloaderBytecodeHash,
+            defaultAccountHash: initialize_data.l2DefaultAccountBytecodeHash,
+            evmEmulatorHash: initialize_data.l2EvmEmulatorBytecodeHash,
+            genesisRoot: parse_bytes32_hex("genesis_root", &genesis_config.genesis_root)?,
+            genesisRollupLeafIndex: U256::from(
+                genesis_config.genesis_rollup_leaf_index.unwrap_or_default(),
+            ),
+            genesisBatchCommitment: parse_optional_bytes32_hex(
+                "genesis_batch_commitment",
+                genesis_config.genesis_batch_commitment.as_deref(),
+            )?,
+            forceDeploymentsData: Bytes::from(force_deployments_data),
+            protocolVersion: U256::from(source_ctm.contracts_config.new_protocol_version),
+        },
+        chainTypeManagerProxyAdmin: gateway_ctm_proxy_admin,
+        validatorTimelockProxy: validator_timelock,
+        facets: Facets {
+            adminFacet: admin,
+            mailboxFacet: mailbox,
+            executorFacet: executor,
+            gettersFacet: getters,
+            migratorFacet: migrator,
+            committerFacet: committer,
+            diamondInit: diamond_init,
+        },
+        genesisUpgrade: genesis_upgrade,
+        verifier,
+    };
+    let ctm_deployer = expect_create2_params_by_file(
+        verifiers,
+        result,
+        "Gateway CTM deployer",
+        ctm_deployer_file,
+        gateway_ctm_config.abi_encode(),
+    );
+    if let Some(ctm_deployer) = ctm_deployer {
+        let ctm_result = GatewayCTMDeployerCTM::new(ctm_deployer, gw_provider.clone())
+            .getResult()
+            .call()
+            .await
+            .context("read GatewayCTMDeployerCTM.getResult()")?;
+        expect_gateway_deployer_address(
+            result,
+            "Gateway CTM deployer ServerNotifier implementation",
+            server_notifier_impl,
+            ctm_result.serverNotifierImplementation,
+        );
+        expect_gateway_deployer_address(
+            result,
+            "Gateway CTM deployer ServerNotifier proxy",
+            server_notifier_proxy,
+            ctm_result.serverNotifierProxy,
+        );
+        expect_gateway_deployer_address(
+            result,
+            "Gateway CTM deployer CTM implementation",
+            ctm_impl,
+            ctm_result.chainTypeManagerImplementation,
+        );
+        expect_gateway_deployer_address(
+            result,
+            "Gateway CTM deployer CTM proxy",
+            ctm_proxy,
+            ctm_result.chainTypeManagerProxy,
+        );
+        expect_gateway_deployer_bytes(
+            result,
+            "Gateway CTM deployer diamondCutData",
+            diamond_cut_bytes.as_slice(),
+            ctm_result.diamondCutData.as_ref(),
+        );
+    }
+
+    Ok(())
+}
+
+fn source_ctm_for_new_gateway<'a>(
+    artifact: &'a EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+) -> Result<&'a CtmArtifact> {
+    for ctm in &artifact.ctms {
+        let scope = format!("ctms.{}", ctm.flavor.label());
+        let ctm_proxy = required_address(
+            &ctm.value,
+            &scope,
+            &["state_transition", "chain_type_manager_proxy"],
+        )?;
+        if ctm_proxy == verifiers.new_gateway_representative_ctm {
+            return Ok(ctm);
+        }
+    }
+
+    anyhow::bail!(
+        "new Gateway representative CTM {} is not present in any [ctms.*].state_transition.chain_type_manager_proxy",
+        verifiers.new_gateway_representative_ctm
+    )
+}
+
+fn read_gateway_force_deployments_data(
+    new_gateway: &crate::upgrade_verification::artifacts::NewGatewayArtifact,
+) -> Result<Vec<u8>> {
+    let raw = new_gateway
+        .value
+        .get("gateway_state_transition")
+        .and_then(toml::Value::as_table)
+        .and_then(|t| t.get("force_deployments_data"))
+        .and_then(toml::Value::as_str)
+        .context(
+            "new_gateway.gateway_state_transition.force_deployments_data is required; \
+             regenerate the [new_gateway] artifact with the updated GatewayVotePreparation script",
+        )?;
+    hex_bytes(
+        "new_gateway.gateway_state_transition.force_deployments_data",
+        raw,
+    )
+}
+
+fn decode_gateway_diamond_cut(
+    new_gateway: &crate::upgrade_verification::artifacts::NewGatewayArtifact,
+) -> Result<(gateway_signatures::DiamondCutData, Vec<u8>)> {
+    let raw = new_gateway
+        .value
+        .get("diamond_cut_data")
+        .and_then(toml::Value::as_str)
+        .context("new_gateway.diamond_cut_data is required")?;
+    let bytes = hex_bytes("new_gateway.diamond_cut_data", raw)?;
+    let diamond_cut = gateway_signatures::DiamondCutData::abi_decode(&bytes)
+        .context("decode new_gateway.diamond_cut_data as DiamondCutData")?;
+    Ok((diamond_cut, bytes))
+}
+
+fn expect_zero_gateway_address(result: &mut VerificationResult, label: &str, addr: Address) {
+    if addr == Address::ZERO {
+        result.report_ok(&format!("{label} is zero"));
+    } else {
+        result.report_error(&format!("{label} must be zero, got {addr}"));
+    }
+}
+
+fn expect_gateway_facet_cut(
+    result: &mut VerificationResult,
+    label: &str,
+    cut: &gateway_signatures::FacetCut,
+    expected_facet: Address,
+    expected_freezable: bool,
+) {
+    if cut.facet == expected_facet {
+        result.report_ok(&format!(
+            "Gateway {label} facet address matches diamond cut"
+        ));
+    } else {
+        result.report_error(&format!(
+            "Gateway {label} facet address mismatch: expected {expected_facet}, got {}",
+            cut.facet
+        ));
+    }
+    match cut.action {
+        gateway_signatures::Action::Add => {}
+        gateway_signatures::Action::Replace
+        | gateway_signatures::Action::Remove
+        | gateway_signatures::Action::__Invalid => {
+            result.report_error(&format!("Gateway {label} facet action must be Add"));
+        }
+    }
+    if cut.isFreezable != expected_freezable {
+        result.report_error(&format!(
+            "Gateway {label} facet isFreezable mismatch: expected {expected_freezable}, got {}",
+            cut.isFreezable
+        ));
+    }
+}
+
+fn expect_gateway_deployer_address(
+    result: &mut VerificationResult,
+    label: &str,
+    expected: Address,
+    actual: Address,
+) {
+    if actual == expected {
+        result.report_ok(&format!("{label} matches artifact"));
+    } else {
+        result.report_error(&format!(
+            "{label} mismatch: expected {expected}, got {actual}"
+        ));
+    }
+}
+
+fn expect_gateway_deployer_bytes(
+    result: &mut VerificationResult,
+    label: &str,
+    expected: &[u8],
+    actual: &[u8],
+) {
+    if actual == expected {
+        result.report_ok(&format!("{label} matches artifact"));
+    } else {
+        result.report_error(&format!(
+            "{label} mismatch: expected 0x{}, got 0x{}",
+            hex::encode(expected),
+            hex::encode(actual)
+        ));
+    }
+}
+
+fn expect_create2_params_by_file(
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+    label: &str,
+    expected_file: &str,
+    expected_constructor_params: Vec<u8>,
+) -> Option<Address> {
+    let matches: Vec<Address> = verifiers
+        .network_verifier
+        .create2_known_bytecodes
+        .iter()
+        .filter_map(|(addr, file)| {
+            if file != expected_file {
+                return None;
+            }
+            let params = verifiers
+                .network_verifier
+                .create2_constructor_params
+                .get(addr)?;
+            (params.as_slice() == expected_constructor_params.as_slice()).then_some(*addr)
+        })
+        .collect();
+
+    match matches.as_slice() {
+        [] => {
+            result.report_error(&format!(
+                "{label}: no CREATE2 deployment for {expected_file} with the expected constructor params"
+            ));
+            None
+        }
+        [addr] => {
+            result.report_ok(&format!("{label}: {expected_file} deployed at {addr}"));
+            Some(*addr)
+        }
+        many => {
+            result.report_error(&format!(
+                "{label}: found {} CREATE2 deployments for {expected_file} with identical constructor params: {:?}",
+                many.len(), many
+            ));
+            None
+        }
+    }
+}
+
+fn parse_bytes32_hex(label: &str, value: &str) -> Result<FixedBytes<32>> {
+    FixedBytes::<32>::from_hex(value)
+        .with_context(|| format!("{label} must be a 0x-prefixed 32-byte hex string"))
+}
+
+fn parse_optional_bytes32_hex(label: &str, value: Option<&str>) -> Result<FixedBytes<32>> {
+    match value {
+        Some(value) => parse_bytes32_hex(label, value),
+        None => Ok(FixedBytes::<32>::ZERO),
+    }
+}
+
+fn hex_bytes(label: &str, value: &str) -> Result<Vec<u8>> {
+    hex::decode(value.trim_start_matches("0x"))
+        .with_context(|| format!("{label} must be 0x-prefixed hex"))
 }

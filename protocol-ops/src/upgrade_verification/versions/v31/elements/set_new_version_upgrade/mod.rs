@@ -371,17 +371,16 @@ impl ProposedUpgrade {
                         tx.txType
                     ));
                 }
-                let decoded = match IComplexUpgrader::forceDeployAndUpgradeCall::abi_decode(
-                    &tx.data,
-                ) {
-                    Ok(decoded) => decoded,
-                    Err(err) => {
-                        result.report_error(&format!(
+                let decoded =
+                    match IComplexUpgrader::forceDeployAndUpgradeCall::abi_decode(&tx.data) {
+                        Ok(decoded) => decoded,
+                        Err(err) => {
+                            result.report_error(&format!(
                             "Era L2 upgrade tx data must decode as forceDeployAndUpgrade: {err}"
                         ));
-                        return Ok(());
-                    }
-                };
+                            return Ok(());
+                        }
+                    };
                 verify_factory_deps(
                     verifiers,
                     result,

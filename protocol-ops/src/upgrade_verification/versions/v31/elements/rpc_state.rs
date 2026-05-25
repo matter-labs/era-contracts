@@ -1,7 +1,9 @@
 use anyhow::Result;
 
 use crate::upgrade_verification::{
-    artifacts::{required_address_in_value as required_address, CtmFlavor, EcosystemUpgradeArtifact},
+    artifacts::{
+        required_address_in_value as required_address, CtmFlavor, EcosystemUpgradeArtifact,
+    },
     constants::EIP1967_PROXY_ADMIN_SLOT,
     verifiers::{VerificationResult, Verifiers},
     versions::v31::{

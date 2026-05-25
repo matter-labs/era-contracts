@@ -11,8 +11,10 @@ use Bridgehub::requestL2TransactionDirectCall;
 use crate::common::logger;
 
 use super::bytecode_verifier::BytecodeVerifier;
-use super::{address_from_short_hex, compute_create2_address_evm, compute_create2_address_zk};
-use crate::upgrade_verification::constants::EIP1967_PROXY_ADMIN_SLOT;
+use super::{compute_create2_address_evm, compute_create2_address_zk};
+use crate::upgrade_verification::constants::{
+    EIP1967_PROXY_ADMIN_SLOT, L2_CREATE2_FACTORY_ADDR, ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
+};
 
 sol! {
     #[derive(Debug)]
@@ -125,6 +127,13 @@ pub struct NetworkVerifier {
     pub create2_constructor_params: HashMap<Address, Vec<u8>>,
 }
 
+struct ParsedCreate2Deployment {
+    addr: Address,
+    name: String,
+    params: Vec<u8>,
+    salt: FixedBytes<32>,
+}
+
 impl NetworkVerifier {
     pub async fn new_v31(
         l1_rpc: String,
@@ -177,12 +186,14 @@ impl NetworkVerifier {
         &mut self,
         tx_hashes: &[FixedBytes<32>],
         create2_factory: &Address,
+        bridgehub_addr: &Address,
         expected_salts: &[FixedBytes<32>],
         bytecode_verifier: &BytecodeVerifier,
         result: &mut crate::upgrade_verification::verifiers::VerificationResult,
     ) {
         let mut fetch_failures = 0_usize;
         let mut reverted = 0_usize;
+        let mut parsed_gateway_deployments = 0_usize;
 
         for tx_hash in tx_hashes {
             let hash = TxHash::from(*tx_hash);
@@ -203,13 +214,22 @@ impl NetworkVerifier {
             let Some(to) = tx.to() else {
                 continue;
             };
-            if to != *create2_factory {
+
+            let deployment = if to == *create2_factory {
+                parse_l1_create2_deploy_from_input(to, tx.input(), bytecode_verifier)
+            } else if to == *bridgehub_addr {
+                check_gw_create2_deploy_from_input(
+                    to,
+                    tx.input(),
+                    bridgehub_addr,
+                    bytecode_verifier,
+                )
+            } else {
+                None
+            };
+            let Some(deployment) = deployment else {
                 continue;
-            }
-            let input = tx.input();
-            if input.len() < 32 {
-                continue;
-            }
+            };
 
             match self.l1_provider.get_transaction_receipt(hash).await {
                 Ok(Some(receipt)) => {
@@ -234,61 +254,30 @@ impl NetworkVerifier {
                 }
             }
 
-            let salt_bytes = &input[..32];
-            let rest = &input[32..];
-
-            let Some((name, params)) = bytecode_verifier.try_parse_bytecode(rest) else {
-                // Bytecode hash isn't in AllContractsHashes — stale deploy
-                // from a prior regen, or a non-v31 deploy that happened to
-                // hit the factory. Silently skip; the address-book lookup
-                // in `expect_create2_params` will hard-error if this would
-                // have been a load-bearing deployment.
-                continue;
-            };
-
-            let salt_fb = FixedBytes::<32>::from_slice(salt_bytes);
-            let addr = compute_create2_address_evm(*create2_factory, salt_fb, keccak256(rest));
-
-            // Salt sanity: only enforced after recognition, so non-deploy tx
-            // first-32 bytes (which aren't salts at all) don't trigger errors.
-            // Hard ERROR per offending deploy — `ensure_success` rejects the
-            // run, but the entry is still inserted into the map below so
-            // downstream address-book lookups in `expect_create2_params` are
-            // unaffected.
-            if !expected_salts.contains(&salt_fb) {
+            if to == *bridgehub_addr {
+                parsed_gateway_deployments += 1;
+                if deployment.salt != FixedBytes::<32>::ZERO {
+                    result.report_error(&format!(
+                        "Gateway CREATE2 deployment of {} at {} (tx {hash:#x}) used salt {}; \
+                         v31 GatewayCTMDeployerHelper must use salt 0",
+                        deployment.name, deployment.addr, deployment.salt
+                    ));
+                }
+            } else if !expected_salts.contains(&deployment.salt) {
+                // Salt sanity: only enforced after recognition, so non-deploy tx
+                // first-32 bytes (which aren't salts at all) don't trigger errors.
+                // Hard ERROR per offending deploy — `ensure_success` rejects the
+                // run, but the entry is still inserted into the map below so
+                // downstream address-book lookups in `expect_create2_params` are
+                // unaffected.
                 result.report_error(&format!(
-                    "Deployment of {name} at {addr} (tx {hash:#x}) used salt {salt_fb} \
-                     which is not in the env-declared salt set"
+                    "Deployment of {} at {} (tx {hash:#x}) used salt {} \
+                     which is not in the env-declared salt set",
+                    deployment.name, deployment.addr, deployment.salt
                 ));
             }
 
-            // Duplicate detection: same address showing up twice with
-            // mismatched metadata is a hard error.
-            if let Some(existing_name) = self.create2_known_bytecodes.get(&addr) {
-                if existing_name != &name {
-                    result.report_error(&format!(
-                        "Duplicate CREATE2 deployment at {addr}: name conflict — \
-                         existing={existing_name}, new={name}"
-                    ));
-                    continue;
-                }
-                if let Some(existing_params) = self.create2_constructor_params.get(&addr) {
-                    if existing_params != &params {
-                        result.report_error(&format!(
-                            "Duplicate CREATE2 deployment at {addr} ({name}): ctor args differ. \
-                             existing=0x{}, new=0x{}",
-                            hex::encode(existing_params),
-                            hex::encode(&params),
-                        ));
-                        continue;
-                    }
-                }
-                // Same address, same metadata — idempotent re-deploy. Skip.
-                continue;
-            }
-
-            self.create2_known_bytecodes.insert(addr, name);
-            self.create2_constructor_params.insert(addr, params);
+            self.insert_create2_deployment(deployment, result);
         }
 
         if fetch_failures > 0 {
@@ -301,6 +290,52 @@ impl NetworkVerifier {
                 "transactions.txt: {reverted} tx(s) reverted (status=0) — skipped"
             ));
         }
+        if parsed_gateway_deployments > 0 {
+            logger::info(format!(
+                "transactions.txt: loaded {parsed_gateway_deployments} Gateway L1→L2 CREATE2 deployment tx(s)"
+            ));
+        }
+    }
+
+    fn insert_create2_deployment(
+        &mut self,
+        deployment: ParsedCreate2Deployment,
+        result: &mut crate::upgrade_verification::verifiers::VerificationResult,
+    ) {
+        let ParsedCreate2Deployment {
+            addr,
+            name,
+            params,
+            salt: _,
+        } = deployment;
+
+        // Duplicate detection: same address showing up twice with mismatched
+        // metadata is a hard error.
+        if let Some(existing_name) = self.create2_known_bytecodes.get(&addr) {
+            if existing_name != &name {
+                result.report_error(&format!(
+                    "Duplicate CREATE2 deployment at {addr}: name conflict — \
+                     existing={existing_name}, new={name}"
+                ));
+                return;
+            }
+            if let Some(existing_params) = self.create2_constructor_params.get(&addr) {
+                if existing_params != &params {
+                    result.report_error(&format!(
+                        "Duplicate CREATE2 deployment at {addr} ({name}): ctor args differ. \
+                         existing=0x{}, new=0x{}",
+                        hex::encode(existing_params),
+                        hex::encode(&params),
+                    ));
+                    return;
+                }
+            }
+            // Same address, same metadata — idempotent re-deploy. Skip.
+            return;
+        }
+
+        self.create2_known_bytecodes.insert(addr, name);
+        self.create2_constructor_params.insert(addr, params);
     }
 
     pub fn get_gateway_chain_id(&self) -> u64 {
@@ -339,6 +374,10 @@ impl NetworkVerifier {
 
     pub fn get_l1_provider(&self) -> RootProvider {
         self.l1_provider.clone()
+    }
+
+    pub fn get_gw_provider(&self) -> RootProvider {
+        self.gw_provider.clone()
     }
 
     pub async fn try_get_l1_chain_id(&self) -> anyhow::Result<u64> {
@@ -423,6 +462,19 @@ impl NetworkVerifier {
             .await;
         Address::from_slice(&addr_as_bytes[12..])
     }
+
+    pub async fn try_get_gateway_proxy_admin(&self, addr: Address) -> anyhow::Result<Address> {
+        let slot = FixedBytes::<32>::from_hex(EIP1967_PROXY_ADMIN_SLOT)
+            .context("invalid EIP-1967 admin slot literal")?;
+        let storage = self
+            .gw_provider
+            .get_storage_at(addr, U256::from_be_bytes(slot.0))
+            .await
+            .with_context(|| format!("failed to read Gateway proxy admin slot for {addr}"))?;
+
+        let bytes = FixedBytes::<32>::from_slice(&storage.to_be_bytes_vec());
+        Ok(Address::from_slice(&bytes[12..]))
+    }
 }
 
 /// Fetches the `transaction` and tries to parse it as a CREATE2 deployment
@@ -434,16 +486,11 @@ impl NetworkVerifier {
 /// instead of a tx hash → useful for replaying the bundle that
 /// `dev execute-safe --out` writes (the bundle log already carries the raw
 /// data so we don't need an `eth_getTransactionByHash` round-trip).
-fn check_create2_deploy_from_input(
+fn parse_l1_create2_deploy_from_input(
     to: Address,
     input: &[u8],
-    expected_create2_address: &Address,
-    expected_create2_salts: &[FixedBytes<32>],
     bytecode_verifier: &BytecodeVerifier,
-) -> Option<(Address, String, Vec<u8>)> {
-    if to != *expected_create2_address {
-        return None;
-    }
+) -> Option<ParsedCreate2Deployment> {
     if input.len() < 32 {
         return None;
     }
@@ -454,17 +501,16 @@ fn check_create2_deploy_from_input(
     // We will try both here.
 
     let salt = &input[0..32];
-    if !expected_create2_salts.iter().any(|s| salt == s.as_slice()) {
-        return None;
-    }
+    let salt = FixedBytes::<32>::from_slice(salt);
 
     if let Some((name, params)) = bytecode_verifier.try_parse_bytecode(&input[32..]) {
-        let addr = compute_create2_address_evm(
-            to,
-            FixedBytes::<32>::from_slice(salt),
-            keccak256(&input[32..]),
-        );
-        return Some((addr, name, params));
+        let addr = compute_create2_address_evm(to, salt, keccak256(&input[32..]));
+        return Some(ParsedCreate2Deployment {
+            addr,
+            name,
+            params,
+            salt,
+        });
     };
 
     let bytecode_input = &input[32..];
@@ -474,74 +520,81 @@ fn check_create2_deploy_from_input(
         bytecode_verifier.is_create2_and_transfer_bytecode_prefix(bytecode_input)
     {
         let x = create2AndTransferParamsCall::abi_decode_raw(create2_and_transfer_input).ok()?;
-        if salt != x.salt.as_slice() {
+        if salt != x.salt {
             return None;
         }
         // We do not need to cross check `owner` here, it will be cross checked against whatever owner is currently set
         // to the final contracts.
         // We do still need to check the input to find out potential constructor param
         let (name, params) = bytecode_verifier.try_parse_bytecode(&x.bytecode)?;
-        let salt = FixedBytes::<32>::from_slice(salt);
         let create2_and_transfer_addr =
             compute_create2_address_evm(to, salt, keccak256(&input[32..]));
 
         let contract_addr =
             compute_create2_address_evm(create2_and_transfer_addr, salt, keccak256(&x.bytecode));
 
-        return Some((contract_addr, name, params));
+        return Some(ParsedCreate2Deployment {
+            addr: contract_addr,
+            name,
+            params,
+            salt,
+        });
     }
 
     None
 }
 
-async fn check_gw_create2_deploy(
-    l1_provider: RootProvider,
+fn check_gw_create2_deploy_from_input(
+    to: Address,
+    input: &[u8],
     bridgehub_addr: &Address,
-    transaction: &str,
     bytecode_verifier: &BytecodeVerifier,
-) -> Option<(Address, String, Vec<u8>)> {
-    let l2_create2_addr = address_from_short_hex("10000");
-
-    let tx_hash: TxHash = transaction.parse().unwrap();
-
-    let tx = l1_provider
-        .get_transaction_by_hash(tx_hash)
-        .await
-        .unwrap()
-        .unwrap();
-
-    if tx.to() != Some(*bridgehub_addr) {
+) -> Option<ParsedCreate2Deployment> {
+    if to != *bridgehub_addr {
         return None;
     }
 
-    let inner_tx = requestL2TransactionDirectCall::abi_decode(tx.input());
+    let l2_call = requestL2TransactionDirectCall::abi_decode(input).ok()?;
+    let l2_contract = l2_call._request.l2Contract;
+    let l2_calldata = l2_call._request.l2Calldata;
 
-    if let Ok(l2_call) = inner_tx {
-        if l2_call._request.l2Contract != l2_create2_addr {
+    if l2_contract == ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR {
+        // ZKsync OS uses the standard EVM deterministic factory whose calldata
+        // is `bytes32 salt || initCode`.
+        let raw = l2_calldata.as_ref();
+        if raw.len() < 32 {
             return None;
         }
+        let salt = FixedBytes::<32>::from_slice(&raw[..32]);
+        let init_code = &raw[32..];
+        let (name, params) = bytecode_verifier.try_parse_bytecode_any_args(init_code)?;
+        let addr = compute_create2_address_evm(l2_contract, salt, keccak256(init_code));
+        return Some(ParsedCreate2Deployment {
+            addr,
+            name,
+            params,
+            salt,
+        });
+    }
 
-        let create2_data = create2Call::abi_decode(&l2_call._request.l2Calldata);
-
-        if let Ok(create2_call) = create2_data {
-            if create2_call._salt != vec![0u8; 32].as_slice() {
-                println!("Salt mismatch: {:?} != {:?}", create2_call._salt, 0);
-                return None;
-            }
-
-            let addr = compute_create2_address_zk(
-                l2_call._request.l2Contract,
-                create2_call._salt,
-                create2_call._bytecodeHash,
-                keccak256(&create2_call._input),
-            );
-
-            if let Some(file_name) =
-                bytecode_verifier.zk_bytecode_hash_to_file(&create2_call._bytecodeHash)
-            {
-                return Some((addr, file_name.to_string(), create2_call._input.to_vec()));
-            }
-        }
+    if l2_contract == L2_CREATE2_FACTORY_ADDR {
+        // Era gateway deployments still call the ZKsync create2 system
+        // factory: create2(salt, bytecodeHash, constructorInput).
+        let create2_call = create2Call::abi_decode(&l2_calldata).ok()?;
+        let salt = create2_call._salt;
+        let addr = compute_create2_address_zk(
+            l2_contract,
+            salt,
+            create2_call._bytecodeHash,
+            keccak256(&create2_call._input),
+        );
+        let file_name = bytecode_verifier.zk_bytecode_hash_to_file(&create2_call._bytecodeHash)?;
+        return Some(ParsedCreate2Deployment {
+            addr,
+            name: file_name.to_string(),
+            params: create2_call._input.to_vec(),
+            salt,
+        });
     }
 
     None
