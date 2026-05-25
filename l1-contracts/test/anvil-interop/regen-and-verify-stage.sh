@@ -78,8 +78,16 @@ print(m.group(1) if m else '', end='')
 ")"
 [[ -z "$ZK_ASSET_ID" ]] && { echo "zk_token_asset_id not found in $PERMANENT_VALUES" >&2; exit 1; }
 [[ -z "$ERA_CHAIN_ID" ]] && { echo "era_chain_id not found in $V31_INPUT" >&2; exit 1; }
+# Legacy gateway chain ID (from [gateway] section in the v31 input TOML).
+# Baked into L1MessageRoot as the _eraGatewayChainId immutable.
+LEGACY_GW_CHAIN_ID="$(python3 -c "
+import re
+m = re.search(r'^\[gateway\].*?^chain_id\s*=\s*(\d+)', open('$V31_INPUT').read(), re.MULTILINE | re.DOTALL)
+print(m.group(1) if m else '0', end='')
+")"
 echo "ZK asset id:  $ZK_ASSET_ID"
 echo "Era chain id: $ERA_CHAIN_ID"
+echo "Legacy GW id: $LEGACY_GW_CHAIN_ID"
 # 1e30 wei
 FUND_AMOUNT="1000000000000000000000000000000"
 
@@ -207,6 +215,7 @@ if [[ "$SKIP_BROADCAST" == "1" && -f "$OUT/executed.json" ]]; then
     --create2-salt "$SNIFFED_SALT" \
     --l1-rpc-url "$RPC" \
     --zk-token-asset-id "$ZK_ASSET_ID" \
+    --legacy-gateway-chain-id "$LEGACY_GW_CHAIN_ID" \
     --genesis-config zksync-os
   echo "=== Done ==="
   exit 0
@@ -273,6 +282,7 @@ echo "  Using sniffed CREATE2 salt: $SNIFFED_SALT"
   --create2-salt "$SNIFFED_SALT" \
   --l1-rpc-url "$RPC" \
   --zk-token-asset-id "$ZK_ASSET_ID" \
+  --legacy-gateway-chain-id "$LEGACY_GW_CHAIN_ID" \
   --genesis-config zksync-os
 
 echo "=== Done ==="

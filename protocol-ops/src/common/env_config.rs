@@ -25,7 +25,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use ethers::types::{Address, H256, U256};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 use crate::common::paths::resolve_l1_contracts_path;
 
@@ -79,15 +79,39 @@ pub struct NewGatewayConfig {
     /// uncontrolled — funds get stuck.
     #[serde(default)]
     pub refund_recipient: Option<Address>,
-    /// Chain ID whose registered CTM `GatewayVotePreparation` should treat as
-    /// the "source" — the deployed GW CTM is a variant of this CTM. Pick the
-    /// chain whose CTM is the one the new gateway will host (typically Era).
-    pub ctm_representative_chain_id: u64,
+    /// Chain ID(s) whose registered CTM(s) `GatewayVotePreparation` should
+    /// treat as the "source" — one GW CTM is deployed per entry. When a
+    /// single value is provided it can be written as a plain integer; when
+    /// multiple CTMs are needed, write a TOML array:
+    ///   `ctm_representative_chain_ids = [2702, 270]`
+    /// The legacy scalar spelling `ctm_representative_chain_id = 2702` is
+    /// also accepted for backwards compatibility.
+    #[serde(
+        alias = "ctm_representative_chain_id",
+        deserialize_with = "deserialize_one_or_many_u64"
+    )]
+    pub ctm_representative_chain_ids: Vec<u64>,
     /// Optional pre-deployed server notifier address. When present, the
     /// `GatewayVotePreparation` skips the redeploy + ownership-transfer
     /// preamble. Leave absent on first GW bring-up.
     #[serde(default)]
     pub server_notifier: Option<Address>,
+}
+
+/// Accept either a single `u64` or a `Vec<u64>` from TOML so both
+/// `ctm_representative_chain_id = 2702` (scalar) and
+/// `ctm_representative_chain_ids = [2702, 270]` (array) work.
+fn deserialize_one_or_many_u64<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u64>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        One(u64),
+        Many(Vec<u64>),
+    }
+    match OneOrMany::deserialize(d)? {
+        OneOrMany::One(v) => Ok(vec![v]),
+        OneOrMany::Many(v) => Ok(v),
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, Copy)]
@@ -486,11 +510,11 @@ mod tests {
         let ng = pv
             .new_gateway
             .expect("permanent-values/stage.toml must carry [new_gateway]");
-        assert_eq!(ng.chain_id, 2708);
+        assert_eq!(ng.chain_id, 2709);
         // 0.2 ZK = 2e17 wei, sized for ~$0.01 per interop call at ZK ≈ $0.05.
         assert_eq!(ng.settlement_fee, U256::from(200_000_000_000_000_000u128));
-        // GW 2708 is a ZKsync OS chain → CTM source is Atlas (witness 2702).
-        assert_eq!(ng.ctm_representative_chain_id, 2702);
+        // GW hosts both ZKsync OS (Atlas, witness 2702) and Era (270) CTMs.
+        assert_eq!(ng.ctm_representative_chain_ids, vec![2702, 270]);
     }
 
     /// Confirms `EnvConfig`'s on-demand readers pick up the

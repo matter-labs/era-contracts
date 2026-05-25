@@ -74,6 +74,7 @@ pub async fn prepare_new_gateway(
     bridgehub: Address,
     core_toml: &Path,
     new_gw: &NewGatewayConfig,
+    ctm_representative_chain_id: u64,
     ctm_tomls: &[CtmPrepareEntry],
     zk_token_asset_id: ethers::types::H256,
 ) -> anyhow::Result<PathBuf> {
@@ -89,7 +90,7 @@ pub async fn prepare_new_gateway(
     let source_ctm = crate::common::l1_contracts::resolve_ctm_proxy(
         &runner.rpc_url,
         bridgehub,
-        new_gw.ctm_representative_chain_id,
+        ctm_representative_chain_id,
     )
     .await
     .context("resolving source CTM proxy for new gateway")?;
@@ -99,9 +100,9 @@ pub async fn prepare_new_gateway(
         .with_context(|| {
             format!(
                 "no prepare entry for source CTM {:#x} (representative chain {}); \
-                 the env's `[new_gateway].ctm_representative_chain_id` must point \
-                 at a chain whose CTM was included in `[[ctm_contracts.ctms]]`",
-                source_ctm, new_gw.ctm_representative_chain_id
+                 the env's `[new_gateway].ctm_representative_chain_ids` must point \
+                 at chains whose CTMs were included in `[[ctm_contracts.ctms]]`",
+                source_ctm, ctm_representative_chain_id
             )
         })?;
     let force_deployments_data = read_ctm_force_deployments_data(&source_ctm_entry.toml)
@@ -114,7 +115,7 @@ pub async fn prepare_new_gateway(
 
     logger::step(format!(
         "Running new-Gateway vote-prepare (GW chain {}, source CTM {:#x} via chain {})",
-        new_gw.chain_id, source_ctm, new_gw.ctm_representative_chain_id
+        new_gw.chain_id, source_ctm, ctm_representative_chain_id
     ));
     logger::info(format!(
         "Settlement fee:   {} (wrapped-ZK wei)",
@@ -211,7 +212,7 @@ pub async fn prepare_new_gateway(
         bridgehub,
         new_gw.chain_id,
         &VotePrepareInputs {
-            ctm_representative_chain_id: new_gw.ctm_representative_chain_id,
+            ctm_representative_chain_id,
             vote_preparation_toml: VOTE_PREP_OUTPUT_REL,
             refund_recipient,
             gateway_settlement_fee: new_gw.settlement_fee,

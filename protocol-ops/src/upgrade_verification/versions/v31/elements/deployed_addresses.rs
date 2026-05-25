@@ -1610,6 +1610,7 @@ pub(crate) async fn verify_v31_provenance(
     verifiers: &Verifiers,
     era_chain_id: u64,
     genesis_config_kind: GenesisConfigKind,
+    legacy_gateway_chain_id: u64,
     result: &mut VerificationResult,
 ) -> Result<()> {
     result.print_info("== Deployment provenance ==");
@@ -1873,17 +1874,15 @@ pub(crate) async fn verify_v31_provenance(
 
     // L1MessageRoot(_bridgehub, _eraGatewayChainId, _chainAssetHandler).
     // The deploy script (`DeployL1CoreUtils.getCreationCalldata`)
-    // populates the second arg from `config.l1ChainId` rather than a
-    // distinct gateway chain id, so the deployed bytecode's
-    // `_eraGatewayChainId` immutable equals the L1 chain id; mirror that
-    // encoding here.
+    // populates `_eraGatewayChainId` from `config.legacyGatewayChainId`
+    // (read from `$.gateway.chain_id` in the upgrade input TOML). Pass
+    // `--legacy-gateway-chain-id` to match (0 for fresh deployments,
+    // 123 for stage, 9075 for mainnet).
     //
     // Stage Sepolia deploys the `L1MessageRootStageSepolia` variant (which
     // skips chain 270's still-on-GW-123 settlement check during
     // `_v31InitializeInner`) — its constructor signature is identical, but
-    // the bytecode hash differs. Pick whichever file the CREATE2 deploy was
-    // identified as, matching the same pattern the DualVerifier branch uses
-    // for the testnet variant.
+    // the bytecode hash differs.
     if let (Some(message_root_impl), Some(chain_asset_handler)) = (
         lookup("message_root_implementation_addr"),
         chain_asset_handler_proxy,
@@ -1904,7 +1903,7 @@ pub(crate) async fn verify_v31_provenance(
             &message_root_impl,
             V31MessageRoot::constructorCall::new((
                 bridgehub_addr,
-                U256::from(l1_chain_id),
+                U256::from(legacy_gateway_chain_id),
                 chain_asset_handler,
             ))
             .abi_encode(),

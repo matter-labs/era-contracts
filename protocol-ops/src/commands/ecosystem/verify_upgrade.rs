@@ -77,6 +77,13 @@ pub struct VerifyUpgradeArgs {
     /// instead of only checked for non-zero. Recommended for production verification runs.
     #[clap(long)]
     pub zk_token_asset_id: Option<FixedBytes<32>>,
+
+    /// Legacy gateway chain ID baked into `L1MessageRoot` / `L1MessageRootStageSepolia`
+    /// as the `_eraGatewayChainId` immutable. Read from `$.gateway.chain_id` in the
+    /// upgrade input TOML at prepare time. Defaults to 0 (fresh deployments with no
+    /// legacy gateway).
+    #[clap(long, default_value_t = 0)]
+    pub legacy_gateway_chain_id: u64,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -152,6 +159,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         create2_factory,
         create2_salts,
         args.zk_token_asset_id,
+        args.legacy_gateway_chain_id,
         &mut result,
     )
     .await;

@@ -78,17 +78,20 @@ impl<'a> V31UpgradeFull<'a> {
         self.run_ctm_admin_steps(runner, deployer, &prepared.ctm_tomls)?;
 
         if let Some(ref new_gw) = self.new_gateway {
-            let path = prepare_new_gateway(
-                runner,
-                deployer,
-                self.inner.bridgehub(),
-                &prepared.core_toml,
-                new_gw,
-                &prepared.ctm_tomls,
-                inputs.zk_token_asset_id,
-            )
-            .await?;
-            prepared.new_gateway_toml = Some(path);
+            for &chain_id in &new_gw.ctm_representative_chain_ids {
+                let path = prepare_new_gateway(
+                    runner,
+                    deployer,
+                    self.inner.bridgehub(),
+                    &prepared.core_toml,
+                    new_gw,
+                    chain_id,
+                    &prepared.ctm_tomls,
+                    inputs.zk_token_asset_id,
+                )
+                .await?;
+                prepared.new_gateway_tomls.push(path);
+            }
         }
 
         Ok(prepared)

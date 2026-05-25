@@ -72,6 +72,7 @@ pub(crate) async fn verify(
     create2_factory: Address,
     create2_salts: Vec<FixedBytes<32>>,
     zk_token_asset_id: Option<FixedBytes<32>>,
+    legacy_gateway_chain_id: u64,
     result: &mut VerificationResult,
 ) -> anyhow::Result<()> {
     result.print_info("== Config verification ==");
@@ -121,6 +122,7 @@ pub(crate) async fn verify(
         &verifiers,
         era_chain_id,
         genesis_config_kind,
+        legacy_gateway_chain_id,
         result,
     )
     .await?;
