@@ -190,9 +190,15 @@ fn verify_v31_zksync_os_force_deployments(
 
 /// Verify the `deployedBytecodeInfo` of a ZKsyncOS force deployment entry maps to the expected file.
 ///
-/// - `ZKsyncOSUnsafeForceDeployment`: 96-byte triple (blake2s | padding | keccak256); observable at [64..96].
-/// - `ZKsyncOSSystemProxyUpgrade`: abi.encode(implInfo_96, proxyInfo_96) = 320 bytes;
-///   impl observable (keccak256 of deployed impl bytecode) at [160..192].
+/// `deployedBytecodeInfo` is `(bytes32 blakeHash, uint32 length, bytes32 observableKeccak)`
+/// per `IComplexUpgrader.sol:27`. ZKsync OS L2's `setBytecodeDetailsEVM` consumes all
+/// three — for fixed-address entries the `newAddress` is fixed and can't bind the tuple
+/// via address derivation (unlike the L2V31Upgrade delegate target), so PUVT must
+/// independently cross-check each component against `AllContractsHashes.json`.
+///
+/// - `ZKsyncOSUnsafeForceDeployment`: 96-byte triple, fields at `[0..32]` / `[32..64]` / `[64..96]`.
+/// - `ZKsyncOSSystemProxyUpgrade`: `abi.encode(implInfo_bytes, proxyInfo_bytes)` = 320 bytes; the
+///   impl triple lives at `[96..192]` after the two offsets + impl length-prefix.
 fn verify_zksync_os_deployed_bytecode_info(
     verifiers: &Verifiers,
     result: &mut VerificationResult,
@@ -201,9 +207,9 @@ fn verify_zksync_os_deployed_bytecode_info(
     addr_label: &str,
     upgrade_type: ZksyncOSUpgradeType,
 ) {
-    let (expected_len, observable_range) = match upgrade_type {
-        ZksyncOSUpgradeType::UnsafeForceDeployment => (96usize, 64..96),
-        ZksyncOSUpgradeType::SystemProxyUpgrade => (320usize, 160..192),
+    let (expected_len, blake_range, length_word_range, observable_range) = match upgrade_type {
+        ZksyncOSUpgradeType::UnsafeForceDeployment => (96usize, 0..32, 32..64, 64..96),
+        ZksyncOSUpgradeType::SystemProxyUpgrade => (320usize, 96..128, 128..160, 160..192),
     };
 
     if bytecode_info.len() != expected_len {
@@ -216,9 +222,7 @@ fn verify_zksync_os_deployed_bytecode_info(
     }
 
     let observable = FixedBytes::<32>::from_slice(&bytecode_info[observable_range]);
-    if evm_deployed_bytecode_hash_matches_file(verifiers, &observable, expected_file) {
-        // ok — no noise on success to keep output readable
-    } else {
+    if !evm_deployed_bytecode_hash_matches_file(verifiers, &observable, expected_file) {
         let actual_file = verifiers
             .bytecode_verifier
             .evm_deployed_bytecode_hash_to_file(&observable)
@@ -227,6 +231,38 @@ fn verify_zksync_os_deployed_bytecode_info(
         result.report_error(&format!(
             "ZKsyncOS force deployment at {addr_label}: expected file {expected_file}, \
              observable hash maps to {actual_file}"
+        ));
+        // Continue: blake + length below may still surface useful errors.
+    }
+
+    let Some((expected_blake, expected_length)) = verifiers
+        .bytecode_verifier
+        .evm_deployed_blake_and_length(expected_file)
+    else {
+        result.report_warn(&format!(
+            "ZKsyncOS force deployment at {addr_label} ({expected_file}): \
+             AllContractsHashes.json lacks blake/length for this file; \
+             only observableKeccak is cross-checked"
+        ));
+        return;
+    };
+
+    let actual_blake = FixedBytes::<32>::from_slice(&bytecode_info[blake_range]);
+    if actual_blake != expected_blake {
+        result.report_error(&format!(
+            "ZKsyncOS force deployment at {addr_label} ({expected_file}): \
+             deployedBytecodeInfo.blakeHash mismatch: expected {expected_blake}, got {actual_blake}"
+        ));
+    }
+
+    // `uint32 length` is padded to a full 32-byte word; the value lives in the
+    // last 4 big-endian bytes.
+    let length_word = &bytecode_info[length_word_range];
+    let actual_length = u32::from_be_bytes(length_word[28..32].try_into().unwrap());
+    if actual_length != expected_length {
+        result.report_error(&format!(
+            "ZKsyncOS force deployment at {addr_label} ({expected_file}): \
+             deployedBytecodeInfo.length mismatch: expected {expected_length}, got {actual_length}"
         ));
     }
 }

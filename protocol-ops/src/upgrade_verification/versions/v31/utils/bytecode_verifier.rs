@@ -19,6 +19,10 @@ pub struct BytecodeVerifier {
     zk_bytecode_file_by_hash: HashMap<FixedBytes<32>, String>,
     /// Maps a contract’s file name to its zk bytecode hash.
     bytecode_file_to_zkhash: HashMap<String, FixedBytes<32>>,
+    /// Maps a contract's file name to its `(evmDeployedBytecodeBlakeHash,
+    /// evmDeployedBytecodeLength)` pair — both fields are populated together
+    /// in `AllContractsHashes.json` for ZKsync OS-relevant EVM contracts.
+    evm_deployed_blake_and_length_by_file: HashMap<String, (FixedBytes<32>, u32)>,
 }
 
 impl BytecodeVerifier {
@@ -126,6 +130,16 @@ impl BytecodeVerifier {
         self.bytecode_file_to_zkhash.get(file)
     }
 
+    /// Returns the (blakeHash, length) pair for a contract's EVM deployed
+    /// bytecode, when present in `AllContractsHashes.json`. ZKsync OS L2
+    /// `setBytecodeDetailsEVM` consumes all three (blake, length, keccak), so
+    /// the full tuple is the right invariant for fixed-address force
+    /// deployments where the deployed address is fixed and can't bind the
+    /// tuple via address derivation.
+    pub fn evm_deployed_blake_and_length(&self, file: &str) -> Option<(FixedBytes<32>, u32)> {
+        self.evm_deployed_blake_and_length_by_file.get(file).copied()
+    }
+
     /// Inserts an entry for the given deployed bytecode hash and file name.
     pub fn insert_evm_deployed_bytecode_hash(
         &mut self,
@@ -160,6 +174,7 @@ impl BytecodeVerifier {
         let mut deployed_bytecode_file_by_hash = HashMap::new();
         let mut bytecode_file_to_zkhash = HashMap::new();
         let mut zk_bytecode_file_by_hash = HashMap::new();
+        let mut evm_deployed_blake_and_length_by_file = HashMap::new();
 
         for contract in contract_hashes.hashes {
             if let Some(ref hash) = contract.evm_bytecode_hash {
@@ -197,7 +212,24 @@ impl BytecodeVerifier {
                 let bytecode_hash = FixedBytes::try_from(decoded.as_slice())
                     .expect("Invalid length for FixedBytes (zk_bytecode_hash)");
                 bytecode_file_to_zkhash.insert(contract.contract_name.clone(), bytecode_hash);
-                zk_bytecode_file_by_hash.insert(bytecode_hash, contract.contract_name);
+                zk_bytecode_file_by_hash.insert(bytecode_hash, contract.contract_name.clone());
+            }
+
+            if let (Some(ref blake), Some(length)) = (
+                contract.evm_deployed_bytecode_blake_hash.as_ref(),
+                contract.evm_deployed_bytecode_length,
+            ) {
+                let decoded = hex::decode(blake).unwrap_or_else(|_| {
+                    panic!(
+                        "Invalid hex in evm_deployed_bytecode_blake_hash for {}",
+                        contract.contract_name
+                    )
+                });
+                let blake_hash = FixedBytes::try_from(decoded.as_slice()).expect(
+                    "Invalid length for FixedBytes (evm_deployed_bytecode_blake_hash)",
+                );
+                evm_deployed_blake_and_length_by_file
+                    .insert(contract.contract_name, (blake_hash, length));
             }
         }
 
@@ -232,6 +264,7 @@ impl BytecodeVerifier {
             deployed_bytecode_file_by_hash,
             zk_bytecode_file_by_hash,
             bytecode_file_to_zkhash,
+            evm_deployed_blake_and_length_by_file,
         }
     }
 }
@@ -244,6 +277,12 @@ pub struct ContractHash {
     pub evm_bytecode_hash: Option<String>,
     #[serde(rename = "evmDeployedBytecodeHash")]
     pub evm_deployed_bytecode_hash: Option<String>,
+    #[serde(rename = "evmDeployedBytecodeBlakeHash")]
+    #[serde(default)]
+    pub evm_deployed_bytecode_blake_hash: Option<String>,
+    #[serde(rename = "evmDeployedBytecodeLength")]
+    #[serde(default)]
+    pub evm_deployed_bytecode_length: Option<u32>,
     #[serde(rename = "zkBytecodeHash")]
     pub zk_bytecode_hash: Option<String>,
 }
