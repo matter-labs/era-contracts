@@ -213,6 +213,7 @@ impl ProposedUpgrade {
             expected_version,
             expected_fixed_force_deployments_data,
             bytecodes_supplier_addr,
+            ctm_flavor,
         )
         .await?;
 
@@ -290,9 +291,12 @@ impl ProposedUpgrade {
         }
     }
 
-    /// Validates the canonical L2 tx shape, then attempts to decode its `data`
-    /// as either `forceDeployAndUpgrade` (Era) or `forceDeployAndUpgradeUniversal`
-    /// (ZKsync OS) and dispatches to the matching flavor verifier.
+    /// Validates the canonical L2 tx shape, then dispatches strictly on the
+    /// CTM flavor: Era expects `(txType=254, data=forceDeployAndUpgrade)`,
+    /// ZKsync OS expects `(txType=126, data=forceDeployAndUpgradeUniversal)`.
+    /// Mismatched `(flavor, txType)` or `(flavor, inner-data selector)` pairs
+    /// are rejected explicitly rather than via decode failure.
+    #[allow(clippy::too_many_arguments)]
     async fn verify_l2_protocol_upgrade_tx(
         &self,
         verifiers: &Verifiers,
@@ -300,6 +304,7 @@ impl ProposedUpgrade {
         expected_version: ProtocolVersion,
         expected_fixed_force_deployments_data: &str,
         bytecodes_supplier_addr: Option<Address>,
+        ctm_flavor: CtmFlavor,
     ) -> anyhow::Result<()> {
         let tx = &self.l2ProtocolUpgradeTx;
 
@@ -358,67 +363,82 @@ impl ProposedUpgrade {
             result.report_error("Invalid L2 upgrade tx reservedDynamic");
         }
 
-        if let Ok(decoded) = IComplexUpgrader::forceDeployAndUpgradeCall::abi_decode(&tx.data) {
-            if tx.txType != U256::from(ERA_SYSTEM_UPGRADE_TX_TYPE) {
-                result.report_error(&format!(
-                    "Era L2 upgrade tx must use txType {ERA_SYSTEM_UPGRADE_TX_TYPE}, got {}",
-                    tx.txType
-                ));
+        match ctm_flavor {
+            CtmFlavor::Era => {
+                if tx.txType != U256::from(ERA_SYSTEM_UPGRADE_TX_TYPE) {
+                    result.report_error(&format!(
+                        "Era L2 upgrade tx must use txType {ERA_SYSTEM_UPGRADE_TX_TYPE}, got {}",
+                        tx.txType
+                    ));
+                }
+                let decoded = match IComplexUpgrader::forceDeployAndUpgradeCall::abi_decode(
+                    &tx.data,
+                ) {
+                    Ok(decoded) => decoded,
+                    Err(err) => {
+                        result.report_error(&format!(
+                            "Era L2 upgrade tx data must decode as forceDeployAndUpgrade: {err}"
+                        ));
+                        return Ok(());
+                    }
+                };
+                verify_factory_deps(
+                    verifiers,
+                    result,
+                    &tx.factoryDeps,
+                    era::EXPECTED_V31_ERA_BYTECODES,
+                    "Era",
+                    bytecodes_supplier_addr,
+                    FactoryDepHashKind::EraZkBytecode,
+                )
+                .await;
+                era::verify_era_force_deploy_and_upgrade(
+                    verifiers,
+                    result,
+                    &decoded,
+                    expected_fixed_force_deployments_data,
+                )
+                .await?;
+                result.report_ok("Decoded Era forceDeployAndUpgrade L2 upgrade tx");
             }
-            verify_factory_deps(
-                verifiers,
-                result,
-                &tx.factoryDeps,
-                era::EXPECTED_V31_ERA_BYTECODES,
-                "Era",
-                bytecodes_supplier_addr,
-                FactoryDepHashKind::EraZkBytecode,
-            )
-            .await;
-            era::verify_era_force_deploy_and_upgrade(
-                verifiers,
-                result,
-                &decoded,
-                expected_fixed_force_deployments_data,
-            )
-            .await?;
-            result.report_ok("Decoded Era forceDeployAndUpgrade L2 upgrade tx");
-            return Ok(());
-        }
-
-        if let Ok(decoded) =
-            IComplexUpgrader::forceDeployAndUpgradeUniversalCall::abi_decode(&tx.data)
-        {
-            if tx.txType != U256::from(ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE) {
-                result.report_error(&format!(
-                    "ZKsync OS L2 upgrade tx must use txType {ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE}, got {}",
-                    tx.txType
-                ));
+            CtmFlavor::ZksyncOs => {
+                if tx.txType != U256::from(ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE) {
+                    result.report_error(&format!(
+                        "ZKsync OS L2 upgrade tx must use txType {ZKSYNC_OS_SYSTEM_UPGRADE_TX_TYPE}, got {}",
+                        tx.txType
+                    ));
+                }
+                let decoded = match IComplexUpgrader::forceDeployAndUpgradeUniversalCall::abi_decode(
+                    &tx.data,
+                ) {
+                    Ok(decoded) => decoded,
+                    Err(err) => {
+                        result.report_error(&format!(
+                            "ZKsync OS L2 upgrade tx data must decode as forceDeployAndUpgradeUniversal: {err}"
+                        ));
+                        return Ok(());
+                    }
+                };
+                verify_factory_deps(
+                    verifiers,
+                    result,
+                    &tx.factoryDeps,
+                    zksync_os::EXPECTED_V31_ZKSYNC_OS_BYTECODES,
+                    "ZKsync OS",
+                    bytecodes_supplier_addr,
+                    FactoryDepHashKind::ZksyncOsEvmBytecode,
+                )
+                .await;
+                zksync_os::verify_zksync_os_force_deploy_and_upgrade(
+                    verifiers,
+                    result,
+                    &decoded,
+                    expected_fixed_force_deployments_data,
+                )
+                .await?;
+                result.report_ok("Decoded ZKsync OS forceDeployAndUpgradeUniversal L2 upgrade tx");
             }
-            verify_factory_deps(
-                verifiers,
-                result,
-                &tx.factoryDeps,
-                zksync_os::EXPECTED_V31_ZKSYNC_OS_BYTECODES,
-                "ZKsync OS",
-                bytecodes_supplier_addr,
-                FactoryDepHashKind::ZksyncOsEvmBytecode,
-            )
-            .await;
-            zksync_os::verify_zksync_os_force_deploy_and_upgrade(
-                verifiers,
-                result,
-                &decoded,
-                expected_fixed_force_deployments_data,
-            )
-            .await?;
-            result.report_ok("Decoded ZKsync OS forceDeployAndUpgradeUniversal L2 upgrade tx");
-            return Ok(());
         }
-
-        result.report_error(
-            "L2 upgrade tx data is neither forceDeployAndUpgrade nor forceDeployAndUpgradeUniversal",
-        );
         Ok(())
     }
 }
