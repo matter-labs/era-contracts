@@ -2221,7 +2221,7 @@ async fn verify_address_has_code(
     }
 }
 
-/// Verify the 15-call new-Gateway bring-up block that `write_merged_ecosystem_toml`
+/// Verify the 16-call new-Gateway bring-up block that `write_merged_ecosystem_toml`
 /// appends to stage 2 when the env has a `[new_gateway]` config. See the
 /// docstring on `GovernanceStage2Calls::verify_artifact` for the call shape.
 ///
@@ -2250,30 +2250,36 @@ async fn verify_gateway_bring_up_calls(
         // L1AssetTracker.registerLegacyToken(zkAssetId) — prefix prepended
         // by `write_merged_ecosystem_toml` when `[new_gateway]` is present.
         (0, "asset_tracker_proxy", "registerLegacyToken(bytes32)"),
+        // Whitelist the new gateway as a settlement layer.
+        (
+            1,
+            "bridgehub_proxy",
+            "setSettlementLayerStatus(uint256,bool)",
+        ),
         // addChainTypeManager L1→L2 (priority tx) — approve + direct.
-        (2, "bridgehub_proxy", direct),
+        (3, "bridgehub_proxy", direct),
         // setAssetDeploymentTracker on L1AssetRouter (L1-side, no approve).
         (
-            3,
+            4,
             "l1_asset_router_proxy",
             "setAssetDeploymentTracker(bytes32,address)",
         ),
         // registerCTMAssetOnL1 on L1CTMDeploymentTracker (L1-side).
         (
-            4,
+            5,
             "ctm_deployment_tracker_proxy",
             "registerCTMAssetOnL1(address)",
         ),
         // setAssetHandler for chain assetId — approve + two-bridges.
-        (6, "bridgehub_proxy", two_bridges),
+        (7, "bridgehub_proxy", two_bridges),
         // chain-asset-handler registration for GW CTM — approve + two-bridges.
-        (8, "bridgehub_proxy", two_bridges),
+        (9, "bridgehub_proxy", two_bridges),
         // acceptOwnership on RollupDAManager — approve + direct.
-        (10, "bridgehub_proxy", direct),
+        (11, "bridgehub_proxy", direct),
         // acceptOwnership on ServerNotifier — approve + direct.
-        (12, "bridgehub_proxy", direct),
+        (13, "bridgehub_proxy", direct),
         // setGatewaySettlementFee on GW_ASSET_TRACKER_ADDR — approve + direct.
-        (14, "bridgehub_proxy", direct),
+        (15, "bridgehub_proxy", direct),
     ];
 
     let mut errors = 0;
@@ -2288,7 +2294,7 @@ async fn verify_gateway_bring_up_calls(
     // round-trip (NTV.tokenAddress(zkAssetId)); cross-call consistency is
     // a sufficient shape check.
     let approve_selector = compute_selector("approve(address,uint256)");
-    let approve_offsets = [1usize, 5, 7, 9, 11, 13];
+    let approve_offsets = [2usize, 6, 8, 10, 12, 14];
     let mut approve_target: Option<Address> = None;
     for off in &approve_offsets {
         let idx = base + *off;
@@ -2326,7 +2332,7 @@ async fn verify_gateway_bring_up_calls(
     // `chainId` is the first 32-byte field of every priority-tx struct
     // (both L2TransactionRequestDirect and L2TransactionRequestTwoBridgesOuter).
     // Decode + cross-check that every priority tx targets the SAME L2 chain.
-    let priority_offsets = [2usize, 6, 8, 10, 12, 14];
+    let priority_offsets = [3usize, 7, 9, 11, 13, 15];
     let mut priority_chain_id: Option<U256> = None;
     for off in &priority_offsets {
         let idx = base + *off;
@@ -2361,10 +2367,10 @@ async fn verify_gateway_bring_up_calls(
 
     // Deep cross-check on the three `requestL2TransactionDirect` priority
     // txs whose targets/args we know how to derive from the artifact:
-    //   - offset 2:  L2 Bridgehub ← addChainTypeManager(new_gw_ctm)
-    //   - offset 10: GW RollupDAManager ← acceptOwnership()
-    //   - offset 12: GW ServerNotifier ← acceptOwnership()
-    // The remaining priority txs (offsets 6/8 two-bridges, 14 setSettlementFee)
+    //   - offset 3:  L2 Bridgehub ← addChainTypeManager(new_gw_ctm)
+    //   - offset 11: GW RollupDAManager ← acceptOwnership()
+    //   - offset 13: GW ServerNotifier ← acceptOwnership()
+    // The remaining priority txs (offsets 7/9 two-bridges, 15 setSettlementFee)
     // are *not* deep-decoded yet — see follow-up note at the end of this fn.
     // L2 Bridgehub lives at the system-contract slot 0x10002 (see
     // `set_new_version_upgrade.rs::L2_BRIDGEHUB_ADDR`).
@@ -2437,7 +2443,7 @@ async fn verify_gateway_bring_up_calls(
 
     let new_gw_ctm = _new_gw.gateway_chain_type_manager_addr;
     check_direct_inner(
-        2,
+        3,
         "addChainTypeManager",
         l2_bridgehub_addr,
         "addChainTypeManager(address)",
@@ -2446,7 +2452,7 @@ async fn verify_gateway_bring_up_calls(
         result,
     );
     check_direct_inner(
-        10,
+        11,
         "acceptOwnership RollupDAManager",
         _new_gw.gateway_rollup_da_manager_addr,
         "acceptOwnership()",
@@ -2455,7 +2461,7 @@ async fn verify_gateway_bring_up_calls(
         result,
     );
     check_direct_inner(
-        12,
+        13,
         "acceptOwnership ServerNotifier",
         _new_gw.gateway_server_notifier_addr,
         "acceptOwnership()",
@@ -2494,13 +2500,21 @@ impl GovernanceStage2Calls {
     /// Stage2 is executed after all chains have upgraded.
     ///
     /// Stage-2 shape (canonical):
-    ///   `[ unpauseMigration, (checkProtocolUpgradePresence, checkMigrationsUnpaused) × N CTMs ]`
+    ///   `[ (setHistoricalMigrationInterval × M, setSettlementLayerStatus)?,
+    ///      unpauseMigration,
+    ///      (checkProtocolUpgradePresence, checkMigrationsUnpaused) × N CTMs ]`
+    ///
+    /// The legacy-GW decommission prefix (M interval calls + 1 blacklist) is
+    /// present when `permanent-values/<env>.toml` has a `[legacy_gateway]`
+    /// section. M equals the number of `[[legacy_gateway.chain_intervals]]`
+    /// entries. The verifier scans dynamically since M is env-dependent.
     ///
     /// When `[new_gateway]` is present in the merged ecosystem TOML,
     /// `write_merged_ecosystem_toml` prepends a `registerLegacyToken` prefix
     /// and appends the `GatewayVotePreparation` bring-up bundle. That extra
     /// section's expected shape is:
     ///   `[ registerLegacyToken,
+    ///      setSettlementLayerStatus                  (whitelist new GW),
     ///      approve + requestL2TransactionDirect      (addChainTypeManager on L2 BH),
     ///      setAssetDeploymentTracker,
     ///      registerCTMAssetOnL1,
@@ -2510,21 +2524,7 @@ impl GovernanceStage2Calls {
     ///      approve + requestL2TransactionDirect      (acceptOwnership ServerNotifier),
     ///      approve + requestL2TransactionDirect      (setGatewaySettlementFee on GW_ASSET_TRACKER_ADDR) ]`
     ///
-    /// = 15 calls. `setSettlementLayerStatus` is *only* emitted when
-    /// `ctm_representative_chain_id == gateway_chain_id` — that branch isn't
-    /// configured for stage today, so this verifier does not expect it.
-    ///
-    /// On top of those, when `[new_gateway].ecosystem_admin_calls_to_execute`
-    /// is non-empty, `write_merged_ecosystem_toml` folds those entries into
-    /// stage 2 too. For v31 stage that's a 2-call appendix:
-    ///   `[ setServerNotifier (on the source CTM, e.g. Atlas),
-    ///      acceptOwnership   (on the newly deployed GW ServerNotifier) ]`
-    /// Both are executed by PUH directly (no ChainAdmin wrap): the source
-    /// CTM's `setServerNotifier` is `onlyOwnerOrAdmin` (PUH owns the CTM
-    /// after stage 1), and bundle 07's `transferOwnership(...)` is rewritten
-    /// to put PUH on the pendingOwner slot so the acceptOwnership goes
-    /// through. See `protocol-ops/src/commands/ecosystem/upgrade.rs`
-    /// (`rewrite_transfer_ownership_targets`).
+    /// = 16 calls.
     pub(crate) async fn verify_artifact(
         &self,
         artifact: &EcosystemUpgradeArtifact,
@@ -2534,9 +2534,60 @@ impl GovernanceStage2Calls {
         result.print_info("== Gov stage 2 calls ===");
 
         let mut errors = 0;
-        let canonical_count = 1 + artifact.ctms.len() * 2;
+
+        // ── Legacy-GW decommission prefix (dynamic) ──────────────────
+        // Scan for setHistoricalMigrationInterval calls at the head of
+        // stage 2, followed by one setSettlementLayerStatus (blacklist).
+        let set_historical_selector = compute_selector(
+            "setHistoricalMigrationInterval(uint256,uint256,(uint256,uint256,uint256,uint256,uint256,bool))",
+        );
+        let set_settlement_selector =
+            compute_selector("setSettlementLayerStatus(uint256,bool)");
+
+        let mut decommission_count: usize = 0;
+        for call in &self.calls.elems {
+            if call.data.len() >= 4
+                && hex::encode(&call.data[0..4]) == set_historical_selector
+            {
+                decommission_count += 1;
+            } else {
+                break;
+            }
+        }
+
+        if decommission_count > 0 {
+            result.report_ok(&format!(
+                "{decommission_count} setHistoricalMigrationInterval call(s) (legacy GW decommission)"
+            ));
+            // Expect setSettlementLayerStatus(oldGwChainId, false) immediately after.
+            if decommission_count < self.calls.elems.len() {
+                let call = &self.calls.elems[decommission_count];
+                if call.data.len() >= 4
+                    && hex::encode(&call.data[0..4]) == set_settlement_selector
+                {
+                    errors += verify_call_by_name(
+                        &self.calls,
+                        decommission_count,
+                        "bridgehub_proxy",
+                        "setSettlementLayerStatus(uint256,bool)",
+                        verifiers,
+                        result,
+                    );
+                    decommission_count += 1;
+                } else {
+                    result.report_error(
+                        "Expected setSettlementLayerStatus(uint256,bool) after historical migration intervals",
+                    );
+                    errors += 1;
+                }
+            }
+        }
+
+        // ── Canonical calls ──────────────────────────────────────────
+        let canonical_prefix = decommission_count;
+        let canonical_count = canonical_prefix + 1 + artifact.ctms.len() * 2;
         let gw_count = if artifact.new_gateway.is_some() {
-            15
+            16
         } else {
             0
         };
@@ -2544,7 +2595,7 @@ impl GovernanceStage2Calls {
 
         errors += verify_call_by_name(
             &self.calls,
-            0,
+            canonical_prefix,
             "chain_asset_handler_proxy",
             "unpauseMigration()",
             verifiers,
@@ -2562,7 +2613,7 @@ impl GovernanceStage2Calls {
                 continue;
             };
 
-            let block = 1 + ctm_index * 2;
+            let block = canonical_prefix + 1 + ctm_index * 2;
             errors += verify_call_by_address(
                 &self.calls,
                 block,

@@ -66,6 +66,9 @@ pub struct PuhGuardiansInputs<'a> {
     pub puh_salt_override: Option<H256>,
     pub guardians_salt_override: Option<H256>,
     pub zk_governance_dir: PathBuf,
+    /// ZKsync OS ChainTypeManager proxy address. Required by
+    /// `DeployPUHAndGuardians.s.sol` — the old PUH has no getter for this.
+    pub zksync_os_ctm: Option<Address>,
 }
 
 impl<'a> PuhGuardiansInputs<'a> {
@@ -78,6 +81,7 @@ impl<'a> PuhGuardiansInputs<'a> {
             puh_salt_override: None,
             guardians_salt_override: None,
             zk_governance_dir: PathBuf::from(DEFAULT_ZK_GOV_DIR),
+            zksync_os_ctm: None,
         }
     }
 }
@@ -170,6 +174,14 @@ pub async fn deploy_puh_guardians(
     let proxy_admin = read_eip1967_admin(&runner.rpc_url, puh_proxy).await?;
     logger::info(format!("PUH ProxyAdmin: {proxy_admin:#x}"));
 
+    let zksync_os_ctm = inputs.zksync_os_ctm.ok_or_else(|| {
+        anyhow::anyhow!(
+            "zksync_os_ctm is required for PUH/Guardians redeploy — \
+             pass it from the CTM prepare output (the CTM with is_zk_sync_os=true)"
+        )
+    })?;
+    logger::info(format!("ZKsync OS CTM: {zksync_os_ctm:#x}"));
+
     // Forge writes the deploy output TOML inside zk-governance/script-out/
     // so it falls under that repo's `fs_permissions` whitelist.
     let zk_gov_script_out = zk_gov_dir.join("script-out");
@@ -193,6 +205,7 @@ pub async fn deploy_puh_guardians(
         .with_env("FOUNDRY_PROFILE", "default")
         .with_env("PREV_PROTOCOL_UPGRADE_HANDLER", format!("{:#x}", puh_proxy))
         .with_env("CHAIN_ASSET_HANDLER", format!("{:#x}", chain_asset_handler))
+        .with_env("ZKSYNC_OS_CHAIN_TYPE_MANAGER", format!("{:#x}", zksync_os_ctm))
         .with_env("CREATE2_FACTORY", format!("{:#x}", create2_factory))
         .with_env("CREATE2_SALT_PUH", format!("{:#x}", puh_salt))
         .with_env("CREATE2_SALT_GUARDIANS", format!("{:#x}", guardians_salt))
