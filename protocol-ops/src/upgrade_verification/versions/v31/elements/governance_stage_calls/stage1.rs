@@ -744,7 +744,7 @@ async fn verify_set_chain_creation_params_payload(
         ctm.flavor.label()
     ));
     match InitializeDataNewChain::abi_decode(&params.diamondCut.initCalldata) {
-        Ok(init_data) => init_data.verify(verifiers, result),
+        Ok(init_data) => init_data.verify(ctm.flavor, verifiers, result),
         Err(err) => {
             result.report_error(&format!(
                 "Failed to decode InitializeDataNewChain from chain-creation initCalldata: {err}"
