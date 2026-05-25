@@ -277,15 +277,7 @@ async fn verify_v31_core_wiring(
 ) -> Result<()> {
     let provider = verifiers.network_verifier.get_l1_provider();
     let bridgehub = BridgehubContract::new(verifiers.bridgehub_address, provider.clone());
-    let bridgehub_owner = match bridgehub.owner().call().await {
-        Ok(owner) => Some(owner),
-        Err(err) => {
-            result.report_error(&format!(
-                "Failed to call Bridgehub.owner() for core wiring checks: {err}"
-            ));
-            None
-        }
-    };
+    let bridgehub_owner = verifiers.bridgehub_owner;
 
     let expected_asset_router = required_address(
         &artifact.core,
@@ -375,15 +367,11 @@ async fn verify_v31_core_wiring(
         )),
     }
 
-    if let Some(expected_owner) = bridgehub_owner {
-        match asset_router_owner.owner().call().await {
-            Ok(actual) => {
-                expect_address_eq(result, "L1AssetRouter.owner()", actual, expected_owner)
-            }
-            Err(err) => result.report_error(&format!(
-                "Failed to call L1AssetRouter.owner() for core wiring checks: {err}"
-            )),
-        }
+    match asset_router_owner.owner().call().await {
+        Ok(actual) => expect_address_eq(result, "L1AssetRouter.owner()", actual, bridgehub_owner),
+        Err(err) => result.report_error(&format!(
+            "Failed to call L1AssetRouter.owner() for core wiring checks: {err}"
+        )),
     }
     match asset_router.legacyBridge().call().await {
         Ok(actual) => expect_address_eq(
@@ -420,19 +408,17 @@ async fn verify_v31_core_wiring(
             "Failed to call AssetTracker.BRIDGE_HUB() for core wiring checks: {err}"
         )),
     }
-    if let Some(expected_pending_owner) = bridgehub_owner {
-        let tracker_ownership = Ownable2Step::new(expected_tracker, provider.clone());
-        match tracker_ownership.pendingOwner().call().await {
-            Ok(actual) => expect_address_eq(
-                result,
-                "AssetTracker.pendingOwner()",
-                actual,
-                expected_pending_owner,
-            ),
-            Err(err) => result.report_error(&format!(
-                "Failed to call AssetTracker.pendingOwner() for pre-upgrade ownership checks: {err}"
-            )),
-        }
+    let tracker_ownership = Ownable2Step::new(expected_tracker, provider.clone());
+    match tracker_ownership.pendingOwner().call().await {
+        Ok(actual) => expect_address_eq(
+            result,
+            "AssetTracker.pendingOwner()",
+            actual,
+            bridgehub_owner,
+        ),
+        Err(err) => result.report_error(&format!(
+            "Failed to call AssetTracker.pendingOwner() for pre-upgrade ownership checks: {err}"
+        )),
     }
 
     match bridgehub.chainAssetHandler().call().await {
@@ -480,20 +466,15 @@ async fn verify_v31_core_wiring(
     // mainnet) before stage 0/1/2 run — `pauseMigration()`, `setAddresses()`,
     // and `unpauseMigration()` are all owner-gated. We expect governance to be
     // `bridgehub.owner()` (== the PUH proxy on PUH-governed envs).
-    if let Some(expected_owner) = bridgehub_owner {
-        let chain_asset_handler_owner =
-            Ownable::new(expected_chain_asset_handler, provider.clone());
-        match chain_asset_handler_owner.owner().call().await {
-            Ok(actual) => expect_address_eq(
-                result,
-                "ChainAssetHandler.owner()",
-                actual,
-                expected_owner,
-            ),
-            Err(err) => result.report_error(&format!(
-                "Failed to call ChainAssetHandler.owner() for pre-upgrade ownership checks: {err}"
-            )),
+    let chain_asset_handler_owner =
+        Ownable::new(expected_chain_asset_handler, provider.clone());
+    match chain_asset_handler_owner.owner().call().await {
+        Ok(actual) => {
+            expect_address_eq(result, "ChainAssetHandler.owner()", actual, bridgehub_owner)
         }
+        Err(err) => result.report_error(&format!(
+            "Failed to call ChainAssetHandler.owner() for pre-upgrade ownership checks: {err}"
+        )),
     }
 
     Ok(())
@@ -649,16 +630,7 @@ async fn verify_v31_timer_admin_state(
     result: &mut VerificationResult,
 ) -> Result<()> {
     let provider = verifiers.network_verifier.get_l1_provider();
-    let bridgehub = BridgehubContract::new(verifiers.bridgehub_address, provider.clone());
-    let bridgehub_owner = match bridgehub.owner().call().await {
-        Ok(owner) => Some(owner),
-        Err(err) => {
-            result.report_error(&format!(
-                "Failed to call Bridgehub.owner() for GovernanceUpgradeTimer admin checks: {err}"
-            ));
-            None
-        }
-    };
+    let bridgehub_owner = verifiers.bridgehub_owner;
 
     for ctm in &artifact.ctms {
         let label = ctm.flavor.label();
@@ -668,16 +640,14 @@ async fn verify_v31_timer_admin_state(
         let expected_ecosystem_admin =
             required_address(&ctm.value, &scope, &["admin", "ecosystem_admin_addr"])?;
 
-        if let Some(actual_timer_governance) = bridgehub_owner {
-            if actual_timer_governance == expected_timer_governance {
-                result.report_ok(&format!(
-                    "{label}.admin.timer_governance_addr matches Bridgehub.owner()"
-                ));
-            } else {
-                result.report_error(&format!(
-                    "{label}.admin.timer_governance_addr mismatch: artifact {expected_timer_governance}, Bridgehub.owner() {actual_timer_governance}"
-                ));
-            }
+        if bridgehub_owner == expected_timer_governance {
+            result.report_ok(&format!(
+                "{label}.admin.timer_governance_addr matches Bridgehub.owner()"
+            ));
+        } else {
+            result.report_error(&format!(
+                "{label}.admin.timer_governance_addr mismatch: artifact {expected_timer_governance}, Bridgehub.owner() {bridgehub_owner}"
+            ));
         }
 
         let ctm_proxy = required_address(

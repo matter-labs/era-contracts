@@ -16,9 +16,11 @@ use crate::{
         artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
         constants::L2_BRIDGEHUB_ADDR,
         versions::v31::utils::{
-            address_verifier::AddressVerifier, bytecode_verifier::BytecodeVerifier,
-            fee_param_verifier::FeeParamVerifier, get_contents_from_github,
-            network_verifier::NetworkVerifier, repo_relative_path,
+            address_verifier::AddressVerifier, apply_l2_to_l1_alias,
+            bytecode_verifier::BytecodeVerifier, fee_param_verifier::FeeParamVerifier,
+            get_contents_from_github,
+            network_verifier::{Bridgehub as BridgehubContract, NetworkVerifier},
+            repo_relative_path,
         },
     },
 };
@@ -31,6 +33,7 @@ sol! {
 pub(crate) struct Verifiers {
     pub testnet_contracts: bool,
     pub bridgehub_address: Address,
+    pub bridgehub_owner: Address,
     pub address_verifier: AddressVerifier,
     pub bytecode_verifier: BytecodeVerifier,
     pub network_verifier: NetworkVerifier,
@@ -83,7 +86,31 @@ impl Verifiers {
         let fee_param_verifier =
             FeeParamVerifier::safe_init(&bridgehub_address, &network_verifier, contracts_commit)
                 .await?;
-        let address_verifier = AddressVerifier::new_v31_from_artifact(artifact)?;
+
+        // `Bridgehub.owner()` is the L1 governance executor (the PUH proxy on
+        // PUH-governed envs). It is the authoritative source for the
+        // `aliased_protocol_upgrade_handler_proxy` value consumed by the
+        // FixedForceDeploymentsData and L2ChainAssetHandler input checks; the
+        // artifact does not carry it directly. We register both the raw owner
+        // and its L1->L2 alias in the address book so downstream call sites
+        // can do plain `get_by_name` lookups without warn-on-miss fallbacks.
+        let bridgehub_owner = BridgehubContract::new(
+            bridgehub_address,
+            network_verifier.get_l1_provider().clone(),
+        )
+        .owner()
+        .call()
+        .await
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "failed to fetch Bridgehub.owner() at {bridgehub_address}; required for governance derivation: {e}"
+            )
+        })?;
+        let aliased_bridgehub_owner = apply_l2_to_l1_alias(bridgehub_owner);
+
+        let mut address_verifier = AddressVerifier::new_v31_from_artifact(artifact)?;
+        address_verifier.add_address(bridgehub_owner, "protocol_upgrade_handler_proxy");
+        address_verifier.add_address(aliased_bridgehub_owner, "aliased_protocol_upgrade_handler_proxy");
 
         let era_genesis_config =
             GenesisConfig::init_v31(GenesisConfigKind::Era, contracts_commit).await?;
@@ -93,6 +120,7 @@ impl Verifiers {
         Ok(Self {
             testnet_contracts: !env.is_mainnet(),
             bridgehub_address,
+            bridgehub_owner,
             address_verifier,
             bytecode_verifier,
             network_verifier,

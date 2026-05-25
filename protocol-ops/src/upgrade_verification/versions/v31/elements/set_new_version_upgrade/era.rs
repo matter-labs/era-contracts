@@ -31,7 +31,6 @@ use crate::upgrade_verification::{
         SHA256_SYSTEM_CONTRACT, SLOAD_CONTRACT_ADDR, CODE_ORACLE_SYSTEM_CONTRACT,
     },
     verifiers::{VerificationResult, Verifiers},
-    versions::v31::utils::apply_l2_to_l1_alias,
 };
 
 use super::{verify_l2_v31_upgrade_inner_calldata, IComplexUpgrader};
@@ -278,43 +277,16 @@ async fn verify_l2_chain_asset_handler_input(
         )),
     }
 
-    match verifiers
+    let expected_aliased_governance = verifiers
         .address_verifier
         .get_by_name("aliased_protocol_upgrade_handler_proxy")
-    {
-        Some(expected) => {
-            if aliased_owner == expected {
-                result
-                    .report_ok("L2ChainAssetHandler input aliasedOwner matches aliased governance");
-            } else {
-                result.report_error(&format!(
-                    "L2ChainAssetHandler input aliasedOwner: expected {expected}, got {aliased_owner}"
-                ));
-            }
-        }
-        None => {
-            // Fallback: try to derive alias from any governance address in the book.
-            let governance = verifiers.address_verifier.get_by_name("governance");
-            let puh = verifiers
-                .address_verifier
-                .get_by_name("protocol_upgrade_handler_proxy");
-            if let Some(gov_addr) = governance.or(puh) {
-                let expected_aliased = apply_l2_to_l1_alias(Address(*gov_addr));
-                if aliased_owner == expected_aliased {
-                    result.report_ok(
-                        "L2ChainAssetHandler input aliasedOwner matches derived alias of governance",
-                    );
-                } else {
-                    result.report_error(&format!(
-                        "L2ChainAssetHandler input aliasedOwner: derived alias {expected_aliased}, got {aliased_owner}"
-                    ));
-                }
-            } else {
-                result.report_warn(&format!(
-                    "L2ChainAssetHandler input aliasedOwner (not verified, governance address missing from address book): {aliased_owner}"
-                ));
-            }
-        }
+        .expect("aliased_protocol_upgrade_handler_proxy must be registered by Verifiers::new_v31");
+    if aliased_owner == expected_aliased_governance {
+        result.report_ok("L2ChainAssetHandler input aliasedOwner matches aliased governance");
+    } else {
+        result.report_error(&format!(
+            "L2ChainAssetHandler input aliasedOwner: expected {expected_aliased_governance}, got {aliased_owner}"
+        ));
     }
 
     if l2_bridgehub != L2_BRIDGEHUB_ADDR {

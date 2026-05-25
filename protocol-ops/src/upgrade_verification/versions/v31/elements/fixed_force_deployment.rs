@@ -201,26 +201,17 @@ impl FixedForceDeploymentsData {
             ));
         }
 
-        // aliasedL1Governance = applyL1ToL2Alias(protocol_upgrade_handler).
-        // Only verifiable when protocol_upgrade_handler is registered in the address book.
-        match verifiers
+        // aliasedL1Governance = applyL1ToL2Alias(Bridgehub.owner()), registered
+        // in the address book at `Verifiers::new_v31`.
+        let expected_aliased_governance = verifiers
             .address_verifier
             .get_by_name("aliased_protocol_upgrade_handler_proxy")
-        {
-            Some(expected) => {
-                if self.aliasedL1Governance == expected {
-                    // ok
-                } else {
-                    result.report_error(&format!(
-                        "aliasedL1Governance mismatch: expected {expected}, got {}",
-                        self.aliasedL1Governance
-                    ));
-                }
-            }
-            None => result.report_warn(&format!(
-                "FixedForceDeploymentsData aliasedL1Governance (not verified, missing from address book): {}",
+            .expect("aliased_protocol_upgrade_handler_proxy must be registered by Verifiers::new_v31");
+        if self.aliasedL1Governance != expected_aliased_governance {
+            result.report_error(&format!(
+                "aliasedL1Governance mismatch: expected {expected_aliased_governance}, got {}",
                 self.aliasedL1Governance
-            )),
+            ));
         }
 
         if self.maxNumberOfZKChains != U256::from(MAX_NUMBER_OF_ZK_CHAINS) {
