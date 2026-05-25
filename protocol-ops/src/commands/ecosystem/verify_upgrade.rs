@@ -37,8 +37,9 @@ pub struct VerifyUpgradeArgs {
     #[clap(long)]
     pub ecosystem_toml: PathBuf,
 
-    /// Optional era-contracts commit to load AllContractsHashes.json from GitHub.
-    /// If omitted, AllContractsHashes.json is read from the repository root.
+    /// Optional era-contracts commit to load contract metadata from GitHub.
+    /// If omitted, the local checkout is the authority for AllContractsHashes.json
+    /// and SystemConfig.json; verify that the checkout matches the reviewed commit.
     #[clap(long)]
     pub contracts_commit: Option<String>,
 

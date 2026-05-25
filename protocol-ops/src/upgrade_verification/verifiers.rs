@@ -10,15 +10,18 @@ use std::fmt::{self, Display};
 use std::fs;
 use std::panic::Location;
 
-use crate::{commands::ecosystem::verify_upgrade::VerifyUpgradeEnv, upgrade_verification::{
-    artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
-    constants::L2_BRIDGEHUB_ADDR,
-    versions::v31::utils::{
-        address_verifier::AddressVerifier, bytecode_verifier::BytecodeVerifier,
-        fee_param_verifier::FeeParamVerifier, get_contents_from_github,
-        network_verifier::NetworkVerifier, repo_relative_path,
+use crate::{
+    commands::ecosystem::verify_upgrade::VerifyUpgradeEnv,
+    upgrade_verification::{
+        artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
+        constants::L2_BRIDGEHUB_ADDR,
+        versions::v31::utils::{
+            address_verifier::AddressVerifier, bytecode_verifier::BytecodeVerifier,
+            fee_param_verifier::FeeParamVerifier, get_contents_from_github,
+            network_verifier::NetworkVerifier, repo_relative_path,
+        },
     },
-}};
+};
 
 sol! {
     function transparentProxyConstructor(address impl, address initialAdmin, bytes memory initCalldata);
@@ -77,6 +80,9 @@ impl Verifiers {
         let network_verifier =
             NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into(), representative_era_chain_id)
                 .await?;
+        let fee_param_verifier =
+            FeeParamVerifier::safe_init(&bridgehub_address, &network_verifier, contracts_commit)
+                .await?;
         let address_verifier = AddressVerifier::new_v31_from_artifact(artifact)?;
 
         let era_genesis_config =
@@ -92,7 +98,7 @@ impl Verifiers {
             network_verifier,
             era_genesis_config,
             zksync_os_genesis_config,
-            fee_param_verifier: FeeParamVerifier::empty(),
+            fee_param_verifier,
             gateway_bridgehub_address: L2_BRIDGEHUB_ADDR,
             representative_era_chain_id: Some(representative_era_chain_id),
             legacy_gateway_chain_id,

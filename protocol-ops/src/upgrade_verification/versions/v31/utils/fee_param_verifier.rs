@@ -1,13 +1,14 @@
 use alloy::{
-    primitives::{Address, U256},
+    primitives::{Address, FixedBytes, U256},
     sol,
-    sol_types::SolValue,
 };
 use serde::{Deserialize, Serialize};
+use std::fs;
 
 use super::{
     get_contents_from_github,
     network_verifier::{Bridgehub, NetworkVerifier},
+    repo_relative_path,
 };
 
 sol! {
@@ -38,83 +39,86 @@ pub struct FeeParamVerifier {
     pub fee_params: FeeParams,
 }
 
-fn expand_to_word(slice: &[u8]) -> Vec<u8> {
-    assert!(slice.len() <= 32);
+fn word_u32(value: &FixedBytes<32>, offset: usize) -> u32 {
+    let mut bytes = [0u8; 4];
+    bytes.copy_from_slice(&value.0[offset..offset + 4]);
+    u32::from_be_bytes(bytes)
+}
 
-    let mut result = vec![0u8; 32];
-    result[32 - slice.len()..32].copy_from_slice(slice);
-
-    result
+fn word_u64(value: &FixedBytes<32>, offset: usize) -> u64 {
+    let mut bytes = [0u8; 8];
+    bytes.copy_from_slice(&value.0[offset..offset + 8]);
+    u64::from_be_bytes(bytes)
 }
 
 impl FeeParamVerifier {
-    pub fn empty() -> Self {
-        Self {
-            fee_params: FeeParams {
-                pubdataPricingMode: PubdataPricingMode::Rollup,
-                batchOverheadL1Gas: 0,
-                maxPubdataPerBatch: 0,
-                maxL2GasPerBatch: 0,
-                priorityTxMaxPubdata: 0,
-                minimalL2GasPrice: 0,
-            },
-        }
-    }
-
     pub async fn safe_init(
         bridgehub_addr: &Address,
         network_verifier: &NetworkVerifier,
-        contracts_commit: &str,
-    ) -> Self {
-        let github_based = Self::init_from_github(contracts_commit).await;
-        let era = Self::init_from_on_chain(bridgehub_addr, network_verifier).await;
+        contracts_commit: Option<&str>,
+    ) -> anyhow::Result<Self> {
+        let config_based = Self::init_v31_from_source(contracts_commit).await?;
+        let era = Self::init_from_on_chain(bridgehub_addr, network_verifier).await?;
 
-        if github_based != era {
-            panic!("Unexpected difference between github-based config and L1-based one");
+        if config_based != era {
+            anyhow::bail!(
+                "Unexpected difference between SystemConfig.json fee params and live Era diamond fee params.\nSystemConfig.json: {:#?}\nLive Era diamond: {:#?}",
+                config_based,
+                era
+            );
         }
 
-        Self {
-            fee_params: github_based,
-        }
+        Ok(Self {
+            fee_params: config_based,
+        })
     }
 
-    async fn init_from_github(commit: &str) -> FeeParams {
-        let system_config = SystemConfig::init_from_github(commit).await;
-        FeeParams {
+    async fn init_v31_from_source(contracts_commit: Option<&str>) -> anyhow::Result<FeeParams> {
+        let system_config = SystemConfig::init_v31(contracts_commit).await?;
+        Ok(FeeParams {
             pubdataPricingMode: PubdataPricingMode::Rollup,
             batchOverheadL1Gas: system_config.batch_overhead_l1_gas,
             maxPubdataPerBatch: system_config.priority_tx_pubdata_per_batch,
             maxL2GasPerBatch: system_config.priority_tx_max_gas_per_batch,
             priorityTxMaxPubdata: system_config.priority_tx_max_pubdata,
             minimalL2GasPrice: u64::from(system_config.priority_tx_minimal_gas_price),
-        }
+        })
     }
 
-    async fn init_from_on_chain(
+    pub(crate) async fn init_from_on_chain(
         bridgehub_addr: &Address,
         network_verifier: &NetworkVerifier,
-    ) -> FeeParams {
+    ) -> anyhow::Result<FeeParams> {
         let bridgehub = Bridgehub::new(*bridgehub_addr, network_verifier.get_l1_provider().clone());
 
-        let diamond_proxy_address = &bridgehub
+        let diamond_proxy_address = bridgehub
             .getHyperchain(U256::from(network_verifier.l2_chain_id))
             .call()
             .await
-            .unwrap();
+            .map_err(|e| anyhow::anyhow!("failed to fetch Era diamond from Bridgehub: {e}"))?;
 
         let value = network_verifier
-            .get_storage_at(diamond_proxy_address, FEE_PARAM_STORAGE_SLOT)
+            .get_storage_at(&diamond_proxy_address, FEE_PARAM_STORAGE_SLOT)
             .await;
 
-        FeeParams {
-            pubdataPricingMode: PubdataPricingMode::abi_decode(&expand_to_word(&value.0[31..32]))
-                .unwrap(),
-            batchOverheadL1Gas: u32::abi_decode(&expand_to_word(&value.0[27..31])).unwrap(),
-            maxPubdataPerBatch: u32::abi_decode(&expand_to_word(&value.0[23..27])).unwrap(),
-            maxL2GasPerBatch: u32::abi_decode(&expand_to_word(&value.0[19..23])).unwrap(),
-            priorityTxMaxPubdata: u32::abi_decode(&expand_to_word(&value.0[15..19])).unwrap(),
-            minimalL2GasPrice: u64::abi_decode(&expand_to_word(&value.0[7..15])).unwrap(),
-        }
+        Self::decode_storage_word(value)
+    }
+
+    pub(crate) fn decode_storage_word(value: FixedBytes<32>) -> anyhow::Result<FeeParams> {
+        let pubdata_pricing_mode = match value.0[31] {
+            0 => PubdataPricingMode::Rollup,
+            1 => PubdataPricingMode::Validium,
+            value => anyhow::bail!("unexpected pubdataPricingMode value {value}"),
+        };
+
+        Ok(FeeParams {
+            pubdataPricingMode: pubdata_pricing_mode,
+            batchOverheadL1Gas: word_u32(&value, 27),
+            maxPubdataPerBatch: word_u32(&value, 23),
+            maxL2GasPerBatch: word_u32(&value, 19),
+            priorityTxMaxPubdata: word_u32(&value, 15),
+            minimalL2GasPrice: word_u64(&value, 7),
+        })
     }
 }
 
@@ -169,9 +173,29 @@ pub struct SystemConfig {
 }
 
 impl SystemConfig {
-    pub async fn init_from_github(commit: &str) -> Self {
+    pub async fn init_v31(contracts_commit: Option<&str>) -> anyhow::Result<Self> {
+        if let Some(contracts_commit) = contracts_commit {
+            return Self::init_from_github(contracts_commit).await;
+        }
+
+        Self::init_from_local()
+    }
+
+    fn init_from_local() -> anyhow::Result<Self> {
+        let path = repo_relative_path("SystemConfig.json");
+        let data = fs::read_to_string(&path)
+            .map_err(|e| anyhow::anyhow!("failed to read {}: {e}", path.display()))?;
+        serde_json::from_str(&data)
+            .map_err(|e| anyhow::anyhow!("failed to parse {}: {e}", path.display()))
+    }
+
+    pub async fn init_from_github(commit: &str) -> anyhow::Result<Self> {
         let contents: String = Self::get_contents(commit).await;
-        serde_json::from_str(&contents).expect("Failed to parse JSON")
+        serde_json::from_str(&contents).map_err(|e| {
+            anyhow::anyhow!(
+                "failed to parse SystemConfig.json from matter-labs/era-contracts@{commit}: {e}"
+            )
+        })
     }
 
     async fn get_contents(commit: &str) -> String {

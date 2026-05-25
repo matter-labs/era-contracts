@@ -4,9 +4,15 @@ use crate::upgrade_verification::{
     artifacts::{required_address_in_value as required_address, EcosystemUpgradeArtifact},
     constants::EIP1967_PROXY_ADMIN_SLOT,
     verifiers::{VerificationResult, Verifiers},
-    versions::v31::utils::network_verifier::{
-        Bridgehub as BridgehubContract, ChainTypeManager, L1AssetRouter, L1AssetTracker, Ownable,
-        Ownable2Step, ValidatorTimelock, ZKChainFeeParams,
+    versions::v31::{
+        utils::{
+            fee_param_verifier::{FeeParamVerifier, FeeParams},
+            network_verifier::{
+                Bridgehub as BridgehubContract, ChainTypeManager, L1AssetRouter, L1AssetTracker,
+                Ownable, Ownable2Step, ValidatorTimelock, ZKChainFeeParams,
+            },
+        },
+        MAX_PRIORITY_TX_GAS_LIMIT,
     },
 };
 
@@ -21,13 +27,6 @@ const CREATE2_FACTORY_CONTRACT_NAME: &str = "Create2Factory";
 // `DiamondInit` writes the default fee params from `Config.sol` into
 // `ZKChainStorage.s.feeParams`; this slot matches the v31 storage layout.
 const FEE_PARAMS_STORAGE_SLOT: u64 = 38;
-const DEFAULT_PUBDATA_PRICING_MODE_ROLLUP: u8 = 0;
-const DEFAULT_BATCH_OVERHEAD_L1_GAS: u32 = 1_000_000;
-const DEFAULT_MAX_PUBDATA_PER_BATCH: u32 = 120_000;
-const DEFAULT_MAX_L2_GAS_PER_BATCH: u32 = 80_000_000;
-const DEFAULT_PRIORITY_TX_MAX_PUBDATA: u32 = 99_000;
-const DEFAULT_MINIMAL_L2_GAS_PRICE: u64 = 250_000_000;
-const DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT: u64 = 72_000_000;
 const MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 10_800;
 const TESTNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS: u32 = 0;
 
@@ -60,34 +59,58 @@ fn expect_address_eq(
     }
 }
 
-fn expect_u8_eq(result: &mut VerificationResult, label: &str, actual: u8, expected: u8) {
+fn expect_debug_eq<T: std::fmt::Debug + PartialEq>(
+    result: &mut VerificationResult,
+    label: &str,
+    actual: &T,
+    expected: &T,
+) {
     if actual == expected {
-        result.report_ok(&format!("{label} matches expected value ({expected})"));
+        result.report_ok(&format!("{label} matches expected value ({expected:?})"));
     } else {
         result.report_error(&format!(
-            "{label} mismatch: expected {expected}, got {actual}"
+            "{label} mismatch: expected {expected:?}, got {actual:?}"
         ));
     }
 }
 
-fn expect_u32_eq(result: &mut VerificationResult, label: &str, actual: u32, expected: u32) {
-    if actual == expected {
-        result.report_ok(&format!("{label} matches expected value ({expected})"));
-    } else {
-        result.report_error(&format!(
-            "{label} mismatch: expected {expected}, got {actual}"
-        ));
-    }
-}
-
-fn expect_u64_eq(result: &mut VerificationResult, label: &str, actual: u64, expected: u64) {
-    if actual == expected {
-        result.report_ok(&format!("{label} matches expected value ({expected})"));
-    } else {
-        result.report_error(&format!(
-            "{label} mismatch: expected {expected}, got {actual}"
-        ));
-    }
+fn expect_fee_params_eq(result: &mut VerificationResult, actual: &FeeParams, expected: &FeeParams) {
+    expect_debug_eq(
+        result,
+        "Era feeParams.pubdataPricingMode",
+        &actual.pubdataPricingMode,
+        &expected.pubdataPricingMode,
+    );
+    expect_debug_eq(
+        result,
+        "Era feeParams.batchOverheadL1Gas",
+        &actual.batchOverheadL1Gas,
+        &expected.batchOverheadL1Gas,
+    );
+    expect_debug_eq(
+        result,
+        "Era feeParams.maxPubdataPerBatch",
+        &actual.maxPubdataPerBatch,
+        &expected.maxPubdataPerBatch,
+    );
+    expect_debug_eq(
+        result,
+        "Era feeParams.maxL2GasPerBatch",
+        &actual.maxL2GasPerBatch,
+        &expected.maxL2GasPerBatch,
+    );
+    expect_debug_eq(
+        result,
+        "Era feeParams.priorityTxMaxPubdata",
+        &actual.priorityTxMaxPubdata,
+        &expected.priorityTxMaxPubdata,
+    );
+    expect_debug_eq(
+        result,
+        "Era feeParams.minimalL2GasPrice",
+        &actual.minimalL2GasPrice,
+        &expected.minimalL2GasPrice,
+    );
 }
 
 /// RPC state checks
@@ -523,59 +546,30 @@ async fn verify_v31_era_fee_params(verifiers: &Verifiers, result: &mut Verificat
         }
     };
 
-    let actual_pubdata_pricing_mode = raw[31];
-    let actual_batch_overhead_l1_gas = u32::from_be_bytes(raw[27..31].try_into().unwrap());
-    let actual_max_pubdata_per_batch = u32::from_be_bytes(raw[23..27].try_into().unwrap());
-    let actual_max_l2_gas_per_batch = u32::from_be_bytes(raw[19..23].try_into().unwrap());
-    let actual_priority_tx_max_pubdata = u32::from_be_bytes(raw[15..19].try_into().unwrap());
-    let actual_minimal_l2_gas_price = u64::from_be_bytes(raw[7..15].try_into().unwrap());
-
-    expect_u8_eq(
+    let actual_fee_params = match FeeParamVerifier::decode_storage_word(FixedBytes::from(raw)) {
+        Ok(value) => value,
+        Err(err) => {
+            result.report_error(&format!(
+                "Cannot verify Era fee params: failed to decode storage slot {FEE_PARAMS_STORAGE_SLOT}: {err}"
+            ));
+            return;
+        }
+    };
+    expect_fee_params_eq(
         result,
-        "Era feeParams.pubdataPricingMode",
-        actual_pubdata_pricing_mode,
-        DEFAULT_PUBDATA_PRICING_MODE_ROLLUP,
-    );
-    expect_u32_eq(
-        result,
-        "Era feeParams.batchOverheadL1Gas",
-        actual_batch_overhead_l1_gas,
-        DEFAULT_BATCH_OVERHEAD_L1_GAS,
-    );
-    expect_u32_eq(
-        result,
-        "Era feeParams.maxPubdataPerBatch",
-        actual_max_pubdata_per_batch,
-        DEFAULT_MAX_PUBDATA_PER_BATCH,
-    );
-    expect_u32_eq(
-        result,
-        "Era feeParams.maxL2GasPerBatch",
-        actual_max_l2_gas_per_batch,
-        DEFAULT_MAX_L2_GAS_PER_BATCH,
-    );
-    expect_u32_eq(
-        result,
-        "Era feeParams.priorityTxMaxPubdata",
-        actual_priority_tx_max_pubdata,
-        DEFAULT_PRIORITY_TX_MAX_PUBDATA,
-    );
-    expect_u64_eq(
-        result,
-        "Era feeParams.minimalL2GasPrice",
-        actual_minimal_l2_gas_price,
-        DEFAULT_MINIMAL_L2_GAS_PRICE,
+        &actual_fee_params,
+        &verifiers.fee_param_verifier.fee_params,
     );
 
     let chain_getters = ZKChainFeeParams::new(diamond, provider);
     match chain_getters.getPriorityTxMaxGasLimit().call().await {
-        Ok(actual) if actual == U256::from(DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT) => result.report_ok(
+        Ok(actual) if actual == U256::from(MAX_PRIORITY_TX_GAS_LIMIT) => result.report_ok(
             &format!(
-                "Era getPriorityTxMaxGasLimit() matches expected value ({DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT})"
+                "Era getPriorityTxMaxGasLimit() matches expected value ({MAX_PRIORITY_TX_GAS_LIMIT})"
             ),
         ),
         Ok(actual) => result.report_error(&format!(
-            "Era getPriorityTxMaxGasLimit() mismatch: expected {DEFAULT_PRIORITY_TX_MAX_GAS_LIMIT}, got {actual}"
+            "Era getPriorityTxMaxGasLimit() mismatch: expected {MAX_PRIORITY_TX_GAS_LIMIT}, got {actual}"
         )),
         Err(err) => result.report_error(&format!(
             "Failed to call Era getPriorityTxMaxGasLimit(): {err}"
