@@ -106,9 +106,7 @@ impl GovernanceStage2Calls {
         let expected_settlement_chain_id = U256::from(verifiers.legacy_gateway_chain_id);
         let mut decommission_count: usize = 0;
         for call in &self.calls.elems {
-            if call.data.len() < 4
-                || hex::encode(&call.data[0..4]) != set_historical_selector
-            {
+            if call.data.len() < 4 || hex::encode(&call.data[0..4]) != set_historical_selector {
                 break;
             }
             match expected_intervals.get(decommission_count) {
@@ -149,8 +147,7 @@ impl GovernanceStage2Calls {
             // after the interval calls — blacklists the legacy GW.
             if decommission_count < self.calls.elems.len() {
                 let call = &self.calls.elems[decommission_count];
-                if call.data.len() >= 4
-                    && hex::encode(&call.data[0..4]) == set_settlement_selector
+                if call.data.len() >= 4 && hex::encode(&call.data[0..4]) == set_settlement_selector
                 {
                     errors += verify_call_by_name(
                         &self.calls,
@@ -958,7 +955,11 @@ fn check_historical_migration_interval(
         }
     };
     let mut errors = 0;
-    let expect = |actual: U256, expected: U256, label: &str, errors: &mut usize, result: &mut VerificationResult| {
+    let expect = |actual: U256,
+                  expected: U256,
+                  label: &str,
+                  errors: &mut usize,
+                  result: &mut VerificationResult| {
         if actual != expected {
             result.report_error(&format!(
                 "Stage 2 call #{idx} ({label}) mismatch: expected {expected}, got {actual}"

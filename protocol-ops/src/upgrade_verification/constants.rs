@@ -153,7 +153,7 @@ mod tests {
                 Pattern::System(p + "address(SYSTEM_CONTRACTS_OFFSET + 0x".len())
             } else if let Some(p) = line.find("address(0x") {
                 Pattern::Literal(p + "address(0x".len())
-            } else if line.contains("address") && line.find("= 0x").is_some() {
+            } else if line.contains("address") && line.contains("= 0x") {
                 let p = line.find("= 0x").expect("checked above");
                 Pattern::FullLiteral(p + "= 0x".len())
             } else {

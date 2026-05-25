@@ -15,7 +15,6 @@ use crate::{
     common::env_config::ChainInterval,
     upgrade_verification::{
         artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
-        constants::L2_BRIDGEHUB_ADDR,
         versions::v31::utils::{
             address_verifier::AddressVerifier,
             apply_l2_to_l1_alias,
@@ -71,6 +70,7 @@ impl GenesisConfigKind {
 
 impl Verifiers {
     /// Creates a v31 verifier context from the single ecosystem TOML.
+    #[allow(clippy::too_many_arguments)]
     pub async fn new_v31(
         env: VerifyUpgradeEnv,
         artifact: &EcosystemUpgradeArtifact,

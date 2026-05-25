@@ -481,7 +481,7 @@ impl NetworkVerifier {
 /// transaction.
 /// If successful, it returns a tuple of three items: the address of the deployed contract,
 /// the path to the contract and its constructor params.
-
+///
 /// Same logic as `check_create2_deploy` but operates on raw `(to, input)`
 /// instead of a tx hash → useful for replaying the bundle that
 /// `dev execute-safe --out` writes (the bundle log already carries the raw

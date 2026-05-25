@@ -27,6 +27,7 @@ use crate::common::logger;
 ///   `executeInstant`), match against the FIRST inner call's target and/or
 ///   selector. Used for the bundle-1 legacy-Gov ceremony pairs and the
 ///   ChainAdmin multicalls in bundles 3/4.
+///
 /// Raw on-disk shape — address-typed fields accept either a `0x…` literal
 /// or a label from `[labels]`. Resolved to the canonical [`SimDescriptionRegistry`]
 /// at load time via [`build_registry`].
