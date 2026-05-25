@@ -1,6 +1,6 @@
 use alloy::{
     hex::{self, FromHex},
-    primitives::{Address, Bytes, FixedBytes},
+    primitives::{Address, Bytes, FixedBytes, U256},
     sol,
     sol_types::SolCall,
 };
@@ -16,8 +16,10 @@ use crate::{
         artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
         constants::L2_BRIDGEHUB_ADDR,
         versions::v31::utils::{
-            address_verifier::AddressVerifier, apply_l2_to_l1_alias,
-            bytecode_verifier::BytecodeVerifier, fee_param_verifier::FeeParamVerifier,
+            address_verifier::AddressVerifier,
+            apply_l2_to_l1_alias,
+            bytecode_verifier::BytecodeVerifier,
+            fee_param_verifier::FeeParamVerifier,
             get_contents_from_github,
             network_verifier::{Bridgehub as BridgehubContract, NetworkVerifier},
             repo_relative_path,
@@ -43,6 +45,10 @@ pub(crate) struct Verifiers {
     pub gateway_bridgehub_address: Address,
     pub representative_era_chain_id: Option<u64>,
     pub legacy_gateway_chain_id: u64,
+    pub new_gateway_chain_id: u64,
+    pub new_gateway_representative_chain_id: u64,
+    pub new_gateway_representative_ctm: Address,
+    pub new_gateway_settlement_fee: U256,
     pub expected_l1_chain_id: u64,
     pub zk_token_asset_id: FixedBytes<32>,
 }
@@ -72,6 +78,9 @@ impl Verifiers {
         contracts_commit: Option<&str>,
         representative_era_chain_id: u64,
         legacy_gateway_chain_id: u64,
+        new_gateway_chain_id: u64,
+        new_gateway_representative_chain_id: u64,
+        new_gateway_settlement_fee: U256,
         expected_l1_chain_id: u64,
         zk_token_asset_id: FixedBytes<32>,
     ) -> anyhow::Result<Self> {
@@ -83,9 +92,32 @@ impl Verifiers {
         let network_verifier =
             NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into(), representative_era_chain_id)
                 .await?;
+        anyhow::ensure!(
+            network_verifier.get_gateway_chain_id() == new_gateway_chain_id,
+            "gateway RPC chain id {} does not match env [new_gateway].chain_id {}",
+            network_verifier.get_gateway_chain_id(),
+            new_gateway_chain_id,
+        );
         let fee_param_verifier =
             FeeParamVerifier::safe_init(&bridgehub_address, &network_verifier, contracts_commit)
                 .await?;
+        let new_gateway_representative_ctm = network_verifier
+            .try_get_chain_type_manager_from_bridgehub(
+                bridgehub_address,
+                U256::from(new_gateway_representative_chain_id),
+            )
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "failed to fetch Bridgehub.chainTypeManager({new_gateway_representative_chain_id}) \
+                     for [new_gateway].ctm_representative_chain_id: {e}"
+                )
+            })?;
+        anyhow::ensure!(
+            new_gateway_representative_ctm != Address::ZERO,
+            "Bridgehub.chainTypeManager({new_gateway_representative_chain_id}) returned zero; \
+             [new_gateway].ctm_representative_chain_id must point to the CTM hosted by the new Gateway",
+        );
 
         // `Bridgehub.owner()` is the L1 governance executor (the PUH proxy on
         // PUH-governed envs). It is the authoritative source for the
@@ -110,7 +142,10 @@ impl Verifiers {
 
         let mut address_verifier = AddressVerifier::new_v31_from_artifact(artifact)?;
         address_verifier.add_address(bridgehub_owner, "protocol_upgrade_handler_proxy");
-        address_verifier.add_address(aliased_bridgehub_owner, "aliased_protocol_upgrade_handler_proxy");
+        address_verifier.add_address(
+            aliased_bridgehub_owner,
+            "aliased_protocol_upgrade_handler_proxy",
+        );
 
         let era_genesis_config =
             GenesisConfig::init_v31(GenesisConfigKind::Era, contracts_commit).await?;
@@ -130,6 +165,10 @@ impl Verifiers {
             gateway_bridgehub_address: L2_BRIDGEHUB_ADDR,
             representative_era_chain_id: Some(representative_era_chain_id),
             legacy_gateway_chain_id,
+            new_gateway_chain_id,
+            new_gateway_representative_chain_id,
+            new_gateway_representative_ctm,
+            new_gateway_settlement_fee,
             expected_l1_chain_id,
             zk_token_asset_id,
         })

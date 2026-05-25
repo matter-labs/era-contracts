@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use alloy::primitives::{Address, FixedBytes};
+use alloy::primitives::{Address, FixedBytes, U256};
 use clap::{Parser, ValueEnum};
 
 use crate::common::env_config::{default_protocol_ops_out_dir, EnvConfig};
@@ -113,6 +113,15 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         )
     })?;
     let create2_factory = Address::from_slice(create2_factory_eth.as_bytes());
+    let new_gateway = env_cfg.new_gateway().ok_or_else(|| {
+        anyhow::anyhow!(
+            "{} is missing required `[new_gateway]` config for v31 verification",
+            env_cfg.permanent_values_path.display()
+        )
+    })?;
+    let new_gateway_chain_id = new_gateway.chain_id;
+    let new_gateway_representative_chain_id = new_gateway.ctm_representative_chain_id;
+    let new_gateway_settlement_fee = ethers_u256_to_alloy(new_gateway.settlement_fee);
 
     // Collect every pinned CREATE2 salt declared in the env config — the Core
     // salt from `[contracts] create2_factory_salt` plus the per-CTM salts under
@@ -154,6 +163,13 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     logger::info(format!(
         "Legacy Gateway chain ID: {legacy_gateway_chain_id}"
     ));
+    logger::info(format!("New Gateway chain ID: {new_gateway_chain_id}"));
+    logger::info(format!(
+        "New Gateway representative chain ID: {new_gateway_representative_chain_id}"
+    ));
+    logger::info(format!(
+        "New Gateway settlement fee: {new_gateway_settlement_fee}"
+    ));
     logger::info(format!("L1 chain ID (expected): {l1_chain_id}"));
     logger::info(format!("CREATE2 factory: {create2_factory}"));
     logger::info(format!("ZK token asset ID: {zk_token_asset_id}"));
@@ -178,6 +194,9 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         args.contracts_commit.as_deref(),
         era_chain_id,
         legacy_gateway_chain_id,
+        new_gateway_chain_id,
+        new_gateway_representative_chain_id,
+        new_gateway_settlement_fee,
         l1_chain_id,
         &tx_hashes,
         create2_factory,
@@ -203,4 +222,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     logger::outro(format!("{}", result));
     verification_result?;
     result.ensure_success()
+}
+
+fn ethers_u256_to_alloy(value: ethers::types::U256) -> U256 {
+    let mut bytes = [0u8; 32];
+    value.to_big_endian(&mut bytes);
+    U256::from_be_bytes(bytes)
 }

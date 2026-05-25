@@ -4,12 +4,15 @@
 
 use std::str::FromStr;
 
-use alloy::primitives::{Address, FixedBytes};
+use alloy::primitives::{Address, FixedBytes, U256};
 
-use crate::{commands::ecosystem::verify_upgrade::VerifyUpgradeEnv, upgrade_verification::{
-    artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
-    verifiers::{VerificationResult, Verifiers},
-}};
+use crate::{
+    commands::ecosystem::verify_upgrade::VerifyUpgradeEnv,
+    upgrade_verification::{
+        artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
+        verifiers::{VerificationResult, Verifiers},
+    },
+};
 
 pub(crate) mod elements;
 pub(crate) mod utils;
@@ -64,6 +67,9 @@ pub(crate) async fn verify(
     contracts_commit: Option<&str>,
     era_chain_id: u64,
     legacy_gateway_chain_id: u64,
+    new_gateway_chain_id: u64,
+    new_gateway_representative_chain_id: u64,
+    new_gateway_settlement_fee: U256,
     l1_chain_id: u64,
     tx_hashes: &[FixedBytes<32>],
     create2_factory: Address,
@@ -80,6 +86,9 @@ pub(crate) async fn verify(
         contracts_commit,
         era_chain_id,
         legacy_gateway_chain_id,
+        new_gateway_chain_id,
+        new_gateway_representative_chain_id,
+        new_gateway_settlement_fee,
         l1_chain_id,
         zk_token_asset_id,
     )

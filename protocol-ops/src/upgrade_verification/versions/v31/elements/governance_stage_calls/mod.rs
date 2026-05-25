@@ -30,8 +30,8 @@ use crate::upgrade_verification::{
     verifiers::{VerificationResult, Verifiers},
 };
 
-use super::{call_list::CallList, super::expected_old_protocol_version_label};
 use super::super::get_expected_old_protocol_version_for_ctm_flavor;
+use super::{super::expected_old_protocol_version_label, call_list::CallList};
 
 mod facets;
 mod helpers;
@@ -66,6 +66,8 @@ sol! {
     function addChainTypeManager(address _chainTypeManager);
     function acceptOwnership();
     function setGatewaySettlementFee(uint256 _newFee);
+    function setAssetHandlerAddress(uint256 _originChainId, bytes32 _assetId, address _assetHandlerAddress);
+    function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress);
 
     // Outer `requestL2TransactionDirect((...))` priority-tx struct. Layout
     // matches `L2TransactionRequestDirect` in `IBridgehubBase.sol`.
@@ -81,6 +83,22 @@ sol! {
         address refundRecipient;
     }
     function requestL2TransactionDirect(L2TransactionRequestDirect _request);
+
+    // Outer `requestL2TransactionTwoBridges((...))` priority-tx struct.
+    // Layout matches `L2TransactionRequestTwoBridgesOuter` in
+    // `IBridgehubBase.sol`.
+    struct L2TransactionRequestTwoBridgesOuter {
+        uint256 chainId;
+        uint256 mintValue;
+        uint256 l2Value;
+        uint256 l2GasLimit;
+        uint256 l2GasPerPubdataByteLimit;
+        address refundRecipient;
+        address secondBridgeAddress;
+        uint256 secondBridgeValue;
+        bytes secondBridgeCalldata;
+    }
+    function requestL2TransactionTwoBridges(L2TransactionRequestTwoBridgesOuter _request);
 
     #[sol(rpc)]
     contract BridgehubOwnerView {
