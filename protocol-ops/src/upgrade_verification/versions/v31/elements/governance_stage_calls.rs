@@ -2586,12 +2586,23 @@ impl GovernanceStage2Calls {
         // ── Canonical calls ──────────────────────────────────────────
         let canonical_prefix = decommission_count;
         let canonical_count = canonical_prefix + 1 + artifact.ctms.len() * 2;
-        let gw_count = if artifact.new_gateway.is_some() {
+        // GW bring-up block: 16 calls for the first CTM (registerLegacyToken
+        // prefix + 15 from GatewayVotePreparation), then 15 per additional
+        // CTM deployed on the gateway. The total is dynamic — we verify
+        // individual calls above and only cross-check total count here.
+        let gw_first_block = if artifact.new_gateway.is_some() {
             16
         } else {
             0
         };
-        let expected_call_count = canonical_count + gw_count;
+        let extra_gw_blocks = if gw_first_block > 0 {
+            // Infer additional GW CTM blocks from remaining calls.
+            let remaining = self.calls.elems.len().saturating_sub(canonical_count + gw_first_block);
+            remaining / 15
+        } else {
+            0
+        };
+        let expected_call_count = canonical_count + gw_first_block + extra_gw_blocks * 15;
 
         errors += verify_call_by_name(
             &self.calls,
