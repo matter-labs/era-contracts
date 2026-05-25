@@ -12,7 +12,7 @@ use crate::upgrade_verification::{
                 Ownable, Ownable2Step, ValidatorTimelock, ZKChainFeeParams,
             },
         },
-        MAX_PRIORITY_TX_GAS_LIMIT,
+        MAX_PRIORITY_TX_GAS_LIMIT, STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID,
     },
 };
 
@@ -158,6 +158,7 @@ pub(crate) async fn verify_v31_artifact_state(
     verify_v31_timer_admin_state(artifact, verifiers, result).await?;
     verify_v31_ctm_permissionless_validator(artifact, verifiers, result).await?;
     verify_v31_ctm_flavor(artifact, verifiers, result).await?;
+    verify_v31_chain_settlement_layers(verifiers, result).await;
 
     Ok(())
 }
@@ -754,4 +755,55 @@ async fn verify_v31_ctm_flavor(
         }
     }
     Ok(())
+}
+
+/// Stage-1 `MessageRoot.initializeL1V31Upgrade()` iterates
+/// `Bridgehub.getAllZKChainChainIDs()` and `require`s every chain to have
+/// `settlementLayer(chainId) == block.chainid`. Failing that on execution
+/// would revert the governance proposal after signers approve it, so PUVT
+/// pre-flights the same iteration at the review block.
+///
+/// `L1MessageRootStageSepolia` skips chain
+/// `STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID` (270) because it's still
+/// settling on the legacy stage Gateway at v31 upgrade time; PUVT applies
+/// the same skip when `is_stage` is set.
+async fn verify_v31_chain_settlement_layers(
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) {
+    let provider = verifiers.network_verifier.get_l1_provider();
+    let bridgehub = BridgehubContract::new(verifiers.bridgehub_address, provider.clone());
+    let expected_l1 = U256::from(verifiers.expected_l1_chain_id);
+
+    let chain_ids = match bridgehub.getAllZKChainChainIDs().call().await {
+        Ok(ids) => ids,
+        Err(err) => {
+            result.report_error(&format!(
+                "Failed to call Bridgehub.getAllZKChainChainIDs() for settlementLayer pre-flight: {err}"
+            ));
+            return;
+        }
+    };
+
+    for chain_id in chain_ids {
+        if verifiers.env.is_stage()
+            && chain_id == U256::from(STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID)
+        {
+            result.report_ok(&format!(
+                "Skipping settlementLayer check for stage chain {chain_id} (L1MessageRootStageSepolia exception)"
+            ));
+            continue;
+        }
+        match bridgehub.settlementLayer(chain_id).call().await {
+            Ok(sl) if sl == expected_l1 => result.report_ok(&format!(
+                "Bridgehub.settlementLayer({chain_id}) == L1 ({expected_l1})"
+            )),
+            Ok(sl) => result.report_error(&format!(
+                "Bridgehub.settlementLayer({chain_id}) mismatch: expected L1 {expected_l1}, got {sl}. Stage-1 MessageRoot.initializeL1V31Upgrade() would revert."
+            )),
+            Err(err) => result.report_error(&format!(
+                "Failed to call Bridgehub.settlementLayer({chain_id}): {err}"
+            )),
+        }
+    }
 }

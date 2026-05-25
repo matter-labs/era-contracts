@@ -359,9 +359,11 @@ async fn verify_core_provenance(
 
     // L1MessageRoot has a stage-sepolia variant with the same constructor
     // signature but different runtime bytecode. The choice is fixed by the
-    // env: mainnet expects `L1MessageRoot`; stage/testnet (on Sepolia)
-    // expect `L1MessageRootStageSepolia`.
-    let message_root_file = if verifiers.testnet_contracts {
+    // env: stage expects `L1MessageRootStageSepolia` (it skips chain 270 in
+    // `_v31InitializeInner` because that chain is still settling on the
+    // legacy stage Gateway at v31 upgrade time); testnet and mainnet expect
+    // the canonical `L1MessageRoot`.
+    let message_root_file = if verifiers.env.is_stage() {
         "l1-contracts/L1MessageRootStageSepolia"
     } else {
         "l1-contracts/L1MessageRoot"
@@ -807,7 +809,7 @@ fn verify_ctm_base_provenance(
         &scope,
         &["state_transition", "verifier_plonk_addr"],
     )?;
-    let verifier_file = if verifiers.testnet_contracts {
+    let verifier_file = if !verifiers.env.is_mainnet() {
         testnet_verifier_file
     } else {
         dual_verifier_file

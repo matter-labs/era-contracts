@@ -33,7 +33,7 @@ sol! {
 
 /// Holds various verifiers and configuration parameters.
 pub(crate) struct Verifiers {
-    pub testnet_contracts: bool,
+    pub env: VerifyUpgradeEnv,
     pub bridgehub_address: Address,
     pub bridgehub_owner: Address,
     pub address_verifier: AddressVerifier,
@@ -84,6 +84,21 @@ impl Verifiers {
         expected_l1_chain_id: u64,
         zk_token_asset_id: FixedBytes<32>,
     ) -> anyhow::Result<Self> {
+        // Audit item B: artifact `is_testnet` per CTM must agree with the
+        // selected env. Otherwise a mainnet run could accept testnet-flagged
+        // artifacts whose Mailbox/Migrator constructor args and VT delay
+        // would later mismatch live state in confusing, downstream ways.
+        let expected_is_testnet = !env.is_mainnet();
+        for ctm in &artifact.ctms {
+            anyhow::ensure!(
+                ctm.contracts_config.is_testnet == expected_is_testnet,
+                "[ctms.{}.contracts_config].is_testnet = {} disagrees with --env {} (expected {expected_is_testnet})",
+                ctm.flavor.label(),
+                ctm.contracts_config.is_testnet,
+                env.as_str(),
+            );
+        }
+
         let bridgehub_address = AddressVerifier::address_from_artifact(
             artifact,
             &["upgrade_addresses", "bridgehub", "bridgehub_proxy_addr"],
@@ -153,7 +168,7 @@ impl Verifiers {
             GenesisConfig::init_v31(GenesisConfigKind::ZksyncOs, contracts_commit).await?;
 
         Ok(Self {
-            testnet_contracts: !env.is_mainnet(),
+            env,
             bridgehub_address,
             bridgehub_owner,
             address_verifier,

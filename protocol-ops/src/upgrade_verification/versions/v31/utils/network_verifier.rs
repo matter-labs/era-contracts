@@ -36,6 +36,7 @@ sol! {
         mapping(uint256 _chainId => address) public chainTypeManager;
         function getHyperchain(uint256 _chainId) external view returns (address chainAddress);
         function getAllZKChainChainIDs() external view returns (uint256[] memory);
+        function settlementLayer(uint256 _chainId) external view returns (uint256);
         function assetRouter() external view returns (address);
         function l1CtmDeployer() external view returns (address);
         function messageRoot() external view returns (address);

@@ -72,7 +72,7 @@ pub enum VerifyUpgradeEnv {
 }
 
 impl VerifyUpgradeEnv {
-    fn as_str(self) -> &'static str {
+    pub fn as_str(self) -> &'static str {
         match self {
             Self::Stage => "stage",
             Self::Testnet => "testnet",
@@ -82,6 +82,10 @@ impl VerifyUpgradeEnv {
 
     pub fn is_mainnet(self) -> bool {
         matches!(self, Self::Mainnet)
+    }
+
+    pub fn is_stage(self) -> bool {
+        matches!(self, Self::Stage)
     }
 }
 

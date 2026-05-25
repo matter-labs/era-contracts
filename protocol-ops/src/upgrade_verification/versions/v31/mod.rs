@@ -30,6 +30,14 @@ pub(crate) const EXPECTED_ZKSYNC_OS_OLD_PROTOCOL_VERSION_STR: &str = "0.30.1";
 pub(crate) const MAX_NUMBER_OF_ZK_CHAINS: u32 = 100;
 pub(crate) const MAX_PRIORITY_TX_GAS_LIMIT: u32 = 72_000_000;
 
+/// Stage Sepolia's Era chain (270) is the single registered chain still
+/// settling on the legacy stage Gateway at v31 upgrade time.
+/// `L1MessageRootStageSepolia._v31InitializeInner` skips it (see
+/// `l1-contracts/contracts/dev-contracts/L1MessageRootStageSepolia.sol`),
+/// so PUVT must apply the same skip when pre-flighting the
+/// `Bridgehub.settlementLayer(chainId) == L1` invariant on stage.
+pub(crate) const STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID: u64 = 270;
+
 pub(crate) fn get_expected_new_protocol_version() -> ProtocolVersion {
     ProtocolVersion::from_str(EXPECTED_NEW_PROTOCOL_VERSION_STR).unwrap()
 }
