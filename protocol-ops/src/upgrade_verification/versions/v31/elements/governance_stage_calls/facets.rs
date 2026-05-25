@@ -468,4 +468,3 @@ fn facet_selectors_from_bytecode(bytecode: &[u8]) -> HashSet<[u8; 4]> {
         .filter(|selector| selector != &[0x17, 0xd7, 0xde, 0x7c])
         .collect()
 }
-

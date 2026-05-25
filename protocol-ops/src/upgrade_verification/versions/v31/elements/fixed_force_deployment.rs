@@ -206,7 +206,9 @@ impl FixedForceDeploymentsData {
         let expected_aliased_governance = verifiers
             .address_verifier
             .get_by_name("aliased_protocol_upgrade_handler_proxy")
-            .expect("aliased_protocol_upgrade_handler_proxy must be registered by Verifiers::new_v31");
+            .expect(
+                "aliased_protocol_upgrade_handler_proxy must be registered by Verifiers::new_v31",
+            );
         if self.aliasedL1Governance != expected_aliased_governance {
             result.report_error(&format!(
                 "aliasedL1Governance mismatch: expected {expected_aliased_governance}, got {}",

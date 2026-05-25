@@ -33,7 +33,7 @@ use super::helpers::{
     verify_call_by_name,
 };
 use super::{
-    upgradeAndCallCall, updateGuardiansCall, BridgehubOwnerView, GovernanceStage0Calls,
+    updateGuardiansCall, upgradeAndCallCall, BridgehubOwnerView, GovernanceStage0Calls,
     ProtocolUpgradeHandler,
 };
 

@@ -92,9 +92,18 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
         proxy!("l1-contracts/InteropHandler", L2_INTEROP_HANDLER_ADDR),
         proxy!("l1-contracts/GWAssetTracker", GW_ASSET_TRACKER_ADDR),
         // ── ZKsync-OS system contracts (getZKsyncOSExtraSystemContracts, 3 entries) ──
-        proxy!("l1-contracts/L2BaseTokenZKOS", L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR),
-        proxy!("l1-contracts/L1MessengerZKOS", L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
-        proxy!("l1-contracts/SystemContext", L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR),
+        proxy!(
+            "l1-contracts/L2BaseTokenZKOS",
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
+        ),
+        proxy!(
+            "l1-contracts/L1MessengerZKOS",
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
+        ),
+        proxy!(
+            "l1-contracts/SystemContext",
+            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR
+        ),
         // ── ProxyAdmin (_buildZKsyncOSProxyAdminEntry) ──
         unsafe_fd!(
             "l1-contracts/SystemContractProxyAdmin",

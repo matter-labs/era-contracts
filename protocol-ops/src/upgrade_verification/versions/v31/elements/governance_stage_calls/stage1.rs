@@ -41,8 +41,8 @@ use super::helpers::{
     required_ctm_address, verify_call_by_address, verify_call_by_name,
 };
 use super::{
-    initializeL1V31UpgradeCall, setAssetTrackerCall, setChainCreationParamsCall, upgradeAndCallCall,
-    upgradeCall, CallList, GovernanceStage1Calls,
+    initializeL1V31UpgradeCall, setAssetTrackerCall, setChainCreationParamsCall,
+    upgradeAndCallCall, upgradeCall, CallList, GovernanceStage1Calls,
 };
 
 /// Stage 1 call layout: 10 ecosystem-wide core calls (indices 0..=9), then 6

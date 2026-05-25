@@ -324,11 +324,7 @@ async fn verify_v31_core_wiring(
     let expected_message_root = required_address(
         &artifact.core,
         "core",
-        &[
-            "upgrade_addresses",
-            "bridgehub",
-            "message_root_proxy_addr",
-        ],
+        &["upgrade_addresses", "bridgehub", "message_root_proxy_addr"],
     )?;
 
     let asset_router = L1AssetRouter::new(expected_asset_router, provider.clone());
@@ -466,8 +462,7 @@ async fn verify_v31_core_wiring(
     // mainnet) before stage 0/1/2 run — `pauseMigration()`, `setAddresses()`,
     // and `unpauseMigration()` are all owner-gated. We expect governance to be
     // `bridgehub.owner()` (== the PUH proxy on PUH-governed envs).
-    let chain_asset_handler_owner =
-        Ownable::new(expected_chain_asset_handler, provider.clone());
+    let chain_asset_handler_owner = Ownable::new(expected_chain_asset_handler, provider.clone());
     match chain_asset_handler_owner.owner().call().await {
         Ok(actual) => {
             expect_address_eq(result, "ChainAssetHandler.owner()", actual, bridgehub_owner)

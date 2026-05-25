@@ -14,21 +14,20 @@ use std::collections::HashMap;
 
 use crate::upgrade_verification::{
     constants::{
-        literal_addr, ECADD_SYSTEM_CONTRACT, ECMUL_SYSTEM_CONTRACT, ECPAIRING_SYSTEM_CONTRACT,
-        ECRECOVER_SYSTEM_CONTRACT, EVENT_WRITER_CONTRACT, EVM_GAS_MANAGER, EVM_PREDEPLOYS_MANAGER,
-        GW_ASSET_TRACKER_ADDR, IDENTITY_SYSTEM_CONTRACT, KECCAK256_SYSTEM_CONTRACT,
-        L2_ACCOUNT_CODE_STORAGE_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR,
-        L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS,
-        L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPRESSOR_ADDR,
+        literal_addr, CODE_ORACLE_SYSTEM_CONTRACT, ECADD_SYSTEM_CONTRACT, ECMUL_SYSTEM_CONTRACT,
+        ECPAIRING_SYSTEM_CONTRACT, ECRECOVER_SYSTEM_CONTRACT, EVENT_WRITER_CONTRACT,
+        EVM_GAS_MANAGER, EVM_PREDEPLOYS_MANAGER, GW_ASSET_TRACKER_ADDR, IDENTITY_SYSTEM_CONTRACT,
+        KECCAK256_SYSTEM_CONTRACT, L2_ACCOUNT_CODE_STORAGE_ADDR, L2_ASSET_ROUTER_ADDR,
+        L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_HOLDER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+        L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPRESSOR_ADDR,
         L2_CREATE2_FACTORY_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_CENTER_ADDR,
         L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE_ADDR,
         L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR,
-        L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR,
-        L2_PUBDATA_CHUNK_PUBLISHER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-        L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-        L2_V31_UPGRADE_CONTRACT, L2_VERSION_SPECIFIC_UPGRADER_ADDR,
-        L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, MODEXP_SYSTEM_CONTRACT, MSG_VALUE_SYSTEM_CONTRACT,
-        SHA256_SYSTEM_CONTRACT, SLOAD_CONTRACT_ADDR, CODE_ORACLE_SYSTEM_CONTRACT,
+        L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR,
+        L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_V31_UPGRADE_CONTRACT,
+        L2_VERSION_SPECIFIC_UPGRADER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, MODEXP_SYSTEM_CONTRACT,
+        MSG_VALUE_SYSTEM_CONTRACT, SHA256_SYSTEM_CONTRACT, SLOAD_CONTRACT_ADDR,
     },
     verifiers::{VerificationResult, Verifiers},
 };
@@ -86,7 +85,10 @@ fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
         simple!("EcPairing", ECPAIRING_SYSTEM_CONTRACT),
         simple!("Modexp", MODEXP_SYSTEM_CONTRACT),
         simple!("system-contracts/EmptyContract", L2_BOOTLOADER_ADDRESS), // bootloader slot
-        simple!("system-contracts/AccountCodeStorage", L2_ACCOUNT_CODE_STORAGE_ADDR),
+        simple!(
+            "system-contracts/AccountCodeStorage",
+            L2_ACCOUNT_CODE_STORAGE_ADDR
+        ),
         simple!("system-contracts/NonceHolder", 0x8003),
         simple!(
             "system-contracts/KnownCodesStorage",
@@ -101,9 +103,15 @@ fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
             "system-contracts/L1Messenger",
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
         ),
-        simple!("system-contracts/MsgValueSimulator", MSG_VALUE_SYSTEM_CONTRACT),
+        simple!(
+            "system-contracts/MsgValueSimulator",
+            MSG_VALUE_SYSTEM_CONTRACT
+        ),
         // L2BaseToken bytecode is L2BaseTokenEra
-        simple!("l1-contracts/L2BaseTokenEra", L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR),
+        simple!(
+            "l1-contracts/L2BaseTokenEra",
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR
+        ),
         simple!(
             "system-contracts/SystemContext",
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR
@@ -118,7 +126,10 @@ fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
         ),
         simple!("CodeOracle", CODE_ORACLE_SYSTEM_CONTRACT),
         simple!("EvmGasManager", EVM_GAS_MANAGER),
-        simple!("system-contracts/EvmPredeploysManager", EVM_PREDEPLOYS_MANAGER),
+        simple!(
+            "system-contracts/EvmPredeploysManager",
+            EVM_PREDEPLOYS_MANAGER
+        ),
         simple!("system-contracts/EvmHashesStorage", 0x8015),
         simple!("P256Verify", 0x0100),
         simple!("system-contracts/Create2Factory", L2_CREATE2_FACTORY_ADDR),
@@ -160,10 +171,7 @@ fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
         simple!("l1-contracts/InteropHandler", L2_INTEROP_HANDLER_ADDR),
         simple!("l1-contracts/GWAssetTracker", GW_ASSET_TRACKER_ADDR),
         // ── Additional: L2V31Upgrade (the delegate target for this upgrade) ──
-        simple!(
-            L2_V31_UPGRADE_CONTRACT,
-            L2_VERSION_SPECIFIC_UPGRADER_ADDR
-        ),
+        simple!(L2_V31_UPGRADE_CONTRACT, L2_VERSION_SPECIFIC_UPGRADER_ADDR),
     ]
 }
 
