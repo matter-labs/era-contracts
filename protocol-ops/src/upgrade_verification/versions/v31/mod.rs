@@ -8,6 +8,7 @@ use alloy::primitives::{Address, FixedBytes, U256};
 
 use crate::{
     commands::ecosystem::verify_upgrade::VerifyUpgradeEnv,
+    common::env_config::ChainInterval,
     upgrade_verification::{
         artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
         verifiers::{VerificationResult, Verifiers},
@@ -92,6 +93,7 @@ pub(crate) async fn verify(
     contracts_commit: Option<&str>,
     era_chain_id: u64,
     legacy_gateway_chain_id: u64,
+    legacy_gateway_chain_intervals: &[ChainInterval],
     new_gateway_chain_id: u64,
     new_gateway_representative_chain_id: u64,
     new_gateway_settlement_fee: U256,
@@ -111,6 +113,7 @@ pub(crate) async fn verify(
         contracts_commit,
         era_chain_id,
         legacy_gateway_chain_id,
+        legacy_gateway_chain_intervals,
         new_gateway_chain_id,
         new_gateway_representative_chain_id,
         new_gateway_settlement_fee,

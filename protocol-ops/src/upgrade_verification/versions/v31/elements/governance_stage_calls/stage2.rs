@@ -21,20 +21,45 @@
 use alloy::{
     hex,
     primitives::{keccak256, Address, Bytes, FixedBytes, U256},
-    sol_types::SolValue,
+    sol,
+    sol_types::{SolCall, SolValue},
 };
 
-use crate::upgrade_verification::{
-    artifacts::{EcosystemUpgradeArtifact, NewGatewayArtifact},
-    constants::{
-        GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR,
-        L2_CHAIN_ASSET_HANDLER_ADDR, L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT,
+use crate::{
+    common::env_config::ChainInterval,
+    upgrade_verification::{
+        artifacts::{EcosystemUpgradeArtifact, NewGatewayArtifact},
+        constants::{
+            GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR,
+            L2_CHAIN_ASSET_HANDLER_ADDR, L2_UPGRADE_GAS_PER_PUBDATA_BYTE_LIMIT,
+        },
+        verifiers::{VerificationResult, Verifiers},
+        versions::v31::MAX_PRIORITY_TX_GAS_LIMIT,
     },
-    verifiers::{VerificationResult, Verifiers},
-    versions::v31::MAX_PRIORITY_TX_GAS_LIMIT,
 };
 
 use super::super::super::utils::compute_selector;
+
+sol! {
+    /// Mirrors `IChainAssetHandler.sol::MigrationInterval`. PUVT decodes
+    /// every stage-2 `setHistoricalMigrationInterval` call's third arg into
+    /// this struct so the per-field invariants can be cross-checked against
+    /// `[[legacy_gateway.chain_intervals]]` in `permanent-values/<env>.toml`.
+    #[derive(Debug)]
+    struct MigrationInterval {
+        uint256 migrateToGWBatchNumber;
+        uint256 migrateFromGWBatchNumber;
+        uint256 settlementLayerBatchLowerBound;
+        uint256 settlementLayerBatchUpperBound;
+        uint256 settlementLayerChainId;
+        bool isActive;
+    }
+    function setHistoricalMigrationInterval(
+        uint256 chainId,
+        uint256 migrationNumber,
+        MigrationInterval interval,
+    );
+}
 use super::helpers::{required_ctm_address, verify_call_by_address, verify_call_by_name};
 use super::{
     CallList, GovernanceStage2Calls, L2TransactionRequestDirect,
@@ -65,19 +90,48 @@ impl GovernanceStage2Calls {
         );
         let set_settlement_selector = compute_selector("setSettlementLayerStatus(uint256,bool)");
 
+        let expected_intervals = &verifiers.legacy_gateway_chain_intervals;
+        let expected_settlement_chain_id = U256::from(verifiers.legacy_gateway_chain_id);
         let mut decommission_count: usize = 0;
         for call in &self.calls.elems {
-            if call.data.len() >= 4
-                && hex::encode(&call.data[0..4]) == set_historical_selector
+            if call.data.len() < 4
+                || hex::encode(&call.data[0..4]) != set_historical_selector
             {
-                decommission_count += 1;
-            } else {
                 break;
             }
+            match expected_intervals.get(decommission_count) {
+                Some(expected) => {
+                    errors += check_historical_migration_interval(
+                        decommission_count,
+                        &call.data,
+                        expected,
+                        expected_settlement_chain_id,
+                        result,
+                    );
+                }
+                None => {
+                    result.report_error(&format!(
+                        "Stage 2 has more setHistoricalMigrationInterval calls than \
+                         [[legacy_gateway.chain_intervals]] entries; unexpected call at index {decommission_count}"
+                    ));
+                    errors += 1;
+                }
+            }
+            decommission_count += 1;
+        }
+        if decommission_count != expected_intervals.len() {
+            result.report_error(&format!(
+                "Stage 2 has {} setHistoricalMigrationInterval call(s) but env declares {} \
+                 [[legacy_gateway.chain_intervals]] entries",
+                decommission_count,
+                expected_intervals.len(),
+            ));
+            errors += 1;
         }
         if decommission_count > 0 {
             result.report_ok(&format!(
-                "{decommission_count} setHistoricalMigrationInterval call(s) (legacy GW decommission)"
+                "Stage 2 decommission prefix: verified {decommission_count} \
+                 setHistoricalMigrationInterval call(s) against [[legacy_gateway.chain_intervals]]"
             ));
             // Expect setSettlementLayerStatus(oldGwChainId, false) immediately
             // after the interval calls — blacklists the legacy GW.
@@ -804,6 +858,91 @@ fn check_set_gateway_settlement_fee(
         ));
         1
     }
+}
+
+fn check_historical_migration_interval(
+    idx: usize,
+    calldata: &[u8],
+    expected: &ChainInterval,
+    expected_settlement_chain_id: U256,
+    result: &mut VerificationResult,
+) -> usize {
+    let decoded = match setHistoricalMigrationIntervalCall::abi_decode(calldata) {
+        Ok(decoded) => decoded,
+        Err(err) => {
+            result.report_error(&format!(
+                "Stage 2 call #{idx}: failed to decode setHistoricalMigrationInterval: {err}"
+            ));
+            return 1;
+        }
+    };
+    let mut errors = 0;
+    let expect = |actual: U256, expected: U256, label: &str, errors: &mut usize, result: &mut VerificationResult| {
+        if actual != expected {
+            result.report_error(&format!(
+                "Stage 2 call #{idx} ({label}) mismatch: expected {expected}, got {actual}"
+            ));
+            *errors += 1;
+        }
+    };
+    expect(
+        decoded.chainId,
+        U256::from(expected.chain_id),
+        "setHistoricalMigrationInterval.chainId",
+        &mut errors,
+        result,
+    );
+    // Deploy script ([CoreUpgrade_v31.s.sol:394]) always passes `0`.
+    expect(
+        decoded.migrationNumber,
+        U256::ZERO,
+        "setHistoricalMigrationInterval.migrationNumber",
+        &mut errors,
+        result,
+    );
+    expect(
+        decoded.interval.migrateToGWBatchNumber,
+        U256::from(expected.migrate_to_sl_batch),
+        "MigrationInterval.migrateToGWBatchNumber",
+        &mut errors,
+        result,
+    );
+    expect(
+        decoded.interval.migrateFromGWBatchNumber,
+        U256::from(expected.migrate_from_sl_batch),
+        "MigrationInterval.migrateFromGWBatchNumber",
+        &mut errors,
+        result,
+    );
+    expect(
+        decoded.interval.settlementLayerBatchLowerBound,
+        U256::from(expected.sl_batch_lower_bound),
+        "MigrationInterval.settlementLayerBatchLowerBound",
+        &mut errors,
+        result,
+    );
+    expect(
+        decoded.interval.settlementLayerBatchUpperBound,
+        U256::from(expected.sl_batch_upper_bound),
+        "MigrationInterval.settlementLayerBatchUpperBound",
+        &mut errors,
+        result,
+    );
+    expect(
+        decoded.interval.settlementLayerChainId,
+        expected_settlement_chain_id,
+        "MigrationInterval.settlementLayerChainId",
+        &mut errors,
+        result,
+    );
+    if decoded.interval.isActive {
+        result.report_error(&format!(
+            "Stage 2 call #{idx}: MigrationInterval.isActive must be false for historical intervals (chain {} no longer settles on the legacy GW)",
+            expected.chain_id
+        ));
+        errors += 1;
+    }
+    errors
 }
 
 fn check_register_legacy_token(

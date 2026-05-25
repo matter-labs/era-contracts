@@ -12,6 +12,7 @@ use std::panic::Location;
 
 use crate::{
     commands::ecosystem::verify_upgrade::VerifyUpgradeEnv,
+    common::env_config::ChainInterval,
     upgrade_verification::{
         artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
         constants::L2_BRIDGEHUB_ADDR,
@@ -45,6 +46,7 @@ pub(crate) struct Verifiers {
     pub gateway_bridgehub_address: Address,
     pub representative_era_chain_id: Option<u64>,
     pub legacy_gateway_chain_id: u64,
+    pub legacy_gateway_chain_intervals: Vec<ChainInterval>,
     pub new_gateway_chain_id: u64,
     pub new_gateway_representative_chain_id: u64,
     pub new_gateway_representative_ctm: Address,
@@ -78,6 +80,7 @@ impl Verifiers {
         contracts_commit: Option<&str>,
         representative_era_chain_id: u64,
         legacy_gateway_chain_id: u64,
+        legacy_gateway_chain_intervals: &[ChainInterval],
         new_gateway_chain_id: u64,
         new_gateway_representative_chain_id: u64,
         new_gateway_settlement_fee: U256,
@@ -180,6 +183,7 @@ impl Verifiers {
             gateway_bridgehub_address: L2_BRIDGEHUB_ADDR,
             representative_era_chain_id: Some(representative_era_chain_id),
             legacy_gateway_chain_id,
+            legacy_gateway_chain_intervals: legacy_gateway_chain_intervals.to_vec(),
             new_gateway_chain_id,
             new_gateway_representative_chain_id,
             new_gateway_representative_ctm,

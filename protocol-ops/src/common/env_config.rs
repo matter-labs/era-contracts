@@ -69,6 +69,25 @@ pub struct PermanentValues {
 #[derive(Debug, Deserialize, Clone)]
 pub struct LegacyGatewayConfig {
     pub chain_id: u64,
+    /// Per-chain historical migration intervals that PUVT cross-checks against
+    /// every `setHistoricalMigrationInterval` call in stage 2's decommission
+    /// prefix. One TOML entry per call; order is preserved.
+    #[serde(default)]
+    pub chain_intervals: Vec<ChainInterval>,
+}
+
+/// Mirrors a `[[legacy_gateway.chain_intervals]]` entry in
+/// `permanent-values/<env>.toml`. The Solidity struct
+/// `MigrationInterval` ([IChainAssetHandler.sol]) is built from these fields
+/// plus `settlementLayerChainId = legacy_gateway.chain_id` and
+/// `isActive = false` (these are historical/completed intervals).
+#[derive(Debug, Deserialize, Clone)]
+pub struct ChainInterval {
+    pub chain_id: u64,
+    pub migrate_to_sl_batch: u64,
+    pub migrate_from_sl_batch: u64,
+    pub sl_batch_lower_bound: u64,
+    pub sl_batch_upper_bound: u64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -328,6 +347,14 @@ impl EnvConfig {
 
     pub fn legacy_gateway_chain_id(&self) -> Option<u64> {
         self.permanent.legacy_gateway.as_ref().map(|gw| gw.chain_id)
+    }
+
+    pub fn legacy_gateway_chain_intervals(&self) -> &[ChainInterval] {
+        self.permanent
+            .legacy_gateway
+            .as_ref()
+            .map(|gw| gw.chain_intervals.as_slice())
+            .unwrap_or(&[])
     }
 
     pub fn l1_chain_id(&self) -> Option<u64> {
