@@ -66,6 +66,23 @@ pub(crate) fn expected_old_protocol_version_label(flavor: CtmFlavor) -> &'static
     }
 }
 
+/// Run the full v31 verification pipeline.
+///
+/// Ordering mirrors the legacy PUVT (`UpgradeOutput::verify` in
+/// `protocol-upgrade-verification-tool`):
+///
+///   1. Verifier construction (incl. SystemConfig.json fee-params init).
+///   2. CREATE2 provenance map population — v31-specific prep that must precede
+///      provenance consumption below.
+///   3. RPC state checks — chain ids, Create2Factory bytecode, proxy admins,
+///      live core wiring, validator timelocks, fee params, settlement layer.
+///      Subsumes legacy's early chain-id sanity (legacy steps 2–3).
+///   4. Deployment provenance — every named v31 deploy + the new-GW CTM
+///      provenance flow (legacy step 4).
+///   5. Per-chain protocol-version sweep — was bundled inside legacy
+///      `deployed_addresses.verify`; sits next to provenance for the same
+///      reason.
+///   6. Stage 0 / 1 / 2 governance calls (legacy steps 7–9). Last.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn verify(
     env: VerifyUpgradeEnv,
@@ -140,10 +157,6 @@ pub(crate) async fn verify(
         count,
     ));
 
-    verify_governance_stage_calls(artifact, &verifiers, result).await?;
-
-    verify_per_chain_protocol_versions(artifact, &verifiers, result).await?;
-
     verify_v31_artifact_state(artifact, &verifiers, create2_factory, result).await?;
 
     verify_v31_provenance(
@@ -154,6 +167,10 @@ pub(crate) async fn verify(
         result,
     )
     .await?;
+
+    verify_per_chain_protocol_versions(artifact, &verifiers, result).await?;
+
+    verify_governance_stage_calls(artifact, &verifiers, result).await?;
 
     Ok(())
 }
