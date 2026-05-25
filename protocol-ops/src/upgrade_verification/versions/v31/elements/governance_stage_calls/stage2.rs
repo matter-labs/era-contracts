@@ -59,6 +59,11 @@ sol! {
         uint256 migrationNumber,
         MigrationInterval interval,
     );
+
+    /// Stage-2 uses this twice with different `(chainId, status)`:
+    /// `(legacy_gw, false)` in the decommission tail and
+    /// `(new_gw, true)` in the new-GW bring-up appendix.
+    function setSettlementLayerStatus(uint256 chainId, bool status);
 }
 use super::helpers::{required_ctm_address, verify_call_by_address, verify_call_by_name};
 use super::{
@@ -146,6 +151,14 @@ impl GovernanceStage2Calls {
                         "bridgehub_proxy",
                         "setSettlementLayerStatus(uint256,bool)",
                         verifiers,
+                        result,
+                    );
+                    errors += check_set_settlement_layer_status(
+                        decommission_count,
+                        &call.data,
+                        U256::from(verifiers.legacy_gateway_chain_id),
+                        false,
+                        "legacy GW blacklist",
                         result,
                     );
                     decommission_count += 1;
@@ -344,6 +357,16 @@ async fn verify_gateway_bring_up_calls(
     );
 
     errors += check_register_legacy_token(calls, base, verifiers, result);
+    if let Some(call) = calls.elems.get(base + 1) {
+        errors += check_set_settlement_layer_status(
+            base + 1,
+            &call.data,
+            U256::from(verifiers.new_gateway_chain_id),
+            true,
+            "new GW whitelist",
+            result,
+        );
+    }
     errors += check_set_asset_deployment_tracker(
         calls,
         base + 4,
@@ -858,6 +881,46 @@ fn check_set_gateway_settlement_fee(
         ));
         1
     }
+}
+
+fn check_set_settlement_layer_status(
+    idx: usize,
+    calldata: &[u8],
+    expected_chain_id: U256,
+    expected_status: bool,
+    label: &str,
+    result: &mut VerificationResult,
+) -> usize {
+    let decoded = match setSettlementLayerStatusCall::abi_decode(calldata) {
+        Ok(decoded) => decoded,
+        Err(err) => {
+            result.report_error(&format!(
+                "Stage 2 call #{idx} ({label}): failed to decode setSettlementLayerStatus: {err}"
+            ));
+            return 1;
+        }
+    };
+    let mut errors = 0;
+    if decoded.chainId != expected_chain_id {
+        result.report_error(&format!(
+            "Stage 2 call #{idx} ({label}) setSettlementLayerStatus.chainId mismatch: expected {expected_chain_id}, got {}",
+            decoded.chainId
+        ));
+        errors += 1;
+    }
+    if decoded.status != expected_status {
+        result.report_error(&format!(
+            "Stage 2 call #{idx} ({label}) setSettlementLayerStatus.status mismatch: expected {expected_status}, got {}",
+            decoded.status
+        ));
+        errors += 1;
+    }
+    if errors == 0 {
+        result.report_ok(&format!(
+            "Stage 2 call #{idx} ({label}) setSettlementLayerStatus({expected_chain_id}, {expected_status}) verified"
+        ));
+    }
+    errors
 }
 
 fn check_historical_migration_interval(
