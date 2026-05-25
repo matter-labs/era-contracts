@@ -386,8 +386,23 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         );
         vm.serializeAddress(
             "gateway_state_transition",
+            "migrator_facet_addr",
+            output.gatewayStateTransition.facets.migratorFacet
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "committer_facet_addr",
+            output.gatewayStateTransition.facets.committerFacet
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
             "diamond_init_addr",
             output.gatewayStateTransition.facets.diamondInit
+        );
+        vm.serializeBytes(
+            "gateway_state_transition",
+            "force_deployments_data",
+            forceDeploymentsData
         );
         vm.serializeAddress(
             "gateway_state_transition",
