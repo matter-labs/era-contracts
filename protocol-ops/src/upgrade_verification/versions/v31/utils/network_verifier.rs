@@ -37,6 +37,7 @@ sol! {
         function getHyperchain(uint256 _chainId) external view returns (address chainAddress);
         function getAllZKChainChainIDs() external view returns (uint256[] memory);
         function assetRouter() external view returns (address);
+        function l1CtmDeployer() external view returns (address);
         function messageRoot() external view returns (address);
         function chainAssetHandler() external view returns (address);
         function getZKChain(uint256 _chainId) external view returns (address chainAddress);

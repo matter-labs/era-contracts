@@ -292,6 +292,15 @@ async fn verify_v31_core_wiring(
         "core",
         &["upgrade_addresses", "bridges", "l1_asset_router_proxy_addr"],
     )?;
+    let expected_ctm_deployment_tracker = required_address(
+        &artifact.core,
+        "core",
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "ctm_deployment_tracker_proxy_addr",
+        ],
+    )?;
     let expected_legacy_bridge = required_address(
         &artifact.core,
         "core",
@@ -332,6 +341,40 @@ async fn verify_v31_core_wiring(
 
     let asset_router = L1AssetRouter::new(expected_asset_router, provider.clone());
     let asset_router_owner = Ownable::new(expected_asset_router, provider.clone());
+    match bridgehub.assetRouter().call().await {
+        Ok(actual) => expect_address_eq(
+            result,
+            "Bridgehub.assetRouter()",
+            actual,
+            expected_asset_router,
+        ),
+        Err(err) => result.report_error(&format!(
+            "Failed to call Bridgehub.assetRouter() for core wiring checks: {err}"
+        )),
+    }
+    match bridgehub.sharedBridge().call().await {
+        Ok(actual) => expect_address_eq(
+            result,
+            "Bridgehub.sharedBridge()",
+            actual,
+            expected_asset_router,
+        ),
+        Err(err) => result.report_error(&format!(
+            "Failed to call Bridgehub.sharedBridge() for core wiring checks: {err}"
+        )),
+    }
+    match bridgehub.l1CtmDeployer().call().await {
+        Ok(actual) => expect_address_eq(
+            result,
+            "Bridgehub.l1CtmDeployer()",
+            actual,
+            expected_ctm_deployment_tracker,
+        ),
+        Err(err) => result.report_error(&format!(
+            "Failed to call Bridgehub.l1CtmDeployer() for core wiring checks: {err}"
+        )),
+    }
+
     if let Some(expected_owner) = bridgehub_owner {
         match asset_router_owner.owner().call().await {
             Ok(actual) => {
@@ -470,6 +513,11 @@ async fn verify_v31_validator_timelocks(
             &scope,
             &["state_transition", "validator_timelock_addr"],
         )?;
+        let chain_type_manager = required_address(
+            &ctm.value,
+            &scope,
+            &["state_transition", "chain_type_manager_proxy"],
+        )?;
         let expected_owner =
             required_address(&ctm.value, &scope, &["admin", "timer_governance_addr"])?;
         let expected_delay = if ctm.contracts_config.is_testnet {
@@ -477,6 +525,19 @@ async fn verify_v31_validator_timelocks(
         } else {
             MAINNET_VALIDATOR_TIMELOCK_EXECUTION_DELAY_SECONDS
         };
+
+        let ctm_view = ChainTypeManager::new(chain_type_manager, provider.clone());
+        match ctm_view.validatorTimelock().call().await {
+            Ok(actual) => expect_address_eq(
+                result,
+                &format!("{label}.ChainTypeManager.validatorTimelock()"),
+                actual,
+                validator_timelock,
+            ),
+            Err(err) => result.report_error(&format!(
+                "Failed to call {label}.ChainTypeManager.validatorTimelock(): {err}"
+            )),
+        }
 
         let owner_view = Ownable::new(validator_timelock, provider.clone());
         match owner_view.owner().call().await {
