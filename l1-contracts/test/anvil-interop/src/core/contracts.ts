@@ -70,6 +70,8 @@ const ARTIFACTS = {
   SystemContractProxyAdmin: "SystemContractProxyAdmin.sol/SystemContractProxyAdmin.json",
   SystemContext: "SystemContext.sol/SystemContext.json",
   TestnetERC20Token: "TestnetERC20Token.sol/TestnetERC20Token.json",
+  L1FlowLinker: "L1FlowLinker.sol/L1FlowLinker.json",
+  L2FlowEscrow: "L2FlowEscrow.sol/L2FlowEscrow.json",
   L2MessageVerification: "L2MessageVerification.sol/L2MessageVerification.json",
   L2InteropRootStorage: "L2InteropRootStorage.sol/L2InteropRootStorage.json",
   L2V31Upgrade: "L2V31Upgrade.sol/L2V31Upgrade.json",
