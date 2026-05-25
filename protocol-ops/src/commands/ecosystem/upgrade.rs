@@ -747,15 +747,23 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
     // TEMPORARY -- do remove
     let is_puh_governed = governance_kind == crate::common::env_config::GovernanceKind::Puh;
     let skip_puh = std::env::var_os(SKIP_PUH_ENV_VAR).is_some();
+    let zksync_os_ctm_proxy = prepared
+        .ctm_tomls
+        .iter()
+        .find(|e| e.is_zk_sync_os)
+        .map(|e| e.proxy);
     let puh_outcome = if is_puh_governed && !skip_puh {
+        let mut puh_inputs =
+            crate::commands::ecosystem::puh_guardians::PuhGuardiansInputs::from_env(
+                env_cfg.as_ref(),
+                bridgehub,
+            );
+        puh_inputs.zksync_os_ctm = zksync_os_ctm_proxy;
         Some(
             crate::commands::ecosystem::puh_guardians::deploy_puh_guardians(
                 &mut runner,
                 &deployer,
-                &crate::commands::ecosystem::puh_guardians::PuhGuardiansInputs::from_env(
-                    env_cfg.as_ref(),
-                    bridgehub,
-                ),
+                &puh_inputs,
             )
             .await
             .context("PUH/Guardians redeploy step")?,

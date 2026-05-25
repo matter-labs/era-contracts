@@ -1,14 +1,22 @@
 //! Stage 2 — post-upgrade governance calls.
 //!
 //! Canonical shape:
-//!   `[ unpauseMigration, (checkProtocolUpgradePresence, checkMigrationsUnpaused) × N CTMs ]`
+//!   `[ (setHistoricalMigrationInterval × M, setSettlementLayerStatus)?,
+//!      unpauseMigration,
+//!      (checkProtocolUpgradePresence, checkMigrationsUnpaused) × N CTMs ]`
 //!
-//! [`verify_gateway_bring_up_calls`] handles the mandatory 15-call new-Gateway
+//! The legacy-GW decommission prefix (M interval calls + 1 blacklist) is
+//! present when `permanent-values/<env>.toml` carries a `[legacy_gateway]`
+//! section. M equals the number of `[[legacy_gateway.chain_intervals]]`
+//! entries and is env-dependent, so the verifier scans dynamically.
+//!
+//! [`verify_gateway_bring_up_calls`] handles the mandatory 16-call new-Gateway
 //! appendix that `write_merged_ecosystem_toml` appends (registerLegacyToken
-//! prefix + GatewayVotePreparation block: approve-then-priority-tx for
-//! `addChainTypeManager`, `setAssetDeploymentTracker`, `registerCTMAssetOnL1`,
-//! two-bridges set-asset-handler calls, RollupDAManager/ServerNotifier
-//! ownership accepts, and the new GW settlement-fee setter).
+//! prefix + new-GW whitelist via `setSettlementLayerStatus` + GatewayVotePreparation
+//! block: approve-then-priority-tx for `addChainTypeManager`,
+//! `setAssetDeploymentTracker`, `registerCTMAssetOnL1`, two-bridges
+//! set-asset-handler calls, RollupDAManager/ServerNotifier ownership accepts,
+//! and the new GW settlement-fee setter).
 
 use alloy::{
     hex,
@@ -43,12 +51,66 @@ impl GovernanceStage2Calls {
         result.print_info("== Gov stage 2 calls ===");
 
         let mut errors = 0;
-        let canonical_count = 1 + artifact.ctms.len() * 2;
-        let expected_call_count = canonical_count + 15;
+
+        // ── Legacy-GW decommission prefix (dynamic) ──────────────────
+        // v31 `CoreUpgrade` prepends `N × setHistoricalMigrationInterval`
+        // followed by one `setSettlementLayerStatus(legacy_gw_chain_id, false)`
+        // before the canonical `unpauseMigration`. N is env-dependent
+        // (`permanent-values/<env>.toml`'s `[[legacy_gateway.chain_intervals]]`),
+        // so scan the head of the call list dynamically. Anything else stays
+        // exactly where the canonical shape says it should be, just shifted
+        // by `canonical_prefix`.
+        let set_historical_selector = compute_selector(
+            "setHistoricalMigrationInterval(uint256,uint256,(uint256,uint256,uint256,uint256,uint256,bool))",
+        );
+        let set_settlement_selector = compute_selector("setSettlementLayerStatus(uint256,bool)");
+
+        let mut decommission_count: usize = 0;
+        for call in &self.calls.elems {
+            if call.data.len() >= 4
+                && hex::encode(&call.data[0..4]) == set_historical_selector
+            {
+                decommission_count += 1;
+            } else {
+                break;
+            }
+        }
+        if decommission_count > 0 {
+            result.report_ok(&format!(
+                "{decommission_count} setHistoricalMigrationInterval call(s) (legacy GW decommission)"
+            ));
+            // Expect setSettlementLayerStatus(oldGwChainId, false) immediately
+            // after the interval calls — blacklists the legacy GW.
+            if decommission_count < self.calls.elems.len() {
+                let call = &self.calls.elems[decommission_count];
+                if call.data.len() >= 4
+                    && hex::encode(&call.data[0..4]) == set_settlement_selector
+                {
+                    errors += verify_call_by_name(
+                        &self.calls,
+                        decommission_count,
+                        "bridgehub_proxy",
+                        "setSettlementLayerStatus(uint256,bool)",
+                        verifiers,
+                        result,
+                    );
+                    decommission_count += 1;
+                } else {
+                    result.report_error(
+                        "Expected setSettlementLayerStatus(uint256,bool) after historical migration intervals",
+                    );
+                    errors += 1;
+                }
+            }
+        }
+
+        let canonical_prefix = decommission_count;
+        let canonical_count = canonical_prefix + 1 + artifact.ctms.len() * 2;
+        let expected_call_count = canonical_count + 16;
 
         errors += verify_call_by_name(
             &self.calls,
-            0,
+            canonical_prefix,
             "chain_asset_handler_proxy",
             "unpauseMigration()",
             verifiers,
@@ -66,7 +128,7 @@ impl GovernanceStage2Calls {
                 continue;
             };
 
-            let block = 1 + ctm_index * 2;
+            let block = canonical_prefix + 1 + ctm_index * 2;
             errors += verify_call_by_address(
                 &self.calls,
                 block,
@@ -131,12 +193,24 @@ impl GovernanceStage2Calls {
     }
 }
 
-/// Verify the 15-call new-Gateway bring-up block.
+/// Verify the 16-call new-Gateway bring-up block.
 ///
 /// This is the stage-2 appendix that bridges setup calls to the new Gateway
 /// before the ecosystem upgrade is executed. The env config is the authority
 /// for the target Gateway chain id, settlement fee, representative CTM and
 /// priority-tx gas limit.
+///
+/// Block layout (offsets are relative to `base`):
+///   0: registerLegacyToken(zkAssetId)
+///   1: setSettlementLayerStatus(newGwChainId, true)  ← whitelist new GW
+///   2: approve + 3: addChainTypeManager (direct)
+///   4: setAssetDeploymentTracker
+///   5: registerCTMAssetOnL1
+///   6: approve + 7: setAssetHandler (two-bridges)
+///   8: approve + 9: setCTMAssetAddress (two-bridges)
+///  10: approve + 11: acceptOwnership RollupDAManager (direct)
+///  12: approve + 13: acceptOwnership ServerNotifier (direct)
+///  14: approve + 15: setGatewaySettlementFee (direct)
 #[allow(clippy::too_many_arguments)]
 async fn verify_gateway_bring_up_calls(
     calls: &CallList,
@@ -155,30 +229,36 @@ async fn verify_gateway_bring_up_calls(
         // L1AssetTracker.registerLegacyToken(zkAssetId) — prefix prepended
         // by `write_merged_ecosystem_toml` when `[new_gateway]` is present.
         (0, "asset_tracker_proxy", "registerLegacyToken(bytes32)"),
+        // Whitelist the new Gateway as a settlement layer on L1 Bridgehub.
+        (
+            1,
+            "bridgehub_proxy",
+            "setSettlementLayerStatus(uint256,bool)",
+        ),
         // addChainTypeManager L1→L2 (priority tx) — approve + direct.
-        (2, "bridgehub_proxy", direct),
+        (3, "bridgehub_proxy", direct),
         // setAssetDeploymentTracker on L1AssetRouter (L1-side, no approve).
         (
-            3,
+            4,
             "l1_asset_router_proxy",
             "setAssetDeploymentTracker(bytes32,address)",
         ),
         // registerCTMAssetOnL1 on L1CTMDeploymentTracker (L1-side).
         (
-            4,
+            5,
             "ctm_deployment_tracker_proxy",
             "registerCTMAssetOnL1(address)",
         ),
         // setAssetHandler for chain assetId — approve + two-bridges.
-        (6, "bridgehub_proxy", two_bridges),
+        (7, "bridgehub_proxy", two_bridges),
         // chain-asset-handler registration for GW CTM — approve + two-bridges.
-        (8, "bridgehub_proxy", two_bridges),
+        (9, "bridgehub_proxy", two_bridges),
         // acceptOwnership on RollupDAManager — approve + direct.
-        (10, "bridgehub_proxy", direct),
+        (11, "bridgehub_proxy", direct),
         // acceptOwnership on ServerNotifier — approve + direct.
-        (12, "bridgehub_proxy", direct),
+        (13, "bridgehub_proxy", direct),
         // setGatewaySettlementFee on GW_ASSET_TRACKER_ADDR — approve + direct.
-        (14, "bridgehub_proxy", direct),
+        (15, "bridgehub_proxy", direct),
     ];
 
     let mut errors = 0;
@@ -212,23 +292,23 @@ async fn verify_gateway_bring_up_calls(
     errors += check_register_legacy_token(calls, base, verifiers, result);
     errors += check_set_asset_deployment_tracker(
         calls,
-        base + 3,
+        base + 4,
         representative_ctm_registration_data,
         ctm_deployment_tracker,
         result,
     );
     errors +=
-        check_register_ctm_asset_on_l1(calls, base + 4, representative_ctm, verifiers, result);
+        check_register_ctm_asset_on_l1(calls, base + 5, representative_ctm, verifiers, result);
 
     let direct_requests = [
         (
-            2usize,
+            3usize,
             "addChainTypeManager",
             L2_BRIDGEHUB_ADDR,
             "addChainTypeManager(address)",
         ),
         (
-            10,
+            11,
             "acceptOwnership RollupDAManager",
             match new_gw.gateway_rollup_da_manager_addr {
                 Some(addr) => addr,
@@ -244,7 +324,7 @@ async fn verify_gateway_bring_up_calls(
             "acceptOwnership()",
         ),
         (
-            12,
+            13,
             "acceptOwnership ServerNotifier",
             match new_gw.gateway_server_notifier_addr {
                 Some(addr) => addr,
@@ -260,7 +340,7 @@ async fn verify_gateway_bring_up_calls(
             "acceptOwnership()",
         ),
         (
-            14,
+            15,
             "setGatewaySettlementFee",
             GW_ASSET_TRACKER_ADDR,
             "setGatewaySettlementFee(uint256)",
@@ -294,7 +374,7 @@ async fn verify_gateway_bring_up_calls(
         errors += check_l2_target(idx, label, req.l2Contract, expected_l2_contract, result);
         errors += check_l2_selector(idx, label, &req.l2Calldata, expected_selector, result);
         match offset {
-            2 => {
+            3 => {
                 errors += check_inner_address_arg(
                     idx,
                     label,
@@ -304,7 +384,7 @@ async fn verify_gateway_bring_up_calls(
                     result,
                 );
             }
-            14 => {
+            15 => {
                 errors += check_set_gateway_settlement_fee(
                     idx,
                     &req.l2Calldata,
@@ -318,14 +398,14 @@ async fn verify_gateway_bring_up_calls(
 
     let two_bridge_requests = [
         (
-            6usize,
+            7usize,
             "setAssetHandlerAddress",
             l1_asset_router,
             L2_ASSET_ROUTER_ADDR,
             "setAssetHandlerAddress(uint256,bytes32,address)",
         ),
         (
-            8,
+            9,
             "setCTMAssetAddress",
             ctm_deployment_tracker,
             L2_BRIDGEHUB_ADDR,
@@ -378,7 +458,7 @@ async fn verify_gateway_bring_up_calls(
             errors += 1;
         }
         match offset {
-            6 => {
+            7 => {
                 errors += check_asset_router_second_bridge_calldata(
                     idx,
                     &req.secondBridgeCalldata,
@@ -386,7 +466,7 @@ async fn verify_gateway_bring_up_calls(
                     result,
                 );
             }
-            8 => {
+            9 => {
                 errors += check_ctm_tracker_second_bridge_calldata(
                     idx,
                     &req.secondBridgeCalldata,
@@ -411,12 +491,12 @@ async fn verify_gateway_bring_up_calls(
     // match the following priority tx's mintValue.
     let approve_selector = compute_selector("approve(address,uint256)");
     let approve_pairs = [
-        (1usize, 2usize),
-        (5, 6),
-        (7, 8),
-        (9, 10),
-        (11, 12),
-        (13, 14),
+        (2usize, 3usize),
+        (6, 7),
+        (8, 9),
+        (10, 11),
+        (12, 13),
+        (14, 15),
     ];
     let mut approve_target: Option<Address> = None;
     for (approve_offset, priority_offset) in approve_pairs {
