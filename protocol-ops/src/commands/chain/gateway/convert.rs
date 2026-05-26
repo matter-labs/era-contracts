@@ -180,6 +180,8 @@ pub(crate) struct VotePrepareInputs<'a> {
     /// (`contracts_newConfig.force_deployments_data`, see
     /// `DefaultCTMUpgrade.s.sol:913`).
     pub force_deployments_data_override: Option<Bytes>,
+    /// CREATE2 salt for the GW CTM deploy. When `None`, uses bytes32(0).
+    pub create2_salt: Option<ethers::types::H256>,
 }
 
 /// Run vote-prepare on an existing `runner`. `sender` must be the whitelisted
@@ -244,14 +246,13 @@ support_l2_legacy_shared_bridge_test = false
 zk_token_asset_id = "{default_zk_token_asset_id}"
 
 [contracts]
-create2_factory_salt = "{zero_bytes32}"
+create2_factory_salt = "{gw_create2_salt}"
 governance_security_council_address = "{zero_address}"
 governance_min_delay = 0
 validator_timelock_execution_delay = 0
 "#,
         zero_address = ZERO_ADDRESS,
         default_zk_token_asset_id = DEFAULT_ZK_TOKEN_ASSET_ID,
-        zero_bytes32 = ZERO_BYTES32,
         refund = inputs.refund_recipient,
         testnet_verifier = {
             let v = crate::common::l1_contracts::resolve_is_testnet_verifier(
@@ -273,6 +274,10 @@ validator_timelock_execution_delay = 0
         gw = chain_id,
         fee = inputs.gateway_settlement_fee,
         fd = force_deployments_data,
+        gw_create2_salt = inputs
+            .create2_salt
+            .map(|s| format!("{s:#066x}"))
+            .unwrap_or_else(|| ZERO_BYTES32.to_string()),
     );
 
     let script_config = contracts_path.join("script-config");
@@ -522,6 +527,7 @@ pub async fn run_convert(args: ConvertArgs) -> anyhow::Result<()> {
             // CLI flow runs against a chain already on the latest version,
             // so the on-chain dump works — no override needed.
             force_deployments_data_override: None,
+            create2_salt: None,
         },
     )
     .await

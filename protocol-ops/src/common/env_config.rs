@@ -539,7 +539,7 @@ mod tests {
             .legacy_gateway
             .expect("permanent-values/stage.toml must carry [legacy_gateway]");
         assert_eq!(legacy_gateway.chain_id, 123);
-        assert_eq!(ng.chain_id, 2708);
+        assert_eq!(ng.chain_id, 2709);
         // 0.2 ZK = 2e17 wei, sized for ~$0.01 per interop call at ZK ≈ $0.05.
         assert_eq!(ng.settlement_fee, U256::from(200_000_000_000_000_000u128));
         // GW 2708 is a ZKsync OS chain → CTM source is Atlas (witness 2702).

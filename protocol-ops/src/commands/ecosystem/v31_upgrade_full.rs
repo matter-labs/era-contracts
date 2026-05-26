@@ -78,17 +78,35 @@ impl<'a> V31UpgradeFull<'a> {
         self.run_ctm_admin_steps(runner, deployer, &prepared.ctm_tomls)?;
 
         if let Some(ref new_gw) = self.new_gateway {
+            // Look up the per-CTM salt: resolve the CTM proxy from the
+            // representative chain, then find its salt in the prepare entries.
+            let ctm_proxy = crate::common::l1_contracts::resolve_ctm_proxy(
+                &runner.rpc_url,
+                self.inner.bridgehub(),
+                new_gw.ctm_representative_chain_id,
+            )
+            .await
+            .ok();
+            let gw_salt = ctm_proxy.and_then(|proxy| {
+                prepared
+                    .ctm_tomls
+                    .iter()
+                    .find(|e| e.proxy == proxy)
+                    .and_then(|_| inputs.create2_factory_salt_per_ctm.as_ref()?.get(&proxy).copied())
+            });
             let path = prepare_new_gateway(
                 runner,
                 deployer,
                 self.inner.bridgehub(),
                 &prepared.core_toml,
                 new_gw,
+                new_gw.ctm_representative_chain_id,
                 &prepared.ctm_tomls,
                 inputs.zk_token_asset_id,
+                gw_salt,
             )
             .await?;
-            prepared.new_gateway_toml = Some(path);
+            prepared.new_gateway_tomls.push(path);
         }
 
         Ok(prepared)

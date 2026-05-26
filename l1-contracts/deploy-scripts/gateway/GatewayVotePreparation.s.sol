@@ -112,7 +112,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: aliasedGovernor,
-            salt: bytes32(0),
+            salt: toml.readBytes32("$.contracts.create2_factory_salt"),
             eraChainId: eraChainId,
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
@@ -160,7 +160,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
             ,
             DirectCreate2Calldata memory directCalldata,
             address create2FactoryAddress
-        ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
+        ) = GatewayCTMDeployerHelper.calculateAddresses(gatewayCTMDeployerConfig.salt, gatewayCTMDeployerConfig);
 
         // Deploy all factory dependencies
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps(gatewayCTMDeployerConfig);
