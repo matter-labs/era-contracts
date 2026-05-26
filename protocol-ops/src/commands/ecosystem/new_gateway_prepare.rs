@@ -77,6 +77,7 @@ pub async fn prepare_new_gateway(
     ctm_representative_chain_id: u64,
     ctm_tomls: &[CtmPrepareEntry],
     zk_token_asset_id: ethers::types::H256,
+    gw_create2_salt: Option<ethers::types::H256>,
 ) -> anyhow::Result<PathBuf> {
     let refund_recipient = new_gw.refund_recipient.unwrap_or(deployer.address);
 
@@ -217,6 +218,7 @@ pub async fn prepare_new_gateway(
             refund_recipient,
             gateway_settlement_fee: new_gw.settlement_fee,
             force_deployments_data_override: Some(force_deployments_data),
+            create2_salt: gw_create2_salt,
         },
     )
     .await

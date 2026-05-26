@@ -112,7 +112,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: aliasedGovernor,
-            salt: keccak256(abi.encode("GatewayVotePreparation", ctm)),
+            salt: toml.readBytes32("$.contracts.create2_factory_salt"),
             eraChainId: config.eraChainId,
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
