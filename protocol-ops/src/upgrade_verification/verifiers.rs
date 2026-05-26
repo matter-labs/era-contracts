@@ -91,8 +91,8 @@ impl Verifiers {
         expected_l1_chain_id: u64,
         zk_token_asset_id: FixedBytes<32>,
     ) -> anyhow::Result<Self> {
-        // Audit item B: artifact `is_testnet` per CTM must agree with the
-        // selected env. Otherwise a mainnet run could accept testnet-flagged
+        // Artifact `is_testnet` per CTM must agree with the selected env.
+        // Otherwise a mainnet run could accept testnet-flagged
         // artifacts whose Mailbox/Migrator constructor args and VT delay
         // would later mismatch live state in confusing, downstream ways.
         let expected_is_testnet = !env.is_mainnet();
