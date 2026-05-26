@@ -6,6 +6,8 @@ use crate::upgrade_verification::verifiers::{VerificationResult, Verifiers};
 use super::super::utils::apply_l2_to_l1_alias;
 use super::super::MAX_NUMBER_OF_ZK_CHAINS;
 
+const SYSTEM_CONTRACT_PROXY_FILE: &str = "l1-contracts/SystemContractProxy";
+
 sol! {
     #[sol(rpc)]
     interface BridgehubBase {
@@ -46,9 +48,9 @@ sol! {
 // ZKsyncOS simple        = 96-byte triplet (blake|pad|keccak)     = 96 bytes  (unused here)
 // ZKsyncOS proxy upgrade = abi.encode(implInfo_96, proxyInfo_96)  = 320 bytes
 //
-// For ZKsyncOS proxy (320 bytes), the impl observable hash lives at implInfo[64..96],
-// which is at raw_bytes[96 + 64 .. 96 + 96] = bytes[160..192] inside the 320-byte blob
-// (after the 64-byte ABI head + 32-byte length prefix).
+// For ZKsyncOS proxy (320 bytes), observables live at:
+// - implInfo[64..96]  => raw_bytes[160..192]
+// - proxyInfo[64..96] => raw_bytes[288..320]
 fn expect_bytecode_info(
     result: &mut VerificationResult,
     verifiers: &Verifiers,
@@ -64,7 +66,7 @@ fn expect_bytecode_info(
         96 => {
             // Simple ZKsyncOS (non-proxy) bytecodeInfo.
             let observable = FixedBytes::<32>::from_slice(&bytecode_info[64..96]);
-            check_zksync_os_observable(result, verifiers, &observable, zksync_os_expected);
+            check_zksync_os_observable(result, verifiers, &observable, zksync_os_expected, "bytecode");
         }
         320 => {
             // ZKsyncOS proxy: abi.encode(implInfo_96, proxyInfo_96).
@@ -76,9 +78,18 @@ fn expect_bytecode_info(
             //   [192..224]= len_proxy    = 96
             //   [224..320]= proxy_96_bytes
             //
-            // Observable (keccak256 of deployed bytecode) lives at raw[160..192].
-            let observable = FixedBytes::<32>::from_slice(&bytecode_info[160..192]);
-            check_zksync_os_observable(result, verifiers, &observable, zksync_os_expected);
+            // Observables (keccak256 of deployed bytecode) live at raw[160..192] and raw[288..320].
+            let impl_observable = FixedBytes::<32>::from_slice(&bytecode_info[160..192]);
+            check_zksync_os_observable(result, verifiers, &impl_observable, zksync_os_expected, "impl");
+
+            let proxy_observable = FixedBytes::<32>::from_slice(&bytecode_info[288..320]);
+            check_zksync_os_observable(
+                result,
+                verifiers,
+                &proxy_observable,
+                SYSTEM_CONTRACT_PROXY_FILE,
+                "proxy",
+            );
         }
         len => result.report_error(&format!(
             "bytecodeInfo for {era_expected}: unexpected length {len} (expected 32/Era, 96/ZKsyncOS-simple, 320/ZKsyncOS-proxy)"
@@ -91,6 +102,7 @@ fn check_zksync_os_observable(
     verifiers: &Verifiers,
     observable: &FixedBytes<32>,
     expected_file: &str,
+    component_label: &str,
 ) {
     match verifiers
         .bytecode_verifier
@@ -100,10 +112,10 @@ fn check_zksync_os_observable(
             // ok
         }
         Some(file) => result.report_error(&format!(
-            "bytecodeInfo for {expected_file}: impl observable hash maps to {file}"
+            "bytecodeInfo for {expected_file}: {component_label} observable hash maps to {file}"
         )),
         None => result.report_error(&format!(
-            "bytecodeInfo for {expected_file}: cannot verify observable hash {observable}"
+            "bytecodeInfo for {expected_file}: cannot verify {component_label} observable hash {observable}"
         )),
     }
 }

@@ -207,9 +207,9 @@ fn verify_zksync_os_deployed_bytecode_info(
     addr_label: &str,
     upgrade_type: ZksyncOSUpgradeType,
 ) {
-    let (expected_len, blake_range, length_word_range, observable_range) = match upgrade_type {
-        ZksyncOSUpgradeType::UnsafeForceDeployment => (96usize, 0..32, 32..64, 64..96),
-        ZksyncOSUpgradeType::SystemProxyUpgrade => (320usize, 96..128, 128..160, 160..192),
+    let expected_len = match upgrade_type {
+        ZksyncOSUpgradeType::UnsafeForceDeployment => 96usize,
+        ZksyncOSUpgradeType::SystemProxyUpgrade => 320usize,
     };
 
     if bytecode_info.len() != expected_len {
@@ -221,7 +221,55 @@ fn verify_zksync_os_deployed_bytecode_info(
         return;
     }
 
-    let observable = FixedBytes::<32>::from_slice(&bytecode_info[observable_range]);
+    match upgrade_type {
+        ZksyncOSUpgradeType::UnsafeForceDeployment => verify_zksync_os_bytecode_info_triplet(
+            verifiers,
+            result,
+            bytecode_info,
+            expected_file,
+            addr_label,
+            0,
+            32,
+            64,
+        ),
+        ZksyncOSUpgradeType::SystemProxyUpgrade => {
+            verify_zksync_os_bytecode_info_triplet(
+                verifiers,
+                result,
+                bytecode_info,
+                expected_file,
+                &format!("{addr_label} [implementation]"),
+                96,
+                128,
+                160,
+            );
+            verify_zksync_os_bytecode_info_triplet(
+                verifiers,
+                result,
+                bytecode_info,
+                "l1-contracts/SystemContractProxy",
+                &format!("{addr_label} [proxy]"),
+                224,
+                256,
+                288,
+            );
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn verify_zksync_os_bytecode_info_triplet(
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+    bytecode_info: &[u8],
+    expected_file: &str,
+    addr_label: &str,
+    blake_start: usize,
+    length_word_start: usize,
+    observable_start: usize,
+) {
+    let observable =
+        FixedBytes::<32>::from_slice(&bytecode_info[observable_start..observable_start + 32]);
     if !evm_deployed_bytecode_hash_matches_file(verifiers, &observable, expected_file) {
         let actual_file = verifiers
             .bytecode_verifier
@@ -247,7 +295,7 @@ fn verify_zksync_os_deployed_bytecode_info(
         return;
     };
 
-    let actual_blake = FixedBytes::<32>::from_slice(&bytecode_info[blake_range]);
+    let actual_blake = FixedBytes::<32>::from_slice(&bytecode_info[blake_start..blake_start + 32]);
     if actual_blake != expected_blake {
         result.report_error(&format!(
             "ZKsyncOS force deployment at {addr_label} ({expected_file}): \
@@ -257,7 +305,7 @@ fn verify_zksync_os_deployed_bytecode_info(
 
     // `uint32 length` is padded to a full 32-byte word; the value lives in the
     // last 4 big-endian bytes.
-    let length_word = &bytecode_info[length_word_range];
+    let length_word = &bytecode_info[length_word_start..length_word_start + 32];
     let actual_length = u32::from_be_bytes(length_word[28..32].try_into().unwrap());
     if actual_length != expected_length {
         result.report_error(&format!(
