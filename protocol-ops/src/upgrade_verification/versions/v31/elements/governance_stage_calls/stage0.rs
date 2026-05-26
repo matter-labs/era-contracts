@@ -18,6 +18,7 @@
 //! `ERA_CHAIN_TYPE_MANAGER` / `ZKSYNC_OS_CHAIN_TYPE_MANAGER`).
 
 use alloy::{
+    hex,
     primitives::{Address, U256},
     sol_types::SolCall,
 };
@@ -33,8 +34,8 @@ use super::helpers::{
     verify_call_by_name,
 };
 use super::{
-    acceptOwnershipCall, updateGuardiansCall, upgradeAndCallCall, BridgehubOwnerView,
-    GovernanceStage0Calls, ProtocolUpgradeHandler,
+    acceptOwnershipCall, updateGuardiansCall, upgradeAndCallCall, BridgehubOwnerView, CallList,
+    GovernanceStage0Calls, Ownable2Step, ProtocolUpgradeHandler,
 };
 
 impl GovernanceStage0Calls {
@@ -101,22 +102,23 @@ impl GovernanceStage0Calls {
 
         let base_count = 1 + artifact.ctms.len();
         // `AdminFunctions.ensureCtmsAndProxyAdminsOwnedByGovernanceWithWraps`
-        // defers `acceptOwnership()` for each CTM whose pendingOwner is PUH
-        // into stage 0 (via `pre-governance-accept-ownerships.toml`). Count
-        // them by selector so PUVT doesn't false-error when the prior
-        // transferOwnership ceremony left pendingOwners outstanding.
-        let accept_ownership_selector = acceptOwnershipCall::SELECTOR;
-        let pre_gov_accept_count = self
-            .calls
-            .elems
-            .iter()
-            .filter(|c| c.data.len() >= 4 && c.data[..4] == accept_ownership_selector)
-            .count();
-        let expected_call_count = if puh_governed {
-            base_count + 2 + pre_gov_accept_count
+        // writes one deferred `acceptOwnership()` call per unique CTM whose
+        // `pendingOwner` is governance at prepare time. Derive that target set
+        // from live Bridgehub/CTM state and validate the stage-0 tail against
+        // it (instead of matching by selector count only).
+        let pre_gov_accept_targets = collect_pre_governance_accept_ownership_targets(
+            artifact,
+            verifiers,
+            bridgehub_owner,
+            result,
+        )
+        .await?;
+        let pre_gov_accept_tail_start = if puh_governed {
+            base_count + 2
         } else {
-            base_count + pre_gov_accept_count
+            base_count
         };
+        let expected_call_count = pre_gov_accept_tail_start + pre_gov_accept_targets.len();
 
         if puh_governed {
             let expected_puh_guardians = artifact.puh_guardians.as_ref().context(
@@ -235,6 +237,13 @@ impl GovernanceStage0Calls {
                 }
             }
         }
+        errors += verify_pre_governance_accept_ownership_tail(
+            &self.calls,
+            pre_gov_accept_tail_start,
+            &pre_gov_accept_targets,
+            verifiers,
+            result,
+        );
 
         match self.calls.elems.len().cmp(&expected_call_count) {
             std::cmp::Ordering::Less => {
@@ -260,6 +269,151 @@ impl GovernanceStage0Calls {
         }
         Ok(())
     }
+}
+
+async fn collect_pre_governance_accept_ownership_targets(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    governance: Address,
+    result: &mut VerificationResult,
+) -> anyhow::Result<Vec<Address>> {
+    let mut unique_ctms = Vec::new();
+    for ctm in &artifact.ctms {
+        let Some(ctm_proxy) = required_ctm_address(
+            ctm,
+            &["state_transition", "chain_type_manager_proxy"],
+            result,
+        ) else {
+            continue;
+        };
+        if ctm_proxy == Address::ZERO {
+            result.report_error(&format!(
+                "{}.chain_type_manager_proxy must not be zero while deriving stage-0 deferred acceptOwnership targets",
+                ctm.flavor.label()
+            ));
+            continue;
+        }
+        if !unique_ctms.contains(&ctm_proxy) {
+            unique_ctms.push(ctm_proxy);
+        }
+    }
+
+    let provider = verifiers.network_verifier.get_l1_provider();
+    let mut targets = Vec::new();
+    for ctm in unique_ctms {
+        let pending_owner = Ownable2Step::new(ctm, provider.clone())
+            .pendingOwner()
+            .call()
+            .await
+            .with_context(|| {
+                format!(
+                    "read ChainTypeManager.pendingOwner() for {ctm} while deriving stage-0 deferred acceptOwnership targets"
+                )
+            })?;
+        if pending_owner == governance {
+            targets.push(ctm);
+        }
+    }
+
+    Ok(targets)
+}
+
+fn verify_pre_governance_accept_ownership_tail(
+    calls: &CallList,
+    tail_start: usize,
+    expected_targets: &[Address],
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> usize {
+    let accept_ownership_selector = acceptOwnershipCall::SELECTOR;
+    let mut errors = 0usize;
+    let mut seen_targets = Vec::new();
+
+    for (index, call) in calls.elems.iter().enumerate() {
+        let is_accept = call.data.len() >= 4 && call.data[0..4] == accept_ownership_selector;
+
+        if index < tail_start && is_accept {
+            result.report_error(&format!(
+                "Deferred acceptOwnership() call found before stage-0 tail at index {index}"
+            ));
+            errors += 1;
+        }
+
+        if index < tail_start {
+            continue;
+        }
+
+        if !is_accept {
+            result.report_error(&format!(
+                "Stage-0 deferred tail call #{index} must be acceptOwnership(), got selector 0x{}",
+                hex::encode(&call.data[0..4.min(call.data.len())])
+            ));
+            errors += 1;
+            continue;
+        }
+        if call.value != U256::ZERO {
+            result.report_error(&format!(
+                "Deferred acceptOwnership() call #{index} must have zero value, got {}",
+                call.value
+            ));
+            errors += 1;
+        }
+        if call.data.len() != 4 {
+            result.report_error(&format!(
+                "Deferred acceptOwnership() call #{index} should have empty args (4-byte selector only), got {} bytes",
+                call.data.len()
+            ));
+            errors += 1;
+        }
+        if !expected_targets.contains(&call.target) {
+            result.report_error(&format!(
+                "Deferred acceptOwnership() call #{index} targets unexpected address {} ({})",
+                call.target,
+                verifiers.address_verifier.name_or_unknown(&call.target)
+            ));
+            errors += 1;
+            continue;
+        }
+        if seen_targets.contains(&call.target) {
+            result.report_error(&format!(
+                "Deferred acceptOwnership() call #{index} repeats target {}",
+                call.target
+            ));
+            errors += 1;
+        } else {
+            seen_targets.push(call.target);
+        }
+    }
+
+    let missing_targets: Vec<Address> = expected_targets
+        .iter()
+        .copied()
+        .filter(|target| !seen_targets.contains(target))
+        .collect();
+    if !missing_targets.is_empty() {
+        let missing = missing_targets
+            .iter()
+            .map(|address| {
+                format!(
+                    "{} ({})",
+                    address,
+                    verifiers.address_verifier.name_or_unknown(address)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        result.report_error(&format!(
+            "Stage-0 deferred acceptOwnership tail is missing expected CTM target(s): {missing}"
+        ));
+        errors += 1;
+    } else {
+        result.report_ok(&format!(
+            "Stage-0 deferred acceptOwnership tail matches {} expected CTM target(s)",
+            expected_targets.len()
+        ));
+    }
+
+    errors
 }
 
 async fn verify_puh_immutables(

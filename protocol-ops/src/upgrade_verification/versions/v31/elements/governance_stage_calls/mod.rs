@@ -106,6 +106,11 @@ sol! {
     }
 
     #[sol(rpc)]
+    contract Ownable2Step {
+        function pendingOwner() external view returns (address);
+    }
+
+    #[sol(rpc)]
     contract ProtocolUpgradeHandler {
         function L2_PROTOCOL_GOVERNOR() external view returns (address);
         function CHAIN_TYPE_MANAGER() external view returns (address);
