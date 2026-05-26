@@ -115,4 +115,4 @@ chain_id = 2709
 # 0.2 ZK = 2e17 wei ≈ $0.01 USD at ZK ≈ $0.05. Bump up/down as price moves.
 settlement_fee = "0x2C68AF0BB140000"
 # Atlas (ZKsyncOS) witness chain — resolves to the Atlas CTM.
-ctm_representative_chain_ids = [2702, 270]
+ctm_representative_chain_ids = [2702]

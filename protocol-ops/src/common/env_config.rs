@@ -513,8 +513,8 @@ mod tests {
         assert_eq!(ng.chain_id, 2709);
         // 0.2 ZK = 2e17 wei, sized for ~$0.01 per interop call at ZK ≈ $0.05.
         assert_eq!(ng.settlement_fee, U256::from(200_000_000_000_000_000u128));
-        // GW hosts both ZKsync OS (Atlas, witness 2702) and Era (270) CTMs.
-        assert_eq!(ng.ctm_representative_chain_ids, vec![2702, 270]);
+        // GW hosts ZKsync OS (Atlas, witness 2702).
+        assert_eq!(ng.ctm_representative_chain_ids, vec![2702]);
     }
 
     /// Confirms `EnvConfig`'s on-demand readers pick up the
