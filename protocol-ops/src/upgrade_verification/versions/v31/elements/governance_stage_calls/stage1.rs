@@ -470,7 +470,7 @@ fn verify_message_root_upgrade_call_args(
     match upgradeAndCallCall::abi_decode(&call.data) {
         Ok(decoded) => {
             let mut errors = 0;
-            errors += expect_named_address(result, verifiers, &decoded.proxy, "l1_message_root");
+            errors += expect_named_address(result, verifiers, &decoded.proxy, "message_root_proxy");
             errors += expect_named_address(
                 result,
                 verifiers,

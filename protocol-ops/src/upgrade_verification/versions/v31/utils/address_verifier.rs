@@ -114,10 +114,6 @@ const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
         "message_root_proxy",
     ),
     (
-        &["upgrade_addresses", "bridgehub", "message_root_proxy_addr"],
-        "l1_message_root",
-    ),
-    (
         &[
             "upgrade_addresses",
             "bridgehub",
