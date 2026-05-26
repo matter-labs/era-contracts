@@ -24,6 +24,9 @@ use alloy::{
 use serde::Deserialize;
 
 const GOVERNANCE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS: u64 = 14 * 24 * 60 * 60;
+const EXPECTED_GUARDIANS_MEMBER_COUNT: usize = 8;
+const ZK_GOVERNANCE_PUH_FILE: &str = "l1-contracts/ProtocolUpgradeHandler";
+const ZK_GOVERNANCE_GUARDIANS_FILE: &str = "l1-contracts/Guardians";
 
 /// Expected constructor signatures for every contract deployed by
 /// `CoreUpgrade_v31` (i.e. `verify_core_provenance`).
@@ -306,6 +309,52 @@ mod gateway_signatures {
     }
 }
 
+/// Expected constructor signatures for zk-governance contracts deployed by
+/// `DeployPUHAndGuardians.s.sol`, plus read-only views used to reconstruct
+/// the exact constructor inputs from the live pre-upgrade PUH state.
+mod governance_signatures {
+    alloy::sol! {
+        contract V31ProtocolUpgradeHandler {
+            constructor(
+                address _l2ProtocolGovernor,
+                address _eraChainTypeManager,
+                address _zksyncOSChainTypeManager,
+                address _bridgeHub,
+                address _l1Nullifier,
+                address _l1AssetRouter,
+                address _l1NativeTokenVault,
+                address _chainAssetHandler,
+                uint256 _eraChainId
+            );
+        }
+
+        contract V31Guardians {
+            constructor(
+                address _protocolUpgradeHandler,
+                address _bridgeHub,
+                uint256 _eraChainId,
+                address[] _members
+            );
+        }
+
+        #[sol(rpc)]
+        contract ProtocolUpgradeHandlerView {
+            function L2_PROTOCOL_GOVERNOR() external view returns (address);
+            function CHAIN_TYPE_MANAGER() external view returns (address);
+            function BRIDGE_HUB() external view returns (address);
+            function L1_NULLIFIER() external view returns (address);
+            function L1_ASSET_ROUTER() external view returns (address);
+            function L1_NATIVE_TOKEN_VAULT() external view returns (address);
+            function guardians() external view returns (address);
+        }
+
+        #[sol(rpc)]
+        contract GuardiansMembersView {
+            function members(uint256 _index) external view returns (address);
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct DeployedAddresses {
     pub(crate) native_token_vault_implementation_addr: Address,
@@ -469,7 +518,159 @@ pub(crate) async fn verify_v31_provenance(
     verify_v31_new_gateway_ctm_provenance(artifact, verifiers, era_chain_id, l1_chain_id, result)
         .await?;
 
+    let governance_admin = verifiers.network_verifier.get_proxy_admin(governance).await;
+    if governance_admin != Address::ZERO {
+        verify_puh_guardians_provenance(artifact, verifiers, result).await?;
+    }
+
     Ok(())
+}
+
+async fn verify_puh_guardians_provenance(
+    artifact: &EcosystemUpgradeArtifact,
+    verifiers: &Verifiers,
+    result: &mut VerificationResult,
+) -> Result<()> {
+    use governance_signatures::*;
+    result.print_info("-- PUH/Guardians deployment provenance --");
+
+    let puh_guardians = artifact
+        .puh_guardians
+        .as_ref()
+        .context("PUH-governed v31 artifact is missing required top-level [puh_guardians] table")?;
+
+    let provider = verifiers.network_verifier.get_l1_provider();
+    let current_puh_addr = verifiers.bridgehub_owner;
+    let current_puh = ProtocolUpgradeHandlerView::new(current_puh_addr, provider.clone());
+
+    let zksync_os_ctm = artifact
+        .ctms
+        .iter()
+        .find(|ctm| ctm.flavor == CtmFlavor::ZksyncOs)
+        .context("PUH/Guardians provenance requires a [ctms.zksync_os] section")?;
+    let zksync_os_ctm_proxy = required_address(
+        &zksync_os_ctm.value,
+        "ctms.zksync_os",
+        &["state_transition", "chain_type_manager_proxy"],
+    )?;
+    let chain_asset_handler = required_address(
+        &artifact.core,
+        "core",
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "chain_asset_handler_proxy_addr",
+        ],
+    )?;
+
+    let l2_protocol_governor = current_puh
+        .L2_PROTOCOL_GOVERNOR()
+        .call()
+        .await
+        .context("calling current PUH.L2_PROTOCOL_GOVERNOR() for zk-governance provenance")?;
+    let era_ctm = current_puh
+        .CHAIN_TYPE_MANAGER()
+        .call()
+        .await
+        .context("calling current PUH.CHAIN_TYPE_MANAGER() for zk-governance provenance")?;
+    let bridgehub = current_puh
+        .BRIDGE_HUB()
+        .call()
+        .await
+        .context("calling current PUH.BRIDGE_HUB() for zk-governance provenance")?;
+    let l1_nullifier = current_puh
+        .L1_NULLIFIER()
+        .call()
+        .await
+        .context("calling current PUH.L1_NULLIFIER() for zk-governance provenance")?;
+    let l1_asset_router = current_puh
+        .L1_ASSET_ROUTER()
+        .call()
+        .await
+        .context("calling current PUH.L1_ASSET_ROUTER() for zk-governance provenance")?;
+    let l1_native_token_vault = current_puh
+        .L1_NATIVE_TOKEN_VAULT()
+        .call()
+        .await
+        .context("calling current PUH.L1_NATIVE_TOKEN_VAULT() for zk-governance provenance")?;
+
+    let old_guardians = current_puh
+        .guardians()
+        .call()
+        .await
+        .context("calling current PUH.guardians() for zk-governance provenance")?;
+    let guardians_members = read_guardians_members(verifiers, old_guardians).await?;
+
+    let puh_ctor_args = V31ProtocolUpgradeHandler::constructorCall::new((
+        l2_protocol_governor,
+        era_ctm,
+        zksync_os_ctm_proxy,
+        bridgehub,
+        l1_nullifier,
+        l1_asset_router,
+        l1_native_token_vault,
+        chain_asset_handler,
+        U256::from(verifiers.era_chain_id),
+    ))
+    .abi_encode();
+    result.expect_create2_params(
+        verifiers,
+        &puh_guardians.new_puh_impl,
+        puh_ctor_args,
+        ZK_GOVERNANCE_PUH_FILE,
+    );
+
+    let guardians_ctor_args = V31Guardians::constructorCall::new((
+        current_puh_addr,
+        bridgehub,
+        U256::from(verifiers.era_chain_id),
+        guardians_members,
+    ))
+    .abi_encode();
+    result.expect_create2_params(
+        verifiers,
+        &puh_guardians.new_guardians,
+        guardians_ctor_args,
+        ZK_GOVERNANCE_GUARDIANS_FILE,
+    );
+
+    Ok(())
+}
+
+async fn read_guardians_members(
+    verifiers: &Verifiers,
+    guardians_addr: Address,
+) -> Result<Vec<Address>> {
+    use governance_signatures::GuardiansMembersView;
+
+    let raw_len = verifiers
+        .network_verifier
+        .storage_at(&guardians_addr, &FixedBytes::<32>::ZERO)
+        .await;
+    let members_len = U256::from_be_slice(raw_len.as_slice());
+    anyhow::ensure!(
+        members_len == U256::from(EXPECTED_GUARDIANS_MEMBER_COUNT),
+        "current Guardians at {guardians_addr} must have exactly {EXPECTED_GUARDIANS_MEMBER_COUNT} members, got {members_len}"
+    );
+
+    let guardians =
+        GuardiansMembersView::new(guardians_addr, verifiers.network_verifier.get_l1_provider());
+    let mut members = Vec::with_capacity(EXPECTED_GUARDIANS_MEMBER_COUNT);
+    for index in 0..EXPECTED_GUARDIANS_MEMBER_COUNT {
+        let member = guardians
+            .members(U256::from(index))
+            .call()
+            .await
+            .with_context(|| {
+                format!("calling current Guardians.members({index}) for zk-governance provenance")
+            })?;
+        anyhow::ensure!(
+            member != Address::ZERO,
+            "current Guardians.members({index}) returned address(0)"
+        );
+        members.push(member);
+    }
+    Ok(members)
 }
 
 #[derive(Clone, Copy)]

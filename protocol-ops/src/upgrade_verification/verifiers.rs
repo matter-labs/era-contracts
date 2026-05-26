@@ -81,6 +81,7 @@ impl Verifiers {
         l1_rpc: impl Into<String>,
         gw_rpc: impl Into<String>,
         contracts_commit: Option<&str>,
+        zk_governance_commit: &str,
         era_chain_id: u64,
         legacy_gateway_chain_id: u64,
         legacy_gateway_chain_intervals: &[ChainInterval],
@@ -109,7 +110,8 @@ impl Verifiers {
             artifact,
             &["upgrade_addresses", "bridgehub", "bridgehub_proxy_addr"],
         )?;
-        let bytecode_verifier = BytecodeVerifier::init_v31(contracts_commit).await?;
+        let bytecode_verifier =
+            BytecodeVerifier::init_v31(contracts_commit, zk_governance_commit).await?;
         let network_verifier =
             NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into(), era_chain_id).await?;
         anyhow::ensure!(

@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use alloy::primitives::{Address, FixedBytes, U256};
+use alloy::primitives::{keccak256, Address, FixedBytes, U256};
 use clap::{Parser, ValueEnum};
 
-use crate::common::env_config::{default_protocol_ops_out_dir, EnvConfig};
+use crate::common::env_config::{default_protocol_ops_out_dir, EnvConfig, GovernanceKind};
 use crate::{
     common::logger,
     upgrade_verification::{
@@ -11,6 +11,9 @@ use crate::{
         versions::v31::utils::transactions_log,
     },
 };
+
+const V31_PUH_SALT_PREIMAGE: &[u8] = b"v31:ProtocolUpgradeHandler";
+const V31_GUARDIANS_SALT_PREIMAGE: &[u8] = b"v31:Guardians";
 
 /// Verify prepared ecosystem upgrade artifacts.
 ///
@@ -42,6 +45,11 @@ pub struct VerifyUpgradeArgs {
     /// and SystemConfig.json; verify that the checkout matches the reviewed commit.
     #[clap(long)]
     pub contracts_commit: Option<String>,
+
+    /// zk-governance commit to load ProtocolUpgradeHandler / Guardians
+    /// bytecode metadata from GitHub.
+    #[clap(long)]
+    pub zk_governance_commit: String,
 
     /// Path to the append-only `transactions.txt` emitted by every prepare
     /// broadcast (see `dev execute-safe::append_transaction_hash`). Each
@@ -146,6 +154,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     for salt in env_cfg.v31_create2_factory_salt_per_ctm()?.values() {
         expected_salts.push(FixedBytes::<32>::from_slice(salt.as_bytes()));
     }
+    if env_cfg.governance_kind() == GovernanceKind::Puh {
+        expected_salts.push(keccak256(V31_PUH_SALT_PREIMAGE));
+        expected_salts.push(keccak256(V31_GUARDIANS_SALT_PREIMAGE));
+    }
 
     let transactions_log_path = match args.transactions_log.clone() {
         Some(path) => path,
@@ -171,6 +183,10 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     } else {
         logger::info("Contracts hashes: local repository AllContractsHashes.json");
     }
+    logger::info(format!(
+        "zk-governance commit: {}",
+        args.zk_governance_commit
+    ));
     logger::info(format!("Representative ZK chain ID: {era_chain_id}"));
     logger::info(format!(
         "Legacy Gateway chain ID: {legacy_gateway_chain_id}"
@@ -211,6 +227,7 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         &args.l1_rpc_url,
         &args.gw_rpc_url,
         args.contracts_commit.as_deref(),
+        args.zk_governance_commit.as_str(),
         era_chain_id,
         legacy_gateway_chain_id,
         &legacy_gateway_chain_intervals,

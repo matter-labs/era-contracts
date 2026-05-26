@@ -127,7 +127,8 @@ cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
   --env stage \
   --ecosystem-toml "../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml" \
   --l1-rpc-url http://127.0.0.1:48546 \
-  --gw-rpc-url "$GW_RPC_URL"
+  --gw-rpc-url "$GW_RPC_URL" \
+  --zk-governance-commit 7c5e27b4de1f3b2f4800da4516f4d73943c2ed7c
 ```
 
 Other knobs (all read from `permanent-values/<env>.toml` and the v31 input
@@ -137,3 +138,4 @@ TOML when `--env` is set — pass an explicit flag to override):
 | --- | --- | --- |
 | `--transactions-log <path>` | `<l1-contracts>/upgrade-envs/v0.31.0-interopB/output/<env>/transactions.txt` | Verifying a custom rollout output dir. |
 | `--contracts-commit <hash>` | local checkout | Verifying against contract metadata from a different commit. When omitted, local `AllContractsHashes.json` and `SystemConfig.json` are authoritative, so first verify the checkout matches the reviewed contracts commit. |
+| `--zk-governance-commit <hash>` | required | PUVT fetches zk-governance `AllContractsHashes.json` at this commit and uses it to provenance-check `[puh_guardians].new_puh_impl` and `[puh_guardians].new_guardians`. |

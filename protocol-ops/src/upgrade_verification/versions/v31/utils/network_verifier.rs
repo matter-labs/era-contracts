@@ -573,7 +573,7 @@ fn check_gw_create2_deploy_from_input(
         }
         let salt = FixedBytes::<32>::from_slice(&raw[..32]);
         let init_code = &raw[32..];
-        let (name, params) = bytecode_verifier.try_parse_bytecode_any_args(init_code)?;
+        let (name, params) = bytecode_verifier.try_parse_bytecode(init_code)?;
         let addr = compute_create2_address_evm(l2_contract, salt, keccak256(init_code));
         return Some(ParsedCreate2Deployment {
             addr,

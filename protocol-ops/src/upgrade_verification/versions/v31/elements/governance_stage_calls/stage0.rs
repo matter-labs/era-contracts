@@ -119,6 +119,9 @@ impl GovernanceStage0Calls {
         };
 
         if puh_governed {
+            let expected_puh_guardians = artifact.puh_guardians.as_ref().context(
+                "PUH-governed v31 artifact is missing required top-level [puh_guardians] table",
+            )?;
             // PUH/Guardians redeploy pair — PUH-governed envs only.
             // Call `base_count` — PUH ProxyAdmin.upgradeAndCall(PUH proxy, new impl, "").
             // Call `base_count + 1` — PUH.updateGuardians(new guardians).
@@ -144,6 +147,12 @@ impl GovernanceStage0Calls {
                             result.report_error(&format!(
                                 "PUH upgrade call #{upgrade_idx} proxy arg {} does not match bridgehub.owner() {}",
                                 decoded.proxy, bridgehub_owner
+                            ));
+                            errors += 1;
+                        } else if decoded.implementation != expected_puh_guardians.new_puh_impl {
+                            result.report_error(&format!(
+                                "PUH upgradeAndCall #{upgrade_idx} implementation {} does not match [puh_guardians].new_puh_impl {}",
+                                decoded.implementation, expected_puh_guardians.new_puh_impl
                             ));
                             errors += 1;
                         } else if !decoded.data.is_empty() {
@@ -198,6 +207,17 @@ impl GovernanceStage0Calls {
                             "PUH updateGuardians(new={})",
                             decoded._newGuardians
                         ));
+                        if decoded._newGuardians == expected_puh_guardians.new_guardians {
+                            result.report_ok(
+                                "PUH updateGuardians target matches [puh_guardians].new_guardians",
+                            );
+                        } else {
+                            result.report_error(&format!(
+                                "PUH updateGuardians #{update_guardians_idx} argument {} does not match [puh_guardians].new_guardians {}",
+                                decoded._newGuardians, expected_puh_guardians.new_guardians
+                            ));
+                            errors += 1;
+                        }
                         errors += verify_address_has_code(
                             &decoded._newGuardians,
                             "PUH new Guardians",

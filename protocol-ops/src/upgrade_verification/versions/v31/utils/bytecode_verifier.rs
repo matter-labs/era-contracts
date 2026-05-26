@@ -2,13 +2,21 @@ use alloy::hex::{self, FromHex};
 use alloy::primitives::{keccak256, Address, Bytes, FixedBytes};
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 
 use super::{
     address_from_short_hex, compute_create2_address_zk, compute_hash_with_arguments,
     get_contents_from_github, repo_relative_path,
 };
+
+const ERA_CONTRACTS_REPO: &str = "matter-labs/era-contracts";
+const ZK_GOVERNANCE_REPO: &str = "zksync-association/zk-governance";
+const ALL_CONTRACTS_HASHES_PATH: &str = "AllContractsHashes.json";
+const ZK_GOVERNANCE_V31_CONTRACTS: &[&str] = &[
+    "l1-contracts/ProtocolUpgradeHandler",
+    "l1-contracts/Guardians",
+];
 
 pub struct BytecodeVerifier {
     /// Maps init bytecode hash to the corresponding file name.
@@ -26,12 +34,26 @@ pub struct BytecodeVerifier {
 }
 
 impl BytecodeVerifier {
-    pub async fn init_v31(contracts_commit: Option<&str>) -> anyhow::Result<Self> {
-        if let Some(contracts_commit) = contracts_commit {
-            return Ok(Self::init_from_github(contracts_commit).await);
-        }
+    pub async fn init_v31(
+        contracts_commit: Option<&str>,
+        zk_governance_commit: &str,
+    ) -> anyhow::Result<Self> {
+        let mut verifier = if let Some(contracts_commit) = contracts_commit {
+            Self::init_from_github(contracts_commit).await
+        } else {
+            Self::init_from_local()?
+        };
 
-        Self::init_from_local()
+        let contract_hashes = ContractHashes::init_from_github_repo(
+            zk_governance_commit,
+            ZK_GOVERNANCE_REPO,
+            ALL_CONTRACTS_HASHES_PATH,
+        )
+        .await?
+        .filter_required(ZK_GOVERNANCE_V31_CONTRACTS)?;
+        verifier.extend_from_contract_hashes(contract_hashes);
+
+        Ok(verifier)
     }
 
     pub fn init_from_local() -> anyhow::Result<Self> {
@@ -39,29 +61,15 @@ impl BytecodeVerifier {
         Ok(Self::from_contract_hashes(contract_hashes))
     }
 
-    /// Tries to parse `maybe_bytecode` as init code by testing 0 to 9 arguments.
-    ///
-    /// On success, returns a tuple of the contract file name and the extra argument
-    /// bytes appended at the end of the bytecode.
-    pub fn try_parse_bytecode(&self, maybe_bytecode: &[u8]) -> Option<(String, Vec<u8>)> {
-        self.try_parse_bytecode_with_max_args(maybe_bytecode, 9)
-    }
-
-    /// Same as [`Self::try_parse_bytecode`], but scans every possible 32-byte
+    /// Tries to parse `maybe_bytecode` as init code by testing every possible 32-byte
     /// constructor-argument suffix. Gateway ZKsync OS deployer constructors
-    /// carry dynamic structs and selector arrays, so the legacy 0..9 word scan
-    /// is too narrow for those L1->GW CREATE2 priority txs.
-    pub fn try_parse_bytecode_any_args(&self, maybe_bytecode: &[u8]) -> Option<(String, Vec<u8>)> {
-        self.try_parse_bytecode_with_max_args(maybe_bytecode, maybe_bytecode.len() / 32)
-    }
-
-    fn try_parse_bytecode_with_max_args(
-        &self,
-        maybe_bytecode: &[u8],
-        max_args: usize,
-    ) -> Option<(String, Vec<u8>)> {
+    /// carry dynamic structs and selector arrays, and zk-governance
+    /// Guardians carries a dynamic members array, so the legacy 0..9 word
+    /// scan is too narrow for those CREATE2 deploys.
+    pub fn try_parse_bytecode(&self, maybe_bytecode: &[u8]) -> Option<(String, Vec<u8>)> {
         // We do not know how many extra 32-byte arguments there are,
         // so we try all values up to the caller-provided bound.
+        let max_args = maybe_bytecode.len() / 32;
         for i in 0..=max_args {
             // Skip if there isn’t even enough data for i arguments.
             if maybe_bytecode.len() < 32 * i {
@@ -183,75 +191,94 @@ impl BytecodeVerifier {
 
     /// Initializes the verifier from contract hashes obtained from GitHub.
     pub async fn init_from_github(commit: &str) -> Self {
-        let contract_hashes = ContractHashes::init_from_github(commit).await;
+        let contract_hashes = ContractHashes::init_from_github(commit)
+            .await
+            .expect("Failed to load AllContractsHashes.json from GitHub");
         Self::from_contract_hashes(contract_hashes)
     }
 
     fn from_contract_hashes(contract_hashes: ContractHashes) -> Self {
-        let mut init_bytecode_file_by_hash = HashMap::new();
-        let mut deployed_bytecode_file_by_hash = HashMap::new();
-        let mut bytecode_file_to_zkhash = HashMap::new();
-        let mut zk_bytecode_file_by_hash = HashMap::new();
-        let mut evm_deployed_blake_and_length_by_file = HashMap::new();
+        let mut verifier = Self {
+            init_bytecode_file_by_hash: HashMap::new(),
+            deployed_bytecode_file_by_hash: HashMap::new(),
+            zk_bytecode_file_by_hash: HashMap::new(),
+            bytecode_file_to_zkhash: HashMap::new(),
+            evm_deployed_blake_and_length_by_file: HashMap::new(),
+        };
 
+        verifier.extend_from_contract_hashes(contract_hashes);
+        verifier.insert_hardcoded_bytecodes();
+        verifier
+    }
+
+    fn extend_from_contract_hashes(&mut self, contract_hashes: ContractHashes) {
         for contract in contract_hashes.hashes {
-            if let Some(ref hash) = contract.evm_bytecode_hash {
-                let decoded = hex::decode(hash).unwrap_or_else(|_| {
-                    panic!(
-                        "Invalid hex in evm_bytecode_hash for {}",
-                        contract.contract_name
-                    )
-                });
-                let bytecode_hash = FixedBytes::try_from(decoded.as_slice())
-                    .expect("Invalid length for FixedBytes (evm_bytecode_hash)");
-                init_bytecode_file_by_hash.insert(bytecode_hash, contract.contract_name.clone());
-            }
+            self.insert_contract_hash(contract);
+        }
+    }
 
-            if let Some(ref hash) = contract.evm_deployed_bytecode_hash {
-                let decoded = hex::decode(hash).unwrap_or_else(|_| {
-                    panic!(
-                        "Invalid hex in evm_deployed_bytecode_hash for {}",
-                        contract.contract_name
-                    )
-                });
-                let bytecode_hash = FixedBytes::try_from(decoded.as_slice())
-                    .expect("Invalid length for FixedBytes (evm_deployed_bytecode_hash)");
-                deployed_bytecode_file_by_hash
-                    .insert(bytecode_hash, contract.contract_name.clone());
-            }
-
-            if let Some(ref hash) = contract.zk_bytecode_hash {
-                let decoded = hex::decode(hash).unwrap_or_else(|_| {
-                    panic!(
-                        "Invalid hex in zk_bytecode_hash for {}",
-                        contract.contract_name
-                    )
-                });
-                let bytecode_hash = FixedBytes::try_from(decoded.as_slice())
-                    .expect("Invalid length for FixedBytes (zk_bytecode_hash)");
-                bytecode_file_to_zkhash.insert(contract.contract_name.clone(), bytecode_hash);
-                zk_bytecode_file_by_hash.insert(bytecode_hash, contract.contract_name.clone());
-            }
-
-            if let (Some(ref blake), Some(length)) = (
-                contract.evm_deployed_bytecode_blake_hash.as_ref(),
-                contract.evm_deployed_bytecode_length,
-            ) {
-                let decoded = hex::decode(blake).unwrap_or_else(|_| {
-                    panic!(
-                        "Invalid hex in evm_deployed_bytecode_blake_hash for {}",
-                        contract.contract_name
-                    )
-                });
-                let blake_hash = FixedBytes::try_from(decoded.as_slice())
-                    .expect("Invalid length for FixedBytes (evm_deployed_bytecode_blake_hash)");
-                evm_deployed_blake_and_length_by_file
-                    .insert(contract.contract_name, (blake_hash, length));
-            }
+    fn insert_contract_hash(&mut self, contract: ContractHash) {
+        if let Some(ref hash) = contract.evm_bytecode_hash {
+            let decoded = hex::decode(hash).unwrap_or_else(|_| {
+                panic!(
+                    "Invalid hex in evm_bytecode_hash for {}",
+                    contract.contract_name
+                )
+            });
+            let bytecode_hash = FixedBytes::try_from(decoded.as_slice())
+                .expect("Invalid length for FixedBytes (evm_bytecode_hash)");
+            self.init_bytecode_file_by_hash
+                .insert(bytecode_hash, contract.contract_name.clone());
         }
 
+        if let Some(ref hash) = contract.evm_deployed_bytecode_hash {
+            let decoded = hex::decode(hash).unwrap_or_else(|_| {
+                panic!(
+                    "Invalid hex in evm_deployed_bytecode_hash for {}",
+                    contract.contract_name
+                )
+            });
+            let bytecode_hash = FixedBytes::try_from(decoded.as_slice())
+                .expect("Invalid length for FixedBytes (evm_deployed_bytecode_hash)");
+            self.deployed_bytecode_file_by_hash
+                .insert(bytecode_hash, contract.contract_name.clone());
+        }
+
+        if let Some(ref hash) = contract.zk_bytecode_hash {
+            let decoded = hex::decode(hash).unwrap_or_else(|_| {
+                panic!(
+                    "Invalid hex in zk_bytecode_hash for {}",
+                    contract.contract_name
+                )
+            });
+            let bytecode_hash = FixedBytes::try_from(decoded.as_slice())
+                .expect("Invalid length for FixedBytes (zk_bytecode_hash)");
+            self.bytecode_file_to_zkhash
+                .insert(contract.contract_name.clone(), bytecode_hash);
+            self.zk_bytecode_file_by_hash
+                .insert(bytecode_hash, contract.contract_name.clone());
+        }
+
+        if let (Some(ref blake), Some(length)) = (
+            contract.evm_deployed_bytecode_blake_hash.as_ref(),
+            contract.evm_deployed_bytecode_length,
+        ) {
+            let decoded = hex::decode(blake).unwrap_or_else(|_| {
+                panic!(
+                    "Invalid hex in evm_deployed_bytecode_blake_hash for {}",
+                    contract.contract_name
+                )
+            });
+            let blake_hash = FixedBytes::try_from(decoded.as_slice())
+                .expect("Invalid length for FixedBytes (evm_deployed_bytecode_blake_hash)");
+            self.evm_deployed_blake_and_length_by_file
+                .insert(contract.contract_name, (blake_hash, length));
+        }
+    }
+
+    fn insert_hardcoded_bytecodes(&mut self) {
         // Create2Factory
-        deployed_bytecode_file_by_hash.insert(
+        self.deployed_bytecode_file_by_hash.insert(
             FixedBytes::<32>::from_hex(
                 "0x2fa86add0aed31f33a762c9d88e807c475bd51d0f52bd0955754b2608f7e4989",
             )
@@ -259,7 +286,7 @@ impl BytecodeVerifier {
             "Create2Factory".to_string(),
         );
         // TransparentProxyAdmin
-        deployed_bytecode_file_by_hash.insert(
+        self.deployed_bytecode_file_by_hash.insert(
             FixedBytes::<32>::from_hex(
                 "0x1d8a3e7186b2285da5ef3ccf4c63a672e91873f2ffdec522a241f72bfcab11c5",
             )
@@ -268,21 +295,13 @@ impl BytecodeVerifier {
         );
         // Hash of the proxy admin used for stage proofs
         // https://sepolia.etherscan.io/address/0x93AEeE8d98fB0873F8fF595fDd534A1f288786D2
-        deployed_bytecode_file_by_hash.insert(
+        self.deployed_bytecode_file_by_hash.insert(
             FixedBytes::<32>::from_hex(
                 "1e651120773914ac75c42598ceac4da0dc3e21709d438937f742ecf916ac30ae",
             )
             .unwrap(),
             "TransparentProxyAdmin".to_string(),
         );
-
-        Self {
-            init_bytecode_file_by_hash,
-            deployed_bytecode_file_by_hash,
-            zk_bytecode_file_by_hash,
-            bytecode_file_to_zkhash,
-            evm_deployed_blake_and_length_by_file,
-        }
     }
 }
 
@@ -330,20 +349,48 @@ impl ContractHashes {
     }
 
     /// Initializes the contract hashes by fetching and parsing the JSON from GitHub.
-    pub async fn init_from_github(commit: &str) -> Self {
-        let contents = Self::get_contents(commit).await;
-        Self {
-            hashes: serde_json::from_str(&contents)
-                .expect("Failed to parse AllContractsHashes.json from GitHub"),
-        }
+    pub async fn init_from_github(commit: &str) -> anyhow::Result<Self> {
+        Self::init_from_github_repo(commit, ERA_CONTRACTS_REPO, ALL_CONTRACTS_HASHES_PATH).await
     }
 
-    async fn get_contents(commit: &str) -> String {
-        get_contents_from_github(
-            commit,
-            "matter-labs/era-contracts",
-            "AllContractsHashes.json",
-        )
-        .await
+    pub async fn init_from_github_repo(
+        commit: &str,
+        repo: &str,
+        file_path: &str,
+    ) -> anyhow::Result<Self> {
+        let contents = get_contents_from_github(commit, repo, file_path).await;
+        Ok(Self {
+            hashes: serde_json::from_str(&contents)
+                .with_context(|| format!("failed to parse {file_path} from {repo}@{commit}"))?,
+        })
+    }
+
+    fn filter_required(self, required_contracts: &[&str]) -> anyhow::Result<Self> {
+        let required: HashSet<&str> = required_contracts.iter().copied().collect();
+        let mut found: HashSet<String> = HashSet::new();
+        let hashes: Vec<_> = self
+            .hashes
+            .into_iter()
+            .filter(|contract| {
+                let is_required = required.contains(contract.contract_name.as_str());
+                if is_required {
+                    found.insert(contract.contract_name.clone());
+                }
+                is_required
+            })
+            .collect();
+
+        let missing: Vec<_> = required_contracts
+            .iter()
+            .copied()
+            .filter(|contract| !found.contains(*contract))
+            .collect();
+        anyhow::ensure!(
+            missing.is_empty(),
+            "zk-governance AllContractsHashes.json is missing required v31 contract(s): {}",
+            missing.join(", ")
+        );
+
+        Ok(Self { hashes })
     }
 }

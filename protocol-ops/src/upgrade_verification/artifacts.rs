@@ -1,4 +1,4 @@
-use std::{fs, path::Path};
+use std::{fs, path::Path, str::FromStr};
 
 use alloy::primitives::Address;
 use anyhow::Context;
@@ -20,6 +20,11 @@ pub(crate) struct EcosystemUpgradeArtifact {
     /// past the canonical 5 (unpauseMigration + per-CTM checks) and which
     /// deployed-GW-CTM address to cross-check.
     pub(crate) new_gateway: Option<NewGatewayArtifact>,
+    /// Optional `[puh_guardians]` table emitted on PUH-governed v31 upgrades.
+    /// It names the two zk-governance contracts deployed via L1 CREATE2 so
+    /// provenance verification can stay decoupled from stage-0 calldata
+    /// decoding; stage-0 verification binds decoded calls back to these values.
+    pub(crate) puh_guardians: Option<PuhGuardiansArtifact>,
     /// Raw top-level `[misc]` table for shared metadata that does not belong to
     /// core or a particular CTM.
     pub(crate) misc: toml::Value,
@@ -31,19 +36,25 @@ pub(crate) struct NewGatewayArtifact {
     /// address of the deployed GW CTM. The `addChainTypeManager` L1→L2
     /// priority tx whose calldata gets baked into stage 2 references this
     /// address as the CTM being added to the L2 Bridgehub on the gateway.
-    pub(crate) gateway_chain_type_manager_addr: alloy::primitives::Address,
+    pub(crate) gateway_chain_type_manager_addr: Address,
     /// Deployed GW RollupDAManager (L1 address). Stage-2 GW bring-up sends
     /// an `acceptOwnership` priority tx targeting this contract on L2 via
     /// the new gateway — used to cross-check the priority-tx's `dstAddress`.
-    pub(crate) gateway_rollup_da_manager_addr: Option<alloy::primitives::Address>,
+    pub(crate) gateway_rollup_da_manager_addr: Option<Address>,
     /// Deployed GW ServerNotifier proxy (L1 address). Same use as above —
     /// the second `acceptOwnership` priority tx targets this contract.
-    pub(crate) gateway_server_notifier_addr: Option<alloy::primitives::Address>,
+    pub(crate) gateway_server_notifier_addr: Option<Address>,
     /// Raw `[new_gateway]` table, kept for downstream verifiers that want
     /// to read additional fields (multicall3_addr, validators, diamond cut)
     /// without re-parsing the artifact.
     #[allow(dead_code)]
     pub(crate) value: toml::Value,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PuhGuardiansArtifact {
+    pub(crate) new_puh_impl: Address,
+    pub(crate) new_guardians: Address,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -182,7 +193,7 @@ impl EcosystemUpgradeArtifact {
                     .context(
                         "[new_gateway.gateway_state_transition] is required when [new_gateway] is present",
                     )?;
-                let parse_required = |field: &str| -> anyhow::Result<alloy::primitives::Address> {
+                let parse_required = |field: &str| -> anyhow::Result<Address> {
                     let raw = gst
                         .get(field)
                         .and_then(toml::Value::as_str)
@@ -191,18 +202,16 @@ impl EcosystemUpgradeArtifact {
                                 "[new_gateway.gateway_state_transition.{field}] is required when [new_gateway] is present"
                             )
                         })?;
-                    use std::str::FromStr;
-                    alloy::primitives::Address::parse_checksummed(raw, None)
-                        .or_else(|_| alloy::primitives::Address::from_str(raw))
+                    Address::parse_checksummed(raw, None)
+                        .or_else(|_| Address::from_str(raw))
                         .with_context(|| format!("invalid address for `{field}`: `{raw}`"))
                 };
-                let parse_optional = |field: &str| -> Option<alloy::primitives::Address> {
+                let parse_optional = |field: &str| -> Option<Address> {
                     let raw = gst.get(field).and_then(toml::Value::as_str)?;
-                    use std::str::FromStr;
-                    alloy::primitives::Address::parse_checksummed(raw, None)
-                        .or_else(|_| alloy::primitives::Address::from_str(raw))
+                    Address::parse_checksummed(raw, None)
+                        .or_else(|_| Address::from_str(raw))
                         .ok()
-                        .filter(|a| *a != alloy::primitives::Address::ZERO)
+                        .filter(|a| *a != Address::ZERO)
                 };
                 Some(NewGatewayArtifact {
                     gateway_chain_type_manager_addr: parse_required(
@@ -211,6 +220,26 @@ impl EcosystemUpgradeArtifact {
                     gateway_rollup_da_manager_addr: parse_optional("rollup_da_manager_addr"),
                     gateway_server_notifier_addr: parse_optional("server_notifier_proxy_addr"),
                     value: toml::Value::Table(table),
+                })
+            }
+            None => None,
+        };
+
+        let puh_guardians = match root.remove("puh_guardians") {
+            Some(value) => {
+                let table = expect_table(value, "puh_guardians")?;
+                let value = toml::Value::Table(table);
+                Some(PuhGuardiansArtifact {
+                    new_puh_impl: required_address_in_value(
+                        &value,
+                        "puh_guardians",
+                        &["new_puh_impl"],
+                    )?,
+                    new_guardians: required_address_in_value(
+                        &value,
+                        "puh_guardians",
+                        &["new_guardians"],
+                    )?,
                 })
             }
             None => None,
@@ -226,6 +255,7 @@ impl EcosystemUpgradeArtifact {
             governance_calls,
             ctms,
             new_gateway,
+            puh_guardians,
             misc,
         })
     }
@@ -332,5 +362,45 @@ mod tests {
         assert_eq!(a.ctms[1].flavor, CtmFlavor::ZksyncOs);
         assert_eq!(a.ctms[0].chain_upgrade_diamond_cut, "0xaa");
         assert_eq!(a.ctms[1].chain_upgrade_diamond_cut, "0xbb");
+    }
+
+    #[test]
+    fn parses_puh_guardians_metadata() {
+        let toml = r#"
+            [governance_calls]
+            stage0_calls = "0x"
+            stage1_calls = "0x"
+            stage2_calls = "0x"
+
+            [core]
+
+            [ctms.era]
+            chain_upgrade_diamond_cut = "0xaa"
+            [ctms.era.contracts_config]
+            diamond_cut_data = "0x"
+            force_deployments_data = "0x"
+            new_protocol_version = 2
+            old_protocol_version = 1
+            governance_upgrade_timer_initial_delay = 0
+            is_testnet = false
+
+            [puh_guardians]
+            new_puh_impl = "0x0000000000000000000000000000000000000001"
+            new_guardians = "0x0000000000000000000000000000000000000002"
+        "#;
+        let artifact = EcosystemUpgradeArtifact::from_toml_str(toml).unwrap();
+        let metadata = artifact.puh_guardians.unwrap();
+        assert_eq!(
+            metadata.new_puh_impl,
+            "0x0000000000000000000000000000000000000001"
+                .parse::<Address>()
+                .unwrap()
+        );
+        assert_eq!(
+            metadata.new_guardians,
+            "0x0000000000000000000000000000000000000002"
+                .parse::<Address>()
+                .unwrap()
+        );
     }
 }
