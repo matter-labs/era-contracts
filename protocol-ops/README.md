@@ -11,14 +11,16 @@ cargo build --release
 
 ## Use
 
+Run all commands below from the `protocol-ops` directory.
+
 ```bash
-./target/release/protocol_ops --help
+cargo run --release --bin protocol_ops -- --help
 ```
 
 ### Example: register a new chain
 
 ```bash
-./target/release/protocol_ops chain init \
+cargo run --release --bin protocol_ops -- chain init \
   --ctm-proxy 0x0000000000000000000000000000000000000001 \
   --l1-da-validator 0x0000000000000000000000000000000000000002 \
   --era-validator-operator 0x0000000000000000000000000000000000000003 \
@@ -72,215 +74,66 @@ You need a working Foundry toolchain (`forge`, `cast`, etc.) and repo contract a
 
 ### Running the Protocol Upgrade Verification Tool (PUVT)
 
-The PUVT requires we have already run the upgrade scripts that deploy all new protocol contracts. We can run the PUVT in local (development) mode or against a live chain.
+The PUVT requires we have already run the upgrade scripts that deploy all new protocol contracts. For v31 stage, regenerate the calldata and replay the prepare bundles on a pinned Sepolia fork, then run PUVT against the same fork.
 
-#### PUVT in Local Mode
-
-Start an anvil fork of the L1:
+Start a read-only Sepolia fork. Keep the RPC URL out of committed files:
 
 ```bash
-anvil --fork-url <l1-rpc-url>
+export L1_RPC_URL='<sepolia-rpc-url>'
+
+anvil \
+  --fork-url "$L1_RPC_URL" \
+  --port 48546 \
+  --auto-impersonate \
+  --disable-block-gas-limit \
+  --base-fee 0
 ```
 
-Open a new terminal and run the protocol-ops upgrade tool. `upgrade-prepare` always runs the
-Foundry script against its own temporary fork and writes replayable bundles to `--out`; it does
-not leave its temporary fork running. For local PUVT testing, use an Anvil default account as the
-deployer so the emitted bundles can be replayed with the matching private key:
+In a second shell, generate the stage artifact:
 
 ```bash
-export SKIP_PUH=1
-export ANVIL_RPC=http://127.0.0.1:8545
-export ANVIL_DEPLOYER=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-export ANVIL_DEPLOYER_PK=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-
-rm -rf /tmp/v31-stage
-mkdir -p /tmp/v31-stage/prepare
-
-./target/release/protocol_ops ecosystem upgrade-prepare-all \
-  --l1-rpc-url "$ANVIL_RPC" \
-  --env stage \
-  --deployer-address "$ANVIL_DEPLOYER" \
-  --out /tmp/v31-stage/prepare \
-  --create2-factory-salt 0x0000000000000000000000000000000000000000000000000000000000000000
-```
-
-Replay the generated deployment bundles into the persistent Anvil fork:
-
-```bash
-rm -f /tmp/v31-stage/executed.json
-for bundle in /tmp/v31-stage/prepare/*.safe.json; do
-  ./target/release/protocol_ops dev execute-safe \
-    --l1-rpc-url "$ANVIL_RPC" \
-    --safe-file "$bundle" \
-    --private-key "$ANVIL_DEPLOYER_PK" \
-    --out /tmp/v31-stage/executed.json
-done
-```
-
-Then run the verifier against the same Anvil fork and the merged TOML
-produced by `upgrade-prepare-all`:
-
-```bash
-./target/release/protocol_ops ecosystem verify-upgrade \
-  --ecosystem-toml /tmp/v31-stage/prepare/ecosystem.toml \
-  --l1-rpc-url "$ANVIL_RPC" \
-  --era-chain-id 270 \
-  --executed-bundles /tmp/v31-stage/executed.json \
-  --create2-salt 0x88923c4cbe9c208bdd041f7c19b2d0f7e16d312e3576f17934dd390b7a2c5cc5 \
-  --zk-token-asset-id 0xd7912bfd25000ee1b3355167866f960a61787b79cd2c7e791036fe6e85a73823
-```
-
-(The salt above is `--env stage`'s `permanent_contracts.create2_factory_salt`; substitute your env's value.)
-
-`--zk-token-asset-id` is recommended for production verification runs. When omitted, `zkTokenAssetId`
-is only checked to be non-zero and a warning is emitted.
-
-The `--create2-factory` flag defaults to the standard Foundry CREATE2
-factory (`0x4e59b44847b379578588920cA78FbF26c0B4956C`) used by the v31
-prepare scripts; override only if your prepare run targeted a different
-factory.
-
-### Regenerating the committed v31 stage calldata
-
-The repo tracks one canonical artifact for the v31 stage upgrade:
-
-```
-l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml
-```
-
-It carries the merged `[governance_calls]` (PUH stage 0/1/2 hex), `[core]`,
-`[ctms.<flavor>]` (Era + ZKsyncOS), and `[new_gateway]` sections. Reviewers
-diff it; downstream tools (PUVT, the simulator converter) read it.
-
-The full prepare → fork-broadcast → PUVT cycle is wrapped in
-`l1-contracts/test/anvil-interop/regen-and-verify-stage.sh`. Use it whenever
-contracts or upgrade scripts change. Two flavors below — Docker (preferred,
-toolchain-free) and a from-source local build.
-
-#### Option A — Docker (preferred)
-
-`docker/protocol/Dockerfile` builds a runtime image with `forge`, `cast`,
-`anvil`, `protocol_ops`, `node`, and all compiled contract artifacts at
-`/contracts/`. The `Build Docker Image` workflow
-(`.github/workflows/build-docker.yaml`) publishes the image to
-`ghcr.io/matter-labs/protocol-ops:<tag>`.
-
-```bash
-# 0. Build (or pull) an image for your branch.
-#    Manual dispatch: bake one with a predictable tag.
-gh workflow run build-docker.yaml \
-  --ref <branch> \
-  -f image_tag_override=<branch>-regen
-#    Then: gh run watch  ⟶  wait for the run to finish, then:
-docker pull ghcr.io/matter-labs/protocol-ops:<branch>-regen
-
-# 1+2. Regen prepare/* + PUVT inside the container, writing directly to
-#      the tracked path on the host via a bind mount. Same DEPLOYER_PK +
-#      L1_FORK_URL inputs as the local run, just passed via `-e`.
-docker run --rm \
-  -e DEPLOYER_PK="$(tr -d '[:space:]' < ~/.test_pk)" \
-  -e L1_FORK_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
-  -v "$PWD/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output:/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output" \
-  -w /contracts/l1-contracts \
-  ghcr.io/matter-labs/protocol-ops:<branch>-regen \
-  bash test/anvil-interop/regen-and-verify-stage.sh
-
-# 3. Promote regen output → tracked path + regenerate every CI-checked
-#    derived artifact on the host (these checks run outside Docker so the
-#    yarn/foundry workspaces need a real local checkout). Then commit.
-cd contracts
-cp l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/regen/prepare/ecosystem.toml \
-   l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml
-yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix
-cd l1-contracts && yarn selectors --fix && ts-node scripts/copy-to-zkstack-out.ts
-cd .. && yarn calculate-hashes:fix
-git add l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml \
-        l1-contracts/selectors l1-contracts/zkstack-out AllContractsHashes.json
-git commit -m "Regenerate v31 stage calldata"
-
-# 4. Broadcast CREATE2 deploys to real Sepolia (idempotent — pre-filters
-#    against on-chain `eth_getCode`).
-docker run --rm \
-  -e DEPLOYER_PK="$(tr -d '[:space:]' < ~/.test_pk)" \
-  -e L1_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
-  -v "$PWD/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output:/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output" \
-  -w /contracts/l1-contracts \
-  ghcr.io/matter-labs/protocol-ops:<branch>-regen \
-  yarn ts-node scripts/regen-via-docker.ts broadcast
-
-# 5. Emit the tx-simulator scenario (also in Docker since protocol_ops + the
-#    --include-manifest helper live there).
-docker run --rm \
-  -v "$PWD/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output:/contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output" \
-  -v "$PWD/transaction-simulator/transactions:/out" \
-  -w /contracts \
-  ghcr.io/matter-labs/protocol-ops:<branch>-regen \
-  protocol_ops ecosystem governance-toml-to-simulator \
-    --env stage \
-    --governance-toml /contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml \
-    --include-manifest /contracts/l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/regen/prepare/manifest.json \
-    --out /out/$(date +%F)-v31-interopB-stage.json
-```
-
-#### Option B — Local toolchain (no Docker)
-
-```bash
-# 0. Rebuild artifacts that the prepare phase reads.
-cd contracts
-yarn sc build:foundry                       # zkout/ — genesis hashes
-cd l1-contracts && forge build              # out/  — l1 artifacts
-cd ../protocol-ops && cargo build           # target/debug/protocol_ops
-
-# 1. Regen against a Sepolia fork. Writes prepare/* + executed.json under
-#    upgrade-envs/v0.31.0-interopB/output/stage/regen/ and runs PUVT.
-cd ../l1-contracts
-DEPLOYER_PK_FILE=~/.test_pk \
-L1_FORK_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
-bash test/anvil-interop/regen-and-verify-stage.sh
-
-# 2. Promote the regen output to the tracked path.
-cp upgrade-envs/v0.31.0-interopB/output/stage/regen/prepare/ecosystem.toml \
-   upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml
-
-# 3. Regenerate every derived artifact CI checks, then commit.
-cd ..
-yarn lint:sol --fix --noPrompt && yarn lint:ts --fix && yarn prettier:fix
-cd l1-contracts && yarn selectors --fix
-ts-node scripts/copy-to-zkstack-out.ts
-cd .. && yarn calculate-hashes:fix
-git add l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml \
-        l1-contracts/selectors l1-contracts/zkstack-out AllContractsHashes.json
-git commit -m "Regenerate v31 stage calldata"
-
-# 4. Broadcast CREATE2 deploys to real Sepolia so the simulator's local fork
-#    finds bytecode at every CREATE2-derived address governance touches.
-#    The script is idempotent: it pre-filters against on-chain `eth_getCode`
-#    and only sends contracts not already deployed.
-DEPLOYER_PK_FILE=~/.test_pk \
-L1_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
-yarn ts-node scripts/regen-via-docker.ts broadcast
-
-# 5. Emit the matching tx-simulator scenario (Safe-bundle JSON shape).
-#    --include-manifest pulls in deployer + SC + CTM-admin Safe bundles so
-#    the simulator's local fork has everything it needs in execution order;
-#    `protocol-ops` filters out non-broadcastable selectors (ZK approves,
-#    GW priority requests, already-executed scheduleTransparent).
 cd protocol-ops
-./target/debug/protocol_ops ecosystem governance-toml-to-simulator \
+
+cargo run --release --bin protocol_ops -- ecosystem upgrade-prepare-all \
   --env stage \
-  --governance-toml ../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml \
-  --include-manifest ../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/regen/prepare/manifest.json \
-  --out <transaction-simulator>/transactions/$(date +%F)-v31-interopB-stage.json
+  --bridgehub 0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE \
+  --l1-rpc-url http://127.0.0.1:48546 \
+  --deployer-address 0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7 \
+  --out ../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/prepare \
+  --additional-args=--memory-limit=536870912 \
+  --additional-args=--offline \
+  --additional-args=--skip-simulation
 ```
 
-The script can be iterated quickly with two env flags:
+This writes the canonical merged calldata to `l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml`. The `prepare/` subdirectory contains `manifest.json` and replayable `*.safe.json` bundles.
+We can send these to the local L1 fork via:
 
-| Flag               | Effect                                                              |
-| ------------------ | ------------------------------------------------------------------- |
-| `SKIP_PREPARE=1`   | Reuse the existing `regen/prepare/` (skip step 1's forge scripts)   |
-| `SKIP_BROADCAST=1` | Reuse `regen/executed.json` (skip funding + bundle replay)          |
-| `KEEP_ANVIL=1`     | Leave the fork anvil running on port 29545 for ad-hoc `cast` probes |
+```bash
+cargo run --release --bin protocol_ops -- ecosystem upgrade-broadcast \
+  --manifest ../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/prepare/manifest.json \
+  --l1-rpc-url http://127.0.0.1:48546 \
+  --unlocked \
+  --out ../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/executed-bundles.json
+```
 
-CI checks that fail if any step in (3) is missed: `solhint`, `eslint`,
-`prettier:check`, the `selectors` file, `AllContractsHashes.json`, the
-`zkstack-out/*.json` set, and `codespell` on prose.
+The deployment tx hashes are appended to the committed `transactions.txt` next to `ecosystem.toml`.
+PUVT reads that file, fetches each tx via `--l1-rpc-url`, and reconstructs the deployment provenance.
+
+```bash
+export L1_RPC_URL=<l1-rpc-url>
+export GW_RPC_URL=<gateway-rpc-url>
+
+cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
+  --env stage \
+  --ecosystem-toml "../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml" \
+  --l1-rpc-url http://127.0.0.1:48546 \
+  --gw-rpc-url "$GW_RPC_URL"
+```
+
+Other knobs (all read from `permanent-values/<env>.toml` and the v31 input
+TOML when `--env` is set — pass an explicit flag to override):
+
+| Flag | Default source | When to override |
+| --- | --- | --- |
+| `--transactions-log <path>` | `<l1-contracts>/upgrade-envs/v0.31.0-interopB/output/<env>/transactions.txt` | Verifying a custom rollout output dir. |
+| `--contracts-commit <hash>` | local checkout | Verifying against contract metadata from a different commit. When omitted, local `AllContractsHashes.json` and `SystemConfig.json` are authoritative, so first verify the checkout matches the reviewed contracts commit. |
