@@ -12,7 +12,7 @@ use std::panic::Location;
 
 use crate::{
     commands::ecosystem::verify_upgrade::VerifyUpgradeEnv,
-    common::env_config::ChainInterval,
+    common::env_config::{ChainInterval, EnvConfig},
     upgrade_verification::{
         artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
         versions::v31::utils::{
@@ -51,6 +51,10 @@ pub(crate) struct Verifiers {
     pub new_gateway_settlement_fee: U256,
     pub expected_l1_chain_id: u64,
     pub zk_token_asset_id: FixedBytes<32>,
+    /// CREATE2 salt used by the new-gateway CTM deployer contracts.
+    /// Derived from `[create2_factory_salts]` in the env input TOML,
+    /// keyed by `new_gateway_representative_ctm` (the L1 CTM proxy).
+    pub gateway_ctm_create2_salt: FixedBytes<32>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -136,6 +140,23 @@ impl Verifiers {
              [new_gateway].ctm_representative_chain_id must point to the CTM hosted by the new Gateway",
         );
 
+        // Look up the per-CTM CREATE2 salt for the new gateway's source CTM.
+        // Keyed by L1 CTM proxy address in [create2_factory_salts] of the
+        // env input TOML. Falls back to zero if the env doesn't declare it
+        // (e.g., a legacy env where the gateway used salt 0).
+        let gateway_ctm_create2_salt = {
+            let per_ctm = EnvConfig::load(env.as_str())
+                .and_then(|cfg| cfg.v31_create2_factory_salt_per_ctm())
+                .unwrap_or_default();
+            // env_config uses ethers H160 keys; compare via raw bytes to avoid
+            // an ethers import here.
+            per_ctm
+                .iter()
+                .find(|(addr, _)| addr.as_bytes() == new_gateway_representative_ctm.as_slice())
+                .map(|(_, h)| FixedBytes::<32>::from_slice(h.as_bytes()))
+                .unwrap_or_default()
+        };
+
         // `Bridgehub.owner()` is the L1 governance executor (the PUH proxy on
         // PUH-governed envs). It is the authoritative source for the
         // `aliased_protocol_upgrade_handler_proxy` value consumed by the
@@ -188,6 +209,7 @@ impl Verifiers {
             new_gateway_settlement_fee,
             expected_l1_chain_id,
             zk_token_asset_id,
+            gateway_ctm_create2_salt,
         })
     }
 

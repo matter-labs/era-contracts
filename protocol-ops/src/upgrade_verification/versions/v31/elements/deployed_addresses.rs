@@ -1039,7 +1039,7 @@ async fn verify_v31_new_gateway_ctm_provenance(
     let source_ctm = source_ctm_for_new_gateway(artifact, verifiers)?;
     let is_zksync_os = matches!(source_ctm.flavor, CtmFlavor::ZksyncOs);
     let aliased_governance = apply_l2_to_l1_alias(verifiers.bridgehub_owner);
-    let gateway_salt = FixedBytes::<32>::ZERO;
+    let gateway_salt = verifiers.gateway_ctm_create2_salt;
 
     let admin = in_gst("admin_facet_addr")?;
     let committer = in_gst("committer_facet_addr")?;

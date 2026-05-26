@@ -262,10 +262,10 @@ impl NetworkVerifier {
 
             if to == *bridgehub_addr {
                 parsed_gateway_deployments += 1;
-                if deployment.salt != FixedBytes::<32>::ZERO {
+                if !expected_salts.contains(&deployment.salt) {
                     result.report_error(&format!(
-                        "Gateway CREATE2 deployment of {} at {} (tx {hash:#x}) used salt {}; \
-                         v31 GatewayCTMDeployerHelper must use salt 0",
+                        "Gateway CREATE2 deployment of {} at {} (tx {hash:#x}) used salt {} \
+                         which is not in the env-declared salt set",
                         deployment.name, deployment.addr, deployment.salt
                     ));
                 }
