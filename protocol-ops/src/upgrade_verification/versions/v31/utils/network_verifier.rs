@@ -55,6 +55,7 @@ sol! {
         function legacyBridge() public view returns (address);
         function L1_WETH_TOKEN() public view returns (address);
         function L1_NULLIFIER() public view returns (address);
+        function ERA_CHAIN_ID() public view returns (uint256);
 
         function nativeTokenVault() public view returns (address);
     }

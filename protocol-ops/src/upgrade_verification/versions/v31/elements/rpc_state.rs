@@ -374,6 +374,25 @@ async fn verify_v31_core_wiring(
             "Failed to call L1AssetRouter.owner() for core wiring checks: {err}"
         )),
     }
+    if let Some(era_chain_id) = verifiers.representative_era_chain_id {
+        let era_chain_id = U256::from(era_chain_id);
+        match asset_router.ERA_CHAIN_ID().call().await {
+            Ok(actual) => {
+                expect_debug_eq(
+                    result,
+                    "L1AssetRouter.eraChainId()",
+                    &actual,
+                    &era_chain_id,
+                );
+            }
+            Err(err) => result.report_error(&format!(
+                "Failed to call L1AssetRouter.eraChainId() for core wiring checks: {err}"
+            )),
+        };
+    } else {
+        result.report_error("Cannot verify AssetRouter.ERA_CHAIN_ID(): env era_chain_id was not loaded");
+    };
+    
     match asset_router.legacyBridge().call().await {
         Ok(actual) => expect_address_eq(
             result,
