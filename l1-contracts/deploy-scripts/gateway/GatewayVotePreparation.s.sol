@@ -113,7 +113,7 @@ contract GatewayVotePreparation is DeployCTMUtils, GatewayGovernanceUtils {
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
             aliasedGovernanceAddress: aliasedGovernor,
             salt: bytes32(0),
-            eraChainId: config.eraChainId,
+            eraChainId: eraChainId,
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
             isZKsyncOS: config.isZKsyncOS,

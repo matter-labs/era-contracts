@@ -593,7 +593,7 @@ contract DeployCTMScript is Script, DeployCTMUtils, IDeployCTM {
 
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
-            gatewayChainId: config.gatewayChainId,
+            gatewayChainId: config.eraGatewayChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: coreAddresses.bridges.proxies.l1AssetRouter,
             l2TokenProxyBytecodeHash: CoreOnGatewayHelper.getDeployedBytecodeHash(
