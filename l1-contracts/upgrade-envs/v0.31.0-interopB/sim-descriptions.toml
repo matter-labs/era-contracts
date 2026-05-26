@@ -217,6 +217,12 @@ target = "l1_asset_tracker"  # L1AssetTracker
 selector = "0x79ba5097"  # acceptOwnership
 desc = "PUH stage 1: L1AssetTracker.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns L1AT."
 
+# ChainRegistrationSender.acceptOwnership — PUH accepts ownership of ChainRegistrationSender that the deployer created+transferred in phase 2.
+[[entries]]
+target = "chain_registration_sender"  # ChainRegistrationSender
+selector = "0x79ba5097"  # acceptOwnership
+desc = "PUH stage 1: ChainRegistrationSender.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns ChainRegistrationSender."
+
 [[entries]]
 target = "ntv"  # NTV
 selector = "0xe26daa7e"  # setAssetTracker
