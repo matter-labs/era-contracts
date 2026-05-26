@@ -314,8 +314,8 @@ impl VerificationResult {
                     self.report_error(&format!(
                         "Expected {} to be {} address - but got address {} at {}",
                         expected,
-                        address,
                         expected_address,
+                        address,
                         Location::caller()
                     ));
                     false
