@@ -130,7 +130,8 @@ library GatewayCTMDeployerHelper {
             address create2FactoryAddress
         )
     {
-        create2FactoryAddress = _getDeploymentTarget(config.isZKsyncOS);
+        // GW is always EVM-equivalent — use the Arachnid factory.
+        create2FactoryAddress = _getDeploymentTarget(true);
         (contracts, deployerCalldata, deployers, directCalldata) = _calculateAddressesInner(_create2Salt, config);
     }
 
@@ -207,7 +208,7 @@ library GatewayCTMDeployerHelper {
         bytes memory constructorArgs = abi.encode(daConfig);
 
         L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(
-            config.isZKsyncOS,
+            true,
             _create2Salt,
             bytecode,
             constructorArgs
@@ -237,7 +238,7 @@ library GatewayCTMDeployerHelper {
         bytes memory constructorArgs = abi.encode(proxyAdminConfig);
 
         L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(
-            config.isZKsyncOS,
+            true,
             _create2Salt,
             bytecode,
             constructorArgs
@@ -269,7 +270,7 @@ library GatewayCTMDeployerHelper {
         bytes memory constructorArgs = abi.encode(vtConfig);
 
         L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(
-            config.isZKsyncOS,
+            true,
             _create2Salt,
             bytecode,
             constructorArgs
@@ -301,7 +302,7 @@ library GatewayCTMDeployerHelper {
         bytes memory constructorArgs = abi.encode(verifiersConfig);
 
         L1L2DeployPrepareResult memory deployResult = _prepareL1L2Deployment(
-            config.isZKsyncOS,
+            true,
             _create2Salt,
             bytecode,
             constructorArgs
@@ -326,7 +327,8 @@ library GatewayCTMDeployerHelper {
             "Admin.sol",
             "AdminFacet",
             adminFacetArgs,
-            config.isZKsyncOS
+            config.isZKsyncOS,
+            true
         );
 
         // MailboxFacet
@@ -342,7 +344,8 @@ library GatewayCTMDeployerHelper {
             "Mailbox.sol",
             "MailboxFacet",
             mailboxFacetArgs,
-            config.isZKsyncOS
+            config.isZKsyncOS,
+            true
         );
 
         // ExecutorFacet
@@ -352,7 +355,8 @@ library GatewayCTMDeployerHelper {
             "Executor.sol",
             "ExecutorFacet",
             executorFacetArgs,
-            config.isZKsyncOS
+            config.isZKsyncOS,
+            true
         );
 
         // GettersFacet
@@ -361,7 +365,8 @@ library GatewayCTMDeployerHelper {
             "Getters.sol",
             "GettersFacet",
             hex"",
-            config.isZKsyncOS
+            config.isZKsyncOS,
+            true
         );
 
         // MigratorFacet
@@ -371,7 +376,8 @@ library GatewayCTMDeployerHelper {
             "Migrator.sol",
             "MigratorFacet",
             migratorFacetArgs,
-            config.isZKsyncOS
+            config.isZKsyncOS,
+            true
         );
 
         // CommitterFacet
@@ -381,7 +387,8 @@ library GatewayCTMDeployerHelper {
             "Committer.sol",
             "CommitterFacet",
             committerFacetArgs,
-            config.isZKsyncOS
+            config.isZKsyncOS,
+            true
         );
 
         // DiamondInit
@@ -391,7 +398,8 @@ library GatewayCTMDeployerHelper {
             "DiamondInit.sol",
             "DiamondInit",
             diamondInitArgs,
-            config.isZKsyncOS
+            config.isZKsyncOS,
+            true
         );
 
         // L1GenesisUpgrade
@@ -400,7 +408,8 @@ library GatewayCTMDeployerHelper {
             "L1GenesisUpgrade.sol",
             "L1GenesisUpgrade",
             hex"",
-            config.isZKsyncOS
+            config.isZKsyncOS,
+            true
         );
 
         // Multicall3
@@ -409,7 +418,8 @@ library GatewayCTMDeployerHelper {
             "Multicall3.sol",
             "Multicall3",
             hex"",
-            config.isZKsyncOS
+            config.isZKsyncOS,
+            true
         );
     }
 
@@ -418,11 +428,12 @@ library GatewayCTMDeployerHelper {
         string memory fileName,
         string memory contractName,
         bytes memory constructorArgs,
-        bool _isZKsyncOS
+        bool _isZKsyncOS,
+        bool _gwIsEvmEquivalent
     ) internal returns (address addr, bytes memory data) {
         bytes memory bytecode = BytecodeUtils.readBytecodeL1(_isZKsyncOS, fileName, contractName);
         L1L2DeployPrepareResult memory result = _prepareL1L2Deployment(
-            _isZKsyncOS,
+            _gwIsEvmEquivalent,
             _create2Salt,
             bytecode,
             constructorArgs
@@ -436,10 +447,11 @@ library GatewayCTMDeployerHelper {
         bytes32 _create2Salt,
         CTMContract vmContract,
         bytes memory constructorArgs,
-        bool _isZKsyncOS
+        bool _isZKsyncOS,
+        bool _gwIsEvmEquivalent
     ) internal returns (address addr, bytes memory data) {
         (string memory fileName, string memory contractName) = DeployCTML1OrGateway.resolve(_isZKsyncOS, vmContract);
-        return _calculateCreate2AddressAndCalldata(_create2Salt, fileName, contractName, constructorArgs, _isZKsyncOS);
+        return _calculateCreate2AddressAndCalldata(_create2Salt, fileName, contractName, constructorArgs, _isZKsyncOS, _gwIsEvmEquivalent);
     }
 
     // ============ CTM Deployer ============
@@ -463,7 +475,8 @@ library GatewayCTMDeployerHelper {
             _create2Salt,
             CTMContract.GatewayCTMDeployerCTM,
             abi.encode(ctmConfig),
-            config.isZKsyncOS
+            config.isZKsyncOS,
+            true
         );
         result = _calculateCTMDeployerAddresses(deployer, ctmConfig, config.isZKsyncOS);
     }
@@ -834,7 +847,9 @@ library GatewayCTMDeployerHelper {
         bool _isZKsyncOS
     ) private returns (address addr) {
         bytes memory bytecode = BytecodeUtils.readBytecodeL1(_isZKsyncOS, fileName, contractName);
-        addr = _computeCreate2Address(_isZKsyncOS, config.deployerAddr, config.salt, bytecode, params);
+        // Always use the EVM CREATE2 derivation: the GW is always EVM-equivalent
+        // regardless of the CTM flavor being deployed.
+        addr = _computeCreate2Address(true, config.deployerAddr, config.salt, bytecode, params);
         _logGatewayVerifyContract(addr, contractName, params);
     }
 
@@ -905,18 +920,18 @@ library GatewayCTMDeployerHelper {
 
     // ======================== VM-branching utilities ========================
 
-    function _getDeploymentTarget(bool _isZKsyncOS) private view returns (address) {
-        return _isZKsyncOS ? Utils.DETERMINISTIC_CREATE2_ADDRESS : L2_CREATE2_FACTORY_ADDR;
+    function _getDeploymentTarget(bool _gwIsEvmEquivalent) private view returns (address) {
+        return _gwIsEvmEquivalent ? Utils.DETERMINISTIC_CREATE2_ADDRESS : L2_CREATE2_FACTORY_ADDR;
     }
 
     function _computeCreate2Address(
-        bool _isZKsyncOS,
+        bool _gwIsEvmEquivalent,
         address _deployer,
         bytes32 _salt,
         bytes memory _bytecode,
         bytes memory _constructorArgs
     ) private returns (address) {
-        if (_isZKsyncOS) {
+        if (_gwIsEvmEquivalent) {
             bytes memory initCode = abi.encodePacked(_bytecode, _constructorArgs);
             return Utils.vm.computeCreate2Address(_salt, keccak256(initCode), _deployer);
         }
@@ -930,13 +945,14 @@ library GatewayCTMDeployerHelper {
     }
 
     function _prepareL1L2Deployment(
-        bool _isZKsyncOS,
+        bool, /* _gwIsEvmEquivalent -- always true for GW */
         bytes32 _salt,
         bytes memory _bytecode,
         bytes memory _constructorArgs
     ) private view returns (L1L2DeployPrepareResult memory result) {
-        result.targetAddress = _getDeploymentTarget(_isZKsyncOS);
-        if (_isZKsyncOS) {
+        // GW is always EVM-equivalent.
+        result.targetAddress = _getDeploymentTarget(true);
+        if (true) {
             bytes memory initCode = abi.encodePacked(_bytecode, _constructorArgs);
             result.expectedAddress = Utils.getL2AddressViaDeterministicCreate2(_salt, initCode);
             result.data = Utils.getDeterministicCreate2FactoryCalldata(_salt, initCode);
