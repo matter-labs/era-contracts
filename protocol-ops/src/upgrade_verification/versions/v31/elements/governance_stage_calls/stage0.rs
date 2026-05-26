@@ -33,8 +33,8 @@ use super::helpers::{
     verify_call_by_name,
 };
 use super::{
-    updateGuardiansCall, upgradeAndCallCall, BridgehubOwnerView, GovernanceStage0Calls,
-    ProtocolUpgradeHandler,
+    acceptOwnershipCall, updateGuardiansCall, upgradeAndCallCall, BridgehubOwnerView,
+    GovernanceStage0Calls, ProtocolUpgradeHandler,
 };
 
 impl GovernanceStage0Calls {
@@ -105,7 +105,7 @@ impl GovernanceStage0Calls {
         // into stage 0 (via `pre-governance-accept-ownerships.toml`). Count
         // them by selector so PUVT doesn't false-error when the prior
         // transferOwnership ceremony left pendingOwners outstanding.
-        let accept_ownership_selector: [u8; 4] = [0x79, 0xba, 0x50, 0x97];
+        let accept_ownership_selector = acceptOwnershipCall::SELECTOR;
         let pre_gov_accept_count = self
             .calls
             .elems
