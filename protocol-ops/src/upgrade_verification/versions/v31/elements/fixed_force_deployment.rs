@@ -294,30 +294,22 @@ impl FixedForceDeploymentsData {
         result.expect_address(verifiers, &self.l2SharedBridgeLegacyImpl, "zero");
         result.expect_address(verifiers, &self.l2BridgedStandardERC20Impl, "zero");
 
-        let bridgehub = BridgehubBase::new(
-            verifiers.bridgehub_address,
-            verifiers.network_verifier.get_l1_provider(),
-        );
-        match bridgehub.chainRegistrationSender().call().await {
-            Ok(sender) => {
-                let expected_alias = apply_l2_to_l1_alias(sender);
-                if self.aliasedChainRegistrationSender == expected_alias {
-                    result.report_ok(&format!(
-                        "aliasedChainRegistrationSender matches applyL1ToL2Alias(Bridgehub.chainRegistrationSender()) = {expected_alias}"
-                    ));
-                } else {
-                    result.report_error(&format!(
-                        "aliasedChainRegistrationSender mismatch: expected {} (alias of {}), got {}",
-                        expected_alias, sender, self.aliasedChainRegistrationSender
-                    ));
-                }
-            }
-            Err(err) => {
-                result.report_warn(&format!(
-                    "Could not verify aliasedChainRegistrationSender via RPC: {err}. Raw value: {}",
-                    self.aliasedChainRegistrationSender
-                ));
-            }
+        let expected_chain_registration_sender = verifiers
+            .address_verifier
+            .get_by_name("chain_registration_sender_proxy")
+            .expect(
+                "chain_registration_sender_proxy must be registered by Verifiers::new_v31",
+            );
+        let expected_chain_registration_sender_alias = apply_l2_to_l1_alias(expected_chain_registration_sender);
+        if self.aliasedChainRegistrationSender == expected_chain_registration_sender_alias {
+            result.report_ok(&format!(
+                "aliasedChainRegistrationSender matches applyL1ToL2Alias(Bridgehub.chainRegistrationSender()) = {expected_chain_registration_sender_alias}"
+            ));
+        } else {
+            result.report_error(&format!(
+                "aliasedChainRegistrationSender mismatch: expected {} (alias of {}), got {}",
+                expected_chain_registration_sender_alias, expected_chain_registration_sender, self.aliasedChainRegistrationSender
+            ));
         }
 
         if self.dangerousTestOnlyForcedBeacon != Address::ZERO {

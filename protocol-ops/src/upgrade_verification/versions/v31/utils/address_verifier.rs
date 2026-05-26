@@ -81,6 +81,14 @@ const V31_ADDRESS_ALIASES: &[(&[&str], &str)] = &[
         &[
             "upgrade_addresses",
             "bridgehub",
+            "chain_registration_sender_proxy_addr",
+        ],
+        "chain_registration_sender_proxy",
+    ),
+    (
+        &[
+            "upgrade_addresses",
+            "bridgehub",
             "chain_registration_sender_implementation_addr",
         ],
         "chain_registration_sender_implementation_addr",

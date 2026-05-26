@@ -49,7 +49,7 @@ use super::{
 /// per-CTM calls repeated once per `[ctms.<flavor>]` section in artifact order:
 /// timer deadline check, migrations-paused check, CTM proxy upgrade,
 /// setChainCreationParams, setNewVersionUpgrade, ValidatorTimelock proxy upgrade.
-const STAGE1_PREFIX_LEN: usize = 10;
+const STAGE1_PREFIX_LEN: usize = 11;
 const STAGE1_PER_CTM_LEN: usize = 6;
 
 /// Index of the per-CTM `ChainTypeManager` proxy upgrade within the
@@ -95,8 +95,8 @@ impl GovernanceStage1Calls {
     ) -> anyhow::Result<()> {
         result.print_info("== Gov stage 1 calls ===");
 
-        const ACCEPT_ASSET_TRACKER_OWNERSHIP: usize = 7;
-        const SET_ASSET_TRACKER: usize = 8;
+        const ACCEPT_ASSET_TRACKER_OWNERSHIP: usize = 8;
+        const SET_ASSET_TRACKER: usize = 9;
 
         let mut errors = 0;
         for (index, target, method) in [
@@ -118,12 +118,14 @@ impl GovernanceStage1Calls {
             (5, "transparent_proxy_admin", "upgrade(address,address)"),
             // Upgrade chain asset handler proxy.
             (6, "transparent_proxy_admin", "upgrade(address,address)"),
+            // Accept ChainRegistrationSender ownership.
+            (7, "chain_registration_sender_proxy", "acceptOwnership()"),
             // Accept AssetTracker ownership.
-            (7, "asset_tracker_proxy", "acceptOwnership()"),
+            (8, "asset_tracker_proxy", "acceptOwnership()"),
             // Wire AssetTracker into NativeTokenVault.
-            (8, "native_token_vault", "setAssetTracker(address)"),
+            (9, "native_token_vault", "setAssetTracker(address)"),
             // Cache MessageRoot / AssetRouter inside L1ChainAssetHandler.
-            (9, "chain_asset_handler_proxy", "setAddresses()"),
+            (10, "chain_asset_handler_proxy", "setAddresses()"),
         ] {
             errors += verify_call_by_name(&self.calls, index, target, method, verifiers, result);
         }

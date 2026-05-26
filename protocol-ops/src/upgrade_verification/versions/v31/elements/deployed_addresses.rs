@@ -72,6 +72,7 @@ mod core_signatures {
         }
         contract V31ChainRegistrationSender {
             constructor(address _bridgehub);
+            function initialize(address _owner);
         }
     }
 }
@@ -517,7 +518,8 @@ async fn verify_core_provenance(
     let asset_router_impl = in_bridges("l1_asset_router_implementation_addr")?;
     let nullifier_impl = in_bridges("l1_nullifier_implementation_addr")?;
     let bridgehub_impl = in_bh("bridgehub_implementation_addr")?;
-    let crs = in_bh("chain_registration_sender_implementation_addr")?;
+    let crs_impl = in_bh("chain_registration_sender_implementation_addr")?;
+    let crs_proxy = in_bh("chain_registration_sender_proxy_addr")?;
     let deployer = required_address(&artifact.misc, "misc", &["deployer_addr"])?;
     let core_proxy_admin = required_address(
         core,
@@ -542,6 +544,12 @@ async fn verify_core_provenance(
         context.bridgehub_addr,
         context.ntv_proxy,
         message_root_proxy,
+    ))
+    .abi_encode();
+
+    // ChainRegistrationSender impl args are reused for the TUPP impl check below.
+    let crs_ctor_args = V31ChainRegistrationSender::constructorCall::new((
+        context.bridgehub_addr,
     ))
     .abi_encode();
 
@@ -633,13 +641,11 @@ async fn verify_core_provenance(
             .abi_encode(),
             "l1-contracts/L1Bridgehub",
         ),
-        // ChainRegistrationSender(bridgehub). Deployed once by `CoreUpgrade_v31`
-        // and surfaced as `[core.upgrade_addresses.bridgehub]
-        // chain_registration_sender_implementation_addr`.
+        // ChainRegistrationSender impl(bridgehub).
+        // Args reused below for the TUPP impl check.
         (
-            crs,
-            V31ChainRegistrationSender::constructorCall::new((context.bridgehub_addr,))
-                .abi_encode(),
+            crs_impl,
+            crs_ctor_args.clone(),
             "l1-contracts/ChainRegistrationSender",
         ),
     ];
@@ -656,6 +662,18 @@ async fn verify_core_provenance(
             core_proxy_admin,
             tracker_ctor_args,
             "l1-contracts/L1AssetTracker",
+        )
+        .await;
+
+    // ChainRegistrationSender TransparentUpgradeableProxy(impl, proxyAdmin, initialize(deployer)).
+    result
+        .expect_create2_params_proxy_with_bytecode(
+            verifiers,
+            &crs_proxy,
+            V31ChainRegistrationSender::initializeCall::new((deployer,)).abi_encode(),
+            core_proxy_admin,
+            crs_ctor_args,
+            "l1-contracts/ChainRegistrationSender",
         )
         .await;
 

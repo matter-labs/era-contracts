@@ -103,6 +103,11 @@ sol! {
     }
 
     #[sol(rpc)]
+    contract ChainRegistrationSender {
+        function BRIDGE_HUB() external view returns (address);
+    }
+
+    #[sol(rpc)]
     contract ValidatorTimelock {
         function executionDelay() external view returns (uint32);
     }

@@ -10,7 +10,7 @@ use crate::upgrade_verification::{
         utils::{
             fee_param_verifier::{FeeParamVerifier, FeeParams},
             network_verifier::{
-                Bridgehub as BridgehubContract, ChainTypeManager, L1AssetRouter, L1AssetTracker,
+                Bridgehub as BridgehubContract, ChainTypeManager, L1AssetRouter, L1AssetTracker, ChainRegistrationSender,
                 Ownable, Ownable2Step, ValidatorTimelock, ZKChainFeeParams,
             },
         },
@@ -317,6 +317,15 @@ async fn verify_v31_core_wiring(
             "l1_asset_tracker_proxy_addr",
         ],
     )?;
+    let expected_chain_registration_sender = required_address(
+        &artifact.core,
+        "core",
+        &[
+            "upgrade_addresses",
+            "bridgehub",
+            "chain_registration_sender_proxy_addr",
+        ]
+    )?;
     let expected_chain_asset_handler = required_address(
         &artifact.core,
         "core",
@@ -438,6 +447,31 @@ async fn verify_v31_core_wiring(
         ),
         Err(err) => result.report_error(&format!(
             "Failed to call AssetTracker.pendingOwner() for pre-upgrade ownership checks: {err}"
+        )),
+    }
+
+    let chain_registration_sender = ChainRegistrationSender::new(expected_chain_registration_sender, provider.clone());
+    match chain_registration_sender.BRIDGE_HUB().call().await {
+        Ok(actual) => expect_address_eq(
+            result,
+            "ChainRegistrationSender.BRIDGE_HUB()",
+            actual,
+            verifiers.bridgehub_address,
+        ),
+        Err(err) => result.report_error(&format!(
+            "Failed to call ChainRegistrationSender.BRIDGE_HUB() for core wiring checks: {err}"
+        )),
+    }
+    let chain_registration_sender_ownership = Ownable2Step::new(expected_chain_registration_sender, provider.clone());
+    match chain_registration_sender_ownership.pendingOwner().call().await {
+        Ok(actual) => expect_address_eq(
+            result,
+            "ChainRegistrationSender.pendingOwner()",
+            actual,
+            bridgehub_owner,
+        ),
+        Err(err) => result.report_error(&format!(
+            "Failed to call ChainRegistrationSender.pendingOwner() for pre-upgrade ownership checks: {err}"
         )),
     }
 

@@ -207,10 +207,16 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridgehub.proxies.chainAssetHandler
         );
         if (coreAddresses.bridgehub.implementations.chainRegistrationSender != address(0)) {
+            require(coreAddresses.bridgehub.implementations.chainRegistrationSender != address(0), "chainRegistrationSenderImpl is zero");
             vm.serializeAddress(
                 "bridgehub",
                 "chain_registration_sender_implementation_addr",
                 coreAddresses.bridgehub.implementations.chainRegistrationSender
+            );
+            vm.serializeAddress(
+                "bridgehub",
+                "chain_registration_sender_proxy_addr",
+                coreAddresses.bridgehub.proxies.chainRegistrationSender
             );
         }
         if (coreAddresses.bridgehub.proxies.assetTracker != address(0)) {
