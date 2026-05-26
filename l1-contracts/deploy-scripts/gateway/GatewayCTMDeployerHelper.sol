@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 // solhint-disable no-console
 
 import {console2 as console} from "forge-std/Script.sol";
-import {VmSafe} from "forge-std/Vm.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
@@ -109,8 +108,6 @@ struct L1L2DeployPrepareResult {
 }
 
 library GatewayCTMDeployerHelper {
-    VmSafe private constant vm = VmSafe(address(uint160(uint256(keccak256("hevm cheat code")))));
-
     /// @notice Calculates all addresses for the deployment.
     /// @dev Uses 5 deployers + direct contract deployments.
     /// @param _create2Salt Salt used for CREATE2 when deploying the deployers.
@@ -965,18 +962,18 @@ library GatewayCTMDeployerHelper {
         if (constructorArgs.length == 0) {
             msgStr = string.concat(
                 "forge verify-contract ",
-                vm.toString(contractAddr),
+                Utils.vm.toString(contractAddr),
                 " ",
                 contractName
             );
         } else {
             msgStr = string.concat(
                 "forge verify-contract ",
-                vm.toString(contractAddr),
+                Utils.vm.toString(contractAddr),
                 " ",
                 contractName,
                 " --constructor-args ",
-                vm.toString(constructorArgs)
+                Utils.vm.toString(constructorArgs)
             );
         }
         console.log(msgStr);
