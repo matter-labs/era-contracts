@@ -508,15 +508,15 @@ async fn verify_v31_validator_timelocks(
         };
 
         let ctm_view = ChainTypeManager::new(chain_type_manager, provider.clone());
-        match ctm_view.validatorTimelock().call().await {
+        match ctm_view.validatorTimelockPostV29().call().await {
             Ok(actual) => expect_address_eq(
                 result,
-                &format!("{label}.ChainTypeManager.validatorTimelock()"),
+                &format!("{label}.ChainTypeManager.validatorTimelockPostV29()"),
                 actual,
                 validator_timelock,
             ),
             Err(err) => result.report_error(&format!(
-                "Failed to call {label}.ChainTypeManager.validatorTimelock(): {err}"
+                "Failed to call {label}.ChainTypeManager.validatorTimelockPostV29(): {err}"
             )),
         }
 

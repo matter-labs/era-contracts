@@ -62,7 +62,7 @@ sol! {
     #[sol(rpc)]
     contract ChainTypeManager {
         function getHyperchain(uint256 _chainId) public view returns (address);
-        address public validatorTimelock;
+        address public validatorTimelockPostV29;
         function protocolVersion() external view returns (uint256);
         function isZKsyncOS() external view returns (bool);
         function owner() external view returns (address);
