@@ -1,6 +1,6 @@
 //! Era-VM `forceDeployAndUpgrade` payload verification.
 //!
-//! Owns the expected `ForceDeployment[]` list (44 entries: 31 EraVM system
+//! Owns the expected `ForceDeployment[]` list (45 entries: 31 EraVM system
 //! contracts + 13 fixed-address core contracts + L2V31Upgrade), the per-entry
 //! shape walker, the special `L2ChainAssetHandler` constructor-input decoder,
 //! the Era factory-dep bytecode list, and the Era orchestrator wired from
