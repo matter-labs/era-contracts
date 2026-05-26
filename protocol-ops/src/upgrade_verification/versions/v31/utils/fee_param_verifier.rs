@@ -92,7 +92,7 @@ impl FeeParamVerifier {
         let bridgehub = Bridgehub::new(*bridgehub_addr, network_verifier.get_l1_provider().clone());
 
         let diamond_proxy_address = bridgehub
-            .getHyperchain(U256::from(network_verifier.l2_chain_id))
+            .getHyperchain(U256::from(network_verifier.era_chain_id))
             .call()
             .await
             .map_err(|e| anyhow::anyhow!("failed to fetch Era diamond from Bridgehub: {e}"))?;

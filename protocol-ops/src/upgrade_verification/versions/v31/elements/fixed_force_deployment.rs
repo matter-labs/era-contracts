@@ -145,25 +145,16 @@ impl FixedForceDeploymentsData {
             ));
         }
 
-        match verifiers.representative_era_chain_id {
-            Some(era_chain_id) if era_chain_id != 0 => {
-                if U256::from(era_chain_id) != self.eraChainId {
-                    result.report_error(&format!(
-                        "FixedForceDeploymentsData eraChainId mismatch: expected {}, got {}",
-                        era_chain_id, self.eraChainId
-                    ));
-                } else {
-                    result.report_ok(&format!(
-                        "FixedForceDeploymentsData eraChainId matches env era_chain_id ({era_chain_id})"
-                    ));
-                }
-            }
-            _ => {
-                result.report_warn(&format!(
-                    "Skipping FixedForceDeploymentsData eraChainId check (got {}): env era_chain_id was not loaded",
-                    self.eraChainId
-                ));
-            }
+        let era_chain_id = verifiers.era_chain_id;
+        if U256::from(era_chain_id) != self.eraChainId {
+            result.report_error(&format!(
+                "FixedForceDeploymentsData eraChainId mismatch: expected {}, got {}",
+                era_chain_id, self.eraChainId
+            ));
+        } else {
+            result.report_ok(&format!(
+                "FixedForceDeploymentsData eraChainId matches env era_chain_id ({era_chain_id})"
+            ));
         }
 
         result.expect_address(verifiers, &self.l1AssetRouter, "l1_asset_router_proxy");

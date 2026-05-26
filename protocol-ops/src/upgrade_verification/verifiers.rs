@@ -42,7 +42,7 @@ pub(crate) struct Verifiers {
     pub era_genesis_config: GenesisConfig,
     pub zksync_os_genesis_config: GenesisConfig,
     pub fee_param_verifier: FeeParamVerifier,
-    pub representative_era_chain_id: Option<u64>,
+    pub era_chain_id: u64,
     pub legacy_gateway_chain_id: u64,
     pub legacy_gateway_chain_intervals: Vec<ChainInterval>,
     pub new_gateway_chain_id: u64,
@@ -81,7 +81,7 @@ impl Verifiers {
         l1_rpc: impl Into<String>,
         gw_rpc: impl Into<String>,
         contracts_commit: Option<&str>,
-        representative_era_chain_id: u64,
+        era_chain_id: u64,
         legacy_gateway_chain_id: u64,
         legacy_gateway_chain_intervals: &[ChainInterval],
         new_gateway_chain_id: u64,
@@ -111,7 +111,7 @@ impl Verifiers {
         )?;
         let bytecode_verifier = BytecodeVerifier::init_v31(contracts_commit).await?;
         let network_verifier =
-            NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into(), representative_era_chain_id)
+            NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into(), era_chain_id)
                 .await?;
         anyhow::ensure!(
             network_verifier.get_gateway_chain_id() == new_gateway_chain_id,
@@ -200,7 +200,7 @@ impl Verifiers {
             era_genesis_config,
             zksync_os_genesis_config,
             fee_param_verifier,
-            representative_era_chain_id: Some(representative_era_chain_id),
+            era_chain_id,
             legacy_gateway_chain_id,
             legacy_gateway_chain_intervals: legacy_gateway_chain_intervals.to_vec(),
             new_gateway_chain_id,

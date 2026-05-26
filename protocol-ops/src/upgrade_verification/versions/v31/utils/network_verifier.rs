@@ -123,7 +123,7 @@ sol! {
 
 pub struct NetworkVerifier {
     pub l1_provider: RootProvider,
-    pub l2_chain_id: u64,
+    pub era_chain_id: u64,
     pub l1_chain_id: u64,
     pub gateway_chain_id: u64,
     pub gw_provider: RootProvider,
@@ -144,7 +144,7 @@ impl NetworkVerifier {
     pub async fn new_v31(
         l1_rpc: String,
         gw_rpc: String,
-        representative_era_chain_id: u64,
+        era_chain_id: u64,
     ) -> anyhow::Result<Self> {
         let l1_provider = RootProvider::new_http(l1_rpc.parse().context("invalid L1 RPC URL")?);
         let l1_chain_id = l1_provider
@@ -160,7 +160,7 @@ impl NetworkVerifier {
 
         Ok(Self {
             l1_provider,
-            l2_chain_id: representative_era_chain_id,
+            era_chain_id,
             l1_chain_id,
             gateway_chain_id,
             gw_provider,

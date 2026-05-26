@@ -361,20 +361,17 @@ async fn verify_puh_immutables(
         }
     }
 
-    if let Some(expected_era_chain_id) = verifiers.representative_era_chain_id {
-        match new_impl.ERA_CHAIN_ID().call().await {
-            Ok(actual) if actual == U256::from(expected_era_chain_id) => result.report_ok(
-                &format!("PUH.ERA_CHAIN_ID() matches env era_chain_id ({expected_era_chain_id})"),
-            ),
-            Ok(actual) => result.report_error(&format!(
-                "PUH.ERA_CHAIN_ID() mismatch: expected {expected_era_chain_id}, got {actual}"
-            )),
-            Err(err) => {
-                result.report_error(&format!("Failed to call new PUH.ERA_CHAIN_ID(): {err}"))
-            }
+    let expected_era_chain_id = verifiers.era_chain_id;
+    match new_impl.ERA_CHAIN_ID().call().await {
+        Ok(actual) if actual == U256::from(expected_era_chain_id) => result.report_ok(
+            &format!("PUH.ERA_CHAIN_ID() matches env era_chain_id ({expected_era_chain_id})"),
+        ),
+        Ok(actual) => result.report_error(&format!(
+            "PUH.ERA_CHAIN_ID() mismatch: expected {expected_era_chain_id}, got {actual}"
+        )),
+        Err(err) => {
+            result.report_error(&format!("Failed to call new PUH.ERA_CHAIN_ID(): {err}"))
         }
-    } else {
-        result.report_error("Cannot verify PUH.ERA_CHAIN_ID(): env era_chain_id was not loaded");
     }
 
     Ok((result.errors - initial_error_count) as usize)

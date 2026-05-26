@@ -92,11 +92,6 @@ pub(super) async fn verify_v31_upgrade_facet_cuts(
                 proposed_facet_cuts
             ));
         }
-        None if verifiers.representative_era_chain_id.is_none() => {
-            result.report_warn(
-                "Skipped exact chain upgrade facet-cut reconstruction; env era_chain_id was not loaded",
-            );
-        }
         None => {}
     }
 
@@ -223,19 +218,17 @@ async fn find_representative_chain_diamond(
 
     let expected_protocol = U256::from(ctm.contracts_config.old_protocol_version);
 
-    if ctm.flavor == CtmFlavor::Era {
-        if let Some(era_chain_id) = verifiers.representative_era_chain_id {
-            let chain_id = U256::from(era_chain_id);
-            if let Some(representative) = inspect_chain_for_facet_cut_reconstruction(
-                chain_id,
-                ctm_proxy,
-                expected_protocol,
-                verifiers,
-            )
-            .await?
-            {
-                return Ok(Some(representative));
-            }
+if ctm.flavor == CtmFlavor::Era {
+        let chain_id = U256::from(verifiers.era_chain_id);
+        if let Some(representative) = inspect_chain_for_facet_cut_reconstruction(
+            chain_id,
+            ctm_proxy,
+            expected_protocol,
+            verifiers,
+        )
+        .await?
+        {
+            return Ok(Some(representative));
         }
     }
 
