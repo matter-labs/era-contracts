@@ -742,7 +742,6 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         .as_ref()
         .map(|c| c.governance_kind())
         .unwrap_or_default();
-    // TEMPORARY -- do remove
     let is_puh_governed = governance_kind == crate::common::env_config::GovernanceKind::Puh;
     let zksync_os_ctm_proxy = prepared
         .ctm_tomls
