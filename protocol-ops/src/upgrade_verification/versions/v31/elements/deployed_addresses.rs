@@ -548,10 +548,8 @@ async fn verify_core_provenance(
     .abi_encode();
 
     // ChainRegistrationSender impl args are reused for the TUPP impl check below.
-    let crs_ctor_args = V31ChainRegistrationSender::constructorCall::new((
-        context.bridgehub_addr,
-    ))
-    .abi_encode();
+    let crs_ctor_args =
+        V31ChainRegistrationSender::constructorCall::new((context.bridgehub_addr,)).abi_encode();
 
     // Single dispatch table: (address, encoded ctor args, expected file).
     let checks: Vec<(Address, Vec<u8>, &str)> = vec![

@@ -92,7 +92,13 @@ impl<'a> V31UpgradeFull<'a> {
                     .ctm_tomls
                     .iter()
                     .find(|e| e.proxy == proxy)
-                    .and_then(|_| inputs.create2_factory_salt_per_ctm.as_ref()?.get(&proxy).copied())
+                    .and_then(|_| {
+                        inputs
+                            .create2_factory_salt_per_ctm
+                            .as_ref()?
+                            .get(&proxy)
+                            .copied()
+                    })
             });
             let path = prepare_new_gateway(
                 runner,

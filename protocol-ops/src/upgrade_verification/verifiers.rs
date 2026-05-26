@@ -111,8 +111,7 @@ impl Verifiers {
         )?;
         let bytecode_verifier = BytecodeVerifier::init_v31(contracts_commit).await?;
         let network_verifier =
-            NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into(), era_chain_id)
-                .await?;
+            NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into(), era_chain_id).await?;
         anyhow::ensure!(
             network_verifier.get_gateway_chain_id() == new_gateway_chain_id,
             "gateway RPC chain id {} does not match env [new_gateway].chain_id {}",

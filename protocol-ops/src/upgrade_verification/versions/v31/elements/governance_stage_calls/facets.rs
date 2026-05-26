@@ -218,7 +218,7 @@ async fn find_representative_chain_diamond(
 
     let expected_protocol = U256::from(ctm.contracts_config.old_protocol_version);
 
-if ctm.flavor == CtmFlavor::Era {
+    if ctm.flavor == CtmFlavor::Era {
         let chain_id = U256::from(verifiers.era_chain_id);
         if let Some(representative) = inspect_chain_for_facet_cut_reconstruction(
             chain_id,

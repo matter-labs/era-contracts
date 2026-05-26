@@ -288,10 +288,9 @@ impl FixedForceDeploymentsData {
         let expected_chain_registration_sender = verifiers
             .address_verifier
             .get_by_name("chain_registration_sender_proxy")
-            .expect(
-                "chain_registration_sender_proxy must be registered by Verifiers::new_v31",
-            );
-        let expected_chain_registration_sender_alias = apply_l2_to_l1_alias(expected_chain_registration_sender);
+            .expect("chain_registration_sender_proxy must be registered by Verifiers::new_v31");
+        let expected_chain_registration_sender_alias =
+            apply_l2_to_l1_alias(expected_chain_registration_sender);
         if self.aliasedChainRegistrationSender == expected_chain_registration_sender_alias {
             result.report_ok(&format!(
                 "aliasedChainRegistrationSender matches applyL1ToL2Alias(Bridgehub.chainRegistrationSender()) = {expected_chain_registration_sender_alias}"
@@ -299,7 +298,9 @@ impl FixedForceDeploymentsData {
         } else {
             result.report_error(&format!(
                 "aliasedChainRegistrationSender mismatch: expected {} (alias of {}), got {}",
-                expected_chain_registration_sender_alias, expected_chain_registration_sender, self.aliasedChainRegistrationSender
+                expected_chain_registration_sender_alias,
+                expected_chain_registration_sender,
+                self.aliasedChainRegistrationSender
             ));
         }
 

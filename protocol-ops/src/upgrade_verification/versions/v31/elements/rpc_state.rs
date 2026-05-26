@@ -10,8 +10,9 @@ use crate::upgrade_verification::{
         utils::{
             fee_param_verifier::{FeeParamVerifier, FeeParams},
             network_verifier::{
-                Bridgehub as BridgehubContract, ChainTypeManager, L1AssetRouter, L1AssetTracker, ChainRegistrationSender,
-                Ownable, Ownable2Step, ValidatorTimelock, ZKChainFeeParams,
+                Bridgehub as BridgehubContract, ChainRegistrationSender, ChainTypeManager,
+                L1AssetRouter, L1AssetTracker, Ownable, Ownable2Step, ValidatorTimelock,
+                ZKChainFeeParams,
             },
         },
         MAX_PRIORITY_TX_GAS_LIMIT, STAGE_SEPOLIA_NON_MIGRATED_ERA_CHAIN_ID,
@@ -324,7 +325,7 @@ async fn verify_v31_core_wiring(
             "upgrade_addresses",
             "bridgehub",
             "chain_registration_sender_proxy_addr",
-        ]
+        ],
     )?;
     let expected_chain_asset_handler = required_address(
         &artifact.core,
@@ -386,18 +387,13 @@ async fn verify_v31_core_wiring(
     let era_chain_id = U256::from(verifiers.era_chain_id);
     match asset_router.ERA_CHAIN_ID().call().await {
         Ok(actual) => {
-            expect_debug_eq(
-                result,
-                "L1AssetRouter.eraChainId()",
-                &actual,
-                &era_chain_id,
-            );
+            expect_debug_eq(result, "L1AssetRouter.eraChainId()", &actual, &era_chain_id);
         }
         Err(err) => result.report_error(&format!(
             "Failed to call L1AssetRouter.eraChainId() for core wiring checks: {err}"
         )),
     };
-    
+
     match asset_router.legacyBridge().call().await {
         Ok(actual) => expect_address_eq(
             result,
@@ -446,7 +442,8 @@ async fn verify_v31_core_wiring(
         )),
     }
 
-    let chain_registration_sender = ChainRegistrationSender::new(expected_chain_registration_sender, provider.clone());
+    let chain_registration_sender =
+        ChainRegistrationSender::new(expected_chain_registration_sender, provider.clone());
     match chain_registration_sender.BRIDGE_HUB().call().await {
         Ok(actual) => expect_address_eq(
             result,
@@ -458,7 +455,8 @@ async fn verify_v31_core_wiring(
             "Failed to call ChainRegistrationSender.BRIDGE_HUB() for core wiring checks: {err}"
         )),
     }
-    let chain_registration_sender_ownership = Ownable2Step::new(expected_chain_registration_sender, provider.clone());
+    let chain_registration_sender_ownership =
+        Ownable2Step::new(expected_chain_registration_sender, provider.clone());
     match chain_registration_sender_ownership.pendingOwner().call().await {
         Ok(actual) => expect_address_eq(
             result,
