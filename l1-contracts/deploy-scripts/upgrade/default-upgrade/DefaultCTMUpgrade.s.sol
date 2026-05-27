@@ -205,6 +205,13 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     ) internal virtual {
         string memory toml = vm.readFile(newConfigPath);
 
+        if (toml.keyExists("$.era_chain_id")) {
+            config.eraChainId = toml.readUint("$.era_chain_id");
+        }
+        if (toml.keyExists("$.legacy_gateway.chain_id")) {
+            config.eraGatewayChainId = toml.readUint("$.legacy_gateway.chain_id");
+        }
+
         PermanentCTMConfig memory permanentConfig = PermanentCTMConfig({
             ctmProxy: ctmProxy,
             bytecodesSupplier: bytecodesSupplier,
@@ -908,6 +915,13 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             "permissionless_validator_addr",
             ctmAddresses.stateTransition.proxies.permissionlessValidator
         );
+        if (ctmAddresses.stateTransition.implementations.serverNotifier != address(0)) {
+            vm.serializeAddress(
+                "state_transition",
+                "server_notifier_implementation_addr",
+                ctmAddresses.stateTransition.implementations.serverNotifier
+            );
+        }
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
@@ -933,6 +947,9 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
             upgradeAddresses.upgradeTimer
         );
 
+        vm.serializeAddress("admin", "timer_governance_addr", config.ownerAddress);
+        string memory admin = vm.serializeAddress("admin", "ecosystem_admin_addr", newConfig.ecosystemAdminAddress);
+
         // Serialize generated upgrade data
         vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
         vm.serializeBytes("contracts_newConfig", "force_deployments_data", generatedData.forceDeploymentsData);
@@ -955,6 +972,7 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "state_transition", stateTransition);
         vm.serializeString("root", "contracts_config", contractsConfig);
+        vm.serializeString("root", "admin", admin);
         string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
 
         vm.writeToml(toml, outputPath);

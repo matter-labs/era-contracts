@@ -25,7 +25,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use ethers::types::{Address, H256, U256};
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 
 use crate::common::paths::resolve_l1_contracts_path;
 
@@ -34,6 +34,11 @@ const PERMANENT_VALUES_DIR: &str = "upgrade-envs/permanent-values";
 
 #[derive(Debug, Deserialize)]
 pub struct PermanentValues {
+    /// L1 chain id (e.g. 11155111 for Sepolia, 1 for mainnet). PUVT reads
+    /// this at startup and cross-checks `eth_chainId` against it as a basic
+    /// "right network" sanity check.
+    #[serde(default)]
+    pub l1_chain_id: Option<u64>,
     #[serde(default)]
     pub zk_token_asset_id: Option<H256>,
     pub core_contracts: CoreContracts,
@@ -55,6 +60,34 @@ pub struct PermanentValues {
     /// + ServerNotifier, and sets the initial interop settlement fee.
     #[serde(default)]
     pub new_gateway: Option<NewGatewayConfig>,
+    /// Historical gateway configuration for chains that settled on the legacy
+    /// Gateway before v31.
+    #[serde(default)]
+    pub legacy_gateway: Option<LegacyGatewayConfig>,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct LegacyGatewayConfig {
+    pub chain_id: u64,
+    /// Per-chain historical migration intervals that PUVT cross-checks against
+    /// every `setHistoricalMigrationInterval` call in stage 2's decommission
+    /// prefix. One TOML entry per call; order is preserved.
+    #[serde(default)]
+    pub chain_intervals: Vec<ChainInterval>,
+}
+
+/// Mirrors a `[[legacy_gateway.chain_intervals]]` entry in
+/// `permanent-values/<env>.toml`. The Solidity struct
+/// `MigrationInterval` ([IChainAssetHandler.sol]) is built from these fields
+/// plus `settlementLayerChainId = legacy_gateway.chain_id` and
+/// `isActive = false` (these are historical/completed intervals).
+#[derive(Debug, Deserialize, Clone)]
+pub struct ChainInterval {
+    pub chain_id: u64,
+    pub migrate_to_sl_batch: u64,
+    pub migrate_from_sl_batch: u64,
+    pub sl_batch_lower_bound: u64,
+    pub sl_batch_upper_bound: u64,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -79,39 +112,15 @@ pub struct NewGatewayConfig {
     /// uncontrolled — funds get stuck.
     #[serde(default)]
     pub refund_recipient: Option<Address>,
-    /// Chain ID(s) whose registered CTM(s) `GatewayVotePreparation` should
-    /// treat as the "source" — one GW CTM is deployed per entry. When a
-    /// single value is provided it can be written as a plain integer; when
-    /// multiple CTMs are needed, write a TOML array:
-    ///   `ctm_representative_chain_ids = [2702, 270]`
-    /// The legacy scalar spelling `ctm_representative_chain_id = 2702` is
-    /// also accepted for backwards compatibility.
-    #[serde(
-        alias = "ctm_representative_chain_id",
-        deserialize_with = "deserialize_one_or_many_u64"
-    )]
-    pub ctm_representative_chain_ids: Vec<u64>,
+    /// Chain ID whose registered CTM `GatewayVotePreparation` should treat as
+    /// the "source" — the deployed GW CTM is a variant of this CTM. Pick the
+    /// chain whose CTM is the one the new gateway will host (typically Era).
+    pub ctm_representative_chain_id: u64,
     /// Optional pre-deployed server notifier address. When present, the
     /// `GatewayVotePreparation` skips the redeploy + ownership-transfer
     /// preamble. Leave absent on first GW bring-up.
     #[serde(default)]
     pub server_notifier: Option<Address>,
-}
-
-/// Accept either a single `u64` or a `Vec<u64>` from TOML so both
-/// `ctm_representative_chain_id = 2702` (scalar) and
-/// `ctm_representative_chain_ids = [2702, 270]` (array) work.
-fn deserialize_one_or_many_u64<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u64>, D::Error> {
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum OneOrMany {
-        One(u64),
-        Many(Vec<u64>),
-    }
-    match OneOrMany::deserialize(d)? {
-        OneOrMany::One(v) => Ok(vec![v]),
-        OneOrMany::Many(v) => Ok(v),
-    }
 }
 
 #[derive(Debug, Deserialize, Clone, Copy)]
@@ -336,6 +345,22 @@ impl EnvConfig {
         self.v31.era_chain_id
     }
 
+    pub fn legacy_gateway_chain_id(&self) -> Option<u64> {
+        self.permanent.legacy_gateway.as_ref().map(|gw| gw.chain_id)
+    }
+
+    pub fn legacy_gateway_chain_intervals(&self) -> &[ChainInterval] {
+        self.permanent
+            .legacy_gateway
+            .as_ref()
+            .map(|gw| gw.chain_intervals.as_slice())
+            .unwrap_or(&[])
+    }
+
+    pub fn l1_chain_id(&self) -> Option<u64> {
+        self.permanent.l1_chain_id
+    }
+
     pub fn ownable_proxies(&self) -> &[OwnableProxyEntry] {
         &self.permanent.ownable_proxies
     }
@@ -510,11 +535,15 @@ mod tests {
         let ng = pv
             .new_gateway
             .expect("permanent-values/stage.toml must carry [new_gateway]");
+        let legacy_gateway = pv
+            .legacy_gateway
+            .expect("permanent-values/stage.toml must carry [legacy_gateway]");
+        assert_eq!(legacy_gateway.chain_id, 123);
         assert_eq!(ng.chain_id, 2709);
         // 0.2 ZK = 2e17 wei, sized for ~$0.01 per interop call at ZK ≈ $0.05.
         assert_eq!(ng.settlement_fee, U256::from(200_000_000_000_000_000u128));
-        // GW hosts ZKsync OS (Atlas, witness 2702).
-        assert_eq!(ng.ctm_representative_chain_ids, vec![2702]);
+        // GW 2708 is a ZKsync OS chain → CTM source is Atlas (witness 2702).
+        assert_eq!(ng.ctm_representative_chain_id, 2702);
     }
 
     /// Confirms `EnvConfig`'s on-demand readers pick up the

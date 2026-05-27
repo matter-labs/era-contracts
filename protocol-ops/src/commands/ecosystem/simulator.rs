@@ -27,6 +27,7 @@ use crate::common::logger;
 ///   `executeInstant`), match against the FIRST inner call's target and/or
 ///   selector. Used for the bundle-1 legacy-Gov ceremony pairs and the
 ///   ChainAdmin multicalls in bundles 3/4.
+///
 /// Raw on-disk shape — address-typed fields accept either a `0x…` literal
 /// or a label from `[labels]`. Resolved to the canonical [`SimDescriptionRegistry`]
 /// at load time via [`build_registry`].
@@ -99,9 +100,7 @@ fn resolve_address(
             .map_err(|err| anyhow::anyhow!("invalid address literal {value}: {err}"))
     } else {
         labels.get(value).copied().ok_or_else(|| {
-            anyhow::anyhow!(
-                "unknown label `{value}` — add it to [labels] in sim-descriptions.toml"
-            )
+            anyhow::anyhow!("unknown label `{value}` — add it to [labels] in sim-descriptions.toml")
         })
     }
 }
@@ -118,8 +117,10 @@ fn build_registry(raw: RawSimDescriptionRegistry) -> anyhow::Result<SimDescripti
         let target = resolve_address(&e.target, labels)
             .with_context(|| format!("entries[{i}].target = `{}`", e.target))?;
         let resolve_opt = |field: &str, v: Option<String>| -> anyhow::Result<Option<Address>> {
-            v.map(|s| resolve_address(&s, labels).with_context(|| format!("entries[{i}].{field} = `{s}`")))
-                .transpose()
+            v.map(|s| {
+                resolve_address(&s, labels).with_context(|| format!("entries[{i}].{field} = `{s}`"))
+            })
+            .transpose()
         };
         entries.push(SimDescriptionEntry {
             target,
@@ -226,12 +227,24 @@ fn parse_first_inner_call(data_hex: &str) -> Option<(Address, String)> {
         // scheduleTransparent((Call[], bytes32, bytes32), uint256)
         0x2c431917 => {
             let tokens = abi_decode(&[operation_type, ParamType::Uint(256)], body).ok()?;
-            tokens.into_iter().next()?.into_tuple()?.into_iter().next()?.into_array()?
+            tokens
+                .into_iter()
+                .next()?
+                .into_tuple()?
+                .into_iter()
+                .next()?
+                .into_array()?
         }
         // executeInstant((Call[], bytes32, bytes32))
         0x95218ecd => {
             let tokens = abi_decode(&[operation_type], body).ok()?;
-            tokens.into_iter().next()?.into_tuple()?.into_iter().next()?.into_array()?
+            tokens
+                .into_iter()
+                .next()?
+                .into_tuple()?
+                .into_iter()
+                .next()?
+                .into_array()?
         }
         _ => return None,
     };
@@ -516,17 +529,23 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
             "Including manifest bundles from {}",
             manifest.display()
         ));
-        let extra = manifest_to_simulator_transactions(manifest, &network, &args.camp_a_signers, &descriptions)
-            .with_context(|| format!("failed to expand manifest bundles {}", manifest.display()))?;
+        let extra = manifest_to_simulator_transactions(
+            manifest,
+            &network,
+            &args.camp_a_signers,
+            &descriptions,
+        )
+        .with_context(|| format!("failed to expand manifest bundles {}", manifest.display()))?;
         transactions.extend(extra);
     }
-    let governance = governance_toml_to_simulator_transactions(&governance_toml, &network, from, &descriptions)
-        .with_context(|| {
-            format!(
-                "failed to convert governance TOML {}",
-                governance_toml.display()
-            )
-        })?;
+    let governance =
+        governance_toml_to_simulator_transactions(&governance_toml, &network, from, &descriptions)
+            .with_context(|| {
+                format!(
+                    "failed to convert governance TOML {}",
+                    governance_toml.display()
+                )
+            })?;
     transactions.extend(governance);
     let body = serde_json::to_string_pretty(&transactions)?;
 
@@ -649,12 +668,15 @@ fn manifest_to_simulator_transactions(
                 None
             };
             let _ = (label.as_str(), kept_total); // kept for `tag` parity; not used in description
-            let description = descriptions
-                .lookup(tx.to, &tx.data)
-                .unwrap_or_else(|| {
-                    let selector = tx.data.get(..10).unwrap_or("0x");
-                    format!("[unlabelled] to={:#x} sel={selector} (bundle {} tx {})", tx.to, bundle.index, idx + 1)
-                });
+            let description = descriptions.lookup(tx.to, &tx.data).unwrap_or_else(|| {
+                let selector = tx.data.get(..10).unwrap_or("0x");
+                format!(
+                    "[unlabelled] to={:#x} sel={selector} (bundle {} tx {})",
+                    tx.to,
+                    bundle.index,
+                    idx + 1
+                )
+            });
             out.push(SimulatorTransaction {
                 description,
                 network: network.to_string(),
@@ -724,7 +746,11 @@ fn governance_toml_to_simulator_transactions(
                 .lookup(call.target, &data_hex)
                 .unwrap_or_else(|| {
                     let selector = data_hex.get(..10).unwrap_or("0x");
-                    format!("[unlabelled] stage{stage} call {} to={:#x} sel={selector}", idx + 1, call.target)
+                    format!(
+                        "[unlabelled] stage{stage} call {} to={:#x} sel={selector}",
+                        idx + 1,
+                        call.target
+                    )
                 });
             out.push(SimulatorTransaction {
                 description,

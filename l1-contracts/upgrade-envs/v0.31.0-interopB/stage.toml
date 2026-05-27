@@ -55,7 +55,7 @@ protocol_upgrade_handler_proxy_address = "0x8f08627524aeD610192132A425D6b9C32a17
 [tokens]
 token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
 
-[gateway]
+[legacy_gateway]
 chain_id = 123
 
 [state_transition]

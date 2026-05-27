@@ -1,4 +1,5 @@
-use std::fs;
+use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -196,8 +197,8 @@ pub(crate) async fn execute_one_bundle(
         ethers::utils::format_units(gas_price, "gwei").unwrap_or_else(|_| gas_price.to_string()),
     ));
 
-    // Per-bundle tx log, persisted to `--out` after every tx so that even
-    // a partial run leaves usable data behind for verify-upgrade.
+    // Per-bundle tx log loaded from `--out`; we only flush additions after
+    // the entire bundle succeeds so failed bundles do not pollute outputs.
     let mut executed: ExecutedBundle = match out_path {
         Some(path) if path.exists() => {
             let raw = fs::read_to_string(path).with_context(|| {
@@ -215,6 +216,8 @@ pub(crate) async fn execute_one_bundle(
         }
         _ => ExecutedBundle::default(),
     };
+    let mut bundle_executed: Vec<ExecutedTx> = Vec::new();
+    let mut bundle_hashes: Vec<H256> = Vec::new();
 
     // Parse + sign + submit each tx sequentially, awaiting its receipt
     // before the next. Some bundle txs depend on contracts deployed by
@@ -340,15 +343,25 @@ pub(crate) async fn execute_one_bundle(
             "Safe tx #{idx} (hash {tx_hash:#x}) reverted (status=0)",
         );
 
-        if let Some(path) = out_path {
-            executed.transactions.push(ExecutedTx {
+        if out_path.is_some() {
+            bundle_executed.push(ExecutedTx {
                 tx_hash: format!("{tx_hash:#x}"),
                 to: format!("{to:#x}"),
                 data: format!("0x{}", ethers::utils::hex::encode(receipt_input(tx)?)),
                 value: format!("{value}"),
                 status: status.as_u64(),
             });
+            bundle_hashes.push(tx_hash);
+        }
+    }
+
+    if let Some(path) = out_path {
+        if !bundle_executed.is_empty() {
+            executed.transactions.extend(bundle_executed);
             persist_executed_bundle(path, &executed)?;
+            for tx_hash in bundle_hashes {
+                append_transaction_hash(path, tx_hash)?;
+            }
         }
     }
 
@@ -419,6 +432,31 @@ fn persist_executed_bundle(path: &Path, bundle: &ExecutedBundle) -> anyhow::Resu
     Ok(())
 }
 
+fn append_transaction_hash(out_path: &Path, tx_hash: H256) -> anyhow::Result<()> {
+    let Some(parent) = out_path.parent() else {
+        return Ok(());
+    };
+    if parent.as_os_str().is_empty() {
+        return Ok(());
+    }
+
+    fs::create_dir_all(parent).with_context(|| {
+        format!(
+            "failed to create transactions.txt output dir {}",
+            parent.display()
+        )
+    })?;
+    let path = parent.join("transactions.txt");
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .with_context(|| format!("failed to open transaction hash log {}", path.display()))?;
+    writeln!(file, "{tx_hash:#x}")
+        .with_context(|| format!("failed to append transaction hash to {}", path.display()))?;
+    Ok(())
+}
+
 /// Replay a Safe bundle file under an **anvil-impersonated** EOA. Matches
 /// `execute_one_bundle` on the wire shape but skips local signing — txs are
 /// dispatched via `eth_sendTransaction` with `from` set to `sender`. Anvil
@@ -478,7 +516,7 @@ pub(crate) async fn execute_one_bundle_unlocked(
 
     // Same accumulating-write shape as `execute_one_bundle`: load any
     // existing log so multiple bundles into the same `--out` path stack in
-    // execution order (consumed by `ecosystem verify-upgrade --executed-bundles`).
+    // execution order. Flush only after full-bundle success.
     let mut executed: ExecutedBundle = match out_path {
         Some(path) if path.exists() => {
             let raw = fs::read_to_string(path).with_context(|| {
@@ -496,7 +534,10 @@ pub(crate) async fn execute_one_bundle_unlocked(
         }
         _ => ExecutedBundle::default(),
     };
+    let mut bundle_executed: Vec<ExecutedTx> = Vec::new();
+    let mut bundle_hashes: Vec<H256> = Vec::new();
 
+    let mut skipped: usize = 0;
     for (idx, tx) in safe_txs.iter().enumerate() {
         let to: Address = tx
             .get("to")
@@ -526,13 +567,52 @@ pub(crate) async fn execute_one_bundle_unlocked(
                 .data(data.clone())
                 .value(value)
                 .into();
-        let estimated = provider
-            .estimate_gas(&estimate_req, None)
-            .await
-            .with_context(|| format!("eth_estimateGas for Safe tx #{idx} (to {to:#x})"))?;
-        let buffered =
-            estimated.saturating_mul(U256::from(GAS_ESTIMATE_BUFFER_BPS)) / U256::from(10_000);
-        let gas_limit = std::cmp::min(buffered, U256::from(PER_TX_GAS_LIMIT_CAP));
+        let gas_limit = match provider.estimate_gas(&estimate_req, None).await {
+            Ok(estimated) => {
+                let buffered = estimated.saturating_mul(U256::from(GAS_ESTIMATE_BUFFER_BPS))
+                    / U256::from(10_000);
+                std::cmp::min(buffered, U256::from(PER_TX_GAS_LIMIT_CAP))
+            }
+            Err(e) => {
+                // Keep unlocked replay idempotent like the signed path:
+                // skip already-deployed CREATE2 txs / known already-done ops.
+                if should_skip_idempotent(&provider, to, &data).await {
+                    logger::info(format!(
+                        "Skipping Safe tx #{idx} (to {to:#x}) — already deployed / idempotent"
+                    ));
+                    skipped += 1;
+                    continue;
+                }
+                let err_str = format!("{e}");
+                let known_idempotent = [
+                    "1a21feed", // OperationExists (current Governance)
+                    "876e8b23", // OperationExists
+                    "61733a89", // EVMBytecodeAlreadyPublished(bytes32)
+                    "0dfb42bf", // AddressAlreadySet
+                    "eda2fbb1", // OperationMustBePending (current Governance)
+                    "b926a6b0", // OperationMustBePending
+                ];
+                if let Some(sig) = known_idempotent.iter().find(|s| err_str.contains(**s)) {
+                    logger::info(format!(
+                        "Skipping Safe tx #{idx} (to {to:#x}) — idempotent revert ({sig})"
+                    ));
+                    skipped += 1;
+                    continue;
+                }
+                let to_hex = format!("{to:#x}").to_lowercase();
+                const CREATE2_FALLBACK_GAS: u64 = 10_000_000;
+                if to_hex.contains(CREATE2_FACTORY) {
+                    logger::info(format!(
+                        "eth_estimateGas failed for CREATE2 tx #{idx}, using fallback gas limit {CREATE2_FALLBACK_GAS}"
+                    ));
+                    U256::from(CREATE2_FALLBACK_GAS)
+                } else {
+                    return Err(e).with_context(|| {
+                        format!("eth_estimateGas for Safe tx #{idx} (to {to:#x})")
+                    });
+                }
+            }
+        };
 
         let req = TransactionRequest::new()
             .from(sender)
@@ -542,7 +622,7 @@ pub(crate) async fn execute_one_bundle_unlocked(
             .chain_id(chain_id)
             .gas(gas_limit)
             .gas_price(gas_price)
-            .nonce(base_nonce + idx);
+            .nonce(base_nonce + idx - skipped);
 
         let pending = provider
             .send_transaction(req, None)
@@ -559,15 +639,25 @@ pub(crate) async fn execute_one_bundle_unlocked(
             "Safe tx #{idx} (hash {tx_hash:#x}) reverted (status=0)",
         );
 
-        if let Some(path) = out_path {
-            executed.transactions.push(ExecutedTx {
+        if out_path.is_some() {
+            bundle_executed.push(ExecutedTx {
                 tx_hash: format!("{tx_hash:#x}"),
                 to: format!("{to:#x}"),
                 data: format!("0x{}", ethers::utils::hex::encode(receipt_input(tx)?)),
                 value: format!("{value}"),
                 status: status.as_u64(),
             });
+            bundle_hashes.push(tx_hash);
+        }
+    }
+
+    if let Some(path) = out_path {
+        if !bundle_executed.is_empty() {
+            executed.transactions.extend(bundle_executed);
             persist_executed_bundle(path, &executed)?;
+            for tx_hash in bundle_hashes {
+                append_transaction_hash(path, tx_hash)?;
+            }
         }
     }
 

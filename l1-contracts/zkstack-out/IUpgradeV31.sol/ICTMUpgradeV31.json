@@ -49,6 +49,11 @@
             "internalType": "address"
           },
           {
+            "name": "chainRegistrationSender",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
             "name": "zkTokenAssetId",
             "type": "bytes32",
             "internalType": "bytes32"

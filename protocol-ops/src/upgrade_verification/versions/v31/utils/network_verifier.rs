@@ -6,15 +6,15 @@ use alloy::sol;
 use alloy::sol_types::SolCall;
 use anyhow::Context;
 use std::collections::HashMap;
-use std::str::FromStr;
 use Bridgehub::requestL2TransactionDirectCall;
 
-use crate::commands::dev::execute_safe::ExecutedBundle;
-
-use super::super::elements::UpgradeOutput;
+use crate::common::logger;
 
 use super::bytecode_verifier::BytecodeVerifier;
-use super::{address_from_short_hex, compute_create2_address_evm, compute_create2_address_zk};
+use super::{compute_create2_address_evm, compute_create2_address_zk};
+use crate::upgrade_verification::constants::{
+    EIP1967_PROXY_ADMIN_SLOT, L2_CREATE2_FACTORY_ADDR, ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR,
+};
 
 sol! {
     #[derive(Debug)]
@@ -38,7 +38,11 @@ sol! {
         mapping(uint256 _chainId => address) public chainTypeManager;
         function getHyperchain(uint256 _chainId) external view returns (address chainAddress);
         function getAllZKChainChainIDs() external view returns (uint256[] memory);
+        function settlementLayer(uint256 _chainId) external view returns (uint256);
         function assetRouter() external view returns (address);
+        function l1CtmDeployer() external view returns (address);
+        function messageRoot() external view returns (address);
+        function chainAssetHandler() external view returns (address);
         function getZKChain(uint256 _chainId) external view returns (address chainAddress);
         function baseToken(uint256 _chainId) external view returns (address);
         function requestL2TransactionDirect(
@@ -48,24 +52,64 @@ sol! {
 
     #[sol(rpc)]
     contract L1AssetRouter {
-        function legacyBridge() public returns (address);
-        function L1_WETH_TOKEN() public returns (address);
-        function L1_NULLIFIER() public returns (address);
+        function legacyBridge() public view returns (address);
+        function L1_WETH_TOKEN() public view returns (address);
+        function L1_NULLIFIER() public view returns (address);
+        function ERA_CHAIN_ID() public view returns (uint256);
 
-        function nativeTokenVault() public returns (address);
+        function nativeTokenVault() public view returns (address);
     }
 
     #[sol(rpc)]
     contract ChainTypeManager {
         function getHyperchain(uint256 _chainId) public view returns (address);
-        address public validatorTimelock;
+        address public validatorTimelockPostV29;
         function protocolVersion() external view returns (uint256);
         function isZKsyncOS() external view returns (bool);
+        function owner() external view returns (address);
+        function PERMISSIONLESS_VALIDATOR() external view returns (address);
     }
 
     #[sol(rpc)]
     contract ZKChain {
         function getProtocolVersion() external view returns (uint256);
+    }
+
+    #[sol(rpc)]
+    contract ZKChainFeeParams {
+        function getPriorityTxMaxGasLimit() external view returns (uint256);
+    }
+
+    /// Minimal `Ownable` view — usable against any contract that exposes a
+    /// public `owner()` getter (TransparentUpgradeableProxy admins, plain
+    /// Ownable proxies, etc.).
+    #[sol(rpc)]
+    contract Ownable {
+        function owner() external view returns (address);
+    }
+
+    /// Minimal `Ownable2Step` view for contracts whose pending owner is a
+    /// pre-governance invariant.
+    #[sol(rpc)]
+    contract Ownable2Step {
+        function owner() external view returns (address);
+        function pendingOwner() external view returns (address);
+    }
+
+    #[sol(rpc)]
+    contract L1AssetTracker {
+        function BRIDGE_HUB() external view returns (address);
+        function chainAssetHandler() external view returns (address);
+    }
+
+    #[sol(rpc)]
+    contract ChainRegistrationSender {
+        function BRIDGE_HUB() external view returns (address);
+    }
+
+    #[sol(rpc)]
+    contract ValidatorTimelock {
+        function executionDelay() external view returns (uint32);
     }
 
     function create2AndTransferParams(bytes memory bytecode, bytes32 salt, address owner);
@@ -77,29 +121,9 @@ sol! {
     ) external payable returns (address);
 }
 
-const EIP1967_PROXY_ADMIN_SLOT: &str =
-    "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
-
-#[derive(Debug)]
-pub struct BridgehubInfo {
-    pub shared_bridge: Address,
-    pub legacy_bridge: Address,
-    pub stm_address: Address,
-    pub transparent_proxy_admin: Address,
-    pub l1_weth_token_address: Address,
-    pub ecosystem_admin: Address,
-    pub bridgehub_addr: Address,
-    pub validator_timelock: Address,
-    pub era_address: Address,
-    pub native_token_vault: Address,
-    pub l1_nullifier: Address,
-    pub l1_asset_router_proxy_addr: Address,
-    pub gateway_base_token_addr: Address,
-}
-
 pub struct NetworkVerifier {
     pub l1_provider: RootProvider,
-    pub l2_chain_id: u64,
+    pub era_chain_id: u64,
     pub l1_chain_id: u64,
     pub gateway_chain_id: u64,
     pub gw_provider: RootProvider,
@@ -109,146 +133,215 @@ pub struct NetworkVerifier {
     pub create2_constructor_params: HashMap<Address, Vec<u8>>,
 }
 
+struct ParsedCreate2Deployment {
+    addr: Address,
+    name: String,
+    params: Vec<u8>,
+    salt: FixedBytes<32>,
+}
+
 impl NetworkVerifier {
-    pub fn new_v31(l1_rpc: String) -> anyhow::Result<Self> {
+    pub async fn new_v31(
+        l1_rpc: String,
+        gw_rpc: String,
+        era_chain_id: u64,
+    ) -> anyhow::Result<Self> {
         let l1_provider = RootProvider::new_http(l1_rpc.parse().context("invalid L1 RPC URL")?);
-        let gw_provider = l1_provider.clone();
+        let l1_chain_id = l1_provider
+            .get_chain_id()
+            .await
+            .context("failed to fetch L1 chain id")?;
+        let gw_provider =
+            RootProvider::new_http(gw_rpc.parse().context("invalid gateway RPC URL")?);
+        let gateway_chain_id = gw_provider
+            .get_chain_id()
+            .await
+            .context("failed to fetch gateway chain id")?;
 
         Ok(Self {
             l1_provider,
-            l2_chain_id: 0,
-            l1_chain_id: 0,
-            gateway_chain_id: 0,
+            era_chain_id,
+            l1_chain_id,
+            gateway_chain_id,
             gw_provider,
             create2_constructor_params: HashMap::new(),
             create2_known_bytecodes: HashMap::new(),
         })
     }
 
-    /// Replay the executed-bundle log produced by `dev execute-safe --out`
-    /// to populate the legacy `create2_known_bytecodes` /
-    /// `create2_constructor_params` maps that
-    /// `VerificationResult::expect_create2_params` consumes. Each tx that
-    /// targets the configured Create2Factory with the configured salt is
-    /// turned into a `(deployed address → contract file + constructor args)`
-    /// entry. Same recognition rules as the legacy `check_create2_deploy`
-    /// (raw CREATE2 + Create2AndTransfer).
-    pub fn populate_create2_from_executed_bundle(
+    /// Walk a `transactions.txt`-style hash list and turn each successful
+    /// CREATE2-factory tx into a `(deployed address → contract file +
+    /// constructor args)` entry.
+    ///
+    /// `transactions.txt` is append-only across regens, so we silently skip
+    /// txs that:
+    ///   - aren't on the RPC (wrong network, or stale-file warning)
+    ///   - reverted on-chain (status != 1)
+    ///   - don't target the configured Create2Factory
+    ///   - have <32 bytes of input
+    ///   - whose bytecode hash no longer matches any contract in
+    ///     `AllContractsHashes.json` (stale deploy from a prior regen — the
+    ///     natural filter for the append-only file)
+    ///
+    /// Surfaces two classes of issue via `result`:
+    ///   - Salt sanity (`expected_salts`): every recognized deploy whose salt
+    ///     isn't in the env-declared set is a hard ERROR.
+    ///   - Duplicate metadata: if the same deployed address shows up twice
+    ///     with different `(name, ctor_args)`, that's a hard ERROR.
+    pub async fn populate_create2_from_transactions_log(
         &mut self,
-        bundle: &ExecutedBundle,
+        tx_hashes: &[FixedBytes<32>],
         create2_factory: &Address,
-        create2_salts: &[FixedBytes<32>],
+        bridgehub_addr: &Address,
+        expected_salts: &[FixedBytes<32>],
         bytecode_verifier: &BytecodeVerifier,
+        result: &mut crate::upgrade_verification::verifiers::VerificationResult,
     ) {
-        for tx in &bundle.transactions {
-            let Some(to) = parse_hex_address(&tx.to) else {
+        let mut fetch_failures = 0_usize;
+        let mut reverted = 0_usize;
+        let mut parsed_gateway_deployments = 0_usize;
+
+        for tx_hash in tx_hashes {
+            let hash = TxHash::from(*tx_hash);
+
+            let tx = match self.l1_provider.get_transaction_by_hash(hash).await {
+                Ok(Some(tx)) => tx,
+                Ok(None) => {
+                    fetch_failures += 1;
+                    continue;
+                }
+                Err(err) => {
+                    logger::warn(format!("eth_getTransactionByHash({hash:#x}) failed: {err}"));
+                    fetch_failures += 1;
+                    continue;
+                }
+            };
+
+            let Some(to) = tx.to() else {
                 continue;
             };
-            let Some(input) = parse_hex_bytes(&tx.data) else {
+
+            let deployment = if to == *create2_factory {
+                parse_l1_create2_deploy_from_input(to, tx.input(), bytecode_verifier)
+            } else if to == *bridgehub_addr {
+                check_gw_create2_deploy_from_input(
+                    to,
+                    tx.input(),
+                    bridgehub_addr,
+                    bytecode_verifier,
+                )
+            } else {
+                None
+            };
+            let Some(deployment) = deployment else {
                 continue;
             };
-            if let Some((addr, name, params)) = check_create2_deploy_from_input(
-                to,
-                &input,
-                create2_factory,
-                create2_salts,
-                bytecode_verifier,
-            ) {
-                self.create2_constructor_params.insert(addr, params);
-                self.create2_known_bytecodes.insert(addr, name);
-            }
-        }
-    }
 
-    pub async fn new(
-        l1_rpc: String,
-        l2_chain_id: u64,
-        gateway_chain_id: u64,
-        gateway_rpc: String,
-        bytecode_verifier: &BytecodeVerifier,
-        config: &UpgradeOutput,
-        bridgehub_address: &Address,
-    ) -> Self {
-        let mut create2_constructor_params = HashMap::new();
-        let mut create2_known_bytecodes = HashMap::new();
-        let l1_provider = RootProvider::new_http(l1_rpc.parse().unwrap());
-        let gw_provider = RootProvider::new_http(gateway_rpc.parse().unwrap());
-
-        if gw_provider.get_chain_id().await.unwrap() != gateway_chain_id {
-            panic!("Incorrect gateway provider")
-        }
-
-        println!(
-            "Adding {} transactions from create2",
-            config.transactions.len()
-        );
-
-        for transaction in &config.transactions {
-            if let Some((address, contract, constructor_param)) = check_create2_deploy(
-                l1_provider.clone(),
-                transaction,
-                &config.create2_factory_addr,
-                &config.create2_factory_salt,
-                bytecode_verifier,
-            )
-            .await
-            {
-                if create2_constructor_params
-                    .insert(address, constructor_param)
-                    .is_some()
-                {
-                    panic!("Duplicate deployment for {:#?}", address)
+            match self.l1_provider.get_transaction_receipt(hash).await {
+                Ok(Some(receipt)) => {
+                    if !receipt.status() {
+                        reverted += 1;
+                        continue;
+                    }
                 }
-
-                if create2_known_bytecodes
-                    .insert(address, contract.clone())
-                    .is_some()
-                {
-                    panic!("Duplicate deployment for {:#?}", address)
+                Ok(None) => {
+                    logger::warn(format!(
+                        "eth_getTransactionReceipt({hash:#x}) returned null"
+                    ));
+                    fetch_failures += 1;
+                    continue;
+                }
+                Err(err) => {
+                    logger::warn(format!(
+                        "eth_getTransactionReceipt({hash:#x}) failed: {err}"
+                    ));
+                    fetch_failures += 1;
+                    continue;
                 }
             }
 
-            if let Some((address, contract, constructor_param)) = check_gw_create2_deploy(
-                l1_provider.clone(),
-                bridgehub_address,
-                transaction,
-                bytecode_verifier,
-            )
-            .await
-            {
-                if create2_constructor_params
-                    .insert(address, constructor_param)
-                    .is_some()
-                {
-                    panic!("Duplicate deployment for {:#?}", address)
+            if to == *bridgehub_addr {
+                parsed_gateway_deployments += 1;
+                if !expected_salts.contains(&deployment.salt) {
+                    result.report_error(&format!(
+                        "Gateway CREATE2 deployment of {} at {} (tx {hash:#x}) used salt {} \
+                         which is not in the env-declared salt set",
+                        deployment.name, deployment.addr, deployment.salt
+                    ));
                 }
+            } else if !expected_salts.contains(&deployment.salt) {
+                // Salt sanity: only enforced after recognition, so non-deploy tx
+                // first-32 bytes (which aren't salts at all) don't trigger errors.
+                // Hard ERROR per offending deploy — `ensure_success` rejects the
+                // run, but the entry is still inserted into the map below so
+                // downstream address-book lookups in `expect_create2_params` are
+                // unaffected.
+                result.report_error(&format!(
+                    "Deployment of {} at {} (tx {hash:#x}) used salt {} \
+                     which is not in the env-declared salt set",
+                    deployment.name, deployment.addr, deployment.salt
+                ));
+            }
 
-                if create2_known_bytecodes
-                    .insert(address, contract.clone())
-                    .is_some()
-                {
-                    panic!("Duplicate deployment for {:#?}", address)
+            self.insert_create2_deployment(deployment, result);
+        }
+
+        if fetch_failures > 0 {
+            logger::warn(format!(
+                "transactions.txt: {fetch_failures} tx(s) not found on the RPC — wrong network, or stale file?"
+            ));
+        }
+        if reverted > 0 {
+            logger::warn(format!(
+                "transactions.txt: {reverted} tx(s) reverted (status=0) — skipped"
+            ));
+        }
+        if parsed_gateway_deployments > 0 {
+            logger::info(format!(
+                "transactions.txt: loaded {parsed_gateway_deployments} Gateway L1→L2 CREATE2 deployment tx(s)"
+            ));
+        }
+    }
+
+    fn insert_create2_deployment(
+        &mut self,
+        deployment: ParsedCreate2Deployment,
+        result: &mut crate::upgrade_verification::verifiers::VerificationResult,
+    ) {
+        let ParsedCreate2Deployment {
+            addr,
+            name,
+            params,
+            salt: _,
+        } = deployment;
+
+        // Duplicate detection: same address showing up twice with mismatched
+        // metadata is a hard error.
+        if let Some(existing_name) = self.create2_known_bytecodes.get(&addr) {
+            if existing_name != &name {
+                result.report_error(&format!(
+                    "Duplicate CREATE2 deployment at {addr}: name conflict — \
+                     existing={existing_name}, new={name}"
+                ));
+                return;
+            }
+            if let Some(existing_params) = self.create2_constructor_params.get(&addr) {
+                if existing_params != &params {
+                    result.report_error(&format!(
+                        "Duplicate CREATE2 deployment at {addr} ({name}): ctor args differ. \
+                         existing=0x{}, new=0x{}",
+                        hex::encode(existing_params),
+                        hex::encode(&params),
+                    ));
+                    return;
                 }
             }
+            // Same address, same metadata — idempotent re-deploy. Skip.
+            return;
         }
 
-        Self {
-            l1_chain_id: l1_provider.get_chain_id().await.unwrap(),
-            l1_provider,
-            l2_chain_id,
-            gateway_chain_id,
-            gw_provider,
-            create2_constructor_params,
-            create2_known_bytecodes,
-        }
-    }
-
-    pub fn get_era_chain_id(&self) -> u64 {
-        self.l2_chain_id
-    }
-
-    pub fn get_l1_chain_id(&self) -> u64 {
-        self.l1_chain_id
+        self.create2_known_bytecodes.insert(addr, name);
+        self.create2_constructor_params.insert(addr, params);
     }
 
     pub fn get_gateway_chain_id(&self) -> u64 {
@@ -263,15 +356,6 @@ impl NetworkVerifier {
         } else {
             keccak256(&code)
         }
-    }
-
-    pub async fn get_chain_diamond_proxy(&self, stm_addr: Address, era_chain_id: u64) -> Address {
-        let ctm = ChainTypeManager::new(stm_addr, self.l1_provider.clone());
-
-        ctm.getHyperchain(U256::from(era_chain_id))
-            .call()
-            .await
-            .unwrap()
     }
 
     pub async fn storage_at(&self, address: &Address, key: &FixedBytes<32>) -> FixedBytes<32> {
@@ -385,65 +469,17 @@ impl NetworkVerifier {
         Address::from_slice(&addr_as_bytes[12..])
     }
 
-    pub async fn get_bridgehub_info(&self, bridgehub_addr: Address) -> BridgehubInfo {
-        let l1_provider = &self.get_l1_provider();
-
-        let bridgehub = Bridgehub::new(bridgehub_addr, l1_provider);
-
-        let shared_bridge_address = bridgehub.sharedBridge().call().await.unwrap();
-
-        let shared_bridge = L1AssetRouter::new(shared_bridge_address, l1_provider);
-
-        let era_chain_id = self.get_era_chain_id();
-
-        let stm_address = bridgehub
-            .chainTypeManager(era_chain_id.try_into().unwrap())
-            .call()
+    pub async fn try_get_gateway_proxy_admin(&self, addr: Address) -> anyhow::Result<Address> {
+        let slot = FixedBytes::<32>::from_hex(EIP1967_PROXY_ADMIN_SLOT)
+            .context("invalid EIP-1967 admin slot literal")?;
+        let storage = self
+            .gw_provider
+            .get_storage_at(addr, U256::from_be_bytes(slot.0))
             .await
-            .unwrap();
-        let chain_type_manager = ChainTypeManager::new(stm_address, l1_provider);
-        let era_address = chain_type_manager
-            .getHyperchain(U256::from(era_chain_id))
-            .call()
-            .await
-            .unwrap();
-        let validator_timelock = chain_type_manager.validatorTimelock().call().await.unwrap();
+            .with_context(|| format!("failed to read Gateway proxy admin slot for {addr}"))?;
 
-        let ecosystem_admin = bridgehub.admin().call().await.unwrap();
-
-        let transparent_proxy_admin = self.get_proxy_admin(bridgehub_addr).await;
-
-        let legacy_bridge = shared_bridge.legacyBridge().call().await.unwrap();
-
-        let l1_weth_token_address = shared_bridge.L1_WETH_TOKEN().call().await.unwrap();
-
-        let native_token_vault = shared_bridge.nativeTokenVault().call().await.unwrap();
-
-        let l1_nullifier = shared_bridge.L1_NULLIFIER().call().await.unwrap();
-
-        let l1_asset_router_proxy_addr = bridgehub.assetRouter().call().await.unwrap();
-
-        let gateway_base_token_addr = bridgehub
-            .baseToken(U256::from(self.get_gateway_chain_id()))
-            .call()
-            .await
-            .unwrap();
-
-        BridgehubInfo {
-            shared_bridge: shared_bridge_address,
-            legacy_bridge,
-            stm_address,
-            transparent_proxy_admin,
-            l1_weth_token_address,
-            ecosystem_admin,
-            bridgehub_addr,
-            validator_timelock,
-            era_address,
-            native_token_vault,
-            l1_nullifier,
-            l1_asset_router_proxy_addr,
-            gateway_base_token_addr,
-        }
+        let bytes = FixedBytes::<32>::from_slice(&storage.to_be_bytes_vec());
+        Ok(Address::from_slice(&bytes[12..]))
     }
 }
 
@@ -451,45 +487,16 @@ impl NetworkVerifier {
 /// transaction.
 /// If successful, it returns a tuple of three items: the address of the deployed contract,
 /// the path to the contract and its constructor params.
-async fn check_create2_deploy(
-    l1_provider: RootProvider,
-    transaction: &str,
-    expected_create2_address: &Address,
-    expected_create2_salt: &FixedBytes<32>,
-    bytecode_verifier: &BytecodeVerifier,
-) -> Option<(Address, String, Vec<u8>)> {
-    let tx_hash: TxHash = transaction.parse().unwrap();
-
-    let tx = l1_provider
-        .get_transaction_by_hash(tx_hash)
-        .await
-        .unwrap()
-        .unwrap();
-
-    let to = tx.to()?;
-    check_create2_deploy_from_input(
-        to,
-        tx.input(),
-        expected_create2_address,
-        std::slice::from_ref(expected_create2_salt),
-        bytecode_verifier,
-    )
-}
-
+///
 /// Same logic as `check_create2_deploy` but operates on raw `(to, input)`
 /// instead of a tx hash → useful for replaying the bundle that
 /// `dev execute-safe --out` writes (the bundle log already carries the raw
 /// data so we don't need an `eth_getTransactionByHash` round-trip).
-fn check_create2_deploy_from_input(
+fn parse_l1_create2_deploy_from_input(
     to: Address,
     input: &[u8],
-    expected_create2_address: &Address,
-    expected_create2_salts: &[FixedBytes<32>],
     bytecode_verifier: &BytecodeVerifier,
-) -> Option<(Address, String, Vec<u8>)> {
-    if to != *expected_create2_address {
-        return None;
-    }
+) -> Option<ParsedCreate2Deployment> {
     if input.len() < 32 {
         return None;
     }
@@ -500,17 +507,16 @@ fn check_create2_deploy_from_input(
     // We will try both here.
 
     let salt = &input[0..32];
-    if !expected_create2_salts.iter().any(|s| salt == s.as_slice()) {
-        return None;
-    }
+    let salt = FixedBytes::<32>::from_slice(salt);
 
     if let Some((name, params)) = bytecode_verifier.try_parse_bytecode(&input[32..]) {
-        let addr = compute_create2_address_evm(
-            to,
-            FixedBytes::<32>::from_slice(salt),
-            keccak256(&input[32..]),
-        );
-        return Some((addr, name, params));
+        let addr = compute_create2_address_evm(to, salt, keccak256(&input[32..]));
+        return Some(ParsedCreate2Deployment {
+            addr,
+            name,
+            params,
+            salt,
+        });
     };
 
     let bytecode_input = &input[32..];
@@ -520,83 +526,81 @@ fn check_create2_deploy_from_input(
         bytecode_verifier.is_create2_and_transfer_bytecode_prefix(bytecode_input)
     {
         let x = create2AndTransferParamsCall::abi_decode_raw(create2_and_transfer_input).ok()?;
-        if salt != x.salt.as_slice() {
+        if salt != x.salt {
             return None;
         }
         // We do not need to cross check `owner` here, it will be cross checked against whatever owner is currently set
         // to the final contracts.
         // We do still need to check the input to find out potential constructor param
         let (name, params) = bytecode_verifier.try_parse_bytecode(&x.bytecode)?;
-        let salt = FixedBytes::<32>::from_slice(salt);
         let create2_and_transfer_addr =
             compute_create2_address_evm(to, salt, keccak256(&input[32..]));
 
         let contract_addr =
             compute_create2_address_evm(create2_and_transfer_addr, salt, keccak256(&x.bytecode));
 
-        return Some((contract_addr, name, params));
+        return Some(ParsedCreate2Deployment {
+            addr: contract_addr,
+            name,
+            params,
+            salt,
+        });
     }
 
     None
 }
 
-fn parse_hex_address(s: &str) -> Option<Address> {
-    Address::from_str(s.trim()).ok()
-}
-
-fn parse_hex_bytes(s: &str) -> Option<Vec<u8>> {
-    let trimmed = s.trim().strip_prefix("0x").unwrap_or(s.trim());
-    hex::decode(trimmed).ok()
-}
-
-async fn check_gw_create2_deploy(
-    l1_provider: RootProvider,
+fn check_gw_create2_deploy_from_input(
+    to: Address,
+    input: &[u8],
     bridgehub_addr: &Address,
-    transaction: &str,
     bytecode_verifier: &BytecodeVerifier,
-) -> Option<(Address, String, Vec<u8>)> {
-    let l2_create2_addr = address_from_short_hex("10000");
-
-    let tx_hash: TxHash = transaction.parse().unwrap();
-
-    let tx = l1_provider
-        .get_transaction_by_hash(tx_hash)
-        .await
-        .unwrap()
-        .unwrap();
-
-    if tx.to() != Some(*bridgehub_addr) {
+) -> Option<ParsedCreate2Deployment> {
+    if to != *bridgehub_addr {
         return None;
     }
 
-    let inner_tx = requestL2TransactionDirectCall::abi_decode(tx.input());
+    let l2_call = requestL2TransactionDirectCall::abi_decode(input).ok()?;
+    let l2_contract = l2_call._request.l2Contract;
+    let l2_calldata = l2_call._request.l2Calldata;
 
-    if let Ok(l2_call) = inner_tx {
-        if l2_call._request.l2Contract != l2_create2_addr {
+    if l2_contract == ZKSYNC_OS_DETERMINISTIC_CREATE2_ADDR {
+        // ZKsync OS uses the standard EVM deterministic factory whose calldata
+        // is `bytes32 salt || initCode`.
+        let raw = l2_calldata.as_ref();
+        if raw.len() < 32 {
             return None;
         }
+        let salt = FixedBytes::<32>::from_slice(&raw[..32]);
+        let init_code = &raw[32..];
+        let (name, params) = bytecode_verifier.try_parse_bytecode(init_code)?;
+        let addr = compute_create2_address_evm(l2_contract, salt, keccak256(init_code));
+        return Some(ParsedCreate2Deployment {
+            addr,
+            name,
+            params,
+            salt,
+        });
+    }
 
-        let create2_data = create2Call::abi_decode(&l2_call._request.l2Calldata);
-
-        if let Ok(create2_call) = create2_data {
-            if create2_call._salt != vec![0u8; 32].as_slice() {
-                println!("Salt mismatch: {:?} != {:?}", create2_call._salt, 0);
-                return None;
-            }
-
-            let addr = compute_create2_address_zk(
-                l2_call._request.l2Contract,
-                create2_call._salt,
-                create2_call._bytecodeHash,
-                keccak256(&create2_call._input),
-            );
-
-            if let Some(file_name) =
-                bytecode_verifier.zk_bytecode_hash_to_file(&create2_call._bytecodeHash)
-            {
-                return Some((addr, file_name.to_string(), create2_call._input.to_vec()));
-            }
-        }
+    if l2_contract == L2_CREATE2_FACTORY_ADDR {
+        // Era gateway deployments still call the ZKsync create2 system
+        // factory: create2(salt, bytecodeHash, constructorInput).
+        let create2_call = create2Call::abi_decode(&l2_calldata).ok()?;
+        let salt = create2_call._salt;
+        let addr = compute_create2_address_zk(
+            l2_contract,
+            salt,
+            create2_call._bytecodeHash,
+            keccak256(&create2_call._input),
+        );
+        let file_name = bytecode_verifier.zk_bytecode_hash_to_file(&create2_call._bytecodeHash)?;
+        return Some(ParsedCreate2Deployment {
+            addr,
+            name: file_name.to_string(),
+            params: create2_call._input.to_vec(),
+            salt,
+        });
     }
 
     None

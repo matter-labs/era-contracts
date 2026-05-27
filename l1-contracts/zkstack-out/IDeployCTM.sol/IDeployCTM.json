@@ -293,6 +293,11 @@
             "internalType": "uint256"
           },
           {
+            "name": "eraGatewayChainId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
             "name": "gatewayChainId",
             "type": "uint256",
             "internalType": "uint256"

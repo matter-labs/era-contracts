@@ -1,22 +1,14 @@
-use std::{fs, path::Path};
+use std::{fs, path::Path, str::FromStr};
 
+use alloy::primitives::Address;
 use anyhow::Context;
 use serde::Deserialize;
 use toml::value::Table;
 
 #[derive(Debug)]
 pub(crate) struct EcosystemUpgradeArtifact {
-    /// Synthetic flat view used by single-CTM-aware verifier code: the
-    /// merged ecosystem TOML's top-level `[governance_calls]` plus a
-    /// deep-merge of `[core]` and the *first* `[ctms.<flavor>]` section.
-    /// Code that needs per-CTM resolution should iterate [`Self::ctms`]
-    /// directly.
-    pub(crate) value: toml::Value,
-    /// Diamond cut from the first `[ctms.<flavor>]` section. Multi-CTM
-    /// callers must walk [`Self::ctms`] for per-CTM cuts.
-    pub(crate) chain_upgrade_diamond_cut: String,
-    /// Contracts config from the first `[ctms.<flavor>]` section.
-    pub(crate) contracts_config: ContractsConfig,
+    /// Raw `[core]` table from the merged ecosystem TOML.
+    pub(crate) core: toml::Value,
     pub(crate) governance_calls: GovernanceCalls,
     /// One entry per `[ctms.<flavor>]` section in the merged TOML, in the
     /// order encountered. `era` always sorts before `zksync_os` for
@@ -28,6 +20,14 @@ pub(crate) struct EcosystemUpgradeArtifact {
     /// past the canonical 5 (unpauseMigration + per-CTM checks) and which
     /// deployed-GW-CTM address to cross-check.
     pub(crate) new_gateway: Option<NewGatewayArtifact>,
+    /// Optional `[puh_guardians]` table emitted on PUH-governed v31 upgrades.
+    /// It names the two zk-governance contracts deployed via L1 CREATE2 so
+    /// provenance verification can stay decoupled from stage-0 calldata
+    /// decoding; stage-0 verification binds decoded calls back to these values.
+    pub(crate) puh_guardians: Option<PuhGuardiansArtifact>,
+    /// Raw top-level `[misc]` table for shared metadata that does not belong to
+    /// core or a particular CTM.
+    pub(crate) misc: toml::Value,
 }
 
 #[derive(Debug)]
@@ -36,19 +36,25 @@ pub(crate) struct NewGatewayArtifact {
     /// address of the deployed GW CTM. The `addChainTypeManager` L1→L2
     /// priority tx whose calldata gets baked into stage 2 references this
     /// address as the CTM being added to the L2 Bridgehub on the gateway.
-    pub(crate) gateway_chain_type_manager_addr: alloy::primitives::Address,
+    pub(crate) gateway_chain_type_manager_addr: Address,
     /// Deployed GW RollupDAManager (L1 address). Stage-2 GW bring-up sends
     /// an `acceptOwnership` priority tx targeting this contract on L2 via
     /// the new gateway — used to cross-check the priority-tx's `dstAddress`.
-    pub(crate) gateway_rollup_da_manager_addr: Option<alloy::primitives::Address>,
+    pub(crate) gateway_rollup_da_manager_addr: Option<Address>,
     /// Deployed GW ServerNotifier proxy (L1 address). Same use as above —
     /// the second `acceptOwnership` priority tx targets this contract.
-    pub(crate) gateway_server_notifier_addr: Option<alloy::primitives::Address>,
+    pub(crate) gateway_server_notifier_addr: Option<Address>,
     /// Raw `[new_gateway]` table, kept for downstream verifiers that want
     /// to read additional fields (multicall3_addr, validators, diamond cut)
     /// without re-parsing the artifact.
     #[allow(dead_code)]
     pub(crate) value: toml::Value,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PuhGuardiansArtifact {
+    pub(crate) new_puh_impl: Address,
+    pub(crate) new_guardians: Address,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,6 +87,31 @@ pub(crate) struct CtmArtifact {
     pub(crate) contracts_config: ContractsConfig,
     /// The raw `[ctms.<flavor>]` table, for per-CTM address lookups.
     pub(crate) value: toml::Value,
+}
+
+/// Resolves a nested address from a TOML value. `scope` is used only for
+/// error messages (e.g. `"core"`, `"misc"`, `"ctms.era"`); `path` is the
+/// chain of keys to walk into `value`.
+pub(crate) fn required_address_in_value(
+    value: &toml::Value,
+    scope: &str,
+    path: &[&str],
+) -> anyhow::Result<Address> {
+    let path_label = format!("{scope}.{}", path.join("."));
+    let mut current = value;
+    for segment in path {
+        let Some(next) = current.get(*segment) else {
+            anyhow::bail!("{path_label} is required");
+        };
+        current = next;
+    }
+
+    let Some(raw) = current.as_str() else {
+        anyhow::bail!("{path_label} must be an address string");
+    };
+
+    raw.parse::<Address>()
+        .with_context(|| format!("{path_label} is not a valid address"))
 }
 
 impl EcosystemUpgradeArtifact {
@@ -149,49 +180,6 @@ impl EcosystemUpgradeArtifact {
             });
         }
 
-        // Build the flat backward-compat view: deep-merge `core` then the
-        // first CTM section into a single top-level table. This keeps the
-        // single-CTM-aware verifier code (address lookups against
-        // `state_transition`, `deployed_addresses`, `upgrade_addresses`,
-        // and top-level fields like `chain_upgrade_diamond_cut`) working
-        // without per-call rewrites.
-        let mut flat = Table::new();
-        flat.insert(
-            "governance_calls".to_string(),
-            toml::Value::try_from(&governance_calls)
-                .context("re-encoding governance_calls into flat view")?,
-        );
-        deep_merge_into(&mut flat, core_table.clone());
-        let primary_table = match &ctms[0].value {
-            toml::Value::Table(t) => t.clone(),
-            _ => unreachable!("validated above"),
-        };
-        deep_merge_into(&mut flat, primary_table);
-
-        // Legacy verifier code expects `deployed_addresses.{bridgehub,bridges}`
-        // at top level (the pre-split single-file ecosystem TOML had them
-        // duplicated under both `deployed_addresses.*` and `upgrade_addresses.*`).
-        // The split prepare emits bridgehub/bridges sub-tables only under
-        // `core.upgrade_addresses.*`, so synthesize the matching
-        // `deployed_addresses.*` entries from there.
-        if let Some(toml::Value::Table(core_upgrade)) = core_table.get("upgrade_addresses") {
-            let dst_dep = flat
-                .entry("deployed_addresses".to_string())
-                .or_insert_with(|| toml::Value::Table(Table::new()));
-            if let toml::Value::Table(dst_dep) = dst_dep {
-                if let Some(toml::Value::Table(bh)) = core_upgrade.get("bridgehub") {
-                    dst_dep
-                        .entry("bridgehub".to_string())
-                        .or_insert_with(|| toml::Value::Table(bh.clone()));
-                }
-                if let Some(toml::Value::Table(br)) = core_upgrade.get("bridges") {
-                    dst_dep
-                        .entry("bridges".to_string())
-                        .or_insert_with(|| toml::Value::Table(br.clone()));
-                }
-            }
-        }
-
         // `[new_gateway]` is optional. Its presence flags GW-bring-up stage-2
         // calls — and we extract the deployed GW CTM proxy address while
         // we're here so the stage-2 verifier doesn't have to re-walk the
@@ -205,7 +193,7 @@ impl EcosystemUpgradeArtifact {
                     .context(
                         "[new_gateway.gateway_state_transition] is required when [new_gateway] is present",
                     )?;
-                let parse_required = |field: &str| -> anyhow::Result<alloy::primitives::Address> {
+                let parse_required = |field: &str| -> anyhow::Result<Address> {
                     let raw = gst
                         .get(field)
                         .and_then(toml::Value::as_str)
@@ -214,18 +202,16 @@ impl EcosystemUpgradeArtifact {
                                 "[new_gateway.gateway_state_transition.{field}] is required when [new_gateway] is present"
                             )
                         })?;
-                    use std::str::FromStr;
-                    alloy::primitives::Address::parse_checksummed(raw, None)
-                        .or_else(|_| alloy::primitives::Address::from_str(raw))
+                    Address::parse_checksummed(raw, None)
+                        .or_else(|_| Address::from_str(raw))
                         .with_context(|| format!("invalid address for `{field}`: `{raw}`"))
                 };
-                let parse_optional = |field: &str| -> Option<alloy::primitives::Address> {
+                let parse_optional = |field: &str| -> Option<Address> {
                     let raw = gst.get(field).and_then(toml::Value::as_str)?;
-                    use std::str::FromStr;
-                    alloy::primitives::Address::parse_checksummed(raw, None)
-                        .or_else(|_| alloy::primitives::Address::from_str(raw))
+                    Address::parse_checksummed(raw, None)
+                        .or_else(|_| Address::from_str(raw))
                         .ok()
-                        .filter(|a| *a != alloy::primitives::Address::ZERO)
+                        .filter(|a| *a != Address::ZERO)
                 };
                 Some(NewGatewayArtifact {
                     gateway_chain_type_manager_addr: parse_required(
@@ -239,13 +225,38 @@ impl EcosystemUpgradeArtifact {
             None => None,
         };
 
+        let puh_guardians = match root.remove("puh_guardians") {
+            Some(value) => {
+                let table = expect_table(value, "puh_guardians")?;
+                let value = toml::Value::Table(table);
+                Some(PuhGuardiansArtifact {
+                    new_puh_impl: required_address_in_value(
+                        &value,
+                        "puh_guardians",
+                        &["new_puh_impl"],
+                    )?,
+                    new_guardians: required_address_in_value(
+                        &value,
+                        "puh_guardians",
+                        &["new_guardians"],
+                    )?,
+                })
+            }
+            None => None,
+        };
+
+        let misc = match root.remove("misc") {
+            Some(value) => toml::Value::Table(expect_table(value, "misc")?),
+            None => toml::Value::Table(Table::new()),
+        };
+
         Ok(Self {
-            value: toml::Value::Table(flat),
-            chain_upgrade_diamond_cut: ctms[0].chain_upgrade_diamond_cut.clone(),
-            contracts_config: ctms[0].contracts_config.clone(),
+            core: toml::Value::Table(core_table),
             governance_calls,
             ctms,
             new_gateway,
+            puh_guardians,
+            misc,
         })
     }
 }
@@ -254,21 +265,6 @@ fn expect_table(value: toml::Value, name: &str) -> anyhow::Result<Table> {
     match value {
         toml::Value::Table(t) => Ok(t),
         _ => anyhow::bail!("[{name}] must be a table"),
-    }
-}
-
-/// Deep-merge `src` into `dst`. Sub-tables are recursed into; scalar /
-/// non-table values from `src` overwrite `dst` on conflict.
-fn deep_merge_into(dst: &mut Table, src: Table) {
-    for (k, v) in src {
-        match (dst.get_mut(&k), v) {
-            (Some(toml::Value::Table(dst_inner)), toml::Value::Table(src_inner)) => {
-                deep_merge_into(dst_inner, src_inner);
-            }
-            (_, v) => {
-                dst.insert(k, v);
-            }
-        }
     }
 }
 
@@ -324,12 +320,10 @@ mod tests {
         let a = EcosystemUpgradeArtifact::from_toml_str(toml).unwrap();
         assert_eq!(a.ctms.len(), 1);
         assert_eq!(a.ctms[0].flavor, CtmFlavor::Era);
-        assert_eq!(a.chain_upgrade_diamond_cut, "0xabcd");
-        // Flat view should expose top-level `state_transition` from the CTM
-        // and `upgrade_addresses` from core.
-        assert!(a.value.get("state_transition").is_some());
-        assert!(a.value.get("upgrade_addresses").is_some());
-        assert!(a.value.get("asset_tracker_proxy_addr").is_some());
+        assert_eq!(a.ctms[0].chain_upgrade_diamond_cut, "0xabcd");
+        assert!(a.core.get("state_transition").is_none());
+        assert!(a.core.get("upgrade_addresses").is_some());
+        assert!(a.core.get("asset_tracker_proxy_addr").is_some());
     }
 
     #[test]
@@ -366,7 +360,47 @@ mod tests {
         assert_eq!(a.ctms.len(), 2);
         assert_eq!(a.ctms[0].flavor, CtmFlavor::Era);
         assert_eq!(a.ctms[1].flavor, CtmFlavor::ZksyncOs);
-        // The flat-view falls back to the first (era) CTM.
-        assert_eq!(a.chain_upgrade_diamond_cut, "0xaa");
+        assert_eq!(a.ctms[0].chain_upgrade_diamond_cut, "0xaa");
+        assert_eq!(a.ctms[1].chain_upgrade_diamond_cut, "0xbb");
+    }
+
+    #[test]
+    fn parses_puh_guardians_metadata() {
+        let toml = r#"
+            [governance_calls]
+            stage0_calls = "0x"
+            stage1_calls = "0x"
+            stage2_calls = "0x"
+
+            [core]
+
+            [ctms.era]
+            chain_upgrade_diamond_cut = "0xaa"
+            [ctms.era.contracts_config]
+            diamond_cut_data = "0x"
+            force_deployments_data = "0x"
+            new_protocol_version = 2
+            old_protocol_version = 1
+            governance_upgrade_timer_initial_delay = 0
+            is_testnet = false
+
+            [puh_guardians]
+            new_puh_impl = "0x0000000000000000000000000000000000000001"
+            new_guardians = "0x0000000000000000000000000000000000000002"
+        "#;
+        let artifact = EcosystemUpgradeArtifact::from_toml_str(toml).unwrap();
+        let metadata = artifact.puh_guardians.unwrap();
+        assert_eq!(
+            metadata.new_puh_impl,
+            "0x0000000000000000000000000000000000000001"
+                .parse::<Address>()
+                .unwrap()
+        );
+        assert_eq!(
+            metadata.new_guardians,
+            "0x0000000000000000000000000000000000000002"
+                .parse::<Address>()
+                .unwrap()
+        );
     }
 }

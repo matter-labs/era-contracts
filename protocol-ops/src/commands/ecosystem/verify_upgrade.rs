@@ -1,165 +1,244 @@
 use std::path::PathBuf;
-use std::str::FromStr;
 
-use alloy::primitives::FixedBytes;
+use alloy::primitives::{keccak256, Address, FixedBytes, U256};
 use clap::{Parser, ValueEnum};
 
+use crate::common::env_config::{default_protocol_ops_out_dir, EnvConfig, GovernanceKind};
 use crate::{
-    commands::dev::execute_safe::ExecutedBundle,
     common::logger,
     upgrade_verification::{
-        artifact_shape,
-        artifacts::EcosystemUpgradeArtifact,
-        verifiers::{GenesisConfigKind, VerificationResult},
+        artifact_shape, artifacts::EcosystemUpgradeArtifact, verifiers::VerificationResult,
+        versions::v31::utils::transactions_log,
     },
 };
+
+const V31_PUH_SALT_PREIMAGE: &[u8] = b"v31:ProtocolUpgradeHandler";
+const V31_GUARDIANS_SALT_PREIMAGE: &[u8] = b"v31:Guardians";
 
 /// Verify prepared ecosystem upgrade artifacts.
 ///
 /// This command is intentionally read-only. It consumes the TOML produced by
-/// `ecosystem upgrade-prepare` and performs validation locally without running
-/// forge scripts or creating an anvil fork.
+/// `ecosystem upgrade-prepare`, walks the append-only `transactions.txt`
+/// emitted alongside, and performs validation locally without running forge
+/// scripts or creating an anvil fork.
 #[derive(Debug, Clone, Parser)]
 pub struct VerifyUpgradeArgs {
-    /// L1 RPC URL used by later verification phases for read-only on-chain checks.
+    /// Environment whose permanent-values and v31 input TOMLs define verification constants.
+    #[clap(long, value_enum)]
+    pub env: VerifyUpgradeEnv,
+
+    /// L1 RPC URL used by deployment provenance to fetch each CREATE2 deployment tx
+    /// and by later phases for read-only on-chain checks.
     #[clap(long, default_value = "http://localhost:8545")]
     pub l1_rpc_url: String,
+
+    /// Gateway RPC URL used by read-only gateway-side checks.
+    #[clap(long, alias = "gw-rpc")]
+    pub gw_rpc_url: String,
 
     /// Path to the v31 ecosystem upgrade TOML produced by `upgrade-prepare`.
     #[clap(long)]
     pub ecosystem_toml: PathBuf,
 
-    /// Optional era-contracts commit to load AllContractsHashes.json from GitHub.
-    /// If omitted, AllContractsHashes.json is read from the repository root.
+    /// Optional era-contracts commit to load contract metadata from GitHub.
+    /// If omitted, the local checkout is the authority for AllContractsHashes.json
+    /// and SystemConfig.json; verify that the checkout matches the reviewed commit.
     #[clap(long)]
     pub contracts_commit: Option<String>,
 
-    /// Existing ZK chain id used for live chain-specific checks.
+    /// zk-governance commit to load ProtocolUpgradeHandler / Guardians
+    /// bytecode metadata from GitHub.
+    #[clap(long)]
+    pub zk_governance_commit: String,
+
+    /// Path to the append-only `transactions.txt` emitted by every prepare
+    /// broadcast (see `dev execute-safe::append_transaction_hash`). Each
+    /// non-blank line is a 0x-prefixed L1 tx hash. We fetch each tx
+    /// via L1 RPC, filter successful CREATE2-factory deploys, identify the
+    /// deployed contract via `AllContractsHashes.json`, and feed the
+    /// `(addr → name, ctor_args)` map that `expect_create2_params` consumes.
+    /// Stale entries (from older regens whose bytecode is no longer in
+    /// AllContractsHashes) are silently skipped.
     ///
-    /// This mirrors the legacy PUVT `--era-chain-id` argument: the L1 RPC is
-    /// used to read Bridgehub/diamond state, while this id selects which chain's
-    /// diamond to inspect.
-    #[clap(long, alias = "chain-id")]
-    pub era_chain_id: u64,
-
-    /// Which local v31 genesis config to load.
-    #[clap(long, value_enum, default_value_t = VerifyUpgradeGenesisConfig::Era)]
-    pub genesis_config: VerifyUpgradeGenesisConfig,
-
-    /// Path to the executed-bundle JSON written by `dev execute-safe --out`.
-    /// Phase 6 (deployment provenance) replays this log to reconstruct
-    /// CREATE2 / TUPP deployments and verify each named v31 implementation
-    /// was deployed from the expected init bytecode + constructor args (the
-    /// immutables-aware check that Phase 5's runtime-hash comparison cannot
-    /// do). Required.
+    /// Defaults to `<l1-contracts>/upgrade-envs/v0.31.0-interopB/output/<env>/transactions.txt`
     #[clap(long)]
-    pub executed_bundles: PathBuf,
+    pub transactions_log: Option<PathBuf>,
 
-    /// Address of the Create2Factory used by the prepare scripts. The
-    /// default matches the factory address used by the v31 stage env
-    /// (`environments/stage/stage.yaml`).
-    #[clap(long, default_value = "0x4e59b44847b379578588920cA78FbF26c0B4956C")]
-    pub create2_factory: String,
-
-    /// CREATE2 salt(s) used by the prepare scripts. Accept multiple via repeated
-    /// `--create2-salt 0xAA --create2-salt 0xBB ...` or a comma-separated list
-    /// `--create2-salt 0xAA,0xBB,0xCC`. Multiple salts are required when the
-    /// prepare flow generates a fresh random salt per sub-script
-    /// (`v31_upgrade_inner.rs` defaults to `H256::random()` per core / per-CTM /
-    /// per-GW-prep when no `--create2-factory-salt` is pinned). PUVT accepts
-    /// any CREATE2 factory tx whose salt matches one of the provided values.
-    /// Required.
-    #[clap(long, value_delimiter = ',', num_args = 1..)]
-    pub create2_salt: Vec<String>,
-
-    /// Expected ZK token asset ID (`keccak256(abi.encode(l1ChainId, 0x10004, zkTokenL1Address))`).
-    /// When provided, `FixedForceDeploymentsData.zkTokenAssetId` is verified against this value
-    /// instead of only checked for non-zero. Recommended for production verification runs.
+    /// Print the ABI-encoded `UpgradeProposal { calls, executor: 0x0, salt: 0x0 }`
+    /// for each governance stage (0/1/2) so an operator can byte-compare against
+    /// the on-chain submitted governance proposal bytes. When set, the rest of
+    /// the verifier is skipped.
     #[clap(long)]
-    pub zk_token_asset_id: Option<FixedBytes<32>>,
-
-    /// Legacy gateway chain ID baked into `L1MessageRoot` / `L1MessageRootStageSepolia`
-    /// as the `_eraGatewayChainId` immutable. Read from `$.gateway.chain_id` in the
-    /// upgrade input TOML at prepare time. Defaults to 0 (fresh deployments with no
-    /// legacy gateway).
-    #[clap(long, default_value_t = 0)]
-    pub legacy_gateway_chain_id: u64,
+    pub display_upgrade_data: bool,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
-pub enum VerifyUpgradeGenesisConfig {
-    Era,
-    ZksyncOs,
+pub enum VerifyUpgradeEnv {
+    Stage,
+    Testnet,
+    Mainnet,
 }
 
-impl From<VerifyUpgradeGenesisConfig> for GenesisConfigKind {
-    fn from(value: VerifyUpgradeGenesisConfig) -> Self {
-        match value {
-            VerifyUpgradeGenesisConfig::Era => Self::Era,
-            VerifyUpgradeGenesisConfig::ZksyncOs => Self::ZksyncOs,
+impl VerifyUpgradeEnv {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Stage => "stage",
+            Self::Testnet => "testnet",
+            Self::Mainnet => "mainnet",
         }
+    }
+
+    pub fn is_mainnet(self) -> bool {
+        matches!(self, Self::Mainnet)
+    }
+
+    pub fn is_stage(self) -> bool {
+        matches!(self, Self::Stage)
     }
 }
 
 pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
+    let env = args.env.as_str();
+    let env_cfg = EnvConfig::load(env)?;
+    let era_chain_id = env_cfg.era_chain_id().ok_or_else(|| {
+        anyhow::anyhow!(
+            "{} is missing top-level `era_chain_id`",
+            env_cfg.v31_input_path.display()
+        )
+    })?;
+    let legacy_gateway_chain_id = env_cfg.legacy_gateway_chain_id().ok_or_else(|| {
+        anyhow::anyhow!(
+            "{} is missing `[legacy_gateway] chain_id`",
+            env_cfg.permanent_values_path.display()
+        )
+    })?;
+    let legacy_gateway_chain_intervals = env_cfg.legacy_gateway_chain_intervals().to_vec();
+    let l1_chain_id = env_cfg.l1_chain_id().ok_or_else(|| {
+        anyhow::anyhow!(
+            "{} is missing top-level `l1_chain_id`",
+            env_cfg.permanent_values_path.display()
+        )
+    })?;
+    let zk_token_asset_id = env_cfg.zk_token_asset_id().ok_or_else(|| {
+        anyhow::anyhow!(
+            "{} is missing top-level `zk_token_asset_id`",
+            env_cfg.permanent_values_path.display()
+        )
+    })?;
+    let zk_token_asset_id = FixedBytes::<32>::from_slice(zk_token_asset_id.as_bytes());
+    let create2_factory_eth = env_cfg.create2_factory().ok_or_else(|| {
+        anyhow::anyhow!(
+            "{} is missing `[permanent_contracts] create2_factory_addr`",
+            env_cfg.permanent_values_path.display()
+        )
+    })?;
+    let create2_factory = Address::from_slice(create2_factory_eth.as_bytes());
+    let new_gateway = env_cfg.new_gateway().ok_or_else(|| {
+        anyhow::anyhow!(
+            "{} is missing required `[new_gateway]` config for v31 verification",
+            env_cfg.permanent_values_path.display()
+        )
+    })?;
+    let new_gateway_chain_id = new_gateway.chain_id;
+    let new_gateway_representative_chain_id = new_gateway.ctm_representative_chain_id;
+    let new_gateway_settlement_fee = ethers_u256_to_alloy(new_gateway.settlement_fee);
+
+    // Collect every pinned CREATE2 salt declared in the env config — the Core
+    // salt from `[contracts] create2_factory_salt` plus the per-CTM salts under
+    // `[create2_factory_salts]`. PUVT hard-errors per deploy whose salt isn't
+    // in this set.
+    let mut expected_salts: Vec<FixedBytes<32>> = Vec::new();
+    if let Some(core_salt) = env_cfg.v31_create2_factory_salt()? {
+        expected_salts.push(FixedBytes::<32>::from_slice(core_salt.as_bytes()));
+    }
+    for salt in env_cfg.v31_create2_factory_salt_per_ctm()?.values() {
+        expected_salts.push(FixedBytes::<32>::from_slice(salt.as_bytes()));
+    }
+    if env_cfg.governance_kind() == GovernanceKind::Puh {
+        expected_salts.push(keccak256(V31_PUH_SALT_PREIMAGE));
+        expected_salts.push(keccak256(V31_GUARDIANS_SALT_PREIMAGE));
+    }
+
+    let transactions_log_path = match args.transactions_log.clone() {
+        Some(path) => path,
+        None => default_protocol_ops_out_dir(env)?.join("transactions.txt"),
+    };
+
     logger::step("Verifying ecosystem upgrade artifacts");
+    logger::info(format!("Env: {env}"));
+    logger::info(format!(
+        "Permanent values: {}",
+        env_cfg.permanent_values_path.display()
+    ));
+    logger::info(format!("V31 input: {}", env_cfg.v31_input_path.display()));
     logger::info(format!("Ecosystem TOML: {}", args.ecosystem_toml.display()));
+    logger::info(format!(
+        "Transactions log: {}",
+        transactions_log_path.display()
+    ));
     logger::info(format!("L1 RPC URL: {}", args.l1_rpc_url));
-    logger::info(format!("Genesis config: {:?}", args.genesis_config));
+    logger::info(format!("Gateway RPC URL: {}", args.gw_rpc_url));
     if let Some(contracts_commit) = &args.contracts_commit {
         logger::info(format!("Contracts commit: {contracts_commit}"));
     } else {
         logger::info("Contracts hashes: local repository AllContractsHashes.json");
     }
-    logger::info(format!("Representative ZK chain ID: {}", args.era_chain_id));
+    logger::info(format!(
+        "zk-governance commit: {}",
+        args.zk_governance_commit
+    ));
+    logger::info(format!("Representative ZK chain ID: {era_chain_id}"));
+    logger::info(format!(
+        "Legacy Gateway chain ID: {legacy_gateway_chain_id}"
+    ));
+    logger::info(format!("New Gateway chain ID: {new_gateway_chain_id}"));
+    logger::info(format!(
+        "New Gateway representative chain ID: {new_gateway_representative_chain_id}"
+    ));
+    logger::info(format!(
+        "New Gateway settlement fee: {new_gateway_settlement_fee}"
+    ));
+    logger::info(format!("L1 chain ID (expected): {l1_chain_id}"));
+    logger::info(format!("CREATE2 factory: {create2_factory}"));
+    logger::info(format!("ZK token asset ID: {zk_token_asset_id}"));
 
     let artifact = EcosystemUpgradeArtifact::read(&args.ecosystem_toml)?;
     artifact_shape::verify(&artifact)?;
 
-    // Read the executed-bundle log produced by `dev execute-safe --out`.
-    // Multiple invocations of `dev execute-safe` against the same path
-    // accumulate into a single file, so we only need to read one path here.
-    logger::info(format!(
-        "Executed bundle: {}",
-        args.executed_bundles.display()
-    ));
-    let raw = std::fs::read_to_string(&args.executed_bundles).map_err(|err| {
-        anyhow::anyhow!("failed to read {}: {err}", args.executed_bundles.display())
-    })?;
-    let executed_bundle: ExecutedBundle = serde_json::from_str(&raw).map_err(|err| {
-        anyhow::anyhow!(
-            "failed to parse executed-bundle JSON {}: {err}",
-            args.executed_bundles.display()
-        )
-    })?;
-
-    let create2_factory = alloy::primitives::Address::from_str(&args.create2_factory)
-        .map_err(|err| anyhow::anyhow!("invalid --create2-factory address: {err}"))?;
-    if args.create2_salt.is_empty() {
-        anyhow::bail!("at least one --create2-salt is required");
+    if args.display_upgrade_data {
+        print_encoded_upgrade_data("Stage0", &artifact.governance_calls.stage0_calls);
+        print_encoded_upgrade_data("Stage1", &artifact.governance_calls.stage1_calls);
+        print_encoded_upgrade_data("Stage2", &artifact.governance_calls.stage2_calls);
+        return Ok(());
     }
-    let create2_salts: Vec<FixedBytes<32>> = args
-        .create2_salt
-        .iter()
-        .map(|s| {
-            FixedBytes::<32>::from_str(s)
-                .map_err(|err| anyhow::anyhow!("invalid --create2-salt `{s}`: {err}"))
-        })
-        .collect::<anyhow::Result<_>>()?;
+
+    let tx_hashes = transactions_log::read(&transactions_log_path)?;
+    logger::info(format!(
+        "Loaded {} transaction hash(es) from {}",
+        tx_hashes.len(),
+        transactions_log_path.display()
+    ));
 
     let mut result = VerificationResult::default();
 
     let verification_result = crate::upgrade_verification::versions::v31::verify(
+        args.env,
         &artifact,
         &args.l1_rpc_url,
+        &args.gw_rpc_url,
         args.contracts_commit.as_deref(),
-        args.era_chain_id,
-        args.genesis_config.into(),
-        &executed_bundle,
+        args.zk_governance_commit.as_str(),
+        era_chain_id,
+        legacy_gateway_chain_id,
+        &legacy_gateway_chain_intervals,
+        new_gateway_chain_id,
+        new_gateway_representative_chain_id,
+        new_gateway_settlement_fee,
+        l1_chain_id,
+        &tx_hashes,
         create2_factory,
-        create2_salts,
-        args.zk_token_asset_id,
-        args.legacy_gateway_chain_id,
+        &expected_salts,
+        zk_token_asset_id,
         &mut result,
     )
     .await;
@@ -180,4 +259,28 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
     logger::outro(format!("{}", result));
     verification_result?;
     result.ensure_success()
+}
+
+fn ethers_u256_to_alloy(value: ethers::types::U256) -> U256 {
+    let mut bytes = [0u8; 32];
+    value.to_big_endian(&mut bytes);
+    U256::from_be_bytes(bytes)
+}
+
+fn print_encoded_upgrade_data(label: &str, stage_calls_hex: &str) {
+    use crate::upgrade_verification::versions::v31::elements::call_list::{
+        CallList, UpgradeProposal,
+    };
+    use alloy::sol_types::SolValue;
+
+    let calls = CallList::parse(stage_calls_hex);
+    let proposal = UpgradeProposal {
+        calls: calls.elems,
+        executor: Address::ZERO,
+        salt: FixedBytes::<32>::ZERO,
+    };
+    println!(
+        "{label} encoded upgrade data = 0x{}",
+        alloy::hex::encode(proposal.abi_encode())
+    );
 }

@@ -6,6 +6,8 @@ use crate::upgrade_verification::verifiers::{VerificationResult, Verifiers};
 use super::super::utils::apply_l2_to_l1_alias;
 use super::super::MAX_NUMBER_OF_ZK_CHAINS;
 
+const SYSTEM_CONTRACT_PROXY_FILE: &str = "l1-contracts/SystemContractProxy";
+
 sol! {
     #[sol(rpc)]
     interface BridgehubBase {
@@ -17,7 +19,7 @@ sol! {
     #[derive(Debug)]
     struct FixedForceDeploymentsData {
         uint256 l1ChainId;
-        uint256 gatewayChainId;
+        uint256 eraGatewayChainId;
         uint256 eraChainId;
         address l1AssetRouter;
         bytes32 l2TokenProxyBytecodeHash;
@@ -46,9 +48,9 @@ sol! {
 // ZKsyncOS simple        = 96-byte triplet (blake|pad|keccak)     = 96 bytes  (unused here)
 // ZKsyncOS proxy upgrade = abi.encode(implInfo_96, proxyInfo_96)  = 320 bytes
 //
-// For ZKsyncOS proxy (320 bytes), the impl observable hash lives at implInfo[64..96],
-// which is at raw_bytes[96 + 64 .. 96 + 96] = bytes[160..192] inside the 320-byte blob
-// (after the 64-byte ABI head + 32-byte length prefix).
+// For ZKsyncOS proxy (320 bytes), observables live at:
+// - implInfo[64..96]  => raw_bytes[160..192]
+// - proxyInfo[64..96] => raw_bytes[288..320]
 fn expect_bytecode_info(
     result: &mut VerificationResult,
     verifiers: &Verifiers,
@@ -64,7 +66,7 @@ fn expect_bytecode_info(
         96 => {
             // Simple ZKsyncOS (non-proxy) bytecodeInfo.
             let observable = FixedBytes::<32>::from_slice(&bytecode_info[64..96]);
-            check_zksync_os_observable(result, verifiers, &observable, zksync_os_expected);
+            check_zksync_os_observable(result, verifiers, &observable, zksync_os_expected, "bytecode");
         }
         320 => {
             // ZKsyncOS proxy: abi.encode(implInfo_96, proxyInfo_96).
@@ -76,9 +78,18 @@ fn expect_bytecode_info(
             //   [192..224]= len_proxy    = 96
             //   [224..320]= proxy_96_bytes
             //
-            // Observable (keccak256 of deployed bytecode) lives at raw[160..192].
-            let observable = FixedBytes::<32>::from_slice(&bytecode_info[160..192]);
-            check_zksync_os_observable(result, verifiers, &observable, zksync_os_expected);
+            // Observables (keccak256 of deployed bytecode) live at raw[160..192] and raw[288..320].
+            let impl_observable = FixedBytes::<32>::from_slice(&bytecode_info[160..192]);
+            check_zksync_os_observable(result, verifiers, &impl_observable, zksync_os_expected, "impl");
+
+            let proxy_observable = FixedBytes::<32>::from_slice(&bytecode_info[288..320]);
+            check_zksync_os_observable(
+                result,
+                verifiers,
+                &proxy_observable,
+                SYSTEM_CONTRACT_PROXY_FILE,
+                "proxy",
+            );
         }
         len => result.report_error(&format!(
             "bytecodeInfo for {era_expected}: unexpected length {len} (expected 32/Era, 96/ZKsyncOS-simple, 320/ZKsyncOS-proxy)"
@@ -91,6 +102,7 @@ fn check_zksync_os_observable(
     verifiers: &Verifiers,
     observable: &FixedBytes<32>,
     expected_file: &str,
+    component_label: &str,
 ) {
     match verifiers
         .bytecode_verifier
@@ -100,10 +112,10 @@ fn check_zksync_os_observable(
             // ok
         }
         Some(file) => result.report_error(&format!(
-            "bytecodeInfo for {expected_file}: impl observable hash maps to {file}"
+            "bytecodeInfo for {expected_file}: {component_label} observable hash maps to {file}"
         )),
-        None => result.report_warn(&format!(
-            "bytecodeInfo for {expected_file}: cannot verify observable hash {observable}"
+        None => result.report_error(&format!(
+            "bytecodeInfo for {expected_file}: cannot verify {component_label} observable hash {observable}"
         )),
     }
 }
@@ -127,37 +139,34 @@ impl FixedForceDeploymentsData {
                     ));
                 }
             }
-            Err(err) => {
-                result.report_warn(&format!(
-                    "Could not verify FixedForceDeploymentsData l1ChainId: {err}"
-                ));
-            }
+            Err(err) => result.report_error(&format!(
+                "Could not verify FixedForceDeploymentsData l1ChainId: {err}"
+            )),
         }
 
-        result.report_warn(&format!(
-            "FixedForceDeploymentsData gatewayChainId (not verified): {}",
-            self.gatewayChainId
-        ));
+        let expected_era_gateway_chain_id = U256::from(verifiers.legacy_gateway_chain_id);
+        if self.eraGatewayChainId != expected_era_gateway_chain_id {
+            result.report_error(&format!(
+                "FixedForceDeploymentsData eraGatewayChainId mismatch: expected legacy gateway chain id {}, got {}",
+                verifiers.legacy_gateway_chain_id, self.eraGatewayChainId
+            ));
+        } else {
+            result.report_ok(&format!(
+                "FixedForceDeploymentsData eraGatewayChainId matches legacy gateway chain id ({})",
+                verifiers.legacy_gateway_chain_id
+            ));
+        }
 
-        match verifiers.representative_era_chain_id {
-            Some(era_chain_id) if era_chain_id != 0 => {
-                if U256::from(era_chain_id) != self.eraChainId {
-                    result.report_error(&format!(
-                        "FixedForceDeploymentsData eraChainId mismatch: expected {}, got {}",
-                        era_chain_id, self.eraChainId
-                    ));
-                } else {
-                    result.report_ok(&format!(
-                        "FixedForceDeploymentsData eraChainId matches --era-chain-id ({era_chain_id})"
-                    ));
-                }
-            }
-            _ => {
-                result.report_warn(&format!(
-                    "Skipping FixedForceDeploymentsData eraChainId check (got {}): pass --era-chain-id to enable it",
-                    self.eraChainId
-                ));
-            }
+        let era_chain_id = verifiers.era_chain_id;
+        if U256::from(era_chain_id) != self.eraChainId {
+            result.report_error(&format!(
+                "FixedForceDeploymentsData eraChainId mismatch: expected {}, got {}",
+                era_chain_id, self.eraChainId
+            ));
+        } else {
+            result.report_ok(&format!(
+                "FixedForceDeploymentsData eraChainId matches env era_chain_id ({era_chain_id})"
+            ));
         }
 
         result.expect_address(verifiers, &self.l1AssetRouter, "l1_asset_router_proxy");
@@ -189,32 +198,25 @@ impl FixedForceDeploymentsData {
                 beacon_proxy_file
             ));
         } else {
-            result.report_warn(&format!(
+            result.report_error(&format!(
                 "l2TokenProxyBytecodeHash cannot be verified: {} not in AllContractsHashes",
                 self.l2TokenProxyBytecodeHash
             ));
         }
 
-        // aliasedL1Governance = applyL1ToL2Alias(protocol_upgrade_handler).
-        // Only verifiable when protocol_upgrade_handler is registered in the address book.
-        match verifiers
+        // aliasedL1Governance = applyL1ToL2Alias(Bridgehub.owner()), registered
+        // in the address book at `Verifiers::new_v31`.
+        let expected_aliased_governance = verifiers
             .address_verifier
             .get_by_name("aliased_protocol_upgrade_handler_proxy")
-        {
-            Some(expected) => {
-                if self.aliasedL1Governance == expected {
-                    // ok
-                } else {
-                    result.report_error(&format!(
-                        "aliasedL1Governance mismatch: expected {expected}, got {}",
-                        self.aliasedL1Governance
-                    ));
-                }
-            }
-            None => result.report_warn(&format!(
-                "FixedForceDeploymentsData aliasedL1Governance (not verified, missing from address book): {}",
+            .expect(
+                "aliased_protocol_upgrade_handler_proxy must be registered by Verifiers::new_v31",
+            );
+        if self.aliasedL1Governance != expected_aliased_governance {
+            result.report_error(&format!(
+                "aliasedL1Governance mismatch: expected {expected_aliased_governance}, got {}",
                 self.aliasedL1Governance
-            )),
+            ));
         }
 
         if self.maxNumberOfZKChains != U256::from(MAX_NUMBER_OF_ZK_CHAINS) {
@@ -295,59 +297,37 @@ impl FixedForceDeploymentsData {
         result.expect_address(verifiers, &self.l2SharedBridgeLegacyImpl, "zero");
         result.expect_address(verifiers, &self.l2BridgedStandardERC20Impl, "zero");
 
-        let bridgehub = BridgehubBase::new(
-            verifiers.bridgehub_address,
-            verifiers.network_verifier.get_l1_provider(),
-        );
-        match bridgehub.chainRegistrationSender().call().await {
-            Ok(sender) => {
-                let expected_alias = apply_l2_to_l1_alias(sender);
-                if self.aliasedChainRegistrationSender == expected_alias {
-                    result.report_ok(&format!(
-                        "aliasedChainRegistrationSender matches applyL1ToL2Alias(Bridgehub.chainRegistrationSender()) = {expected_alias}"
-                    ));
-                } else {
-                    result.report_error(&format!(
-                        "aliasedChainRegistrationSender mismatch: expected {} (alias of {}), got {}",
-                        expected_alias, sender, self.aliasedChainRegistrationSender
-                    ));
-                }
-            }
-            Err(err) => {
-                result.report_warn(&format!(
-                    "Could not verify aliasedChainRegistrationSender via RPC: {err}. Raw value: {}",
-                    self.aliasedChainRegistrationSender
-                ));
-            }
+        let expected_chain_registration_sender = verifiers
+            .address_verifier
+            .get_by_name("chain_registration_sender_proxy")
+            .expect("chain_registration_sender_proxy must be registered by Verifiers::new_v31");
+        let expected_chain_registration_sender_alias =
+            apply_l2_to_l1_alias(expected_chain_registration_sender);
+        if self.aliasedChainRegistrationSender == expected_chain_registration_sender_alias {
+            result.report_ok(&format!(
+                "aliasedChainRegistrationSender matches applyL1ToL2Alias(Bridgehub.chainRegistrationSender()) = {expected_chain_registration_sender_alias}"
+            ));
+        } else {
+            result.report_error(&format!(
+                "aliasedChainRegistrationSender mismatch: expected {} (alias of {}), got {}",
+                expected_chain_registration_sender_alias,
+                expected_chain_registration_sender,
+                self.aliasedChainRegistrationSender
+            ));
         }
 
         if self.dangerousTestOnlyForcedBeacon != Address::ZERO {
             result.report_error("dangerousTestOnlyForcedBeacon must be 0");
         }
 
-        match verifiers.zk_token_asset_id {
-            Some(expected) => {
-                if self.zkTokenAssetId == expected {
-                    result.report_ok(&format!(
-                        "zkTokenAssetId matches --zk-token-asset-id ({expected})"
-                    ));
-                } else {
-                    result.report_error(&format!(
-                        "zkTokenAssetId mismatch: expected {expected}, got {}",
-                        self.zkTokenAssetId
-                    ));
-                }
-            }
-            None => {
-                if self.zkTokenAssetId == FixedBytes::<32>::ZERO {
-                    result.report_error("zkTokenAssetId must not be zero");
-                } else {
-                    result.report_warn(&format!(
-                        "zkTokenAssetId not fully verified (pass --zk-token-asset-id to enable): {}",
-                        self.zkTokenAssetId
-                    ));
-                }
-            }
+        let expected = verifiers.zk_token_asset_id;
+        if self.zkTokenAssetId == expected {
+            result.report_ok(&format!("zkTokenAssetId matches env value ({expected})"));
+        } else {
+            result.report_error(&format!(
+                "zkTokenAssetId mismatch: expected {expected}, got {}",
+                self.zkTokenAssetId
+            ));
         }
 
         Ok(())
