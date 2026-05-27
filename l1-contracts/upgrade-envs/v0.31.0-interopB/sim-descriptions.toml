@@ -23,6 +23,7 @@
 bridgehub                           = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"  # Bridgehub proxy
 l1_asset_router                     = "0xfD3130Ea0e8B7Dd61Ac3663328a66d97eb02f84b"  # L1AssetRouter proxy
 ntv                                 = "0x257CE1e946c9C6531E2C9deBF7fcf821F9467f73"  # NativeTokenVault proxy
+chain_registration_sender           = "" # ChainRegistrationSender proxy (v31)
 l1_asset_tracker                    = "0xA2b0A6F731a06c09729C4166B452974463AC47B8"  # L1AssetTracker proxy (v31)
 chain_asset_handler                 = "0xCEe1A9d2FE1c587B72F115974d33296C1F9ac35d"  # ChainAssetHandler proxy
 ctm_deployment_tracker              = "0x25E04b7d1fC963aB8e5fEB0797f7a943E260e8b6"  # CTMDeploymentTracker (L1CtmDeployer)
@@ -211,17 +212,17 @@ selector = "0x9623609d"  # upgradeAndCall
 arg0_address = "puh"  # PUH proxy
 desc = "PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH proxy 0x8f086275…, newImpl, empty) — upgrades the ProtocolUpgradeHandler proxy itself (PUH/Guardians redeploy)."
 
-# L1AssetTracker.acceptOwnership — PUH accepts ownership of L1AT that the deployer created+transferred in phase 2.
-[[entries]]
-target = "l1_asset_tracker"  # L1AssetTracker
-selector = "0x79ba5097"  # acceptOwnership
-desc = "PUH stage 1: L1AssetTracker.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns L1AT."
-
 # ChainRegistrationSender.acceptOwnership — PUH accepts ownership of ChainRegistrationSender that the deployer created+transferred in phase 2.
 [[entries]]
 target = "chain_registration_sender"  # ChainRegistrationSender
 selector = "0x79ba5097"  # acceptOwnership
 desc = "PUH stage 1: ChainRegistrationSender.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns ChainRegistrationSender."
+
+# L1AssetTracker.acceptOwnership — PUH accepts ownership of L1AT that the deployer created+transferred in phase 2.
+[[entries]]
+target = "l1_asset_tracker"  # L1AssetTracker
+selector = "0x79ba5097"  # acceptOwnership
+desc = "PUH stage 1: L1AssetTracker.acceptOwnership() — completes the deployer-issued transferOwnership(PUH); PUH owns L1AT."
 
 [[entries]]
 target = "ntv"  # NTV
