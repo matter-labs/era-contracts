@@ -34,8 +34,8 @@ use super::helpers::{
     verify_call_by_name,
 };
 use super::{
-    acceptOwnershipCall, updateGuardiansCall, upgradeAndCallCall, BridgehubOwnerView, CallList,
-    GovernanceStage0Calls, Ownable2Step, ProtocolUpgradeHandler,
+    acceptOwnershipCall, updateGuardiansCall, upgradeAndCallCall, CallList, GovernanceStage0Calls,
+    Ownable2Step, ProtocolUpgradeHandler,
 };
 
 impl GovernanceStage0Calls {
@@ -86,14 +86,7 @@ impl GovernanceStage0Calls {
         }
 
         // Probe for PUH-governed env.
-        let bridgehub_owner = BridgehubOwnerView::new(
-            verifiers.bridgehub_address,
-            verifiers.network_verifier.get_l1_provider(),
-        )
-        .owner()
-        .call()
-        .await
-        .context("read Bridgehub.owner() to detect PUH-governed env")?;
+        let bridgehub_owner = verifiers.bridgehub_owner;
         let bridgehub_owner_admin = verifiers
             .network_verifier
             .get_proxy_admin(bridgehub_owner)
