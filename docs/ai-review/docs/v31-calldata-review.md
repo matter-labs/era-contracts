@@ -462,14 +462,14 @@ Prefix:
 
 For each CTM `i`, `block_start = 11 + 6 * i`:
 
-| Index             | Target                            | Selector                      | Required payload check                                                                                                                                                                                    |
-| ----------------- | --------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `block_start + 0` | CTM timer                         | `checkDeadline()`             | `[ctms.<flavor>.deployed_addresses].l1_governance_upgrade_timer`                                                                                                                                          |
-| `block_start + 1` | CTM upgrade stage validator       | `checkMigrationsPaused()`     | `[ctms.<flavor>.deployed_addresses].upgrade_stage_validator`                                                                                                                                              |
-| `block_start + 2` | CTM proxy admin                   | `upgrade(address,address)`    | CTM proxy and implementation match `[ctms.<flavor>.state_transition]`                                                                                                                                     |
-| `block_start + 3` | CTM proxy                         | `setChainCreationParams(...)` | perform Step 8                                                                                                                                                                                            |
-| `block_start + 4` | CTM proxy                         | `setNewVersionUpgrade(...)`   | perform Steps 9, 10, and 11                                                                                                                                                                               |
-| `block_start + 5` | ValidatorTimelock proxy admin     | `upgrade(address,address)`    | PUVT verifies `proxy == validator_timelock_addr` and `impl == validator_timelock_implementation_addr` from the artifact; call target is the proxy admin read from the EIP-1967 admin slot of the VT proxy |
+| Index             | Target                        | Selector                      | Required payload check                                                                                                                                                                                    |
+| ----------------- | ----------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `block_start + 0` | CTM timer                     | `checkDeadline()`             | `[ctms.<flavor>.deployed_addresses].l1_governance_upgrade_timer`                                                                                                                                          |
+| `block_start + 1` | CTM upgrade stage validator   | `checkMigrationsPaused()`     | `[ctms.<flavor>.deployed_addresses].upgrade_stage_validator`                                                                                                                                              |
+| `block_start + 2` | CTM proxy admin               | `upgrade(address,address)`    | CTM proxy and implementation match `[ctms.<flavor>.state_transition]`                                                                                                                                     |
+| `block_start + 3` | CTM proxy                     | `setChainCreationParams(...)` | perform Step 8                                                                                                                                                                                            |
+| `block_start + 4` | CTM proxy                     | `setNewVersionUpgrade(...)`   | perform Steps 9, 10, and 11                                                                                                                                                                               |
+| `block_start + 5` | ValidatorTimelock proxy admin | `upgrade(address,address)`    | PUVT verifies `proxy == validator_timelock_addr` and `impl == validator_timelock_implementation_addr` from the artifact; call target is the proxy admin read from the EIP-1967 admin slot of the VT proxy |
 
 PUVT decodes the VT upgrade call and verifies the `proxy` and `implementation` args against the
 artifact. The call target (proxy admin) is read from the EIP-1967 slot of the VT proxy at
@@ -876,10 +876,10 @@ When `upgrade-envs/permanent-values/<env>.toml` has a `[legacy_gateway]` section
 Stage 2 starts with `M + 1` decommission calls where `M` is the number of
 `[[legacy_gateway.chain_intervals]]` entries:
 
-| Index     | Target                      | Selector                                                                                                           | Extra checks                                    |
-| --------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
-| `0..M-1`  | `chain_asset_handler_proxy` | `setHistoricalMigrationInterval(uint256,uint256,(uint256,uint256,uint256,uint256,uint256,bool))`                   | one per `[[legacy_gateway.chain_intervals]]`    |
-| `M`       | `bridgehub_proxy`           | `setSettlementLayerStatus(uint256,bool)`                                                                           | second arg is `false`; blacklists the old GW    |
+| Index    | Target                      | Selector                                                                                         | Extra checks                                 |
+| -------- | --------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| `0..M-1` | `chain_asset_handler_proxy` | `setHistoricalMigrationInterval(uint256,uint256,(uint256,uint256,uint256,uint256,uint256,bool))` | one per `[[legacy_gateway.chain_intervals]]` |
+| `M`      | `bridgehub_proxy`           | `setSettlementLayerStatus(uint256,bool)`                                                         | second arg is `false`; blacklists the old GW |
 
 Decode each `setHistoricalMigrationInterval` call:
 
@@ -891,6 +891,7 @@ cast calldata-decode \
 
 Match the decoded arguments against the corresponding
 `[[legacy_gateway.chain_intervals]]` entry in `permanent-values/<env>.toml`:
+
 - arg 1 (`_chainId`) = `chain_id`;
 - arg 2 (`_migrationNumber`) = `0` (always zero in the current flow);
 - `interval.migrateToGWBatchNumber` = `migrate_to_sl_batch`;
@@ -920,11 +921,11 @@ Let `D = M + 1` when the prefix is present, `D = 0` when absent.
 
 ### Canonical section
 
-| Index           | Target                          | Selector                         | Extra checks |
-| --------------- | ------------------------------- | -------------------------------- | ------------ |
-| `D`             | `chain_asset_handler_proxy`     | `unpauseMigration()`             | zero value   |
-| `D + 1 + 2*i`   | CTM `i` upgrade stage validator | `checkProtocolUpgradePresence()` | one per CTM  |
-| `D + 2 + 2*i`   | CTM `i` upgrade stage validator | `checkMigrationsUnpaused()`      | one per CTM  |
+| Index         | Target                          | Selector                         | Extra checks |
+| ------------- | ------------------------------- | -------------------------------- | ------------ |
+| `D`           | `chain_asset_handler_proxy`     | `unpauseMigration()`             | zero value   |
+| `D + 1 + 2*i` | CTM `i` upgrade stage validator | `checkProtocolUpgradePresence()` | one per CTM  |
+| `D + 2 + 2*i` | CTM `i` upgrade stage validator | `checkMigrationsUnpaused()`      | one per CTM  |
 
 Canonical section count is `1 + 2 * N` (not counting the decommission prefix).
 
@@ -1104,24 +1105,24 @@ then the bring-up priority transactions interleaved with base-token approvals.
 
 Expected 16-call block:
 
-| Offset | Target                         | Selector                                     | Required check                                                                    |
-| ------ | ------------------------------ | -------------------------------------------- | --------------------------------------------------------------------------------- |
-| `0`    | `asset_tracker_proxy`          | `registerLegacyToken(bytes32)`               | asset ID matches the matrix ZK token asset ID                                     |
-| `1`    | `bridgehub_proxy`              | `setSettlementLayerStatus(uint256,bool)`     | second arg is `true`; whitelists the new GW chain ID as a valid settlement layer  |
-| `2`    | base token                     | `approve(address,uint256)`                   | spender is L1 AssetRouter; all 6 approve targets must be the same base token      |
-| `3`    | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `addChainTypeManager(new_gw_ctm)` to L2 Bridgehub `0x10002`                 |
-| `4`    | `l1_asset_router_proxy`        | `setAssetDeploymentTracker(bytes32,address)` | asset ID and tracker address match `[new_gateway]`                                |
-| `5`    | `ctm_deployment_tracker_proxy` | `registerCTMAssetOnL1(address)`              | argument matches `[new_gateway]` CTM asset                                        |
-| `6`    | base token                     | `approve(address,uint256)`                   | same approve target family                                                        |
-| `7`    | `bridgehub_proxy`              | `requestL2TransactionTwoBridges(...)`        | decode and verify set-asset-handler payload                                       |
-| `8`    | base token                     | `approve(address,uint256)`                   | same approve target family                                                        |
-| `9`    | `bridgehub_proxy`              | `requestL2TransactionTwoBridges(...)`        | decode and verify GW CTM registration payload                                     |
-| `10`   | base token                     | `approve(address,uint256)`                   | same approve target family                                                        |
-| `11`   | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `acceptOwnership()` on GW RollupDAManager                                   |
-| `12`   | base token                     | `approve(address,uint256)`                   | same approve target family                                                        |
-| `13`   | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `acceptOwnership()` on GW ServerNotifier                                    |
-| `14`   | base token                     | `approve(address,uint256)`                   | same approve target family                                                        |
-| `15`   | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `setGatewaySettlementFee(...)` on GW asset tracker                          |
+| Offset | Target                         | Selector                                     | Required check                                                                   |
+| ------ | ------------------------------ | -------------------------------------------- | -------------------------------------------------------------------------------- |
+| `0`    | `asset_tracker_proxy`          | `registerLegacyToken(bytes32)`               | asset ID matches the matrix ZK token asset ID                                    |
+| `1`    | `bridgehub_proxy`              | `setSettlementLayerStatus(uint256,bool)`     | second arg is `true`; whitelists the new GW chain ID as a valid settlement layer |
+| `2`    | base token                     | `approve(address,uint256)`                   | spender is L1 AssetRouter; all 6 approve targets must be the same base token     |
+| `3`    | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `addChainTypeManager(new_gw_ctm)` to L2 Bridgehub `0x10002`                |
+| `4`    | `l1_asset_router_proxy`        | `setAssetDeploymentTracker(bytes32,address)` | asset ID and tracker address match `[new_gateway]`                               |
+| `5`    | `ctm_deployment_tracker_proxy` | `registerCTMAssetOnL1(address)`              | argument matches `[new_gateway]` CTM asset                                       |
+| `6`    | base token                     | `approve(address,uint256)`                   | same approve target family                                                       |
+| `7`    | `bridgehub_proxy`              | `requestL2TransactionTwoBridges(...)`        | decode and verify set-asset-handler payload                                      |
+| `8`    | base token                     | `approve(address,uint256)`                   | same approve target family                                                       |
+| `9`    | `bridgehub_proxy`              | `requestL2TransactionTwoBridges(...)`        | decode and verify GW CTM registration payload                                    |
+| `10`   | base token                     | `approve(address,uint256)`                   | same approve target family                                                       |
+| `11`   | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `acceptOwnership()` on GW RollupDAManager                                  |
+| `12`   | base token                     | `approve(address,uint256)`                   | same approve target family                                                       |
+| `13`   | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `acceptOwnership()` on GW ServerNotifier                                   |
+| `14`   | base token                     | `approve(address,uint256)`                   | same approve target family                                                       |
+| `15`   | `bridgehub_proxy`              | `requestL2TransactionDirect(...)`            | inner `setGatewaySettlementFee(...)` on GW asset tracker                         |
 
 The approve calls are at offsets 2, 6, 8, 10, 12, 14 (six total). The priority
 transaction calls are at offsets 3, 7, 9, 11, 13, 15 (six total).
