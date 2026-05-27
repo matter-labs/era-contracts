@@ -133,10 +133,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         additionalConfig.newProtocolVersion = loadProtocolVersionFromGenesis();
 
         // Legacy Era gateway chain ID — baked into L1MessageRoot as immutable
-        // ERA_GATEWAY_CHAIN_ID. Read from the upgrade input TOML ([gateway] section)
+        // ERA_GATEWAY_CHAIN_ID. Read from the upgrade input TOML ([legacy_gateway] section)
         // so the constructor gets the right value. Optional: absent on fresh/local.
-        if (upgradeToml.keyExists("$.gateway.chain_id")) {
-            config.legacyGatewayChainId = upgradeToml.readUint("$.gateway.chain_id");
+        if (upgradeToml.keyExists("$.legacy_gateway.chain_id")) {
+            config.legacyGatewayChainId = upgradeToml.readUint("$.legacy_gateway.chain_id");
         }
 
         coreAddresses.bridgehub.proxies.bridgehub = bridgehubProxyAddress;
