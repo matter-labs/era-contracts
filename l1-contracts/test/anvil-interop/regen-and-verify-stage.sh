@@ -61,7 +61,6 @@ echo "Deployer EOA: $DEPLOYER"
 # Pull env-specific values from the canonical config TOMLs so this script
 # doesn't drift from the source of truth when stage/mainnet/testnet update.
 PERMANENT_VALUES="$L1_CONTRACTS_DIR/upgrade-envs/permanent-values/stage.toml"
-V31_INPUT="$L1_CONTRACTS_DIR/upgrade-envs/v0.31.0-interopB/stage.toml"
 read_toml_str() {
   # $1 = file, $2 = key (top-level scalar string in TOML — `key = "0x…"`)
   python3 -c "
@@ -71,23 +70,18 @@ print(m.group(1) if m else '', end='')
 "
 }
 ZK_ASSET_ID="$(read_toml_str "$PERMANENT_VALUES" zk_token_asset_id)"
-ERA_CHAIN_ID="$(python3 -c "
-import re
-m = re.search(r'^era_chain_id\s*=\s*(\d+)', open('$V31_INPUT').read(), re.MULTILINE)
-print(m.group(1) if m else '', end='')
-")"
 [[ -z "$ZK_ASSET_ID" ]] && { echo "zk_token_asset_id not found in $PERMANENT_VALUES" >&2; exit 1; }
-[[ -z "$ERA_CHAIN_ID" ]] && { echo "era_chain_id not found in $V31_INPUT" >&2; exit 1; }
-# Legacy gateway chain ID (from [gateway] section in the v31 input TOML).
-# Baked into L1MessageRoot as the _eraGatewayChainId immutable.
-LEGACY_GW_CHAIN_ID="$(python3 -c "
-import re
-m = re.search(r'^\[gateway\].*?^chain_id\s*=\s*(\d+)', open('$V31_INPUT').read(), re.MULTILINE | re.DOTALL)
-print(m.group(1) if m else '0', end='')
-")"
 echo "ZK asset id:  $ZK_ASSET_ID"
-echo "Era chain id: $ERA_CHAIN_ID"
-echo "Legacy GW id: $LEGACY_GW_CHAIN_ID"
+# Gateway RPC — PUVT uses it for read-only GW-side checks.
+GW_RPC_URL="${GW_RPC_URL:-https://zksync-os-stage-gateway.zksync.dev}"
+echo "GW RPC:       $GW_RPC_URL"
+# zk-governance commit for PUH/Guardians bytecode verification.
+# zk-governance commit whose AllContractsHashes.json PUVT uses to verify
+# PUH/Guardians bytecodes. Override via ZK_GOVERNANCE_COMMIT env var; the
+# default points to the latest kl/v31-puh-guardians-redeploy on upstream
+# (zksync-association/zk-governance) which carries the regenerated hashes.
+ZK_GOV_COMMIT="${ZK_GOVERNANCE_COMMIT:-7c5e27b}"
+echo "zk-gov commit: $ZK_GOV_COMMIT"
 # 1e30 wei
 FUND_AMOUNT="1000000000000000000000000000000"
 
@@ -108,34 +102,6 @@ else
   exit 1
 fi
 echo "Using protocol_ops at: $PROTOCOL_OPS"
-
-# Extract every distinct CREATE2 salt used by the prepare run. For named
-# envs we pin salts in version control (`upgrade-envs/v0.31.0-interopB/
-# <env>.toml` → top-level `[contracts] create2_factory_salt` for Core and
-# `[create2_factory_salts]` for per-CTM), so a stage prepare emits the
-# pinned salt for Core + one pinned salt per CTM + the GW-prep salt
-# (still `H256::random` for now — `GatewayVotePreparation` doesn't read
-# the upgrade input). PUVT's `--create2-salt` accepts a comma-separated
-# list and matches each CREATE2 factory tx against the set; sniffing from
-# the executed bundle stays correct regardless of how many salts are
-# pinned vs random.
-sniff_create2_salts() {
-  local executed_path="$1"
-  python3 - "$executed_path" <<'PY'
-import json, sys
-data = json.load(open(sys.argv[1]))
-factory = "0x4e59b44847b379578588920ca78fbf26c0b4956c"
-seen, salts = set(), []
-for tx in data["transactions"]:
-    if tx.get("to", "").lower() == factory:
-        s = tx["data"][2:66]
-        if s not in seen:
-            seen.add(s); salts.append("0x" + s)
-if not salts:
-    sys.exit("no CREATE2 factory tx found in " + sys.argv[1])
-print(",".join(salts))
-PY
-}
 
 # Set KEEP_ANVIL=1 to leave the fork anvil running on $PORT after the script
 # exits. Use together with SKIP_PREPARE=1 + SKIP_BROADCAST=1 to iterate on
@@ -207,16 +173,12 @@ SKIP_BROADCAST="${SKIP_BROADCAST:-0}"
 if [[ "$SKIP_BROADCAST" == "1" && -f "$OUT/executed.json" ]]; then
   echo "=== Steps 2-3: SKIPPED (SKIP_BROADCAST=1, reusing $OUT/executed.json) ==="
   echo "=== Step 4: verify-upgrade (PUVT) ==="
-  SNIFFED_SALT="$(sniff_create2_salts "$OUT/executed.json")"
   "$PROTOCOL_OPS" ecosystem verify-upgrade \
+    --env stage \
     --ecosystem-toml "$OUT/ecosystem.toml" \
-    --era-chain-id "$ERA_CHAIN_ID" \
-    --executed-bundles "$OUT/executed.json" \
-    --create2-salt "$SNIFFED_SALT" \
     --l1-rpc-url "$RPC" \
-    --zk-token-asset-id "$ZK_ASSET_ID" \
-    --legacy-gateway-chain-id "$LEGACY_GW_CHAIN_ID" \
-    --genesis-config zksync-os
+    --gw-rpc-url "$GW_RPC_URL" \
+    --zk-governance-commit "$ZK_GOV_COMMIT"
   echo "=== Done ==="
   exit 0
 fi
@@ -262,6 +224,16 @@ else
 fi
 
 echo "=== Step 3: upgrade-broadcast --unlocked --out ==="
+# transactions.txt is append-only: real deployment tx hashes accumulate
+# across regens. Back up any existing hashes before the broadcast step
+# (which writes anvil-fork hashes), then prepend them afterward so the
+# file always starts with the real hashes.
+TXLOG="$OUT/transactions.txt"
+TXLOG_BAK="$OUT/.transactions.txt.bak"
+if [[ -s "$TXLOG" ]]; then
+  cp "$TXLOG" "$TXLOG_BAK"
+  : > "$TXLOG"
+fi
 # Pin the base fee to 1 gwei so the EIP-1559 escalation doesn't cause
 # MsgValueTooLow on priority deposit txs whose mintValue was computed
 # at prepare-time with a lower gas price.
@@ -271,18 +243,18 @@ cast rpc anvil_setNextBlockBaseFeePerGas 0x3B9ACA00 --rpc-url "$RPC" >/dev/null
   --l1-rpc-url "$RPC" \
   --unlocked \
   --out "$OUT/executed.json"
+# Restore backed-up hashes before the fresh anvil ones.
+if [[ -f "$TXLOG_BAK" ]]; then
+  cat "$TXLOG" >> "$TXLOG_BAK"
+  mv "$TXLOG_BAK" "$TXLOG"
+fi
 
 echo "=== Step 4: verify-upgrade (PUVT) ==="
-SNIFFED_SALT="$(sniff_create2_salts "$OUT/executed.json")"
-echo "  Using sniffed CREATE2 salt: $SNIFFED_SALT"
 "$PROTOCOL_OPS" ecosystem verify-upgrade \
+  --env stage \
   --ecosystem-toml "$OUT/ecosystem.toml" \
-  --era-chain-id "$ERA_CHAIN_ID" \
-  --executed-bundles "$OUT/executed.json" \
-  --create2-salt "$SNIFFED_SALT" \
   --l1-rpc-url "$RPC" \
-  --zk-token-asset-id "$ZK_ASSET_ID" \
-  --legacy-gateway-chain-id "$LEGACY_GW_CHAIN_ID" \
-  --genesis-config zksync-os
+  --gw-rpc-url "$GW_RPC_URL" \
+  --zk-governance-commit "$ZK_GOV_COMMIT"
 
 echo "=== Done ==="

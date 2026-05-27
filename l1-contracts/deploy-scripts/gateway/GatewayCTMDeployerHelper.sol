@@ -2,6 +2,9 @@
 
 pragma solidity 0.8.28;
 
+// solhint-disable no-console
+
+import {console2 as console} from "forge-std/Script.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/validators/ValidatorTimelock.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
@@ -212,6 +215,7 @@ library GatewayCTMDeployerHelper {
         );
         deployer = deployResult.expectedAddress;
         data = deployResult.data;
+        _logGatewayVerifyContract(deployer, "GatewayCTMDeployerDA", constructorArgs);
         result = _calculateDADeployerAddresses(deployer, daConfig, config.isZKsyncOS);
     }
 
@@ -241,6 +245,7 @@ library GatewayCTMDeployerHelper {
         );
         deployer = deployResult.expectedAddress;
         data = deployResult.data;
+        _logGatewayVerifyContract(deployer, "GatewayCTMDeployerProxyAdmin", constructorArgs);
         result = _calculateProxyAdminDeployerAddresses(deployer, proxyAdminConfig, config.isZKsyncOS);
     }
 
@@ -272,6 +277,7 @@ library GatewayCTMDeployerHelper {
         );
         deployer = deployResult.expectedAddress;
         data = deployResult.data;
+        _logGatewayVerifyContract(deployer, "GatewayCTMDeployerValidatorTimelock", constructorArgs);
         result = _calculateValidatorTimelockDeployerAddresses(deployer, vtConfig, config.isZKsyncOS);
     }
 
@@ -303,6 +309,7 @@ library GatewayCTMDeployerHelper {
         );
         deployer = deployResult.expectedAddress;
         data = deployResult.data;
+        _logGatewayVerifyContract(deployer, vdName, constructorArgs);
         result = _calculateVerifiersDeployerAddresses(deployer, verifiersConfig, config.isZKsyncOS);
     }
 
@@ -433,6 +440,7 @@ library GatewayCTMDeployerHelper {
         );
         addr = result.expectedAddress;
         data = result.data;
+        _logGatewayVerifyContract(addr, contractName, constructorArgs);
     }
 
     function _calculateCreate2AddressAndCalldata(
@@ -837,11 +845,12 @@ library GatewayCTMDeployerHelper {
         bytes memory params,
         InnerDeployConfig memory config,
         bool _isZKsyncOS
-    ) private returns (address) {
+    ) private returns (address addr) {
         bytes memory bytecode = BytecodeUtils.readBytecodeL1(_isZKsyncOS, fileName, contractName);
         // Always use the EVM CREATE2 derivation: the GW is always EVM-equivalent
         // regardless of the CTM flavor being deployed.
-        return _computeCreate2Address(true, config.deployerAddr, config.salt, bytecode, params);
+        addr = _computeCreate2Address(true, config.deployerAddr, config.salt, bytecode, params);
+        _logGatewayVerifyContract(addr, contractName, params);
     }
 
     // ============ Factory Dependencies ============
@@ -952,5 +961,37 @@ library GatewayCTMDeployerHelper {
             result.expectedAddress = Utils.getL2AddressViaCreate2Factory(_salt, bytecodeHash, _constructorArgs);
             (, result.data) = Utils.getDeploymentCalldata(_salt, _bytecode, _constructorArgs);
         }
+    }
+
+    /// Emit a `forge verify-contract` line for a GW-side deploy. GW contracts
+    /// are EVM-equivalent (ZKsync OS), so no toolchain flag is needed — the
+    /// operator supplies the GW chain id and (if required) a custom
+    /// `--verifier-url` at script invocation time. Routing into
+    /// `gw-verification-logs.txt` is handled on the Rust side based on the
+    /// emitting forge script (`GatewayVotePreparation.s.sol`).
+    function _logGatewayVerifyContract(
+        address contractAddr,
+        string memory contractName,
+        bytes memory constructorArgs
+    ) internal view {
+        string memory msgStr;
+        if (constructorArgs.length == 0) {
+            msgStr = string.concat(
+                "forge verify-contract ",
+                Utils.vm.toString(contractAddr),
+                " ",
+                contractName
+            );
+        } else {
+            msgStr = string.concat(
+                "forge verify-contract ",
+                Utils.vm.toString(contractAddr),
+                " ",
+                contractName,
+                " --constructor-args ",
+                Utils.vm.toString(constructorArgs)
+            );
+        }
+        console.log(msgStr);
     }
 }

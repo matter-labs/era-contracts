@@ -205,7 +205,10 @@ pub async fn deploy_puh_guardians(
         .with_env("FOUNDRY_PROFILE", "default")
         .with_env("PREV_PROTOCOL_UPGRADE_HANDLER", format!("{:#x}", puh_proxy))
         .with_env("CHAIN_ASSET_HANDLER", format!("{:#x}", chain_asset_handler))
-        .with_env("ZKSYNC_OS_CHAIN_TYPE_MANAGER", format!("{:#x}", zksync_os_ctm))
+        .with_env(
+            "ZKSYNC_OS_CHAIN_TYPE_MANAGER",
+            format!("{:#x}", zksync_os_ctm),
+        )
         .with_env("CREATE2_FACTORY", format!("{:#x}", create2_factory))
         .with_env("CREATE2_SALT_PUH", format!("{:#x}", puh_salt))
         .with_env("CREATE2_SALT_GUARDIANS", format!("{:#x}", guardians_salt))

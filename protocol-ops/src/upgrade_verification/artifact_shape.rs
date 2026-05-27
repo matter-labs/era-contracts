@@ -4,7 +4,7 @@ use anyhow::Context;
 use ethers::types::Address;
 
 use crate::upgrade_verification::{
-    artifacts::{EcosystemUpgradeArtifact, GovernanceCalls},
+    artifacts::{CtmArtifact, EcosystemUpgradeArtifact, GovernanceCalls},
     hex::decode_required_hex,
 };
 
@@ -27,16 +27,29 @@ pub(crate) fn verify(artifact: &EcosystemUpgradeArtifact) -> anyhow::Result<()> 
 }
 
 fn validate_ecosystem_artifact(artifact: &EcosystemUpgradeArtifact) -> anyhow::Result<()> {
-    validate_ecosystem_table(&artifact.value)?;
-    decode_required_hex(
-        "chain_upgrade_diamond_cut",
-        &artifact.chain_upgrade_diamond_cut,
-    )?;
+    validate_ecosystem_table(&artifact.core)?;
     validate_governance_calls(&artifact.governance_calls)?;
-    validate_optional_hex_fields(&artifact.value)?;
-    validate_address_fields(&artifact.value)?;
-    validate_protocol_versions(&artifact.value)?;
-    if let Some(contracts_config) = artifact.value.get("contracts_config") {
+
+    validate_address_fields("core", &artifact.core)?;
+    validate_protocol_versions(&artifact.core)?;
+
+    for ctm in &artifact.ctms {
+        validate_ctm_artifact(ctm)?;
+    }
+
+    Ok(())
+}
+
+fn validate_ctm_artifact(ctm: &CtmArtifact) -> anyhow::Result<()> {
+    let label = ctm.flavor.label();
+    decode_required_hex(
+        &format!("ctms.{label}.chain_upgrade_diamond_cut"),
+        &ctm.chain_upgrade_diamond_cut,
+    )?;
+    validate_optional_hex_fields(&ctm.value)?;
+    validate_address_fields(&format!("ctms.{label}"), &ctm.value)?;
+    validate_protocol_versions(&ctm.value)?;
+    if let Some(contracts_config) = ctm.value.get("contracts_config") {
         validate_protocol_versions(contracts_config)?;
     }
 
@@ -70,17 +83,17 @@ fn validate_optional_hex_fields(value: &toml::Value) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn validate_address_fields(value: &toml::Value) -> anyhow::Result<()> {
-    validate_top_level_address_fields(value)?;
+fn validate_address_fields(path: &str, value: &toml::Value) -> anyhow::Result<()> {
+    validate_top_level_address_fields(path, value)?;
     for table_name in ADDRESS_TABLES {
         if let Some(address_table) = value.get(*table_name) {
-            validate_address_table_fields(table_name, address_table)?;
+            validate_address_table_fields(&format!("{path}.{table_name}"), address_table)?;
         }
     }
     Ok(())
 }
 
-fn validate_top_level_address_fields(value: &toml::Value) -> anyhow::Result<()> {
+fn validate_top_level_address_fields(path: &str, value: &toml::Value) -> anyhow::Result<()> {
     let Some(table) = value.as_table() else {
         return Ok(());
     };
@@ -88,9 +101,9 @@ fn validate_top_level_address_fields(value: &toml::Value) -> anyhow::Result<()> 
     for (field, field_value) in table {
         if looks_like_top_level_address_field(field) {
             let Some(address) = field_value.as_str() else {
-                anyhow::bail!("{ARTIFACT_NAME}.{field} must be an address string");
+                anyhow::bail!("{ARTIFACT_NAME}.{path}.{field} must be an address string");
             };
-            parse_address(field, address)?;
+            parse_address(&format!("{path}.{field}"), address)?;
         }
     }
     Ok(())

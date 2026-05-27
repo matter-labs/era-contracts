@@ -11,10 +11,10 @@ use alloy::{
 
 pub mod address_verifier;
 pub mod bytecode_verifier;
-pub mod display_upgrade_data;
 pub mod facet_cut_set;
 pub mod fee_param_verifier;
 pub mod network_verifier;
+pub mod transactions_log;
 
 pub fn repo_relative_path(relative_path: impl AsRef<Path>) -> PathBuf {
     let relative_path = relative_path.as_ref();

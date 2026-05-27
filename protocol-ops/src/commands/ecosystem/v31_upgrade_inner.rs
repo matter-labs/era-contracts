@@ -346,6 +346,15 @@ impl<'a> V31UpgradeInner<'a> {
                 .context("Failed to auto-resolve governance address from bridgehub")?;
         logger::info(format!("Governance (auto-resolved): {governance:#x}"));
 
+        let chain_registration_sender = read_chain_registration_sender_proxy(
+            &self
+                .contracts_path
+                .join(inputs.core_output_path.trim_start_matches('/')),
+        )?;
+        logger::info(format!(
+            "ChainRegistrationSender (core prepare): {chain_registration_sender:#x}"
+        ));
+
         // Per-CTM CREATE2 salt. Each CTM prepare deploys a few contracts
         // whose constructor args are env-wide constants — notably
         // `GovernanceUpgradeTimer(initialDelay, 2 weeks, ownerAddress,
@@ -390,6 +399,7 @@ impl<'a> V31UpgradeInner<'a> {
                     inputs.upgrade_input_path.clone(),
                     output_path_str.clone(),
                     governance,
+                    chain_registration_sender,
                     inputs.zk_token_asset_id,
                 ),),
             )?
@@ -406,6 +416,32 @@ impl<'a> V31UpgradeInner<'a> {
 
         Ok((ctm_output_path, is_zk_sync_os))
     }
+}
+
+fn read_chain_registration_sender_proxy(core_toml: &Path) -> anyhow::Result<Address> {
+    let raw =
+        fs::read_to_string(core_toml).with_context(|| format!("read {}", core_toml.display()))?;
+    let top: toml::Value =
+        toml::from_str(&raw).with_context(|| format!("parse {}", core_toml.display()))?;
+    let value = top
+        .get("upgrade_addresses")
+        .and_then(|v| v.get("bridgehub"))
+        .and_then(|v| v.get("chain_registration_sender_proxy_addr"))
+        .and_then(|v| v.as_str())
+        .with_context(|| {
+            format!(
+                "missing upgrade_addresses.bridgehub.chain_registration_sender_proxy_addr in {}",
+                core_toml.display()
+            )
+        })?;
+
+    value.parse().with_context(|| {
+        format!(
+            "chain_registration_sender_proxy_addr in {} is not a valid address: {}",
+            core_toml.display(),
+            value,
+        )
+    })
 }
 
 fn ensure_script_exists(contracts_path: &Path, script_path: &str) -> anyhow::Result<()> {

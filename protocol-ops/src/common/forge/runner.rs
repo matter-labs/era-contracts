@@ -48,6 +48,7 @@ pub struct ForgeRunner {
     _anvil: AnvilInstance,
     runs: Vec<ForgeScriptRun>,
     extra_verification_logs: Vec<String>,
+    gw_verification_logs: Vec<String>,
 }
 
 impl ForgeRunner {
@@ -73,6 +74,7 @@ impl ForgeRunner {
             _anvil: anvil,
             runs: Vec::new(),
             extra_verification_logs: Vec::new(),
+            gw_verification_logs: Vec::new(),
         })
     }
 
@@ -264,8 +266,16 @@ impl ForgeRunner {
         }
         let result = cmd.run();
         if let Ok(output) = &result {
-            self.extra_verification_logs
-                .extend(extract_extra_verification_logs(output));
+            let lines = extract_extra_verification_logs(output);
+            // GW CTM deploy script (`GatewayVotePreparation.s.sol`) is the
+            // only script whose `forge verify-contract` emissions target the
+            // ZK chain — route those to the GW bucket so they land in
+            // `gw-verification-logs.txt`. All other scripts deploy on L1.
+            if is_gw_deploy_script(script.script_name()) {
+                self.gw_verification_logs.extend(lines);
+            } else {
+                self.extra_verification_logs.extend(lines);
+            }
         }
         Ok(result.map(|_| ()))
     }
@@ -362,20 +372,32 @@ impl ForgeRunner {
         &self.runs
     }
 
+    /// Write the L1 verification logs.
     pub fn write_extra_verification_logs(&self, path: &Path) -> anyhow::Result<()> {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("failed to create {}", parent.display()))?;
-        }
-
-        let mut content = String::new();
-        for line in &self.extra_verification_logs {
-            content.push_str(line);
-            content.push('\n');
-        }
-        fs::write(path, content).with_context(|| format!("failed to write {}", path.display()))?;
-        Ok(())
+        write_verification_logs(path, &self.extra_verification_logs)
     }
+
+    /// Write the Gateway verification logs — `forge verify-contract` lines
+    /// emitted by the GW CTM deployer helper for contracts that live on the
+    /// ZK chain side of the bridge.
+    pub fn write_gw_verification_logs(&self, path: &Path) -> anyhow::Result<()> {
+        write_verification_logs(path, &self.gw_verification_logs)
+    }
+}
+
+fn write_verification_logs(path: &Path, lines: &[String]) -> anyhow::Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .with_context(|| format!("failed to create {}", parent.display()))?;
+    }
+
+    let mut content = String::new();
+    for line in lines {
+        content.push_str(line);
+        content.push('\n');
+    }
+    fs::write(path, content).with_context(|| format!("failed to write {}", path.display()))?;
+    Ok(())
 }
 
 fn extract_extra_verification_logs(output: &str) -> Vec<String> {
@@ -390,6 +412,17 @@ fn extract_extra_verification_logs(output: &str) -> Vec<String> {
 
 fn is_extra_verification_log_line(line: &str) -> bool {
     line.contains("forge verify-contract")
+}
+
+/// GW CTM contracts are deployed (via L1->L2 transactions) by
+/// `GatewayVotePreparation.s.sol`. Any `forge verify-contract` line emitted
+/// during that script run targets the ZK chain side of the bridge.
+fn is_gw_deploy_script(script_name: &Path) -> bool {
+    script_name
+        .file_name()
+        .and_then(|s| s.to_str())
+        .map(|s| s.starts_with("GatewayVotePreparation"))
+        .unwrap_or(false)
 }
 
 // Trait for handling forge errors. Required for implementing method for CmdResult

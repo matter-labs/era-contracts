@@ -42,8 +42,6 @@ use crate::config::forge_interface::script_params::{
     UPGRADE_V31_CORE_OUTPUT_PATH, UPGRADE_V31_INTEROP_LOCAL_INPUT_PATH,
 };
 
-const SKIP_PUH_ENV_VAR: &str = "SKIP_PUH";
-
 // ── upgrade-governance (stages 0 + 1 + 2 on one fork) ─────────────────────
 
 /// Run governance stages 0, 1, and 2 on the same anvil fork. Forge's
@@ -744,15 +742,13 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         .as_ref()
         .map(|c| c.governance_kind())
         .unwrap_or_default();
-    // TEMPORARY -- do remove
     let is_puh_governed = governance_kind == crate::common::env_config::GovernanceKind::Puh;
-    let skip_puh = std::env::var_os(SKIP_PUH_ENV_VAR).is_some();
     let zksync_os_ctm_proxy = prepared
         .ctm_tomls
         .iter()
         .find(|e| e.is_zk_sync_os)
         .map(|e| e.proxy);
-    let puh_outcome = if is_puh_governed && !skip_puh {
+    let puh_outcome = if is_puh_governed {
         let mut puh_inputs =
             crate::commands::ecosystem::puh_guardians::PuhGuardiansInputs::from_env(
                 env_cfg.as_ref(),
@@ -769,15 +765,9 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             .context("PUH/Guardians redeploy step")?,
         )
     } else {
-        if is_puh_governed {
-            logger::info(format!(
-                "Skipping PUH/Guardians redeploy ({SKIP_PUH_ENV_VAR} is set)"
-            ));
-        } else {
-            logger::info(
-                "Skipping PUH/Guardians redeploy (governance_kind != \"puh\" — env uses legacy Governance.sol)",
-            );
-        }
+        logger::info(
+            "Skipping PUH/Guardians redeploy (governance_kind != \"puh\" — env uses legacy Governance.sol)",
+        );
         None
     };
 
@@ -810,6 +800,7 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             &prepared.core_toml,
             &prepared.ctm_tomls,
             &extra_stage0,
+            puh_outcome.as_ref(),
             &prepared.new_gateway_tomls,
             inputs.zk_token_asset_id,
             &merged_path,
@@ -823,6 +814,12 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
         logger::info(format!(
             "Wrote extra verification logs → {}",
             extra_verification_logs_path.display()
+        ));
+        let gw_verification_logs_path = canonical_dir.join("gw-verification-logs.txt");
+        runner.write_gw_verification_logs(&gw_verification_logs_path)?;
+        logger::info(format!(
+            "Wrote GW verification logs → {}",
+            gw_verification_logs_path.display()
         ));
         Some(merged_path)
     } else {
@@ -910,11 +907,16 @@ fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> 
 ///
 /// [new_gateway]                   # only when present: GatewayVotePreparation
 /// ...                             # output minus governance_calls_to_execute.
+///
+/// [puh_guardians]                 # only when PUH/Guardians were redeployed
+/// new_puh_impl = "0x..."
+/// new_guardians = "0x..."
 /// ```
 fn write_merged_ecosystem_toml(
     core_toml: &Path,
     ctm_entries: &[crate::commands::ecosystem::v31_upgrade_inner::CtmPrepareEntry],
     extra_stage0: &[crate::common::governance_calls::GovernanceCall],
+    puh_guardians: Option<&crate::commands::ecosystem::puh_guardians::PuhGuardiansOutcome>,
     new_gateway_tomls: &[PathBuf],
     zk_token_asset_id: ethers::types::H256,
     dst: &Path,
@@ -945,7 +947,16 @@ fn write_merged_ecosystem_toml(
         Ok((value, gov))
     }
 
-    let (core_body, core_gov) = load_and_split(core_toml)?;
+    let (mut core_body, core_gov) = load_and_split(core_toml)?;
+    let misc_body = match core_body.remove("misc") {
+        Some(Value::Table(table)) => Some(table),
+        Some(other) => anyhow::bail!(
+            "[misc] in {} must be a table (got {})",
+            core_toml.display(),
+            other.type_str()
+        ),
+        None => None,
+    };
 
     let mut ctms_table: Table = Table::new();
     let mut stage0: Vec<String> = vec![core_gov.stage0_calls];
@@ -1052,8 +1063,8 @@ fn write_merged_ecosystem_toml(
     governance_calls_table.insert("stage2_calls".into(), Value::String(s2));
 
     // Build the document with [governance_calls] first, then [core], then
-    // [ctms.*], then optional [new_gateway]. `toml::to_string` orders keys as
-    // inserted.
+    // [ctms.*], optional [new_gateway], and [misc] last. `toml::to_string`
+    // orders keys as inserted.
     let mut doc = Table::new();
     doc.insert(
         "governance_calls".into(),
@@ -1064,6 +1075,21 @@ fn write_merged_ecosystem_toml(
     if let Some(body) = new_gateway_body {
         doc.insert("new_gateway".into(), Value::Table(body));
     }
+    if let Some(puh_guardians) = puh_guardians {
+        let mut table = Table::new();
+        table.insert(
+            "new_puh_impl".into(),
+            Value::String(format!("{:#x}", puh_guardians.new_puh_impl)),
+        );
+        table.insert(
+            "new_guardians".into(),
+            Value::String(format!("{:#x}", puh_guardians.new_guardians)),
+        );
+        doc.insert("puh_guardians".into(), Value::Table(table));
+    }
+    if let Some(body) = misc_body {
+        doc.insert("misc".into(), Value::Table(body));
+    }
 
     let new_gateway_count = if new_gateway_tomls.is_empty() { 0 } else { 1 };
     let body = format!(
@@ -1072,10 +1098,13 @@ fn write_merged_ecosystem_toml(
          # the combined stage 0/1/2 hex from {} prepare TOML(s); [core] mirrors the\n\
          # core prepare output (minus its own [governance_calls]); [ctms.<flavor>]\n\
          # mirrors each per-CTM prepare output (one section per `is_zk_sync_os`\n\
-         # value) for downstream verification. When [new_gateway] is present, it\n\
+         # value) for downstream verification. [misc] carries shared metadata used\n\
+         # by verification. When [new_gateway] is present, it\n\
          # mirrors GatewayVotePreparation's output (deployed GW CTM addresses +\n\
          # diamond cut data) — its `governance_calls_to_execute` has already been\n\
-         # folded into stage 2 above.\n\n{}",
+         # folded into stage 2 above. When [puh_guardians] is present, it names\n\
+         # the zk-governance contracts deployed in stage 0 and used by PUVT for\n\
+         # CREATE2 provenance checks.\n\n{}",
         1 + ctm_entries.len() + new_gateway_count,
         toml::to_string(&doc).context("serialize merged ecosystem TOML")?
     );

@@ -133,10 +133,10 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
         additionalConfig.newProtocolVersion = loadProtocolVersionFromGenesis();
 
         // Legacy Era gateway chain ID — baked into L1MessageRoot as immutable
-        // ERA_GATEWAY_CHAIN_ID. Read from the upgrade input TOML ([gateway] section)
+        // ERA_GATEWAY_CHAIN_ID. Read from the upgrade input TOML ([legacy_gateway] section)
         // so the constructor gets the right value. Optional: absent on fresh/local.
-        if (upgradeToml.keyExists("$.gateway.chain_id")) {
-            config.legacyGatewayChainId = upgradeToml.readUint("$.gateway.chain_id");
+        if (upgradeToml.keyExists("$.legacy_gateway.chain_id")) {
+            config.legacyGatewayChainId = upgradeToml.readUint("$.legacy_gateway.chain_id");
         }
 
         coreAddresses.bridgehub.proxies.bridgehub = bridgehubProxyAddress;
@@ -206,6 +206,19 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             "chain_asset_handler_proxy_addr",
             coreAddresses.bridgehub.proxies.chainAssetHandler
         );
+        if (coreAddresses.bridgehub.proxies.chainRegistrationSender != address(0)) {
+            require(coreAddresses.bridgehub.implementations.chainRegistrationSender != address(0), "chainRegistrationSenderImpl is zero");
+            vm.serializeAddress(
+                "bridgehub",
+                "chain_registration_sender_implementation_addr",
+                coreAddresses.bridgehub.implementations.chainRegistrationSender
+            );
+            vm.serializeAddress(
+                "bridgehub",
+                "chain_registration_sender_proxy_addr",
+                coreAddresses.bridgehub.proxies.chainRegistrationSender
+            );
+        }
         if (coreAddresses.bridgehub.proxies.assetTracker != address(0)) {
             require(coreAddresses.bridgehub.implementations.assetTracker != address(0), "assetTrackerImpl is zero");
             vm.serializeAddress(
@@ -276,7 +289,16 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
             coreAddresses.bridges.implementations.l1NativeTokenVault
         );
 
-        string memory toml = vm.serializeString("root", "upgrade_addresses", deployedAddresses);
+        string memory shared = vm.serializeAddress(
+            "shared",
+            "transparent_proxy_admin",
+            coreAddresses.shared.transparentProxyAdmin
+        );
+        deployedAddresses = vm.serializeString("deployed_addresses", "shared", shared);
+
+        string memory misc = vm.serializeAddress("misc", "deployer_addr", config.deployerAddress);
+        vm.serializeString("root", "upgrade_addresses", deployedAddresses);
+        string memory toml = vm.serializeString("root", "misc", misc);
 
         vm.writeToml(toml, outputPath);
 

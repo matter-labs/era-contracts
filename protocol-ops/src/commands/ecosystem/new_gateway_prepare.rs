@@ -68,6 +68,7 @@ const VOTE_PREP_OUTPUT_REL: &str = "script-out/v31-new-gateway-vote-preparation.
 /// deployer's address is used as the refund recipient — EOAs aren't aliased
 /// across L1→L2, so refunds land back at the deployer on L2 and stay
 /// spendable.
+#[allow(clippy::too_many_arguments)]
 pub async fn prepare_new_gateway(
     runner: &mut ForgeRunner,
     deployer: &Wallet,

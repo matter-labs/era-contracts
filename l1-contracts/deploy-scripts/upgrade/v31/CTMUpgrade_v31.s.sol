@@ -41,6 +41,9 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
             _params.governance,
             _params.zkTokenAssetId
         );
+        if (_params.chainRegistrationSender != address(0)) {
+            coreAddresses.bridgehub.proxies.chainRegistrationSender = _params.chainRegistrationSender;
+        }
         prepareCTMUpgrade();
         prepareDefaultGovernanceCalls();
         prepareDefaultCTMAdminCalls();

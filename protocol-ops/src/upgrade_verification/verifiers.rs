@@ -1,8 +1,6 @@
-#![allow(dead_code)]
-
 use alloy::{
     hex::{self, FromHex},
-    primitives::{Address, Bytes, FixedBytes},
+    primitives::{Address, Bytes, FixedBytes, U256},
     sol,
     sol_types::SolCall,
 };
@@ -12,15 +10,20 @@ use std::fmt::{self, Display};
 use std::fs;
 use std::panic::Location;
 
-use crate::upgrade_verification::{
-    artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
-    versions::v31::{
-        utils::{
-            address_from_short_hex, address_verifier::AddressVerifier,
-            bytecode_verifier::BytecodeVerifier, fee_param_verifier::FeeParamVerifier,
-            get_contents_from_github, network_verifier::NetworkVerifier, repo_relative_path,
+use crate::{
+    commands::ecosystem::verify_upgrade::VerifyUpgradeEnv,
+    common::env_config::{ChainInterval, EnvConfig},
+    upgrade_verification::{
+        artifacts::{CtmFlavor, EcosystemUpgradeArtifact},
+        versions::v31::utils::{
+            address_verifier::AddressVerifier,
+            apply_l2_to_l1_alias,
+            bytecode_verifier::BytecodeVerifier,
+            fee_param_verifier::FeeParamVerifier,
+            get_contents_from_github,
+            network_verifier::{Bridgehub as BridgehubContract, NetworkVerifier},
+            repo_relative_path,
         },
-        UpgradeOutput,
     },
 };
 
@@ -30,18 +33,28 @@ sol! {
 
 /// Holds various verifiers and configuration parameters.
 pub(crate) struct Verifiers {
-    pub testnet_contracts: bool,
+    pub env: VerifyUpgradeEnv,
     pub bridgehub_address: Address,
+    pub bridgehub_owner: Address,
     pub address_verifier: AddressVerifier,
     pub bytecode_verifier: BytecodeVerifier,
     pub network_verifier: NetworkVerifier,
-    pub genesis_config: GenesisConfig,
     pub era_genesis_config: GenesisConfig,
     pub zksync_os_genesis_config: GenesisConfig,
     pub fee_param_verifier: FeeParamVerifier,
-    pub gateway_bridgehub_address: Address,
-    pub representative_era_chain_id: Option<u64>,
-    pub zk_token_asset_id: Option<FixedBytes<32>>,
+    pub era_chain_id: u64,
+    pub legacy_gateway_chain_id: u64,
+    pub legacy_gateway_chain_intervals: Vec<ChainInterval>,
+    pub new_gateway_chain_id: u64,
+    pub new_gateway_representative_chain_id: u64,
+    pub new_gateway_representative_ctm: Address,
+    pub new_gateway_settlement_fee: U256,
+    pub expected_l1_chain_id: u64,
+    pub zk_token_asset_id: FixedBytes<32>,
+    /// CREATE2 salt used by the new-gateway CTM deployer contracts.
+    /// Derived from `[create2_factory_salts]` in the env input TOML,
+    /// keyed by `new_gateway_representative_ctm` (the L1 CTM proxy).
+    pub gateway_ctm_create2_salt: FixedBytes<32>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -61,130 +74,144 @@ impl GenesisConfigKind {
 
 impl Verifiers {
     /// Creates a v31 verifier context from the single ecosystem TOML.
-    ///
-    /// This keeps the copied PUVT shape intact: as more v31 parity checks are
-    /// restored, the placeholder verifier fields below should be replaced with
-    /// their real RPC / reference-data initialization.
+    #[allow(clippy::too_many_arguments)]
     pub async fn new_v31(
+        env: VerifyUpgradeEnv,
         artifact: &EcosystemUpgradeArtifact,
         l1_rpc: impl Into<String>,
+        gw_rpc: impl Into<String>,
         contracts_commit: Option<&str>,
-        representative_era_chain_id: Option<u64>,
-        genesis_config_kind: GenesisConfigKind,
+        zk_governance_commit: &str,
+        era_chain_id: u64,
+        legacy_gateway_chain_id: u64,
+        legacy_gateway_chain_intervals: &[ChainInterval],
+        new_gateway_chain_id: u64,
+        new_gateway_representative_chain_id: u64,
+        new_gateway_settlement_fee: U256,
+        expected_l1_chain_id: u64,
+        zk_token_asset_id: FixedBytes<32>,
     ) -> anyhow::Result<Self> {
+        // Artifact `is_testnet` per CTM must agree with the selected env.
+        // Otherwise a mainnet run could accept testnet-flagged
+        // artifacts whose Mailbox/Migrator constructor args and VT delay
+        // would later mismatch live state in confusing, downstream ways.
+        let expected_is_testnet = !env.is_mainnet();
+        for ctm in &artifact.ctms {
+            anyhow::ensure!(
+                ctm.contracts_config.is_testnet == expected_is_testnet,
+                "[ctms.{}.contracts_config].is_testnet = {} disagrees with --env {} (expected {expected_is_testnet})",
+                ctm.flavor.label(),
+                ctm.contracts_config.is_testnet,
+                env.as_str(),
+            );
+        }
+
         let bridgehub_address = AddressVerifier::address_from_artifact(
             artifact,
-            &["deployed_addresses", "bridgehub", "bridgehub_proxy_addr"],
+            &["upgrade_addresses", "bridgehub", "bridgehub_proxy_addr"],
         )?;
-        let bytecode_verifier = BytecodeVerifier::init_v31(contracts_commit).await?;
-        let network_verifier = NetworkVerifier::new_v31(l1_rpc.into())?;
-        let address_verifier = AddressVerifier::new_v31_from_artifact(artifact)?;
+        let bytecode_verifier =
+            BytecodeVerifier::init_v31(contracts_commit, zk_governance_commit).await?;
+        let network_verifier =
+            NetworkVerifier::new_v31(l1_rpc.into(), gw_rpc.into(), era_chain_id).await?;
+        anyhow::ensure!(
+            network_verifier.get_gateway_chain_id() == new_gateway_chain_id,
+            "gateway RPC chain id {} does not match env [new_gateway].chain_id {}",
+            network_verifier.get_gateway_chain_id(),
+            new_gateway_chain_id,
+        );
+        let fee_param_verifier =
+            FeeParamVerifier::safe_init(&bridgehub_address, &network_verifier, contracts_commit)
+                .await?;
+        let new_gateway_representative_ctm = network_verifier
+            .try_get_chain_type_manager_from_bridgehub(
+                bridgehub_address,
+                U256::from(new_gateway_representative_chain_id),
+            )
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "failed to fetch Bridgehub.chainTypeManager({new_gateway_representative_chain_id}) \
+                     for [new_gateway].ctm_representative_chain_id: {e}"
+                )
+            })?;
+        anyhow::ensure!(
+            new_gateway_representative_ctm != Address::ZERO,
+            "Bridgehub.chainTypeManager({new_gateway_representative_chain_id}) returned zero; \
+             [new_gateway].ctm_representative_chain_id must point to the CTM hosted by the new Gateway",
+        );
+
+        // Look up the per-CTM CREATE2 salt for the new gateway's source CTM.
+        // Keyed by L1 CTM proxy address in [create2_factory_salts] of the
+        // env input TOML. Falls back to zero if the env doesn't declare it
+        // (e.g., a legacy env where the gateway used salt 0).
+        let gateway_ctm_create2_salt = {
+            let per_ctm = EnvConfig::load(env.as_str())
+                .and_then(|cfg| cfg.v31_create2_factory_salt_per_ctm())
+                .unwrap_or_default();
+            // env_config uses ethers H160 keys; compare via raw bytes to avoid
+            // an ethers import here.
+            per_ctm
+                .iter()
+                .find(|(addr, _)| addr.as_bytes() == new_gateway_representative_ctm.as_slice())
+                .map(|(_, h)| FixedBytes::<32>::from_slice(h.as_bytes()))
+                .unwrap_or_default()
+        };
+
+        // `Bridgehub.owner()` is the L1 governance executor (the PUH proxy on
+        // PUH-governed envs). It is the authoritative source for the
+        // `aliased_protocol_upgrade_handler_proxy` value consumed by the
+        // FixedForceDeploymentsData and L2ChainAssetHandler input checks; the
+        // artifact does not carry it directly. We register both the raw owner
+        // and its L1->L2 alias in the address book so downstream call sites
+        // can do plain `get_by_name` lookups without warn-on-miss fallbacks.
+        let bridgehub_owner = BridgehubContract::new(
+            bridgehub_address,
+            network_verifier.get_l1_provider().clone(),
+        )
+        .owner()
+        .call()
+        .await
+        .map_err(|e| {
+            anyhow::anyhow!(
+                "failed to fetch Bridgehub.owner() at {bridgehub_address}; required for governance derivation: {e}"
+            )
+        })?;
+        let aliased_bridgehub_owner = apply_l2_to_l1_alias(bridgehub_owner);
+
+        let mut address_verifier = AddressVerifier::new_v31_from_artifact(artifact)?;
+        address_verifier.add_address(bridgehub_owner, "protocol_upgrade_handler_proxy");
+        address_verifier.add_address(
+            aliased_bridgehub_owner,
+            "aliased_protocol_upgrade_handler_proxy",
+        );
 
         let era_genesis_config =
             GenesisConfig::init_v31(GenesisConfigKind::Era, contracts_commit).await?;
         let zksync_os_genesis_config =
             GenesisConfig::init_v31(GenesisConfigKind::ZksyncOs, contracts_commit).await?;
-        let genesis_config = match genesis_config_kind {
-            GenesisConfigKind::Era => era_genesis_config.clone(),
-            GenesisConfigKind::ZksyncOs => zksync_os_genesis_config.clone(),
-        };
 
         Ok(Self {
-            testnet_contracts: false,
+            env,
             bridgehub_address,
+            bridgehub_owner,
             address_verifier,
             bytecode_verifier,
             network_verifier,
-            genesis_config,
             era_genesis_config,
             zksync_os_genesis_config,
-            fee_param_verifier: FeeParamVerifier::empty(),
-            gateway_bridgehub_address: address_from_short_hex("10002"),
-            representative_era_chain_id,
-            zk_token_asset_id: None,
-        })
-    }
-
-    /// Creates a new `Verifiers` instance.
-    #[allow(clippy::too_many_arguments)]
-    pub async fn new(
-        testnet_contracts: bool,
-        bridgehub_address: impl AsRef<str>,
-        era_commit: &str,
-        contracts_commit: &str,
-        l1_rpc: String,
-        gw_rpc: String,
-        era_chain_id: u64,
-        gateway_chain_id: u64,
-        config: &UpgradeOutput,
-    ) -> Self {
-        let bridgehub_address =
-            Address::from_hex(bridgehub_address.as_ref()).expect("Bridgehub address");
-
-        let bytecode_verifier = BytecodeVerifier::init_from_github(contracts_commit).await;
-        let network_verifier = NetworkVerifier::new(
-            l1_rpc,
-            era_chain_id,
-            gateway_chain_id,
-            gw_rpc,
-            &bytecode_verifier,
-            config,
-            &bridgehub_address,
-        )
-        .await;
-
-        if testnet_contracts && network_verifier.get_l1_chain_id() == 1 {
-            panic!("Testnet contracts are not expected to be deployed on L1 mainnet - you passed --testnet-contracts flag.");
-        }
-
-        let address_verifier = AddressVerifier::new(
-            bridgehub_address,
-            &network_verifier,
-            &bytecode_verifier,
-            config,
-        )
-        .await;
-
-        let fee_param_verifier =
-            FeeParamVerifier::safe_init(&bridgehub_address, &network_verifier, contracts_commit)
-                .await;
-        let genesis_config = GenesisConfig::init_from_github(era_commit)
-            .await
-            .expect("Failed to init");
-        Self {
-            testnet_contracts,
-            bridgehub_address,
-            address_verifier,
-            bytecode_verifier,
-            network_verifier,
-            genesis_config: genesis_config.clone(),
-            era_genesis_config: genesis_config.clone(),
-            zksync_os_genesis_config: genesis_config,
             fee_param_verifier,
-            gateway_bridgehub_address: address_from_short_hex("10002"),
-            representative_era_chain_id: Some(era_chain_id),
-            zk_token_asset_id: None,
-        }
-    }
-
-    /// Fetches extra addresses from the network and appends them to the internal verifier.
-    pub async fn append_addresses(&mut self) -> anyhow::Result<()> {
-        let info = self
-            .network_verifier
-            .get_bridgehub_info(self.bridgehub_address)
-            .await;
-
-        self.address_verifier
-            .add_address(self.bridgehub_address, "bridgehub_proxy");
-        self.address_verifier
-            .add_address(info.stm_address, "state_transition_manager");
-        self.address_verifier
-            .add_address(info.transparent_proxy_admin, "transparent_proxy_admin");
-        self.address_verifier
-            .add_address(info.shared_bridge, "old_shared_bridge_proxy");
-        self.address_verifier
-            .add_address(info.legacy_bridge, "legacy_erc20_bridge_proxy");
-        Ok(())
+            era_chain_id,
+            legacy_gateway_chain_id,
+            legacy_gateway_chain_intervals: legacy_gateway_chain_intervals.to_vec(),
+            new_gateway_chain_id,
+            new_gateway_representative_chain_id,
+            new_gateway_representative_ctm,
+            new_gateway_settlement_fee,
+            expected_l1_chain_id,
+            zk_token_asset_id,
+            gateway_ctm_create2_salt,
+        })
     }
 
     pub(crate) fn genesis_config_for_ctm(&self, flavor: CtmFlavor) -> &GenesisConfig {
@@ -230,19 +257,6 @@ impl GenesisConfig {
         serde_json::from_str(&data).map_err(|e| {
             anyhow::anyhow!("failed to parse {path} from matter-labs/era-contracts@{commit}: {e}")
         })
-    }
-
-    /// Initializes the genesis configuration from a file on GitHub.
-    pub async fn init_from_github(commit: &str) -> anyhow::Result<Self> {
-        println!("init from github {}", commit);
-        let data = get_contents_from_github(
-            commit,
-            "matter-labs/zksync-era",
-            "etc/env/file_based/genesis.yaml",
-        )
-        .await;
-        serde_yaml::from_str(&data)
-            .map_err(|e| anyhow::anyhow!("Failed to parse genesis.yaml: {}", e))
     }
 }
 
@@ -300,8 +314,8 @@ impl VerificationResult {
                     self.report_error(&format!(
                         "Expected {} to be {} address - but got address {} at {}",
                         expected,
-                        address,
                         expected_address,
+                        address,
                         Location::caller()
                     ));
                     false
@@ -341,7 +355,7 @@ impl VerificationResult {
                 ));
             }
             None => {
-                self.report_warn(&format!(
+                self.report_error(&format!(
                     "Cannot verify bytecode hash: {} - expected {} at {}",
                     bytecode_hash,
                     expected,
