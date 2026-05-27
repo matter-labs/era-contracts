@@ -1500,10 +1500,14 @@ async fn verify_v31_new_gateway_ctm_provenance(
             genesisRollupLeafIndex: U256::from(
                 genesis_config.genesis_rollup_leaf_index.unwrap_or_default(),
             ),
-            genesisBatchCommitment: parse_optional_bytes32_hex(
-                "genesis_batch_commitment",
-                genesis_config.genesis_batch_commitment.as_deref(),
-            )?,
+            genesisBatchCommitment: if is_zksync_os {
+                zksync_os_genesis_batch_commitment()
+            } else {
+                parse_optional_bytes32_hex(
+                    "genesis_batch_commitment",
+                    genesis_config.genesis_batch_commitment.as_deref(),
+                )?
+            },
             forceDeploymentsData: Bytes::from(force_deployments_data),
             protocolVersion: U256::from(source_ctm.contracts_config.new_protocol_version),
         },
@@ -1751,6 +1755,10 @@ fn parse_optional_bytes32_hex(label: &str, value: Option<&str>) -> Result<FixedB
         Some(value) => parse_bytes32_hex(label, value),
         None => Ok(FixedBytes::<32>::ZERO),
     }
+}
+
+fn zksync_os_genesis_batch_commitment() -> FixedBytes<32> {
+    FixedBytes::<32>::from(U256::from(1).to_be_bytes::<32>())
 }
 
 fn hex_bytes(label: &str, value: &str) -> Result<Vec<u8>> {
