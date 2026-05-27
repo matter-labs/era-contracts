@@ -23,7 +23,7 @@
 bridgehub                           = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"  # Bridgehub proxy
 l1_asset_router                     = "0xfD3130Ea0e8B7Dd61Ac3663328a66d97eb02f84b"  # L1AssetRouter proxy
 ntv                                 = "0x257CE1e946c9C6531E2C9deBF7fcf821F9467f73"  # NativeTokenVault proxy
-chain_registration_sender           = "" # ChainRegistrationSender proxy (v31)
+chain_registration_sender           = "0xEeA39E812de9264b53cBd21CeA04ED69FBE07208"  # ChainRegistrationSender proxy (v31)
 l1_asset_tracker                    = "0x7F648511e0b2DfA639896929D36481b4E340132D"  # L1AssetTracker proxy (v31)
 chain_asset_handler                 = "0xCEe1A9d2FE1c587B72F115974d33296C1F9ac35d"  # ChainAssetHandler proxy
 ctm_deployment_tracker              = "0x25E04b7d1fC963aB8e5fEB0797f7a943E260e8b6"  # CTMDeploymentTracker (L1CtmDeployer)
@@ -48,8 +48,8 @@ atlas_validator_timelock            = "0x1E4299F7a19597E09bD8593AB7B68277183e977
 l1_zk_token                         = "0xf41D4478F1D6b8A096c0369B05C0b24ae00CC2dF"  # L1 ZK token (BridgedStandardERC20)
 gw_l2_bridgehub                     = "0x0000000000000000000000000000000000010002"  # Gateway L2 Bridgehub (system contract on chain 2708)
 gw_l2_settlement_fee_setter         = "0x0000000000000000000000000000000000010010"  # Gateway L2 settlement-layer fee setter
-gw_l2_server_notifier               = "0x04F39D3dA7F2fDf9D115a0a863c136C2eA8a0f23"  # Gateway L2 ServerNotifier
-gw_l2_rollup_da_manager             = "0x46827590823Dc0d5a23F7B6418cc59A9eFDE6Bd1"  # Gateway L2 RollupDAManager
+gw_l2_server_notifier               = "0xBc7dD5BAC8b7afdDCAEB921699acDC54Fc5401F4"  # Gateway L2 ServerNotifier (v31 new GW)
+gw_l2_rollup_da_manager             = "0x1B756bD9aeB52435d3444004f7cdb6aD7931249a"  # Gateway L2 RollupDAManager (v31 new GW)
 
 [[entries]]
 target = "upgrade_handler"
