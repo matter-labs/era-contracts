@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "forge-std/Script.sol";
+// solhint-disable no-console
+import {Script} from "forge-std/Script.sol";
+import {console} from "forge-std/console.sol";
 
 /// @notice Deploy the Arachnid deterministic-deployment-proxy (CREATE2 factory)
 ///         at the canonical address 0x4e59b44847b379578588920cA78FbF26c0B4956C.
@@ -24,28 +26,26 @@ import "forge-std/Script.sol";
 ///
 /// See https://github.com/Arachnid/deterministic-deployment-proxy
 contract DeployCreate2Factory is Script {
-    address constant PRESIGNED_DEPLOYER = 0x3fAB184622Dc19b6109349B94811493BF2a45362;
-    address constant EXPECTED_FACTORY = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+    error FundingFailed();
+
+    address internal constant PRESIGNED_DEPLOYER = 0x3fAB184622Dc19b6109349B94811493BF2a45362;
+    address internal constant EXPECTED_FACTORY = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
     /// Enough to cover gasPrice=100gwei × gasLimit=100000 with margin.
-    uint256 constant FUND_AMOUNT = 0.1 ether;
+    uint256 internal constant FUND_AMOUNT = 0.1 ether;
 
     function run() external {
         if (EXPECTED_FACTORY.code.length > 0) {
-            console.log("CREATE2 factory already deployed at", EXPECTED_FACTORY);
             return;
         }
 
         uint256 balance = PRESIGNED_DEPLOYER.balance;
-        console.log("Presigned deployer balance:", balance);
 
         if (balance < FUND_AMOUNT) {
             uint256 needed = FUND_AMOUNT - balance;
-            console.log("Funding presigned deployer with", needed);
+
             vm.broadcast();
             (bool ok, ) = PRESIGNED_DEPLOYER.call{value: needed}("");
-            require(ok, "funding failed");
-        } else {
-            console.log("Presigned deployer already funded");
+            if (!ok) revert FundingFailed();
         }
 
         console.log("");
