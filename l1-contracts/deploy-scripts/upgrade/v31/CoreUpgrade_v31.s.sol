@@ -431,7 +431,13 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     ///           permanent-values: `/upgrade-envs/permanent-values/<env>.toml`
     ///         We extract the basename of `v31UpgradeInputRelPath` and rebuild
     ///         the path under `permanent-values/`.
+    ///         Honors `PERMANENT_VALUES_INPUT_OVERRIDE` when set, so test harnesses
+    ///         that render the file into a scratch dir can point us at it directly.
     function _permanentValuesPathFromV31Input() internal view returns (string memory) {
+        string memory override_ = vm.envOr("PERMANENT_VALUES_INPUT_OVERRIDE", string(""));
+        if (bytes(override_).length > 0) {
+            return override_;
+        }
         bytes memory p = bytes(v31UpgradeInputRelPath);
         require(p.length > 0, "v31UpgradeInputRelPath empty");
         uint256 lastSlash = 0;
