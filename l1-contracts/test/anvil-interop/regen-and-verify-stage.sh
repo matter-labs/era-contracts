@@ -224,6 +224,16 @@ else
 fi
 
 echo "=== Step 3: upgrade-broadcast --unlocked --out ==="
+# transactions.txt is append-only: real deployment tx hashes accumulate
+# across regens. Back up any existing hashes before the broadcast step
+# (which writes anvil-fork hashes), then prepend them afterward so the
+# file always starts with the real hashes.
+TXLOG="$OUT/transactions.txt"
+TXLOG_BAK="$OUT/.transactions.txt.bak"
+if [[ -s "$TXLOG" ]]; then
+  cp "$TXLOG" "$TXLOG_BAK"
+  : > "$TXLOG"
+fi
 # Pin the base fee to 1 gwei so the EIP-1559 escalation doesn't cause
 # MsgValueTooLow on priority deposit txs whose mintValue was computed
 # at prepare-time with a lower gas price.
@@ -233,6 +243,11 @@ cast rpc anvil_setNextBlockBaseFeePerGas 0x3B9ACA00 --rpc-url "$RPC" >/dev/null
   --l1-rpc-url "$RPC" \
   --unlocked \
   --out "$OUT/executed.json"
+# Restore backed-up hashes before the fresh anvil ones.
+if [[ -f "$TXLOG_BAK" ]]; then
+  cat "$TXLOG" >> "$TXLOG_BAK"
+  mv "$TXLOG_BAK" "$TXLOG"
+fi
 
 echo "=== Step 4: verify-upgrade (PUVT) ==="
 "$PROTOCOL_OPS" ecosystem verify-upgrade \
