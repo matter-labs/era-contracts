@@ -174,7 +174,7 @@ jobs:
       - name: Run DeployL1CoreContracts script
         working-directory: ./l1-contracts
         # First we need to deploy the ecosystem contracts
-        run: forge script ./deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --slow --private-key $ANVIL_PRIVATE_KEY --skip '*/l1-contracts/contracts/*'
+        run: forge script ./deploy-scripts/ecosystem/DeployL1CoreContracts.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY --skip '*/l1-contracts/contracts/*'
 
       - name: Read bridgehub proxy address
         id: read-bridgehub
