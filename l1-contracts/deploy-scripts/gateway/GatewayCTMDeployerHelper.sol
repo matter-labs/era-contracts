@@ -108,6 +108,9 @@ struct L1L2DeployPrepareResult {
 }
 
 library GatewayCTMDeployerHelper {
+    // GW deploys are EVM-equivalent by default, but tests may force EraVM mode.
+    string internal constant GW_IS_EVM_EQUIVALENT_ENV = "GW_IS_EVM_EQUIVALENT";
+
     /// @notice Calculates all addresses for the deployment.
     /// @dev Uses 5 deployers + direct contract deployments.
     /// @param _create2Salt Salt used for CREATE2 when deploying the deployers.
@@ -130,8 +133,9 @@ library GatewayCTMDeployerHelper {
             address create2FactoryAddress
         )
     {
-        // GW is always EVM-equivalent — use the Arachnid factory.
-        create2FactoryAddress = _getDeploymentTarget(true);
+        // Use Arachnid deterministic CREATE2 by default (GW path),
+        // unless the env override switches to EraVM factory mode.
+        create2FactoryAddress = _getDeploymentTarget(_isGatewayEvmEquivalentInCurrentContext());
         (contracts, deployerCalldata, deployers, directCalldata) = _calculateAddressesInner(_create2Salt, config);
     }
 
@@ -855,9 +859,14 @@ library GatewayCTMDeployerHelper {
         bool _isZKsyncOS
     ) private returns (address addr) {
         bytes memory bytecode = BytecodeUtils.readBytecodeL1(_isZKsyncOS, fileName, contractName);
-        // Always use the EVM CREATE2 derivation: the GW is always EVM-equivalent
-        // regardless of the CTM flavor being deployed.
-        addr = _computeCreate2Address(true, config.deployerAddr, config.salt, bytecode, params);
+        // Address derivation must match the factory mode selected for this context.
+        addr = _computeCreate2Address(
+            _isGatewayEvmEquivalentInCurrentContext(),
+            config.deployerAddr,
+            config.salt,
+            bytecode,
+            params
+        );
         _logGatewayVerifyContract(addr, contractName, params);
     }
 
@@ -928,6 +937,12 @@ library GatewayCTMDeployerHelper {
 
     // ======================== VM-branching utilities ========================
 
+    function _isGatewayEvmEquivalentInCurrentContext() private view returns (bool) {
+        // Default: true (real GW deploy flow).
+        // Tests may set GW_IS_EVM_EQUIVALENT=false to force EraVM-native factory mode.
+        return Utils.vm.envOr(GW_IS_EVM_EQUIVALENT_ENV, true);
+    }
+
     function _getDeploymentTarget(bool _gwIsEvmEquivalent) private view returns (address) {
         return _gwIsEvmEquivalent ? Utils.DETERMINISTIC_CREATE2_ADDRESS : L2_CREATE2_FACTORY_ADDR;
     }
@@ -953,14 +968,15 @@ library GatewayCTMDeployerHelper {
     }
 
     function _prepareL1L2Deployment(
-        bool /* _gwIsEvmEquivalent -- always true for GW */,
+        bool /* _gwIsEvmEquivalent */,
         bytes32 _salt,
         bytes memory _bytecode,
         bytes memory _constructorArgs
     ) private view returns (L1L2DeployPrepareResult memory result) {
-        // GW is always EVM-equivalent.
-        result.targetAddress = _getDeploymentTarget(true);
-        if (true) {
+        // Keep target/call-data/address derivation in sync with the selected mode.
+        bool gwIsEvmEquivalent = _isGatewayEvmEquivalentInCurrentContext();
+        result.targetAddress = _getDeploymentTarget(gwIsEvmEquivalent);
+        if (gwIsEvmEquivalent) {
             bytes memory initCode = abi.encodePacked(_bytecode, _constructorArgs);
             result.expectedAddress = Utils.getL2AddressViaDeterministicCreate2(_salt, initCode);
             result.data = Utils.getDeterministicCreate2FactoryCalldata(_salt, initCode);
