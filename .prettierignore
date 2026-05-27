@@ -30,3 +30,7 @@ l1-contracts/test/anvil-interop/config/fork-l2-rpcs.json
 # them rewrites every byte and silently invalidates downstream replay diffs.
 l1-contracts/upgrade-envs/**/output/**/protocol-ops/**/*.safe.json
 l1-contracts/upgrade-envs/**/output/**/protocol-ops/**/manifest.json
+# anvil-interop harness writes generated state under outputs/ — pids, prepare
+# bundles, manifests. Same reasoning as above: re-formatting breaks downstream
+# replay/diff.
+l1-contracts/test/anvil-interop/outputs/

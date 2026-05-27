@@ -77,8 +77,9 @@ abstract contract GatewayGovernanceUtils is Script {
         // Whitelist the new GW on the L1 Bridgehub iff it isn't already.
         // Mirrors GatewayPreparation.sol's idempotent check on the same setter.
         if (
-            !IL1Bridgehub(_gatewayGovernanceConfig.bridgehubProxy)
-                .whitelistedSettlementLayers(_gatewayGovernanceConfig.gatewayChainId)
+            !IL1Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).whitelistedSettlementLayers(
+                _gatewayGovernanceConfig.gatewayChainId
+            )
         ) {
             calls = _getSetSettlementLayerCalls();
         }

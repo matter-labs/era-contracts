@@ -298,15 +298,8 @@ contract AdminFunctions is Script, IAdminFunctions {
         for (uint256 i = 0; i < _count; i++) {
             trimmed[i] = _calls[i];
         }
-        string memory toml = vm.serializeBytes(
-            "pre_governance_accept_ownerships",
-            "calls",
-            abi.encode(trimmed)
-        );
-        string memory path = string.concat(
-            vm.projectRoot(),
-            "/script-out/pre-governance-accept-ownerships.toml"
-        );
+        string memory toml = vm.serializeBytes("pre_governance_accept_ownerships", "calls", abi.encode(trimmed));
+        string memory path = string.concat(vm.projectRoot(), "/script-out/pre-governance-accept-ownerships.toml");
         vm.writeToml(toml, path);
     }
 

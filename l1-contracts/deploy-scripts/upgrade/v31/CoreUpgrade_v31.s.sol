@@ -114,7 +114,7 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
     /// @dev AssetTracker is new in v31, we initialize it here with deployer as owner, then transfer ownership
     /// @dev The same is done for ChainRegistrationSender
     function updateContractConnections() internal {
-        /////// AssetTracker 
+        /////// AssetTracker
         console.log("Configuring AssetTracker connections...");
 
         address assetTrackerProxy = coreAddresses.bridgehub.proxies.assetTracker;
@@ -139,14 +139,17 @@ contract CoreUpgrade_v31 is Script, DefaultCoreUpgrade, ICoreUpgradeV31 {
         Ownable2StepUpgradeable(assetTrackerProxy).transferOwnership(properOwner);
         console.log("AssetTracker ownership transfer initiated (pending acceptance by governance)");
 
-        /////// ChainRegistrationSender 
+        /////// ChainRegistrationSender
         console.log("Configuring ChainRegistrationSender connections...");
 
         address chainRegistrationSenderProxy = coreAddresses.bridgehub.proxies.chainRegistrationSender;
         require(chainRegistrationSenderProxy != address(0), "ChainRegistrationSender proxy not deployed");
 
         console.log("ChainRegistrationSender proxy:", chainRegistrationSenderProxy);
-        console.log("Current ChainRegistrationSender owner:", Ownable2StepUpgradeable(chainRegistrationSenderProxy).owner());
+        console.log(
+            "Current ChainRegistrationSender owner:",
+            Ownable2StepUpgradeable(chainRegistrationSenderProxy).owner()
+        );
         console.log("Deployer (msg.sender):", msg.sender);
 
         // Transfer ownership to the proper owner (governance)

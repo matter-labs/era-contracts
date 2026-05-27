@@ -143,7 +143,15 @@ function findContractAndRoot(name: string): { solPath: string; root: string; res
 // -----------------------------
 // Run a single forge verify attempt
 // -----------------------------
-function tryVerify(chain: string, addr: string, name: string, rest: string, root: string, isZksync: boolean, gwMode: boolean): boolean {
+function tryVerify(
+  chain: string,
+  addr: string,
+  name: string,
+  rest: string,
+  root: string,
+  isZksync: boolean,
+  gwMode: boolean
+): boolean {
   let cmd: string;
   if (gwMode) {
     const url = GW_EXPLORER_URLS[chain];

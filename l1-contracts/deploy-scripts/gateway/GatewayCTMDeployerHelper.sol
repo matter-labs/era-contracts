@@ -451,7 +451,15 @@ library GatewayCTMDeployerHelper {
         bool _gwIsEvmEquivalent
     ) internal returns (address addr, bytes memory data) {
         (string memory fileName, string memory contractName) = DeployCTML1OrGateway.resolve(_isZKsyncOS, vmContract);
-        return _calculateCreate2AddressAndCalldata(_create2Salt, fileName, contractName, constructorArgs, _isZKsyncOS, _gwIsEvmEquivalent);
+        return
+            _calculateCreate2AddressAndCalldata(
+                _create2Salt,
+                fileName,
+                contractName,
+                constructorArgs,
+                _isZKsyncOS,
+                _gwIsEvmEquivalent
+            );
     }
 
     // ============ CTM Deployer ============
@@ -945,7 +953,7 @@ library GatewayCTMDeployerHelper {
     }
 
     function _prepareL1L2Deployment(
-        bool, /* _gwIsEvmEquivalent -- always true for GW */
+        bool /* _gwIsEvmEquivalent -- always true for GW */,
         bytes32 _salt,
         bytes memory _bytecode,
         bytes memory _constructorArgs
@@ -976,12 +984,7 @@ library GatewayCTMDeployerHelper {
     ) internal view {
         string memory msgStr;
         if (constructorArgs.length == 0) {
-            msgStr = string.concat(
-                "forge verify-contract ",
-                Utils.vm.toString(contractAddr),
-                " ",
-                contractName
-            );
+            msgStr = string.concat("forge verify-contract ", Utils.vm.toString(contractAddr), " ", contractName);
         } else {
             msgStr = string.concat(
                 "forge verify-contract ",

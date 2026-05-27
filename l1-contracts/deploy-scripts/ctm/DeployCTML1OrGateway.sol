@@ -201,11 +201,7 @@ library DeployCTML1OrGateway {
         IVerifierV2 currentFflonk = verifier.fflonkVerifiers(DEFAULT_ZKSYNC_OS_VERIFIER_VERSION);
         IVerifier currentPlonk = verifier.plonkVerifiers(DEFAULT_ZKSYNC_OS_VERIFIER_VERSION);
         if (address(currentFflonk) == address(0) && address(currentPlonk) == address(0)) {
-            verifier.addVerifier(
-                DEFAULT_ZKSYNC_OS_VERIFIER_VERSION,
-                IVerifierV2(_fflonk),
-                IVerifier(_plonk)
-            );
+            verifier.addVerifier(DEFAULT_ZKSYNC_OS_VERIFIER_VERSION, IVerifierV2(_fflonk), IVerifier(_plonk));
         } else {
             require(
                 address(currentFflonk) == _fflonk && address(currentPlonk) == _plonk,

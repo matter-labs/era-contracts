@@ -42,7 +42,8 @@
  * See `.claude/skills/regenerate-v31-stage-calldata/SKILL.md`
  * (Core principle + Iteration via Docker) for the full pipeline context.
  */
-import { spawnSync, type SpawnSyncOptions } from "child_process";
+import { spawnSync } from "child_process";
+import type { SpawnSyncOptions } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -52,8 +53,7 @@ const CONTRACTS_DIR = path.resolve(__dirname, "..");
 const ENV_DIR = "upgrade-envs/v0.31.0-interopB";
 const OUT_DIR_HOST = path.join(CONTRACTS_DIR, "l1-contracts", ENV_DIR, "output");
 const OUT_DIR_CONTAINER = `/contracts/l1-contracts/${ENV_DIR}/output`;
-const IMAGE =
-  process.env.PROTOCOL_OPS_IMAGE ?? "ghcr.io/matter-labs/protocol-ops:v31-camp-split";
+const IMAGE = process.env.PROTOCOL_OPS_IMAGE ?? "ghcr.io/matter-labs/protocol-ops:v31-camp-split";
 
 function die(msg: string): never {
   console.error(msg);
@@ -168,12 +168,7 @@ function commonMounts(): string[] {
  * hangs 5–30 min per CTM).
  */
 function sourcifyBlock(): string[] {
-  return [
-    "--add-host",
-    "sourcify.dev:127.0.0.1",
-    "--add-host",
-    "repo.sourcify.dev:127.0.0.1",
-  ];
+  return ["--add-host", "sourcify.dev:127.0.0.1", "--add-host", "repo.sourcify.dev:127.0.0.1"];
 }
 
 function dockerRun(args: string[], opts: SpawnSyncOptions = {}): number {
@@ -251,11 +246,7 @@ function computeCreate2Address(txData: string): string | null {
   const salt = "0x" + stripped.slice(0, 64);
   const initcode = "0x" + stripped.slice(64);
   try {
-    return ethers.utils.getCreate2Address(
-      CREATE2_FACTORY,
-      salt,
-      ethers.utils.keccak256(initcode)
-    );
+    return ethers.utils.getCreate2Address(CREATE2_FACTORY, salt, ethers.utils.keccak256(initcode));
   } catch {
     return null;
   }
@@ -336,10 +327,7 @@ async function probeIdempotentSkip(
   return matchIdempotentSelector(raw);
 }
 
-async function checkDeployedWithRetry(
-  provider: ethers.providers.JsonRpcProvider,
-  addr: string
-): Promise<boolean> {
+async function checkDeployedWithRetry(provider: ethers.providers.JsonRpcProvider, addr: string): Promise<boolean> {
   for (let attempt = 0; attempt < 3; attempt++) {
     const code = await provider.getCode(addr);
     if (code && code !== "0x") return true;
@@ -370,9 +358,7 @@ async function cmdBroadcast(pk: string, rpc: string, binMount: string[]): Promis
     .sort()
     .map((f) => path.join(prepareDir, f));
   if (sourceBundles.length === 0) {
-    die(
-      `No deployer bundle for ${wallet.address} under ${prepareDir} — run regen first`
-    );
+    die(`No deployer bundle for ${wallet.address} under ${prepareDir} — run regen first`);
   }
   console.log(`Source deployer bundles (${sourceBundles.length}):`);
   for (const b of sourceBundles) console.log(`  ${b}`);
@@ -384,15 +370,14 @@ async function cmdBroadcast(pk: string, rpc: string, binMount: string[]): Promis
   //    L1→L2 GW-CTM deploys in bundle 05 broadcast through unchanged.
   let merged: SafeBundle | null = null;
   const toConsider: SafeTx[] = [];
-  let totalIn = 0;
+  let txsIn = 0;
   for (const src of sourceBundles) {
     const parsed = JSON.parse(fs.readFileSync(src, "utf8")) as SafeBundle;
     if (merged === null) {
-      const { transactions: _ignored, ...rest } = parsed;
-      merged = { ...rest, transactions: [] };
+      merged = { ...parsed, transactions: [] };
     }
     const txs = parsed.transactions ?? [];
-    totalIn += txs.length;
+    txsIn += txs.length;
     for (const tx of txs) toConsider.push(tx);
   }
   if (merged === null) die("Internal: no bundles loaded");
@@ -448,7 +433,7 @@ async function cmdBroadcast(pk: string, rpc: string, binMount: string[]): Promis
   const filteredPath = path.join(stageOutDir, "deployer-bundle-filtered.safe.json");
   fs.writeFileSync(filteredPath, JSON.stringify(merged, null, 2));
   console.log(
-    `Merged: ${totalIn} txs across ${sourceBundles.length} bundle(s) → ` +
+    `Merged: ${txsIn} txs across ${sourceBundles.length} bundle(s) → ` +
       `${create2Total} CREATE2 → ${create2Total - create2Skipped.length} new ` +
       `(${create2Skipped.length} already deployed), ` +
       `${nonCreate2Total} other → ${nonCreate2Total - nonCreate2Skipped.length} new ` +
@@ -459,9 +444,7 @@ async function cmdBroadcast(pk: string, rpc: string, binMount: string[]): Promis
   }
 
   if (toSend.length === 0) {
-    console.log(
-      `Nothing new to broadcast against ${rpc} — every kept tx is already on chain.`
-    );
+    console.log(`Nothing new to broadcast against ${rpc} — every kept tx is already on chain.`);
     return 0;
   }
 
@@ -575,7 +558,7 @@ async function main(): Promise<void> {
   const needsRpc = ["regen", "broadcast"].includes(sub);
 
   const pk = needsPk ? readPrivateKey() : "";
-  const rpc = needsRpc ? process.env.L1_RPC_URL ?? "" : "";
+  const rpc = needsRpc ? (process.env.L1_RPC_URL ?? "") : "";
   if (needsRpc && !rpc) die("L1_RPC_URL is required");
 
   const binMount = resolveBinaryMount();

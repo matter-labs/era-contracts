@@ -65,12 +65,13 @@ Every tx in a regen has a sender. There are exactly two camps:
 
 **The rule**: never put a Camp-A bundle's txs into the sim JSON. Re-running
 sender work that already happened on chain hits one of:
+
 - `OperationExists()` / `OperationMustBePending()` for legacy-Gov ceremonies,
 - `Ownable: caller is not the new owner` for an Ownable2Step `acceptOwnership`
   whose `transferOwnership` already cleared,
 - `AddressAlreadySet(...)` for deploys whose target has code.
 
-The fix is structural — execute all Camp-A work on real chain *before* the
+The fix is structural — execute all Camp-A work on real chain _before_ the
 sim runs. Filters in `simulator.rs` should select by **signer**, not by
 selector or `to`. Per-call selector skips (the old `SKIPPED_SELECTORS`,
 CREATE2-factory carveout, etc.) are signal that we're encoding a Camp-A bundle
@@ -107,14 +108,14 @@ must be pushed separately, one for each admin EOA in the manifest
 (`prepare/*_0x<admin-lc>.safe.json`). The local sim (phase 3.5) is what
 catches a missing phase 2b — see the troubleshooting table below.
 
-| Phase     | What runs                                                                                    | Touches real chain? | Output                                                            |
-| --------- | -------------------------------------------------------------------------------------------- | ------------------- | ----------------------------------------------------------------- |
-| **1**     | `protocol_ops ecosystem upgrade-prepare-all` (deterministic from `stage.toml`)               | no                  | `output/stage/ecosystem.toml` + `manifest.json` + `*.safe.json`   |
-| **1.5**   | anvil fork + replay prepare bundles via impersonation + `protocol_ops verify-upgrade` (PUVT) | no                  | `executed.json` (fork-replay log), PUVT report                    |
-| **2**     | `yarn ts-node scripts/regen-via-docker.ts broadcast` — push CREATE2 deploys to **real Sepolia**         | yes (deployer EOA)  | bytecode lives at the CREATE2 addresses on real Sepolia           |
-| **2b**    | broadcast **per-CTM admin** setup bundles (`*_0x343ee72…safe.json`, `*_0xd66949…safe.json`)  | yes (each CTM admin EOA) | `transferOwnership(PUH)`, `addVerifier`, `setNewVersionUpgrade`, ServerNotifier `ProxyAdmin.upgrade` land on Sepolia so stage1 `acceptOwnership` etc. don't revert |
-| **3**     | `protocol_ops ecosystem governance-toml-to-simulator`                                        | no                  | tx-simulator scenario JSON (one entry per PUH stage 0/1/2 call)   |
-| **3.5**   | `yarn simulate --file <sim.json>` from a local `transaction-simulator` clone                 | no (forks Sepolia)  | local pass/fail before pushing — same code path as tx-simulator CI |
+| Phase   | What runs                                                                                       | Touches real chain?      | Output                                                                                                                                                             |
+| ------- | ----------------------------------------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **1**   | `protocol_ops ecosystem upgrade-prepare-all` (deterministic from `stage.toml`)                  | no                       | `output/stage/ecosystem.toml` + `manifest.json` + `*.safe.json`                                                                                                    |
+| **1.5** | anvil fork + replay prepare bundles via impersonation + `protocol_ops verify-upgrade` (PUVT)    | no                       | `executed.json` (fork-replay log), PUVT report                                                                                                                     |
+| **2**   | `yarn ts-node scripts/regen-via-docker.ts broadcast` — push CREATE2 deploys to **real Sepolia** | yes (deployer EOA)       | bytecode lives at the CREATE2 addresses on real Sepolia                                                                                                            |
+| **2b**  | broadcast **per-CTM admin** setup bundles (`*_0x343ee72…safe.json`, `*_0xd66949…safe.json`)     | yes (each CTM admin EOA) | `transferOwnership(PUH)`, `addVerifier`, `setNewVersionUpgrade`, ServerNotifier `ProxyAdmin.upgrade` land on Sepolia so stage1 `acceptOwnership` etc. don't revert |
+| **3**   | `protocol_ops ecosystem governance-toml-to-simulator`                                           | no                       | tx-simulator scenario JSON (one entry per PUH stage 0/1/2 call)                                                                                                    |
+| **3.5** | `yarn simulate --file <sim.json>` from a local `transaction-simulator` clone                    | no (forks Sepolia)       | local pass/fail before pushing — same code path as tx-simulator CI                                                                                                 |
 
 Phase boundaries matter for state contamination: each broadcast in phase 2
 diverges real Sepolia from the fork state phase 1.5 used as its baseline.
@@ -129,10 +130,10 @@ fully-local mode** — macOS-built Foundry artifacts diverge from Linux ones
 just enough to break reproducibility. The single entry point is
 `scripts/regen-via-docker.ts` with two binary-source modes:
 
-| Mode | When | What's mounted | Per-iteration cost |
-| --- | --- | --- | --- |
-| **Mode 1 — Iteration**: local cross-built `protocol_ops` + bundled Foundry/contracts | Rust changes only (sim filter, emitter, broadcaster, prepare wrapper) | host binary → `/contracts/protocol-ops/protocol_ops` (override) | ~30 s cross-cargo + prepare time |
-| **Mode 2 — Canonical**: everything from the image | Solidity changed, or you're producing the final regen you commit/push | nothing overridden — image has everything | trigger `build-docker.yaml` (~12 min CI build) + prepare time |
+| Mode                                                                                 | When                                                                  | What's mounted                                                  | Per-iteration cost                                            |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------- |
+| **Mode 1 — Iteration**: local cross-built `protocol_ops` + bundled Foundry/contracts | Rust changes only (sim filter, emitter, broadcaster, prepare wrapper) | host binary → `/contracts/protocol-ops/protocol_ops` (override) | ~30 s cross-cargo + prepare time                              |
+| **Mode 2 — Canonical**: everything from the image                                    | Solidity changed, or you're producing the final regen you commit/push | nothing overridden — image has everything                       | trigger `build-docker.yaml` (~12 min CI build) + prepare time |
 
 Both modes use the same `stage.toml`, `permanent-values/`, and
 `test/anvil-interop/` bind-mounts so config/script edits land without a
@@ -177,12 +178,12 @@ yarn --cwd ../transaction-simulator simulate --file transactions/<dated>.json
 
 Toggles:
 
-| Env var | Effect |
-| --- | --- |
-| `USE_BUNDLED_BIN=1` | Skip the binary mount; use the image's bundled `protocol_ops` (drops the cross-build entirely — config/Solidity-only iteration). |
-| `SKIP_BUILD=1` | Reuse `protocol-ops/target/x86_64-unknown-linux-gnu/release/protocol_ops` without re-running cargo zigbuild. |
-| `PROTOCOL_OPS_BIN_HOST=<path>` | Mount this binary explicitly (skips cross-build). |
-| `PROTOCOL_OPS_IMAGE=<ref>` | Override the default image ref (`ghcr.io/matter-labs/protocol-ops:v31-camp-split`). |
+| Env var                        | Effect                                                                                                                           |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `USE_BUNDLED_BIN=1`            | Skip the binary mount; use the image's bundled `protocol_ops` (drops the cross-build entirely — config/Solidity-only iteration). |
+| `SKIP_BUILD=1`                 | Reuse `protocol-ops/target/x86_64-unknown-linux-gnu/release/protocol_ops` without re-running cargo zigbuild.                     |
+| `PROTOCOL_OPS_BIN_HOST=<path>` | Mount this binary explicitly (skips cross-build).                                                                                |
+| `PROTOCOL_OPS_IMAGE=<ref>`     | Override the default image ref (`ghcr.io/matter-labs/protocol-ops:v31-camp-split`).                                              |
 
 ### Mode 2 — canonical regen from a fresh image
 
@@ -279,6 +280,7 @@ yarn ts-node scripts/regen-via-docker.ts sim-emit \
 ```
 
 Notes:
+
 - The image is published linux/amd64 only; arm64 Macs run it under qemu
   emulation (1.5–3× slower than native). The wrapper passes
   `--platform linux/amd64` automatically.
@@ -319,14 +321,14 @@ git push
 
 ### Local-rehearsal troubleshooting
 
-| Symptom in `yarn simulate` output                                  | Likely cause                                                                            |
-| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| `EOA with non-empty calldata` on `stage0` `startTimer` or similar  | Phase 2 wasn't run after the most recent salt rotation. Re-run `yarn ts-node scripts/regen-via-docker.ts broadcast`. |
-| `OperationMustBePending()` / `OperationExists()` on legacy Gov     | Stale sim JSON that still includes deployer/legacy-Gov bundles. Re-emit with a fresh `protocol_ops` build — the simulator emitter must not include manifest. |
-| `DeadlineNotYetPassed()` on stage1                                 | `checkDeadline()` `timeIncrease` injection missed. Confirm `simulator.rs` `CHECK_DEADLINE_SELECTOR` matches the actual stage1 selector, or extend the list.   |
-| `Ownable: caller is not the owner` on a CTM call                   | Ownership ceremony for that CTM never landed on Sepolia. Either the legacy-Gov bundle wasn't broadcast or the wrong PUH address is in `stage.toml`.            |
+| Symptom in `yarn simulate` output                                       | Likely cause                                                                                                                                                                                                                                     |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `EOA with non-empty calldata` on `stage0` `startTimer` or similar       | Phase 2 wasn't run after the most recent salt rotation. Re-run `yarn ts-node scripts/regen-via-docker.ts broadcast`.                                                                                                                             |
+| `OperationMustBePending()` / `OperationExists()` on legacy Gov          | Stale sim JSON that still includes deployer/legacy-Gov bundles. Re-emit with a fresh `protocol_ops` build — the simulator emitter must not include manifest.                                                                                     |
+| `DeadlineNotYetPassed()` on stage1                                      | `checkDeadline()` `timeIncrease` injection missed. Confirm `simulator.rs` `CHECK_DEADLINE_SELECTOR` matches the actual stage1 selector, or extend the list.                                                                                      |
+| `Ownable: caller is not the owner` on a CTM call                        | Ownership ceremony for that CTM never landed on Sepolia. Either the legacy-Gov bundle wasn't broadcast or the wrong PUH address is in `stage.toml`.                                                                                              |
 | `Ownable2Step: caller is not the new owner` on stage1 `acceptOwnership` | Phase 2b gap — the CTM admin EOA never broadcast its `transferOwnership(PUH)` setup. Grep `prepare/manifest.json` for the failing target address, find the bundle that contains the `0xf2fde38b` call, broadcast it from the matching admin key. |
-| `AddressAlreadySet(...)`                                           | State contamination from prior broadcasts — rotate CREATE2 salts (pre-flight section above) and re-run from phase 1.                                          |
+| `AddressAlreadySet(...)`                                                | State contamination from prior broadcasts — rotate CREATE2 salts (pre-flight section above) and re-run from phase 1.                                                                                                                             |
 
 ## Iteration flags on `regen-and-verify-stage.sh`
 
