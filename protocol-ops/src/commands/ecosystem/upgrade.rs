@@ -1024,12 +1024,11 @@ fn write_merged_ecosystem_toml(
 
     let has_era_ctm = ctm_entries.iter().any(|entry| !entry.is_zk_sync_os);
     let has_zkos_ctm = ctm_entries.iter().any(|entry| entry.is_zk_sync_os);
-    if has_era_ctm && has_zkos_ctm
-        && (era_test_calls.is_none() || zksync_os_test_calls.is_none()) {
-            anyhow::bail!(
-                "both Era and ZKOS CTMs are present, but one flavor is missing [test_upgrade_calls]"
-            );
-        }
+    if has_era_ctm && has_zkos_ctm && (era_test_calls.is_none() || zksync_os_test_calls.is_none()) {
+        anyhow::bail!(
+            "both Era and ZKOS CTMs are present, but one flavor is missing [test_upgrade_calls]"
+        );
+    }
 
     if !extra_stage0.is_empty() {
         stage0.push(format!("0x{}", hex::encode(encode_calls(extra_stage0))));
