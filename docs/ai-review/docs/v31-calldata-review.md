@@ -626,8 +626,10 @@ Then verify:
 - added selectors are derived from the reviewed v31 facet ABIs/runtime bytecode;
 - exclude the tooling-only `getName()` selector `0x17d7de7c` from facet-cut
   comparison;
-- `isFreezable` values match the reviewed v31 facet table and the old diamond
-  state for removed selectors.
+- `isFreezable` values for `Add` operations match the reviewed v31 facet table;
+  for `Remove` operations the `isFreezable` field in the calldata is ignored by
+  `_removeFunctions` (it does not consume the parameter), so any value there is
+  a no-op and need not match the old on-chain state.
 
 If no representative chain can be inspected, record the gap. Do not claim exact
 facet-cut verification.
@@ -664,8 +666,11 @@ Check the outer `ProposedUpgrade`:
 - bootloader hash maps to `Bootloader`;
 - default account hash maps to `system-contracts/DefaultAccount`;
 - EVM emulator hash maps to `EvmEmulator`;
-- `verifier` equals the CTM verifier address;
-- verifier params are zero;
+- `verifier` is `address(0)` — the field is deprecated; `BaseZkSyncUpgrade.upgrade`
+  never reads it and instead fetches the verifier from CTM via
+  `protocolVersionVerifier(newProtocolVersion)`, which was set by the
+  `setNewVersionUpgrade` `verifier` argument verified in Step 9;
+- `verifierParams` is all-zero — deprecated, kept only for ABI compatibility;
 - `l1ContractsUpgradeCalldata` is empty;
 - `postUpgradeCalldata` is empty;
 - `upgradeTimestamp` is zero.
