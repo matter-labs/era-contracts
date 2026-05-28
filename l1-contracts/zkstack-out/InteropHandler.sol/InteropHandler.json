@@ -123,6 +123,30 @@
   },
   {
     "type": "function",
+    "name": "getShadowAccountAddress",
+    "inputs": [
+      {
+        "name": "_ownerChainId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_ownerAddress",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "initL2",
     "inputs": [
       {
@@ -308,6 +332,31 @@
     "anonymous": false
   },
   {
+    "type": "event",
+    "name": "ShadowAccountDeployed",
+    "inputs": [
+      {
+        "name": "shadowAccount",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "ownerChainId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "ownerAddress",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
     "type": "error",
     "name": "BundleAlreadyProcessed",
     "inputs": [
@@ -422,6 +471,11 @@
   {
     "type": "error",
     "name": "MessageNotIncluded",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ShadowAccountDeploymentFailed",
     "inputs": []
   },
   {

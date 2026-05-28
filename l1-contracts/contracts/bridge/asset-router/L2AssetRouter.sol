@@ -80,6 +80,14 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// @notice Tracks interop route (public vs private) per asset, preventing mixing.
     mapping(bytes32 assetId => InteropRoute) public assetInteropRoute;
 
+    /// @notice Canonical atomic-flow escrow on this chain. Whitelisted to call the AR's
+    /// burn (`initiateIndirectCall` / `bridgehubDepositBaseToken`) and mint
+    /// (`finalizeDeposit`) entries on behalf of an L1-finalized atomic flow. See
+    /// `docs/src/specs/design/atomicity_using_l1_finality.md`. Set once via
+    /// `setAtomicFlowEscrow`; remains `address(0)` (effectively disabled) on chains that
+    /// do not opt in to the atomic-flow stack.
+    address public atomicFlowEscrow;
+
     /// @notice Returns the bridgehub contract.
     function _bridgehub() internal view virtual override returns (IBridgehubBase) {
         return IBridgehubBase(L2_BRIDGEHUB_ADDR);
@@ -155,18 +163,22 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _;
     }
 
-    /// @notice Checks that the message sender is the L1 Asset Router.
+    /// @notice Checks that the message sender is the L1 Asset Router, this contract
+    /// itself, or — if the atomic-flow stack is enabled on this chain — the canonical
+    /// atomic-flow escrow. The escrow drives destination-side mints by calling
+    /// `finalizeDeposit` on behalf of an L1-finalized atomic flow.
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
+        bool isAtomicFlowEscrow = atomicFlowEscrow != address(0) && msg.sender == atomicFlowEscrow;
         if (_chainId == L1_CHAIN_ID) {
-            // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
             if (
                 (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(L1_ASSET_ROUTER)) &&
-                msg.sender != address(this)
+                msg.sender != address(this) &&
+                !isAtomicFlowEscrow
             ) {
                 revert Unauthorized(msg.sender);
             }
         } else {
-            if (msg.sender != address(this)) {
+            if (msg.sender != address(this) && !isAtomicFlowEscrow) {
                 revert Unauthorized(msg.sender);
             }
         }
@@ -184,9 +196,14 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _;
     }
 
-    /// @notice Checks that the message sender is the interop center.
+    /// @notice Checks that the message sender is the interop center, or — if the
+    /// atomic-flow stack is enabled on this chain — the canonical atomic-flow escrow.
+    /// The escrow drives source-side burns by calling `initiateIndirectCall` /
+    /// `bridgehubDepositBaseToken` on behalf of an L1-finalized atomic flow.
     modifier onlyL2InteropCenter() {
-        require(msg.sender == _interopCenterAddr(), Unauthorized(msg.sender));
+        if (msg.sender != _interopCenterAddr() && !(atomicFlowEscrow != address(0) && msg.sender == atomicFlowEscrow)) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
@@ -256,6 +273,16 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         if (owner() != _aliasedOwner) {
             _transferOwnership(_aliasedOwner);
         }
+    }
+
+    /// @notice Registers the canonical atomic-flow escrow on this chain. One-shot: the
+    /// escrow address is set exactly once, after which the AR's atomic-flow auth gates
+    /// recognise it. Callable only by the complex upgrader (matches the rest of the AR's
+    /// privileged setters). See `atomicFlowEscrow` for the broader design context.
+    function setAtomicFlowEscrow(address _escrow) external onlyUpgrader {
+        require(atomicFlowEscrow == address(0), Unauthorized(msg.sender));
+        require(_escrow != address(0), EmptyAddress());
+        atomicFlowEscrow = _escrow;
     }
 
     /// @inheritdoc IL2AssetRouter

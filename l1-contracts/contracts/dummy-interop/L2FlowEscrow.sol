@@ -5,154 +5,208 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL2FlowEscrow} from "./IL2FlowEscrow.sol";
-import {COMMIT_LOG_TAG, SendSpec} from "./IDummyFlow.sol";
+import {COMMIT_LOG_TAG, SendSpec, SpecState} from "./IDummyFlow.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
+import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+
+/// @dev `finalizeDeposit` is declared on `AssetRouterBase` (the abstract contract) but
+/// not on its interface. Tiny local interface so the escrow can call it without pulling
+/// in the abstract contract.
+interface IAssetRouterFinalizeDeposit {
+    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) external payable;
+}
 import {
-    EscrowFlowAlreadyCommitted,
-    EscrowFlowAlreadySettled,
     EscrowAlreadyInitialized,
+    EscrowDepositorMismatch,
+    EscrowInvalidAuthorizeFromState,
+    EscrowInvalidRefundAuthorizeFromState,
     EscrowOnlyAliasedLinker,
+    EscrowSelfDestination,
     EscrowSendSpecMissingDest,
-    EscrowSendSpecSelfDest,
     EscrowSendSpecZeroAmount,
+    EscrowSendSpecZeroOriginChain,
     EscrowSendSpecZeroRecipient,
     EscrowSendSpecZeroToken,
-    EscrowFollowupFailed
+    EscrowSpecAlreadyCommitted,
+    EscrowSpecNotExecutable,
+    EscrowSpecNotForThisChain,
+    EscrowSpecNotRevertable
 } from "./DummyFlowErrors.sol";
-
-/// @notice Minter interface assumed for any token used in `executeFromL1`. The dummy stack
-/// uses `TestnetERC20Token` which exposes `mint`; production integrations would swap this
-/// for an asset-router-style mint or a per-token bridge custody release.
-interface IMintableToken {
-    function mint(address _to, uint256 _amount) external returns (bool);
-}
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice See `IL2FlowEscrow`. The escrow is userspace — anyone can deploy one and use it
-/// with the L1 linker. Each escrow instance is tied to one L1 linker address (set at
-/// construction or via `initialize`) and rejects any other aliased sender on the L1-only
-/// entries (`executeFromL1`, `refundFromL1`).
+/// @notice See `IL2FlowEscrow`. Implements the asymmetric trust model: the L1 linker
+/// address is a hardcoded constant in this contract's bytecode, so a CREATE2-deploy with
+/// a fixed salt yields the same address on every L2.
+///
+/// Asset moves route through `L2AssetRouter` → `L2NativeTokenVault`:
+///   - source: `AR.initiateIndirectCall` (gated to also accept this escrow via the AR's
+///     `atomicFlowEscrow` extension);
+///   - destination: `AR.finalizeDeposit` (same gate extension).
+/// Refunds bypass AR — locked tokens never leave escrow custody before execute, so a
+/// refund is a direct local `safeTransfer`.
 contract L2FlowEscrow is IL2FlowEscrow {
     using SafeERC20 for IERC20;
 
-    enum Settlement {
-        None,
-        Committed,
-        Executed,
-        Refunded
+    /// @dev Set once via `initialize`. The bytecode is identical on every L2 (no
+    /// embedded constants), so CREATE2 with a fixed salt yields the same escrow address
+    /// everywhere; the per-chain initializer then binds each instance to the canonical L1
+    /// linker address.
+    address private _l1Linker;
+
+    mapping(bytes32 flowId => mapping(bytes32 specHash => SpecState)) internal _state;
+
+    /// @notice One-shot initializer.
+    function initialize(address _linker) external {
+        if (_l1Linker != address(0)) revert EscrowAlreadyInitialized();
+        _l1Linker = _linker;
     }
 
-    /// @dev L1-side address of the linker that drives this escrow. Compared against
-    /// `undoL1ToL2Alias(msg.sender)` on every L1-only entry. Set once via `initialize` to
-    /// keep the contract free of immutables / constructors so it deploys cleanly under
-    /// ZKsync OS as well as Era.
-    address public l1Linker;
-
-    struct Commit {
-        address depositor;
-        SendSpec spec;
-    }
-
-    mapping(bytes32 flowId => Commit) internal _commits;
-    mapping(bytes32 flowId => Settlement) public settlement;
-
-    /// @notice One-shot initializer. Callable by anyone exactly once; the deployer is
-    /// expected to invoke it atomically post-deploy.
-    function initialize(address _l1Linker) external {
-        if (l1Linker != address(0)) revert EscrowAlreadyInitialized();
-        l1Linker = _l1Linker;
+    /// @inheritdoc IL2FlowEscrow
+    function L1_LINKER() external view returns (address) {
+        return _l1Linker;
     }
 
     /// @inheritdoc IL2FlowEscrow
     function commitSend(bytes32 _flowId, SendSpec calldata _spec) external {
-        if (settlement[_flowId] != Settlement.None) revert EscrowFlowAlreadyCommitted(_flowId);
+        _validateSourceSpec(_spec);
+        if (msg.sender != _spec.depositor) revert EscrowDepositorMismatch(msg.sender, _spec.depositor);
 
-        _validateSendSpec(_spec);
+        bytes32 specHash = keccak256(abi.encode(_spec));
+        if (_state[_flowId][specHash] != SpecState.Unset) revert EscrowSpecAlreadyCommitted(specHash);
+        _state[_flowId][specHash] = SpecState.Committed;
 
-        settlement[_flowId] = Settlement.Committed;
-        _commits[_flowId].depositor = msg.sender;
-        // Field-by-field copy: legacy codegen can't whole-struct-copy a calldata struct with
-        // a nested dynamic `bytes` into storage.
-        SendSpec storage stored = _commits[_flowId].spec;
-        stored.destChainId = _spec.destChainId;
-        stored.recipient = _spec.recipient;
-        stored.token = _spec.token;
-        stored.amount = _spec.amount;
-        stored.followupTo = _spec.followupTo;
-        stored.followupData = _spec.followupData;
+        IERC20(_spec.originToken).safeTransferFrom(_spec.depositor, address(this), _spec.amount);
 
-        IERC20(_spec.token).safeTransferFrom(msg.sender, address(this), _spec.amount);
+        // L2→L1 commit log: linker reads this back via `IMessageVerification` to learn the
+        // chain's outbound contribution. Payload is `(TAG, flowId, destChainId, specHash)`;
+        // the sender field of the L2Message (set by the L1 messenger system contract) pins
+        // the escrow address — not duplicated in the data.
+        L2ContractHelper.sendMessageToL1(abi.encode(COMMIT_LOG_TAG, _flowId, _spec.destChainId, specHash));
 
-        // L2→L1 commit log: the L1 linker reads this back via
-        // `IMessageVerification.proveL2MessageInclusionShared` to learn the chain's outbound
-        // contribution to the flow. Tag is versioned so the schema can evolve.
-        L2ContractHelper.sendMessageToL1(abi.encode(COMMIT_LOG_TAG, _flowId, address(this), _spec));
-
-        emit FlowCommitted(_flowId, msg.sender, _spec);
+        emit FlowCommitted(_flowId, specHash, _spec.depositor);
     }
 
     /// @inheritdoc IL2FlowEscrow
-    function executeFromL1(bytes32 _flowId, SendSpec[] calldata _inboundSpecs) external {
+    function authorizeFromL1(bytes32 _flowId, bytes32[] calldata _specHashes) external {
         _requireAliasedLinker();
-        Settlement s = settlement[_flowId];
-        // Two valid prior states:
-        //   None     — this chain is receive-only (never called `commitSend`).
-        //   Committed — this chain locked something; settlement now moves to Executed and the
-        //               lock is consumed (kept in this contract as bridge custody, matching
-        //               the burn-side of a real bridge's burn-and-mint semantics).
-        if (s != Settlement.None && s != Settlement.Committed) revert EscrowFlowAlreadySettled(_flowId);
-        settlement[_flowId] = Settlement.Executed;
-
-        uint256 n = _inboundSpecs.length;
+        uint256 n = _specHashes.length;
         for (uint256 i; i < n; ++i) {
-            SendSpec calldata inbound = _inboundSpecs[i];
-            IMintableToken(inbound.token).mint(inbound.recipient, inbound.amount);
-
-            bool followupInvoked = inbound.followupTo != address(0);
-            if (followupInvoked) {
-                (bool ok, ) = inbound.followupTo.call(inbound.followupData);
-                if (!ok) revert EscrowFollowupFailed(inbound.followupTo, inbound.followupData);
+            bytes32 h = _specHashes[i];
+            SpecState s = _state[_flowId][h];
+            // Valid prior states: Unset (destination) or Committed (source).
+            if (s != SpecState.Unset && s != SpecState.Committed) {
+                revert EscrowInvalidAuthorizeFromState(h, s);
             }
+            _state[_flowId][h] = SpecState.Executable;
+            emit FlowAuthorized(_flowId, h);
+        }
+    }
 
-            emit InboundDelivered(_flowId, inbound.recipient, inbound.token, inbound.amount, followupInvoked);
+    /// @inheritdoc IL2FlowEscrow
+    function authorizeRefundFromL1(bytes32 _flowId, bytes32[] calldata _specHashes) external {
+        _requireAliasedLinker();
+        uint256 n = _specHashes.length;
+        for (uint256 i; i < n; ++i) {
+            bytes32 h = _specHashes[i];
+            SpecState s = _state[_flowId][h];
+            // Only Committed entries can be refunded — destinations have no lock to return.
+            if (s != SpecState.Committed) revert EscrowInvalidRefundAuthorizeFromState(h, s);
+            _state[_flowId][h] = SpecState.Revertable;
+            emit FlowRefundAuthorized(_flowId, h);
+        }
+    }
+
+    /// @inheritdoc IL2FlowEscrow
+    function execute(bytes32 _flowId, SendSpec calldata _spec) external {
+        bytes32 specHash = keccak256(abi.encode(_spec));
+        SpecState s = _state[_flowId][specHash];
+        if (s != SpecState.Executable) revert EscrowSpecNotExecutable(specHash, s);
+        _state[_flowId][specHash] = SpecState.Executed;
+
+        bool isSource;
+        if (_spec.originChainId == block.chainid) {
+            _executeSource(_spec);
+            isSource = true;
+        } else if (_spec.destChainId == block.chainid) {
+            _executeDestination(_spec);
+            isSource = false;
+        } else {
+            revert EscrowSpecNotForThisChain(_spec.originChainId, _spec.destChainId);
         }
 
-        emit FlowExecuted(_flowId, n);
+        emit FlowExecuted(_flowId, specHash, isSource);
+    }
+
+    /// @dev Source-side burn. Approve NTV for the locked amount, then call
+    /// `AR.initiateIndirectCall` — its internal `_burn` path pulls from `address(this)`
+    /// (passed as `_originalCaller`) into NTV custody. The returned `InteropCallStarter`
+    /// is discarded; we don't emit an outbound interop bundle, the L1 linker carries
+    /// authorization instead.
+    function _executeSource(SendSpec calldata _spec) internal {
+        IERC20(_spec.originToken).safeIncreaseAllowance(L2_NATIVE_TOKEN_VAULT_ADDR, _spec.amount);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(_spec.originChainId, _spec.originToken);
+        bytes memory burnData = DataEncoding.encodeBridgeBurnData(_spec.amount, _spec.recipient, _spec.originToken);
+        bytes memory depositData = DataEncoding.encodeAssetRouterBridgehubDepositData(assetId, burnData);
+        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).initiateIndirectCall({
+            _chainId: _spec.destChainId,
+            _originalCaller: address(this),
+            _value: 0,
+            _data: depositData
+        });
+    }
+
+    /// @dev Destination-side mint. Synthesize the NTV-expected `transferData` from the
+    /// `SendSpec` body (whose hash is bound by the L1 authorization), then call
+    /// `AR.finalizeDeposit`. The AR's extended `onlyAssetRouterCounterpartOrSelf` accepts
+    /// this escrow as the canonical atomic-flow escrow.
+    function _executeDestination(SendSpec calldata _spec) internal {
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(_spec.originChainId, _spec.originToken);
+        bytes memory transferData = DataEncoding.encodeBridgeMintData({
+            _originalCaller: _spec.depositor,
+            _remoteReceiver: _spec.recipient,
+            _originToken: _spec.originToken,
+            _amount: _spec.amount,
+            _erc20Metadata: _spec.erc20Data
+        });
+        IAssetRouterFinalizeDeposit(L2_ASSET_ROUTER_ADDR).finalizeDeposit(_spec.originChainId, assetId, transferData);
     }
 
     /// @inheritdoc IL2FlowEscrow
-    function refundFromL1(bytes32 _flowId) external {
-        _requireAliasedLinker();
-        Settlement s = settlement[_flowId];
-        if (s != Settlement.Committed) revert EscrowFlowAlreadySettled(_flowId);
+    function claimRefund(bytes32 _flowId, SendSpec calldata _spec) external {
+        bytes32 specHash = keccak256(abi.encode(_spec));
+        SpecState s = _state[_flowId][specHash];
+        if (s != SpecState.Revertable) revert EscrowSpecNotRevertable(specHash, s);
+        _state[_flowId][specHash] = SpecState.Reverted;
 
-        settlement[_flowId] = Settlement.Refunded;
-        Commit storage commit = _commits[_flowId];
-        address depositor = commit.depositor;
-        IERC20(commit.spec.token).safeTransfer(depositor, commit.spec.amount);
+        // Source-side only — the depositor is the recorded payer carried in the spec body
+        // (whose hash is bound by the L1 authorization).
+        IERC20(_spec.originToken).safeTransfer(_spec.depositor, _spec.amount);
 
-        emit FlowRefunded(_flowId, depositor);
+        emit FlowRefunded(_flowId, specHash, _spec.depositor);
     }
 
-    function getCommit(bytes32 _flowId) external view returns (address depositor, SendSpec memory spec) {
-        Commit storage commit = _commits[_flowId];
-        return (commit.depositor, commit.spec);
+    /// @inheritdoc IL2FlowEscrow
+    function bundleState(bytes32 _flowId, bytes32 _specHash) external view returns (SpecState) {
+        return _state[_flowId][_specHash];
     }
 
     function _requireAliasedLinker() internal view {
         address unaliased = AddressAliasHelper.undoL1ToL2Alias(msg.sender);
-        if (unaliased != l1Linker) revert EscrowOnlyAliasedLinker(msg.sender);
+        if (unaliased != _l1Linker) revert EscrowOnlyAliasedLinker(msg.sender);
     }
 
-    /// @dev Sanity checks applied at `commitSend`. Receive-only chains skip `commitSend`
-    /// entirely, so a spec reaching here must describe a real outbound transfer.
-    function _validateSendSpec(SendSpec calldata _spec) internal view {
+    /// @dev Validation applied at `commitSend`. A source-side spec must describe a real
+    /// outbound transfer that originates on this chain.
+    function _validateSourceSpec(SendSpec calldata _spec) internal view {
         if (_spec.destChainId == 0) revert EscrowSendSpecMissingDest();
-        if (_spec.destChainId == block.chainid) revert EscrowSendSpecSelfDest(_spec.destChainId);
+        if (_spec.destChainId == block.chainid) revert EscrowSelfDestination(_spec.destChainId);
+        if (_spec.originChainId != block.chainid) revert EscrowSendSpecZeroOriginChain();
         if (_spec.amount == 0) revert EscrowSendSpecZeroAmount();
-        if (_spec.token == address(0)) revert EscrowSendSpecZeroToken();
+        if (_spec.originToken == address(0)) revert EscrowSendSpecZeroToken();
         if (_spec.recipient == address(0)) revert EscrowSendSpecZeroRecipient();
     }
 }

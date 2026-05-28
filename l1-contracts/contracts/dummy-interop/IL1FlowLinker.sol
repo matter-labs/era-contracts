@@ -2,10 +2,9 @@
 pragma solidity ^0.8.21;
 
 import {L2Message} from "../common/Messaging.sol";
-import {FlowState, Participant, SendSpec} from "./IDummyFlow.sol";
 
-/// @notice Inclusion proof bundle for one chain's commit log. The linker re-verifies each via
-/// `IMessageVerification.proveL2MessageInclusionShared`.
+/// @notice Inclusion proof bundle for one chain's commit log. The linker re-verifies each
+/// via `IMessageVerification.proveL2MessageInclusionShared`.
 struct CommitProof {
     uint256 chainId;
     uint256 blockOrBatchNumber;
@@ -14,10 +13,10 @@ struct CommitProof {
     bytes32[] merkleProof;
 }
 
-/// @notice Per-chain L1→L2 dispatch parameters for `executeFlow`. The caller picks gas + refund
-/// settings per chain; `mintValue` is what's passed to `Bridgehub.requestL2TransactionDirect`
-/// as the L2 base token mint amount, and must collectively sum to `msg.value` for ETH-base
-/// chains.
+/// @notice Per-chain L1→L2 dispatch parameters for `executeFlow` / `revertFlow`. The
+/// caller picks gas + refund settings per chain; `mintValue` is what's passed to
+/// `Bridgehub.requestL2TransactionDirect` as the L2 base token mint amount, and must
+/// collectively sum to `msg.value` for ETH-base chains.
 struct ExecuteParams {
     uint256 mintValue;
     uint256 l2GasLimit;
@@ -25,12 +24,29 @@ struct ExecuteParams {
     address refundRecipient;
 }
 
+/// @notice On-chain flow lifecycle states.
+enum FlowState {
+    None,
+    Initiated,
+    Finalized,
+    Reverted
+}
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice L1-side flow coordinator. Owns flow lifecycle (Initiated → Finalized → Reverted),
-/// verifies per-chain commit logs against each chain's batch root via the existing L1 message
-/// verification path, and drives finality by dispatching one L1→L2 priority tx per participating
-/// chain to that chain's `L2FlowEscrow`.
+/// @notice L1-side flow coordinator. Owns flow lifecycle, verifies per-chain commit logs
+/// against the existing L1 `IMessageVerification`, and dispatches L1→L2 priority txs via
+/// `Bridgehub` to authorize per-chain settlement (or refunds).
+///
+/// `flowId` is a cryptographic commitment to the full spec set:
+/// `keccak256(abi.encode(sortedSpecHashes))`. `recordFinalitySignal` enforces equality
+/// between the registered `flowId` and the hash of the verified commits' spec hashes; this
+/// catches partial-commit attacks (e.g., one side of a swap not committing) without any
+/// count-based heuristic.
+///
+/// The escrow address on every participating L2 is implied: a single canonical address
+/// known to the linker via the one-shot `initialize`. Commit-log validation checks each
+/// log's sender equals that address.
 interface IL1FlowLinker {
     event FlowRegistered(bytes32 indexed flowId, address indexed registrar, uint64 deadline);
     event FlowFinalized(bytes32 indexed flowId);
@@ -38,27 +54,35 @@ interface IL1FlowLinker {
     event FlowExecuteDispatched(bytes32 indexed flowId, uint256 indexed chainId, bytes32 canonicalTxHash);
     event FlowRefundDispatched(bytes32 indexed flowId, uint256 indexed chainId, bytes32 canonicalTxHash);
 
-    /// @notice Register a flow on L1 with its full participating set. `msg.sender` is recorded
-    /// as the registrar (currently informational — anyone can drive `recordFinalitySignal` and
-    /// `executeFlow`). One registration per flow id. Must include at least one participant.
-    function registerFlow(bytes32 _flowId, Participant[] calldata _participants, uint64 _deadline) external;
+    /// @notice One-shot post-deploy setup. Records the canonical L2 escrow address that
+    /// every participating L2 is expected to have at via deterministic CREATE2.
+    function initialize(address _canonicalEscrow) external;
 
-    /// @notice Verify one commit log per non-receive-only participant against its chain's L1
-    /// batch root, check graph closure (every `destChainId` referenced is in the participating
-    /// set), and flip the flow to `Finalized`. Receive-only chains are not required to publish
-    /// a commit log — they trust the linker's L1→L2 dispatch.
+    /// @notice Register a flow on L1. `_chainIds` MUST be sorted ascending and deduplicated.
+    /// `_flowId` is the `keccak256(abi.encode(sortedSpecHashes))` the participants agreed on
+    /// off-chain; the linker doesn't know the specs yet — only that this flowId stands for
+    /// a specific bundle of them.
+    function registerFlow(bytes32 _flowId, uint256[] calldata _chainIds, uint64 _deadline) external;
+
+    /// @notice Verify the commit logs, assert completeness against `_flowId`, check graph
+    /// closure, and flip the flow to `Finalized`. Completeness check:
+    /// `keccak256(abi.encode(sortedSpecHashes)) == _flowId`. The `_proofs` array is in the
+    /// order the caller chose; the linker sorts the extracted spec hashes itself before
+    /// hashing.
     function recordFinalitySignal(bytes32 _flowId, CommitProof[] calldata _proofs) external;
 
-    /// @notice After finality, dispatch one `Bridgehub.requestL2TransactionDirect` per
-    /// participating chain. Each chain receives the list of `SendSpec`s whose `destChainId`
-    /// equals its own (its inbound set), encoded as a call to the chain's escrow
-    /// `executeFromL1(_flowId, inboundSpecs)`. `msg.value` must equal the sum of
-    /// `_execParams[i].mintValue` for ETH-base chains.
+    /// @notice Dispatch one `Bridgehub.requestL2TransactionDirect` per participating chain,
+    /// targeting the canonical escrow with payload
+    /// `authorizeFromL1(flowId, specHashes)`. The hashes sent to chain `X` are the union of
+    /// (a) hashes whose source is `X` (committed there) and (b) hashes whose destination is
+    /// `X`. `msg.value` must equal sum of `_execParams[i].mintValue`.
     function executeFlow(bytes32 _flowId, ExecuteParams[] calldata _execParams) external payable;
 
-    /// @notice After the deadline, if the flow never finalized, dispatch `refundFromL1` to
-    /// every chain that committed a lock so depositors can recover their tokens. Receive-only
-    /// chains are skipped automatically. `msg.value` rules match `executeFlow`.
+    /// @notice After deadline with no finality, dispatch
+    /// `authorizeRefundFromL1(flowId, specHashes)` to each chain that committed at least
+    /// one spec. Chains that committed nothing receive no dispatch (their `_execParams`
+    /// entry must have `mintValue == 0`). Caller of `revertFlow` pays gas; `msg.value`
+    /// rules match `executeFlow`.
     function revertFlow(bytes32 _flowId, ExecuteParams[] calldata _execParams) external payable;
 
     function flowState(bytes32 _flowId) external view returns (FlowState);

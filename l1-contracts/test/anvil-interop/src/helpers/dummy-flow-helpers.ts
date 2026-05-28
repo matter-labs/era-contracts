@@ -2,9 +2,10 @@
  * Helpers for the dummy-interop atomicity stack.
  *
  * Deploys `MockL2MessageVerification` (reused on L1 — same interface) + `L1FlowLinker` on L1
- * and one `L2FlowEscrow` per participating L2. Constructs `CommitProof` / `ExecuteParams`
- * payloads for the linker entries. Cross-chain inclusion proofs are mocked: the linker
- * accepts any proof because the L1 message verifier always returns true.
+ * and one `L2FlowEscrow` per participating L2. Computes `flowId` from sorted spec hashes,
+ * constructs `CommitProof` / `ExecuteParams` payloads for the linker entries. Cross-chain
+ * inclusion proofs are mocked: the linker accepts any proof because the L1 message verifier
+ * always returns true.
  */
 
 import { BigNumber, Contract, ContractFactory, Wallet, ethers, providers } from "ethers";
@@ -15,16 +16,11 @@ import { ANVIL_DEFAULT_PRIVATE_KEY, L2_TO_L1_MESSENGER_ADDR } from "../core/cons
 export interface SendSpec {
   destChainId: BigNumber;
   recipient: string;
-  token: string;
+  originChainId: BigNumber;
+  originToken: string;
   amount: BigNumber;
-  followupTo: string;
-  followupData: string;
-}
-
-/** Mirror of `Participant`. */
-export interface Participant {
-  chainId: BigNumber;
-  escrow: string;
+  erc20Data: string;
+  depositor: string;
 }
 
 /** Mirror of `CommitProof`. */
@@ -49,17 +45,42 @@ export interface ExecuteParams {
 }
 
 const SOLIDITY_SEND_SPEC_TUPLE =
-  "tuple(uint256 destChainId, address recipient, address token, uint256 amount, address followupTo, bytes followupData)";
+  "tuple(uint256 destChainId, address recipient, uint256 originChainId, address originToken, " +
+  "uint256 amount, bytes erc20Data, address depositor)";
 
-// COMMIT_LOG_TAG = bytes4(keccak256("DummyFlow.commit.v1"))
-export const COMMIT_LOG_TAG = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("DummyFlow.commit.v1")).slice(0, 10);
+// COMMIT_LOG_TAG = bytes4(keccak256("DummyFlow.commit.v2"))
+export const COMMIT_LOG_TAG = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("DummyFlow.commit.v2")).slice(0, 10);
+
+/**
+ * Compute a spec hash matching `keccak256(abi.encode(sendSpec))` on chain.
+ */
+export function computeSpecHash(spec: SendSpec): string {
+  const encoded = ethers.utils.defaultAbiCoder.encode([SOLIDITY_SEND_SPEC_TUPLE], [spec]);
+  return ethers.utils.keccak256(encoded);
+}
+
+/**
+ * Compute the flowId: `keccak256(abi.encode(sortedSpecHashes))`. Sort order matches the
+ * linker's `_sortHashes` (lexicographic ascending on bytes32).
+ */
+export function computeFlowId(specs: SendSpec[]): string {
+  const hashes = specs.map(computeSpecHash);
+  const sorted = [...hashes].sort((a, b) =>
+    a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0
+  );
+  const encoded = ethers.utils.defaultAbiCoder.encode(["bytes32[]"], [sorted]);
+  return ethers.utils.keccak256(encoded);
+}
 
 /**
  * Deploy `MockL2MessageVerification` + `L1FlowLinker` on L1. The mock verifier accepts any
  * inclusion proof — fine for anvil tests where the real cross-chain settlement pipeline
  * doesn't run.
  */
-export async function deployL1FlowStack(l1Provider: providers.JsonRpcProvider, l1Bridgehub: string): Promise<{
+export async function deployL1FlowStack(
+  l1Provider: providers.JsonRpcProvider,
+  l1Bridgehub: string
+): Promise<{
   linker: Contract;
   mockVerifier: Contract;
 }> {
@@ -122,7 +143,6 @@ export function buildCommitProofFromReceipt(
       `No L1MessageSent event from L2_TO_L1_MESSENGER in receipt for chain ${chainId} (escrow ${escrowAddress})`
     );
   }
-  // The sender comes from the indexed topic; decode the data payload (the message bytes).
   const senderFromTopic = ethers.utils.getAddress("0x" + log.topics[1].slice(26));
   const [data] = ethers.utils.defaultAbiCoder.decode(["bytes"], log.data);
   if (senderFromTopic.toLowerCase() !== escrowAddress.toLowerCase()) {
@@ -161,21 +181,39 @@ export function buildExecuteParams(
   };
 }
 
-/** Convenience: helpers to make a `SendSpec` that's receive-only / no followup. */
+/** Convenience constructor for a `SendSpec` with reasonable defaults. */
 export function buildSendSpec(args: {
   destChainId: number;
   recipient: string;
-  token: string;
+  originChainId: number;
+  originToken: string;
   amount: BigNumber;
-  followupTo?: string;
-  followupData?: string;
+  depositor: string;
+  erc20Data?: string;
 }): SendSpec {
   return {
     destChainId: BigNumber.from(args.destChainId),
     recipient: args.recipient,
-    token: args.token,
+    originChainId: BigNumber.from(args.originChainId),
+    originToken: args.originToken,
     amount: args.amount,
-    followupTo: args.followupTo ?? ethers.constants.AddressZero,
-    followupData: args.followupData ?? "0x",
+    erc20Data: args.erc20Data ?? "0x",
+    depositor: args.depositor,
   };
+}
+
+/**
+ * Build the `erc20Data` blob the NTV expects when deploying a bridged shim on first
+ * arrival. Mirrors `DataEncoding.encodeTokenData(chainId, name, symbol, decimals)`:
+ *   NEW_ENCODING_VERSION (0x01) || abi.encode(chainId, abi.encode(name), abi.encode(symbol), abi.encode(decimals))
+ */
+export function encodeErc20Data(originChainId: number, name: string, symbol: string, decimals: number): string {
+  const nameBytes = ethers.utils.defaultAbiCoder.encode(["string"], [name]);
+  const symbolBytes = ethers.utils.defaultAbiCoder.encode(["string"], [symbol]);
+  const decimalsBytes = ethers.utils.defaultAbiCoder.encode(["uint8"], [decimals]);
+  const inner = ethers.utils.defaultAbiCoder.encode(
+    ["uint256", "bytes", "bytes", "bytes"],
+    [originChainId, nameBytes, symbolBytes, decimalsBytes]
+  );
+  return "0x01" + inner.slice(2);
 }

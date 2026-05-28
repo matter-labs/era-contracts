@@ -1,35 +1,40 @@
 /**
- * End-to-end test for the dummy-interop atomicity stack. Mirrors the prior generic
- * Simulator test but uses the lock-and-send-on-finality model: each L2 emits one L2→L1
- * commit log carrying its declarative `SendSpec`, the L1 linker collects them and finalizes
- * the flow, and `executeFlow` dispatches one `Bridgehub.requestL2TransactionDirect` per
- * participating L2 that lands as `executeFromL1(flowId, inboundSpecs[])` on the chain's
- * escrow.
+ * End-to-end test for the dummy-interop atomicity stack.
  *
  * Topology (three GW-settled chains):
- *   Chain A: user locks aAmount of testTokenA, dispatches → B (recipient = user on B).
- *   Chain B: user locks bAmount of testTokenB, dispatches → C (recipient = user on C).
+ *   Chain A: user locks aAmount of testTokenA, sends → user on B.
+ *   Chain B: user locks bAmount of testTokenB, sends → user on C.
  *   Chain C: receive-only.
  *
- * The "swap pool" abstraction is dropped here — both legs are bridge transfers initiated by
- * the same user. Verifies the basic A→B→C flow lifecycle plumbing; the atomic-on-arrival
- * pool callback can be layered on top later via SendSpec.followupTo.
+ * Verifies:
+ *   - commitSend pulls tokens into escrow + emits L2→L1 commit log
+ *   - flowId-as-commitment: linker rejects partial commits via hash equality
+ *   - executeFlow dispatches authorizeFromL1 to each participating chain
+ *   - per-chain execute() runs once authorized; source = burn (no-op placeholder),
+ *     destination = mint via placeholder IMintableToken
  */
 
 import { expect } from "chai";
-import { BigNumber, Contract, ContractFactory, Wallet, ethers } from "ethers";
+import { BigNumber, Contract, Wallet, ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
-import { getChainIdsByRole, getL2Chain, extractAndRelayNewPriorityRequests } from "../../src/core/utils";
+import {
+  getChainIdsByRole,
+  getL2Chain,
+  extractAndRelayNewPriorityRequests,
+  impersonateAndRun,
+} from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
-import { ANVIL_DEFAULT_PRIVATE_KEY } from "../../src/core/const";
+import { ANVIL_DEFAULT_PRIVATE_KEY, L2_ASSET_ROUTER_ADDR, L2_COMPLEX_UPGRADER_ADDR } from "../../src/core/const";
 import {
   buildCommitProofFromReceipt,
   buildExecuteParams,
   buildSendSpec,
+  computeFlowId,
   deployL1FlowStack,
   deployL2EscrowsForChains,
+  encodeErc20Data,
   ExecuteParams,
-  Participant,
+  SendSpec,
 } from "../../src/helpers/dummy-flow-helpers";
 
 const TEST_TOKEN_DECIMALS = 18;
@@ -40,6 +45,15 @@ enum FlowState {
   Initiated = 1,
   Finalized = 2,
   Reverted = 3,
+}
+
+enum SpecState {
+  Unset = 0,
+  Committed = 1,
+  Executable = 2,
+  Executed = 3,
+  Revertable = 4,
+  Reverted = 5,
 }
 
 type ChainCtx = {
@@ -65,9 +79,6 @@ describe("12 - Dummy Flow atomic A → B → C", function () {
   let l1Wallet: Wallet;
   let bridgehub: Contract;
 
-  // Amounts:
-  // - A → B: aAmount of A's test token, bridged to user on B.
-  // - B → C: bAmount of B's test token, bridged to user on C.
   const aAmount = ethers.utils.parseUnits("10", TEST_TOKEN_DECIMALS);
   const bAmount = ethers.utils.parseUnits("7", TEST_TOKEN_DECIMALS);
 
@@ -84,7 +95,7 @@ describe("12 - Dummy Flow atomic A → B → C", function () {
     l1Wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, l1Provider);
     bridgehub = new Contract(state.l1Addresses.bridgehub, getAbi("L1Bridgehub"), l1Wallet);
 
-    // Deploy linker on L1, escrows on each L2 chain (all wired to the same linker address).
+    // Deploy linker on L1, escrows on each L2 (all wired to the same linker address).
     const deployed = await deployL1FlowStack(l1Provider, state.l1Addresses.bridgehub);
     linker = deployed.linker;
 
@@ -100,6 +111,23 @@ describe("12 - Dummy Flow atomic A → B → C", function () {
       linker.address
     );
 
+    // Set the canonical escrow on the linker (escrows are all CREATE2-aligned in the
+    // dummy stack — pick any one address).
+    const canonicalEscrow = escrows[aId].address;
+    await (await linker.initialize(canonicalEscrow)).wait();
+
+    // Whitelist each chain's escrow on its L2AssetRouter via the upgrader address.
+    // Required so the escrow can call AR.initiateIndirectCall (source-side burn) and
+    // AR.finalizeDeposit (destination-side mint).
+    await Promise.all(
+      l2Triples.map(async ({ chainId, provider }) =>
+        impersonateAndRun(provider, L2_COMPLEX_UPGRADER_ADDR, async (signer) => {
+          const ar = new Contract(L2_ASSET_ROUTER_ADDR, getAbi("L2AssetRouter"), signer);
+          await (await ar.setAtomicFlowEscrow(escrows[chainId].address)).wait();
+        })
+      )
+    );
+
     const ctxs = await Promise.all(
       l2Triples.map(async ({ chainId, rpcUrl, provider }) => {
         const user = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
@@ -112,39 +140,41 @@ describe("12 - Dummy Flow atomic A → B → C", function () {
     [chainA, chainB, chainC] = ctxs;
   });
 
-  it("lock → record finality → executeFlow lands inbound mints on B and C", async () => {
-    const flowId = ethers.utils.id(`dummy.flow.${Date.now()}`);
+  it("commit → authorize → execute: A→B→C inbound mints land on B and C", async () => {
     const deadline = Math.floor(Date.now() / 1000) + 3600;
-    const recipientUser = chainA.user.address; // same default Anvil account on every chain
+    const recipientUser = chainA.user.address;
 
-    // ─── PHASE 1: registerFlow on L1 ──────────────────────────────────────────────────
-    // Anyone can register; we use the same user wallet. Participating set is all three
-    // chains; their escrow addresses are bound to the flow up-front so commit logs from
-    // other addresses can't be smuggled in later.
-    const participants: Participant[] = [
-      { chainId: BigNumber.from(chainA.chainId), escrow: chainA.escrow.address },
-      { chainId: BigNumber.from(chainB.chainId), escrow: chainB.escrow.address },
-      { chainId: BigNumber.from(chainC.chainId), escrow: chainC.escrow.address },
-    ];
-    await (await linker.registerFlow(flowId, participants, deadline)).wait();
-    expect(await linker.flowState(flowId)).to.equal(FlowState.Initiated);
-
-    // ─── PHASE 2: commitSend on each sender (A and B) ─────────────────────────────────
-    // Receive-only chains (C here) skip this step; the L1 linker will dispatch to them
-    // anyway via executeFromL1 with their inbound list.
-    const aSpec = buildSendSpec({
+    // Build both SendSpecs first so we can derive flowId from them. Each carries the
+    // origin token's (name, symbol, decimals) so the destination's NTV can deploy a
+    // bridged shim on first arrival without needing to query the source chain.
+    const erc20Data = encodeErc20Data(chainA.chainId, "Test Token", "TEST", TEST_TOKEN_DECIMALS);
+    const aSpec: SendSpec = buildSendSpec({
       destChainId: chainB.chainId,
       recipient: recipientUser,
-      token: chainA.testToken.address,
+      originChainId: chainA.chainId,
+      originToken: chainA.testToken.address,
       amount: aAmount,
+      depositor: recipientUser,
+      erc20Data,
     });
-    const bSpec = buildSendSpec({
+    const bSpec: SendSpec = buildSendSpec({
       destChainId: chainC.chainId,
       recipient: recipientUser,
-      token: chainB.testToken.address,
+      originChainId: chainB.chainId,
+      originToken: chainB.testToken.address,
       amount: bAmount,
+      depositor: recipientUser,
+      erc20Data: encodeErc20Data(chainB.chainId, "Test Token", "TEST", TEST_TOKEN_DECIMALS),
     });
+    const flowId = computeFlowId([aSpec, bSpec]);
 
+    // ─── PHASE 1: registerFlow on L1 ──────────────────────────────────────────────────
+    // Participating-chain list is sorted ascending per the linker's invariant.
+    const chainIds = [chainA.chainId, chainB.chainId, chainC.chainId].sort((x, y) => x - y);
+    await (await linker.registerFlow(flowId, chainIds, deadline)).wait();
+    expect(await linker.flowState(flowId)).to.equal(FlowState.Initiated);
+
+    // ─── PHASE 2: commitSend on each sender (A, B) ────────────────────────────────────
     const userABefore: BigNumber = await chainA.testToken.balanceOf(recipientUser);
     const userBBefore: BigNumber = await chainB.testToken.balanceOf(recipientUser);
     const userCBefore: BigNumber = await chainC.testToken.balanceOf(recipientUser);
@@ -159,93 +189,122 @@ describe("12 - Dummy Flow atomic A → B → C", function () {
       await (chainB.escrow.connect(chainB.user) as Contract).commitSend(flowId, bSpec)
     ).wait();
 
-    // Lock landed: A and B escrows now hold the user's tokens; user balance reduced.
     expect((await chainA.testToken.balanceOf(chainA.escrow.address)).toString()).to.equal(aAmount.toString());
     expect((await chainB.testToken.balanceOf(chainB.escrow.address)).toString()).to.equal(bAmount.toString());
-    expect((await chainA.testToken.balanceOf(recipientUser)).toString()).to.equal(userABefore.sub(aAmount).toString());
-    expect((await chainB.testToken.balanceOf(recipientUser)).toString()).to.equal(userBBefore.sub(bAmount).toString());
 
     // ─── PHASE 3: recordFinalitySignal on L1 ──────────────────────────────────────────
-    // Pull L2→L1 commit logs out of each commitSend receipt and submit them with mock
-    // inclusion proofs (the L1 MockL2MessageVerification accepts anything). C didn't
-    // commit, so it has no proof to submit.
     const aProof = buildCommitProofFromReceipt(chainA.chainId, aCommitReceipt, chainA.escrow.address);
     const bProof = buildCommitProofFromReceipt(chainB.chainId, bCommitReceipt, chainB.escrow.address);
     await (await linker.recordFinalitySignal(flowId, [aProof, bProof])).wait();
     expect(await linker.flowState(flowId)).to.equal(FlowState.Finalized);
 
-    // ─── PHASE 4: executeFlow on L1 → dispatches to each L2 ───────────────────────────
-    // ExecuteParams must align with participants in the order registerFlow recorded them.
-    // For each chain, msg.value pays the L2 base-token mintValue (= baseCost). l2GasLimit
-    // / pubdata defaults come from buildExecuteParams.
+    // ─── PHASE 4: executeFlow on L1 → dispatches authorizeFromL1 to each L2 ──────────
     const l2GasLimit = BigNumber.from(2_000_000);
     const l2GasPerPubdataByteLimit = BigNumber.from(800);
     const baseCosts = await Promise.all(
-      participants.map((p) =>
-        bridgehub.l2TransactionBaseCost(p.chainId, GAS_PRICE, l2GasLimit, l2GasPerPubdataByteLimit)
-      )
+      chainIds.map((cid) => bridgehub.l2TransactionBaseCost(cid, GAS_PRICE, l2GasLimit, l2GasPerPubdataByteLimit))
     );
-    const execParams: ExecuteParams[] = participants.map((_, i) =>
+    const execParams: ExecuteParams[] = chainIds.map((_, i) =>
       buildExecuteParams(baseCosts[i], recipientUser, { l2GasLimit, l2GasPerPubdataByteLimit })
     );
     const totalMintValue = baseCosts.reduce((acc, b) => acc.add(b), BigNumber.from(0));
 
     const execReceipt = await (
-      await linker.executeFlow(flowId, execParams, {
-        value: totalMintValue,
-        gasLimit: 10_000_000,
-      })
+      await linker.executeFlow(flowId, execParams, { value: totalMintValue, gasLimit: 10_000_000 })
     ).wait();
 
-    // ─── PHASE 5: Relay each priority tx into its target L2 anvil ─────────────────────
-    // The L1 receipt contains NewPriorityRequest events for the GW (per chain) and the
-    // nested L2 diamonds. We iterate the participating set and let the resolved-path
-    // helper handle the two-hop GW relay per chain.
+    // ─── PHASE 5: Relay each priority tx into its target L2 anvil ────────────────────
+    // The L1 receipt contains NPRs on multiple L1 diamond proxies:
+    //   - one per dispatched chain, on the GW's L1 diamond (the wrapping txs for GW-settled targets);
+    //   - one per dispatched chain, on the chain's own L1 diamond (the actual L2 calldata).
+    // We can't call `extractAndRelayNewPriorityRequests` once per chain in resolved-path
+    // mode because that would re-relay the GW-bound NPRs N times and the GW asset
+    // tracker rejects duplicate canonical tx hashes. Instead: do hop 1 (all GW NPRs in
+    // one batch) and hop 2 (per-chain NPRs to per-chain anvils) explicitly.
     const gwChainId = state.chains!.config.find((c) => c.role === "gateway")!.chainId;
-    const gwRpcUrl = getL2Chain(state.chains!, gwChainId).rpcUrl;
+    const gwProvider = new ethers.providers.JsonRpcProvider(getL2Chain(state.chains!, gwChainId).rpcUrl);
+    const gwL1Diamond = await bridgehub.getZKChain(gwChainId);
+
+    // Hop 1: relay every GW-bound NPR to the GW anvil.
+    await extractAndRelayNewPriorityRequests(
+      execReceipt,
+      [{ diamondProxy: gwL1Diamond, provider: gwProvider }],
+      (line) => console.log(`[GW relay] ${line}`)
+    );
+
+    // Hop 2: relay each chain's L1-diamond NPRs to its own anvil.
     for (const ctx of [chainA, chainB, chainC]) {
+      const chainL1Diamond = await bridgehub.getZKChain(ctx.chainId);
       await extractAndRelayNewPriorityRequests(
         execReceipt,
-        {
-          l1RpcUrl: state.chains!.l1!.rpcUrl,
-          bridgehubAddr: state.l1Addresses!.bridgehub,
-          chainId: ctx.chainId,
-          chainRpcUrl: ctx.rpcUrl,
-          gwRpcUrl,
-        },
-        (line) => console.log(line)
+        [{ diamondProxy: chainL1Diamond, provider: ctx.provider }],
+        (line) => console.log(`[chain ${ctx.chainId} relay] ${line}`)
       );
     }
 
-    // ─── Assertions: inbound transfers landed where expected ──────────────────────────
-    //
-    // NOTE on cross-chain token addresses: the SendSpec carries a single `token` address
-    // that the destination escrow uses as the mint target. The dummy stack has no asset
-    // registry — it relies on the deploy-test-tokens script using the same wallet at the
-    // same nonce on every chain, so `testTokens[A] == testTokens[B] == testTokens[C]`.
-    // A real bridge would resolve a chain-independent `assetId` to a per-chain token
-    // address; that's the integration the user can layer on later.
-    expect(chainA.testToken.address).to.equal(chainB.testToken.address);
-    expect(chainB.testToken.address).to.equal(chainC.testToken.address);
+    // After authorize lands, each spec's state on its source AND destination chains is
+    // Executable. Verify a couple:
+    const aSpecHash = ethers.utils.keccak256(
+      ethers.utils.defaultAbiCoder.encode(
+        [
+          "tuple(uint256 destChainId, address recipient, uint256 originChainId, address originToken, " +
+            "uint256 amount, bytes erc20Data, address depositor)",
+        ],
+        [aSpec]
+      )
+    );
+    expect(await chainA.escrow.bundleState(flowId, aSpecHash)).to.equal(SpecState.Executable);
+    expect(await chainB.escrow.bundleState(flowId, aSpecHash)).to.equal(SpecState.Executable);
 
-    // A is a sender-only (no inbound) — its user balance stays at userABefore - aAmount,
-    // and the escrow still holds aAmount (bridge custody, no burn in the dummy stack).
+    // ─── PHASE 6: user-driven execute() on each chain ─────────────────────────────────
+    // Source side burns (placeholder no-op in V1) + destination side mints.
+    await (await (chainA.escrow.connect(chainA.user) as Contract).execute(flowId, aSpec)).wait();
+    await (await (chainB.escrow.connect(chainB.user) as Contract).execute(flowId, aSpec)).wait();
+    await (await (chainB.escrow.connect(chainB.user) as Contract).execute(flowId, bSpec)).wait();
+    await (await (chainC.escrow.connect(chainC.user) as Contract).execute(flowId, bSpec)).wait();
+
+    // ─── Assertions ───────────────────────────────────────────────────────────────────
+    // Source side: tokens left the escrow at execute-time (AR.bridgehubDeposit moves
+    // them into NTV custody). User balance unchanged from post-commit.
     expect((await chainA.testToken.balanceOf(recipientUser)).toString()).to.equal(userABefore.sub(aAmount).toString());
-    expect((await chainA.testToken.balanceOf(chainA.escrow.address)).toString()).to.equal(aAmount.toString());
+    expect((await chainA.testToken.balanceOf(chainA.escrow.address)).toString()).to.equal("0");
+    expect((await chainB.testToken.balanceOf(recipientUser)).toString()).to.equal(userBBefore.sub(bAmount).toString());
+    expect((await chainB.testToken.balanceOf(chainB.escrow.address)).toString()).to.equal("0");
 
-    // B receives aAmount on the token (newly minted by B's escrow) AND is still down
-    // bAmount of the same token from its own commitSend lock.
-    const userOnB: BigNumber = await chainB.testToken.balanceOf(recipientUser);
-    expect(userOnB.toString()).to.equal(
-      userBBefore.sub(bAmount).add(aAmount).toString(),
-      "B's user balance = before - bAmount(locked) + aAmount(minted inbound)"
+    // Destination side: the user receives a freshly-deployed BridgedStandardERC20
+    // shim, NOT the chain's native testToken at the same address. Look up the shim
+    // via NTV.tokenAddress(assetId) and check its balanceOf.
+    const ntvAbi = ["function tokenAddress(bytes32 assetId) view returns (address)"];
+    const erc20AbiBal = ["function balanceOf(address) view returns (uint256)"];
+    const ntvAddr = "0x0000000000000000000000000000000000010004"; // L2_NATIVE_TOKEN_VAULT_ADDR
+
+    const aAssetId = ethers.utils.keccak256(
+      ethers.utils.defaultAbiCoder.encode(
+        ["uint256", "address", "address"],
+        [chainA.chainId, ntvAddr, chainA.testToken.address]
+      )
+    );
+    const bAssetId = ethers.utils.keccak256(
+      ethers.utils.defaultAbiCoder.encode(
+        ["uint256", "address", "address"],
+        [chainB.chainId, ntvAddr, chainB.testToken.address]
+      )
     );
 
-    // C receives bAmount (minted by C's escrow). C is pure receive-only.
-    const userOnC: BigNumber = await chainC.testToken.balanceOf(recipientUser);
-    expect(userOnC.toString()).to.equal(
-      userCBefore.add(bAmount).toString(),
-      "C's user balance increases by bAmount"
-    );
+    const ntvOnB = new Contract(ntvAddr, ntvAbi, chainB.provider);
+    const shimAonB = await ntvOnB.tokenAddress(aAssetId);
+    expect(shimAonB).to.not.equal(ethers.constants.AddressZero, "shim for A's token should be deployed on B");
+    const shimAonBBalance = await new Contract(shimAonB, erc20AbiBal, chainB.provider).balanceOf(recipientUser);
+    expect(shimAonBBalance.toString()).to.equal(aAmount.toString(), "B's user received aAmount of shim(A.token)");
+
+    const ntvOnC = new Contract(ntvAddr, ntvAbi, chainC.provider);
+    const shimBonC = await ntvOnC.tokenAddress(bAssetId);
+    expect(shimBonC).to.not.equal(ethers.constants.AddressZero, "shim for B's token should be deployed on C");
+    const shimBonCBalance = await new Contract(shimBonC, erc20AbiBal, chainC.provider).balanceOf(recipientUser);
+    expect(shimBonCBalance.toString()).to.equal(bAmount.toString(), "C's user received bAmount of shim(B.token)");
+
+    // Lifecycle final states.
+    expect(await chainA.escrow.bundleState(flowId, aSpecHash)).to.equal(SpecState.Executed);
+    expect(await chainB.escrow.bundleState(flowId, aSpecHash)).to.equal(SpecState.Executed);
   });
 });

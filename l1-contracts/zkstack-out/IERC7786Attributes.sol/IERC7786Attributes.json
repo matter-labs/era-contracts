@@ -40,6 +40,13 @@
   },
   {
     "type": "function",
+    "name": "shadowAccount",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
     "name": "unbundlerAddress",
     "inputs": [
       {

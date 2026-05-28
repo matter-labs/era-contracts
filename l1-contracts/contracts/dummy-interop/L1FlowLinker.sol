@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IL1FlowLinker, CommitProof, ExecuteParams} from "./IL1FlowLinker.sol";
-import {COMMIT_LOG_TAG, FlowState, Participant, SendSpec} from "./IDummyFlow.sol";
+import {IL1FlowLinker, CommitProof, ExecuteParams, FlowState} from "./IL1FlowLinker.sol";
 import {IL2FlowEscrow} from "./IL2FlowEscrow.sol";
+import {COMMIT_LOG_TAG} from "./IDummyFlow.sol";
 import {IL1Bridgehub} from "../core/bridgehub/IL1Bridgehub.sol";
 import {L2TransactionRequestDirect} from "../core/bridgehub/IBridgehubBase.sol";
 import {IMessageVerification} from "../common/interfaces/IMessageVerification.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {
+    ChainsNotSorted,
     CommitChainNotInParticipants,
-    CommitCountMismatch,
     CommitLogFlowIdMismatch,
     CommitLogNotIncluded,
     CommitLogSenderMismatch,
@@ -20,23 +20,31 @@ import {
     DuplicateCommit,
     DuplicateParticipantChain,
     EmptyParticipantSet,
+    ExecParamsLengthMismatch,
     FlowAlreadyRegistered,
     FlowExpired,
+    FlowIdMismatch,
     FlowNotExpired,
     FlowNotFinalized,
     FlowNotInitiated,
+    LinkerAlreadyInitialized,
+    LinkerNotInitialized,
     MintValueSumMismatch
 } from "./DummyFlowErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice See `IL1FlowLinker`. Owns flow lifecycle on L1, verifies per-chain commit logs
-/// against each chain's batch root, and drives finality by dispatching one L1→L2 priority tx
-/// per participating chain via `Bridgehub.requestL2TransactionDirect`. ETH-base chains only
-/// in this V1 — custom-base-token chains and Gateway-settled chains are out of scope.
+/// via `IMessageVerification`, and drives finality by dispatching one L1→L2 priority tx
+/// per participating chain via `Bridgehub.requestL2TransactionDirect`. ETH-base chains
+/// only in V1.
 contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
     IL1Bridgehub public immutable BRIDGEHUB;
     IMessageVerification public immutable MESSAGE_VERIFICATION;
+
+    /// @dev Canonical L2 escrow address — same on every L2 (deterministic CREATE2 with
+    /// the linker address baked into the escrow bytecode). Set once via `initialize`.
+    address public canonicalEscrow;
 
     struct Flow {
         FlowState state;
@@ -45,11 +53,17 @@ contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
     }
 
     mapping(bytes32 flowId => Flow) internal _flows;
+    /// @dev Sorted ascending; uniqueness enforced at `registerFlow`.
     mapping(bytes32 flowId => uint256[]) internal _participantChains;
-    /// @dev `escrow == address(0)` means "chainId not in this flow's participating set".
-    mapping(bytes32 flowId => mapping(uint256 chainId => address escrow)) internal _participantEscrow;
-    mapping(bytes32 flowId => mapping(uint256 chainId => SendSpec)) internal _commits;
-    mapping(bytes32 flowId => mapping(uint256 chainId => bool)) internal _hasCommit;
+
+    /// @dev For each chain that committed at least one spec for this flow: the spec hashes
+    /// it committed. Populated during `recordFinalitySignal`. Used by `executeFlow` to
+    /// route hashes to authorize-dispatches and by `revertFlow` to know which chains have
+    /// locks to refund.
+    mapping(bytes32 flowId => mapping(uint256 chainId => bytes32[])) internal _committedHashes;
+    /// @dev For each committed spec hash: the destination chain id (extracted from the
+    /// commit log). Used by `executeFlow` to route mint-dispatches.
+    mapping(bytes32 flowId => mapping(bytes32 specHash => uint256)) internal _destChainOf;
 
     constructor(IL1Bridgehub _bridgehub, IMessageVerification _messageVerification) reentrancyGuardInitializer {
         BRIDGEHUB = _bridgehub;
@@ -57,18 +71,32 @@ contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
     }
 
     /// @inheritdoc IL1FlowLinker
-    function registerFlow(bytes32 _flowId, Participant[] calldata _participants, uint64 _deadline) external {
+    function initialize(address _canonicalEscrow) external {
+        if (canonicalEscrow != address(0)) revert LinkerAlreadyInitialized();
+        canonicalEscrow = _canonicalEscrow;
+    }
+
+    /// @inheritdoc IL1FlowLinker
+    function registerFlow(bytes32 _flowId, uint256[] calldata _chainIds, uint64 _deadline) external {
+        if (canonicalEscrow == address(0)) revert LinkerNotInitialized();
         if (_flows[_flowId].state != FlowState.None) revert FlowAlreadyRegistered(_flowId);
         if (_deadline <= block.timestamp) revert DeadlineInPast(_deadline);
 
-        uint256 n = _participants.length;
+        uint256 n = _chainIds.length;
         if (n == 0) revert EmptyParticipantSet();
 
+        // Require sorted-ascending + dedup. This is the canonical ordering callers should
+        // use when computing flowId-derived data off-chain and lets membership checks be
+        // linear-scan instead of mapping reads.
+        uint256 prev;
         for (uint256 i; i < n; ++i) {
-            Participant calldata p = _participants[i];
-            if (_participantEscrow[_flowId][p.chainId] != address(0)) revert DuplicateParticipantChain(p.chainId);
-            _participantEscrow[_flowId][p.chainId] = p.escrow;
-            _participantChains[_flowId].push(p.chainId);
+            uint256 c = _chainIds[i];
+            if (i > 0 && c <= prev) {
+                if (c == prev) revert DuplicateParticipantChain(c);
+                revert ChainsNotSorted();
+            }
+            _participantChains[_flowId].push(c);
+            prev = c;
         }
 
         _flows[_flowId] = Flow({state: FlowState.Initiated, deadline: _deadline, registrar: msg.sender});
@@ -81,39 +109,90 @@ contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
         if (flow.state != FlowState.Initiated) revert FlowNotInitiated(_flowId);
         if (block.timestamp > flow.deadline) revert FlowExpired(_flowId);
 
-        // Verify + ingest each commit log. We don't require every participant to commit —
-        // receive-only chains never publish a commit log. Senders must.
-        uint256 commitCount = _proofs.length;
-        for (uint256 i; i < commitCount; ++i) {
-            _ingestCommit(_flowId, _proofs[i]);
-        }
+        bytes32[] memory collected = _ingestAllCommits(_flowId, _proofs);
 
-        // Graph closure: every `destChainId` referenced by any commit must be in the
-        // participating set. Receive-only chains were registered up-front in `registerFlow`,
-        // so the check is just a lookup against `_participantEscrow`.
-        uint256 chainsLen = _participantChains[_flowId].length;
-        for (uint256 i; i < chainsLen; ++i) {
-            uint256 chainId = _participantChains[_flowId][i];
-            if (!_hasCommit[_flowId][chainId]) continue;
-            uint256 dest = _commits[_flowId][chainId].destChainId;
-            if (_participantEscrow[_flowId][dest] == address(0)) revert DestChainNotInParticipants(dest);
+        // Completeness check: the registered flowId IS the hash commitment to the full
+        // expected spec set. Anything missing or extra fails this equality.
+        bytes32[] memory sorted = _sortHashes(collected);
+        bytes32 computedFlowId = keccak256(abi.encode(sorted));
+        if (computedFlowId != _flowId) revert FlowIdMismatch(_flowId, computedFlowId);
+
+        // Closure: every destination referenced by any commit must be in the participating
+        // set. Combined with the flowId hash check, this guarantees the graph closes.
+        for (uint256 i; i < sorted.length; ++i) {
+            uint256 dest = _destChainOf[_flowId][sorted[i]];
+            if (!_isParticipant(_flowId, dest)) revert DestChainNotInParticipants(dest);
         }
 
         flow.state = FlowState.Finalized;
         emit FlowFinalized(_flowId);
     }
 
-    /// @dev Verify a single commit log against `MESSAGE_VERIFICATION` and store its `SendSpec`.
-    /// Reverts on tag/sender/flowId mismatch, duplicate commit, or chain not in the
-    /// participating set. The verification check itself is what binds the SendSpec to an
-    /// actual L2 inclusion — without it, anyone could craft an arbitrary commit log.
-    function _ingestCommit(bytes32 _flowId, CommitProof calldata _proof) internal {
-        address expectedEscrow = _participantEscrow[_flowId][_proof.chainId];
-        if (expectedEscrow == address(0)) revert CommitChainNotInParticipants(_proof.chainId);
-        if (_proof.message.sender != expectedEscrow) {
-            revert CommitLogSenderMismatch(_proof.chainId, expectedEscrow, _proof.message.sender);
+    /// @inheritdoc IL1FlowLinker
+    function executeFlow(bytes32 _flowId, ExecuteParams[] calldata _execParams) external payable nonReentrant {
+        if (_flows[_flowId].state != FlowState.Finalized) revert FlowNotFinalized(_flowId);
+        _checkExecParams(_flowId, _execParams);
+
+        uint256[] storage chains = _participantChains[_flowId];
+        uint256 chainsLen = chains.length;
+        for (uint256 i; i < chainsLen; ++i) {
+            _dispatchAuthorize(_flowId, chains[i], _execParams[i]);
         }
-        if (_hasCommit[_flowId][_proof.chainId]) revert DuplicateCommit(_proof.chainId);
+    }
+
+    /// @inheritdoc IL1FlowLinker
+    function revertFlow(bytes32 _flowId, ExecuteParams[] calldata _execParams) external payable nonReentrant {
+        Flow storage flow = _flows[_flowId];
+        if (flow.state != FlowState.Initiated) revert FlowNotInitiated(_flowId);
+        if (block.timestamp <= flow.deadline) revert FlowNotExpired(_flowId, flow.deadline);
+
+        _checkExecParams(_flowId, _execParams);
+
+        flow.state = FlowState.Reverted;
+        emit FlowReverted(_flowId);
+
+        uint256[] storage chains = _participantChains[_flowId];
+        uint256 chainsLen = chains.length;
+        for (uint256 i; i < chainsLen; ++i) {
+            _dispatchRefund(_flowId, chains[i], _execParams[i]);
+        }
+    }
+
+    /// @inheritdoc IL1FlowLinker
+    function flowState(bytes32 _flowId) external view returns (FlowState) {
+        return _flows[_flowId].state;
+    }
+
+    function participantChains(bytes32 _flowId) external view returns (uint256[] memory) {
+        return _participantChains[_flowId];
+    }
+
+    function committedHashesFor(bytes32 _flowId, uint256 _chainId) external view returns (bytes32[] memory) {
+        return _committedHashes[_flowId][_chainId];
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                Internals
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Verify + ingest each commit proof. Returns the deduped array of all spec
+    /// hashes seen. Reverts on tag/sender/flowId mismatch, duplicate hash, or commit-chain
+    /// not in the participating set.
+    function _ingestAllCommits(bytes32 _flowId, CommitProof[] calldata _proofs) internal returns (bytes32[] memory) {
+        uint256 n = _proofs.length;
+        bytes32[] memory hashes = new bytes32[](n);
+        for (uint256 i; i < n; ++i) {
+            hashes[i] = _ingestOneCommit(_flowId, _proofs[i]);
+        }
+        return hashes;
+    }
+
+    function _ingestOneCommit(bytes32 _flowId, CommitProof calldata _proof) internal returns (bytes32) {
+        address expected = canonicalEscrow;
+        if (_proof.message.sender != expected) {
+            revert CommitLogSenderMismatch(_proof.chainId, _proof.message.sender);
+        }
+        if (!_isParticipant(_flowId, _proof.chainId)) revert CommitChainNotInParticipants(_proof.chainId);
 
         bool included = MESSAGE_VERIFICATION.proveL2MessageInclusionShared({
             _chainId: _proof.chainId,
@@ -124,65 +203,50 @@ contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
         });
         if (!included) revert CommitLogNotIncluded(_proof.chainId);
 
-        (bytes4 tag, bytes32 logFlowId, address logEscrow, SendSpec memory spec) = abi.decode(
+        (bytes4 tag, bytes32 logFlowId, uint256 destChainId, bytes32 specHash) = abi.decode(
             _proof.message.data,
-            (bytes4, bytes32, address, SendSpec)
+            (bytes4, bytes32, uint256, bytes32)
         );
         if (tag != COMMIT_LOG_TAG) revert CommitLogTagMismatch(tag);
         if (logFlowId != _flowId) revert CommitLogFlowIdMismatch(logFlowId);
-        // Belt-and-braces: the message.sender check already pins the escrow, but the
-        // payload also self-identifies and we cross-check for safety.
-        if (logEscrow != expectedEscrow) {
-            revert CommitLogSenderMismatch(_proof.chainId, expectedEscrow, logEscrow);
-        }
 
-        _hasCommit[_flowId][_proof.chainId] = true;
-        SendSpec storage stored = _commits[_flowId][_proof.chainId];
-        stored.destChainId = spec.destChainId;
-        stored.recipient = spec.recipient;
-        stored.token = spec.token;
-        stored.amount = spec.amount;
-        stored.followupTo = spec.followupTo;
-        stored.followupData = spec.followupData;
+        if (_destChainOf[_flowId][specHash] != 0) revert DuplicateCommit(specHash);
+        _destChainOf[_flowId][specHash] = destChainId;
+        _committedHashes[_flowId][_proof.chainId].push(specHash);
+
+        return specHash;
     }
 
-    /// @inheritdoc IL1FlowLinker
-    function executeFlow(bytes32 _flowId, ExecuteParams[] calldata _execParams) external payable nonReentrant {
-        if (_flows[_flowId].state != FlowState.Finalized) revert FlowNotFinalized(_flowId);
-        _checkExecParamsLen(_flowId, _execParams);
-
+    function _isParticipant(bytes32 _flowId, uint256 _chainId) internal view returns (bool) {
         uint256[] storage chains = _participantChains[_flowId];
-        uint256 chainsLen = chains.length;
-        for (uint256 i; i < chainsLen; ++i) {
-            _dispatchExecuteOne(_flowId, chains[i], _execParams[i]);
+        uint256 n = chains.length;
+        for (uint256 i; i < n; ++i) {
+            if (chains[i] == _chainId) return true;
         }
+        return false;
     }
 
-    /// @inheritdoc IL1FlowLinker
-    function revertFlow(bytes32 _flowId, ExecuteParams[] calldata _execParams) external payable nonReentrant {
-        Flow storage flow = _flows[_flowId];
-        if (flow.state != FlowState.Initiated) revert FlowNotInitiated(_flowId);
-        if (block.timestamp <= flow.deadline) revert FlowNotExpired(_flowId, flow.deadline);
-
-        _checkExecParamsLen(_flowId, _execParams);
-
-        flow.state = FlowState.Reverted;
-        emit FlowReverted(_flowId);
-
-        uint256[] storage chains = _participantChains[_flowId];
-        uint256 chainsLen = chains.length;
-        bytes memory calldataPayload = abi.encodeCall(IL2FlowEscrow.refundFromL1, (_flowId));
-        for (uint256 i; i < chainsLen; ++i) {
-            _dispatchRefundOne(_flowId, chains[i], _execParams[i], calldataPayload);
+    /// @dev In-place insertion sort. Spec sets are small (≤ chainsLen for typical flows),
+    /// so O(n²) is fine.
+    function _sortHashes(bytes32[] memory _arr) internal pure returns (bytes32[] memory) {
+        uint256 n = _arr.length;
+        for (uint256 i = 1; i < n; ++i) {
+            bytes32 key = _arr[i];
+            uint256 j = i;
+            while (j > 0 && _arr[j - 1] > key) {
+                _arr[j] = _arr[j - 1];
+                --j;
+            }
+            _arr[j] = key;
         }
+        return _arr;
     }
 
     /// @dev Validates `_execParams.length` matches the participating set size and that
-    /// `msg.value` equals the sum of per-chain `mintValue`s. ETH-base chains only — a
-    /// custom-base-token destination would require pre-approving the AssetRouter (deferred).
-    function _checkExecParamsLen(bytes32 _flowId, ExecuteParams[] calldata _execParams) internal view {
+    /// `msg.value` equals the sum of per-chain `mintValue`s.
+    function _checkExecParams(bytes32 _flowId, ExecuteParams[] calldata _execParams) internal view {
         uint256 chainsLen = _participantChains[_flowId].length;
-        if (_execParams.length != chainsLen) revert CommitCountMismatch(chainsLen, _execParams.length);
+        if (_execParams.length != chainsLen) revert ExecParamsLengthMismatch(chainsLen, _execParams.length);
         uint256 totalMintValue;
         for (uint256 i; i < chainsLen; ++i) {
             totalMintValue += _execParams[i].mintValue;
@@ -190,91 +254,96 @@ contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
         if (msg.value != totalMintValue) revert MintValueSumMismatch(totalMintValue, msg.value);
     }
 
-    function _dispatchExecuteOne(bytes32 _flowId, uint256 _chainId, ExecuteParams calldata _params) internal {
-        SendSpec[] memory inboundSpecs = _collectInbound(_flowId, _chainId);
-        bytes memory calldataPayload = abi.encodeCall(IL2FlowEscrow.executeFromL1, (_flowId, inboundSpecs));
-        bytes32 canonicalTxHash = _dispatch(_chainId, _participantEscrow[_flowId][_chainId], _params, calldataPayload);
+    /// @dev Build the spec-hash list for chain `_chainId`: union of (a) hashes it
+    /// committed (sender-side) and (b) hashes whose destChain == it (receiver-side).
+    function _hashesForChain(bytes32 _flowId, uint256 _chainId) internal view returns (bytes32[] memory) {
+        uint256 count = _countInboundFor(_flowId, _chainId) + _committedHashes[_flowId][_chainId].length;
+        bytes32[] memory out = new bytes32[](count);
+        uint256 k = _fillOwnHashes(_flowId, _chainId, out, 0);
+        _fillInboundHashes(_flowId, _chainId, out, k);
+        return out;
+    }
+
+    function _countInboundFor(bytes32 _flowId, uint256 _chainId) internal view returns (uint256) {
+        uint256[] storage chains = _participantChains[_flowId];
+        uint256 n = chains.length;
+        uint256 count;
+        for (uint256 i; i < n; ++i) {
+            uint256 src = chains[i];
+            if (src == _chainId) continue;
+            bytes32[] storage srcHashes = _committedHashes[_flowId][src];
+            uint256 m = srcHashes.length;
+            for (uint256 j; j < m; ++j) {
+                if (_destChainOf[_flowId][srcHashes[j]] == _chainId) ++count;
+            }
+        }
+        return count;
+    }
+
+    function _fillOwnHashes(
+        bytes32 _flowId,
+        uint256 _chainId,
+        bytes32[] memory _out,
+        uint256 _k
+    ) internal view returns (uint256) {
+        bytes32[] storage own = _committedHashes[_flowId][_chainId];
+        uint256 n = own.length;
+        for (uint256 i; i < n; ++i) {
+            _out[_k++] = own[i];
+        }
+        return _k;
+    }
+
+    function _fillInboundHashes(bytes32 _flowId, uint256 _chainId, bytes32[] memory _out, uint256 _k) internal view {
+        uint256[] storage chains = _participantChains[_flowId];
+        uint256 n = chains.length;
+        for (uint256 i; i < n; ++i) {
+            uint256 src = chains[i];
+            if (src == _chainId) continue;
+            bytes32[] storage srcHashes = _committedHashes[_flowId][src];
+            uint256 m = srcHashes.length;
+            for (uint256 j; j < m; ++j) {
+                if (_destChainOf[_flowId][srcHashes[j]] == _chainId) {
+                    _out[_k++] = srcHashes[j];
+                }
+            }
+        }
+    }
+
+    function _dispatchAuthorize(bytes32 _flowId, uint256 _chainId, ExecuteParams calldata _params) internal {
+        bytes32[] memory hashes = _hashesForChain(_flowId, _chainId);
+        bytes memory payload = abi.encodeCall(IL2FlowEscrow.authorizeFromL1, (_flowId, hashes));
+        bytes32 canonicalTxHash = _dispatch(_chainId, _params, payload);
         emit FlowExecuteDispatched(_flowId, _chainId, canonicalTxHash);
     }
 
-    /// @dev Refund dispatch is a no-op for receive-only chains (no lock to refund). The
-    /// caller must still pass an `ExecuteParams` entry with `mintValue == 0` so the array
-    /// stays aligned with the participating set.
-    function _dispatchRefundOne(
-        bytes32 _flowId,
-        uint256 _chainId,
-        ExecuteParams calldata _params,
-        bytes memory _calldataPayload
-    ) internal {
-        if (!_hasCommit[_flowId][_chainId]) {
+    function _dispatchRefund(bytes32 _flowId, uint256 _chainId, ExecuteParams calldata _params) internal {
+        // Only chains that committed something have anything to refund. Chains that didn't
+        // commit must still pass an ExecuteParams entry (for index alignment) but with
+        // mintValue == 0 — we skip dispatching to them.
+        bytes32[] storage committed = _committedHashes[_flowId][_chainId];
+        if (committed.length == 0) {
             if (_params.mintValue != 0) revert MintValueSumMismatch(0, _params.mintValue);
             return;
         }
-        bytes32 canonicalTxHash = _dispatch(_chainId, _participantEscrow[_flowId][_chainId], _params, _calldataPayload);
+        bytes32[] memory hashes = new bytes32[](committed.length);
+        for (uint256 i; i < committed.length; ++i) {
+            hashes[i] = committed[i];
+        }
+        bytes memory payload = abi.encodeCall(IL2FlowEscrow.authorizeRefundFromL1, (_flowId, hashes));
+        bytes32 canonicalTxHash = _dispatch(_chainId, _params, payload);
         emit FlowRefundDispatched(_flowId, _chainId, canonicalTxHash);
-    }
-
-    /// @inheritdoc IL1FlowLinker
-    function flowState(bytes32 _flowId) external view returns (FlowState) {
-        return _flows[_flowId].state;
-    }
-
-    function flowDeadline(bytes32 _flowId) external view returns (uint64) {
-        return _flows[_flowId].deadline;
-    }
-
-    function participants(bytes32 _flowId) external view returns (uint256[] memory chainIds, address[] memory escrows) {
-        uint256[] storage chains = _participantChains[_flowId];
-        uint256 n = chains.length;
-        chainIds = new uint256[](n);
-        escrows = new address[](n);
-        for (uint256 i; i < n; ++i) {
-            chainIds[i] = chains[i];
-            escrows[i] = _participantEscrow[_flowId][chains[i]];
-        }
-    }
-
-    function commit(bytes32 _flowId, uint256 _chainId) external view returns (bool hasCommitted, SendSpec memory spec) {
-        return (_hasCommit[_flowId][_chainId], _commits[_flowId][_chainId]);
-    }
-
-    /// @dev Walk all committed senders, collecting every `SendSpec` whose `destChainId`
-    /// equals `_destChainId`. With n participants this is O(n) per dispatched chain
-    /// (O(n²) overall) — fine for the small n flows we care about.
-    function _collectInbound(bytes32 _flowId, uint256 _destChainId) internal view returns (SendSpec[] memory) {
-        uint256[] storage chains = _participantChains[_flowId];
-        uint256 n = chains.length;
-
-        uint256 inboundCount;
-        for (uint256 i; i < n; ++i) {
-            uint256 src = chains[i];
-            if (!_hasCommit[_flowId][src]) continue;
-            if (_commits[_flowId][src].destChainId == _destChainId) ++inboundCount;
-        }
-
-        SendSpec[] memory result = new SendSpec[](inboundCount);
-        uint256 j;
-        for (uint256 i; i < n; ++i) {
-            uint256 src = chains[i];
-            if (!_hasCommit[_flowId][src]) continue;
-            if (_commits[_flowId][src].destChainId == _destChainId) {
-                result[j] = _commits[_flowId][src];
-                ++j;
-            }
-        }
-        return result;
     }
 
     function _dispatch(
         uint256 _chainId,
-        address _l2Escrow,
         ExecuteParams calldata _params,
         bytes memory _calldata
     ) internal returns (bytes32 canonicalTxHash) {
         L2TransactionRequestDirect memory req = L2TransactionRequestDirect({
             chainId: _chainId,
             mintValue: _params.mintValue,
-            l2Contract: _l2Escrow,
+            l2Contract: canonicalEscrow,
             l2Value: 0,
             l2Calldata: _calldata,
             l2GasLimit: _params.l2GasLimit,
