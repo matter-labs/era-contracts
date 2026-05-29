@@ -7,6 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {Utils} from "../../utils/Utils.sol";
@@ -16,6 +17,7 @@ import {IL1Bridgehub} from "contracts/core/bridgehub/IL1Bridgehub.sol";
 import {L1Bridgehub} from "contracts/core/bridgehub/L1Bridgehub.sol";
 
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManagerBase} from "contracts/state-transition/ChainTypeManagerBase.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -44,6 +46,10 @@ import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {DefaultL2UpgradeStrategy} from "./DefaultL2UpgradeStrategy.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
+
+interface IAdminPreV31 {
+    function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
+}
 
 /// @notice Script used for default CTM upgrade flow. Should be run after Ecosystem upgrade
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
@@ -810,15 +816,17 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
 
         admin = IZKChain(chainDiamondProxyAddress).getAdmin();
 
-        calls = new Call[](1);
-        calls[0] = Call({
-            target: chainDiamondProxyAddress,
-            data: abi.encodeCall(
+        (, uint32 oldProtocolVersionMinor, ) = SemVer.unpackSemVer(SafeCast.toUint96(oldProtocolVersion));
+        // Pre-v31 chain diamonds only expose the legacy 2-arg selector; the v31 selector reverts with "F".
+        bytes memory upgradeCallData = oldProtocolVersionMinor < 31
+            ? abi.encodeCall(IAdminPreV31.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData))
+            : abi.encodeCall(
                 IAdmin.upgradeChainFromVersion,
                 (chainDiamondProxyAddress, oldProtocolVersion, upgradeCutData)
-            ),
-            value: 0
-        });
+            );
+
+        calls = new Call[](1);
+        calls[0] = Call({target: chainDiamondProxyAddress, data: upgradeCallData, value: 0});
     }
 
     /// @notice Tests that it is possible to create a new chain with the new version
