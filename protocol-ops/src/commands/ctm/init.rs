@@ -106,9 +106,10 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
     let bridgehub_owner = if args.reuse_gov_and_admin {
         bridgehub_admin.clone()
     } else {
-        let owner_addr = crate::common::l1_contracts::resolve_governance(&runner.rpc_url, bridgehub)
-            .await
-            .context("resolving bridgehub.owner() from L1")?;
+        let owner_addr =
+            crate::common::l1_contracts::resolve_governance(&runner.rpc_url, bridgehub)
+                .await
+                .context("resolving bridgehub.owner() from L1")?;
         runner.prepare_sender(owner_addr).await?
     };
 
