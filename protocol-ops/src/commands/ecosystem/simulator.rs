@@ -813,7 +813,7 @@ fn append_test_upgrade_calls(
                 to: format!("{:#x}", call.target),
                 data: data_hex,
                 value: call.value.to_string(),
-                value_to_mint: None,
+                value_to_mint: Some("1".to_string()),
                 time_increase: None,
                 tag: tag.to_string(),
             });
