@@ -111,10 +111,12 @@ describe("12 - Dummy Flow atomic A → B → C", function () {
       linker.address
     );
 
-    // Set the canonical escrow on the linker (escrows are all CREATE2-aligned in the
-    // dummy stack — pick any one address).
-    const canonicalEscrow = escrows[aId].address;
-    await (await linker.initialize(canonicalEscrow)).wait();
+    // Register the escrow address per chain on the linker. On anvil all three escrows
+    // happen to land at the same CREATE address (same deployer + matching nonces), but
+    // we still pass them per-chain so the test exercises the post-canonical-escrow API.
+    const initChainIds = [aId, bId, cId].slice().sort((x, y) => x - y);
+    const initEscrows = initChainIds.map((id) => escrows[id].address);
+    await (await linker.initialize(initChainIds, initEscrows)).wait();
 
     // Whitelist each chain's escrow on its L2AssetRouter via the AR's owner.
     // Required so the escrow can call AR.initiateIndirectCall (source-side burn) and

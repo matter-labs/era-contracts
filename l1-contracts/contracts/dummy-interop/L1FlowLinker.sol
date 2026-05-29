@@ -28,6 +28,10 @@ import {
     FlowNotFinalized,
     FlowNotInitiated,
     LinkerAlreadyInitialized,
+    LinkerEscrowNotRegistered,
+    LinkerInitEmptyChainIds,
+    LinkerInitEscrowLenMismatch,
+    LinkerInitZeroEscrow,
     LinkerNotInitialized,
     MintValueSumMismatch
 } from "./DummyFlowErrors.sol";
@@ -42,9 +46,16 @@ contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
     IL1Bridgehub public immutable BRIDGEHUB;
     IMessageVerification public immutable MESSAGE_VERIFICATION;
 
-    /// @dev Canonical L2 escrow address — same on every L2 (deterministic CREATE2 with
-    /// the linker address baked into the escrow bytecode). Set once via `initialize`.
-    address public canonicalEscrow;
+    /// @dev Per-chain L2 escrow addresses. Populated by `initialize`. Used as both the
+    /// expected commit-log `sender` (in `_ingestOneCommit`) and the `l2Contract` target of
+    /// the L1->L2 priority tx (in `_dispatch`).
+    mapping(uint256 chainId => address) public escrowOf;
+
+    /// @dev True once `initialize` has been called. We can't gate on `escrowOf` alone
+    /// because a chain could legitimately register `address(0)` if the deployer wanted to
+    /// — though we forbid that in `initialize`, the explicit flag still keeps the check
+    /// cheap and unambiguous.
+    bool internal _initialized;
 
     struct Flow {
         FlowState state;
@@ -71,14 +82,21 @@ contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
     }
 
     /// @inheritdoc IL1FlowLinker
-    function initialize(address _canonicalEscrow) external {
-        if (canonicalEscrow != address(0)) revert LinkerAlreadyInitialized();
-        canonicalEscrow = _canonicalEscrow;
+    function initialize(uint256[] calldata _chainIds, address[] calldata _escrows) external {
+        if (_initialized) revert LinkerAlreadyInitialized();
+        uint256 n = _chainIds.length;
+        if (n == 0) revert LinkerInitEmptyChainIds();
+        if (n != _escrows.length) revert LinkerInitEscrowLenMismatch(n, _escrows.length);
+        for (uint256 i; i < n; ++i) {
+            if (_escrows[i] == address(0)) revert LinkerInitZeroEscrow(_chainIds[i]);
+            escrowOf[_chainIds[i]] = _escrows[i];
+        }
+        _initialized = true;
     }
 
     /// @inheritdoc IL1FlowLinker
     function registerFlow(bytes32 _flowId, uint256[] calldata _chainIds, uint64 _deadline) external {
-        if (canonicalEscrow == address(0)) revert LinkerNotInitialized();
+        if (!_initialized) revert LinkerNotInitialized();
         if (_flows[_flowId].state != FlowState.None) revert FlowAlreadyRegistered(_flowId);
         if (_deadline <= block.timestamp) revert DeadlineInPast(_deadline);
 
@@ -95,6 +113,8 @@ contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
                 if (c == prev) revert DuplicateParticipantChain(c);
                 revert ChainsNotSorted();
             }
+            // Fail early: every participating chain must already have an escrow registered.
+            if (escrowOf[c] == address(0)) revert LinkerEscrowNotRegistered(c);
             _participantChains[_flowId].push(c);
             prev = c;
         }
@@ -192,7 +212,10 @@ contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
     }
 
     function _ingestOneCommit(bytes32 _flowId, CommitProof calldata _proof) internal returns (bytes32) {
-        address expected = canonicalEscrow;
+        // Escrow expected on this specific chain. `registerFlow` already guaranteed every
+        // participant chain has a non-zero entry, but a non-participant chain's proof
+        // would yield `address(0)` here — still caught below by the participant check.
+        address expected = escrowOf[_proof.chainId];
         if (_proof.message.sender != expected) {
             revert CommitLogSenderMismatch(_proof.chainId, _proof.message.sender);
         }
@@ -344,10 +367,12 @@ contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
         ExecuteParams calldata _params,
         bytes memory _calldata
     ) internal returns (bytes32 canonicalTxHash) {
+        // Per-chain escrow target. `registerFlow` has already enforced non-zero entry for
+        // every participant; this read just resolves which address to dispatch to.
         L2TransactionRequestDirect memory req = L2TransactionRequestDirect({
             chainId: _chainId,
             mintValue: _params.mintValue,
-            l2Contract: canonicalEscrow,
+            l2Contract: escrowOf[_chainId],
             l2Value: 0,
             l2Calldata: _calldata,
             l2GasLimit: _params.l2GasLimit,

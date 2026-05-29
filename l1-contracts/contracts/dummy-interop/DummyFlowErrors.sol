@@ -25,6 +25,10 @@ error CommitChainNotInParticipants(uint256 chainId);
 error DestChainNotInParticipants(uint256 destChainId);
 error MintValueSumMismatch(uint256 expected, uint256 actual);
 error ExecParamsLengthMismatch(uint256 expected, uint256 actual);
+error LinkerInitEscrowLenMismatch(uint256 chainIdsLen, uint256 escrowsLen);
+error LinkerInitEmptyChainIds();
+error LinkerInitZeroEscrow(uint256 chainId);
+error LinkerEscrowNotRegistered(uint256 chainId);
 
 // ── L2FlowEscrow errors ─────────────────────────────────────────────────────────────
 error EscrowAlreadyInitialized();

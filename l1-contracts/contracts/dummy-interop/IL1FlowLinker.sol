@@ -44,9 +44,11 @@ enum FlowState {
 /// catches partial-commit attacks (e.g., one side of a swap not committing) without any
 /// count-based heuristic.
 ///
-/// The escrow address on every participating L2 is implied: a single canonical address
-/// known to the linker via the one-shot `initialize`. Commit-log validation checks each
-/// log's sender equals that address.
+/// The escrow address per participating L2 is registered up-front: the linker's one-shot
+/// `initialize` populates a `chainId -> escrowAddress` map. Commit-log validation checks
+/// each log's sender equals the escrow registered for that chain. This removes the older
+/// "single canonical address everywhere" assumption — useful when different L2s have
+/// non-matching deployment quirks (different ContractDeployer, nonce constraints, etc.).
 interface IL1FlowLinker {
     event FlowRegistered(bytes32 indexed flowId, address indexed registrar, uint64 deadline);
     event FlowFinalized(bytes32 indexed flowId);
@@ -54,9 +56,14 @@ interface IL1FlowLinker {
     event FlowExecuteDispatched(bytes32 indexed flowId, uint256 indexed chainId, bytes32 canonicalTxHash);
     event FlowRefundDispatched(bytes32 indexed flowId, uint256 indexed chainId, bytes32 canonicalTxHash);
 
-    /// @notice One-shot post-deploy setup. Records the canonical L2 escrow address that
-    /// every participating L2 is expected to have at via deterministic CREATE2.
-    function initialize(address _canonicalEscrow) external;
+    /// @notice One-shot post-deploy setup. Registers the escrow address for each chain the
+    /// linker may coordinate. `_chainIds` and `_escrows` are parallel arrays of equal
+    /// length; the caller is responsible for sorting/uniqueness. Subsequent calls revert.
+    function initialize(uint256[] calldata _chainIds, address[] calldata _escrows) external;
+
+    /// @notice Returns the L2 escrow address registered for `_chainId`, or `address(0)` if
+    /// the chain was never registered.
+    function escrowOf(uint256 _chainId) external view returns (address);
 
     /// @notice Register a flow on L1. `_chainIds` MUST be sorted ascending and deduplicated.
     /// `_flowId` is the `keccak256(abi.encode(sortedSpecHashes))` the participants agreed on
@@ -72,7 +79,7 @@ interface IL1FlowLinker {
     function recordFinalitySignal(bytes32 _flowId, CommitProof[] calldata _proofs) external;
 
     /// @notice Dispatch one `Bridgehub.requestL2TransactionDirect` per participating chain,
-    /// targeting the canonical escrow with payload
+    /// targeting that chain's registered escrow (see `escrowOf`) with payload
     /// `authorizeFromL1(flowId, specHashes)`. The hashes sent to chain `X` are the union of
     /// (a) hashes whose source is `X` (committed there) and (b) hashes whose destination is
     /// `X`. `msg.value` must equal sum of `_execParams[i].mintValue`.
