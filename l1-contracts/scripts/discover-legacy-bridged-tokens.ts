@@ -4,7 +4,7 @@
  * v31 stage3 (`CoreUpgrade_v31.stage3` → `registerBridgedTokensInNTV`) has the
  * full set of legacy token addresses to seed `NTV.bridgedTokens`.
  *
- * Sources scanned (union, deduped, checksummed):
+ * Sources scanned (output is the union, deduped and checksummed):
  *
  *   - L1AssetRouter.LegacyDepositInitiated(chainId, l2DepositTxHash, from, to,
  *       l1Token, amount) — legacy ERC20 deposits routed through the asset
@@ -26,8 +26,8 @@
  *     Reads `core_contracts.bridgehub_proxy_addr` from
  *     `upgrade-envs/permanent-values/<env>.toml`, resolves AssetRouter,
  *     NativeTokenVault and L1ERC20Bridge on-chain, scans logs over the
- *     supplied (or full-history) block range, and writes the deduped token
- *     list to `--out` (default
+ *     supplied (or full-history) block range, and writes the deduped,
+ *     EIP-55-checksummed token list to `--out` (default
  *     `upgrade-envs/v0.31.0-interopB/<env>-bridged-tokens.toml`).
  *
  * Output schema mirrors what `TokenMigrationUtils._readConfiguredBridgedTokens`

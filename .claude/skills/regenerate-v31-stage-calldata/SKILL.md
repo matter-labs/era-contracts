@@ -122,13 +122,18 @@ diverges real Sepolia from the fork state phase 1.5 used as its baseline.
 The fix is to rotate CREATE2 salts before the next regen — see the pre-flight
 section below.
 
-## How to run — only Docker, two modes
+## How to run — Docker on macOS, native or Docker on Linux
 
 Every regen, broadcast, and sim-emit step runs inside the published image so
-Foundry + Solidity artifacts are bit-identical run-to-run. There is **no
-fully-local mode** — macOS-built Foundry artifacts diverge from Linux ones
-just enough to break reproducibility. The single entry point is
-`scripts/regen-via-docker.ts` with two binary-source modes:
+Foundry + Solidity artifacts are bit-identical run-to-run. **On macOS, Docker
+is required** — macOS-built Foundry artifacts diverge from Linux ones just
+enough to break reproducibility. **On Linux you can skip Docker entirely**
+and run `protocol_ops` and Foundry directly against the host toolchain
+(produces the same bit-identical artifacts as the image since the image is
+itself linux/amd64); the Docker path still works and is what CI uses.
+
+The Docker entry point is `scripts/regen-via-docker.ts` with two
+binary-source modes:
 
 | Mode                                                                                 | When                                                                  | What's mounted                                                  | Per-iteration cost                                            |
 | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------- |

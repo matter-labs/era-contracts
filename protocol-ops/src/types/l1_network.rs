@@ -42,6 +42,16 @@ impl L1Network {
         }
     }
 
+    /// `zk_token_asset_id` for live networks is intentionally read from
+    /// `permanent-values/<env>.toml` rather than hard-coded here. There is no
+    /// single "canonical" Sepolia or Mainnet ZK asset ID — the same L1
+    /// network hosts multiple deployments (stage uses a different ZkTokenV2
+    /// instance than testnet, mainnet has its own), and inlining a constant
+    /// in this enum forces a code change every time a new env appears. The
+    /// per-env TOML keeps the asset ID next to the other env-specific
+    /// addresses (bridgehub, CTMs, etc.) and makes it discoverable by anyone
+    /// onboarding a new chain. Only `Localhost` returns a built-in constant
+    /// because interop tests deterministically deploy the token themselves.
     pub fn zk_token_asset_id(&self) -> anyhow::Result<H256> {
         match self {
             L1Network::Localhost => {

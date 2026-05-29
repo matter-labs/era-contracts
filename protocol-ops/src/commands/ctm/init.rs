@@ -7,6 +7,7 @@ use crate::commands::ctm::deploy::{deploy, CtmDeployInput};
 use crate::commands::hub::register_ctm::{register_ctm, RegisterCtmInput};
 
 use crate::commands::output::write_output_if_requested;
+use crate::common::env_config::EnvConfig;
 use crate::common::SharedRunArgs;
 use crate::common::{forge::ForgeRunner, logger, wallets::Wallet};
 use crate::config::forge_interface::deploy_ctm::output::DeployCTMOutput;
@@ -17,15 +18,24 @@ use crate::types::VMOption;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct CtmInitArgs {
+    /// Per-env preset (`stage` / `testnet` / `mainnet` / `local`). Loads
+    /// `upgrade-envs/permanent-values/<env>.toml` and supplies defaults for
+    /// `--bridgehub`, `--zk-token-asset-id`, and `--owner` when those flags
+    /// are omitted. Explicit flags still win.
+    #[clap(long, help_heading = "Topology")]
+    pub env: Option<String>,
+
     // Input
-    /// Bridgehub proxy address
+    /// Bridgehub proxy address. Required unless `--env` is set (then sourced
+    /// from `permanent-values/<env>.toml`).
     #[clap(long, help_heading = "Input")]
-    pub bridgehub: Address,
+    pub bridgehub: Option<Address>,
     /// VM type: zksyncos or eravm
     #[clap(long, value_enum, default_value_t = VMOption::ZKSyncOsVM, help_heading = "Input")]
     pub vm_type: VMOption,
 
-    /// Owner address (default: sender)
+    /// Owner address (default: sender, or env's `owner_address` when `--env`
+    /// is set).
     #[clap(long, help_heading = "Signers")]
     pub owner: Option<Address>,
 
@@ -49,7 +59,8 @@ pub struct CtmInitArgs {
     /// Enable support for legacy bridge testing
     #[clap(long, default_value_t = false, num_args = 0..=1, default_missing_value = "true", help_heading = "Advanced input")]
     pub with_legacy_bridge: bool,
-    /// ZK token asset ID
+    /// ZK token asset ID (defaults from env's `zk_token_asset_id` when
+    /// `--env` is set).
     #[clap(long, help_heading = "Advanced input")]
     pub zk_token_asset_id: Option<H256>,
     /// CREATE2 factory salt
@@ -60,15 +71,31 @@ pub struct CtmInitArgs {
 // ── run() ───────────────────────────────────────────────────────────────────
 
 pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
+    let env_cfg = match args.env.as_deref() {
+        Some(env) => Some(EnvConfig::load(env)?),
+        None => None,
+    };
+
+    let bridgehub = args
+        .bridgehub
+        .or_else(|| env_cfg.as_ref().map(|c| c.bridgehub()))
+        .ok_or_else(|| anyhow::anyhow!("--bridgehub or --env must be supplied"))?;
+    let owner_override = args
+        .owner
+        .or_else(|| env_cfg.as_ref().and_then(|c| c.owner_address()));
+    let zk_token_asset_id = args
+        .zk_token_asset_id
+        .or_else(|| env_cfg.as_ref().and_then(|c| c.zk_token_asset_id()));
+
     let mut runner = ForgeRunner::new(&args.shared)?;
     let deployer = runner.prepare_sender(args.deployer_address).await?;
 
-    let owner = Wallet::resolve(args.owner, None, &deployer)?;
+    let owner = Wallet::resolve(owner_override, None, &deployer)?;
 
     // Bridgehub is the single source of truth — admin + owner come straight
     // from it. No override.
     let bridgehub_admin_addr =
-        crate::common::l1_contracts::resolve_bridgehub_admin(&runner.rpc_url, args.bridgehub)
+        crate::common::l1_contracts::resolve_bridgehub_admin(&runner.rpc_url, bridgehub)
             .await
             .context("resolving bridgehub.admin() from L1")?;
     let bridgehub_admin = runner.prepare_sender(bridgehub_admin_addr).await?;
@@ -79,21 +106,20 @@ pub async fn run(args: CtmInitArgs) -> anyhow::Result<()> {
     let bridgehub_owner = if args.reuse_gov_and_admin {
         bridgehub_admin.clone()
     } else {
-        let owner_addr =
-            crate::common::l1_contracts::resolve_governance(&runner.rpc_url, args.bridgehub)
-                .await
-                .context("resolving bridgehub.owner() from L1")?;
+        let owner_addr = crate::common::l1_contracts::resolve_governance(&runner.rpc_url, bridgehub)
+            .await
+            .context("resolving bridgehub.owner() from L1")?;
         runner.prepare_sender(owner_addr).await?
     };
 
     let ctm_input = CtmInitInput {
-        bridgehub: args.bridgehub,
+        bridgehub,
         owner: owner.address,
         vm_type: args.vm_type,
         reuse_gov_and_admin: args.reuse_gov_and_admin,
         with_testnet_verifier: args.with_testnet_verifier,
         with_legacy_bridge: args.with_legacy_bridge,
-        zk_token_asset_id: args.zk_token_asset_id,
+        zk_token_asset_id,
         create2_factory_salt: args.create2_factory_salt,
     };
     let ctm_output = ctm_init(

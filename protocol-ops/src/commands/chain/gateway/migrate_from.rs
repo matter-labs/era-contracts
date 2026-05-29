@@ -367,7 +367,13 @@ pub(crate) async fn stage_set_da_validator_pair_from(
     l1_da_validator: Address,
     l2_da_commitment_scheme: L2DACommitmentScheme,
 ) -> anyhow::Result<()> {
-    let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
+    // migrate_from has no `--access-control-restriction` flag — chains that
+    // migrate off the gateway use the Ownable ChainAdmin path. If/when that
+    // changes, lift the flag into this helper too.
+    let access_control_restriction = ethers::types::Address::zero();
+    let sender = runner
+        .prepare_chain_admin_broadcaster(bridgehub, chain_id, access_control_restriction)
+        .await?;
 
     // Use the existing Admin.setDAValidatorPair flow (NOT the gateway-routed
     // setDAValidatorPairWithGateway) — after migrating back, the chain's
@@ -379,6 +385,7 @@ pub(crate) async fn stage_set_da_validator_pair_from(
             "setDAValidatorPair",
             (
                 bridgehub,
+                access_control_restriction,
                 chain_id,
                 l1_da_validator,
                 l2_da_commitment_scheme as u8,

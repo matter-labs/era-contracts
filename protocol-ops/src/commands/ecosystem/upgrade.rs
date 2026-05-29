@@ -1183,8 +1183,11 @@ fn read_asset_tracker_proxy_from_core(core_toml: &Path) -> anyhow::Result<Addres
 
 /// Read the multi-CTM config TOML and return per-CTM inputs + the
 /// `core_is_zk_sync_os` value to pass to the Core script. If the TOML doesn't
-/// set `core_is_zk_sync_os`, fall back to the first CTM entry's `is_zk_sync_os`
-/// (and require that one to be set in that case — Core needs *some* value).
+/// set `core_is_zk_sync_os`, derive it from the CTM entries: prefer `false`
+/// (Era) over `true` when both flavors are present (Era's v31 ABI is a
+/// superset, so a Core deploy targeting Era is also valid for Atlas). The
+/// preference is intentionally order-independent — `[[ctm]]` ordering in the
+/// TOML must not change the resulting Core flavor.
 fn load_ctm_config(path: &Path) -> anyhow::Result<(Vec<CtmInputs>, Option<bool>)> {
     let content = fs::read_to_string(path)
         .with_context(|| format!("Failed to read CTM config TOML: {}", path.display()))?;
@@ -1198,9 +1201,15 @@ fn load_ctm_config(path: &Path) -> anyhow::Result<(Vec<CtmInputs>, Option<bool>)
         );
     }
 
-    let core_is_zk_sync_os = parsed
-        .core_is_zk_sync_os
-        .or_else(|| parsed.ctms.first().and_then(|c| c.is_zk_sync_os));
+    let core_is_zk_sync_os = parsed.core_is_zk_sync_os.or_else(|| {
+        if parsed.ctms.iter().any(|c| c.is_zk_sync_os == Some(false)) {
+            Some(false)
+        } else if parsed.ctms.iter().any(|c| c.is_zk_sync_os == Some(true)) {
+            Some(true)
+        } else {
+            None
+        }
+    });
 
     let ctms: Vec<CtmInputs> = parsed
         .ctms

@@ -12,7 +12,6 @@ import {DeployGatewayTransactionFilterer} from "deploy-scripts/gateway/DeployGat
 import {ChainInfoFromBridgehub, Utils} from "deploy-scripts/utils/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {AdminFunctions} from "deploy-scripts/AdminFunctions.s.sol";
-import {GetDiamondCutData} from "deploy-scripts/utils/GetDiamondCutData.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IMigrator} from "contracts/state-transition/chain-interfaces/IMigrator.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -134,11 +133,10 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
 
     function migrateChainToGateway(uint256 migratingChainId) public {
         AdminFunctions adminScript = new AdminFunctions();
-        // `skipLogs = true`: under `forge test` no fork URL is active, so
-        // `eth_getLogs` would revert. The test harness preloads
-        // `gatewayDiamondCutData` from TOML during `initializeConfig`, so we
-        // can pass the cached value directly to `migrateChainToGatewayWithCutData`.
-        GetDiamondCutData.getDiamondCutAndForceDeployment(gatewayCTMAddress, true);
+        // Under `forge test` no fork URL is active, so `eth_getLogs` would
+        // revert if we tried to derive the diamond-cut data on the fly.
+        // `initializeConfig` preloads `gatewayDiamondCutData` from TOML, so we
+        // pass the cached value directly to `migrateChainToGatewayWithCutData`.
         adminScript.migrateChainToGatewayWithCutData(
             _gatewayGovernanceConfig.bridgehubProxy,
             _getL1GasPrice(),

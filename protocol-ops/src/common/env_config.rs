@@ -177,8 +177,11 @@ pub enum GovernanceKind {
 
 #[derive(Debug, Deserialize)]
 pub struct CtmContracts {
-    /// Legacy single-CTM Era address (kept for anvil-interop). New consumers
-    /// should read the `ctms` array.
+    /// Legacy single-CTM Era address. Only `anvil-interop` synthetic-state
+    /// fixtures still read this flat field directly; every protocol-ops
+    /// command consumes the multi-CTM `ctms` array below. TODO: thread the
+    /// `[[ctm_contracts.ctms]]` shape through anvil-interop and remove this
+    /// field so the legacy shape isn't carried in two places.
     #[serde(default)]
     pub ctm_proxy_addr: Option<Address>,
     /// v31 multi-CTM list — proxy + per-CTM overrides for pre-v31 envs.
@@ -201,8 +204,12 @@ pub struct CtmEntry {
 pub struct PermanentContracts {
     #[serde(default)]
     pub create2_factory_addr: Option<Address>,
-    #[serde(default)]
-    pub create2_factory_salt: Option<H256>,
+    // NOTE: `create2_factory_salt` deliberately does NOT live here. The salt
+    // rotates every regen (the CREATE2 deployer would collide with previously
+    // deployed addresses if reused), so it belongs in the v31 input TOML
+    // (`upgrade-envs/v0.31.0-interopB/<env>.toml [contracts] create2_factory_salt`)
+    // alongside the rest of the per-regen inputs. See
+    // `EnvConfig::v31_create2_factory_salt`.
 }
 
 /// Fields read from the v31 upgrade input TOML (best-effort regex parse —
@@ -280,13 +287,6 @@ impl EnvConfig {
             .permanent_contracts
             .as_ref()
             .and_then(|p| p.create2_factory_addr)
-    }
-
-    pub fn create2_factory_salt(&self) -> Option<H256> {
-        self.permanent
-            .permanent_contracts
-            .as_ref()
-            .and_then(|p| p.create2_factory_salt)
     }
 
     /// Per-upgrade-version CREATE2 salt from

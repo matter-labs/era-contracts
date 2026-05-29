@@ -51,10 +51,17 @@ async fn run_update(args: ChainValidatorArgs, add: bool) -> anyhow::Result<()> {
     let (bridgehub, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
-    // Sender is always the chain admin — that's the only address whose
-    // simulation authors a ChainAdmin.multicall with the intended semantics.
-    let sender = runner.prepare_chain_admin(bridgehub, chain_id).await?;
-    let admin_address = sender.address;
+    // `AdminFunctions.updateValidator` → `Utils.adminExecute` internally
+    // `vm.startBroadcast(adminOwner)` (or the AccessControlRestriction default
+    // admin when set), so Forge's sender must match that EOA for nonce tracking
+    // on the anvil fork.
+    let sender = runner
+        .prepare_chain_admin_broadcaster(bridgehub, chain_id, args.access_control_restriction)
+        .await?;
+    let admin_address =
+        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
+            .await
+            .context("resolving chain admin from L1")?;
     let validator_timelock = crate::common::l1_contracts::resolve_validator_timelock(
         &runner.rpc_url,
         bridgehub,

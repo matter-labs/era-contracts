@@ -892,6 +892,7 @@ contract AdminFunctions is Script, IAdminFunctions {
 
     function setDAValidatorPair(
         address _bridgehub,
+        address _accessControlRestriction,
         uint256 _chainId,
         address _l1DaValidator,
         L2DACommitmentScheme _l2DaCommitmentScheme,
@@ -906,7 +907,7 @@ contract AdminFunctions is Script, IAdminFunctions {
             data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaCommitmentScheme))
         });
 
-        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+        saveAndSendAdminTx(chainInfo.admin, _accessControlRestriction, calls, _shouldSend);
     }
 
     struct MigrateChainToGatewayParams {
@@ -1318,10 +1319,19 @@ contract AdminFunctions is Script, IAdminFunctions {
     }
 
     function saveAndSendAdminTx(address _admin, Call[] memory _calls, bool _shouldSend) internal {
+        saveAndSendAdminTx(_admin, address(0), _calls, _shouldSend);
+    }
+
+    function saveAndSendAdminTx(
+        address _admin,
+        address _accessControlRestriction,
+        Call[] memory _calls,
+        bool _shouldSend
+    ) internal {
         bytes memory data = abi.encode(_calls);
 
         if (_shouldSend && _calls.length > 0) {
-            Utils.adminExecuteCalls(_admin, address(0), _calls);
+            Utils.adminExecuteCalls(_admin, _accessControlRestriction, _calls);
         }
 
         saveOutput(Output({admin: _admin, encodedData: data}));

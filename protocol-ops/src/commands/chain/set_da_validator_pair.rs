@@ -4,6 +4,7 @@ use ethers::types::Address;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::output::write_output_if_requested;
+use crate::common::addresses::ZERO_ADDRESS;
 use crate::common::forge::ForgeRunner;
 use crate::common::logger;
 use crate::common::SharedRunArgs;
@@ -12,8 +13,9 @@ use crate::types::L2DACommitmentScheme;
 
 /// Set the DA validator pair for an L1-settling chain.
 ///
-/// Drives `AdminFunctions.s.sol::setDAValidatorPair(bridgehub, chainId,
-/// l1DaValidator, l2DaCommitmentScheme, true)` against a forked anvil and
+/// Drives `AdminFunctions.s.sol::setDAValidatorPair(bridgehub,
+/// accessControlRestriction, chainId, l1DaValidator, l2DaCommitmentScheme,
+/// true)` against a forked anvil and
 /// emits a Gnosis Safe Transaction Builder JSON bundle via `--out`. Replay
 /// the bundle via `protocol-ops dev execute-safe` (or any Safe-bundle-aware
 /// executor) to apply it.
@@ -31,6 +33,11 @@ pub struct ChainSetDaValidatorPairArgs {
     #[clap(flatten)]
     #[serde(flatten)]
     pub topology: crate::common::EcosystemChainArgs,
+
+    /// AccessControlRestriction contract address.
+    /// Use `ZERO_ADDRESS` for Ownable ChainAdmin.
+    #[clap(long, default_value = ZERO_ADDRESS)]
+    pub access_control_restriction: Address,
 
     /// L1 DA validator contract address. The post-upgrade `RollupL1DAValidator`
     /// (or analogous) deployed by the ecosystem upgrade.
@@ -64,11 +71,12 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
         crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, bridgehub, chain_id)
             .await
             .context("resolving chain admin from L1")?;
-    // The Solidity script executes via ChainAdmin, but broadcasts from the
-    // ChainAdmin owner internally. Use that owner as Forge's sender so Foundry
-    // tracks the correct nonce on the anvil fork.
+    // `AdminFunctions.setDAValidatorPair` → `Utils.adminExecuteCalls` internally
+    // `vm.startBroadcast(adminOwner)` (or the AccessControlRestriction default
+    // admin when `--access-control-restriction` is set), so Forge's sender must
+    // match that EOA for nonce tracking on the anvil fork.
     let sender = runner
-        .prepare_chain_admin_owner(bridgehub, chain_id)
+        .prepare_chain_admin_broadcaster(bridgehub, chain_id, args.access_control_restriction)
         .await?;
 
     let forge = runner
@@ -77,6 +85,7 @@ pub async fn run(args: ChainSetDaValidatorPairArgs) -> anyhow::Result<()> {
             "setDAValidatorPair",
             (
                 bridgehub,
+                args.access_control_restriction,
                 ethers::types::U256::from(chain_id),
                 args.l1_da_validator,
                 args.l2_da_commitment_scheme as u8,

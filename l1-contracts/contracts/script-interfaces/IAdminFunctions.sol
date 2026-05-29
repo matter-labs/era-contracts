@@ -143,6 +143,7 @@ interface IAdminFunctions {
 
     function setDAValidatorPair(
         address bridgehub,
+        address accessControlRestriction,
         uint256 chainId,
         address l1DaValidator,
         L2DACommitmentScheme l2DaCommitmentScheme,

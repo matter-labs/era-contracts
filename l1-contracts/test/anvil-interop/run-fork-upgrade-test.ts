@@ -388,8 +388,11 @@ async function main(): Promise<void> {
     }
 
     // ── Step 9: Verify protocol version bump ─────────────────────
-    if (skipL2) {
-      console.log("\n=== Step 9: Skipped protocol-version verify (FORK_SKIP_L2=1, no L2 forks) ===\n");
+    // `verifyProtocolVersions` reads the L1 diamond proxy via `l1Provider` —
+    // it doesn't touch any L2 fork, so `skipL2` alone is no reason to skip it.
+    // We skip only when the per-chain L1 upgrade tx wasn't broadcast.
+    if (skipChainUpgrades) {
+      console.log("\n=== Step 9: Skipped protocol-version verify (FORK_SKIP_CHAIN_UPGRADES=1) ===\n");
     } else {
       console.log(`\n=== Step 9: Verifying protocol versions (${elapsed()}) ===\n`);
       await verifyProtocolVersions(l1Provider, upgradeChainAddresses);
