@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -376,6 +377,8 @@ pub struct GovernanceTomlToSimulatorArgs {
 #[derive(Debug, Deserialize)]
 struct GovernanceCallsToml {
     governance_calls: GovernanceCalls,
+    #[serde(default)]
+    test_upgrade_calls: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -765,5 +768,57 @@ fn governance_toml_to_simulator_transactions(
             });
         }
     }
+
+    append_test_upgrade_calls(&mut out, &parsed.test_upgrade_calls, network, descriptions)?;
+
     Ok(out)
+}
+
+fn append_test_upgrade_calls(
+    out: &mut Vec<SimulatorTransaction>,
+    test_upgrade_calls: &BTreeMap<String, String>,
+    network: &str,
+    descriptions: &SimDescriptionRegistry,
+) -> anyhow::Result<()> {
+    for (tag, encoded_calls) in test_upgrade_calls {
+        if !tag.starts_with("test_") || tag.ends_with("_caller") {
+            continue;
+        }
+
+        let caller_key = format!("{tag}_caller");
+        let caller = test_upgrade_calls
+            .get(&caller_key)
+            .with_context(|| format!("missing [test_upgrade_calls].{caller_key}"))?
+            .parse::<Address>()
+            .with_context(|| format!("invalid [test_upgrade_calls].{caller_key} address"))?;
+        let calls = decode_calls(encoded_calls)
+            .with_context(|| format!("failed to decode [test_upgrade_calls].{tag}"))?;
+
+        for (idx, call) in calls.into_iter().enumerate() {
+            let data_hex = format!("0x{}", hex::encode(&call.data));
+            let description = descriptions
+                .lookup(call.target, &data_hex)
+                .unwrap_or_else(|| {
+                    let selector = data_hex.get(..10).unwrap_or("0x");
+                    format!(
+                        "[unlabelled] {tag} call {} to={:#x} sel={selector}",
+                        idx + 1,
+                        call.target
+                    )
+                });
+            out.push(SimulatorTransaction {
+                description,
+                network: network.to_string(),
+                from: format!("{caller:#x}"),
+                to: format!("{:#x}", call.target),
+                data: data_hex,
+                value: call.value.to_string(),
+                value_to_mint: None,
+                time_increase: None,
+                tag: tag.to_string(),
+            });
+        }
+    }
+
+    Ok(())
 }
