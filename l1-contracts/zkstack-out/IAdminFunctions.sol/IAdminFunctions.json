@@ -726,6 +726,11 @@
         "internalType": "address"
       },
       {
+        "name": "accessControlRestriction",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "chainId",
         "type": "uint256",
         "internalType": "uint256"

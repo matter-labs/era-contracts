@@ -800,6 +800,11 @@
         "internalType": "address"
       },
       {
+        "name": "_accessControlRestriction",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "_chainId",
         "type": "uint256",
         "internalType": "uint256"

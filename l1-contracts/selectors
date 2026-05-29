@@ -4930,7 +4930,7 @@ IAdminFunctions
 |----------+------------------------------------------------------------------------------------------------------------+------------|
 | Function | revokeGatewayWhitelist(address,uint256,address,bool)                                                       | 0xa3e54db6 |
 |----------+------------------------------------------------------------------------------------------------------------+------------|
-| Function | setDAValidatorPair(address,uint256,address,uint8,bool)                                                     | 0xc8fb3685 |
+| Function | setDAValidatorPair(address,address,uint256,address,uint8,bool)                                             | 0xe082b812 |
 |----------+------------------------------------------------------------------------------------------------------------+------------|
 | Function | setDAValidatorPairWithGateway(address,uint256,uint256,uint256,address,uint8,address,address,bool)          | 0x4836c6be |
 |----------+------------------------------------------------------------------------------------------------------------+------------|
