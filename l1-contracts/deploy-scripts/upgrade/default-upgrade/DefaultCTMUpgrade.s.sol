@@ -50,6 +50,9 @@ import {UpgradeUtils} from "./UpgradeUtils.sol";
 contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     using stdToml for string;
 
+    uint256 internal constant ERA_TEST_CREATE_CHAIN_ID = 555;
+    uint256 internal constant ZKSYNC_OS_TEST_CREATE_CHAIN_ID = 556;
+
     // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
         address upgradeTimer;
@@ -819,10 +822,14 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
     }
 
     /// @notice Tests that it is possible to create a new chain with the new version
+    function getDefaultTestCreateChainId() public view virtual returns (uint256) {
+        return config.isZKsyncOS ? ZKSYNC_OS_TEST_CREATE_CHAIN_ID : ERA_TEST_CREATE_CHAIN_ID;
+    }
+
     function TESTONLY_prepareCreateChainCall() private returns (Call[] memory calls, address admin) {
         admin = getBridgehubAdmin();
         calls = new Call[](1);
-        calls[0] = prepareCreateNewChainCall(555)[0];
+        calls[0] = prepareCreateNewChainCall(getDefaultTestCreateChainId())[0];
     }
 
     function deployUpgradeStageValidator() internal {
