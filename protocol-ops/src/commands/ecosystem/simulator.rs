@@ -407,6 +407,17 @@ struct SimulatorTransaction {
     /// `tx.timeIncrease` branch there.
     #[serde(rename = "timeIncrease", skip_serializing_if = "Option::is_none")]
     time_increase: Option<u64>,
+    /// Transaction-simulator-only escape hatch for per-chain upgrade tests.
+    /// When set, the simulator mutates the forked chain diamond storage so
+    /// `totalBatchesExecuted == totalBatchesVerified == totalBatchesCommitted`
+    /// before sending the tx. This must stay limited to `test_upgrade_*`
+    /// transactions; it is not a real proposal action and must not be used for
+    /// stage/bundle/create-chain calls.
+    #[serde(
+        rename = "emulateAllBatchesExecuted",
+        skip_serializing_if = "Option::is_none"
+    )]
+    emulate_all_batches_executed: Option<bool>,
     tag: String,
 }
 
@@ -689,6 +700,7 @@ fn manifest_to_simulator_transactions(
                 value: tx.value.clone().unwrap_or_else(|| "0".to_string()),
                 value_to_mint,
                 time_increase: None,
+                emulate_all_batches_executed: None,
                 tag: format!("bundle_{}", bundle.index),
             });
         }
@@ -764,6 +776,7 @@ fn governance_toml_to_simulator_transactions(
                 value: call.value.to_string(),
                 value_to_mint,
                 time_increase,
+                emulate_all_batches_executed: None,
                 tag: format!("stage{stage}"),
             });
         }
@@ -793,6 +806,7 @@ fn append_test_upgrade_calls(
             .with_context(|| format!("invalid [test_upgrade_calls].{caller_key} address"))?;
         let calls = decode_calls(encoded_calls)
             .with_context(|| format!("failed to decode [test_upgrade_calls].{tag}"))?;
+        let emulate_all_batches_executed = tag.starts_with("test_upgrade_").then_some(true);
 
         for (idx, call) in calls.into_iter().enumerate() {
             let data_hex = format!("0x{}", hex::encode(&call.data));
@@ -815,6 +829,7 @@ fn append_test_upgrade_calls(
                 value: call.value.to_string(),
                 value_to_mint: Some("1".to_string()),
                 time_increase: None,
+                emulate_all_batches_executed,
                 tag: tag.to_string(),
             });
         }
