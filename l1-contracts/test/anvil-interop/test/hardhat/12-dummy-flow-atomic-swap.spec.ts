@@ -24,7 +24,7 @@ import {
   impersonateAndRun,
 } from "../../src/core/utils";
 import { getAbi } from "../../src/core/contracts";
-import { ANVIL_DEFAULT_PRIVATE_KEY, L2_ASSET_ROUTER_ADDR, L2_COMPLEX_UPGRADER_ADDR } from "../../src/core/const";
+import { ANVIL_DEFAULT_PRIVATE_KEY, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
 import {
   buildCommitProofFromReceipt,
   buildExecuteParams,
@@ -116,16 +116,20 @@ describe("12 - Dummy Flow atomic A → B → C", function () {
     const canonicalEscrow = escrows[aId].address;
     await (await linker.initialize(canonicalEscrow)).wait();
 
-    // Whitelist each chain's escrow on its L2AssetRouter via the upgrader address.
+    // Whitelist each chain's escrow on its L2AssetRouter via the AR's owner.
     // Required so the escrow can call AR.initiateIndirectCall (source-side burn) and
-    // AR.finalizeDeposit (destination-side mint).
+    // AR.finalizeDeposit (destination-side mint). `setAtomicFlowEscrow` is gated
+    // `onlyOwner` (lifted off `onlyUpgrader` so a userspace AR can wire its own escrow
+    // without going through the system complex upgrader).
     await Promise.all(
-      l2Triples.map(async ({ chainId, provider }) =>
-        impersonateAndRun(provider, L2_COMPLEX_UPGRADER_ADDR, async (signer) => {
+      l2Triples.map(async ({ chainId, provider }) => {
+        const arReader = new Contract(L2_ASSET_ROUTER_ADDR, getAbi("L2AssetRouter"), provider);
+        const arOwner: string = await arReader.owner();
+        await impersonateAndRun(provider, arOwner, async (signer) => {
           const ar = new Contract(L2_ASSET_ROUTER_ADDR, getAbi("L2AssetRouter"), signer);
           await (await ar.setAtomicFlowEscrow(escrows[chainId].address)).wait();
-        })
-      )
+        });
+      })
     );
 
     const ctxs = await Promise.all(
@@ -166,11 +170,12 @@ describe("12 - Dummy Flow atomic A → B → C", function () {
       depositor: recipientUser,
       erc20Data: encodeErc20Data(chainB.chainId, "Test Token", "TEST", TEST_TOKEN_DECIMALS),
     });
-    const flowId = computeFlowId([aSpec, bSpec]);
-
     // ─── PHASE 1: registerFlow on L1 ──────────────────────────────────────────────────
     // Participating-chain list is sorted ascending per the linker's invariant.
+    // flowId binds the sorted spec hashes, the sorted chain ids, and the deadline — the
+    // chain ids + deadline must therefore be fixed before deriving flowId.
     const chainIds = [chainA.chainId, chainB.chainId, chainC.chainId].sort((x, y) => x - y);
+    const flowId = computeFlowId([aSpec, bSpec], chainIds, deadline);
     await (await linker.registerFlow(flowId, chainIds, deadline)).wait();
     expect(await linker.flowState(flowId)).to.equal(FlowState.Initiated);
 

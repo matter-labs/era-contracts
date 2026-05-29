@@ -10,7 +10,6 @@ import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @dev `finalizeDeposit` is declared on `AssetRouterBase` (the abstract contract) but
 /// not on its interface. Tiny local interface so the escrow can call it without pulling
@@ -38,9 +37,13 @@ import {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice See `IL2FlowEscrow`. Implements the asymmetric trust model: the L1 linker
-/// address is a hardcoded constant in this contract's bytecode, so a CREATE2-deploy with
-/// a fixed salt yields the same address on every L2.
+/// @notice See `IL2FlowEscrow`. All three addresses the escrow depends on (the L1 linker
+/// it trusts, plus the AR/NTV it calls into) are storage-set in `initialize` — none are
+/// baked into bytecode. This lets the escrow point at either the system AR/NTV (system
+/// predeploys) or a userspace `PrivateL2AssetRouter` / `PrivateL2NativeTokenVault`,
+/// chosen at deploy time. CREATE2 with a fixed salt across L2s still yields the same
+/// escrow address (since bytecode is identical), but each instance's wiring is set by
+/// its per-chain initializer.
 ///
 /// Asset moves route through `L2AssetRouter` → `L2NativeTokenVault`:
 ///   - source: `AR.initiateIndirectCall` (gated to also accept this escrow via the AR's
@@ -51,18 +54,31 @@ import {
 contract L2FlowEscrow is IL2FlowEscrow {
     using SafeERC20 for IERC20;
 
-    /// @dev Set once via `initialize`. The bytecode is identical on every L2 (no
-    /// embedded constants), so CREATE2 with a fixed salt yields the same escrow address
-    /// everywhere; the per-chain initializer then binds each instance to the canonical L1
-    /// linker address.
+    /// @dev L1 linker this escrow trusts. Set once via `initialize`.
     address private _l1Linker;
+
+    /// @dev L2 asset router this escrow calls into for burns/mints. Set once via
+    /// `initialize`. Typically a `PrivateL2AssetRouter` deployed in userspace, but the
+    /// system `L2_ASSET_ROUTER_ADDR` is also a valid choice on chains that wire its
+    /// `atomicFlowEscrow` slot to point at this escrow.
+    address private _assetRouter;
+
+    /// @dev L2 native token vault used for source-side allowances. Set once via
+    /// `initialize`. Must be the NTV that `_assetRouter` itself routes burns through.
+    address private _nativeTokenVault;
 
     mapping(bytes32 flowId => mapping(bytes32 specHash => SpecState)) internal _state;
 
     /// @notice One-shot initializer.
-    function initialize(address _linker) external {
+    /// @param _linker The canonical L1 linker address whose aliased counterpart will be
+    /// allowed to call `authorizeFromL1` / `authorizeRefundFromL1`.
+    /// @param _ar The L2 asset router this escrow drives for burns/mints.
+    /// @param _ntv The L2 native token vault `_ar` routes through.
+    function initialize(address _linker, address _ar, address _ntv) external {
         if (_l1Linker != address(0)) revert EscrowAlreadyInitialized();
         _l1Linker = _linker;
+        _assetRouter = _ar;
+        _nativeTokenVault = _ntv;
     }
 
     /// @inheritdoc IL2FlowEscrow
@@ -147,11 +163,11 @@ contract L2FlowEscrow is IL2FlowEscrow {
     /// is discarded; we don't emit an outbound interop bundle, the L1 linker carries
     /// authorization instead.
     function _executeSource(SendSpec calldata _spec) internal {
-        IERC20(_spec.originToken).safeIncreaseAllowance(L2_NATIVE_TOKEN_VAULT_ADDR, _spec.amount);
+        IERC20(_spec.originToken).safeIncreaseAllowance(_nativeTokenVault, _spec.amount);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(_spec.originChainId, _spec.originToken);
         bytes memory burnData = DataEncoding.encodeBridgeBurnData(_spec.amount, _spec.recipient, _spec.originToken);
         bytes memory depositData = DataEncoding.encodeAssetRouterBridgehubDepositData(assetId, burnData);
-        IL2AssetRouter(L2_ASSET_ROUTER_ADDR).initiateIndirectCall({
+        IL2AssetRouter(_assetRouter).initiateIndirectCall({
             _chainId: _spec.destChainId,
             _originalCaller: address(this),
             _value: 0,
@@ -172,7 +188,7 @@ contract L2FlowEscrow is IL2FlowEscrow {
             _amount: _spec.amount,
             _erc20Metadata: _spec.erc20Data
         });
-        IAssetRouterFinalizeDeposit(L2_ASSET_ROUTER_ADDR).finalizeDeposit(_spec.originChainId, assetId, transferData);
+        IAssetRouterFinalizeDeposit(_assetRouter).finalizeDeposit(_spec.originChainId, assetId, transferData);
     }
 
     /// @inheritdoc IL2FlowEscrow

@@ -112,9 +112,13 @@ contract L1FlowLinker is IL1FlowLinker, ReentrancyGuard {
         bytes32[] memory collected = _ingestAllCommits(_flowId, _proofs);
 
         // Completeness check: the registered flowId IS the hash commitment to the full
-        // expected spec set. Anything missing or extra fails this equality.
+        // expected (specs, chainIds, deadline) tuple. Anything missing/extra in the spec
+        // set fails this equality. Binding the chain set and the deadline into the hash
+        // (in addition to the spec hashes) prevents a frontrunning attacker from racing
+        // `registerFlow` with the same spec set but a different chain set or earlier
+        // deadline.
         bytes32[] memory sorted = _sortHashes(collected);
-        bytes32 computedFlowId = keccak256(abi.encode(sorted));
+        bytes32 computedFlowId = keccak256(abi.encode(sorted, _participantChains[_flowId], flow.deadline));
         if (computedFlowId != _flowId) revert FlowIdMismatch(_flowId, computedFlowId);
 
         // Closure: every destination referenced by any commit must be in the participating

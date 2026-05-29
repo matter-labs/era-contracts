@@ -17,10 +17,11 @@ import {SendSpec, SpecState} from "./IDummyFlow.sol";
 /// stay in escrow custody between commit and execute, so refunds are direct local
 /// transfers — no NTV involvement.
 ///
-/// The escrow trusts a single canonical L1 linker address, hardcoded into the bytecode as
-/// a `constant`. CREATE2-deploying the same bytecode on every L2 with the same salt yields
-/// the same escrow address everywhere, so the L1 linker can identify the escrow on any L2
-/// by one canonical address.
+/// The escrow trusts a single canonical L1 linker address, set in `initialize` and stored
+/// for the lifetime of the contract. The bytecode itself contains no per-chain or
+/// per-deployment constants, so CREATE2-deploying the same bytecode on every L2 with the
+/// same salt yields the same escrow address everywhere — only the storage wiring (linker,
+/// asset router, native token vault) varies per chain.
 interface IL2FlowEscrow {
     event FlowCommitted(bytes32 indexed flowId, bytes32 indexed specHash, address indexed depositor);
     event FlowAuthorized(bytes32 indexed flowId, bytes32 indexed specHash);
@@ -56,7 +57,7 @@ interface IL2FlowEscrow {
     /// `Revertable -> Reverted`.
     function claimRefund(bytes32 _flowId, SendSpec calldata _spec) external;
 
-    /// @notice The L1 linker address this escrow trusts (hardcoded constant).
+    /// @notice The L1 linker address this escrow trusts (set in `initialize`).
     function L1_LINKER() external view returns (address);
 
     /// @notice Current per-`(flowId, specHash)` state.

@@ -10,7 +10,12 @@
 
 import { BigNumber, Contract, ContractFactory, Wallet, ethers, providers } from "ethers";
 import { getAbi, getCreationBytecode } from "../core/contracts";
-import { ANVIL_DEFAULT_PRIVATE_KEY, L2_TO_L1_MESSENGER_ADDR } from "../core/const";
+import {
+  ANVIL_DEFAULT_PRIVATE_KEY,
+  L2_ASSET_ROUTER_ADDR,
+  L2_NATIVE_TOKEN_VAULT_ADDR,
+  L2_TO_L1_MESSENGER_ADDR,
+} from "../core/const";
 
 /** Mirror of the Solidity `SendSpec` struct in `IDummyFlow.sol`. */
 export interface SendSpec {
@@ -60,15 +65,28 @@ export function computeSpecHash(spec: SendSpec): string {
 }
 
 /**
- * Compute the flowId: `keccak256(abi.encode(sortedSpecHashes))`. Sort order matches the
- * linker's `_sortHashes` (lexicographic ascending on bytes32).
+ * Compute the flowId: `keccak256(abi.encode(sortedSpecHashes, sortedChainIds, deadline))`.
+ * Spec-hash sort order matches the linker's `_sortHashes` (lexicographic ascending on
+ * bytes32); chain ids must be passed ascending-sorted with no duplicates (the linker's
+ * `registerFlow` enforces this).
+ *
+ * Binding the chain set + deadline into the hash prevents a frontrunning attacker from
+ * racing `registerFlow` with the same spec set but a different chain set or earlier
+ * deadline.
  */
-export function computeFlowId(specs: SendSpec[]): string {
+export function computeFlowId(
+  specs: SendSpec[],
+  sortedChainIds: ReadonlyArray<number | BigNumber>,
+  deadline: number | BigNumber
+): string {
   const hashes = specs.map(computeSpecHash);
-  const sorted = [...hashes].sort((a, b) =>
+  const sortedHashes = [...hashes].sort((a, b) =>
     a.toLowerCase() < b.toLowerCase() ? -1 : a.toLowerCase() > b.toLowerCase() ? 1 : 0
   );
-  const encoded = ethers.utils.defaultAbiCoder.encode(["bytes32[]"], [sorted]);
+  const encoded = ethers.utils.defaultAbiCoder.encode(
+    ["bytes32[]", "uint256[]", "uint64"],
+    [sortedHashes, sortedChainIds.map((c) => BigNumber.from(c)), BigNumber.from(deadline)]
+  );
   return ethers.utils.keccak256(encoded);
 }
 
@@ -103,20 +121,34 @@ export async function deployL1FlowStack(
 
 /**
  * Deploy one `L2FlowEscrow` on each provided L2, wired to the same `_l1LinkerAddress`.
+ * Each chain may override the AR/NTV the escrow drives — defaults are the system
+ * predeploys at `L2_ASSET_ROUTER_ADDR` / `L2_NATIVE_TOKEN_VAULT_ADDR`, which is what
+ * the anvil tests use. For real testnet deploys, pass the userspace
+ * `PrivateL2AssetRouter` / `PrivateL2NativeTokenVault` addresses.
+ *
  * Returns a map from chainId → deployed escrow contract.
  */
 export async function deployL2EscrowsForChains(
-  l2Providers: Array<{ chainId: number; provider: providers.JsonRpcProvider }>,
+  l2Providers: Array<{
+    chainId: number;
+    provider: providers.JsonRpcProvider;
+    /** Defaults to the system L2_ASSET_ROUTER_ADDR if omitted. */
+    assetRouter?: string;
+    /** Defaults to the system L2_NATIVE_TOKEN_VAULT_ADDR if omitted. */
+    nativeTokenVault?: string;
+  }>,
   _l1LinkerAddress: string
 ): Promise<Record<number, Contract>> {
   const out: Record<number, Contract> = {};
   await Promise.all(
-    l2Providers.map(async ({ chainId, provider }) => {
+    l2Providers.map(async ({ chainId, provider, assetRouter, nativeTokenVault }) => {
       const wallet = new Wallet(ANVIL_DEFAULT_PRIVATE_KEY, provider);
       const factory = new ContractFactory(getAbi("L2FlowEscrow"), getCreationBytecode("L2FlowEscrow"), wallet);
       const escrow = await factory.deploy();
       await escrow.deployed();
-      await (await escrow.initialize(_l1LinkerAddress)).wait();
+      const ar = assetRouter ?? L2_ASSET_ROUTER_ADDR;
+      const ntv = nativeTokenVault ?? L2_NATIVE_TOKEN_VAULT_ADDR;
+      await (await escrow.initialize(_l1LinkerAddress, ar, ntv)).wait();
       out[chainId] = escrow;
     })
   );
