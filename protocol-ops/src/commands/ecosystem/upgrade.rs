@@ -187,6 +187,14 @@ struct GovernanceCalls {
     stage2_calls: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+struct TestUpgradeCalls {
+    test_create_chain: String,
+    test_create_chain_caller: String,
+    test_upgrade_chain: String,
+    test_upgrade_chain_caller: String,
+}
+
 #[derive(Debug, Deserialize)]
 struct EcosystemUpgradeOutput {
     governance_calls: GovernanceCalls,
@@ -897,6 +905,16 @@ fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> 
 /// stage1_calls = "0x..."
 /// stage2_calls = "0x..."
 ///
+/// [test_upgrade_calls]            # optional: copied from CTM prepare output
+/// test_create_chain_era = "0x..."
+/// test_create_chain_era_caller = "0x..."
+/// test_upgrade_chain_era = "0x..."
+/// test_upgrade_chain_era_caller = "0x..."
+/// test_create_chain_zkos = "0x..."
+/// test_create_chain_zkos_caller = "0x..."
+/// test_upgrade_chain_zkos = "0x..."
+/// test_upgrade_chain_zkos_caller = "0x..."
+///
 /// [core]                          # whole core TOML minus its [governance_calls]
 /// ...
 ///
@@ -932,9 +950,13 @@ fn write_merged_ecosystem_toml(
         fs::create_dir_all(parent)?;
     }
 
-    // Read each source as a generic TOML table; pop [governance_calls] out so
-    // it can be merged at the top level, leaving the rest to embed verbatim.
-    fn load_and_split(path: &Path) -> anyhow::Result<(Table, GovernanceCalls)> {
+    // Read each source as a generic TOML table; pop [governance_calls] (always
+    // present) and optional [test_upgrade_calls] out so governance can be
+    // merged at top level and test calls can be lifted to top-level
+    // `ecosystem.toml`.
+    fn load_and_split(
+        path: &Path,
+    ) -> anyhow::Result<(Table, GovernanceCalls, Option<TestUpgradeCalls>)> {
         let raw = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
         let mut value: Table =
             toml::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
@@ -944,10 +966,19 @@ fn write_merged_ecosystem_toml(
         let gov: GovernanceCalls = gov
             .try_into()
             .with_context(|| format!("invalid [governance_calls] in {}", path.display()))?;
-        Ok((value, gov))
+
+        let test = value
+            .remove("test_upgrade_calls")
+            .map(|v| {
+                v.try_into()
+                    .with_context(|| format!("invalid [test_upgrade_calls] in {}", path.display()))
+            })
+            .transpose()?;
+
+        Ok((value, gov, test))
     }
 
-    let (mut core_body, core_gov) = load_and_split(core_toml)?;
+    let (mut core_body, core_gov, _core_test_calls) = load_and_split(core_toml)?;
     let misc_body = match core_body.remove("misc") {
         Some(Value::Table(table)) => Some(table),
         Some(other) => anyhow::bail!(
@@ -962,9 +993,11 @@ fn write_merged_ecosystem_toml(
     let mut stage0: Vec<String> = vec![core_gov.stage0_calls];
     let mut stage1: Vec<String> = vec![core_gov.stage1_calls];
     let mut stage2: Vec<String> = vec![core_gov.stage2_calls];
+    let mut era_test_calls: Option<TestUpgradeCalls> = None;
+    let mut zksync_os_test_calls: Option<TestUpgradeCalls> = None;
 
     for entry in ctm_entries {
-        let (body, gov) = load_and_split(&entry.toml)?;
+        let (body, gov, test_calls) = load_and_split(&entry.toml)?;
         let label = if entry.is_zk_sync_os {
             "zksync_os"
         } else {
@@ -979,6 +1012,22 @@ fn write_merged_ecosystem_toml(
         stage0.push(gov.stage0_calls);
         stage1.push(gov.stage1_calls);
         stage2.push(gov.stage2_calls);
+
+        if let Some(test_calls) = test_calls {
+            if entry.is_zk_sync_os {
+                zksync_os_test_calls = Some(test_calls);
+            } else {
+                era_test_calls = Some(test_calls);
+            }
+        }
+    }
+
+    let has_era_ctm = ctm_entries.iter().any(|entry| !entry.is_zk_sync_os);
+    let has_zkos_ctm = ctm_entries.iter().any(|entry| entry.is_zk_sync_os);
+    if has_era_ctm && has_zkos_ctm && (era_test_calls.is_none() || zksync_os_test_calls.is_none()) {
+        anyhow::bail!(
+            "both Era and ZKOS CTMs are present, but one flavor is missing [test_upgrade_calls]"
+        );
     }
 
     if !extra_stage0.is_empty() {
@@ -1062,14 +1111,54 @@ fn write_merged_ecosystem_toml(
     governance_calls_table.insert("stage1_calls".into(), Value::String(s1));
     governance_calls_table.insert("stage2_calls".into(), Value::String(s2));
 
-    // Build the document with [governance_calls] first, then [core], then
-    // [ctms.*], optional [new_gateway], and [misc] last. `toml::to_string`
-    // orders keys as inserted.
+    // Build the document with [governance_calls] first, then optional
+    // [test_upgrade_calls], then [core], [ctms.*], optional [new_gateway],
+    // and [misc] last. `toml::to_string` orders keys as inserted.
     let mut doc = Table::new();
     doc.insert(
         "governance_calls".into(),
         Value::Table(governance_calls_table),
     );
+    if era_test_calls.is_some() || zksync_os_test_calls.is_some() {
+        let mut test_table = Table::new();
+        if let Some(test_calls) = era_test_calls {
+            test_table.insert(
+                "test_create_chain_era".into(),
+                Value::String(test_calls.test_create_chain),
+            );
+            test_table.insert(
+                "test_create_chain_era_caller".into(),
+                Value::String(test_calls.test_create_chain_caller),
+            );
+            test_table.insert(
+                "test_upgrade_chain_era".into(),
+                Value::String(test_calls.test_upgrade_chain),
+            );
+            test_table.insert(
+                "test_upgrade_chain_era_caller".into(),
+                Value::String(test_calls.test_upgrade_chain_caller),
+            );
+        }
+        if let Some(test_calls) = zksync_os_test_calls {
+            test_table.insert(
+                "test_create_chain_zkos".into(),
+                Value::String(test_calls.test_create_chain),
+            );
+            test_table.insert(
+                "test_create_chain_zkos_caller".into(),
+                Value::String(test_calls.test_create_chain_caller),
+            );
+            test_table.insert(
+                "test_upgrade_chain_zkos".into(),
+                Value::String(test_calls.test_upgrade_chain),
+            );
+            test_table.insert(
+                "test_upgrade_chain_zkos_caller".into(),
+                Value::String(test_calls.test_upgrade_chain_caller),
+            );
+        }
+        doc.insert("test_upgrade_calls".into(), Value::Table(test_table));
+    }
     doc.insert("core".into(), Value::Table(core_body));
     doc.insert("ctms".into(), Value::Table(ctms_table));
     if let Some(body) = new_gateway_body {
@@ -1095,7 +1184,9 @@ fn write_merged_ecosystem_toml(
     let body = format!(
         "# Auto-generated by `protocol-ops ecosystem upgrade-prepare-all`.\n\
          # Merged ecosystem upgrade artifact: top-level [governance_calls] holds\n\
-         # the combined stage 0/1/2 hex from {} prepare TOML(s); [core] mirrors the\n\
+         # the combined stage 0/1/2 hex from {} prepare TOML(s). Optional\n\
+         # [test_upgrade_calls] is copied from per-CTM prepare output under\n\
+         # flavor-suffixed keys (`*_era`, `*_zkos`). [core] mirrors the\n\
          # core prepare output (minus its own [governance_calls]); [ctms.<flavor>]\n\
          # mirrors each per-CTM prepare output (one section per `is_zk_sync_os`\n\
          # value) for downstream verification. [misc] carries shared metadata used\n\

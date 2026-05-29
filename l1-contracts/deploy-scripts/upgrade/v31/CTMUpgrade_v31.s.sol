@@ -47,6 +47,11 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
         prepareCTMUpgrade();
         prepareDefaultGovernanceCalls();
         prepareDefaultCTMAdminCalls();
+
+        // Emit test-only calls (`test_create_chain`, `test_upgrade_chain`) into
+        // the CTM output TOML so protocol-ops can lift them into merged
+        // `ecosystem.toml` for tx-simulator checks.
+        prepareDefaultTestUpgradeCalls();
     }
 
     /// @notice Deploy everything that should be deployed
