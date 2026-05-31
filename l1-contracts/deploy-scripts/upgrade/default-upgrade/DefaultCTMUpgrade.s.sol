@@ -46,6 +46,7 @@ import {AddressIntrospector} from "../../utils/AddressIntrospector.sol";
 import {DefaultL2UpgradeStrategy} from "./DefaultL2UpgradeStrategy.sol";
 import {UpgradeHelperLib} from "./UpgradeHelperLib.sol";
 import {UpgradeUtils} from "./UpgradeUtils.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 interface IAdminPreV31 {
     function upgradeChainFromVersion(uint256 _protocolVersion, Diamond.DiamondCutData calldata _cutData) external;
@@ -529,6 +530,11 @@ contract DefaultCTMUpgrade is Script, DefaultL2UpgradeStrategy {
         Call[][] memory allCalls = new Call[][](1);
         allCalls[0] = prepareUpgradeServerNotifierCall();
         calls = UpgradeUtils.mergeCallsArray(allCalls);
+
+        address chainAdmin = IOwnable(calls[0].target).owner();
+        address chainAdminOwner = IOwnable(chainAdmin).owner();
+        vm.serializeAddress("ctm_admin_calls", "chain_admin", chainAdmin);
+        vm.serializeAddress("ctm_admin_calls", "chain_admin_owner", chainAdminOwner);
 
         string memory ctmAdminCallsSerialized = vm.serializeBytes(
             "ctm_admin_calls",
