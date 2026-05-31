@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -374,11 +374,48 @@ pub struct GovernanceTomlToSimulatorArgs {
     pub descriptions: Option<PathBuf>,
 }
 
+/// Minimal view of `[ctms.<flavor>.ctm_admin_calls]` used only to derive the bundle tag for the matching manifest entry.
+#[derive(Debug, Deserialize)]
+struct CtmAdminCallsSection {
+    chain_admin: Address,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct CtmFlavorSection {
+    #[serde(default)]
+    ctm_admin_calls: Option<CtmAdminCallsSection>,
+}
+
 #[derive(Debug, Deserialize)]
 struct GovernanceCallsToml {
     governance_calls: GovernanceCalls,
     #[serde(default)]
     test_upgrade_calls: BTreeMap<String, String>,
+    /// Per-CTM flavor sections — only `ctm_admin_calls.chain_admin` is consumed
+    #[serde(default)]
+    ctms: BTreeMap<String, CtmFlavorSection>,
+}
+
+/// Maps CTM flavor names (as they appear in the TOML) to the simulator tag.
+const CTM_ADMIN_CALLS_FLAVOR_TAGS: &[(&str, &str)] = &[
+    ("era", "ctm_admin_calls_era"),
+    ("zksync_os", "ctm_admin_calls_zkos"),
+];
+
+/// Builds a `chain_admin → simulator tag` map from the parsed TOML.
+/// Keyed by the ChainAdmin address (`tx.to` in the bundle) rather than the
+/// signer (`bundle.target`), because the same EOA signs many bundles but each
+/// ChainAdmin address is unique to one ctm_admin_calls entry.
+fn build_ctm_admin_calls_tag_map(parsed: &GovernanceCallsToml) -> HashMap<Address, String> {
+    let mut map = HashMap::new();
+    for (flavor, tag) in CTM_ADMIN_CALLS_FLAVOR_TAGS {
+        if let Some(ctm) = parsed.ctms.get(*flavor) {
+            if let Some(ref section) = ctm.ctm_admin_calls {
+                map.insert(section.chain_admin, tag.to_string());
+            }
+        }
+    }
+    map
 }
 
 #[derive(Debug, Deserialize)]
@@ -534,6 +571,17 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
     });
     let descriptions = load_descriptions(descriptions_path.as_deref());
 
+    // Parse the ecosystem TOML once up-front to build the ctm_admin_calls tag
+    // map — used below to give manifest bundles their proper flavor tag instead
+    // of the generic `bundle_<index>`.
+    let ctm_admin_calls_tags: HashMap<Address, String> = {
+        let content = fs::read_to_string(&governance_toml)
+            .with_context(|| format!("failed to read {}", governance_toml.display()))?;
+        let parsed: GovernanceCallsToml = toml::from_str(&content)
+            .with_context(|| format!("failed to parse {}", governance_toml.display()))?;
+        build_ctm_admin_calls_tag_map(&parsed)
+    };
+
     // Manifest bundles come FIRST (Camp-B setup the sim impersonates), then
     // governance stages 0/1/2. Order matters: setup writes the state
     // (pendingOwner, verifier registry, etc.) that the gov calls then read.
@@ -548,6 +596,7 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
             &network,
             &args.camp_a_signers,
             &descriptions,
+            &ctm_admin_calls_tags,
         )
         .with_context(|| format!("failed to expand manifest bundles {}", manifest.display()))?;
         transactions.extend(extra);
@@ -593,6 +642,7 @@ fn manifest_to_simulator_transactions(
     network: &str,
     explicit_camp_a: &[Address],
     descriptions: &SimDescriptionRegistry,
+    ctm_admin_calls_tags: &HashMap<Address, String>,
 ) -> anyhow::Result<Vec<SimulatorTransaction>> {
     let manifest_dir = manifest_path.parent().ok_or_else(|| {
         anyhow::anyhow!("manifest path has no parent: {}", manifest_path.display())
@@ -701,7 +751,10 @@ fn manifest_to_simulator_transactions(
                 value_to_mint,
                 time_increase: None,
                 emulate_all_batches_executed: None,
-                tag: format!("bundle_{}", bundle.index),
+                tag: ctm_admin_calls_tags
+                    .get(&tx.to)
+                    .cloned()
+                    .unwrap_or_else(|| format!("bundle_{}", bundle.index)),
             });
         }
     }
