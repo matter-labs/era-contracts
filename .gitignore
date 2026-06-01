@@ -38,6 +38,12 @@ l1-contracts/script-out/*
 # stays tracked.
 l1-contracts/upgrade-envs/**/output/**/*.safe.json
 l1-contracts/upgrade-envs/**/output/**/manifest.json
+# Exception: the curated, machine-independent `sim-inputs/` set (normalized
+# manifest.json minus metadata[] + the Camp-B *.safe.json bundles) IS tracked.
+# It's what `governance-toml-to-simulator --emit-sim-inputs` writes so the sim
+# can be reproduced from git on any machine (see the fix-calldata-bug skill).
+!l1-contracts/upgrade-envs/**/output/**/sim-inputs/manifest.json
+!l1-contracts/upgrade-envs/**/output/**/sim-inputs/*.safe.json
 # Regen / broadcast scratch artifacts (executed.json, anvil.log, raw forge
 # script outputs). Not the canonical governance.toml.
 l1-contracts/upgrade-envs/**/output/**/regen/

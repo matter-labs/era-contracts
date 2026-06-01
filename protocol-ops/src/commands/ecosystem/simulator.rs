@@ -372,6 +372,19 @@ pub struct GovernanceTomlToSimulatorArgs {
     /// `--env` is set and the file exists.
     #[clap(long)]
     pub descriptions: Option<PathBuf>,
+
+    /// When set, write a curated, machine-independent **sim-inputs** set to this
+    /// directory instead of emitting the sim JSON: a normalized `manifest.json`
+    /// (just `bundles[]` — no `metadata[]`, which embeds local paths / the RPC
+    /// URL / timestamps) plus the referenced Camp-B `*.safe.json` bundles.
+    /// Camp-A (deployer) bundles are dropped, mirroring the sim's own
+    /// classification, so the committed set is exactly what the emit consumes.
+    ///
+    /// This is the VPS handoff artifact: the regen box commits `<dir>` alongside
+    /// `ecosystem.toml`, and a local emit then reproduces the sim purely from
+    /// git. See `.claude/skills/fix-calldata-bug`. Short-circuits sim emission.
+    #[clap(long)]
+    pub emit_sim_inputs: Option<PathBuf>,
 }
 
 /// Minimal view of `[ctms.<flavor>.ctm_admin_calls]` used only to derive the bundle tag for the matching manifest entry.
@@ -544,14 +557,21 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
     };
 
     // Resolve manifest path: explicit `--include-manifest` wins; otherwise
-    // auto-discover `<env-out>/prepare/manifest.json` when `--env` is set.
+    // auto-discover, preferring the committed `<env-out>/sim-inputs/manifest.json`
+    // (the git-portable handoff set) over the per-run `<env-out>/prepare/manifest.json`.
     let manifest_path = match args.include_manifest {
         Some(path) => Some(path),
         None => env_cfg.as_ref().and_then(|cfg| {
             crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)
                 .ok()
-                .map(|base| base.join("prepare").join("manifest.json"))
-                .filter(|p| p.is_file())
+                .and_then(|base| {
+                    [
+                        base.join("sim-inputs").join("manifest.json"),
+                        base.join("prepare").join("manifest.json"),
+                    ]
+                    .into_iter()
+                    .find(|p| p.is_file())
+                })
         }),
     };
 
@@ -570,6 +590,19 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
         })
     });
     let descriptions = load_descriptions(descriptions_path.as_deref());
+
+    // `--emit-sim-inputs`: write the curated, git-portable sim-inputs set and
+    // stop. This is the VPS regen's handoff step — it has the prepare manifest
+    // right there; a local emit later reproduces the sim from the committed set.
+    if let Some(sim_inputs_dir) = args.emit_sim_inputs.as_ref() {
+        let manifest = manifest_path.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "--emit-sim-inputs needs a manifest; none found (pass --include-manifest or run with --env after prepare)"
+            )
+        })?;
+        write_sim_inputs(manifest, &args.camp_a_signers, sim_inputs_dir)?;
+        return Ok(());
+    }
 
     // Parse the ecosystem TOML once up-front to build the ctm_admin_calls tag
     // map — used below to give manifest bundles their proper flavor tag instead
@@ -623,6 +656,93 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
         println!("{body}");
     }
 
+    Ok(())
+}
+
+/// Write a curated, machine-independent **sim-inputs** set into `out_dir`:
+/// a normalized `manifest.json` (only `bundles[]` — no `metadata[]`, which
+/// embeds local paths / the RPC URL / timestamps) plus the referenced Camp-B
+/// `*.safe.json` bundles, copied verbatim. Camp-A (deployer) bundles are
+/// dropped — same classification as [`manifest_to_simulator_transactions`] —
+/// so the committed set is exactly what the emit consumes.
+///
+/// Bundle `file` fields stay bare filenames resolved relative to the manifest
+/// dir, so the copied set is portable: commit `out_dir` and a local emit
+/// reproduces the sim with no out-of-band copy. See the fix-calldata-bug skill.
+fn write_sim_inputs(
+    manifest_path: &Path,
+    explicit_camp_a: &[Address],
+    out_dir: &Path,
+) -> anyhow::Result<()> {
+    let manifest_dir = manifest_path.parent().ok_or_else(|| {
+        anyhow::anyhow!("manifest path has no parent: {}", manifest_path.display())
+    })?;
+    let manifest: PrepareManifest = serde_json::from_str(
+        &fs::read_to_string(manifest_path)
+            .with_context(|| format!("failed to read {}", manifest_path.display()))?,
+    )
+    .with_context(|| format!("failed to parse {}", manifest_path.display()))?;
+
+    // Load every bundle so we can classify Camp-A and copy Camp-B.
+    let mut loaded: Vec<(ManifestBundle, SafeBundleFile)> =
+        Vec::with_capacity(manifest.bundles.len());
+    for bundle in manifest.bundles {
+        let bundle_path = manifest_dir.join(&bundle.file);
+        let bundle_file: SafeBundleFile = serde_json::from_str(
+            &fs::read_to_string(&bundle_path)
+                .with_context(|| format!("failed to read bundle {}", bundle_path.display()))?,
+        )
+        .with_context(|| format!("failed to parse bundle {}", bundle_path.display()))?;
+        loaded.push((bundle, bundle_file));
+    }
+
+    // Camp-A classification — mirrors `manifest_to_simulator_transactions`:
+    // explicit `--camp-a-signers` wins, else auto-detect "signs at least one
+    // CREATE2-factory call".
+    let camp_a: std::collections::HashSet<Address> = if !explicit_camp_a.is_empty() {
+        explicit_camp_a.iter().copied().collect()
+    } else {
+        loaded
+            .iter()
+            .filter(|(_, bf)| {
+                bf.transactions
+                    .iter()
+                    .any(|tx| format!("{:#x}", tx.to) == CREATE2_FACTORY)
+            })
+            .map(|(b, _)| b.target)
+            .collect()
+    };
+
+    fs::create_dir_all(out_dir)
+        .with_context(|| format!("failed to create sim-inputs dir {}", out_dir.display()))?;
+
+    let mut kept = Vec::new();
+    for (bundle, _) in &loaded {
+        if camp_a.contains(&bundle.target) {
+            continue;
+        }
+        // Copy the Camp-B safe.json verbatim (bare filename → portable).
+        let src = manifest_dir.join(&bundle.file);
+        let dst = out_dir.join(&bundle.file);
+        fs::copy(&src, &dst)
+            .with_context(|| format!("failed to copy {} -> {}", src.display(), dst.display()))?;
+        kept.push(serde_json::json!({
+            "index": bundle.index,
+            "file": bundle.file,
+            "target": format!("{:#x}", bundle.target),
+            "steps": bundle.steps.clone(),
+        }));
+    }
+
+    let manifest_out = out_dir.join("manifest.json");
+    let normalized = serde_json::to_string_pretty(&serde_json::json!({ "bundles": kept }))?;
+    fs::write(&manifest_out, format!("{normalized}\n"))
+        .with_context(|| format!("failed to write {}", manifest_out.display()))?;
+    logger::info(format!(
+        "Wrote {} Camp-B sim-input bundle(s) + normalized manifest to {}",
+        kept.len(),
+        out_dir.display()
+    ));
     Ok(())
 }
 
