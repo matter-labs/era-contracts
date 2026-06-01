@@ -58,9 +58,12 @@ ignored). A local emit auto-prefers `sim-inputs/manifest.json` over `prepare/`.
 ## The loop
 
 ```
-local: fix code ──push code──▶ VPS: pull, regen ──push artifacts──▶ local: pull, emit sim ──push sim
-        + dry-run                 ecosystem.toml + sim-inputs/        tx-simulator JSON
+local: fix code ──push code──▶ VPS: pull, regen ──push artifacts──▶ broadcast deploys ──▶ local: pull, emit sim,
+        + dry-run                 ecosystem.toml + sim-inputs/        to REAL Sepolia        rehearse (must pass), push sim
+                                  (Phase 2)                           (Phase 2b)             (Phase 3)
 ```
+Phase 2b is the one most easily skipped — the sim rehearses against a Sepolia fork, so
+the deploys must exist on real Sepolia first or the rehearsal reverts.
 
 ### Phase 1 — fix + dry-run (local)
 1. Edit the code. Common spots: `protocol-ops/src/commands/ecosystem/*` (prepare,
@@ -90,13 +93,60 @@ The VPS agent (or you, over ssh):
 5. Commit **artifacts only** (`ecosystem.toml`, `sim-inputs/`, the CI-derived files) —
    **no code** (it came from local). Push.
 
+### Phase 2b — broadcast the Camp-A deploys to real Sepolia (deployer key)
+**Easy to forget, and the sim cannot pass without it.** The sim's fork forks Sepolia
+**tip** and inherits Camp-A (deployer-signed) deployments from there — it does *not*
+deploy them itself. So every CREATE2 deploy the upgrade points at — including the
+redeployed PUH set (testnet PUH impl + Guardians + SecurityCouncil + EmergencyUpgradeBoard)
+and the core/CTM impls — must be broadcast to **real Sepolia** first, by whoever holds
+the deployer EOA. Addresses are deterministic (CREATE2), so they land at exactly the
+committed `ecosystem.toml`/`sim-inputs` addresses. Run from local or VPS — it's a real
+on-chain write, so confirm before broadcasting. Verify with
+`cast code <new-impl> --rpc-url <sepolia>` (non-empty) before rehearsing.
+
 ### Phase 3 — finish the sim (local)
 1. `git pull` the artifact commit.
 2. Emit the sim from the committed inputs:
    `governance-toml-to-simulator --env <env> --out ../transaction-simulator/transactions/<dated>.json`
    (auto-uses the pulled `ecosystem.toml` + `sim-inputs/manifest.json`).
-3. Rehearse locally: `yarn --cwd ../transaction-simulator simulate --file <…>`.
-4. Commit + push the sim JSON to the transaction-simulator repo.
+3. **No-unlabelled-calls gate.** Every call must have a curated description —
+   `grep -c '\[unlabelled\]' <emitted .json>` must be **0**. Any code change that
+   adds/reorders calls (new governance calls, a redeployed contract, new selectors)
+   will surface as `[unlabelled] …` fallbacks. For each, add a `[[entries]]` block to
+   `upgrade-envs/<ver>/sim-descriptions.toml` keyed by `(target, selector)` + a
+   discriminator if that pair repeats (`arg0_address`=word0, `l2_contract`=word3,
+   `second_bridge_address`=word7, or `inner_target`/`inner_selector` for
+   multicall/schedule/execute wrappers), then **re-emit** and re-check. Commit the
+   `sim-descriptions.toml` change to the era-contracts branch.
+4. **Rehearse-passes gate.** `yarn --cwd ../transaction-simulator simulate --file <…>`
+   must reach **`✅ All simulations succeed!`** — every tx ✔, none ❌. A clean *emit*
+   (0 unlabelled) is necessary but **not** sufficient; the sim must actually execute.
+   This run also rewrites `decoded-calldata/<file>.json` (a *derived* artifact — the
+   emit in step 2 only writes `transactions/`), so after adding labels in step 3 re-run
+   `simulate` and re-check `grep -c '\[unlabelled\]'` on **both** files (a stale decode
+   reads as "still unlabelled"). Common failure → cause:
+   - `ERC1967InvalidImplementation(addr)` (`0x4c9c8ce3`) on a proxy `upgrade*` /
+     `EOA with non-empty calldata` on a CREATE2 target → **Phase 2b not done**: that
+     address isn't deployed on Sepolia. `cast code <addr>` returns `0x`. Broadcast the
+     Camp-A deploys, then re-rehearse.
+   - `Ownable2Step: caller is not the new owner` → the per-CTM-admin `transferOwnership`
+     setup didn't land on Sepolia (a Camp-B/2b gap).
+   - `OperationExists()` (`0x1a21feed`) on a legacy-Gov `scheduleTransparent` (or
+     `OperationMustBePending()` on `executeInstant`) → that ceremony is **Camp-A**: it was
+     already broadcast to real Sepolia in phase 2b, so the fork inherits it and the sim
+     must not replay it. Re-emit with `--camp-a-signers <ceremony signer>` to drop the
+     bundle. NB the sim forks Sepolia **tip**, so a bundle that passed before phase-2b can
+     start reverting *after* it — re-rehearse once all real-chain broadcasts have landed.
+   - `Ownership invariant FAILED: PUH.guardians() is <new>, expected <old>` (or for the
+     SecurityCouncil / EmergencyUpgradeBoard) → all txs passed but the simulator's
+     **hardcoded expected governance addresses** are stale. A regen that redeploys the
+     governance set (new bytecode and/or salt) moves those addresses, so update them in
+     the transaction-simulator's `scripts/constants.ts` (the per-env `guardians` etc.) to
+     the values in the regenerated `ecosystem.toml` `[puh_guardians]`, then re-run. Like
+     `sim-descriptions.toml`, this is a tx-sim-side artifact that must track the regen.
+5. Commit + push the sim JSON to the transaction-simulator repo — **only** after the
+   no-unlabelled gate is clean **and** the rehearsal prints `✅ All simulations succeed!`.
+   A reverting sim must never be pushed (CI runs this exact rehearsal).
 
 ## Agent coordination: git is the only channel
 
@@ -125,6 +175,9 @@ git plus a human relay of turn-taking:
   artifacts on macOS for commit, and don't edit code on the VPS (it would diverge from
   the reviewed local commit).
 - **`cargo build`, not `cargo check`**, before any regen — and re-verify with `strings`.
+- **Zero `[unlabelled]` calls** in the emitted sim (and the decoded file after a rehearsal)
+  before pushing it — `grep -c '\[unlabelled\]'` must be `0`. New/reordered calls need
+  matching `sim-descriptions.toml` entries.
 - **Keep PUVT in lockstep** with the deploy scripts; a deploy-side change with no
   matching verification change fails phase-1 PUVT (that's the point — let it catch you
   locally before the VPS run).
