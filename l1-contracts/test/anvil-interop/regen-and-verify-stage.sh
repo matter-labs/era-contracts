@@ -125,9 +125,12 @@ trap cleanup EXIT
 # manifests — letting us iterate fast on the broadcast / verify path.
 SKIP_PREPARE="${SKIP_PREPARE:-0}"
 if [[ "$SKIP_PREPARE" != "1" ]]; then
+  # Preserve transactions.txt across the wipe: back it up, then restore after mkdir.
+  [[ -f "$OUT/transactions.txt" ]] && _txbak=$(mktemp) && cp "$OUT/transactions.txt" "$_txbak"
   rm -rf "$OUT"
 fi
 mkdir -p "$OUT"
+[[ -n "${_txbak:-}" ]] && mv "$_txbak" "$OUT/transactions.txt"
 
 # If an anvil is already serving on $PORT (left running from a previous
 # `KEEP_ANVIL=1` invocation), reuse it. The prior broadcast's state lives on

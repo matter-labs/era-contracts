@@ -26,7 +26,11 @@ use serde::Deserialize;
 const GOVERNANCE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS: u64 = 14 * 24 * 60 * 60;
 const EXPECTED_GUARDIANS_MEMBER_COUNT: usize = 8;
 const ZK_GOVERNANCE_PUH_FILE: &str = "l1-contracts/ProtocolUpgradeHandler";
+/// Zeroed-delay handler deployed on every non-mainnet ecosystem (stage/testnet).
+const ZK_GOVERNANCE_TESTNET_PUH_FILE: &str = "l1-contracts/TestnetProtocolUpgradeHandler";
 const ZK_GOVERNANCE_GUARDIANS_FILE: &str = "l1-contracts/Guardians";
+const ZK_GOVERNANCE_SECURITY_COUNCIL_FILE: &str = "l1-contracts/SecurityCouncil";
+const ZK_GOVERNANCE_EMERGENCY_BOARD_FILE: &str = "l1-contracts/EmergencyUpgradeBoard";
 
 /// Expected constructor signatures for every contract deployed by
 /// `CoreUpgrade_v31` (i.e. `verify_core_provenance`).
@@ -337,6 +341,19 @@ mod governance_signatures {
             );
         }
 
+        contract V31SecurityCouncil {
+            constructor(address _protocolUpgradeHandler, address[] _members);
+        }
+
+        contract V31EmergencyUpgradeBoard {
+            constructor(
+                address _protocolUpgradeHandler,
+                address _securityCouncil,
+                address _guardians,
+                address _zkFoundation
+            );
+        }
+
         #[sol(rpc)]
         contract ProtocolUpgradeHandlerView {
             function L2_PROTOCOL_GOVERNOR() external view returns (address);
@@ -346,11 +363,18 @@ mod governance_signatures {
             function L1_ASSET_ROUTER() external view returns (address);
             function L1_NATIVE_TOKEN_VAULT() external view returns (address);
             function guardians() external view returns (address);
+            function securityCouncil() external view returns (address);
+            function emergencyUpgradeBoard() external view returns (address);
         }
 
         #[sol(rpc)]
         contract GuardiansMembersView {
             function members(uint256 _index) external view returns (address);
+        }
+
+        #[sol(rpc)]
+        contract EmergencyUpgradeBoardView {
+            function ZK_FOUNDATION_SAFE() external view returns (address);
         }
     }
 }
@@ -601,6 +625,34 @@ async fn verify_puh_guardians_provenance(
         .context("calling current PUH.guardians() for zk-governance provenance")?;
     let guardians_members = read_guardians_members(verifiers, old_guardians).await?;
 
+    let old_security_council = current_puh
+        .securityCouncil()
+        .call()
+        .await
+        .context("calling current PUH.securityCouncil() for zk-governance provenance")?;
+    let security_council_members =
+        read_multisig_members(verifiers, old_security_council, "SecurityCouncil").await?;
+
+    let old_emergency_board = current_puh
+        .emergencyUpgradeBoard()
+        .call()
+        .await
+        .context("calling current PUH.emergencyUpgradeBoard() for zk-governance provenance")?;
+    let zk_foundation_safe = EmergencyUpgradeBoardView::new(old_emergency_board, provider.clone())
+        .ZK_FOUNDATION_SAFE()
+        .call()
+        .await
+        .context("calling current EmergencyUpgradeBoard.ZK_FOUNDATION_SAFE() for provenance")?;
+
+    // On every non-mainnet ecosystem the redeploy uses the zeroed-delay
+    // `TestnetProtocolUpgradeHandler`; mainnet uses the real handler. This
+    // mirrors `DeployPUHAndGuardians.s.sol`'s `USE_TESTNET_PUH` selection.
+    let puh_file = if verifiers.env.is_mainnet() {
+        ZK_GOVERNANCE_PUH_FILE
+    } else {
+        ZK_GOVERNANCE_TESTNET_PUH_FILE
+    };
+
     let puh_ctor_args = V31ProtocolUpgradeHandler::constructorCall::new((
         l2_protocol_governor,
         era_ctm,
@@ -617,7 +669,7 @@ async fn verify_puh_guardians_provenance(
         verifiers,
         &puh_guardians.new_puh_impl,
         puh_ctor_args,
-        ZK_GOVERNANCE_PUH_FILE,
+        puh_file,
     );
 
     let guardians_ctor_args = V31Guardians::constructorCall::new((
@@ -634,7 +686,73 @@ async fn verify_puh_guardians_provenance(
         ZK_GOVERNANCE_GUARDIANS_FILE,
     );
 
+    let security_council_ctor_args =
+        V31SecurityCouncil::constructorCall::new((current_puh_addr, security_council_members))
+            .abi_encode();
+    result.expect_create2_params(
+        verifiers,
+        &puh_guardians.new_security_council,
+        security_council_ctor_args,
+        ZK_GOVERNANCE_SECURITY_COUNCIL_FILE,
+    );
+
+    // The new board embeds the *new* SecurityCouncil + Guardians (so it never
+    // dangles against the stale set) and preserves the existing ZK Foundation safe.
+    let emergency_board_ctor_args = V31EmergencyUpgradeBoard::constructorCall::new((
+        current_puh_addr,
+        puh_guardians.new_security_council,
+        puh_guardians.new_guardians,
+        zk_foundation_safe,
+    ))
+    .abi_encode();
+    result.expect_create2_params(
+        verifiers,
+        &puh_guardians.new_emergency_upgrade_board,
+        emergency_board_ctor_args,
+        ZK_GOVERNANCE_EMERGENCY_BOARD_FILE,
+    );
+
     Ok(())
+}
+
+/// Reads a `Multisig`'s member list (length at storage slot 0, then
+/// `members(i)`). Generic over Guardians / SecurityCouncil; unlike
+/// [`read_guardians_members`] it does not assert a fixed member count.
+async fn read_multisig_members(
+    verifiers: &Verifiers,
+    multisig_addr: Address,
+    label: &str,
+) -> Result<Vec<Address>> {
+    use governance_signatures::GuardiansMembersView;
+
+    let raw_len = verifiers
+        .network_verifier
+        .storage_at(&multisig_addr, &FixedBytes::<32>::ZERO)
+        .await;
+    let members_len = U256::from_be_slice(raw_len.as_slice());
+    anyhow::ensure!(
+        members_len != U256::ZERO,
+        "current {label} at {multisig_addr} has no members"
+    );
+    let members_len = usize::try_from(members_len)
+        .with_context(|| format!("{label} member count {members_len} overflows usize"))?;
+
+    let multisig =
+        GuardiansMembersView::new(multisig_addr, verifiers.network_verifier.get_l1_provider());
+    let mut members = Vec::with_capacity(members_len);
+    for index in 0..members_len {
+        let member = multisig
+            .members(U256::from(index))
+            .call()
+            .await
+            .with_context(|| format!("calling current {label}.members({index}) for provenance"))?;
+        anyhow::ensure!(
+            member != Address::ZERO,
+            "current {label}.members({index}) returned address(0)"
+        );
+        members.push(member);
+    }
+    Ok(members)
 }
 
 async fn read_guardians_members(

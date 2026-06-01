@@ -55,6 +55,8 @@ pub(crate) struct NewGatewayArtifact {
 pub(crate) struct PuhGuardiansArtifact {
     pub(crate) new_puh_impl: Address,
     pub(crate) new_guardians: Address,
+    pub(crate) new_security_council: Address,
+    pub(crate) new_emergency_upgrade_board: Address,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -239,6 +241,16 @@ impl EcosystemUpgradeArtifact {
                         &value,
                         "puh_guardians",
                         &["new_guardians"],
+                    )?,
+                    new_security_council: required_address_in_value(
+                        &value,
+                        "puh_guardians",
+                        &["new_security_council"],
+                    )?,
+                    new_emergency_upgrade_board: required_address_in_value(
+                        &value,
+                        "puh_guardians",
+                        &["new_emergency_upgrade_board"],
                     )?,
                 })
             }

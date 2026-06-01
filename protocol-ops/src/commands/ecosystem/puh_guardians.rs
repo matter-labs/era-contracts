@@ -42,8 +42,12 @@ const EIP1967_ADMIN_SLOT: H256 = H256([
 /// on dispatch. We pass empty bytes for the post-upgrade call (no init-style
 /// hook needed for the impl swap).
 const PROXY_ADMIN_UPGRADE_AND_CALL_SELECTOR: [u8; 4] = [0x96, 0x23, 0x60, 0x9d];
+/// `ProtocolUpgradeHandler.updateSecurityCouncil(address)` selector.
+const PUH_UPDATE_SECURITY_COUNCIL_SELECTOR: [u8; 4] = [0xdb, 0xfe, 0x3e, 0x96];
 /// `ProtocolUpgradeHandler.updateGuardians(address)` selector.
 const PUH_UPDATE_GUARDIANS_SELECTOR: [u8; 4] = [0x69, 0x16, 0x16, 0xc5];
+/// `ProtocolUpgradeHandler.updateEmergencyUpgradeBoard(address)` selector.
+const PUH_UPDATE_EMERGENCY_BOARD_SELECTOR: [u8; 4] = [0x7a, 0xed, 0xf3, 0x37];
 /// `bridgehub.chainAssetHandler()` selector.
 const BRIDGEHUB_CHAIN_ASSET_HANDLER_SELECTOR: [u8; 4] = [0x70, 0xd8, 0xaf, 0x87];
 
@@ -51,6 +55,10 @@ const BRIDGEHUB_CHAIN_ASSET_HANDLER_SELECTOR: [u8; 4] = [0x70, 0xd8, 0xaf, 0x87]
 const DEFAULT_CREATE2_FACTORY: &str = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
 /// Default forge script (relative to the zk-governance foundry root).
 const DEFAULT_SCRIPT_PATH: &str = "scripts/DeployPUHAndGuardians.s.sol:DeployPUHAndGuardians";
+/// CREATE2 salt seeds for the redeployed governance set. Kept distinct from the
+/// PUH/Guardians seeds so the four contracts land at independent addresses.
+const SECURITY_COUNCIL_SALT_SEED: &[u8] = b"v31:SecurityCouncil";
+const EMERGENCY_BOARD_SALT_SEED: &[u8] = b"v31:EmergencyUpgradeBoard";
 /// Default sibling checkout path for zk-governance.
 pub const DEFAULT_ZK_GOV_DIR: &str = "../../zk-governance";
 
@@ -65,14 +73,24 @@ pub struct PuhGuardiansInputs<'a> {
     pub create2_factory_override: Option<Address>,
     pub puh_salt_override: Option<H256>,
     pub guardians_salt_override: Option<H256>,
+    pub security_council_salt_override: Option<H256>,
+    pub emergency_board_salt_override: Option<H256>,
     pub zk_governance_dir: PathBuf,
     /// ZKsync OS ChainTypeManager proxy address. Required by
     /// `DeployPUHAndGuardians.s.sol` — the old PUH has no getter for this.
     pub zksync_os_ctm: Option<Address>,
+    /// When true, deploy `TestnetProtocolUpgradeHandler` (zeroed legal-veto /
+    /// upgrade-delay periods) instead of the real `ProtocolUpgradeHandler`.
+    /// Defaults to `!env.is_mainnet()` — stage/testnet get the testnet handler,
+    /// mainnet gets the real one — mirroring the per-CTM `is_testnet` rule.
+    pub use_testnet_puh: bool,
 }
 
 impl<'a> PuhGuardiansInputs<'a> {
     pub fn from_env(env: Option<&'a EnvConfig>, bridgehub: Address) -> Self {
+        // Mainnet keeps the full timelock; every other ecosystem (stage /
+        // testnet / local) gets the zeroed-delay testnet handler.
+        let use_testnet_puh = env.map(|c| !c.is_mainnet()).unwrap_or(false);
         Self {
             env,
             bridgehub,
@@ -80,8 +98,11 @@ impl<'a> PuhGuardiansInputs<'a> {
             create2_factory_override: None,
             puh_salt_override: None,
             guardians_salt_override: None,
+            security_council_salt_override: None,
+            emergency_board_salt_override: None,
             zk_governance_dir: PathBuf::from(DEFAULT_ZK_GOV_DIR),
             zksync_os_ctm: None,
+            use_testnet_puh,
         }
     }
 }
@@ -95,6 +116,8 @@ pub struct PuhGuardiansOutcome {
     pub proxy_admin: Address,
     pub new_puh_impl: Address,
     pub new_guardians: Address,
+    pub new_security_council: Address,
+    pub new_emergency_upgrade_board: Address,
 }
 
 /// Run `DeployPUHAndGuardians.s.sol` against the supplied runner (same anvil
@@ -122,6 +145,12 @@ pub async fn deploy_puh_guardians(
     let guardians_salt = inputs
         .guardians_salt_override
         .unwrap_or_else(|| H256::from(keccak256(b"v31:Guardians")));
+    let security_council_salt = inputs
+        .security_council_salt_override
+        .unwrap_or_else(|| H256::from(keccak256(SECURITY_COUNCIL_SALT_SEED)));
+    let emergency_board_salt = inputs
+        .emergency_board_salt_override
+        .unwrap_or_else(|| H256::from(keccak256(EMERGENCY_BOARD_SALT_SEED)));
 
     // Resolve --zk-governance-dir relative to the contracts root (`paths::contracts_root()`),
     // so the default `../../zk-governance` works regardless of shell cwd. Some
@@ -212,6 +241,15 @@ pub async fn deploy_puh_guardians(
         .with_env("CREATE2_FACTORY", format!("{:#x}", create2_factory))
         .with_env("CREATE2_SALT_PUH", format!("{:#x}", puh_salt))
         .with_env("CREATE2_SALT_GUARDIANS", format!("{:#x}", guardians_salt))
+        .with_env(
+            "CREATE2_SALT_SECURITY_COUNCIL",
+            format!("{:#x}", security_council_salt),
+        )
+        .with_env(
+            "CREATE2_SALT_EMERGENCY_BOARD",
+            format!("{:#x}", emergency_board_salt),
+        )
+        .with_env("USE_TESTNET_PUH", inputs.use_testnet_puh.to_string())
         .with_env("ERA_CHAIN_ID", era_chain_id.to_string())
         .with_env(
             "DEPLOY_OUTPUT_TOML",
@@ -233,9 +271,23 @@ pub async fn deploy_puh_guardians(
         .with_context(|| format!("Failed to parse {}", deploy_output_toml.display()))?;
     let new_puh_impl = parsed.new_puh_impl;
     let new_guardians = parsed.new_guardians;
-    logger::info(format!("New PUH impl:    {new_puh_impl:#x}"));
-    logger::info(format!("New Guardians:   {new_guardians:#x}"));
+    let new_security_council = parsed.new_security_council;
+    let new_emergency_upgrade_board = parsed.new_emergency_upgrade_board;
+    logger::info(format!(
+        "New PUH impl:    {new_puh_impl:#x} (testnet handler: {})",
+        inputs.use_testnet_puh
+    ));
+    logger::info(format!("New Guardians:        {new_guardians:#x}"));
+    logger::info(format!("New SecurityCouncil:  {new_security_council:#x}"));
+    logger::info(format!(
+        "New EmergencyBoard:   {new_emergency_upgrade_board:#x}"
+    ));
 
+    // Stage-0 wiring, executed as the PUH via governance. The impl swap goes
+    // first; then the three `onlySelf` setters repoint the proxy at the freshly
+    // deployed SecurityCouncil, Guardians and EmergencyUpgradeBoard. The board
+    // already embeds the new SC + Guardians as immutables (set at deploy), so
+    // pointing the PUH at the new board completes a consistent set.
     let stage0_calls = vec![
         GovernanceCall {
             target: proxy_admin,
@@ -245,7 +297,17 @@ pub async fn deploy_puh_guardians(
         GovernanceCall {
             target: puh_proxy,
             value: U256::zero(),
+            data: encode_puh_update_security_council(new_security_council),
+        },
+        GovernanceCall {
+            target: puh_proxy,
+            value: U256::zero(),
             data: encode_puh_update_guardians(new_guardians),
+        },
+        GovernanceCall {
+            target: puh_proxy,
+            value: U256::zero(),
+            data: encode_puh_update_emergency_board(new_emergency_upgrade_board),
         },
     ];
 
@@ -255,6 +317,8 @@ pub async fn deploy_puh_guardians(
         proxy_admin,
         new_puh_impl,
         new_guardians,
+        new_security_council,
+        new_emergency_upgrade_board,
     })
 }
 
@@ -262,6 +326,8 @@ pub async fn deploy_puh_guardians(
 struct DeployOutput {
     new_puh_impl: Address,
     new_guardians: Address,
+    new_security_council: Address,
+    new_emergency_upgrade_board: Address,
 }
 
 fn http_provider(rpc: &str) -> anyhow::Result<Provider<Http>> {
@@ -319,8 +385,22 @@ fn encode_proxy_admin_upgrade(proxy: Address, new_impl: Address) -> Vec<u8> {
 }
 
 fn encode_puh_update_guardians(new_guardians: Address) -> Vec<u8> {
+    encode_address_setter(PUH_UPDATE_GUARDIANS_SELECTOR, new_guardians)
+}
+
+fn encode_puh_update_security_council(new_security_council: Address) -> Vec<u8> {
+    encode_address_setter(PUH_UPDATE_SECURITY_COUNCIL_SELECTOR, new_security_council)
+}
+
+fn encode_puh_update_emergency_board(new_board: Address) -> Vec<u8> {
+    encode_address_setter(PUH_UPDATE_EMERGENCY_BOARD_SELECTOR, new_board)
+}
+
+/// Encodes a `selector(address)` call — the shape of all three PUH `update*`
+/// setters (`updateSecurityCouncil` / `updateGuardians` / `updateEmergencyUpgradeBoard`).
+fn encode_address_setter(selector: [u8; 4], addr: Address) -> Vec<u8> {
     let mut buf = Vec::with_capacity(4 + 32);
-    buf.extend_from_slice(&PUH_UPDATE_GUARDIANS_SELECTOR);
-    buf.extend_from_slice(&abi_encode(&[Token::Address(new_guardians)]));
+    buf.extend_from_slice(&selector);
+    buf.extend_from_slice(&abi_encode(&[Token::Address(addr)]));
     buf
 }

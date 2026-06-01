@@ -15,7 +15,10 @@ const ZK_GOVERNANCE_REPO: &str = "zksync-association/zk-governance";
 const ALL_CONTRACTS_HASHES_PATH: &str = "AllContractsHashes.json";
 const ZK_GOVERNANCE_V31_CONTRACTS: &[&str] = &[
     "l1-contracts/ProtocolUpgradeHandler",
+    "l1-contracts/TestnetProtocolUpgradeHandler",
     "l1-contracts/Guardians",
+    "l1-contracts/SecurityCouncil",
+    "l1-contracts/EmergencyUpgradeBoard",
 ];
 
 pub struct BytecodeVerifier {

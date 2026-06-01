@@ -345,6 +345,13 @@ impl EnvConfig {
         self.v31.era_chain_id
     }
 
+    /// Whether this is the mainnet ecosystem. Drives testnet-vs-real contract
+    /// selection (e.g. the per-CTM verifier and the PUH redeploy: every
+    /// non-mainnet env gets the zeroed-delay `TestnetProtocolUpgradeHandler`).
+    pub fn is_mainnet(&self) -> bool {
+        self.env == "mainnet"
+    }
+
     pub fn legacy_gateway_chain_id(&self) -> Option<u64> {
         self.permanent.legacy_gateway.as_ref().map(|gw| gw.chain_id)
     }

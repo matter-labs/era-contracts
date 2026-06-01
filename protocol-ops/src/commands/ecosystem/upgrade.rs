@@ -459,6 +459,8 @@ struct UpgradePrepareAllOutput {
     puh_proxy: String,
     new_puh_impl: String,
     new_guardians: String,
+    new_security_council: String,
+    new_emergency_upgrade_board: String,
     puh_proxy_admin: String,
 }
 
@@ -859,6 +861,14 @@ pub async fn run_upgrade_prepare_all(mut args: UpgradePrepareAllArgs) -> anyhow:
             .as_ref()
             .map(|o| format!("{:#x}", o.new_guardians))
             .unwrap_or_default(),
+        new_security_council: puh_outcome
+            .as_ref()
+            .map(|o| format!("{:#x}", o.new_security_council))
+            .unwrap_or_default(),
+        new_emergency_upgrade_board: puh_outcome
+            .as_ref()
+            .map(|o| format!("{:#x}", o.new_emergency_upgrade_board))
+            .unwrap_or_default(),
         puh_proxy_admin: puh_outcome
             .as_ref()
             .map(|o| format!("{:#x}", o.proxy_admin))
@@ -926,9 +936,11 @@ fn infer_core_is_zk_sync_os(entries: &[crate::common::env_config::CtmEntry]) -> 
 /// [new_gateway]                   # only when present: GatewayVotePreparation
 /// ...                             # output minus governance_calls_to_execute.
 ///
-/// [puh_guardians]                 # only when PUH/Guardians were redeployed
+/// [puh_guardians]                 # only when the PUH governance set was redeployed
 /// new_puh_impl = "0x..."
 /// new_guardians = "0x..."
+/// new_security_council = "0x..."
+/// new_emergency_upgrade_board = "0x..."
 /// ```
 fn write_merged_ecosystem_toml(
     core_toml: &Path,
@@ -1173,6 +1185,14 @@ fn write_merged_ecosystem_toml(
         table.insert(
             "new_guardians".into(),
             Value::String(format!("{:#x}", puh_guardians.new_guardians)),
+        );
+        table.insert(
+            "new_security_council".into(),
+            Value::String(format!("{:#x}", puh_guardians.new_security_council)),
+        );
+        table.insert(
+            "new_emergency_upgrade_board".into(),
+            Value::String(format!("{:#x}", puh_guardians.new_emergency_upgrade_board)),
         );
         doc.insert("puh_guardians".into(), Value::Table(table));
     }
