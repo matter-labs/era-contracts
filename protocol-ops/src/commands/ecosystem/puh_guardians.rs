@@ -55,10 +55,11 @@ const BRIDGEHUB_CHAIN_ASSET_HANDLER_SELECTOR: [u8; 4] = [0x70, 0xd8, 0xaf, 0x87]
 const DEFAULT_CREATE2_FACTORY: &str = "0x4e59b44847b379578588920cA78FbF26c0B4956C";
 /// Default forge script (relative to the zk-governance foundry root).
 const DEFAULT_SCRIPT_PATH: &str = "scripts/DeployPUHAndGuardians.s.sol:DeployPUHAndGuardians";
-/// CREATE2 salt seeds for the redeployed governance set. Kept distinct from the
-/// PUH/Guardians seeds so the four contracts land at independent addresses.
-const SECURITY_COUNCIL_SALT_SEED: &[u8] = b"v31:SecurityCouncil";
-const EMERGENCY_BOARD_SALT_SEED: &[u8] = b"v31:EmergencyUpgradeBoard";
+/// Default seed for the single CREATE2 salt shared by the whole redeployed
+/// governance set (PUH impl, Guardians, SecurityCouncil, EmergencyUpgradeBoard).
+/// Each contract has distinct init code, so one salt is collision-free and
+/// rotates the set as a group. Override via `gov_salt_override`.
+const GOV_SALT_SEED: &[u8] = b"v31:gov";
 /// Default sibling checkout path for zk-governance.
 pub const DEFAULT_ZK_GOV_DIR: &str = "../../zk-governance";
 
@@ -71,10 +72,9 @@ pub struct PuhGuardiansInputs<'a> {
     /// Forge script: contract address overrides. `None` = on-chain auto-resolve.
     pub chain_asset_handler_override: Option<Address>,
     pub create2_factory_override: Option<Address>,
-    pub puh_salt_override: Option<H256>,
-    pub guardians_salt_override: Option<H256>,
-    pub security_council_salt_override: Option<H256>,
-    pub emergency_board_salt_override: Option<H256>,
+    /// CREATE2 salt shared by all four redeployed contracts. `None` =
+    /// `keccak256(GOV_SALT_SEED)`. Rotate this to move the whole set.
+    pub gov_salt_override: Option<H256>,
     pub zk_governance_dir: PathBuf,
     /// ZKsync OS ChainTypeManager proxy address. Required by
     /// `DeployPUHAndGuardians.s.sol` — the old PUH has no getter for this.
@@ -96,10 +96,7 @@ impl<'a> PuhGuardiansInputs<'a> {
             bridgehub,
             chain_asset_handler_override: None,
             create2_factory_override: None,
-            puh_salt_override: None,
-            guardians_salt_override: None,
-            security_council_salt_override: None,
-            emergency_board_salt_override: None,
+            gov_salt_override: None,
             zk_governance_dir: PathBuf::from(DEFAULT_ZK_GOV_DIR),
             zksync_os_ctm: None,
             use_testnet_puh,
@@ -139,18 +136,9 @@ pub async fn deploy_puh_guardians(
                 .parse()
                 .expect("hardcoded factory address parses")
         });
-    let puh_salt = inputs
-        .puh_salt_override
-        .unwrap_or_else(|| H256::from(keccak256(b"v31:ProtocolUpgradeHandler")));
-    let guardians_salt = inputs
-        .guardians_salt_override
-        .unwrap_or_else(|| H256::from(keccak256(b"v31:Guardians")));
-    let security_council_salt = inputs
-        .security_council_salt_override
-        .unwrap_or_else(|| H256::from(keccak256(SECURITY_COUNCIL_SALT_SEED)));
-    let emergency_board_salt = inputs
-        .emergency_board_salt_override
-        .unwrap_or_else(|| H256::from(keccak256(EMERGENCY_BOARD_SALT_SEED)));
+    let gov_salt = inputs
+        .gov_salt_override
+        .unwrap_or_else(|| H256::from(keccak256(GOV_SALT_SEED)));
 
     // Resolve --zk-governance-dir relative to the contracts root (`paths::contracts_root()`),
     // so the default `../../zk-governance` works regardless of shell cwd. Some
@@ -239,16 +227,7 @@ pub async fn deploy_puh_guardians(
             format!("{:#x}", zksync_os_ctm),
         )
         .with_env("CREATE2_FACTORY", format!("{:#x}", create2_factory))
-        .with_env("CREATE2_SALT_PUH", format!("{:#x}", puh_salt))
-        .with_env("CREATE2_SALT_GUARDIANS", format!("{:#x}", guardians_salt))
-        .with_env(
-            "CREATE2_SALT_SECURITY_COUNCIL",
-            format!("{:#x}", security_council_salt),
-        )
-        .with_env(
-            "CREATE2_SALT_EMERGENCY_BOARD",
-            format!("{:#x}", emergency_board_salt),
-        )
+        .with_env("CREATE2_SALT_GOV", format!("{:#x}", gov_salt))
         .with_env("USE_TESTNET_PUH", inputs.use_testnet_puh.to_string())
         .with_env("ERA_CHAIN_ID", era_chain_id.to_string())
         .with_env(
