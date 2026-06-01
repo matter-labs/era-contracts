@@ -80,7 +80,7 @@ echo "GW RPC:       $GW_RPC_URL"
 # PUH/Guardians bytecodes. Override via ZK_GOVERNANCE_COMMIT env var; the
 # default points to the latest kl/v31-puh-guardians-redeploy on upstream
 # (zksync-association/zk-governance) which carries the regenerated hashes.
-ZK_GOV_COMMIT="${ZK_GOVERNANCE_COMMIT:-2897dbc}"
+ZK_GOV_COMMIT="${ZK_GOVERNANCE_COMMIT:-3e516c5}"
 echo "zk-gov commit: $ZK_GOV_COMMIT"
 # 1e30 wei
 FUND_AMOUNT="1000000000000000000000000000000"
@@ -173,14 +173,20 @@ fi
 # go straight to verify-upgrade against an already-broadcast anvil state.
 # Useful for iterating on PUVT without paying the broadcast cost every time.
 SKIP_BROADCAST="${SKIP_BROADCAST:-0}"
-if [[ "$SKIP_BROADCAST" == "1" && -f "$OUT/executed.json" ]]; then
-  echo "=== Steps 2-3: SKIPPED (SKIP_BROADCAST=1, reusing $OUT/executed.json) ==="
+if [[ "$SKIP_BROADCAST" == "1" && -f "$OUT/fork-rehearsal/executed.json" ]]; then
+  echo "=== Steps 2-3: SKIPPED (SKIP_BROADCAST=1, reusing $OUT/fork-rehearsal/executed.json) ==="
   echo "=== Step 4: verify-upgrade (PUVT) ==="
+  # Same committed-real + fork-rehearsal combined log as the full path below.
+  COMBINED_TXLOG="$OUT/fork-rehearsal/transactions.combined.txt"
+  : > "$COMBINED_TXLOG"
+  [[ -f "$OUT/transactions.txt" ]] && cat "$OUT/transactions.txt" >> "$COMBINED_TXLOG"
+  [[ -f "$OUT/fork-rehearsal/transactions.txt" ]] && cat "$OUT/fork-rehearsal/transactions.txt" >> "$COMBINED_TXLOG"
   "$PROTOCOL_OPS" ecosystem verify-upgrade \
     --env stage \
     --ecosystem-toml "$OUT/ecosystem.toml" \
     --l1-rpc-url "$RPC" \
     --gw-rpc-url "$GW_RPC_URL" \
+    --transactions-log "$COMBINED_TXLOG" \
     --zk-governance-commit "$ZK_GOV_COMMIT"
   echo "=== Done ==="
   exit 0
@@ -227,16 +233,18 @@ else
 fi
 
 echo "=== Step 3: upgrade-broadcast --unlocked --out ==="
-# transactions.txt is append-only: real deployment tx hashes accumulate
-# across regens. Back up any existing hashes before the broadcast step
-# (which writes anvil-fork hashes), then prepend them afterward so the
-# file always starts with the real hashes.
-TXLOG="$OUT/transactions.txt"
-TXLOG_BAK="$OUT/.transactions.txt.bak"
-if [[ -s "$TXLOG" ]]; then
-  cp "$TXLOG" "$TXLOG_BAK"
-  : > "$TXLOG"
-fi
+# The committed `transactions.txt` holds *real-network* deployment hashes only
+# (they resolve on any Sepolia fork). This fork rehearsal mines its own hashes,
+# which exist solely on this local fork instance — so they go to an EPHEMERAL,
+# git-ignored dir and are NEVER merged into the committed log. `protocol_ops`
+# writes the hash log next to `--out`, so pointing `--out` at `fork-rehearsal/`
+# keeps the fork hashes (`fork-rehearsal/transactions.txt`) cleanly separated.
+# PUVT (Step 4) then reads the committed real log + this run's fork log.
+REAL_TXLOG="$OUT/transactions.txt"
+FORK_DIR="$OUT/fork-rehearsal"
+FORK_TXLOG="$FORK_DIR/transactions.txt"
+rm -rf "$FORK_DIR"
+mkdir -p "$FORK_DIR"
 # Pin the base fee to 1 gwei so the EIP-1559 escalation doesn't cause
 # MsgValueTooLow on priority deposit txs whose mintValue was computed
 # at prepare-time with a lower gas price.
@@ -245,19 +253,20 @@ cast rpc anvil_setNextBlockBaseFeePerGas 0x3B9ACA00 --rpc-url "$RPC" >/dev/null
   --manifest "$OUT/prepare/manifest.json" \
   --l1-rpc-url "$RPC" \
   --unlocked \
-  --out "$OUT/executed.json"
-# Restore backed-up hashes before the fresh anvil ones.
-if [[ -f "$TXLOG_BAK" ]]; then
-  cat "$TXLOG" >> "$TXLOG_BAK"
-  mv "$TXLOG_BAK" "$TXLOG"
-fi
+  --out "$FORK_DIR/executed.json"
 
 echo "=== Step 4: verify-upgrade (PUVT) ==="
+# Feed PUVT the committed real-network log followed by this run's fork log.
+COMBINED_TXLOG="$FORK_DIR/transactions.combined.txt"
+: > "$COMBINED_TXLOG"
+[[ -f "$REAL_TXLOG" ]] && cat "$REAL_TXLOG" >> "$COMBINED_TXLOG"
+[[ -f "$FORK_TXLOG" ]] && cat "$FORK_TXLOG" >> "$COMBINED_TXLOG"
 "$PROTOCOL_OPS" ecosystem verify-upgrade \
   --env stage \
   --ecosystem-toml "$OUT/ecosystem.toml" \
   --l1-rpc-url "$RPC" \
   --gw-rpc-url "$GW_RPC_URL" \
+  --transactions-log "$COMBINED_TXLOG" \
   --zk-governance-commit "$ZK_GOV_COMMIT"
 
 echo "=== Done ==="

@@ -1,0 +1,28 @@
+{
+  "bundles": [
+    {
+      "file": "01_ecosystem.upgrade-prepare-all_0x5555555590930f501c88b73ea43b3eeb5a71643c.safe.json",
+      "index": 1,
+      "steps": [
+        "ecosystem.upgrade-prepare-all"
+      ],
+      "target": "0x5555555590930f501c88b73ea43b3eeb5a71643c"
+    },
+    {
+      "file": "03_ecosystem.upgrade-prepare-all_0xd669494442609879b209cca8eba2bdc904d2e69d.safe.json",
+      "index": 3,
+      "steps": [
+        "ecosystem.upgrade-prepare-all"
+      ],
+      "target": "0xd669494442609879b209cca8eba2bdc904d2e69d"
+    },
+    {
+      "file": "04_ecosystem.upgrade-prepare-all_0x5555555590930f501c88b73ea43b3eeb5a71643c.safe.json",
+      "index": 4,
+      "steps": [
+        "ecosystem.upgrade-prepare-all"
+      ],
+      "target": "0x5555555590930f501c88b73ea43b3eeb5a71643c"
+    }
+  ]
+}

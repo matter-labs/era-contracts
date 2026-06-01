@@ -49,6 +49,10 @@ l1-contracts/upgrade-envs/**/output/**/manifest.json
 l1-contracts/upgrade-envs/**/output/**/regen/
 l1-contracts/upgrade-envs/**/output/**/executed.json
 l1-contracts/upgrade-envs/**/output/**/anvil.log
+# Ephemeral fork-rehearsal tx log: hashes mined only on the local verification
+# fork, regenerated every run. Kept out of the committed `transactions.txt`
+# (which holds real-network deployments only) so it never accumulates.
+l1-contracts/upgrade-envs/**/output/**/fork-rehearsal/
 l1-contracts/test/foundry/l1/integration/deploy-scripts/script-out/*.toml
 !l1-contracts/script-out/.gitkeep
 *.timestamp
