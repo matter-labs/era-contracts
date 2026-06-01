@@ -173,8 +173,7 @@ DEPLOYER_PK_FILE=~/.test_pk \
 L1_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
 ./regen-and-verify-stage.sh
 
-# phase 2 — broadcast Camp-A bundles to real Sepolia (host protocol_ops/cast)
-# phase 2b — broadcast each per-CTM-admin setup bundle
+# phase 2 — broadcast the deployer's Camp-A bundles to REAL Sepolia (see below)
 # phase 3 — emit tx-simulator JSON via `protocol_ops ecosystem governance-toml-to-simulator`
 # phase 3.5 — `yarn --cwd ../../../transaction-simulator simulate --file <json>`
 ```
@@ -182,6 +181,51 @@ L1_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
 Build the host binary once with `cd protocol-ops && cargo build --release`
 (the `regen-via-docker.ts` Mode-1 cross-build into `target-linux/` is only
 needed when the host is macOS).
+
+#### Phase 2 — deploy contracts to real Sepolia (native)
+
+`upgrade-broadcast` requires a `--key` per **distinct signer** in the manifest
+and bails otherwise. We only hold the **deployer** key (`~/.test_pk`,
+`0x343Ee72…`); the Camp-B per-CTM admin signers (`0x5555…`, `0xd669…`) are
+sim-only by design. So filter the manifest to the deployer-signed bundles
+first, then broadcast just those. The broadcast is **idempotent** — `execute-safe`
+skips CREATE2 targets that already have code and known `AddressAlreadySet`
+reverts — so it's safe to re-run.
+
+```bash
+ENVOUT=l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage
+DEP=0x343Ee72DdD8CCD80cd43D6Adbc6c463a2DE433a7
+
+# 1) Filter manifest → deployer-only (the .safe.json bundle files are reused as-is).
+python3 - "$ENVOUT/prepare/manifest.json" <<'PY'
+import json,sys
+p=sys.argv[1]; m=json.load(open(p))
+dep="0x343ee72ddd8ccd80cd43d6adbc6c463a2de433a7"
+m["bundles"]=[b for b in m["bundles"] if b["target"].lower()==dep]
+json.dump(m, open(p.replace("manifest.json","manifest-deployer-only.json"),"w"), indent=2)
+PY
+
+# 2) Broadcast to real Sepolia. `--out`'s parent dir is the committed stage
+#    dir, so the real deploy tx hashes append to the tracked transactions.txt
+#    (the real-network log). New gov/CTM contracts deploy; already-on-chain
+#    ones are skipped.
+protocol_ops ecosystem upgrade-broadcast \
+  --manifest "$ENVOUT/prepare/manifest-deployer-only.json" \
+  --l1-rpc-url "$L1_RPC_URL" \
+  --key "$DEP=$(cat ~/.test_pk)" \
+  --out "$ENVOUT/sepolia-deploy-executed.json"
+
+# 3) Sanity-check the new contracts now have code on real Sepolia:
+#    cast code <new SecurityCouncil/Guardians/board addr> --rpc-url "$L1_RPC_URL"
+```
+
+Bundle 05 carries L1→L2 Gateway-CTM priority txs whose `mintValue` is paid in
+the chain's ZK base token — the deployer EOA must hold enough of it
+(`cast call <zkToken> "balanceOf(address)" $DEP`). Commit the grown
+`transactions.txt` alongside the regen artifacts.
+
+> **NOTE:** `regen-via-docker.ts` is hard-disabled on Linux (it `die()`s unless
+> `FORCE_DOCKER_REGEN=1`). Everything above is the native replacement.
 
 The Docker entry point is `scripts/regen-via-docker.ts` with two
 binary-source modes:

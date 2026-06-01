@@ -48,6 +48,11 @@ l1-contracts/upgrade-envs/**/output/**/manifest.json
 # script outputs). Not the canonical governance.toml.
 l1-contracts/upgrade-envs/**/output/**/regen/
 l1-contracts/upgrade-envs/**/output/**/executed.json
+# Scratch from the native real-Sepolia broadcast (phase 2): the deployer-only
+# filtered manifest and the executed-tx log. Real deploy hashes land in the
+# tracked transactions.txt; these are throwaway.
+l1-contracts/upgrade-envs/**/output/**/manifest-deployer-only.json
+l1-contracts/upgrade-envs/**/output/**/sepolia-deploy-executed.json
 l1-contracts/upgrade-envs/**/output/**/anvil.log
 # Ephemeral fork-rehearsal tx log: hashes mined only on the local verification
 # fork, regenerated every run. Kept out of the committed `transactions.txt`

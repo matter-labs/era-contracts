@@ -554,6 +554,35 @@ async function main(): Promise<void> {
   const sub = process.argv[2];
   if (!sub) usage();
 
+  // Docker is only needed on macOS, whose Foundry artifacts diverge from Linux
+  // just enough to change CREATE2 addresses. On Linux the host toolchain is
+  // already linux/amd64, so the NATIVE (no-Docker) path produces bit-identical
+  // artifacts with none of the Docker overhead. Refuse here so this script is
+  // never used on Linux by accident. Override with FORCE_DOCKER_REGEN=1 only
+  // for a deliberate cross-platform reason.
+  if (process.platform === "linux" && process.env.FORCE_DOCKER_REGEN !== "1") {
+    die(
+      [
+        "regen-via-docker.ts is disabled on Linux — use the native (no-Docker) path,",
+        "which produces bit-identical artifacts. Equivalents:",
+        "",
+        "  # phases 1 + 1.5 — prepare + fork-replay + PUVT",
+        "  cd l1-contracts/test/anvil-interop && \\",
+        "    DEPLOYER_PK_FILE=~/.test_pk L1_FORK_URL=<sepolia-rpc> ./regen-and-verify-stage.sh",
+        "",
+        "  # phase 2 — real-Sepolia broadcast",
+        "  protocol_ops ecosystem upgrade-broadcast --manifest <prepare>/manifest.json \\",
+        "    --l1-rpc-url <sepolia-rpc> --key 0xADDR=0xKEY --out <executed.json>",
+        "",
+        "  # phase 3 — sim-inputs / sim JSON",
+        "  protocol_ops ecosystem governance-toml-to-simulator --env <env> [--emit-sim-inputs <dir> | --out <json>]",
+        "",
+        "See .claude/skills/regenerate-v31-stage-calldata (native Linux path).",
+        "Override with FORCE_DOCKER_REGEN=1 only if you truly need the Docker path on Linux.",
+      ].join("\n")
+    );
+  }
+
   const needsPk = ["regen", "broadcast", "sim-emit"].includes(sub);
   const needsRpc = ["regen", "broadcast"].includes(sub);
 
