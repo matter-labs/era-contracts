@@ -224,6 +224,44 @@ the chain's ZK base token — the deployer EOA must hold enough of it
 (`cast call <zkToken> "balanceOf(address)" $DEP`). Commit the grown
 `transactions.txt` alongside the regen artifacts.
 
+#### Phase 2.5 — verify the deployed contracts on Etherscan
+
+After the real-Sepolia broadcast, source-verify every **newly deployed L1
+contract** so the explorer shows source. For v31 stage that's the four
+zk-governance contracts redeployed via CREATE2 (the L1→L2 Gateway-CTM
+deploys in bundle 05 land on the **Gateway L2**, not Sepolia — verify those on
+the Gateway explorer, not here). `upgrade-broadcast`'s `executed.json` has only
+raw tx data, so get each contract's name + address + args from the **prepare's
+forge broadcast log** (deterministic — fork CREATE2 addresses equal real
+Sepolia's):
+
+```
+zk-governance/l1-contracts/broadcast/DeployPUHAndGuardians.s.sol/11155111/run-latest.json
+era-contracts/l1-contracts/broadcast/CoreUpgrade_v31.s.sol/11155111/run-latest.json
+```
+
+For byte-exact constructor args, slice them off the on-chain initcode (the
+deploy tx `data` = `salt(32) ++ creationCode ++ ctorArgs`; `ctorArgs =
+data[2+64+len(creationCode):]`, where `creationCode = forge inspect
+<src>:<C> bytecode`). That initcode starting with the locally-compiled
+`creationCode` also proves the deployed bytecode matches the committed source.
+
+Then, from the repo holding the source (zk-governance for the gov set), with
+its `foundry.toml` compiler config:
+
+```bash
+forge verify-contract <addr> src/<C>.sol:<C> \
+  --chain sepolia --compiler-version 0.8.24 \
+  --num-of-optimizations 10000000 --evm-version cancun \
+  --constructor-args 0x<ctorArgs> \
+  --etherscan-api-key "$ETHERSCAN_API_KEY" --watch
+```
+
+v31 stage gov set (verify each): `TestnetProtocolUpgradeHandler`, `Guardians`,
+`SecurityCouncil`, `EmergencyUpgradeBoard`. `already verified` is fine
+(Etherscan bytecode-matches identical contracts). Verification is
+Etherscan-side only — nothing to commit.
+
 > **NOTE:** `regen-via-docker.ts` is hard-disabled on Linux (it `die()`s unless
 > `FORCE_DOCKER_REGEN=1`). Everything above is the native replacement.
 
