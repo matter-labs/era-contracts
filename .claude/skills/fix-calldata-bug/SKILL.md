@@ -103,11 +103,16 @@ The VPS agent (or you, over ssh):
 Two Claude agents (local + VPS) do **not** talk directly. They coordinate through
 git plus a human relay of turn-taking:
 
-- **Shared branches.** Both pull/push the same era-contracts branch (code + artifacts)
-  and the tx-simulator branch (sim).
+- **Shared branch, possibly two remotes.** Both agents work one era-contracts branch.
+  The branch may live on a **fork** the VPS can push to (e.g. `kelemeno`) plus the
+  canonical `origin` — the VPS pushes artifacts to the fork; the local agent
+  fast-forwards from the fork and syncs `origin` (`git fetch <fork> <branch>` →
+  `git merge --ff-only <fork>/<branch>` → `git push origin <branch>`). If both agents
+  share one writable remote, this collapses to a plain pull/push.
 - **The commit sha is the handshake.** Phase 1 prints the pushed sha; the VPS agent
   pulls and verifies HEAD == that sha before regenerating. Phase 2 prints the artifact
-  sha; the local agent pulls that before emitting.
+  sha; the local agent fast-forwards to it before emitting. A fast-forward (not a merge
+  commit) confirms the VPS built on exactly the reviewed code.
 - **Turn-taking is relayed by the human** ("VPS: wait for a push" → local pushes →
   "VPS: pull + regen + push" → "local: wait for that push" → local pulls). Each agent
   waits for the expected sha rather than guessing timing.
@@ -123,4 +128,5 @@ git plus a human relay of turn-taking:
 - **Keep PUVT in lockstep** with the deploy scripts; a deploy-side change with no
   matching verification change fails phase-1 PUVT (that's the point — let it catch you
   locally before the VPS run).
-- Don't push to `matter-labs/era-contracts` directly — use the fork (`origin`).
+- **Never force-push** the shared branch — both agents fast-forward it. If histories
+  diverged, stop and reconcile by hand; a force-push would clobber the other agent's work.
