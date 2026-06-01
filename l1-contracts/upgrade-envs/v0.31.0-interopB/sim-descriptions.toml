@@ -119,8 +119,18 @@ desc = "PUH stage 0: PUH ProxyAdmin.upgradeAndCall(PUH_proxy, new_PUH_impl, empt
 
 [[entries]]
 target = "puh"  # PUH (self)
+selector = "0xdbfe3e96"  # updateSecurityCouncil(address)
+desc = "PUH stage 0: PUH.updateSecurityCouncil(new_security_council) — after impl swap, point PUH at the freshly deployed SecurityCouncil (redeployed with the Guardians + EmergencyUpgradeBoard so the board never references a stale council)."
+
+[[entries]]
+target = "puh"  # PUH (self)
 selector = "0x691616c5"  # updateGuardians(address)
 desc = "PUH stage 0: PUH.updateGuardians(new_guardians) — after impl swap, point PUH at the freshly deployed Guardians contract."
+
+[[entries]]
+target = "puh"  # PUH (self)
+selector = "0x7aedf337"  # updateEmergencyUpgradeBoard(address)
+desc = "PUH stage 0: PUH.updateEmergencyUpgradeBoard(new_emergency_upgrade_board) — point PUH at the freshly deployed EmergencyUpgradeBoard, which embeds the new SecurityCouncil + Guardians (completes the consistent governance-set redeploy)."
 
 [[entries]]
 target = "atlas_ctm"  # Atlas CTM
@@ -355,6 +365,12 @@ selector = "0xd52471c1"
 l2_contract = "gw_l2_settlement_fee_setter"  # L2 system contract at 0x10010
 desc = "PUH stage 2 call 20: Bridgehub.requestL2TransactionDirect → L2 contract 0x10010.setGatewaySettlementFee(0.2 ZK = 200000000000000000 wei). Sets the per-call settlement-layer fee that GW charges chains settling through it."
 
+[[entries]]
+target = "bridgehub"
+selector = "0xd52471c1"
+l2_contract = "0xbbfa2a95bdc7416142516303bd852328ac5aa9da"  # new-GW L2 contract (chain 2709)
+desc = "PUH stage 2: Bridgehub.requestL2TransactionDirect (chain 2709) → L2 0xbbfa2a95….acceptOwnership() — completes an Ownable2Step transfer of a new-GW L2 contract to PUH (L1→L2 aliased), same pattern as the RollupDAManager / ServerNotifier accepts above."
+
 # requestL2TransactionTwoBridges — disambiguated by `second_bridge_address`.
 [[entries]]
 target = "bridgehub"
@@ -378,3 +394,28 @@ desc = "PUH stage 2 call 9: L1AssetRouter.setAssetDeploymentTracker(<GW CTM asse
 target = "ctm_deployment_tracker"  # CTMDeploymentTracker
 selector = "0x2f9db630"  # registerCTMAssetOnL1(address)
 desc = "PUH stage 2 call 10: CTMDeploymentTracker.registerCTMAssetOnL1(Atlas CTM 0x73bee414…) — registers the source-CTM assetId on the L1 CTMDeploymentTracker."
+
+# Post-upgrade smoke tests (appended from [test_upgrade_calls]; not part of the
+# governance ceremony). createNewChain pairs are disambiguated by the test
+# chainId at arg0 (era=555, zksync_os=556); the upgrade calls have unique targets.
+[[entries]]
+target = "bridgehub"  # Bridgehub
+selector = "0xf113c88b"  # createNewChain
+arg0_address = "0x000000000000000000000000000000000000022b"  # chainId 555 (Era test chain)
+desc = "Test (post-upgrade smoke): Bridgehub.createNewChain(chainId 555, Era CTM) — verifies a fresh Era chain can be created on the v31 protocol version."
+
+[[entries]]
+target = "bridgehub"  # Bridgehub
+selector = "0xf113c88b"  # createNewChain
+arg0_address = "0x000000000000000000000000000000000000022c"  # chainId 556 (ZKsync OS test chain)
+desc = "Test (post-upgrade smoke): Bridgehub.createNewChain(chainId 556, Atlas/ZKsync OS CTM) — verifies a fresh ZKsync OS chain can be created on the v31 protocol version."
+
+[[entries]]
+target = "0x9cff734c0529e89e2294b592d9f4d310754ec8ca"  # Era test chain (admin/diamond)
+selector = "0xfc57565f"  # upgradeChainFromVersion
+desc = "Test (post-upgrade smoke): upgrade an existing Era chain to v31 (upgradeChainFromVersion) — verifies the upgrade path for an already-registered Era chain."
+
+[[entries]]
+target = "0x98a0d85435a0e2834142bfd24a30e0c0b6866de2"  # ZKsync OS test chain (admin/diamond)
+selector = "0xfc57565f"  # upgradeChainFromVersion
+desc = "Test (post-upgrade smoke): upgrade an existing ZKsync OS chain to v31 (upgradeChainFromVersion) — verifies the upgrade path for an already-registered ZKsync OS chain."
