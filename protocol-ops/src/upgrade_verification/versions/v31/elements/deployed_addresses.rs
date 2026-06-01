@@ -25,6 +25,10 @@ use serde::Deserialize;
 
 const GOVERNANCE_TIMER_MAX_ADDITIONAL_DELAY_SECONDS: u64 = 14 * 24 * 60 * 60;
 const EXPECTED_GUARDIANS_MEMBER_COUNT: usize = 8;
+/// `SecurityCouncil.sol` requires exactly this many members. The live council
+/// carries more (12 on stage), so the redeploy copies the first 8 — see
+/// `DeployPUHAndGuardians.s.sol::_readFirstMembers`.
+const EXPECTED_SECURITY_COUNCIL_MEMBER_COUNT: usize = 8;
 const ZK_GOVERNANCE_PUH_FILE: &str = "l1-contracts/ProtocolUpgradeHandler";
 /// Zeroed-delay handler deployed on every non-mainnet ecosystem (stage/testnet).
 const ZK_GOVERNANCE_TESTNET_PUH_FILE: &str = "l1-contracts/TestnetProtocolUpgradeHandler";
@@ -632,6 +636,17 @@ async fn verify_puh_guardians_provenance(
         .context("calling current PUH.securityCouncil() for zk-governance provenance")?;
     let security_council_members =
         read_multisig_members(verifiers, old_security_council, "SecurityCouncil").await?;
+    // DeployPUHAndGuardians redeploys the SecurityCouncil with the first
+    // EXPECTED_SECURITY_COUNCIL_MEMBER_COUNT members of the current council
+    // (SecurityCouncil.sol enforces exactly that many). Mirror that truncation
+    // so the expected ctor args match the on-chain deployment.
+    anyhow::ensure!(
+        security_council_members.len() >= EXPECTED_SECURITY_COUNCIL_MEMBER_COUNT,
+        "current SecurityCouncil at {old_security_council} has {} members, fewer than the {EXPECTED_SECURITY_COUNCIL_MEMBER_COUNT} the redeploy requires",
+        security_council_members.len()
+    );
+    let security_council_members =
+        security_council_members[..EXPECTED_SECURITY_COUNCIL_MEMBER_COUNT].to_vec();
 
     let old_emergency_board = current_puh
         .emergencyUpgradeBoard()

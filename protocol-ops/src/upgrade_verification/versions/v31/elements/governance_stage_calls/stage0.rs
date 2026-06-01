@@ -1,15 +1,20 @@
 //! Stage 0 — pre-upgrade governance calls.
 //!
 //! Stage-0 shape:
-//!   `[ pauseMigration, startTimer (×N CTMs), <optional PUH-redeploy pair>, <optional acceptOwnership tail> ]`
+//!   `[ pauseMigration, startTimer (×N CTMs), <optional PUH-redeploy block>, <optional acceptOwnership tail> ]`
 //!
-//! The PUH-redeploy pair (`upgradeAndCall(puh_proxy_admin, new_impl, "")` +
-//! `updateGuardians(new_guardians)`) is only emitted on **PUH-governed envs**
+//! The PUH-redeploy block is only emitted on **PUH-governed envs**
 //! (`governance_kind = "puh"` in permanent-values — stage / mainnet today).
 //! `upgrade-prepare-all` appends it via `puh_guardians::deploy_puh_guardians`
-//! when `bridgehub.owner()` is a ProtocolUpgradeHandler proxy: first call
-//! upgrades the PUH implementation on its ProxyAdmin, second call rewires
-//! the new Guardians on the proxy itself.
+//! when `bridgehub.owner()` is a ProtocolUpgradeHandler proxy. It is four
+//! calls, in this order:
+//!   1. `upgradeAndCall(puh_proxy_admin, new_impl, "")` — swaps the PUH impl,
+//!   2. `updateSecurityCouncil(new_security_council)`,
+//!   3. `updateGuardians(new_guardians)`,
+//!   4. `updateEmergencyUpgradeBoard(new_emergency_upgrade_board)`.
+//! The three `onlySelf` setters repoint the proxy at the freshly deployed
+//! SecurityCouncil, Guardians and EmergencyUpgradeBoard (the board already
+//! embeds the new SC + Guardians as immutables, so the set stays consistent).
 //!
 //! [`verify_puh_immutables`] reads every immutable getter on the *new* PUH
 //! implementation and compares against either the current PUH (for "must-be-
@@ -34,8 +39,9 @@ use super::helpers::{
     verify_call_by_name,
 };
 use super::{
-    acceptOwnershipCall, updateGuardiansCall, upgradeAndCallCall, CallList, GovernanceStage0Calls,
-    Ownable2Step, ProtocolUpgradeHandler,
+    acceptOwnershipCall, updateEmergencyUpgradeBoardCall, updateGuardiansCall,
+    updateSecurityCouncilCall, upgradeAndCallCall, CallList, GovernanceStage0Calls, Ownable2Step,
+    ProtocolUpgradeHandler,
 };
 
 impl GovernanceStage0Calls {
@@ -106,8 +112,10 @@ impl GovernanceStage0Calls {
             result,
         )
         .await?;
+        // PUH-redeploy block is 4 calls: upgradeAndCall + the three update*
+        // setters (SecurityCouncil, Guardians, EmergencyUpgradeBoard).
         let pre_gov_accept_tail_start = if puh_governed {
-            base_count + 2
+            base_count + 4
         } else {
             base_count
         };
@@ -117,11 +125,15 @@ impl GovernanceStage0Calls {
             let expected_puh_guardians = artifact.puh_guardians.as_ref().context(
                 "PUH-governed v31 artifact is missing required top-level [puh_guardians] table",
             )?;
-            // PUH/Guardians redeploy pair — PUH-governed envs only.
-            // Call `base_count` — PUH ProxyAdmin.upgradeAndCall(PUH proxy, new impl, "").
-            // Call `base_count + 1` — PUH.updateGuardians(new guardians).
+            // PUH/Guardians redeploy block — PUH-governed envs only.
+            // Call `base_count`     — PUH ProxyAdmin.upgradeAndCall(PUH proxy, new impl, "").
+            // Call `base_count + 1` — PUH.updateSecurityCouncil(new security council).
+            // Call `base_count + 2` — PUH.updateGuardians(new guardians).
+            // Call `base_count + 3` — PUH.updateEmergencyUpgradeBoard(new board).
             let upgrade_idx = base_count;
-            let update_guardians_idx = base_count + 1;
+            let update_security_council_idx = base_count + 1;
+            let update_guardians_idx = base_count + 2;
+            let update_emergency_board_idx = base_count + 3;
             // OZ v5 `TransparentUpgradeableProxyAdmin.upgradeAndCall` is the
             // selector used by `puh_guardians::encode_proxy_admin_upgrade` —
             // the v4 `upgrade(address,address)` selector reverts on the v5
@@ -188,6 +200,50 @@ impl GovernanceStage0Calls {
             }
             errors += verify_call_by_address(
                 &self.calls,
+                update_security_council_idx,
+                bridgehub_owner,
+                "puh_proxy",
+                "updateSecurityCouncil(address)",
+                verifiers,
+                result,
+            );
+            if let Some(call) = self.calls.elems.get(update_security_council_idx) {
+                match updateSecurityCouncilCall::abi_decode(&call.data) {
+                    Ok(decoded) => {
+                        result.report_ok(&format!(
+                            "PUH updateSecurityCouncil(new={})",
+                            decoded._newSecurityCouncil
+                        ));
+                        if decoded._newSecurityCouncil == expected_puh_guardians.new_security_council
+                        {
+                            result.report_ok(
+                                "PUH updateSecurityCouncil target matches [puh_guardians].new_security_council",
+                            );
+                        } else {
+                            result.report_error(&format!(
+                                "PUH updateSecurityCouncil #{update_security_council_idx} argument {} does not match [puh_guardians].new_security_council {}",
+                                decoded._newSecurityCouncil, expected_puh_guardians.new_security_council
+                            ));
+                            errors += 1;
+                        }
+                        errors += verify_address_has_code(
+                            &decoded._newSecurityCouncil,
+                            "PUH new SecurityCouncil",
+                            verifiers,
+                            result,
+                        )
+                        .await;
+                    }
+                    Err(err) => {
+                        result.report_error(&format!(
+                            "Failed to decode updateSecurityCouncil(...) at call #{update_security_council_idx}: {err}"
+                        ));
+                        errors += 1;
+                    }
+                }
+            }
+            errors += verify_call_by_address(
+                &self.calls,
                 update_guardians_idx,
                 bridgehub_owner,
                 "puh_proxy",
@@ -224,6 +280,51 @@ impl GovernanceStage0Calls {
                     Err(err) => {
                         result.report_error(&format!(
                             "Failed to decode updateGuardians(...) at call #{update_guardians_idx}: {err}"
+                        ));
+                        errors += 1;
+                    }
+                }
+            }
+            errors += verify_call_by_address(
+                &self.calls,
+                update_emergency_board_idx,
+                bridgehub_owner,
+                "puh_proxy",
+                "updateEmergencyUpgradeBoard(address)",
+                verifiers,
+                result,
+            );
+            if let Some(call) = self.calls.elems.get(update_emergency_board_idx) {
+                match updateEmergencyUpgradeBoardCall::abi_decode(&call.data) {
+                    Ok(decoded) => {
+                        result.report_ok(&format!(
+                            "PUH updateEmergencyUpgradeBoard(new={})",
+                            decoded._newEmergencyUpgradeBoard
+                        ));
+                        if decoded._newEmergencyUpgradeBoard
+                            == expected_puh_guardians.new_emergency_upgrade_board
+                        {
+                            result.report_ok(
+                                "PUH updateEmergencyUpgradeBoard target matches [puh_guardians].new_emergency_upgrade_board",
+                            );
+                        } else {
+                            result.report_error(&format!(
+                                "PUH updateEmergencyUpgradeBoard #{update_emergency_board_idx} argument {} does not match [puh_guardians].new_emergency_upgrade_board {}",
+                                decoded._newEmergencyUpgradeBoard, expected_puh_guardians.new_emergency_upgrade_board
+                            ));
+                            errors += 1;
+                        }
+                        errors += verify_address_has_code(
+                            &decoded._newEmergencyUpgradeBoard,
+                            "PUH new EmergencyUpgradeBoard",
+                            verifiers,
+                            result,
+                        )
+                        .await;
+                    }
+                    Err(err) => {
+                        result.report_error(&format!(
+                            "Failed to decode updateEmergencyUpgradeBoard(...) at call #{update_emergency_board_idx}: {err}"
                         ));
                         errors += 1;
                     }

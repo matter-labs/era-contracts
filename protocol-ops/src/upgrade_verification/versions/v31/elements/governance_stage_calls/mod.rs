@@ -58,7 +58,9 @@ sol! {
     function initializeL1V31Upgrade();
     function setAssetTracker(address _l1AssetTracker);
     function setAddresses();
+    function updateSecurityCouncil(address _newSecurityCouncil);
     function updateGuardians(address _newGuardians);
+    function updateEmergencyUpgradeBoard(address _newEmergencyUpgradeBoard);
 
     // L2-side selectors carried as `l2Calldata` inside the new-Gateway
     // bring-up priority txs. Decoded by `verify_gateway_bring_up_calls` to

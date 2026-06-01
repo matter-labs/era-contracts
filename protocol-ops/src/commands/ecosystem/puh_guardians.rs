@@ -59,7 +59,7 @@ const DEFAULT_SCRIPT_PATH: &str = "scripts/DeployPUHAndGuardians.s.sol:DeployPUH
 /// governance set (PUH impl, Guardians, SecurityCouncil, EmergencyUpgradeBoard).
 /// Each contract has distinct init code, so one salt is collision-free and
 /// rotates the set as a group. Override via `gov_salt_override`.
-const GOV_SALT_SEED: &[u8] = b"v31:gov";
+pub(crate) const GOV_SALT_SEED: &[u8] = b"v31:gov";
 /// Default sibling checkout path for zk-governance.
 pub const DEFAULT_ZK_GOV_DIR: &str = "../../zk-governance";
 

@@ -80,7 +80,7 @@ echo "GW RPC:       $GW_RPC_URL"
 # PUH/Guardians bytecodes. Override via ZK_GOVERNANCE_COMMIT env var; the
 # default points to the latest kl/v31-puh-guardians-redeploy on upstream
 # (zksync-association/zk-governance) which carries the regenerated hashes.
-ZK_GOV_COMMIT="${ZK_GOVERNANCE_COMMIT:-7c5e27b}"
+ZK_GOV_COMMIT="${ZK_GOVERNANCE_COMMIT:-2897dbc}"
 echo "zk-gov commit: $ZK_GOV_COMMIT"
 # 1e30 wei
 FUND_AMOUNT="1000000000000000000000000000000"

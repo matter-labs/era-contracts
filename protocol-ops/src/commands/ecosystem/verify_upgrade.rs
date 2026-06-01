@@ -12,8 +12,7 @@ use crate::{
     },
 };
 
-const V31_PUH_SALT_PREIMAGE: &[u8] = b"v31:ProtocolUpgradeHandler";
-const V31_GUARDIANS_SALT_PREIMAGE: &[u8] = b"v31:Guardians";
+use super::puh_guardians::GOV_SALT_SEED;
 
 /// Verify prepared ecosystem upgrade artifacts.
 ///
@@ -155,8 +154,11 @@ pub async fn run(args: VerifyUpgradeArgs) -> anyhow::Result<()> {
         expected_salts.push(FixedBytes::<32>::from_slice(salt.as_bytes()));
     }
     if env_cfg.governance_kind() == GovernanceKind::Puh {
-        expected_salts.push(keccak256(V31_PUH_SALT_PREIMAGE));
-        expected_salts.push(keccak256(V31_GUARDIANS_SALT_PREIMAGE));
+        // The PUH/Guardians/SecurityCouncil/EmergencyUpgradeBoard redeploy uses
+        // a single shared salt (`keccak256(GOV_SALT_SEED)`) for all four — see
+        // `puh_guardians::deploy_puh_guardians`. They have distinct init code,
+        // so one salt is collision-free.
+        expected_salts.push(keccak256(GOV_SALT_SEED));
     }
 
     let transactions_log_path = match args.transactions_log.clone() {

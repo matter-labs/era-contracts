@@ -124,13 +124,64 @@ section below.
 
 ## How to run — Docker on macOS, native or Docker on Linux
 
+> **On Linux, the native (no-Docker) path is preferred.** Run `protocol_ops`
+> and Foundry directly against the host toolchain — the host is linux/amd64,
+> so artifacts are already bit-identical to the image and Docker adds nothing
+> but overhead. Docker is only required on macOS, where macOS-built Foundry
+> artifacts diverge from Linux ones enough to break reproducibility.
+
 Every regen, broadcast, and sim-emit step runs inside the published image so
 Foundry + Solidity artifacts are bit-identical run-to-run. **On macOS, Docker
 is required** — macOS-built Foundry artifacts diverge from Linux ones just
 enough to break reproducibility. **On Linux you can skip Docker entirely**
 and run `protocol_ops` and Foundry directly against the host toolchain
 (produces the same bit-identical artifacts as the image since the image is
-itself linux/amd64); the Docker path still works and is what CI uses.
+itself linux/amd64); the Docker path still works and is what CI uses but is
+not needed on Linux.
+
+### Native Linux path (preferred on Linux)
+
+**Host build prerequisites** (one-time): `protocol_ops` links OpenSSL via the
+`openssl-sys` crate, which needs `pkg-config` plus the OpenSSL dev headers on
+the host. Without `pkg-config` the build fails with
+`could not find system library 'openssl' … pkg-config could not be found`,
+and — because `regen-and-verify-stage.sh` silently falls back to a stale
+`target/debug/protocol_ops` — the regen then runs old code (e.g. missing the
+`CREATE2_SALT_GOV` env var) instead of erroring. Install once:
+
+```bash
+sudo apt-get install -y pkg-config libssl-dev
+```
+
+After any `protocol-ops/` Rust change (or a fresh contracts pull that touches
+it), **rebuild and verify the binary actually recompiled** before regenerating
+— a failed/stale build is the trap above:
+
+```bash
+cd protocol-ops && cargo build --bin protocol_ops
+ls -la target/debug/protocol_ops   # mtime must be now, not an old date
+```
+
+Skip `regen-via-docker.ts` entirely. Use the wrapper script and host-native
+`protocol_ops` for each phase:
+
+```bash
+cd l1-contracts/test/anvil-interop
+
+# phases 1 + 1.5 — prepare + fork-replay + PUVT, no Docker
+DEPLOYER_PK_FILE=~/.test_pk \
+L1_RPC_URL="https://eth-sepolia.g.alchemy.com/v2/<key>" \
+./regen-and-verify-stage.sh
+
+# phase 2 — broadcast Camp-A bundles to real Sepolia (host protocol_ops/cast)
+# phase 2b — broadcast each per-CTM-admin setup bundle
+# phase 3 — emit tx-simulator JSON via `protocol_ops ecosystem governance-toml-to-simulator`
+# phase 3.5 — `yarn --cwd ../../../transaction-simulator simulate --file <json>`
+```
+
+Build the host binary once with `cd protocol-ops && cargo build --release`
+(the `regen-via-docker.ts` Mode-1 cross-build into `target-linux/` is only
+needed when the host is macOS).
 
 The Docker entry point is `scripts/regen-via-docker.ts` with two
 binary-source modes:
