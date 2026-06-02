@@ -120,15 +120,15 @@ The deployment tx hashes are appended to the committed `transactions.txt` next t
 PUVT reads that file, fetches each tx via `--l1-rpc-url`, and reconstructs the deployment provenance.
 
 ```bash
-export L1_RPC_URL=<l1-rpc-url>
+export L1_RPC_URL=http://127.0.0.1:48546
 export GW_RPC_URL=<gateway-rpc-url>
 
 cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
   --env stage \
   --ecosystem-toml "../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml" \
-  --l1-rpc-url http://127.0.0.1:48546 \
+  --l1-rpc-url "$L1_RPC_URL" \
   --gw-rpc-url "$GW_RPC_URL" \
-  --zk-governance-commit 7c5e27b4de1f3b2f4800da4516f4d73943c2ed7c
+  --zk-governance-commit 3e516c526de575cc0c42247e1aefaf1bcac47cd6
 ```
 
 Other knobs (all read from `permanent-values/<env>.toml` and the v31 input
