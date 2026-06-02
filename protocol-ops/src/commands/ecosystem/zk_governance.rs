@@ -4,13 +4,15 @@
 //! Runs `DeployPUHAndGuardians.s.sol` from the sibling `zk-governance`
 //! checkout (default `../../zk-governance`, foundry root with `foundry.toml`
 //! at the top level) on the same anvil fork as the core/CTM prepares,
-//! and returns the two PUH proposal calls that wire the new contracts into
+//! and returns the four PUH proposal calls that wire the new contracts into
 //! the existing PUH proxy:
 //!
-//!   1. `ProxyAdmin.upgrade(puhProxy, newPuhImpl)` — swap the impl
-//!   2. `PUH.updateGuardians(newGuardians)` — point at the new Guardians
+//!   1. `ProxyAdmin.upgradeAndCall(puhProxy, newPuhImpl, "")` — swap the impl
+//!   2. `PUH.updateSecurityCouncil(newSecurityCouncil)` — point at the new SecurityCouncil
+//!   3. `PUH.updateGuardians(newGuardians)` — point at the new Guardians
+//!   4. `PUH.updateEmergencyUpgradeBoard(newEmergencyUpgradeBoard)` — point at the new board
 //!
-//! These land in **stage 0** so the new PUH + Guardians are wired before the
+//! These land in **stage 0** so the new PUH governance set is wired before the
 //! v31 ecosystem proxy upgrades execute.
 
 use std::fs;
@@ -66,7 +68,7 @@ pub const DEFAULT_ZK_GOV_DIR: &str = "../../zk-governance";
 /// Inputs for the PUH/Guardians redeploy step. Most fields default — callers
 /// (`ecosystem upgrade-prepare-all`) should pass `env` for the auto-fills and
 /// can leave salts/script overrides at defaults.
-pub struct PuhGuardiansInputs<'a> {
+pub struct ZkGovernanceInputs<'a> {
     pub env: Option<&'a EnvConfig>,
     pub bridgehub: Address,
     /// Forge script: contract address overrides. `None` = on-chain auto-resolve.
@@ -86,7 +88,7 @@ pub struct PuhGuardiansInputs<'a> {
     pub use_testnet_puh: bool,
 }
 
-impl<'a> PuhGuardiansInputs<'a> {
+impl<'a> ZkGovernanceInputs<'a> {
     pub fn from_env(env: Option<&'a EnvConfig>, bridgehub: Address) -> Self {
         // Mainnet keeps the full timelock; every other ecosystem (stage /
         // testnet / local) gets the zeroed-delay testnet handler.
@@ -107,7 +109,7 @@ impl<'a> PuhGuardiansInputs<'a> {
 /// Outcome of the redeploy: the two governance calls to add to stage 0, plus
 /// addresses surfaced for diagnostics / output payloads.
 #[derive(Debug)]
-pub struct PuhGuardiansOutcome {
+pub struct ZkGovernanceOutcome {
     pub stage0_calls: Vec<GovernanceCall>,
     pub puh_proxy: Address,
     pub proxy_admin: Address,
@@ -123,8 +125,8 @@ pub struct PuhGuardiansOutcome {
 pub async fn deploy_puh_guardians(
     runner: &mut ForgeRunner,
     deployer: &Wallet,
-    inputs: &PuhGuardiansInputs<'_>,
-) -> anyhow::Result<PuhGuardiansOutcome> {
+    inputs: &ZkGovernanceInputs<'_>,
+) -> anyhow::Result<ZkGovernanceOutcome> {
     let era_chain_id = inputs.env.and_then(|c| c.era_chain_id()).ok_or_else(|| {
         anyhow::anyhow!("--env must supply era_chain_id for PUH/Guardians redeploy")
     })?;
@@ -290,7 +292,7 @@ pub async fn deploy_puh_guardians(
         },
     ];
 
-    Ok(PuhGuardiansOutcome {
+    Ok(ZkGovernanceOutcome {
         stage0_calls,
         puh_proxy,
         proxy_admin,

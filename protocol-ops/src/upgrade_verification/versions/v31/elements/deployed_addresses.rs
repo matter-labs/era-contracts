@@ -548,24 +548,24 @@ pub(crate) async fn verify_v31_provenance(
 
     let governance_admin = verifiers.network_verifier.get_proxy_admin(governance).await;
     if governance_admin != Address::ZERO {
-        verify_puh_guardians_provenance(artifact, verifiers, result).await?;
+        verify_zk_governance_provenance(artifact, verifiers, result).await?;
     }
 
     Ok(())
 }
 
-async fn verify_puh_guardians_provenance(
+async fn verify_zk_governance_provenance(
     artifact: &EcosystemUpgradeArtifact,
     verifiers: &Verifiers,
     result: &mut VerificationResult,
 ) -> Result<()> {
     use governance_signatures::*;
-    result.print_info("-- PUH/Guardians deployment provenance --");
+    result.print_info("-- zk-governance deployment provenance --");
 
-    let puh_guardians = artifact
-        .puh_guardians
+    let zk_governance = artifact
+        .zk_governance
         .as_ref()
-        .context("PUH-governed v31 artifact is missing required top-level [puh_guardians] table")?;
+        .context("zk-governance v31 artifact is missing required top-level [zk_governance] table")?;
 
     let provider = verifiers.network_verifier.get_l1_provider();
     let current_puh_addr = verifiers.bridgehub_owner;
@@ -575,7 +575,7 @@ async fn verify_puh_guardians_provenance(
         .ctms
         .iter()
         .find(|ctm| ctm.flavor == CtmFlavor::ZksyncOs)
-        .context("PUH/Guardians provenance requires a [ctms.zksync_os] section")?;
+        .context("zk-governance provenance requires a [ctms.zksync_os] section")?;
     let zksync_os_ctm_proxy = required_address(
         &zksync_os_ctm.value,
         "ctms.zksync_os",
@@ -682,7 +682,7 @@ async fn verify_puh_guardians_provenance(
     .abi_encode();
     result.expect_create2_params(
         verifiers,
-        &puh_guardians.new_puh_impl,
+        &zk_governance.new_puh_impl,
         puh_ctor_args,
         puh_file,
     );
@@ -696,7 +696,7 @@ async fn verify_puh_guardians_provenance(
     .abi_encode();
     result.expect_create2_params(
         verifiers,
-        &puh_guardians.new_guardians,
+        &zk_governance.new_guardians,
         guardians_ctor_args,
         ZK_GOVERNANCE_GUARDIANS_FILE,
     );
@@ -706,7 +706,7 @@ async fn verify_puh_guardians_provenance(
             .abi_encode();
     result.expect_create2_params(
         verifiers,
-        &puh_guardians.new_security_council,
+        &zk_governance.new_security_council,
         security_council_ctor_args,
         ZK_GOVERNANCE_SECURITY_COUNCIL_FILE,
     );
@@ -715,14 +715,14 @@ async fn verify_puh_guardians_provenance(
     // dangles against the stale set) and preserves the existing ZK Foundation safe.
     let emergency_board_ctor_args = V31EmergencyUpgradeBoard::constructorCall::new((
         current_puh_addr,
-        puh_guardians.new_security_council,
-        puh_guardians.new_guardians,
+        zk_governance.new_security_council,
+        zk_governance.new_guardians,
         zk_foundation_safe,
     ))
     .abi_encode();
     result.expect_create2_params(
         verifiers,
-        &puh_guardians.new_emergency_upgrade_board,
+        &zk_governance.new_emergency_upgrade_board,
         emergency_board_ctor_args,
         ZK_GOVERNANCE_EMERGENCY_BOARD_FILE,
     );

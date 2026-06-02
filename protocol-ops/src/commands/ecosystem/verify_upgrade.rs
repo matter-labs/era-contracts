@@ -12,7 +12,7 @@ use crate::{
     },
 };
 
-use super::puh_guardians::GOV_SALT_SEED;
+use super::zk_governance::GOV_SALT_SEED;
 
 /// Verify prepared ecosystem upgrade artifacts.
 ///
@@ -45,7 +45,7 @@ pub struct VerifyUpgradeArgs {
     #[clap(long)]
     pub contracts_commit: Option<String>,
 
-    /// zk-governance commit to load ProtocolUpgradeHandler / Guardians
+    /// zk-governance commit to load PUH / Guardians / SecurityCouncil / EUB
     /// bytecode metadata from GitHub.
     #[clap(long)]
     pub zk_governance_commit: String,

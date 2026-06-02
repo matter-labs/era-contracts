@@ -9,7 +9,7 @@
 # by verification. When [new_gateway] is present, it
 # mirrors GatewayVotePreparation's output (deployed GW CTM addresses +
 # diamond cut data) — its `governance_calls_to_execute` has already been
-# folded into stage 2 above. When [puh_guardians] is present, it names
+# folded into stage 2 above. When [zk_governance] is present, it names
 # the zk-governance contracts deployed in stage 0 and used by PUVT for
 # CREATE2 provenance checks.
 
@@ -189,7 +189,7 @@ server_notifier_proxy_addr = "0xbBfA2a95BDC7416142516303BD852328Ac5AA9dA"
 validator_timelock_addr = "0x887F317590a466d6fA95B36B834b1E41e7B1D944"
 verifier_addr = "0x9B1787bc02D701F3512bE10b556FE11dF3f5FC6D"
 
-[puh_guardians]
+[zk_governance]
 new_emergency_upgrade_board = "0x24de9c60f6e7226f996d4837feb9337c207b07e6"
 new_guardians = "0x6c9499d438cb708457235450aa7dff858ca1585c"
 new_puh_impl = "0xf8d8becd01fd7f2b18cadcf52cfd30dc2cc941b8"

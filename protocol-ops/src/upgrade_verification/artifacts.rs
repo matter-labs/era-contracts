@@ -20,11 +20,11 @@ pub(crate) struct EcosystemUpgradeArtifact {
     /// past the canonical 5 (unpauseMigration + per-CTM checks) and which
     /// deployed-GW-CTM address to cross-check.
     pub(crate) new_gateway: Option<NewGatewayArtifact>,
-    /// Optional `[puh_guardians]` table emitted on PUH-governed v31 upgrades.
-    /// It names the two zk-governance contracts deployed via L1 CREATE2 so
+    /// Optional `[zk_governance]` table emitted on PUH-governed v31 upgrades.
+    /// It names the four zk-governance contracts deployed via L1 CREATE2 so
     /// provenance verification can stay decoupled from stage-0 calldata
     /// decoding; stage-0 verification binds decoded calls back to these values.
-    pub(crate) puh_guardians: Option<PuhGuardiansArtifact>,
+    pub(crate) zk_governance: Option<ZkGovernanceArtifact>,
     /// Raw top-level `[misc]` table for shared metadata that does not belong to
     /// core or a particular CTM.
     pub(crate) misc: toml::Value,
@@ -52,7 +52,7 @@ pub(crate) struct NewGatewayArtifact {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct PuhGuardiansArtifact {
+pub(crate) struct ZkGovernanceArtifact {
     pub(crate) new_puh_impl: Address,
     pub(crate) new_guardians: Address,
     pub(crate) new_security_council: Address,
@@ -227,29 +227,29 @@ impl EcosystemUpgradeArtifact {
             None => None,
         };
 
-        let puh_guardians = match root.remove("puh_guardians") {
+        let zk_governance = match root.remove("zk_governance") {
             Some(value) => {
-                let table = expect_table(value, "puh_guardians")?;
+                let table = expect_table(value, "zk_governance")?;
                 let value = toml::Value::Table(table);
-                Some(PuhGuardiansArtifact {
+                Some(ZkGovernanceArtifact {
                     new_puh_impl: required_address_in_value(
                         &value,
-                        "puh_guardians",
+                        "zk_governance",
                         &["new_puh_impl"],
                     )?,
                     new_guardians: required_address_in_value(
                         &value,
-                        "puh_guardians",
+                        "zk_governance",
                         &["new_guardians"],
                     )?,
                     new_security_council: required_address_in_value(
                         &value,
-                        "puh_guardians",
+                        "zk_governance",
                         &["new_security_council"],
                     )?,
                     new_emergency_upgrade_board: required_address_in_value(
                         &value,
-                        "puh_guardians",
+                        "zk_governance",
                         &["new_emergency_upgrade_board"],
                     )?,
                 })
@@ -267,7 +267,7 @@ impl EcosystemUpgradeArtifact {
             governance_calls,
             ctms,
             new_gateway,
-            puh_guardians,
+            zk_governance,
             misc,
         })
     }
@@ -377,7 +377,7 @@ mod tests {
     }
 
     #[test]
-    fn parses_puh_guardians_metadata() {
+    fn parses_zk_governance_metadata() {
         let toml = r#"
             [governance_calls]
             stage0_calls = "0x"
@@ -396,12 +396,14 @@ mod tests {
             governance_upgrade_timer_initial_delay = 0
             is_testnet = false
 
-            [puh_guardians]
+            [zk_governance]
             new_puh_impl = "0x0000000000000000000000000000000000000001"
             new_guardians = "0x0000000000000000000000000000000000000002"
+            new_security_council = "0x0000000000000000000000000000000000000003"
+            new_emergency_upgrade_board = "0x0000000000000000000000000000000000000004"
         "#;
         let artifact = EcosystemUpgradeArtifact::from_toml_str(toml).unwrap();
-        let metadata = artifact.puh_guardians.unwrap();
+        let metadata = artifact.zk_governance.unwrap();
         assert_eq!(
             metadata.new_puh_impl,
             "0x0000000000000000000000000000000000000001"
@@ -411,6 +413,18 @@ mod tests {
         assert_eq!(
             metadata.new_guardians,
             "0x0000000000000000000000000000000000000002"
+                .parse::<Address>()
+                .unwrap()
+        );
+        assert_eq!(
+            metadata.new_security_council,
+            "0x0000000000000000000000000000000000000003"
+                .parse::<Address>()
+                .unwrap()
+        );
+        assert_eq!(
+            metadata.new_emergency_upgrade_board,
+            "0x0000000000000000000000000000000000000004"
                 .parse::<Address>()
                 .unwrap()
         );

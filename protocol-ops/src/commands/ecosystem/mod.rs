@@ -24,7 +24,7 @@ use crate::{
 pub(crate) mod broadcast;
 pub(crate) mod init;
 pub(crate) mod new_gateway_prepare;
-pub(crate) mod puh_guardians;
+pub(crate) mod zk_governance;
 pub(crate) mod simulator;
 pub(crate) mod stage3;
 pub(crate) mod upgrade;
@@ -38,7 +38,7 @@ pub enum EcosystemCommands {
     /// Initialize ecosystem
     Init(EcosystemInitArgs),
     /// Phase 1 of the ecosystem upgrade: deploys all new ecosystem contracts
-    /// (core + per-CTM impls + new ProtocolUpgradeHandler + new Guardians) on
+    /// (core + per-CTM impls + new zk-governance set) on
     /// a single anvil fork, emits operational admin bundles for CTM-owned
     /// surfaces, and writes the merged `<out>/prepare/governance.toml` for
     /// Phase 2 to replay.

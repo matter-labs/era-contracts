@@ -122,10 +122,10 @@ impl GovernanceStage0Calls {
         let expected_call_count = pre_gov_accept_tail_start + pre_gov_accept_targets.len();
 
         if puh_governed {
-            let expected_puh_guardians = artifact.puh_guardians.as_ref().context(
-                "PUH-governed v31 artifact is missing required top-level [puh_guardians] table",
+            let expected_zk_governance = artifact.zk_governance.as_ref().context(
+                "PUH-governed v31 artifact is missing required top-level [zk_governance] table",
             )?;
-            // PUH/Guardians redeploy block — PUH-governed envs only.
+            // zk-governance redeploy block — PUH-governed envs only.
             // Call `base_count`     — PUH ProxyAdmin.upgradeAndCall(PUH proxy, new impl, "").
             // Call `base_count + 1` — PUH.updateSecurityCouncil(new security council).
             // Call `base_count + 2` — PUH.updateGuardians(new guardians).
@@ -156,10 +156,10 @@ impl GovernanceStage0Calls {
                                 decoded.proxy, bridgehub_owner
                             ));
                             errors += 1;
-                        } else if decoded.implementation != expected_puh_guardians.new_puh_impl {
+                        } else if decoded.implementation != expected_zk_governance.new_puh_impl {
                             result.report_error(&format!(
-                                "PUH upgradeAndCall #{upgrade_idx} implementation {} does not match [puh_guardians].new_puh_impl {}",
-                                decoded.implementation, expected_puh_guardians.new_puh_impl
+                                "PUH upgradeAndCall #{upgrade_idx} implementation {} does not match [zk_governance].new_puh_impl {}",
+                                decoded.implementation, expected_zk_governance.new_puh_impl
                             ));
                             errors += 1;
                         } else if !decoded.data.is_empty() {
@@ -214,15 +214,16 @@ impl GovernanceStage0Calls {
                             "PUH updateSecurityCouncil(new={})",
                             decoded._newSecurityCouncil
                         ));
-                        if decoded._newSecurityCouncil == expected_puh_guardians.new_security_council
+                        if decoded._newSecurityCouncil
+                            == expected_zk_governance.new_security_council
                         {
                             result.report_ok(
-                                "PUH updateSecurityCouncil target matches [puh_guardians].new_security_council",
+                                "PUH updateSecurityCouncil target matches [zk_governance].new_security_council",
                             );
                         } else {
                             result.report_error(&format!(
-                                "PUH updateSecurityCouncil #{update_security_council_idx} argument {} does not match [puh_guardians].new_security_council {}",
-                                decoded._newSecurityCouncil, expected_puh_guardians.new_security_council
+                                "PUH updateSecurityCouncil #{update_security_council_idx} argument {} does not match [zk_governance].new_security_council {}",
+                                decoded._newSecurityCouncil, expected_zk_governance.new_security_council
                             ));
                             errors += 1;
                         }
@@ -258,14 +259,14 @@ impl GovernanceStage0Calls {
                             "PUH updateGuardians(new={})",
                             decoded._newGuardians
                         ));
-                        if decoded._newGuardians == expected_puh_guardians.new_guardians {
+                        if decoded._newGuardians == expected_zk_governance.new_guardians {
                             result.report_ok(
-                                "PUH updateGuardians target matches [puh_guardians].new_guardians",
+                                "PUH updateGuardians target matches [zk_governance].new_guardians",
                             );
                         } else {
                             result.report_error(&format!(
-                                "PUH updateGuardians #{update_guardians_idx} argument {} does not match [puh_guardians].new_guardians {}",
-                                decoded._newGuardians, expected_puh_guardians.new_guardians
+                                "PUH updateGuardians #{update_guardians_idx} argument {} does not match [zk_governance].new_guardians {}",
+                                decoded._newGuardians, expected_zk_governance.new_guardians
                             ));
                             errors += 1;
                         }
@@ -302,15 +303,15 @@ impl GovernanceStage0Calls {
                             decoded._newEmergencyUpgradeBoard
                         ));
                         if decoded._newEmergencyUpgradeBoard
-                            == expected_puh_guardians.new_emergency_upgrade_board
+                            == expected_zk_governance.new_emergency_upgrade_board
                         {
                             result.report_ok(
-                                "PUH updateEmergencyUpgradeBoard target matches [puh_guardians].new_emergency_upgrade_board",
+                                "PUH updateEmergencyUpgradeBoard target matches [zk_governance].new_emergency_upgrade_board",
                             );
                         } else {
                             result.report_error(&format!(
-                                "PUH updateEmergencyUpgradeBoard #{update_emergency_board_idx} argument {} does not match [puh_guardians].new_emergency_upgrade_board {}",
-                                decoded._newEmergencyUpgradeBoard, expected_puh_guardians.new_emergency_upgrade_board
+                                "PUH updateEmergencyUpgradeBoard #{update_emergency_board_idx} argument {} does not match [zk_governance].new_emergency_upgrade_board {}",
+                                decoded._newEmergencyUpgradeBoard, expected_zk_governance.new_emergency_upgrade_board
                             ));
                             errors += 1;
                         }
