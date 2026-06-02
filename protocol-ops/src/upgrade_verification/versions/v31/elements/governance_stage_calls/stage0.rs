@@ -12,7 +12,7 @@
 //!   2. `updateSecurityCouncil(new_security_council)`,
 //!   3. `updateGuardians(new_guardians)`,
 //!   4. `updateEmergencyUpgradeBoard(new_emergency_upgrade_board)`.
-//! 
+//!
 //! The three `onlySelf` setters repoint the proxy at the freshly deployed
 //! SecurityCouncil, Guardians and EmergencyUpgradeBoard (the board already
 //! embeds the new SC + Guardians as immutables, so the set stays consistent).
