@@ -128,7 +128,7 @@ cargo run --release --bin protocol_ops -- ecosystem verify-upgrade \
   --ecosystem-toml "../l1-contracts/upgrade-envs/v0.31.0-interopB/output/stage/ecosystem.toml" \
   --l1-rpc-url "$L1_RPC_URL" \
   --gw-rpc-url "$GW_RPC_URL" \
-  --zk-governance-commit 3e516c526de575cc0c42247e1aefaf1bcac47cd6
+  --zk-governance-commit 41ad762d7478c80e1e8c3a2c8cabbdfca9f7ffce
 ```
 
 Other knobs (all read from `permanent-values/<env>.toml` and the v31 input
