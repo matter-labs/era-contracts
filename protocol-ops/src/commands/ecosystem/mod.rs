@@ -24,13 +24,13 @@ use crate::{
 pub(crate) mod broadcast;
 pub(crate) mod init;
 pub(crate) mod new_gateway_prepare;
-pub(crate) mod zk_governance;
 pub(crate) mod simulator;
 pub(crate) mod stage3;
 pub(crate) mod upgrade;
 pub(crate) mod v31_upgrade_full;
 pub(crate) mod v31_upgrade_inner;
 pub(crate) mod verify_upgrade;
+pub(crate) mod zk_governance;
 
 #[derive(Subcommand, Debug)]
 #[allow(clippy::large_enum_variant)]

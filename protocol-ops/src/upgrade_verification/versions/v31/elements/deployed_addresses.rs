@@ -562,10 +562,9 @@ async fn verify_zk_governance_provenance(
     use governance_signatures::*;
     result.print_info("-- zk-governance deployment provenance --");
 
-    let zk_governance = artifact
-        .zk_governance
-        .as_ref()
-        .context("zk-governance v31 artifact is missing required top-level [zk_governance] table")?;
+    let zk_governance = artifact.zk_governance.as_ref().context(
+        "zk-governance v31 artifact is missing required top-level [zk_governance] table",
+    )?;
 
     let provider = verifiers.network_verifier.get_l1_provider();
     let current_puh_addr = verifiers.bridgehub_owner;

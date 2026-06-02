@@ -12,17 +12,18 @@ just enough to change CREATE2 addresses. So the work splits across two machines,
 and — when a Claude runs on each — across two agents.
 
 The companion skills carry the mechanics this one orchestrates:
+
 - `regenerate-v31-stage-calldata` — the prepare → fork-broadcast → PUVT → sim-emit cycle.
 - `v31-calldata-review` — generate → PUVT → manual/AI review.
 
 ## Core principle: split by reproducibility
 
-| Step | Output | Where | Why |
-| --- | --- | --- | --- |
-| Edit code | source diffs | **local** | author + read |
-| Dry-run regen | throwaway fork artifacts | **local** | prove the fix compiles + PUVT-passes; macOS addresses, **never committed** |
-| Real regen | `ecosystem.toml` + `sim-inputs/` | **VPS (Linux)** | bit-identical with CI; the committed artifacts |
-| Emit sim | tx-simulator JSON | **local** | a deterministic transform of committed inputs — portable, cheap |
+| Step          | Output                           | Where           | Why                                                                        |
+| ------------- | -------------------------------- | --------------- | -------------------------------------------------------------------------- |
+| Edit code     | source diffs                     | **local**       | author + read                                                              |
+| Dry-run regen | throwaway fork artifacts         | **local**       | prove the fix compiles + PUVT-passes; macOS addresses, **never committed** |
+| Real regen    | `ecosystem.toml` + `sim-inputs/` | **VPS (Linux)** | bit-identical with CI; the committed artifacts                             |
+| Emit sim      | tx-simulator JSON                | **local**       | a deterministic transform of committed inputs — portable, cheap            |
 
 Anything that depends on **compiled bytecode** (CREATE2 addresses → `ecosystem.toml`,
 the Camp-B `*.safe.json`) must be produced on the VPS. Anything that's a **pure
@@ -62,10 +63,12 @@ local: fix code ──push code──▶ VPS: pull, regen ──push artifacts�
         + dry-run                 ecosystem.toml + sim-inputs/        to REAL Sepolia        rehearse (must pass), push sim
                                   (Phase 2)                           (Phase 2b)             (Phase 3)
 ```
+
 Phase 2b is the one most easily skipped — the sim rehearses against a Sepolia fork, so
 the deploys must exist on real Sepolia first or the rehearsal reverts.
 
 ### Phase 1 — fix + dry-run (local)
+
 1. Edit the code. Common spots: `protocol-ops/src/commands/ecosystem/*` (prepare,
    puh_guardians, simulator), `protocol-ops/src/upgrade_verification/**` (PUVT must
    stay in lockstep with the deploy scripts — e.g. a member-count truncation in the
@@ -82,7 +85,9 @@ the deploys must exist on real Sepolia first or the rehearsal reverts.
    because the code was already checked here.
 
 ### Phase 2 — real regen (VPS)
+
 The VPS agent (or you, over ssh):
+
 1. `git pull` the exact code commits pushed in phase 1 (verify HEAD matches — the
    commit sha is the contract between the agents).
 2. Run the canonical regen (`regenerate-v31-stage-calldata`, native on Linux or
@@ -94,8 +99,9 @@ The VPS agent (or you, over ssh):
    **no code** (it came from local). Push.
 
 ### Phase 2b — broadcast the Camp-A deploys to real Sepolia (deployer key)
+
 **Easy to forget, and the sim cannot pass without it.** The sim's fork forks Sepolia
-**tip** and inherits Camp-A (deployer-signed) deployments from there — it does *not*
+**tip** and inherits Camp-A (deployer-signed) deployments from there — it does _not_
 deploy them itself. So every CREATE2 deploy the upgrade points at — including the
 redeployed PUH set (testnet PUH impl + Guardians + SecurityCouncil + EmergencyUpgradeBoard)
 and the core/CTM impls — must be broadcast to **real Sepolia** first, by whoever holds
@@ -105,6 +111,7 @@ on-chain write, so confirm before broadcasting. Verify with
 `cast code <new-impl> --rpc-url <sepolia>` (non-empty) before rehearsing.
 
 ### Phase 3 — finish the sim (local)
+
 1. `git pull` the artifact commit.
 2. Emit the sim from the committed inputs:
    `governance-toml-to-simulator --env <env> --out ../transaction-simulator/transactions/<dated>.json`
@@ -119,9 +126,9 @@ on-chain write, so confirm before broadcasting. Verify with
    multicall/schedule/execute wrappers), then **re-emit** and re-check. Commit the
    `sim-descriptions.toml` change to the era-contracts branch.
 4. **Rehearse-passes gate.** `yarn --cwd ../transaction-simulator simulate --file <…>`
-   must reach **`✅ All simulations succeed!`** — every tx ✔, none ❌. A clean *emit*
+   must reach **`✅ All simulations succeed!`** — every tx ✔, none ❌. A clean _emit_
    (0 unlabelled) is necessary but **not** sufficient; the sim must actually execute.
-   This run also rewrites `decoded-calldata/<file>.json` (a *derived* artifact — the
+   This run also rewrites `decoded-calldata/<file>.json` (a _derived_ artifact — the
    emit in step 2 only writes `transactions/`), so after adding labels in step 3 re-run
    `simulate` and re-check `grep -c '\[unlabelled\]'` on **both** files (a stale decode
    reads as "still unlabelled"). Common failure → cause:
@@ -136,7 +143,7 @@ on-chain write, so confirm before broadcasting. Verify with
      already broadcast to real Sepolia in phase 2b, so the fork inherits it and the sim
      must not replay it. Re-emit with `--camp-a-signers <ceremony signer>` to drop the
      bundle. NB the sim forks Sepolia **tip**, so a bundle that passed before phase-2b can
-     start reverting *after* it — re-rehearse once all real-chain broadcasts have landed.
+     start reverting _after_ it — re-rehearse once all real-chain broadcasts have landed.
    - `Ownership invariant FAILED: PUH.guardians() is <new>, expected <old>` (or for the
      SecurityCouncil / EmergencyUpgradeBoard) → all txs passed but the simulator's
      **hardcoded expected governance addresses** are stale. A regen that redeploys the
@@ -170,6 +177,7 @@ git plus a human relay of turn-taking:
   you have the protocol.
 
 ### Guardrails
+
 - **Never commit a macOS-produced `ecosystem.toml`** — only the VPS's is canonical.
 - **Code is pushed from local; artifacts are pushed from the VPS.** Don't regenerate
   artifacts on macOS for commit, and don't edit code on the VPS (it would diverge from
