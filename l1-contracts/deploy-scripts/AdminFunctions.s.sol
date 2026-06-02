@@ -394,10 +394,15 @@ contract AdminFunctions is Script, IAdminFunctions {
     function _wrapLegacyGovernance(address _gov, address _target, bytes memory _data) private {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: 0, data: _data});
+        // Mix the per-regen `legacy_gov_salt` (Utils.currentLegacyGovSalt()) into
+        // the op salt so the op id rotates with it — without this the op id is a
+        // fixed counter and collides with a previously-broadcast (and possibly
+        // stranded) op of the same content. The counter keeps multiple wraps in a
+        // single regen distinct.
         ILegacyGovernance.LegacyOperation memory op = ILegacyGovernance.LegacyOperation({
             calls: calls,
             predecessor: bytes32(0),
-            salt: bytes32(_legacyGovSaltCounter++)
+            salt: keccak256(abi.encodePacked(Utils.currentLegacyGovSalt(), _legacyGovSaltCounter++))
         });
         address eoaOwner = IOwnableSingleStep(_gov).owner();
         address sc = ILegacyGovernance(_gov).securityCouncil();

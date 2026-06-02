@@ -557,20 +557,25 @@ pub async fn run(args: GovernanceTomlToSimulatorArgs) -> anyhow::Result<()> {
     };
 
     // Resolve manifest path: explicit `--include-manifest` wins; otherwise
-    // auto-discover, preferring the committed `<env-out>/sim-inputs/manifest.json`
+    // auto-discover. Normally prefer the committed `<env-out>/sim-inputs/manifest.json`
     // (the git-portable handoff set) over the per-run `<env-out>/prepare/manifest.json`.
+    // BUT when *producing* sim-inputs (`--emit-sim-inputs`), source from `prepare/`
+    // first — reading from `sim-inputs/` while `write_sim_inputs` truncates those same
+    // files would self-overwrite the source to 0 bytes.
     let manifest_path = match args.include_manifest {
         Some(path) => Some(path),
         None => env_cfg.as_ref().and_then(|cfg| {
             crate::common::env_config::default_protocol_ops_out_dir(&cfg.env)
                 .ok()
                 .and_then(|base| {
-                    [
-                        base.join("sim-inputs").join("manifest.json"),
-                        base.join("prepare").join("manifest.json"),
-                    ]
-                    .into_iter()
-                    .find(|p| p.is_file())
+                    let sim_inputs = base.join("sim-inputs").join("manifest.json");
+                    let prepare = base.join("prepare").join("manifest.json");
+                    let candidates = if args.emit_sim_inputs.is_some() {
+                        [prepare, sim_inputs]
+                    } else {
+                        [sim_inputs, prepare]
+                    };
+                    candidates.into_iter().find(|p| p.is_file())
                 })
         }),
     };
@@ -712,6 +717,19 @@ fn write_sim_inputs(
             .map(|(b, _)| b.target)
             .collect()
     };
+    // The CREATE2-presence heuristic silently fails when prepare runs against a
+    // fork where the contracts are already deployed (no CREATE2 calls in the
+    // deployer's bundle) — the deployer then leaks into sim-inputs as Camp-B.
+    // Zero detected Camp-A signers is almost always that bug: fail loudly so the
+    // caller passes `--camp-a-signers <deployer>` rather than ship a wrong set.
+    if explicit_camp_a.is_empty() && camp_a.is_empty() {
+        anyhow::bail!(
+            "no Camp-A signers detected (CREATE2-presence heuristic found none) — the \
+             deployer would leak into sim-inputs. Re-run with explicit --camp-a-signers <deployer EOA> \
+             (e.g. the broadcast signer). This commonly happens when prepare ran against an \
+             already-deployed fork tip."
+        );
+    }
 
     fs::create_dir_all(out_dir)
         .with_context(|| format!("failed to create sim-inputs dir {}", out_dir.display()))?;
