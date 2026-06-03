@@ -1,8 +1,9 @@
 //! Stage 1 — the main upgrade ceremony.
 //!
-//! Call layout: 10 ecosystem-wide core calls (indices 0..=9), then a 6-call
-//! block per `[ctms.<flavor>]` entry, repeated in artifact order. The
-//! per-CTM block layout is captured by [`PER_CTM_OFFSET_*`] constants below.
+//! Non-stage call layout: 11 generated ecosystem-wide core calls
+//! (indices 0..=10), then a 6-call block per `[ctms.<flavor>]` entry,
+//! repeated in artifact order. Stage prepends one emergency-path
+//! `pauseMigration()` call, so all generated calls shift by one there.
 //!
 //! Two passes:
 //! - [`verify_call_shape`] — every call's `(target, selector, value=0)`.
@@ -45,13 +46,10 @@ use super::{
     upgradeAndCallCall, upgradeCall, CallList, GovernanceStage1Calls,
 };
 
-/// Stage 1 call layout: 12 ecosystem-wide core calls (indices 0..=11) — the
-/// first is `ChainAssetHandler.pauseMigration()` (re-asserts the stage-0 pause,
-/// which the EmergencyUpgradeBoard path's built-in unpause would otherwise
-/// clear) — then 6 per-CTM calls repeated once per `[ctms.<flavor>]` section in
-/// artifact order: timer deadline check, migrations-paused check, CTM proxy
-/// upgrade, setChainCreationParams, setNewVersionUpgrade, ValidatorTimelock proxy upgrade.
-const STAGE1_PREFIX_LEN: usize = 12;
+/// Number of generated ecosystem-wide stage-1 calls before any per-CTM block.
+/// On stage, PUVT additionally requires one leading `pauseMigration()` call
+/// because stage1 is executed through the emergency-upgrade path.
+const STAGE1_GENERATED_PREFIX_LEN: usize = 11;
 const STAGE1_PER_CTM_LEN: usize = 6;
 
 /// Index of the per-CTM `ChainTypeManager` proxy upgrade within the
@@ -63,8 +61,12 @@ const PER_CTM_OFFSET_SET_CHAIN_CREATION_PARAMS: usize = 3;
 const PER_CTM_OFFSET_SET_NEW_VERSION_UPGRADE: usize = 4;
 const PER_CTM_OFFSET_UPGRADE_VALIDATOR_TIMELOCK: usize = 5;
 
-fn ctm_block_start(ctm_index: usize) -> usize {
-    STAGE1_PREFIX_LEN + ctm_index * STAGE1_PER_CTM_LEN
+fn ctm_block_start(ctm_index: usize, call_offset: usize) -> usize {
+    call_offset + STAGE1_GENERATED_PREFIX_LEN + ctm_index * STAGE1_PER_CTM_LEN
+}
+
+fn stage1_call_offset(verifiers: &Verifiers) -> usize {
+    usize::from(verifiers.env.is_stage())
 }
 
 impl GovernanceStage1Calls {
@@ -97,43 +99,61 @@ impl GovernanceStage1Calls {
     ) -> anyhow::Result<()> {
         result.print_info("== Gov stage 1 calls ===");
 
-        const ACCEPT_ASSET_TRACKER_OWNERSHIP: usize = 9;
-        const SET_ASSET_TRACKER: usize = 10;
+        const ACCEPT_ASSET_TRACKER_OWNERSHIP: usize = 8;
+        const SET_ASSET_TRACKER: usize = 9;
 
+        let call_offset = stage1_call_offset(verifiers);
         let mut errors = 0;
+        if verifiers.env.is_stage() {
+            // Stage executes stage1 through EmergencyUpgradeBoard, whose
+            // emergency path unpauses migrations before forwarding the calls.
+            // Re-pause first so the later checkMigrationsPaused() calls still
+            // validate the intended stage0 state.
+            errors += verify_call_by_name(
+                &self.calls,
+                0,
+                "chain_asset_handler_proxy",
+                "pauseMigration()",
+                verifiers,
+                result,
+            );
+        }
         for (index, target, method) in [
-            // Re-assert the migration pause (first stage-1 call). The EmergencyUpgradeBoard path's
-            // built-in unfreeze/unpause clears the stage-0 pause; without this, checkMigrationsPaused
-            // below reverts. Harmless on the normal governance path.
-            (0, "chain_asset_handler_proxy", "pauseMigration()"),
             // Upgrade Bridgehub proxy.
-            (1, "transparent_proxy_admin", "upgrade(address,address)"),
+            (0, "transparent_proxy_admin", "upgrade(address,address)"),
             // Upgrade L1 nullifier proxy.
-            (2, "transparent_proxy_admin", "upgrade(address,address)"),
+            (1, "transparent_proxy_admin", "upgrade(address,address)"),
             // Upgrade L1 asset router proxy.
-            (3, "transparent_proxy_admin", "upgrade(address,address)"),
+            (2, "transparent_proxy_admin", "upgrade(address,address)"),
             // Upgrade native token vault proxy.
-            (4, "transparent_proxy_admin", "upgrade(address,address)"),
+            (3, "transparent_proxy_admin", "upgrade(address,address)"),
             // Upgrade message root proxy and initialize v31 state.
             (
-                5,
+                4,
                 "transparent_proxy_admin",
                 "upgradeAndCall(address,address,bytes)",
             ),
             // Upgrade CTM deployment tracker proxy.
-            (6, "transparent_proxy_admin", "upgrade(address,address)"),
+            (5, "transparent_proxy_admin", "upgrade(address,address)"),
             // Upgrade chain asset handler proxy.
-            (7, "transparent_proxy_admin", "upgrade(address,address)"),
+            (6, "transparent_proxy_admin", "upgrade(address,address)"),
             // Accept ChainRegistrationSender ownership.
-            (8, "chain_registration_sender_proxy", "acceptOwnership()"),
+            (7, "chain_registration_sender_proxy", "acceptOwnership()"),
             // Accept AssetTracker ownership.
-            (9, "asset_tracker_proxy", "acceptOwnership()"),
+            (8, "asset_tracker_proxy", "acceptOwnership()"),
             // Wire AssetTracker into NativeTokenVault.
-            (10, "native_token_vault", "setAssetTracker(address)"),
+            (9, "native_token_vault", "setAssetTracker(address)"),
             // Cache MessageRoot / AssetRouter inside L1ChainAssetHandler.
-            (11, "chain_asset_handler_proxy", "setAddresses()"),
+            (10, "chain_asset_handler_proxy", "setAddresses()"),
         ] {
-            errors += verify_call_by_name(&self.calls, index, target, method, verifiers, result);
+            errors += verify_call_by_name(
+                &self.calls,
+                call_offset + index,
+                target,
+                method,
+                verifiers,
+                result,
+            );
         }
 
         // Per-CTM block (6 calls per CTM, in artifact order):
@@ -144,7 +164,7 @@ impl GovernanceStage1Calls {
         //   +4 CTM proxy.setNewVersionUpgrade(...)
         //   +5 VT proxy admin.upgrade(VT proxy, new impl)
         for (ctm_index, ctm) in ctms.iter().enumerate() {
-            let block = ctm_block_start(ctm_index);
+            let block = ctm_block_start(ctm_index, call_offset);
             let timer_label = format!("{}.upgrade_timer", ctm.flavor.label());
             let validator_label = format!("{}.upgrade_stage_validator", ctm.flavor.label());
             let ctm_proxy_label = format!("{}.chain_type_manager_proxy", ctm.flavor.label());
@@ -249,7 +269,8 @@ impl GovernanceStage1Calls {
             }
         }
 
-        let expected_call_count = STAGE1_PREFIX_LEN + ctms.len() * STAGE1_PER_CTM_LEN;
+        let expected_call_count =
+            call_offset + STAGE1_GENERATED_PREFIX_LEN + ctms.len() * STAGE1_PER_CTM_LEN;
         match self.calls.elems.len().cmp(&expected_call_count) {
             std::cmp::Ordering::Less => {
                 result.report_error(&format!(
@@ -272,8 +293,10 @@ impl GovernanceStage1Calls {
 
         // The accepted AssetTracker proxy must be the one wired into NativeTokenVault.
         if let (Some(accept_call), Some(set_asset_tracker_call)) = (
-            self.calls.elems.get(ACCEPT_ASSET_TRACKER_OWNERSHIP),
-            self.calls.elems.get(SET_ASSET_TRACKER),
+            self.calls
+                .elems
+                .get(call_offset + ACCEPT_ASSET_TRACKER_OWNERSHIP),
+            self.calls.elems.get(call_offset + SET_ASSET_TRACKER),
         ) {
             match setAssetTrackerCall::abi_decode(&set_asset_tracker_call.data) {
                 Ok(decoded) if decoded._l1AssetTracker == accept_call.target => {
@@ -309,16 +332,15 @@ impl GovernanceStage1Calls {
     ) -> anyhow::Result<()> {
         result.print_info("== Gov stage 1 payloads ===");
 
-        // Indices are offset by 1 because call #0 is ChainAssetHandler.pauseMigration() (no payload
-        // to verify here; its shape is checked in verify_call_shape).
-        const UPGRADE_BRIDGEHUB: usize = 1;
-        const UPGRADE_L1_NULLIFIER: usize = 2;
-        const UPGRADE_L1_ASSET_ROUTER: usize = 3;
-        const UPGRADE_NATIVE_TOKEN_VAULT: usize = 4;
-        const UPGRADE_MESSAGE_ROOT: usize = 5;
-        const UPGRADE_CTM_DEPLOYMENT_TRACKER: usize = 6;
-        const UPGRADE_CHAIN_ASSET_HANDLER: usize = 7;
+        const UPGRADE_BRIDGEHUB: usize = 0;
+        const UPGRADE_L1_NULLIFIER: usize = 1;
+        const UPGRADE_L1_ASSET_ROUTER: usize = 2;
+        const UPGRADE_NATIVE_TOKEN_VAULT: usize = 3;
+        const UPGRADE_MESSAGE_ROOT: usize = 4;
+        const UPGRADE_CTM_DEPLOYMENT_TRACKER: usize = 5;
+        const UPGRADE_CHAIN_ASSET_HANDLER: usize = 6;
 
+        let call_offset = stage1_call_offset(verifiers);
         let mut errors = 0;
 
         for (index, proxy_name, implementation_name) in [
@@ -361,7 +383,7 @@ impl GovernanceStage1Calls {
         ] {
             errors += verify_upgrade_call_args(
                 &self.calls,
-                index,
+                call_offset + index,
                 proxy_name,
                 implementation_name,
                 verifiers,
@@ -372,7 +394,7 @@ impl GovernanceStage1Calls {
         // Verify MessageRoot upgradeAndCall payload.
         errors += verify_message_root_upgrade_call_args(
             &self.calls,
-            UPGRADE_MESSAGE_ROOT,
+            call_offset + UPGRADE_MESSAGE_ROOT,
             verifiers,
             result,
         );
@@ -381,7 +403,7 @@ impl GovernanceStage1Calls {
         // setNewVersionUpgrade. Validated against each CTM's own
         // chain_upgrade_diamond_cut + contracts_config.
         for (i, ctm) in artifact.ctms.iter().enumerate() {
-            let block = ctm_block_start(i);
+            let block = ctm_block_start(i, call_offset);
             result.print_info(&format!(
                 "-- CTM[{i}] = {} ----------------------",
                 ctm.flavor.label()
