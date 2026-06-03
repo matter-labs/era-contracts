@@ -1,7 +1,8 @@
 //! ZKsync OS `forceDeployAndUpgradeUniversal` payload verification.
 //!
-//! Owns the expected `UniversalContractUpgradeInfo[]` list (17 fixed-address
-//! entries with proxy-upgrade or unsafe-force-deployment shapes), the
+//! Owns the expected `UniversalContractUpgradeInfo[]` list (15 fixed-address
+//! entries, all proxy-upgrade shapes; the only unsafe force deployment is the
+//! L2V31Upgrade delegate target, validated separately), the
 //! deployed-bytecode-info decoder (96-byte triple or 320-byte impl/proxy
 //! pair), the keccak-derived L2V31Upgrade delegate-address check, the ZKsync
 //! OS factory-dep bytecode list, and the ZKsync OS orchestrator wired from
@@ -17,8 +18,7 @@ use crate::upgrade_verification::{
         L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR,
         L2_INTEROP_ROOT_STORAGE_ADDR, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION_ADDR,
         L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
-        L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-        L2_V31_UPGRADE_CONTRACT, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_V31_UPGRADE_CONTRACT,
     },
     verifiers::{VerificationResult, Verifiers},
 };
@@ -51,17 +51,11 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
             }
         };
     }
-    macro_rules! unsafe_fd {
-        ($file:expr, $addr:expr) => {
-            ZksyncOSExpectedFd {
-                address: $addr,
-                file: $file,
-                upgrade_type: ZksyncOSUpgradeType::UnsafeForceDeployment,
-            }
-        };
-    }
+    // NOTE: every entry below is a SystemProxyUpgrade. v31 no longer performs any unsafe
+    // ZKsyncOS force deployment except the L2V31Upgrade delegate target (validated separately);
+    // verify_v31_zksync_os_force_deployments enforces that no other unsafe FD is present.
     vec![
-        // ── Fixed-address core contracts (getFixedAddressCoreContracts, 13 entries) ──
+        // ── Fixed-address core contracts (getFixedAddressCoreContracts, 12 entries; L2WrappedBaseToken excluded) ──
         proxy!("l1-contracts/L2Bridgehub", L2_BRIDGEHUB_ADDR),
         proxy!("l1-contracts/L2AssetRouter", L2_ASSET_ROUTER_ADDR),
         proxy!(
@@ -69,11 +63,7 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
             L2_NATIVE_TOKEN_VAULT_ADDR
         ),
         proxy!("l1-contracts/L2MessageRoot", L2_MESSAGE_ROOT_ADDR),
-        // L2WrappedBaseToken sits directly as the implementation — not behind a proxy.
-        unsafe_fd!(
-            "l1-contracts/L2WrappedBaseToken",
-            L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
-        ),
+        // L2WrappedBaseToken is intentionally NOT force-deployed by v31 (its impl is left as-is).
         proxy!(
             "l1-contracts/L2MessageVerification",
             L2_MESSAGE_VERIFICATION_ADDR
@@ -104,11 +94,8 @@ fn expected_v31_zksync_os_force_deployments() -> Vec<ZksyncOSExpectedFd> {
             "l1-contracts/SystemContext",
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR
         ),
-        // ── ProxyAdmin (_buildZKsyncOSProxyAdminEntry) ──
-        unsafe_fd!(
-            "l1-contracts/SystemContractProxyAdmin",
-            L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
-        ),
+        // ── ProxyAdmin (0x1000c) is a direct-deployed contract present from genesis; v31 no longer
+        //    force-deploys it (it would require an unsafe overwrite), so it is not in this list. ──
     ]
 }
 
@@ -125,9 +112,24 @@ fn verify_v31_zksync_os_force_deployments(
         expected.into_iter().map(|e| (e.address, e)).collect();
 
     for deployment in deployments {
-        // Skip the L2V31Upgrade delegate-target; already validated elsewhere.
+        // Skip the L2V31Upgrade delegate-target; already validated elsewhere. It is the ONLY
+        // ZKsyncOS force deployment allowed to be unsafe (it's the delegatecall implementation).
         if deployment.newAddress == delegate_to {
             continue;
+        }
+
+        // Guard: no other entry may be an unsafe force deployment. v31 deliberately uses only
+        // SystemProxyUpgrade for the fixed-address contracts; an unsafe FD here would overwrite
+        // bytecode in place (e.g. the old L2WrappedBaseToken / SystemContractProxyAdmin entries),
+        // which we have removed. Catch any regression that reintroduces one.
+        if deployment.upgradeType
+            == IComplexUpgrader::ContractUpgradeType::ZKsyncOSUnsafeForceDeployment
+        {
+            result.report_error(&format!(
+                "Unsafe ZKsyncOS force deployment at {} is not allowed (only the L2V31Upgrade \
+                 delegate target may use ZKsyncOSUnsafeForceDeployment)",
+                deployment.newAddress
+            ));
         }
 
         let addr = deployment.newAddress;
@@ -324,7 +326,6 @@ pub(super) const EXPECTED_V31_ZKSYNC_OS_BYTECODES: &[&str] = &[
     "l1-contracts/L2AssetRouter",
     "l1-contracts/L2NativeTokenVaultZKOS",
     "l1-contracts/L2MessageRoot",
-    "l1-contracts/L2WrappedBaseToken",
     "l1-contracts/L2MessageVerification",
     "l1-contracts/L2ChainAssetHandler",
     "l1-contracts/L2InteropRootStorage",

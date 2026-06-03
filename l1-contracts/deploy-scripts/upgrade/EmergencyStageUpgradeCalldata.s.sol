@@ -71,10 +71,20 @@ contract EmergencyStageUpgradeCalldata is Script {
         console2.log("---- STEP 1: approveHash txs (send each from the owner EOA) ----");
 
         (address[] memory gMembers, bytes[] memory gSigs) = _approveSet(
-            owner, board.GUARDIANS(), dom, EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH, id, "GUARDIANS"
+            owner,
+            board.GUARDIANS(),
+            dom,
+            EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH,
+            id,
+            "GUARDIANS"
         );
         (address[] memory scMembers, bytes[] memory scSigs) = _approveSet(
-            owner, board.SECURITY_COUNCIL(), dom, EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH, id, "SECURITY_COUNCIL"
+            owner,
+            board.SECURITY_COUNCIL(),
+            dom,
+            EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH,
+            id,
+            "SECURITY_COUNCIL"
         );
         bytes memory zkSig = _approveZk(owner, board.ZK_FOUNDATION_SAFE(), dom, id);
 
@@ -96,27 +106,7 @@ contract EmergencyStageUpgradeCalldata is Script {
         bytes memory encodedCalls = toml.readBytes(
             string.concat(".governance_calls.stage", vm.toString(_stage), "_calls")
         );
-        IProtocolUpgradeHandler.Call[] memory calls = abi.decode(encodedCalls, (IProtocolUpgradeHandler.Call[]));
-        if (_stage != 1) {
-            return calls;
-        }
-
-        // Emergency-path fixup: PUH.executeEmergencyUpgrade runs a built-in unfreeze/unpause pre-step
-        // that calls ChainAssetHandler.unpauseMigration(), clearing the pause set in stage 0. stage 1's
-        // checkMigrationsPaused() would then revert with MigrationsNotPaused(). Re-assert the pause as the
-        // first stage-1 call so it holds through stage-1 validation. (The normal governance path has no
-        // such auto-unpause; this is specific to executing via the EmergencyUpgradeBoard.)
-        address cah = toml.readAddress(".core.upgrade_addresses.bridgehub.chain_asset_handler_proxy_addr");
-        IProtocolUpgradeHandler.Call[] memory withPause = new IProtocolUpgradeHandler.Call[](calls.length + 1);
-        withPause[0] = IProtocolUpgradeHandler.Call({
-            target: cah,
-            value: 0,
-            data: abi.encodeWithSignature("pauseMigration()")
-        });
-        for (uint256 i = 0; i < calls.length; i++) {
-            withPause[i + 1] = calls[i];
-        }
-        return withPause;
+        return abi.decode(encodedCalls, (IProtocolUpgradeHandler.Call[]));
     }
 
     /// @dev Approves `threshold` member-Safe message hashes (printing each approveHash tx) and returns
@@ -147,7 +137,8 @@ contract EmergencyStageUpgradeCalldata is Script {
 
     function _approveZk(address _owner, address _zk, bytes32 _dom, bytes32 _id) internal view returns (bytes memory) {
         bytes32 boardDigest = EIP712Utils.buildDigest(
-            _dom, keccak256(abi.encode(EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH, _id))
+            _dom,
+            keccak256(abi.encode(EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH, _id))
         );
         bytes32 safeMsgHash = ISafeMsg(_zk).getMessageHash(abi.encode(boardDigest));
         console2.log("[ZK_FOUNDATION] To (Safe):", _zk);

@@ -1,7 +1,7 @@
 //! Era-VM `forceDeployAndUpgrade` payload verification.
 //!
-//! Owns the expected `ForceDeployment[]` list (45 entries: 31 EraVM system
-//! contracts + 13 fixed-address core contracts + L2V31Upgrade), the per-entry
+//! Owns the expected `ForceDeployment[]` list (44 entries: 31 EraVM system
+//! contracts + 12 fixed-address core contracts + L2V31Upgrade), the per-entry
 //! shape walker, the special `L2ChainAssetHandler` constructor-input decoder,
 //! the Era factory-dep bytecode list, and the Era orchestrator wired from
 //! `ProposedUpgrade::verify_l2_protocol_upgrade_tx`.
@@ -26,8 +26,8 @@ use crate::upgrade_verification::{
         L2_MESSAGE_VERIFICATION_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_PUBDATA_CHUNK_PUBLISHER_ADDR,
         L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR,
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_V31_UPGRADE_CONTRACT,
-        L2_VERSION_SPECIFIC_UPGRADER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, MODEXP_SYSTEM_CONTRACT,
-        MSG_VALUE_SYSTEM_CONTRACT, SHA256_SYSTEM_CONTRACT, SLOAD_CONTRACT_ADDR,
+        L2_VERSION_SPECIFIC_UPGRADER_ADDR, MODEXP_SYSTEM_CONTRACT, MSG_VALUE_SYSTEM_CONTRACT,
+        SHA256_SYSTEM_CONTRACT, SLOAD_CONTRACT_ADDR,
     },
     verifiers::{VerificationResult, Verifiers},
 };
@@ -138,7 +138,7 @@ fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
             "l1-contracts/SystemContractProxyAdmin",
             L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR
         ),
-        // ── Fixed-address core contracts (FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 13) ──
+        // ── Fixed-address core contracts (FIXED_ADDRESS_CORE_CONTRACTS_COUNT = 12; L2WrappedBaseToken excluded) ──
         simple!("l1-contracts/L2Bridgehub", L2_BRIDGEHUB_ADDR),
         simple!("l1-contracts/L2AssetRouter", L2_ASSET_ROUTER_ADDR),
         simple!(
@@ -146,10 +146,7 @@ fn expected_v31_era_force_deployments() -> Vec<EraExpectedFd> {
             L2_NATIVE_TOKEN_VAULT_ADDR
         ),
         simple!("l1-contracts/L2MessageRoot", L2_MESSAGE_ROOT_ADDR),
-        simple!(
-            "l1-contracts/L2WrappedBaseToken",
-            L2_WRAPPED_BASE_TOKEN_IMPL_ADDR
-        ),
+        // L2WrappedBaseToken is intentionally NOT force-deployed by v31 (its impl is left as-is).
         simple!(
             "l1-contracts/L2MessageVerification",
             L2_MESSAGE_VERIFICATION_ADDR
@@ -354,7 +351,6 @@ pub(super) const EXPECTED_V31_ERA_BYTECODES: &[&str] = &[
     "l1-contracts/L2AssetRouter",
     "l1-contracts/L2NativeTokenVault",
     "l1-contracts/L2MessageRoot",
-    "l1-contracts/L2WrappedBaseToken",
     "l1-contracts/L2MessageVerification",
     "l1-contracts/L2ChainAssetHandler",
     "l1-contracts/L2InteropRootStorage",

@@ -45,11 +45,13 @@ use super::{
     upgradeAndCallCall, upgradeCall, CallList, GovernanceStage1Calls,
 };
 
-/// Stage 1 call layout: 10 ecosystem-wide core calls (indices 0..=9), then 6
-/// per-CTM calls repeated once per `[ctms.<flavor>]` section in artifact order:
-/// timer deadline check, migrations-paused check, CTM proxy upgrade,
-/// setChainCreationParams, setNewVersionUpgrade, ValidatorTimelock proxy upgrade.
-const STAGE1_PREFIX_LEN: usize = 11;
+/// Stage 1 call layout: 12 ecosystem-wide core calls (indices 0..=11) — the
+/// first is `ChainAssetHandler.pauseMigration()` (re-asserts the stage-0 pause,
+/// which the EmergencyUpgradeBoard path's built-in unpause would otherwise
+/// clear) — then 6 per-CTM calls repeated once per `[ctms.<flavor>]` section in
+/// artifact order: timer deadline check, migrations-paused check, CTM proxy
+/// upgrade, setChainCreationParams, setNewVersionUpgrade, ValidatorTimelock proxy upgrade.
+const STAGE1_PREFIX_LEN: usize = 12;
 const STAGE1_PER_CTM_LEN: usize = 6;
 
 /// Index of the per-CTM `ChainTypeManager` proxy upgrade within the
@@ -95,37 +97,41 @@ impl GovernanceStage1Calls {
     ) -> anyhow::Result<()> {
         result.print_info("== Gov stage 1 calls ===");
 
-        const ACCEPT_ASSET_TRACKER_OWNERSHIP: usize = 8;
-        const SET_ASSET_TRACKER: usize = 9;
+        const ACCEPT_ASSET_TRACKER_OWNERSHIP: usize = 9;
+        const SET_ASSET_TRACKER: usize = 10;
 
         let mut errors = 0;
         for (index, target, method) in [
+            // Re-assert the migration pause (first stage-1 call). The EmergencyUpgradeBoard path's
+            // built-in unfreeze/unpause clears the stage-0 pause; without this, checkMigrationsPaused
+            // below reverts. Harmless on the normal governance path.
+            (0, "chain_asset_handler_proxy", "pauseMigration()"),
             // Upgrade Bridgehub proxy.
-            (0, "transparent_proxy_admin", "upgrade(address,address)"),
-            // Upgrade L1 nullifier proxy.
             (1, "transparent_proxy_admin", "upgrade(address,address)"),
-            // Upgrade L1 asset router proxy.
+            // Upgrade L1 nullifier proxy.
             (2, "transparent_proxy_admin", "upgrade(address,address)"),
-            // Upgrade native token vault proxy.
+            // Upgrade L1 asset router proxy.
             (3, "transparent_proxy_admin", "upgrade(address,address)"),
+            // Upgrade native token vault proxy.
+            (4, "transparent_proxy_admin", "upgrade(address,address)"),
             // Upgrade message root proxy and initialize v31 state.
             (
-                4,
+                5,
                 "transparent_proxy_admin",
                 "upgradeAndCall(address,address,bytes)",
             ),
             // Upgrade CTM deployment tracker proxy.
-            (5, "transparent_proxy_admin", "upgrade(address,address)"),
-            // Upgrade chain asset handler proxy.
             (6, "transparent_proxy_admin", "upgrade(address,address)"),
+            // Upgrade chain asset handler proxy.
+            (7, "transparent_proxy_admin", "upgrade(address,address)"),
             // Accept ChainRegistrationSender ownership.
-            (7, "chain_registration_sender_proxy", "acceptOwnership()"),
+            (8, "chain_registration_sender_proxy", "acceptOwnership()"),
             // Accept AssetTracker ownership.
-            (8, "asset_tracker_proxy", "acceptOwnership()"),
+            (9, "asset_tracker_proxy", "acceptOwnership()"),
             // Wire AssetTracker into NativeTokenVault.
-            (9, "native_token_vault", "setAssetTracker(address)"),
+            (10, "native_token_vault", "setAssetTracker(address)"),
             // Cache MessageRoot / AssetRouter inside L1ChainAssetHandler.
-            (10, "chain_asset_handler_proxy", "setAddresses()"),
+            (11, "chain_asset_handler_proxy", "setAddresses()"),
         ] {
             errors += verify_call_by_name(&self.calls, index, target, method, verifiers, result);
         }
@@ -303,13 +309,15 @@ impl GovernanceStage1Calls {
     ) -> anyhow::Result<()> {
         result.print_info("== Gov stage 1 payloads ===");
 
-        const UPGRADE_BRIDGEHUB: usize = 0;
-        const UPGRADE_L1_NULLIFIER: usize = 1;
-        const UPGRADE_L1_ASSET_ROUTER: usize = 2;
-        const UPGRADE_NATIVE_TOKEN_VAULT: usize = 3;
-        const UPGRADE_MESSAGE_ROOT: usize = 4;
-        const UPGRADE_CTM_DEPLOYMENT_TRACKER: usize = 5;
-        const UPGRADE_CHAIN_ASSET_HANDLER: usize = 6;
+        // Indices are offset by 1 because call #0 is ChainAssetHandler.pauseMigration() (no payload
+        // to verify here; its shape is checked in verify_call_shape).
+        const UPGRADE_BRIDGEHUB: usize = 1;
+        const UPGRADE_L1_NULLIFIER: usize = 2;
+        const UPGRADE_L1_ASSET_ROUTER: usize = 3;
+        const UPGRADE_NATIVE_TOKEN_VAULT: usize = 4;
+        const UPGRADE_MESSAGE_ROOT: usize = 5;
+        const UPGRADE_CTM_DEPLOYMENT_TRACKER: usize = 6;
+        const UPGRADE_CHAIN_ASSET_HANDLER: usize = 7;
 
         let mut errors = 0;
 

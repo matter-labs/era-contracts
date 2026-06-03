@@ -365,13 +365,19 @@ contract DefaultCoreUpgrade is Script, DeployL1CoreUtils {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](3);
+        Call[][] memory allCalls = new Call[][](4);
 
+        // Re-assert the migration pause as the first stage-1 call. When this upgrade is executed via the
+        // EmergencyUpgradeBoard, PUH.executeEmergencyUpgrade runs a built-in unfreeze/unpause pre-step that
+        // calls ChainAssetHandler.unpauseMigration(), clearing the pause set in stage 0; stage 1's
+        // checkMigrationsPaused() would then revert with MigrationsNotPaused(). Harmless on the normal
+        // governance path (the pause from stage 0 is simply re-asserted).
+        allCalls[0] = preparePauseGatewayMigrationsCall();
         console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
-        allCalls[0] = prepareUpgradeProxiesCalls();
-        allCalls[1] = provideSetNewVersionUpgradeCall();
+        allCalls[1] = prepareUpgradeProxiesCalls();
+        allCalls[2] = provideSetNewVersionUpgradeCall();
         console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
-        allCalls[2] = prepareVersionSpecificStage1GovernanceCallsL1();
+        allCalls[3] = prepareVersionSpecificStage1GovernanceCallsL1();
 
         calls = UpgradeUtils.mergeCallsArray(allCalls);
     }
