@@ -33,6 +33,7 @@ import {
     MigrationNumberMismatch,
     NotSystemContext,
     OnlyChain,
+    SLHasDifferentCTM,
     ZKChainNotRegistered,
     IteratedMigrationsNotSupported
 } from "../bridgehub/L1BridgehubErrors.sol";
@@ -194,6 +195,14 @@ abstract contract ChainAssetHandlerBase is
             }
 
             ctmMintData = IChainTypeManager(ctm).forwardedBridgeBurn(chainId, bridgehubBurnData.ctmData);
+
+            // For security reasons, chain migration is temporarily restricted to settlement layers with the same CTM
+            if (
+                _settlementChainId != _l1ChainId() &&
+                IBridgehubBase(_bridgehub()).chainTypeManager(_settlementChainId) != ctm
+            ) {
+                revert SLHasDifferentCTM();
+            }
 
             if (block.chainid != _l1ChainId()) {
                 require(_settlementChainId == _l1ChainId(), MigrationNotToL1());
