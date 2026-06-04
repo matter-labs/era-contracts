@@ -33,7 +33,6 @@ import {
     MigrationNumberMismatch,
     NotSystemContext,
     OnlyChain,
-    SLHasDifferentCTM,
     ZKChainNotRegistered,
     IteratedMigrationsNotSupported
 } from "../bridgehub/L1BridgehubErrors.sol";
@@ -195,17 +194,6 @@ abstract contract ChainAssetHandlerBase is
             }
 
             ctmMintData = IChainTypeManager(ctm).forwardedBridgeBurn(chainId, bridgehubBurnData.ctmData);
-
-            // Chains migrating away from L1 may settle on a Gateway managed by a different CTM.
-            // For migrations that do NOT originate from L1, the destination settlement layer must keep the
-            // same CTM (a Gateway can only migrate a chain back to L1 anyway, see the MigrationNotToL1 check).
-            if (
-                block.chainid != _l1ChainId() &&
-                _settlementChainId != _l1ChainId() &&
-                IBridgehubBase(_bridgehub()).chainTypeManager(_settlementChainId) != ctm
-            ) {
-                revert SLHasDifferentCTM();
-            }
 
             if (block.chainid != _l1ChainId()) {
                 require(_settlementChainId == _l1ChainId(), MigrationNotToL1());
