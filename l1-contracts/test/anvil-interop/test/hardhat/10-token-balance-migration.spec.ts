@@ -9,8 +9,8 @@
  *   - Pre-migration state on the L1-settled chain (interop sending is rejected
  *     until the chain is migrated to GW).
  *   - Forward TBM (L1 → GW) for ETH and an NTV test token, verifying that the L1
- *     and GW sides agree on `assetMigrationNumber` and that the GW per-chain
- *     `chainBalance` is bounded by the L1 `chainBalance[GW][ETH]`.
+ *     and GW sides agree on `assetMigrationNumber` and that accounting snapshots
+ *     match exactly for the balance-moving transitions exercised below.
  *   - Reverse TBM (GW → L1):
  *       - `setSettlementLayerViaBootloader` on the L2 side (real SystemContext path),
  *       - `simulateGWChainMigrationBurn` on the GW side, which reproduces the two
@@ -92,7 +92,7 @@ import {
   setSettlementLayerViaBootloader,
   simulateGWChainMigrationBurn,
 } from "../../src/helpers/harness-shims";
-import { getGWChainBalance } from "../../src/helpers/process-logs-helper";
+import { getGWChainBalance, getGWPendingInteropBalance } from "../../src/helpers/process-logs-helper";
 import { customError, expectRevert, randomBigNumber } from "../../src/helpers/balance-helpers";
 import { encodeEvmAddress, encodeEvmChain } from "../../src/helpers/erc7930";
 import type { CallStarter } from "../../src/helpers/interop-helpers";
@@ -114,6 +114,12 @@ const UNREGISTERED_CHAIN_ID = 1337;
 const UNREGISTERED_DESTINATION_BYTES = encodeEvmChain(UNREGISTERED_CHAIN_ID);
 
 const POST_REVERSE_MIGRATION_NUMBER = 2;
+
+interface TrackerBalanceSnapshot {
+  l1: BigNumber;
+  gwChain: BigNumber;
+  gwPending: BigNumber;
+}
 
 // Random-amount ranges scoped to the specific flow that consumes them. Ranges are
 // kept small relative to Anvil's default account balance so a fresh deploy and a
@@ -160,6 +166,39 @@ describe("10 - Token Balance Migration Lifecycle", function () {
   // Asset IDs
   let ethAssetId: string;
   let reverseTbmTestTokenAssetId: string;
+
+  async function snapshotTrackerBalances(_chainId: number, _assetId: string): Promise<TrackerBalanceSnapshot> {
+    return {
+      l1: await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, _chainId, _assetId),
+      gwChain: await getGWChainBalance(gwProvider, _chainId, _assetId),
+      gwPending: await getGWPendingInteropBalance(gwProvider, _chainId, _assetId),
+    };
+  }
+
+  function expectBalanceDelta(_before: BigNumber, _after: BigNumber, _expectedDelta: BigNumber, _label: string): void {
+    const actualDelta = _after.sub(_before);
+    expect(actualDelta.eq(_expectedDelta), `${_label} delta ${actualDelta} == ${_expectedDelta}`).to.equal(true);
+  }
+
+  function expectBalanceDecrease(
+    _before: BigNumber,
+    _after: BigNumber,
+    _expectedDelta: BigNumber,
+    _label: string
+  ): void {
+    const actualDelta = _before.sub(_after);
+    expect(actualDelta.eq(_expectedDelta), `${_label} decrease ${actualDelta} == ${_expectedDelta}`).to.equal(true);
+  }
+
+  function expectTrackerSnapshotUnchanged(
+    _before: TrackerBalanceSnapshot,
+    _after: TrackerBalanceSnapshot,
+    _label: string
+  ): void {
+    expect(_after.l1.eq(_before.l1), `${_label}: L1 chainBalance unchanged`).to.equal(true);
+    expect(_after.gwChain.eq(_before.gwChain), `${_label}: GW chainBalance unchanged`).to.equal(true);
+    expect(_after.gwPending.eq(_before.gwPending), `${_label}: GW pendingInteropBalance unchanged`).to.equal(true);
+  }
 
   before(async () => {
     state = runner.loadState();
@@ -323,16 +362,6 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       }
     });
 
-    // Note: the aggregate `sum(GW.chainBalance[c]) + sum(GW.pendingInteropBalance[c])
-    // == L1.chainBalance[GW][ETH]` invariant does not hold exactly, because L1's
-    // aggregate also accumulates the priority-tx base-cost overhead from every
-    // L1→GW priority tx (the bookkeeping value paid into the GW mailbox at the
-    // gateway level, not credited to a destination chain's per-chain balance).
-    // Per-step exact accounting is instead asserted at the operation that moves
-    // value: see "L1 deposit of a random amount populates GW chainBalance[chainId][ETH]"
-    // (asserts exact equality against the deposit's `mintValue = amount + baseCost`)
-    // and the reverse-TBM drain test (asserts post-drain GW `chainBalance == 0`).
-
     it("running TBM end-to-end for an already-migrated NTV test token is a no-op (idempotent)", async () => {
       // Test tokens are migrated to GW during `registerAndMigrateTestTokens` in
       // deployment-runner, so `assetMigrationNumber` is already at the chain's
@@ -347,6 +376,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         reverseTbmChainId,
         reverseTbmTestTokenAssetId
       );
+      const accountingBefore = await snapshotTrackerBalances(reverseTbmChainId, reverseTbmTestTokenAssetId);
       const l1MigBefore = await queryAssetMigrationNumber(
         l1Provider,
         l1AssetTrackerAddr,
@@ -374,6 +404,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         reverseTbmChainId,
         reverseTbmTestTokenAssetId
       );
+      const accountingAfter = await snapshotTrackerBalances(reverseTbmChainId, reverseTbmTestTokenAssetId);
       const l1MigAfter = await queryAssetMigrationNumber(
         l1Provider,
         l1AssetTrackerAddr,
@@ -384,6 +415,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       expect(gwMigAfter, "already-migrated asset: GW assetMigrationNumber unchanged").to.equal(gwMigBefore);
       expect(l1MigAfter, "already-migrated asset: L1 assetMigrationNumber unchanged").to.equal(l1MigBefore);
       expect(l1MigAfter, "L1 and GW assetMigrationNumber agree").to.equal(gwMigAfter);
+      expectTrackerSnapshotUnchanged(accountingBefore, accountingAfter, "already-migrated test token TBM");
     });
 
     it("cannot initiate migration for a bogus assetId (AssetIdNotRegistered)", async () => {
@@ -530,6 +562,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
     // succeed after the reverse TBM completes. Mirrors the source suite's
     // `unfinalizedWithdrawals` → `withdrawals` lifecycle.
     const pendingWithdrawals: Record<string, PendingWithdrawal> = {};
+    const reverseMigrationAmounts: Record<string, BigNumber> = {};
     // Bundles delivered to the reverse-TBM chain *while it is still GW-settled*,
     // captured here so the post-SL-change tests below can attempt to claim them
     // and assert the InteropHandler guard fires after the chain migrates to L1.
@@ -601,6 +634,14 @@ describe("10 - Token Balance Migration Lifecycle", function () {
     // structures its progressive tests.
 
     it("L1 deposit of a random amount populates GW chainBalance[chainId][ETH]", async () => {
+      const l1ChainBalanceBeforeDeposit = await queryL1ChainBalance(
+        l1Provider,
+        l1AssetTrackerAddr,
+        reverseTbmChainId,
+        ethAssetId
+      );
+      const gwPendingBeforeDeposit = await getGWPendingInteropBalance(gwProvider, reverseTbmChainId, ethAssetId);
+
       const result = await depositETHToL2({
         l1RpcUrl: getL1RpcUrl(state),
         l2RpcUrl: getL2RpcUrl(state, reverseTbmChainId),
@@ -619,16 +660,26 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       const expectedDelta = result.mintValue;
 
       const gwBalanceAfter = await getGWChainBalance(gwProvider, reverseTbmChainId, ethAssetId);
-      const gwDelta = gwBalanceAfter.sub(gwBalanceBeforeDeposit);
-      expect(gwDelta.eq(expectedDelta), `GW chainBalance delta ${gwDelta} == mintValue ${expectedDelta}`).to.equal(
-        true
-      );
+      expectBalanceDelta(gwBalanceBeforeDeposit, gwBalanceAfter, expectedDelta, "GW chainBalance[chain][ETH]");
+
+      const gwPendingAfterDeposit = await getGWPendingInteropBalance(gwProvider, reverseTbmChainId, ethAssetId);
+      expect(
+        gwPendingAfterDeposit.eq(gwPendingBeforeDeposit),
+        `GW pendingInteropBalance[chain][ETH] unchanged on L1 deposit (${gwPendingBeforeDeposit})`
+      ).to.equal(true);
 
       const l1GWBalanceAfter = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, gwChainId, ethAssetId);
-      const l1GWDelta = l1GWBalanceAfter.sub(l1GWBalanceBeforeDeposit);
+      expectBalanceDelta(l1GWBalanceBeforeDeposit, l1GWBalanceAfter, expectedDelta, "L1 chainBalance[GW][ETH]");
+
+      const l1ChainBalanceAfterDeposit = await queryL1ChainBalance(
+        l1Provider,
+        l1AssetTrackerAddr,
+        reverseTbmChainId,
+        ethAssetId
+      );
       expect(
-        l1GWDelta.eq(expectedDelta),
-        `L1 chainBalance[GW][ETH] delta ${l1GWDelta} == mintValue ${expectedDelta}`
+        l1ChainBalanceAfterDeposit.eq(l1ChainBalanceBeforeDeposit),
+        `L1 chainBalance[chain][ETH] unchanged while chain settles on GW (${l1ChainBalanceBeforeDeposit})`
       ).to.equal(true);
     });
 
@@ -715,13 +766,28 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       ];
 
       for (const { label, assetId } of assetsToMigrate) {
+        const accountingBefore = await snapshotTrackerBalances(reverseTbmChainId, assetId);
         const tx = await gwAssetTracker
           .connect(gwWallet)
           .initiateGatewayToL1MigrationOnGateway(reverseTbmChainId, assetId, { gasLimit: 5_000_000 });
         gwToL1MigrationReceipts[label] = await tx.wait();
+        reverseMigrationAmounts[label] = accountingBefore.gwChain;
 
-        const gwBalanceAfter = await getGWChainBalance(gwProvider, reverseTbmChainId, assetId);
-        expect(gwBalanceAfter.eq(0), `GW chainBalance for ${label} drained to 0`).to.equal(true);
+        const accountingAfter = await snapshotTrackerBalances(reverseTbmChainId, assetId);
+        expectBalanceDecrease(
+          accountingBefore.gwChain,
+          accountingAfter.gwChain,
+          accountingBefore.gwChain,
+          `GW chainBalance for ${label}`
+        );
+        expect(accountingAfter.gwChain.eq(0), `GW chainBalance for ${label} drained to 0`).to.equal(true);
+        expect(
+          accountingAfter.gwPending.eq(accountingBefore.gwPending),
+          `GW pendingInteropBalance for ${label} unchanged during reverse-TBM initiate`
+        ).to.equal(true);
+        expect(accountingAfter.l1.eq(accountingBefore.l1), `L1 chainBalance for ${label} not restored yet`).to.equal(
+          true
+        );
 
         const gwMig = await queryAssetMigrationNumber(
           gwProvider,
@@ -843,7 +909,8 @@ describe("10 - Token Balance Migration Lifecycle", function () {
 
       for (const { label, assetId, receiptLabel } of assetsToFinalise) {
         const finalizeParams = buildFinalizeWithdrawalParams(gwToL1MigrationReceipts[receiptLabel], gwChainId);
-        const l1BalanceBefore = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, reverseTbmChainId, assetId);
+        const accountingBefore = await snapshotTrackerBalances(reverseTbmChainId, assetId);
+        const expectedRestoredAmount = reverseMigrationAmounts[receiptLabel];
 
         const tx = await l1AssetTracker
           .connect(l1Wallet)
@@ -861,10 +928,20 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         expect(l1AssetMig, `L1AT assetMigrationNumber for ${label}`).to.equal(POST_REVERSE_MIGRATION_NUMBER);
 
         // L1 chainBalance is restored by `_migrateFunds` in the finalisation path.
-        const l1BalanceAfter = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, reverseTbmChainId, assetId);
+        const accountingAfterL1 = await snapshotTrackerBalances(reverseTbmChainId, assetId);
+        expectBalanceDelta(
+          accountingBefore.l1,
+          accountingAfterL1.l1,
+          expectedRestoredAmount,
+          `L1AT chainBalance for ${label}`
+        );
         expect(
-          l1BalanceAfter.gte(l1BalanceBefore),
-          `L1AT chainBalance for ${label} monotonically restored (${l1BalanceBefore} -> ${l1BalanceAfter})`
+          accountingAfterL1.gwChain.eq(accountingBefore.gwChain),
+          `GW chainBalance for ${label} unchanged by L1 finalisation`
+        ).to.equal(true);
+        expect(
+          accountingAfterL1.gwPending.eq(accountingBefore.gwPending),
+          `GW pendingInteropBalance for ${label} unchanged by L1 finalisation`
         ).to.equal(true);
 
         // Relay the confirmation priority txs the L1 receipt emitted: the
@@ -894,6 +971,13 @@ describe("10 - Token Balance Migration Lifecycle", function () {
           const result = await relayTx(reverseTbmProvider, req.from, req.to, req.calldata, req.value);
           expect(result.success, `${label} confirmMigrationOnL2 relay`).to.equal(true);
         }
+
+        const accountingAfterConfirmations = await snapshotTrackerBalances(reverseTbmChainId, assetId);
+        expectTrackerSnapshotUnchanged(
+          accountingAfterL1,
+          accountingAfterConfirmations,
+          `${label} reverse-TBM confirmations`
+        );
 
         const gwAssetMigPost = await queryAssetMigrationNumber(
           gwProvider,
@@ -954,6 +1038,8 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       await (await freshL1Token.mint(deployer.address, mintAmount, { gasLimit: 500_000 })).wait();
 
       const depositAmount = randomBigNumber(TBM_WITHDRAWAL_AMOUNT_RANGE.min, TBM_WITHDRAWAL_AMOUNT_RANGE.max.mul(10));
+      const freshAssetId = encodeNtvAssetId(L1_CHAIN_ID, freshL1Token.address);
+      const accountingBefore = await snapshotTrackerBalances(reverseTbmChainId, freshAssetId);
       const depositResult = await depositERC20ToL2({
         l1RpcUrl: getL1RpcUrl(state),
         l2RpcUrl: getL2RpcUrl(state, reverseTbmChainId),
@@ -963,8 +1049,19 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         amount: depositAmount,
       });
       expect(depositResult.l1TxHash, "L1 deposit tx hash").to.not.be.null;
+      expect(depositResult.assetId, "fresh L1 token assetId").to.equal(freshAssetId);
 
-      const freshAssetId = depositResult.assetId;
+      const accountingAfter = await snapshotTrackerBalances(reverseTbmChainId, freshAssetId);
+      expectBalanceDelta(accountingBefore.l1, accountingAfter.l1, depositAmount, "L1 chainBalance[chain][fresh ERC20]");
+      expect(
+        accountingAfter.gwChain.eq(accountingBefore.gwChain),
+        "GW chainBalance for fresh ERC20 unchanged"
+      ).to.equal(true);
+      expect(
+        accountingAfter.gwPending.eq(accountingBefore.gwPending),
+        "GW pendingInteropBalance for fresh ERC20 unchanged"
+      ).to.equal(true);
+
       const l1Mig = await queryAssetMigrationNumber(
         l1Provider,
         l1AssetTrackerAddr,
