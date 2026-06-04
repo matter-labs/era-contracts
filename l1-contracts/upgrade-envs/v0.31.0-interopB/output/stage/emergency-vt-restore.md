@@ -14,8 +14,8 @@ MultisigCommitter (`0x8419fc5e…`) to a plain ValidatorTimelock (`0x31332716…
 
 ## Deployed & verified implementation
 
-| Contract | Address | Etherscan | Deployment tx |
-|---|---|---|---|
+| Contract                                | Address                                      | Etherscan                                                                                        | Deployment tx                                                                                                                                                              |
+| --------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `MultisigCommitter` (ZKsync-OS VT impl) | `0x3Ccb407b66DbED21369A0a46ee75fe64D462F6D6` | [verified](https://sepolia.etherscan.io/address/0x3ccb407b66dbed21369a0a46ee75fe64d462f6d6#code) | [`0xf6db066a0ff7453619da7bc4fbf4499c445e95168fd9fc2c5d1e4ba1cd25a24f`](https://sepolia.etherscan.io/tx/0xf6db066a0ff7453619da7bc4fbf4499c445e95168fd9fc2c5d1e4ba1cd25a24f) |
 
 - CREATE2 factory `0x4e59b44847b379578588920cA78FbF26c0B4956C`, default salt (`CREATE2_FACTORY_SALT` env unset).
@@ -32,20 +32,20 @@ Owner EOA that must send **every** tx below: `0xd669494442609879b209CcA8eba2BdC9
 
 ### Step 1 — `approveHash(bytes32)` txs (12), each sent from the owner EOA
 
-| # | Board | Member Safe (`To`) | Data |
-|---|---|---|---|
-| 1 | GUARDIANS 1 | `0x4B5AB87019d0964F8aD45d455CE09774232aE386` | `0xd4d9bdcdd330253c558a7387d8a596cd719449b9d3bb1a9771dcd410dad21a15988c57fb` |
-| 2 | GUARDIANS 2 | `0x57F7470cae9AB771Fa9596AD782002a819bB1752` | `0xd4d9bdcdf572db73644f54625ec2e435437e4bb2dab92ea54f0b34fd85f03ed56de2840b` |
-| 3 | GUARDIANS 3 | `0x72A07A28BF6D85D0E371e491E613469DA60241B0` | `0xd4d9bdcd74ff882153126e4bc552d09e9fb3c8ebcf4c25242b6e9022c162ec1503e5c923` |
-| 4 | GUARDIANS 4 | `0x76D6720a631D847fEBe197344fe7aB3eE735974E` | `0xd4d9bdcddf08756ecb9c545b83e35aadc71782e925287cc1f73f14e96d89d78b90b119ca` |
-| 5 | GUARDIANS 5 | `0x988D1558758e2eA0B730E3832538328241679dea` | `0xd4d9bdcd4637408ac0e4dc99aa72ecbded85e026714ce1aae02a3e80a840b4d69136ee66` |
-| 6 | SECURITY_COUNCIL 1 | `0x0FBB6e6AC5105F9aA1e8526A15b639654d9b2f65` | `0xd4d9bdcde63fe617eb304676f7d1d2625fa166fb8abc93a9650451097938b70232fbcb77` |
-| 7 | SECURITY_COUNCIL 2 | `0x166eeC98a309a260A0d1D1DCAbA5dc045020b0Dd` | `0xd4d9bdcd2a468d69a0c5f310ffeeb43b833251f618b789e1515206826f3f7ab742f0db4d` |
-| 8 | SECURITY_COUNCIL 3 | `0x1715DA08BB48Ad38865c8aE71C6ab0a46eE98696` | `0xd4d9bdcdbec4617129910bc7b5c3fd477c91eed6b6885611241b973430e2f5691d6fb94d` |
-| 9 | SECURITY_COUNCIL 4 | `0x1bD92A8eE39AD8d9B014DE1D42E2Fa9a87257a51` | `0xd4d9bdcdc3231ad5a702975bc921267524eb193f4fb7b2bcdba6da1e9488708389a36829` |
-| 10 | SECURITY_COUNCIL 5 | `0x2a2905bbDB5106b923B48e6b49318C77CeFCb435` | `0xd4d9bdcd55d6d7910c1850d050e1fdb35fc10c638c1f3e79aa9b16dd078b977d6e784d1f` |
-| 11 | SECURITY_COUNCIL 6 | `0x3C8E07e953BE71449F839FEe556CC6d145590F98` | `0xd4d9bdcdb20a8d9d8961a781aabb3c08318f2639bfeb0109a4148acb68d45625a6f2d8bb` |
-| 12 | ZK_FOUNDATION | `0x684a96d0123FAda56344DF3208781999Fa768dE1` | `0xd4d9bdcdda5284a2d80cc3af73fa1116adf06af9409ac6e12733ed7f1acb03ab1dfe9c2a` |
+| #   | Board              | Member Safe (`To`)                           | Data                                                                         |
+| --- | ------------------ | -------------------------------------------- | ---------------------------------------------------------------------------- |
+| 1   | GUARDIANS 1        | `0x4B5AB87019d0964F8aD45d455CE09774232aE386` | `0xd4d9bdcdd330253c558a7387d8a596cd719449b9d3bb1a9771dcd410dad21a15988c57fb` |
+| 2   | GUARDIANS 2        | `0x57F7470cae9AB771Fa9596AD782002a819bB1752` | `0xd4d9bdcdf572db73644f54625ec2e435437e4bb2dab92ea54f0b34fd85f03ed56de2840b` |
+| 3   | GUARDIANS 3        | `0x72A07A28BF6D85D0E371e491E613469DA60241B0` | `0xd4d9bdcd74ff882153126e4bc552d09e9fb3c8ebcf4c25242b6e9022c162ec1503e5c923` |
+| 4   | GUARDIANS 4        | `0x76D6720a631D847fEBe197344fe7aB3eE735974E` | `0xd4d9bdcddf08756ecb9c545b83e35aadc71782e925287cc1f73f14e96d89d78b90b119ca` |
+| 5   | GUARDIANS 5        | `0x988D1558758e2eA0B730E3832538328241679dea` | `0xd4d9bdcd4637408ac0e4dc99aa72ecbded85e026714ce1aae02a3e80a840b4d69136ee66` |
+| 6   | SECURITY_COUNCIL 1 | `0x0FBB6e6AC5105F9aA1e8526A15b639654d9b2f65` | `0xd4d9bdcde63fe617eb304676f7d1d2625fa166fb8abc93a9650451097938b70232fbcb77` |
+| 7   | SECURITY_COUNCIL 2 | `0x166eeC98a309a260A0d1D1DCAbA5dc045020b0Dd` | `0xd4d9bdcd2a468d69a0c5f310ffeeb43b833251f618b789e1515206826f3f7ab742f0db4d` |
+| 8   | SECURITY_COUNCIL 3 | `0x1715DA08BB48Ad38865c8aE71C6ab0a46eE98696` | `0xd4d9bdcdbec4617129910bc7b5c3fd477c91eed6b6885611241b973430e2f5691d6fb94d` |
+| 9   | SECURITY_COUNCIL 4 | `0x1bD92A8eE39AD8d9B014DE1D42E2Fa9a87257a51` | `0xd4d9bdcdc3231ad5a702975bc921267524eb193f4fb7b2bcdba6da1e9488708389a36829` |
+| 10  | SECURITY_COUNCIL 5 | `0x2a2905bbDB5106b923B48e6b49318C77CeFCb435` | `0xd4d9bdcd55d6d7910c1850d050e1fdb35fc10c638c1f3e79aa9b16dd078b977d6e784d1f` |
+| 11  | SECURITY_COUNCIL 6 | `0x3C8E07e953BE71449F839FEe556CC6d145590F98` | `0xd4d9bdcdb20a8d9d8961a781aabb3c08318f2639bfeb0109a4148acb68d45625a6f2d8bb` |
+| 12  | ZK_FOUNDATION      | `0x684a96d0123FAda56344DF3208781999Fa768dE1` | `0xd4d9bdcdda5284a2d80cc3af73fa1116adf06af9409ac6e12733ed7f1acb03ab1dfe9c2a` |
 
 ### Step 2 — `executeEmergencyUpgrade(...)` (send last, from any funded account)
 

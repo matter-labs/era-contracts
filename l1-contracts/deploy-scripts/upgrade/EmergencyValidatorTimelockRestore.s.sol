@@ -66,10 +66,7 @@ contract EmergencyValidatorTimelockRestore is EmergencyStageUpgradeCalldata, Cre
         calls[0] = IProtocolUpgradeHandler.Call({
             target: ZKOS_VT_PROXY_ADMIN,
             value: 0,
-            data: abi.encodeCall(
-                ProxyAdmin.upgrade,
-                (ITransparentUpgradeableProxy(payable(ZKOS_VT_PROXY)), _newVtImpl)
-            )
+            data: abi.encodeCall(ProxyAdmin.upgrade, (ITransparentUpgradeableProxy(payable(ZKOS_VT_PROXY)), _newVtImpl))
         });
 
         _emitForCalls(calls, "VT RESTORE (ZKsync-OS -> MultisigCommitter)");
