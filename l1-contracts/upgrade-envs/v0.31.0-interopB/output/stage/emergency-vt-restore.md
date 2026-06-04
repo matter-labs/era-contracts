@@ -12,10 +12,10 @@ commit `6430dea61` (branch `kl/anvil-hardening`), against Sepolia (chain 1115511
 
 ## Deployed & verified implementations
 
-| Contract | Address | Etherscan |
-|---|---|---|
-| `MultisigCommitter` (ZKsync-OS VT impl) | `0x3Ccb407b66DbED21369A0a46ee75fe64D462F6D6` | [verified](https://sepolia.etherscan.io/address/0x3ccb407b66dbed21369a0a46ee75fe64d462f6d6#code) |
-| `L1ChainAssetHandler` impl (new) | `0x4f561b32Ec48c41d680Fa0a1191A24a035F07bC1` | [verified](https://sepolia.etherscan.io/address/0x4f561b32ec48c41d680fa0a1191a24a035f07bc1#code) |
+| Contract | Address | Etherscan | Deployment tx |
+|---|---|---|---|
+| `MultisigCommitter` (ZKsync-OS VT impl) | `0x3Ccb407b66DbED21369A0a46ee75fe64D462F6D6` | [verified](https://sepolia.etherscan.io/address/0x3ccb407b66dbed21369a0a46ee75fe64d462f6d6#code) | [`0xf6db066a0ff7453619da7bc4fbf4499c445e95168fd9fc2c5d1e4ba1cd25a24f`](https://sepolia.etherscan.io/tx/0xf6db066a0ff7453619da7bc4fbf4499c445e95168fd9fc2c5d1e4ba1cd25a24f) |
+| `L1ChainAssetHandler` impl (new) | `0x4f561b32Ec48c41d680Fa0a1191A24a035F07bC1` | [verified](https://sepolia.etherscan.io/address/0x4f561b32ec48c41d680fa0a1191a24a035f07bc1#code) | [`0x17a841d31e29598709f75cf02f58f1329fd3ce405887ec48637cabf1f50b062e`](https://sepolia.etherscan.io/tx/0x17a841d31e29598709f75cf02f58f1329fd3ce405887ec48637cabf1f50b062e) |
 
 - CREATE2 factory `0x4e59b44847b379578588920cA78FbF26c0B4956C`, default salt (`CREATE2_FACTORY_SALT` env unset).
 - VT/MultisigCommitter bytecode is unchanged from the prior commit, so its address is identical (not re-broadcast).
