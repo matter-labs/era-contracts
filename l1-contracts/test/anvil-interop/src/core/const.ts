@@ -47,6 +47,8 @@ export const ANVIL_FUND_BALANCE = "0x56BC75E2D63100000";
 // Default gas limits for test transactions
 export const INTEROP_SEND_BUNDLE_GAS_LIMIT = 500_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
+// 7 gwei, used by Anvil interop specs to exercise the non-zero dynamic fee path.
+export const ANVIL_INTEROP_PROTOCOL_FEE_WEI = "7000000000";
 
 // Default TestnetERC20Token deployment parameters for interop test helpers
 export const TEST_TOKEN_DECIMALS = 18;

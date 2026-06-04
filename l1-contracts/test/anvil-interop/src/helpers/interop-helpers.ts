@@ -16,11 +16,12 @@ import {
   INTEROP_BUNDLE_TUPLE_TYPE,
   INTEROP_CENTER_ADDR,
   INTEROP_SEND_BUNDLE_GAS_LIMIT,
+  L2_BOOTLOADER_ADDR,
   L2_ASSET_ROUTER_ADDR,
   L2_INTEROP_HANDLER_ADDR,
 } from "../core/const";
 import { encodeBridgeBurnData, encodeAssetRouterBridgehubDepositData } from "../core/data-encoding";
-import { buildMockInteropProof } from "../core/utils";
+import { buildMockInteropProof, impersonateAndRun } from "../core/utils";
 import { encodeEvmChain, encodeEvmAddress } from "./erc7930";
 import { waitForLiveInteropProof } from "./temp-sdk";
 import { approveTokenForNtv, expectBalanceDelta, getTokenAddressForAsset, getTokenBalance } from "./balance-helpers";
@@ -447,6 +448,35 @@ export async function getCallStatus(
 export async function getInteropProtocolFee(provider: providers.JsonRpcProvider): Promise<BigNumber> {
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
   return interopCenter.interopProtocolFee();
+}
+
+/**
+ * Set the dynamic interop protocol fee through the bootloader-only production entry point.
+ */
+export async function setInteropProtocolFee(provider: providers.JsonRpcProvider, fee: BigNumber): Promise<void> {
+  if (isLiveInteropMode()) {
+    throw new Error("setInteropProtocolFee uses Anvil bootloader impersonation and cannot run in live mode");
+  }
+
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  await impersonateAndRun(provider, L2_BOOTLOADER_ADDR, async (signer) => {
+    const tx = await interopCenter.connect(signer).setInteropFee(fee, { gasLimit: 500_000 });
+    await tx.wait();
+  });
+
+  const actualFee = await interopCenter.interopProtocolFee();
+  expect(actualFee.eq(fee), `InteropCenter fee should be ${fee.toString()}, got ${actualFee.toString()}`).to.be.true;
+}
+
+/**
+ * Get accumulated base-token interop fees for a coinbase address.
+ */
+export async function getAccumulatedProtocolFees(
+  provider: providers.JsonRpcProvider,
+  coinbase: string
+): Promise<BigNumber> {
+  const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+  return interopCenter.accumulatedProtocolFees(coinbase);
 }
 
 /**
