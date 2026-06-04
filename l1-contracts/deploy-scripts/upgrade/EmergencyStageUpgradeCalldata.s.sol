@@ -55,7 +55,12 @@ contract EmergencyStageUpgradeCalldata is Script {
     }
 
     function _emit(uint256 _stage) internal view {
-        IProtocolUpgradeHandler.Call[] memory calls = _loadCalls(_stage);
+        _emitForCalls(_loadCalls(_stage), string.concat("STAGE ", vm.toString(_stage)));
+    }
+
+    /// @notice Emits the approveHash + execute calldata for an arbitrary emergency-upgrade proposal.
+    /// @dev Shared by the stage runners and by one-off emergency upgrades (e.g. a single ProxyAdmin.upgrade).
+    function _emitForCalls(IProtocolUpgradeHandler.Call[] memory calls, string memory _title) internal view {
         IEmergencyUpgrageBoard board = IEmergencyUpgrageBoard(PUH.emergencyUpgradeBoard());
         address owner = ISafeMsg(board.ZK_FOUNDATION_SAFE()).getOwners()[0];
 
@@ -64,7 +69,7 @@ contract EmergencyStageUpgradeCalldata is Script {
         );
         bytes32 dom = EIP712Utils.buildDomainHash(address(board), "EmergencyUpgradeBoard", "1");
 
-        console2.log("================ EMERGENCY UPGRADE STAGE %s ================", _stage);
+        console2.log("================ EMERGENCY UPGRADE %s ================", _title);
         console2.log("Calls in proposal:", calls.length);
         console2.log("Owner EOA that must send EVERY tx below (your MetaMask account):", owner);
         console2.log("");
