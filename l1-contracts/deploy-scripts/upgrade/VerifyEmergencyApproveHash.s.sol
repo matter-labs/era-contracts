@@ -48,9 +48,27 @@ contract VerifyEmergencyApproveHash is Script {
         address owner = ISafeApprove(board.ZK_FOUNDATION_SAFE()).getOwners()[0];
         console2.log("Owner EOA (must be your MetaMask account):", owner);
 
-        bytes memory gSigs = _approveAndMark(owner, board.GUARDIANS(), dom, EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH, id);
-        bytes memory scSigs = _approveAndMark(owner, board.SECURITY_COUNCIL(), dom, EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH, id);
-        bytes memory zkSig = _approveSingle(owner, board.ZK_FOUNDATION_SAFE(), dom, EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH, id);
+        bytes memory gSigs = _approveAndMark(
+            owner,
+            board.GUARDIANS(),
+            dom,
+            EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH,
+            id
+        );
+        bytes memory scSigs = _approveAndMark(
+            owner,
+            board.SECURITY_COUNCIL(),
+            dom,
+            EXECUTE_EMERGENCY_UPGRADE_SECURITY_COUNCIL_TYPEHASH,
+            id
+        );
+        bytes memory zkSig = _approveSingle(
+            owner,
+            board.ZK_FOUNDATION_SAFE(),
+            dom,
+            EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH,
+            id
+        );
 
         board.executeEmergencyUpgrade(calls, SALT, gSigs, scSigs, zkSig);
         console2.log("SUCCESS: board accepted approved-hash markers; emergency upgrade executed (empty calls).");
