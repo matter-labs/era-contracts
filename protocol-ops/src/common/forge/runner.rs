@@ -48,8 +48,7 @@ pub struct ForgeRunner {
     pub shell: Shell,
     /// User-supplied forge CLI flags (--verify, --verifier-url, etc.).
     pub forge_args: ForgeScriptArgs,
-    /// Effective RPC URL (always the anvil fork — protocol-ops never
-    /// broadcasts against real L1).
+    /// Effective RPC URL for Forge simulations (always the anvil fork).
     pub rpc_url: String,
     /// Path to the `l1-contracts` foundry project root.
     pub foundry_scripts_path: PathBuf,
@@ -61,8 +60,8 @@ pub struct ForgeRunner {
 impl ForgeRunner {
     /// Create a new runner from the shared CLI args.
     ///
-    /// Always forks `shared.l1_rpc_url` with anvil and targets the fork —
-    /// protocol-ops is prepare-only and never touches real L1.
+    /// Always forks `shared.l1_rpc_url` with anvil and targets the fork for
+    /// the Forge simulation step.
     pub fn new(shared: &SharedRunArgs) -> anyhow::Result<Self> {
         let shell = Shell::new().context("failed to create shell")?;
 

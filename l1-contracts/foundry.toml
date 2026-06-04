@@ -49,6 +49,7 @@ remappings = [
     "system-contracts/=../system-contracts/",
   "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
   "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
+  "test-utils/=test/foundry/l1/integration/utils/",
 ]
 optimizer = true
 optimizer_runs = 9999999

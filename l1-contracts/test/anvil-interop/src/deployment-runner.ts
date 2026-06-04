@@ -19,11 +19,17 @@ import type {
 } from "./core/types";
 import { getChainIdsByRole, timeIt } from "./core/utils";
 import { getAbi, getCreationBytecode } from "./core/contracts";
-import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS } from "./core/const";
+import { ANVIL_DEFAULT_PRIVATE_KEY, ETH_TOKEN_ADDRESS, INTEROP_CENTER_ADDR } from "./core/const";
+import { getInteropSourcePrivateKey, isLiveInteropMode } from "./core/accounts";
 import { encodeNtvAssetId } from "./core/data-encoding";
 import { deployTestTokens } from "./helpers/deploy-test-token";
 import { depositERC20ToL2 } from "./helpers/l1-deposit-helper";
 import { registerAndMigrateTestTokens } from "./helpers/token-balance-migration-helper";
+import { asViemAddress, createLiveZksyncSdk } from "./helpers/temp-sdk";
+
+const ZERO_ADDRESS = ethers.constants.AddressZero;
+const LIVE_CHAIN_PORT_PLACEHOLDER = 0;
+const LIVE_TEST_TOKEN_DECIMALS = 18;
 
 export interface StartChainOptions {
   blockTime?: number;
@@ -49,7 +55,8 @@ export class DeploymentRunner {
 
   constructor(baseDir: string = __dirname + "/..") {
     const runSuffix = process.env.ANVIL_INTEROP_RUN_SUFFIX || "";
-    this.stateDir = path.join(baseDir, `outputs/state${runSuffix}`);
+    const stateDirName = isLiveInteropMode() ? "live-state" : "state";
+    this.stateDir = path.join(baseDir, `outputs/${stateDirName}${runSuffix}`);
     this.configDir = path.join(baseDir, "config");
     this.configPath = path.join(this.configDir, "anvil-config.json");
     fs.mkdirSync(this.stateDir, { recursive: true });
@@ -87,6 +94,214 @@ export class DeploymentRunner {
   /** Clear cached deployment state so a fresh run doesn't see stale data. */
   clearState(): void {
     this.saveState({});
+  }
+
+  isLiveMode(): boolean {
+    return isLiveInteropMode();
+  }
+
+  private getRequiredEnv(name: string): string {
+    const value = process.env[name]?.trim();
+    if (!value) {
+      throw new Error(`${name} is required when ANVIL_INTEROP_LIVE=1`);
+    }
+    return value;
+  }
+
+  private async resolveLiveChainId(label: string, rpcUrl: string): Promise<number> {
+    const provider = new providers.JsonRpcProvider(rpcUrl);
+    const network = await provider.getNetwork();
+    console.log(`  ${label}: discovered chain ID ${network.chainId}`);
+    return network.chainId;
+  }
+
+  private emptyLiveL1Addresses(params: {
+    bridgehub: string;
+    l1AssetRouter: string;
+    l1Nullifier?: string;
+    l1NativeTokenVault?: string;
+  }): CoreDeployedAddresses {
+    return {
+      bridgehub: params.bridgehub,
+      stateTransitionManager: ZERO_ADDRESS,
+      validatorTimelock: ZERO_ADDRESS,
+      l1SharedBridge: params.l1AssetRouter,
+      l1NullifierProxy: params.l1Nullifier ?? ZERO_ADDRESS,
+      l1NativeTokenVault: params.l1NativeTokenVault ?? ZERO_ADDRESS,
+      l1AssetTracker: ZERO_ADDRESS,
+      l1ERC20Bridge: ZERO_ADDRESS,
+      governance: ZERO_ADDRESS,
+      transparentProxyAdmin: ZERO_ADDRESS,
+      blobVersionedHashRetriever: ZERO_ADDRESS,
+      messageRoot: ZERO_ADDRESS,
+      ctmDeploymentTracker: ZERO_ADDRESS,
+      l1ChainAssetHandler: ZERO_ADDRESS,
+      chainRegistrationSender: ZERO_ADDRESS,
+    };
+  }
+
+  private async discoverLiveZkToken(
+    sourceRpcUrl: string,
+    sourceAddress: string
+  ): Promise<{ l1Address: string; assetId: string } | undefined> {
+    const provider = new providers.JsonRpcProvider(sourceRpcUrl);
+    const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
+    const assetId: string = await interopCenter.ZK_TOKEN_ASSET_ID();
+
+    if (assetId === ethers.constants.HashZero) {
+      console.warn("  The ZK token has not yet been bridged to the source chain; fixed ZK fee tests will be skipped.");
+      return undefined;
+    }
+
+    const zkTokenAddress: string = await interopCenter.getZKTokenAddress();
+    if (ethers.utils.getAddress(zkTokenAddress) === ZERO_ADDRESS) {
+      console.warn("  The ZK token has not yet been bridged to the source chain; fixed ZK fee tests will be skipped.");
+      return undefined;
+    }
+
+    const zkToken = new Contract(zkTokenAddress, getAbi("TestnetERC20Token"), provider);
+    const zkBalance = await zkToken.balanceOf(sourceAddress);
+    if (zkBalance.isZero()) {
+      console.warn("  ZK token balance is zero; fixed ZK fee tests will be skipped.");
+    }
+
+    console.log(`  Source chain ZK token assetId: ${assetId}`);
+    return { l1Address: ZERO_ADDRESS, assetId };
+  }
+
+  async setupLiveState(): Promise<DeploymentState> {
+    console.log("\n=== Live Interop State Setup ===\n");
+
+    const gwRpcUrl = this.getRequiredEnv("LIVE_GW_RPC");
+    const chainARpcUrl = this.getRequiredEnv("LIVE_CHAIN_A_RPC");
+    const chainBRpcUrl = this.getRequiredEnv("LIVE_CHAIN_B_RPC");
+
+    const [gwChainId, chainAId, chainBId] = await Promise.all([
+      this.resolveLiveChainId("Gateway", gwRpcUrl),
+      this.resolveLiveChainId("Chain A", chainARpcUrl),
+      this.resolveLiveChainId("Chain B", chainBRpcUrl),
+    ]);
+
+    const l1RpcUrl = this.getRequiredEnv("LIVE_L1_RPC");
+    const privateKey = getInteropSourcePrivateKey();
+
+    const l1Provider = new providers.JsonRpcProvider(l1RpcUrl);
+    const l1ChainId = (await l1Provider.getNetwork()).chainId;
+    const sourceL1Wallet = new Wallet(privateKey, l1Provider);
+    const sourceAddress = sourceL1Wallet.address;
+    const liveZkToken = await this.discoverLiveZkToken(chainARpcUrl, sourceAddress);
+
+    const chainALiveSdk = createLiveZksyncSdk({
+      privateKey,
+      l1RpcUrl,
+      l1ChainId,
+      l2RpcUrl: chainARpcUrl,
+      l2ChainId: chainAId,
+      l2Name: "Live Interop Chain A",
+    });
+    const liveAddresses = await chainALiveSdk.client.ensureAddresses();
+
+    const testTokens: Record<number, string> = {};
+
+    for (const [chainId, chainRpcUrl] of [[chainAId, chainARpcUrl]] as const) {
+      const l1TokenFactory = new ContractFactory(
+        getAbi("TestnetERC20Token"),
+        getCreationBytecode("TestnetERC20Token"),
+        sourceL1Wallet
+      );
+      const token = await l1TokenFactory.deploy(
+        process.env.LIVE_TEST_TOKEN_NAME || "Live Interop Test Token",
+        process.env.LIVE_TEST_TOKEN_SYMBOL || "LIT",
+        LIVE_TEST_TOKEN_DECIMALS
+      );
+      await token.deployed();
+
+      const mintAmount = ethers.utils.parseUnits(
+        process.env.LIVE_TEST_TOKEN_AMOUNT || "1000",
+        LIVE_TEST_TOKEN_DECIMALS
+      );
+      const mintAmountBigInt = BigInt(mintAmount.toString());
+      const mintTx = await token.mint(sourceAddress, mintAmount);
+      await mintTx.wait();
+
+      const targetLiveSdk = createLiveZksyncSdk({
+        privateKey,
+        l1RpcUrl,
+        l1ChainId,
+        l2RpcUrl: chainRpcUrl,
+        l2ChainId: chainId,
+        l2Name: `Live Interop Chain ${chainId}`,
+      });
+      const l1TokenAddress = asViemAddress(token.address, "L1 test token");
+      const assetId = encodeNtvAssetId(l1ChainId, token.address);
+      console.log(`  Depositing L1 test token ${token.address} to chain ${chainId}...`);
+      const deposit = await targetLiveSdk.sdk.deposits.create({
+        token: l1TokenAddress,
+        amount: mintAmountBigInt,
+        to: targetLiveSdk.account.address,
+      });
+      const depositReceipt = await targetLiveSdk.sdk.deposits.wait(deposit, { for: "l2" });
+      if (!depositReceipt) {
+        throw new Error(`Live token deposit to chain ${chainId} did not produce an L2 receipt`);
+      }
+
+      const l2Provider = new providers.JsonRpcProvider(chainRpcUrl);
+      const l2TokenAddress = await targetLiveSdk.sdk.tokens.toL2Address(l1TokenAddress);
+      const l2Token = new Contract(l2TokenAddress, getAbi("TestnetERC20Token"), new Wallet(privateKey, l2Provider));
+      const l2Balance = await l2Token.balanceOf(sourceAddress);
+      if (l2Balance.lt(mintAmount)) {
+        throw new Error(
+          `Live token deposit to chain ${chainId} completed but L2 balance is ${l2Balance.toString()}, expected at least ${mintAmount.toString()}`
+        );
+      }
+
+      testTokens[chainId] = l2TokenAddress;
+      console.log(`  Chain ${chainId} live test token: ${l2TokenAddress}`);
+      console.log(`  Chain ${chainId} live test token assetId: ${assetId}`);
+    }
+
+    const liveState: DeploymentState = {
+      chains: {
+        l1: null,
+        l2: [
+          { chainId: gwChainId, rpcUrl: gwRpcUrl, port: LIVE_CHAIN_PORT_PLACEHOLDER },
+          { chainId: chainAId, rpcUrl: chainARpcUrl, port: LIVE_CHAIN_PORT_PLACEHOLDER },
+          { chainId: chainBId, rpcUrl: chainBRpcUrl, port: LIVE_CHAIN_PORT_PLACEHOLDER },
+        ],
+        config: [
+          { chainId: gwChainId, port: LIVE_CHAIN_PORT_PLACEHOLDER, role: "gateway", settlement: "l1" },
+          { chainId: chainAId, port: LIVE_CHAIN_PORT_PLACEHOLDER, role: "gwSettled", settlement: "gateway" },
+          { chainId: chainBId, port: LIVE_CHAIN_PORT_PLACEHOLDER, role: "gwSettled", settlement: "gateway" },
+        ],
+      },
+      l1Addresses: this.emptyLiveL1Addresses({
+        bridgehub: liveAddresses.bridgehub,
+        l1AssetRouter: liveAddresses.l1AssetRouter,
+        l1Nullifier: liveAddresses.l1Nullifier,
+        l1NativeTokenVault: liveAddresses.l1NativeTokenVault,
+      }),
+      ctmAddresses: {
+        chainTypeManager: ZERO_ADDRESS,
+        chainAdmin: ZERO_ADDRESS,
+        diamondProxy: ZERO_ADDRESS,
+        adminFacet: ZERO_ADDRESS,
+        gettersFacet: ZERO_ADDRESS,
+        mailboxFacet: ZERO_ADDRESS,
+        executorFacet: ZERO_ADDRESS,
+        verifier: ZERO_ADDRESS,
+        validiumL1DAValidator: ZERO_ADDRESS,
+        rollupL1DAValidator: ZERO_ADDRESS,
+      },
+      chainAddresses: [],
+      testTokens,
+    };
+    if (liveZkToken) {
+      liveState.zkToken = liveZkToken;
+    }
+
+    this.saveState(liveState);
+    console.log("\n=== Live Interop State Saved ===\n");
+    return liveState;
   }
 
   private toChainConfigMap(chainConfigs: AnvilConfig["chains"]): Map<number, AnvilConfig["chains"][number]> {

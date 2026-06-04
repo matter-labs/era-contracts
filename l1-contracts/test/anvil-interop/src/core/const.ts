@@ -48,6 +48,10 @@ export const ANVIL_FUND_BALANCE = "0x56BC75E2D63100000";
 export const INTEROP_SEND_BUNDLE_GAS_LIMIT = 500_000;
 export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
 
+// Default TestnetERC20Token deployment parameters for interop test helpers
+export const TEST_TOKEN_DECIMALS = 18;
+export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";
+
 export const INTEROP_BUNDLE_TUPLE_TYPE =
   "tuple(bytes1,uint256,uint256,bytes32,bytes32,tuple(bytes1,bool,address,address,uint256,bytes)[],tuple(bytes,bytes,bool))";
 

@@ -442,29 +442,6 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         });
     }
 
-    // function test_safeTransferFundsFromSharedBridge_Erc() public {
-    //     bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(token));
-    //     uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, assetId);
-    //     // solhint-disable-next-line func-named-parameters
-    //     vm.expectEmit(true, true, false, true, address(token));
-    //     emit IERC20.Transfer(address(l1Nullifier), address(nativeTokenVault), amount);
-    //     nativeTokenVault.transferFundsFromSharedBridge(address(token));
-    //     nativeTokenVault.updateChainBalancesFromSharedBridge(address(token), chainId);
-    //     uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, assetId);
-    //     assertEq(endBalanceNtv - startBalanceNtv, amount);
-    // }
-
-    // function test_safeTransferFundsFromSharedBridge_Eth() public {
-    //     uint256 startEthBalanceNtv = address(nativeTokenVault).balance;
-    //     uint256 startBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ASSET_ID);
-    //     nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
-    //     nativeTokenVault.updateChainBalancesFromSharedBridge(ETH_TOKEN_ADDRESS, chainId);
-    //     uint256 endBalanceNtv = nativeTokenVault.chainBalance(chainId, ETH_TOKEN_ASSET_ID);
-    //     uint256 endEthBalanceNtv = address(nativeTokenVault).balance;
-    //     assertEq(endBalanceNtv - startBalanceNtv, amount);
-    //     assertEq(endEthBalanceNtv - startEthBalanceNtv, amount);
-    // }
-
     function test_bridgehubDeposit_Eth_storesCorrectTxHash() public {
         _setBaseTokenAssetId(tokenAssetId);
         vm.prank(bridgehubAddress);

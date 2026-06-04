@@ -2,7 +2,7 @@
 //!
 //! Each invocation that passed `--out <dir>` produces:
 //!
-//!   `<dir>/NN_<step>_<signer>.safe.json` — one Safe Transaction Builder file
+//!   `<dir>/NN_<step>_<target>.safe.json` — one Safe Transaction Builder file
 //!                                          per consecutive same-signer group
 //!   `<dir>/manifest.json`                — append-only index with per-bundle
 //!                                          info plus per-command debug metadata
@@ -13,7 +13,7 @@
 //! {
 //!   "bundles": [
 //!     { "index": 1, "file": "01_…safe.json", "target": "0x…", "steps": […],
-//!       "tx_count": 3, "signer": "ecosystem.deployer" }
+//!       "tx_count": 3 }
 //!   ],
 //!   "metadata": [
 //!     { "command": "ecosystem.upgrade-prepare", "input": {…}, "output": {…} }
@@ -23,8 +23,12 @@
 //!
 //! Multiple invocations writing into the same `--out` dir append to both
 //! arrays — `manifest.json` is read-modify-write.
+//!
+//! Bundles are dispatched externally — see `dev execute-safe --safe-file
+//! --private-key`. Callers that need to apply every bundle in a manifest
+//! iterate `bundles[]` and pick the matching signer per `bundles[].target`
+//! themselves.
 
-use std::collections::HashMap;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -35,7 +39,7 @@ use crate::common::forge::{split_into_bundles, ForgeRunner, SafeBundle};
 use crate::common::logger;
 
 /// Write Safe bundles + append metadata into `manifest.json` if the user
-/// passed `--out`. No-op otherwise.
+/// passed `--out`. No-op otherwise (used by simulation / dry-run callers).
 pub async fn write_output_if_requested<I, O>(
     command: &str,
     shared: &crate::common::SharedRunArgs,
@@ -47,35 +51,23 @@ where
     I: Serialize,
     O: Serialize,
 {
-    let Some(ref out_dir) = shared.out else {
+    let Some(bundle_dir) = shared.out.as_ref() else {
         return Ok(());
     };
 
     let bundles = split_into_bundles(runner, command)?;
     let l1_chain_id = fetch_l1_chain_id(&shared.l1_rpc_url).await?;
-    let address_names = shared
-        .wallets_yaml
-        .as_ref()
-        .map(|p| build_address_name_map(p))
-        .transpose()?
-        .unwrap_or_default();
     let metadata = json!({
         "command": command,
         "input": serde_json::to_value(input)?,
         "output": serde_json::to_value(output)?,
     });
-    write_safe_bundles_dir(
-        command,
-        &bundles,
-        l1_chain_id,
-        out_dir,
-        &address_names,
-        metadata,
-    )?;
+
+    write_safe_bundles_dir(command, &bundles, l1_chain_id, bundle_dir, metadata)?;
     logger::info(format!(
         "Safe bundles ({} file(s)) + metadata written to: {}",
         bundles.len(),
-        out_dir.display()
+        bundle_dir.display()
     ));
     Ok(())
 }
@@ -105,7 +97,6 @@ fn write_safe_bundles_dir(
     bundles: &[SafeBundle],
     l1_chain_id: u64,
     dir: &Path,
-    address_names: &HashMap<String, String>,
     metadata_entry: Value,
 ) -> anyhow::Result<()> {
     std::fs::create_dir_all(dir)
@@ -160,16 +151,13 @@ fn write_safe_bundles_dir(
             anyhow::anyhow!("Failed to write safe file '{}': {e}", filepath.display())
         })?;
 
-        let mut entry = json!({
+        let entry = json!({
             "index": idx,
             "file": filename,
             "target": target_lower,
             "steps": bundle.steps,
             "tx_count": bundle.txs.len(),
         });
-        if let Some(name) = address_names.get(&target_lower) {
-            entry["signer"] = json!(name);
-        }
         bundle_entries.push(entry);
     }
 
@@ -221,57 +209,6 @@ fn read_existing_manifest(path: &Path) -> anyhow::Result<(Vec<Value>, Vec<Value>
         .cloned()
         .unwrap_or_default();
     Ok((bundles, metadata))
-}
-
-/// Parse `wallets.yaml` and build a reverse map from lowercase address to
-/// human-readable wallet path (e.g. `"0xabcd…" → "ecosystem.deployer"`).
-///
-/// The YAML has a two-level structure:
-/// ```yaml
-/// ecosystem:
-///   deployer:
-///     address: "0x..."
-///   owner:
-///     address: "0x..."
-/// gateway:
-///   owner:
-///     address: "0x..."
-///   commit_operator:
-///     address: "0x..."
-/// ```
-fn build_address_name_map(path: &Path) -> anyhow::Result<HashMap<String, String>> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| anyhow::anyhow!("Failed to read wallets.yaml '{}': {e}", path.display()))?;
-    let root: serde_yaml::Value = serde_yaml::from_str(&content)
-        .map_err(|e| anyhow::anyhow!("Failed to parse wallets.yaml '{}': {e}", path.display()))?;
-
-    let mut map = HashMap::new();
-    if let serde_yaml::Value::Mapping(top) = &root {
-        for (section_key, section_val) in top {
-            let section = match section_key.as_str() {
-                Some(s) => s,
-                None => continue,
-            };
-            let roles = match section_val.as_mapping() {
-                Some(m) => m,
-                None => continue,
-            };
-            for (role_key, role_val) in roles {
-                let role = match role_key.as_str() {
-                    Some(s) => s,
-                    None => continue,
-                };
-                if let Some(addr) = role_val
-                    .as_mapping()
-                    .and_then(|m| m.get(serde_yaml::Value::String("address".into())))
-                    .and_then(|v| v.as_str())
-                {
-                    map.insert(addr.to_ascii_lowercase(), format!("{section}.{role}"));
-                }
-            }
-        }
-    }
-    Ok(map)
 }
 
 fn safe_txs_from_bundle(bundle: &SafeBundle) -> anyhow::Result<Vec<Value>> {

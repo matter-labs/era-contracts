@@ -10,11 +10,11 @@ use crate::common::forge::{Forge, ForgeRunner, ForgeScriptArg};
 use crate::common::logger;
 use crate::common::SharedRunArgs;
 
-/// Set chain-upgrade timestamp, prepare-only.
+/// Set chain-upgrade timestamp.
 ///
 /// Drives `AdminFunctions.s.sol::adminScheduleUpgrade(admin, acr, version, ts)`
-/// against a forked anvil, emits a Gnosis Safe Transaction Builder JSON bundle
-/// via `--out`, and never broadcasts. Apply the bundle via
+/// against a forked anvil and emits a Gnosis Safe Transaction Builder JSON
+/// bundle via `--out`. Apply the bundle separately via
 /// `protocol-ops dev execute-safe` (or any Safe-bundle-aware executor).
 #[derive(Debug, Clone, Serialize, Deserialize, Parser)]
 pub struct ChainSetUpgradeTimestampArgs {
@@ -43,9 +43,16 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
     let (eco, chain_id) = args.topology.resolve()?;
     let mut runner = ForgeRunner::new(&args.shared)?;
 
-    // Sender is always the chain admin.
-    let sender = runner.prepare_chain_admin(eco.bridgehub, chain_id).await?;
-    let admin_address = sender.address;
+    let admin_address =
+        crate::common::l1_contracts::resolve_chain_admin(&runner.rpc_url, eco.bridgehub, chain_id)
+            .await
+            .context("resolving chain admin from L1")?;
+    // The Solidity script executes via ChainAdmin, but broadcasts from the
+    // ChainAdmin owner internally. Use that owner as Forge's sender so Foundry
+    // tracks the correct nonce on the anvil fork.
+    let sender = runner
+        .prepare_chain_admin_owner(eco.bridgehub, chain_id)
+        .await?;
 
     let script_path = Path::new("deploy-scripts/AdminFunctions.s.sol");
 
@@ -57,10 +64,8 @@ pub async fn run(args: ChainSetUpgradeTimestampArgs) -> anyhow::Result<()> {
         url: runner.rpc_url.clone(),
     });
     script_args.add_arg(ForgeScriptArg::Ffi);
-    // `--broadcast` against the anvil fork. In this mode the
-    // target RPC is the anvil fork, so "broadcast" produces no real-chain
-    // effect — it just records the tx in forge's run file so protocol-ops can
-    // extract it into the Safe bundle.
+    // Broadcast against the anvil fork so Forge records txs into its run
+    // file — protocol-ops extracts those into the Safe bundle.
     script_args.add_arg(ForgeScriptArg::Broadcast);
     script_args.additional_args.extend([
         format!("{:#x}", admin_address),

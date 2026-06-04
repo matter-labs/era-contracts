@@ -10,22 +10,22 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {IBridgehubBase} from "contracts/core/bridgehub/IBridgehubBase.sol";
 
 import {SLNotWhitelisted} from "contracts/core/bridgehub/L1BridgehubErrors.sol";
-import {NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1} from "contracts/common/L1ContractErrors.sol";
+import {
+    CTMNotRegistered,
+    NotCurrentSettlementLayer,
+    SettlementLayersMustSettleOnL1,
+    Unauthorized,
+    ZeroAddress
+} from "contracts/common/L1ContractErrors.sol";
 
 contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
 
     function prepare() public {
-        // _generateUserAddresses();
-
         _deployL1Contracts();
-        // _deployTokens();
-        // _registerNewTokens(tokens);
-
-        // _deployEra();
-        // _deployZKChain(ETH_TOKEN_ADDRESS);
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));
@@ -49,7 +49,7 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         // Verify address(0) is an invalid CTM address
         assertEq(ctm, address(0), "Testing removal of zero address CTM");
 
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(ZeroAddress.selector));
         vm.prank(owner);
         addresses.bridgehub.removeChainTypeManager(ctm);
 
@@ -68,7 +68,7 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         address currentCtm = addresses.bridgehub.chainTypeManager(eraZKChainId);
         assertTrue(currentCtm != address(1), "Address(1) should not be the current CTM");
 
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(CTMNotRegistered.selector));
         vm.prank(owner);
         addresses.bridgehub.removeChainTypeManager(ctm);
 
@@ -85,6 +85,9 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         assertTrue(owner != address(0), "Owner should not be zero address");
         assertTrue(ctm != address(0), "CTM address should not be zero");
 
+        // Expect ChainTypeManagerRemoved event
+        vm.expectEmit(true, true, true, true, address(addresses.bridgehub));
+        emit IBridgehubBase.ChainTypeManagerRemoved(ctm);
         vm.prank(owner);
         addresses.bridgehub.removeChainTypeManager(ctm);
 
@@ -116,7 +119,7 @@ contract BridgehubNormalTest is L1ContractDeployer, ZKChainDeployer, TokenDeploy
         address notAllowed = makeAddr("notAllowed");
         assertTrue(notAllowed != owner, "notAllowed should be different from owner");
 
-        vm.expectRevert();
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, notAllowed));
         vm.prank(notAllowed);
         addresses.bridgehub.setAddressesV31(newChainRegistrationSender);
 

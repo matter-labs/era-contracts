@@ -236,10 +236,6 @@ contract BaseTokenHolderTest is Test {
         );
     }
 
-    function test_burnAndStartBridging_successFromInteropHandler() public {
-        _burnAndStartBridging_success(L2_INTEROP_HANDLER_ADDR, ERA_CHAIN_ID);
-    }
-
     function test_burnAndStartBridging_successFromInteropCenter() public {
         _burnAndStartBridging_success(L2_INTEROP_CENTER_ADDR, ERA_CHAIN_ID);
     }
@@ -263,6 +259,14 @@ contract BaseTokenHolderTest is Test {
         baseTokenHolder.burnAndStartBridging{value: amount}(ERA_CHAIN_ID);
     }
 
+    function test_burnAndStartBridging_revertFromInteropHandler() public {
+        vm.deal(L2_INTEROP_HANDLER_ADDR, 1 ether);
+
+        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, L2_INTEROP_HANDLER_ADDR));
+        baseTokenHolder.burnAndStartBridging{value: 1 ether}(ERA_CHAIN_ID);
+    }
+
     function test_burnAndStartBridging_revertFromComplexUpgrader() public {
         vm.deal(L2_COMPLEX_UPGRADER_ADDR, 1 ether);
 
@@ -282,7 +286,7 @@ contract BaseTokenHolderTest is Test {
     function test_burnAndStartBridging_callsAssetTrackerWithCorrectParams() public {
         uint256 amount = 2 ether;
 
-        vm.deal(L2_INTEROP_HANDLER_ADDR, amount);
+        vm.deal(L2_INTEROP_CENTER_ADDR, amount);
 
         // Verify exact parameters passed to asset tracker
         vm.expectCall(
@@ -294,7 +298,7 @@ contract BaseTokenHolderTest is Test {
             )
         );
 
-        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        vm.prank(L2_INTEROP_CENTER_ADDR);
         baseTokenHolder.burnAndStartBridging{value: amount}(GATEWAY_CHAIN_ID);
     }
 
@@ -342,8 +346,8 @@ contract BaseTokenHolderTest is Test {
         holder.give(recipient, 0, ERA_CHAIN_ID);
 
         // Verify burnAndStartBridging() is callable
-        vm.deal(L2_INTEROP_HANDLER_ADDR, 1);
-        vm.prank(L2_INTEROP_HANDLER_ADDR);
+        vm.deal(L2_INTEROP_CENTER_ADDR, 1);
+        vm.prank(L2_INTEROP_CENTER_ADDR);
         holder.burnAndStartBridging{value: 1}(ERA_CHAIN_ID);
     }
 }

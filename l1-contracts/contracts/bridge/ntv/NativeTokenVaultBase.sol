@@ -457,16 +457,21 @@ abstract contract NativeTokenVaultBase is
         address _originalCaller
     ) internal {
         // Note, that in order to track `totalPreV31TotalSupply` correctly in L2AssetTracker,
-        // we have to call it before any balance changes will be performed.
-        _handleBridgeToChain(_chainId, _assetId, _depositAmount);
-
+        // we have to call _handleBridgeToChain before any balance changes will be performed.
         if (_assetId == _baseTokenAssetId()) {
             require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
             if (_isBridgedToken) {
-                // Send tokens to BaseTokenHolder and notify L2AssetTracker via burnAndStartBridging
+                // This is the interop/asset-router case where this chain's base token is being
+                // bridged to a chain with a different base token. NTV still has to produce the
+                // bridge burn data for the asset-router flow, but the actual source-side base
+                // token burn/accounting goes through BaseTokenHolder.
                 L2_BASE_TOKEN_HOLDER.burnAndStartBridging{value: msg.value}(_chainId);
+            } else {
+                /// This is  only the case on L1, on L2 the base token is always bridged.
+                _handleBridgeToChain(_chainId, _assetId, _depositAmount);
             }
         } else {
+            _handleBridgeToChain(_chainId, _assetId, _depositAmount);
             require(msg.value == 0, NonEmptyMsgValue());
             if (_isBridgedToken) {
                 IBridgedStandardToken(_tokenAddress).bridgeBurn(_originalCaller, _depositAmount);
@@ -647,6 +652,11 @@ abstract contract NativeTokenVaultBase is
                             PAUSE
     //////////////////////////////////////////////////////////////*/
 
+    /// @dev This pausability is inherited by both L1 and L2 vaults through the shared base.
+    /// @dev On L1 it is part of the emergency controls for asset movement.
+    /// Interop-specific emergency handling is expected to happen at the Gateway layer in GWAssetTracker.
+    /// On L2 it is kept only for legacy/shared-code reasons and should not be used as an emergency mechanism.
+    /// Future L2 logic should rely on the L1/GW freeze flow instead of local pausability.
     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
     function pause() external onlyOwner {
         _pause();
