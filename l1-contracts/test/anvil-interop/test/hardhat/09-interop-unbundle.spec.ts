@@ -11,6 +11,7 @@ import {
   isLiveInteropMode,
 } from "../../src/core/accounts";
 import {
+  ANVIL_INTEROP_PROTOCOL_FEE_WEI,
   BundleStatus,
   CallStatus,
   DEFAULT_TX_GAS_LIMIT,
@@ -34,6 +35,8 @@ import {
   unbundlerAddressAttr,
   getTokenTransferData,
   getInteropProtocolFee,
+  setInteropProtocolFee,
+  getAccumulatedProtocolFees,
   deployRevertingContract,
   deployDummyInteropRecipient,
   getInteropExecutionData,
@@ -50,6 +53,8 @@ import {
   customError,
   randomBigNumber,
 } from "../../src/helpers/balance-helpers";
+
+const ANVIL_INTEROP_PROTOCOL_FEE = BigNumber.from(ANVIL_INTEROP_PROTOCOL_FEE_WEI);
 
 /**
  * 09 - Interop Unbundle (verifyBundle / unbundleBundle)
@@ -114,6 +119,10 @@ describe("09 - Interop Unbundle (failing calls)", function () {
     const destChain = getL2Chain(state.chains, destChainId);
     sourceProvider = new providers.JsonRpcProvider(sourceChain.rpcUrl);
     destProvider = new providers.JsonRpcProvider(destChain.rpcUrl);
+
+    if (!isLiveInteropMode()) {
+      await setInteropProtocolFee(sourceProvider, ANVIL_INTEROP_PROTOCOL_FEE);
+    }
 
     sourceTokenAddress = state.testTokens[sourceChainId];
     sourceAssetId = await getAssetIdForToken(sourceProvider, sourceTokenAddress);
@@ -195,6 +204,15 @@ describe("09 - Interop Unbundle (failing calls)", function () {
       bundleAttributes,
       value: valuePerBundle,
     });
+
+    if (!isLiveInteropMode()) {
+      const minedBlock = await sourceProvider.getBlock(result.receipt.blockNumber);
+      const accumulatedFees = await getAccumulatedProtocolFees(sourceProvider, minedBlock.miner);
+      expect(
+        accumulatedFees.gte(interopFee.mul(callStarters.length)),
+        "failing bundle: coinbase should accumulate protocol fee for every call"
+      ).to.be.true;
+    }
 
     expect(result.bundleHash).to.not.equal(ethers.constants.HashZero);
 

@@ -4,8 +4,13 @@ import { ethers } from "ethers";
 import { DeploymentRunner } from "../../src/deployment-runner";
 import { getChainIdsByRole, getL2Chain } from "../../src/core/utils";
 import { encodeNtvAssetId } from "../../src/core/data-encoding";
-import { getInteropRecipientAddress, getInteropSourceAddress } from "../../src/core/accounts";
-import { ETH_TOKEN_ADDRESS, INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
+import { getInteropRecipientAddress, getInteropSourceAddress, isLiveInteropMode } from "../../src/core/accounts";
+import {
+  ANVIL_INTEROP_PROTOCOL_FEE_WEI,
+  ETH_TOKEN_ADDRESS,
+  INTEROP_CENTER_ADDR,
+  L2_ASSET_ROUTER_ADDR,
+} from "../../src/core/const";
 import { runtimeConfig } from "../../src/core/runtime-config";
 import { encodeEvmChainAddress } from "../../src/helpers/erc7930";
 import {
@@ -16,6 +21,8 @@ import {
   useFixedFeeAttr,
   getTokenTransferData,
   getInteropProtocolFee,
+  setInteropProtocolFee,
+  getAccumulatedProtocolFees,
   getZkInteropFee,
   getZkTokenAssetId,
   getZkTokenAddress,
@@ -33,6 +40,8 @@ import {
   expectBalanceDelta,
   randomBigNumber,
 } from "../../src/helpers/balance-helpers";
+
+const ANVIL_INTEROP_PROTOCOL_FEE = ethers.BigNumber.from(ANVIL_INTEROP_PROTOCOL_FEE_WEI);
 
 /**
  * 08 - Interop Messages (sendMessage / executeBundle)
@@ -102,6 +111,10 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     sourceProvider = new ethers.providers.JsonRpcProvider(sourceChain.rpcUrl);
     destProvider = new ethers.providers.JsonRpcProvider(destChain.rpcUrl);
 
+    if (!isLiveInteropMode()) {
+      await setInteropProtocolFee(sourceProvider, ANVIL_INTEROP_PROTOCOL_FEE);
+    }
+
     interopFee = await getInteropProtocolFee(sourceProvider);
     zkInteropFee = await getZkInteropFee(sourceProvider);
     console.log(`   Interop protocol fee: ${interopFee.toString()}`);
@@ -149,6 +162,9 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
       customBaseTokenChainId = customBaseTokenConfig.chainId;
       const customChain = getL2Chain(state.chains!, customBaseTokenChainId);
       customBaseTokenProvider = new ethers.providers.JsonRpcProvider(customChain.rpcUrl);
+      if (!isLiveInteropMode()) {
+        await setInteropProtocolFee(customBaseTokenProvider, ANVIL_INTEROP_PROTOCOL_FEE);
+      }
       console.log(`   Custom base token chain: ${customBaseTokenChainId}`);
     }
   });
@@ -176,6 +192,11 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
 
     const balAfter = await captureBalance(sourceProvider);
     expectNativeSpend(balBefore, balAfter, msgValue, result.receipt, "base token message");
+    if (!isLiveInteropMode()) {
+      const minedBlock = await sourceProvider.getBlock(result.receipt.blockNumber);
+      const accumulatedFees = await getAccumulatedProtocolFees(sourceProvider, minedBlock.miner);
+      expect(accumulatedFees.gte(interopFee), "base token message: coinbase should accumulate protocol fee").to.be.true;
+    }
 
     console.log(`   Base token message sent: ${result.txHash}`);
 

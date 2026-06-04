@@ -9,7 +9,7 @@ import {
   getInteropSourceAddress,
   isLiveInteropMode,
 } from "../../src/core/accounts";
-import { INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
+import { ANVIL_INTEROP_PROTOCOL_FEE_WEI, INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR } from "../../src/core/const";
 import { encodeEvmAddress } from "../../src/helpers/erc7930";
 import {
   sendInteropBundle,
@@ -22,6 +22,8 @@ import {
   useFixedFeeAttr,
   getTokenTransferData,
   getInteropProtocolFee,
+  setInteropProtocolFee,
+  getAccumulatedProtocolFees,
   getAccumulatedZkFees,
   getZkInteropFee,
   getZkTokenAssetId,
@@ -54,6 +56,7 @@ const ERC20_TOKEN_MIN = BigNumber.from(100);
 const ERC20_TOKEN_MAX = BigNumber.from(10000);
 const ROUNDTRIP_TOKEN_TRANSFER_AMOUNT = ethers.utils.parseUnits("1", 18);
 const EXCESS_MSG_VALUE_DELTA = BigNumber.from(1);
+const ANVIL_INTEROP_PROTOCOL_FEE = BigNumber.from(ANVIL_INTEROP_PROTOCOL_FEE_WEI);
 
 /**
  * 07 - Interop Bundles (sendBundle / executeBundle)
@@ -141,6 +144,11 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     }
     l1Provider = new ethers.providers.JsonRpcProvider(l1RpcUrl);
 
+    if (!isLiveInteropMode()) {
+      await setInteropProtocolFee(sourceProvider, ANVIL_INTEROP_PROTOCOL_FEE);
+      await setInteropProtocolFee(destProvider, ANVIL_INTEROP_PROTOCOL_FEE);
+    }
+
     sourceTokenAddress = state.testTokens![sourceChainId];
     sourceAssetId = await getAssetIdForToken(sourceProvider, sourceTokenAddress);
 
@@ -214,6 +222,11 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     expect(sendResult.interopBundle, "single direct call: interopBundle should exist").to.not.be.null;
 
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "single direct call");
+    if (!isLiveInteropMode()) {
+      const minedBlock = await sourceProvider.getBlock(sendResult.receipt.blockNumber);
+      const accumulatedFees = await getAccumulatedProtocolFees(sourceProvider, minedBlock.miner);
+      expect(accumulatedFees.gte(interopFee), "single direct call: coinbase should accumulate protocol fee").to.be.true;
+    }
 
     console.log("   [send] Single direct call bundle sent");
 
