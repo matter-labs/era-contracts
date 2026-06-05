@@ -23,7 +23,8 @@ import {
   getTokenTransferData,
   getInteropProtocolFee,
   setInteropProtocolFee,
-  getAccumulatedProtocolFees,
+  snapshotAccumulatedProtocolFees,
+  expectAccumulatedProtocolFeeDelta,
   getAccumulatedZkFees,
   getZkInteropFee,
   getZkTokenAssetId,
@@ -207,6 +208,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     const bundleAttributes = [executionAddressAttr(getInteropSourceAddress())];
 
     const balBefore = await captureBalance(sourceProvider);
+    const protocolFeesBefore = !isLiveInteropMode() ? await snapshotAccumulatedProtocolFees(sourceProvider) : undefined;
 
     const sendResult = await sendInteropBundle({
       sourceProvider,
@@ -222,10 +224,14 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     expect(sendResult.interopBundle, "single direct call: interopBundle should exist").to.not.be.null;
 
     expectNativeSpend(balBefore, balAfter, msgValue, sendResult.receipt, "single direct call");
-    if (!isLiveInteropMode()) {
-      const minedBlock = await sourceProvider.getBlock(sendResult.receipt.blockNumber);
-      const accumulatedFees = await getAccumulatedProtocolFees(sourceProvider, minedBlock.miner);
-      expect(accumulatedFees.gte(interopFee), "single direct call: coinbase should accumulate protocol fee").to.be.true;
+    if (protocolFeesBefore) {
+      await expectAccumulatedProtocolFeeDelta(
+        sourceProvider,
+        protocolFeesBefore,
+        sendResult.receipt,
+        interopFee,
+        "single direct call"
+      );
     }
 
     console.log("   [send] Single direct call bundle sent");

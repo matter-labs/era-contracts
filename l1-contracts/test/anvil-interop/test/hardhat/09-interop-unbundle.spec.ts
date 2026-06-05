@@ -36,7 +36,8 @@ import {
   getTokenTransferData,
   getInteropProtocolFee,
   setInteropProtocolFee,
-  getAccumulatedProtocolFees,
+  snapshotAccumulatedProtocolFees,
+  expectAccumulatedProtocolFeeDelta,
   deployRevertingContract,
   deployDummyInteropRecipient,
   getInteropExecutionData,
@@ -197,6 +198,7 @@ describe("09 - Interop Unbundle (failing calls)", function () {
       bundleAttributes.push(unbundlerAddressAttr(getInteropUnbundlerAddress()));
     }
 
+    const protocolFeesBefore = !isLiveInteropMode() ? await snapshotAccumulatedProtocolFees(sourceProvider) : undefined;
     const result = await sendInteropBundle({
       sourceProvider,
       destinationChainId: destChainId,
@@ -205,13 +207,14 @@ describe("09 - Interop Unbundle (failing calls)", function () {
       value: valuePerBundle,
     });
 
-    if (!isLiveInteropMode()) {
-      const minedBlock = await sourceProvider.getBlock(result.receipt.blockNumber);
-      const accumulatedFees = await getAccumulatedProtocolFees(sourceProvider, minedBlock.miner);
-      expect(
-        accumulatedFees.gte(interopFee.mul(callStarters.length)),
-        "failing bundle: coinbase should accumulate protocol fee for every call"
-      ).to.be.true;
+    if (protocolFeesBefore) {
+      await expectAccumulatedProtocolFeeDelta(
+        sourceProvider,
+        protocolFeesBefore,
+        result.receipt,
+        interopFee.mul(callStarters.length),
+        "failing bundle"
+      );
     }
 
     expect(result.bundleHash).to.not.equal(ethers.constants.HashZero);

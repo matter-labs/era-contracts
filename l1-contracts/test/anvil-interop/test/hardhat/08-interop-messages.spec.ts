@@ -22,7 +22,8 @@ import {
   getTokenTransferData,
   getInteropProtocolFee,
   setInteropProtocolFee,
-  getAccumulatedProtocolFees,
+  snapshotAccumulatedProtocolFees,
+  expectAccumulatedProtocolFeeDelta,
   getZkInteropFee,
   getZkTokenAssetId,
   getZkTokenAddress,
@@ -178,6 +179,7 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
     const msgValue = interopFee.add(amount);
 
     const balBefore = await captureBalance(sourceProvider);
+    const protocolFeesBefore = !isLiveInteropMode() ? await snapshotAccumulatedProtocolFees(sourceProvider) : undefined;
 
     const result = await sendInteropMessage({
       sourceProvider,
@@ -192,10 +194,14 @@ describe("08 - Interop Messages (GW-settled chains)", function () {
 
     const balAfter = await captureBalance(sourceProvider);
     expectNativeSpend(balBefore, balAfter, msgValue, result.receipt, "base token message");
-    if (!isLiveInteropMode()) {
-      const minedBlock = await sourceProvider.getBlock(result.receipt.blockNumber);
-      const accumulatedFees = await getAccumulatedProtocolFees(sourceProvider, minedBlock.miner);
-      expect(accumulatedFees.gte(interopFee), "base token message: coinbase should accumulate protocol fee").to.be.true;
+    if (protocolFeesBefore) {
+      await expectAccumulatedProtocolFeeDelta(
+        sourceProvider,
+        protocolFeesBefore,
+        result.receipt,
+        interopFee,
+        "base token message"
+      );
     }
 
     console.log(`   Base token message sent: ${result.txHash}`);

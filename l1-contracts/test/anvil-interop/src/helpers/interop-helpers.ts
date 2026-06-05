@@ -32,6 +32,11 @@ const sendResultsByBundleData = new Map<string, InteropSendResult>();
 /** IERC7786Attributes interface — used for attribute encoding via encodeFunctionData. */
 const erc7786Iface = new ethers.utils.Interface(getAbi("IERC7786Attributes"));
 
+export interface AccumulatedProtocolFeesSnapshot {
+  coinbase: string;
+  amount: BigNumber;
+}
+
 // ── ERC-7786 attribute encoding ────────────────────────────────
 // Uses IERC7786Attributes.encodeFunctionData so selectors and parameter
 // encoding are derived from the Solidity interface — no manual hex.
@@ -477,6 +482,39 @@ export async function getAccumulatedProtocolFees(
 ): Promise<BigNumber> {
   const interopCenter = new Contract(INTEROP_CENTER_ADDR, getAbi("InteropCenter"), provider);
   return interopCenter.accumulatedProtocolFees(coinbase);
+}
+
+/**
+ * Snapshot the current block coinbase's accumulated dynamic interop protocol fees.
+ */
+export async function snapshotAccumulatedProtocolFees(
+  provider: providers.JsonRpcProvider
+): Promise<AccumulatedProtocolFeesSnapshot> {
+  const latestBlock = await provider.getBlock("latest");
+  return {
+    coinbase: latestBlock.miner,
+    amount: await getAccumulatedProtocolFees(provider, latestBlock.miner),
+  };
+}
+
+/**
+ * Assert the exact dynamic-fee delta credited by a transaction.
+ */
+export async function expectAccumulatedProtocolFeeDelta(
+  provider: providers.JsonRpcProvider,
+  before: AccumulatedProtocolFeesSnapshot,
+  receipt: providers.TransactionReceipt,
+  expectedDelta: BigNumber,
+  label: string
+): Promise<void> {
+  const minedBlock = await provider.getBlock(receipt.blockNumber);
+  expect(minedBlock.miner.toLowerCase(), `${label}: transaction mined by snapshotted coinbase`).to.equal(
+    before.coinbase.toLowerCase()
+  );
+
+  const after = await getAccumulatedProtocolFees(provider, minedBlock.miner);
+  const actualDelta = after.sub(before.amount);
+  expect(actualDelta.eq(expectedDelta), `${label}: protocol fee delta ${actualDelta} == ${expectedDelta}`).to.be.true;
 }
 
 /**

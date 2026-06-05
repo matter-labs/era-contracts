@@ -62,6 +62,7 @@ import { encodeNtvAssetId } from "../../src/core/data-encoding";
 import {
   ANVIL_DEFAULT_ACCOUNT_ADDR,
   ANVIL_DEFAULT_PRIVATE_KEY,
+  ANVIL_RECIPIENT_ADDR,
   ETH_TOKEN_ADDRESS,
   GW_ASSET_TRACKER_ADDR,
   INTEROP_CENTER_ADDR,
@@ -121,6 +122,11 @@ interface TrackerBalanceSnapshot {
   gwPending: BigNumber;
 }
 
+interface L1SettlementBalanceSnapshot {
+  chain: BigNumber;
+  gateway: BigNumber;
+}
+
 // Random-amount ranges scoped to the specific flow that consumes them. Ranges are
 // kept small relative to Anvil's default account balance so a fresh deploy and a
 // pregenerated-state run both have headroom for deposits, TBM, and assertions.
@@ -173,6 +179,56 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       gwChain: await getGWChainBalance(gwProvider, _chainId, _assetId),
       gwPending: await getGWPendingInteropBalance(gwProvider, _chainId, _assetId),
     };
+  }
+
+  async function snapshotL1SettlementBalances(
+    _chainId: number,
+    _assetId: string
+  ): Promise<L1SettlementBalanceSnapshot> {
+    return {
+      chain: await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, _chainId, _assetId),
+      gateway: await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, gwChainId, _assetId),
+    };
+  }
+
+  async function getL1RecipientAssetBalance(_pending: PendingWithdrawal): Promise<BigNumber> {
+    if (_pending.tokenAddress === ETH_TOKEN_ADDRESS) {
+      return l1Provider.getBalance(_pending.l1Recipient);
+    }
+
+    const l1NativeTokenVault = new Contract(
+      state.l1Addresses!.l1NativeTokenVault,
+      getAbi("L1NativeTokenVault"),
+      l1Provider
+    );
+    const l1TokenAddress: string = await l1NativeTokenVault.tokenAddress(_pending.assetId);
+    if (l1TokenAddress === ethers.constants.AddressZero) {
+      return BigNumber.from(0);
+    }
+
+    const l1Token = new Contract(l1TokenAddress, getAbi("TestnetERC20Token"), l1Provider);
+    return l1Token.balanceOf(_pending.l1Recipient);
+  }
+
+  function expectGatewayToL1MigrationInitiated(
+    _receipt: ethers.providers.TransactionReceipt,
+    _assetId: string,
+    _chainId: number,
+    _amount: BigNumber,
+    _label: string
+  ): void {
+    const iface = new ethers.utils.Interface(getAbi("GWAssetTracker"));
+    const eventTopic = iface.getEventTopic("GatewayToL1MigrationInitiated");
+    const eventLogs = _receipt.logs.filter(
+      (log) => log.address.toLowerCase() === GW_ASSET_TRACKER_ADDR.toLowerCase() && log.topics[0] === eventTopic
+    );
+
+    expect(eventLogs.length, `${_label}: exactly one GatewayToL1MigrationInitiated event`).to.equal(1);
+
+    const event = iface.parseLog(eventLogs[0]);
+    expect(event.args.assetId, `${_label}: event assetId`).to.equal(_assetId);
+    expect(BigNumber.from(event.args.chainId).toNumber(), `${_label}: event chainId`).to.equal(_chainId);
+    expect(BigNumber.from(event.args.amount).eq(_amount), `${_label}: event amount`).to.equal(true);
   }
 
   function expectBalanceDelta(_before: BigNumber, _after: BigNumber, _expectedDelta: BigNumber, _label: string): void {
@@ -303,7 +359,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
   // ── Forward TBM (L1 → GW) ───────────────────────────────────────────
 
   describe("Forward TBM (L1 → GW)", () => {
-    it("L1AT and GWAT assetMigrationNumber match and are >= 1 for ETH on every ETH-base GW-settled chain", async () => {
+    it("L1AT and GWAT track ETH as migrated to GW for every ETH-base GW-settled chain", async () => {
       // Custom-base-token chains (e.g. chain 14) do not migrate ETH, so we filter
       // by base token rather than over-matching on `gwSettledChainIds`.
       const ethBaseChainIds = gwSettledChainIds.filter((id) => {
@@ -328,12 +384,19 @@ describe("10 - Token Balance Migration Lifecycle", function () {
           ethAssetId
         );
 
-        expect(l1Mig, `L1AT assetMigrationNumber[${chainId}][ETH]`).to.be.gte(1);
+        const accounting = await snapshotTrackerBalances(chainId, ethAssetId);
+
+        expect(l1Mig, `L1AT assetMigrationNumber[${chainId}][ETH]`).to.equal(1);
         expect(l1Mig, `L1AT/GWAT assetMigrationNumber should match for chain ${chainId} (ETH)`).to.equal(gwMig);
+        expect(accounting.l1.eq(0), `L1 chainBalance[${chainId}][ETH] migrated away from chain`).to.equal(true);
+        expect(
+          accounting.gwPending.eq(0),
+          `GW pendingInteropBalance[${chainId}][ETH] is empty after forward TBM setup`
+        ).to.equal(true);
       }
     });
 
-    it("L1AT and GWAT assetMigrationNumber match for the NTV test token on every GW-settled chain", async () => {
+    it("L1AT and GWAT track each NTV test token as migrated to GW on every GW-settled chain", async () => {
       // Mirrors the source suite's "Correctly assigns chain token balances" check,
       // applied to the per-chain NTV test token that the anvil harness deploys and
       // migrates to GW during `registerAndMigrateTestTokens`.
@@ -357,8 +420,20 @@ describe("10 - Token Balance Migration Lifecycle", function () {
           testTokenAssetId
         );
 
-        expect(l1Mig, `L1AT assetMigrationNumber[${chainId}][testToken]`).to.be.gte(1);
+        const accounting = await snapshotTrackerBalances(chainId, testTokenAssetId);
+        const l1GatewayBalance = await queryL1ChainBalance(l1Provider, l1AssetTrackerAddr, gwChainId, testTokenAssetId);
+
+        expect(l1Mig, `L1AT assetMigrationNumber[${chainId}][testToken]`).to.equal(1);
         expect(l1Mig, `L1AT/GWAT assetMigrationNumber should match for chain ${chainId} (test token)`).to.equal(gwMig);
+        expect(accounting.l1.eq(0), `L1 chainBalance[${chainId}][testToken] migrated away from chain`).to.equal(true);
+        expect(
+          accounting.gwPending.eq(0),
+          `GW pendingInteropBalance[${chainId}][testToken] is empty after forward TBM setup`
+        ).to.equal(true);
+        expect(
+          l1GatewayBalance.eq(accounting.gwChain),
+          `L1 chainBalance[GW][testToken] ${l1GatewayBalance} == GW chainBalance[${chainId}][testToken] ${accounting.gwChain}`
+        ).to.equal(true);
       }
     });
 
@@ -384,7 +459,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         reverseTbmChainId,
         reverseTbmTestTokenAssetId
       );
-      expect(gwMigBefore, "setup guarantee: test token is already migrated on GW").to.be.gte(1);
+      expect(gwMigBefore, "setup guarantee: test token is already migrated on GW").to.equal(1);
 
       await migrateTokenBalanceToGW({
         l2Provider: reverseTbmProvider,
@@ -772,6 +847,13 @@ describe("10 - Token Balance Migration Lifecycle", function () {
           .initiateGatewayToL1MigrationOnGateway(reverseTbmChainId, assetId, { gasLimit: 5_000_000 });
         gwToL1MigrationReceipts[label] = await tx.wait();
         reverseMigrationAmounts[label] = accountingBefore.gwChain;
+        expectGatewayToL1MigrationInitiated(
+          gwToL1MigrationReceipts[label],
+          assetId,
+          reverseTbmChainId,
+          accountingBefore.gwChain,
+          label
+        );
 
         const accountingAfter = await snapshotTrackerBalances(reverseTbmChainId, assetId);
         expectBalanceDecrease(
@@ -863,6 +945,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         chainId: reverseTbmChainId,
         l1Addresses: state.l1Addresses!,
         amount: ethAmount,
+        l1Recipient: ANVIL_RECIPIENT_ADDR,
       });
 
       const tokenAmount = randomBigNumber(TBM_WITHDRAWAL_AMOUNT_RANGE.min, TBM_WITHDRAWAL_AMOUNT_RANGE.max);
@@ -874,6 +957,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         amount: tokenAmount,
         l2TokenAddress: state.testTokens![reverseTbmChainId],
         tokenOriginChainId: reverseTbmChainId,
+        l1Recipient: ANVIL_RECIPIENT_ADDR,
       });
 
       expect(pendingWithdrawals.baseToken.l2TxHash, "ETH withdrawal L2 tx").to.not.be.null;
@@ -910,6 +994,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       for (const { label, assetId, receiptLabel } of assetsToFinalise) {
         const finalizeParams = buildFinalizeWithdrawalParams(gwToL1MigrationReceipts[receiptLabel], gwChainId);
         const accountingBefore = await snapshotTrackerBalances(reverseTbmChainId, assetId);
+        const l1SettlementBefore = await snapshotL1SettlementBalances(reverseTbmChainId, assetId);
         const expectedRestoredAmount = reverseMigrationAmounts[receiptLabel];
 
         const tx = await l1AssetTracker
@@ -929,11 +1014,24 @@ describe("10 - Token Balance Migration Lifecycle", function () {
 
         // L1 chainBalance is restored by `_migrateFunds` in the finalisation path.
         const accountingAfterL1 = await snapshotTrackerBalances(reverseTbmChainId, assetId);
+        const l1SettlementAfter = await snapshotL1SettlementBalances(reverseTbmChainId, assetId);
         expectBalanceDelta(
           accountingBefore.l1,
           accountingAfterL1.l1,
           expectedRestoredAmount,
           `L1AT chainBalance for ${label}`
+        );
+        expectBalanceDelta(
+          l1SettlementBefore.chain,
+          l1SettlementAfter.chain,
+          expectedRestoredAmount,
+          `L1AT chainBalance[chain] for ${label}`
+        );
+        expectBalanceDecrease(
+          l1SettlementBefore.gateway,
+          l1SettlementAfter.gateway,
+          expectedRestoredAmount,
+          `L1AT chainBalance[GW] for ${label}`
         );
         expect(
           accountingAfterL1.gwChain.eq(accountingBefore.gwChain),
@@ -1011,11 +1109,40 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       // that covers each pending withdrawal. The same finalisation call that
       // reverted with `InsufficientChainBalance` above now lands.
       for (const [label, pending] of Object.entries(pendingWithdrawals)) {
+        const l1ChainBalanceBefore = await queryL1ChainBalance(
+          l1Provider,
+          l1AssetTrackerAddr,
+          pending.chainId,
+          pending.assetId
+        );
+        const recipientBalanceBefore = await getL1RecipientAssetBalance(pending);
+
         const result = await finalizeWithdrawalOnL1(getL1RpcUrl(state), state.l1Addresses!, pending);
         expect(
           result.success,
           `${label} finalisation after reverse TBM: ${result.errorMessage?.slice(0, 200)}`
         ).to.equal(true);
+
+        const l1ChainBalanceAfter = await queryL1ChainBalance(
+          l1Provider,
+          l1AssetTrackerAddr,
+          pending.chainId,
+          pending.assetId
+        );
+        const recipientBalanceAfter = await getL1RecipientAssetBalance(pending);
+
+        expectBalanceDecrease(
+          l1ChainBalanceBefore,
+          l1ChainBalanceAfter,
+          pending.amount,
+          `${label}: L1 chainBalance[chain][asset]`
+        );
+        expectBalanceDelta(
+          recipientBalanceBefore,
+          recipientBalanceAfter,
+          pending.amount,
+          `${label}: L1 recipient asset balance`
+        );
       }
     });
 
