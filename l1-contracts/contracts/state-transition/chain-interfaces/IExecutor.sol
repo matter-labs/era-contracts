@@ -24,6 +24,17 @@ struct LogProcessingOutput {
 /// @dev Maximal value that SystemLogKey variable can have.
 uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
 
+/// @notice Per-batch export of a chain's interop IMT root to the L1 `GlobalInteropIMT` registry.
+/// @dev Supplied by the operator in the execute batch data (analogous to how interop dependency
+/// roots are supplied). In the demo the value/DA are trusted; in production the IMT root is part
+/// of the block commitment and the DA commitment covers the IMT preimage.
+/// @param imtRoot The chain's interop IMT root after the batch.
+/// @param daCommitment Commitment (e.g. hash of the calldata blob) to the IMT preimage data.
+struct InteropImtExport {
+    bytes32 imtRoot;
+    bytes32 daCommitment;
+}
+
 /// @notice The struct passed to the assetTracker for processing L2 logs and collecting settlement fees.
 /// @param logs The L2 logs from the batch.
 /// @param messages The L2 messages corresponding to the logs. Note: there can be fewer messages than logs,

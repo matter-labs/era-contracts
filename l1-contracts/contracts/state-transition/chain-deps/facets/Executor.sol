@@ -6,7 +6,8 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehubBase} from "../../../core/bridgehub/IBridgehubBase.sol";
 import {IMessageRootBase} from "../../../core/message-root/IMessageRoot.sol";
 import {EMPTY_STRING_KECCAK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
-import {IExecutor, ProcessLogsInput} from "../../chain-interfaces/IExecutor.sol";
+import {IExecutor, InteropImtExport, ProcessLogsInput} from "../../chain-interfaces/IExecutor.sol";
+import {IGlobalInteropIMT} from "../../../atomic-interop/IGlobalInteropIMT.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {GW_ASSET_TRACKER} from "../../../common/l2-helpers/L2ContractInterfaces.sol";
@@ -153,6 +154,33 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
     }
 
+    /// @notice Exposes the chain's interop IMT root(s) to the L1 `GlobalInteropIMT` registry.
+    /// @dev No-op unless the chain opted in (`s.globalInteropImt != 0`) and the operator supplied
+    /// per-batch exports in the execute data. The export values are trusted in the demo; in
+    /// production the IMT root is part of the block commitment and the DA commitment covers the
+    /// IMT preimage.
+    function _exportInteropImtRoots(
+        StoredBatchInfo[] memory _batchesData,
+        InteropImtExport[] memory _imtExports
+    ) internal {
+        address registry = s.globalInteropImt;
+        if (registry == address(0) || _imtExports.length == 0) {
+            return;
+        }
+        uint256 n = _batchesData.length;
+        if (_imtExports.length != n) {
+            revert InvalidBatchesDataLength(n, _imtExports.length);
+        }
+        for (uint256 i = 0; i < n; ++i) {
+            IGlobalInteropIMT(registry).submitChainRoot(
+                s.chainId,
+                _batchesData[i].batchNumber,
+                _imtExports[i].imtRoot,
+                _imtExports[i].daCommitment
+            );
+        }
+    }
+
     /// @inheritdoc IExecutor
     // slither-disable-next-line reentrancy-no-eth
     function executeBatchesSharedBridge(
@@ -211,6 +239,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             uint256 batchesDataLength = batchesData.length;
             for (uint256 i = 0; i < batchesDataLength; ++i) {
                 _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
+            }
+            // Expose this chain's interop IMT root(s) to the L1 GlobalInteropIMT registry, if the
+            // chain has opted in. Gated by a zero-address check so default chains are unaffected.
+            // Scoped so the decoded exports do not widen the outer function's stack frame.
+            {
+                _exportInteropImtRoots(batchesData, BatchDecoder.decodeExecuteImtExports(_executeData));
             }
         }
 

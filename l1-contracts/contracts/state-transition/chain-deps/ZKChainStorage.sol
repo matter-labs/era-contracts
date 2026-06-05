@@ -260,4 +260,9 @@ struct ZKChainStorage {
     /// except for ZKsync OS chains that have existed before the v31 upgrade.
     /// @dev STORAGE SLOT: 68
     bool baseTokenHasTotalSupply;
+    /// @dev Optional address of the L1 GlobalInteropIMT registry. When non-zero, the Executor exposes
+    /// the chain's interop IMT root (supplied by the operator in the execute batch data) to this
+    /// registry on batch execution. Zero disables the feature (default for all existing chains).
+    /// @dev STORAGE SLOT: 69
+    address globalInteropImt;
 }
