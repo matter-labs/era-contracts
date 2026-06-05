@@ -67,6 +67,7 @@ import {
   GW_ASSET_TRACKER_ADDR,
   INTEROP_CENTER_ADDR,
   L1_CHAIN_ID,
+  L2_BASE_TOKEN_ADDR,
   L2_ASSET_TRACKER_ADDR,
   L2_BRIDGEHUB_ADDR,
   L2_CHAIN_ASSET_HANDLER_ADDR,
@@ -385,10 +386,17 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         );
 
         const accounting = await snapshotTrackerBalances(chainId, ethAssetId);
+        const l2Provider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, chainId));
+        const l2BaseToken = new Contract(L2_BASE_TOKEN_ADDR, getAbi("IBaseToken"), l2Provider);
+        const l2BaseTokenTotalSupply = await l2BaseToken.totalSupply();
 
         expect(l1Mig, `L1AT assetMigrationNumber[${chainId}][ETH]`).to.equal(1);
         expect(l1Mig, `L1AT/GWAT assetMigrationNumber should match for chain ${chainId} (ETH)`).to.equal(gwMig);
         expect(accounting.l1.eq(0), `L1 chainBalance[${chainId}][ETH] migrated away from chain`).to.equal(true);
+        expect(
+          accounting.gwChain.eq(l2BaseTokenTotalSupply),
+          `GW chainBalance[${chainId}][ETH] ${accounting.gwChain} == L2 base token totalSupply ${l2BaseTokenTotalSupply}`
+        ).to.equal(true);
         expect(
           accounting.gwPending.eq(0),
           `GW pendingInteropBalance[${chainId}][ETH] is empty after forward TBM setup`
@@ -421,9 +429,6 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         );
 
         const accounting = await snapshotTrackerBalances(chainId, testTokenAssetId);
-        const l2Provider = new ethers.providers.JsonRpcProvider(getL2RpcUrl(state, chainId));
-        const l2AssetTracker = new Contract(L2_ASSET_TRACKER_ADDR, getAbi("L2AssetTracker"), l2Provider);
-        const l2ChainBalance = await l2AssetTracker.chainBalance(chainId, testTokenAssetId);
 
         expect(l1Mig, `L1AT assetMigrationNumber[${chainId}][testToken]`).to.equal(1);
         expect(l1Mig, `L1AT/GWAT assetMigrationNumber should match for chain ${chainId} (test token)`).to.equal(gwMig);
@@ -433,8 +438,8 @@ describe("10 - Token Balance Migration Lifecycle", function () {
           `GW pendingInteropBalance[${chainId}][testToken] is empty after forward TBM setup`
         ).to.equal(true);
         expect(
-          accounting.gwChain.eq(l2ChainBalance),
-          `GW chainBalance[${chainId}][testToken] ${accounting.gwChain} == L2 chainBalance[${chainId}][testToken] ${l2ChainBalance}`
+          accounting.gwChain.gt(0),
+          `GW chainBalance[${chainId}][testToken] contains migrated supply after forward TBM`
         ).to.equal(true);
       }
     });

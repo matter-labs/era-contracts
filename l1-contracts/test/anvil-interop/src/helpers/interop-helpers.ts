@@ -550,6 +550,40 @@ export async function getAccumulatedZkFees(provider: providers.JsonRpcProvider, 
 }
 
 /**
+ * Snapshot the current block coinbase's accumulated fixed ZK interop fees.
+ */
+export async function snapshotAccumulatedZkFees(
+  provider: providers.JsonRpcProvider
+): Promise<AccumulatedProtocolFeesSnapshot> {
+  const latestBlock = await provider.getBlock("latest");
+  return {
+    coinbase: latestBlock.miner,
+    amount: await getAccumulatedZkFees(provider, latestBlock.miner),
+  };
+}
+
+/**
+ * Assert the exact fixed-ZK-fee delta credited by a transaction.
+ */
+export async function expectAccumulatedZkFeeDelta(
+  provider: providers.JsonRpcProvider,
+  before: AccumulatedProtocolFeesSnapshot,
+  receipt: providers.TransactionReceipt,
+  expectedDelta: BigNumber,
+  label: string
+): Promise<void> {
+  const minedBlock = await provider.getBlock(receipt.blockNumber);
+  expect(minedBlock.miner.toLowerCase(), `${label}: transaction mined by snapshotted coinbase`).to.equal(
+    before.coinbase.toLowerCase()
+  );
+
+  const after = await getAccumulatedZkFees(provider, minedBlock.miner);
+  const actualDelta = after.sub(before.amount);
+  expect(actualDelta.eq(expectedDelta), `${label}: accumulated ZK fee delta ${actualDelta} == ${expectedDelta}`).to.be
+    .true;
+}
+
+/**
  * Deploy a DummyInteropRecipient contract on a chain.
  * This contract implements IERC7786Recipient.receiveMessage and can receive ETH.
  * Required as the destination for direct-call bundles (value transfers).

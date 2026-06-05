@@ -25,7 +25,8 @@ import {
   setInteropProtocolFee,
   snapshotAccumulatedProtocolFees,
   expectAccumulatedProtocolFeeDelta,
-  getAccumulatedZkFees,
+  snapshotAccumulatedZkFees,
+  expectAccumulatedZkFeeDelta,
   getZkInteropFee,
   getZkTokenAssetId,
   getZkTokenAddress,
@@ -273,6 +274,7 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
     await approveToken(sourceProvider, sourceZkTokenAddress, INTEROP_CENTER_ADDR, zkInteropFee);
 
     const balBefore = await captureBalance(sourceProvider, sourceZkTokenAddress);
+    const accumulatedZkFeesBefore = await snapshotAccumulatedZkFees(sourceProvider);
     const sendResult = await sendInteropBundle({
       sourceProvider,
       destinationChainId: destChainId,
@@ -288,9 +290,13 @@ describe("07 - Interop Bundles (GW-settled chains)", function () {
       "single direct call fixed fee: sender ZK token should decrease by the fixed fee"
     ).to.be.true;
 
-    const minedBlock = await sourceProvider.getBlock(sendResult.receipt.blockNumber);
-    const accumulatedZkFees = await getAccumulatedZkFees(sourceProvider, minedBlock.miner);
-    expect(accumulatedZkFees.gte(zkInteropFee), "coinbase should accumulate the fixed ZK fee").to.be.true;
+    await expectAccumulatedZkFeeDelta(
+      sourceProvider,
+      accumulatedZkFeesBefore,
+      sendResult.receipt,
+      zkInteropFee,
+      "single direct call fixed fee"
+    );
 
     const recipientBefore = await getNativeBalance(destProvider, dummyRecipient1);
     const receipt = await executeBundle(destProvider, sendResult.bundleData, sourceChainId);
