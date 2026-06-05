@@ -12,10 +12,15 @@ error GlobalImtZeroSubmitter();
 error GlobalImtBatchNotIncreasing(uint256 chainId, uint256 current, uint256 provided);
 error GlobalImtUnknownBlock(uint256 blockNumber);
 
-// ── L2InteropCommitmentTree errors ──────────────────────────────────────────────────
+// ── L2InteropCommitmentTree (indexed merkle tree) errors ─────────────────────────────
 error CommitmentTreeAlreadyInitialized();
 error CommitmentTreeNotAppender(address sender);
 error CommitmentTreeZeroAppender();
+error CommitmentTreeZeroValue();
+/// @dev The supplied low-nullifier's value is not strictly below the value being inserted.
+error CommitmentTreeLowNullifierNotBelow(uint256 value, uint256 lowValue);
+/// @dev The value being inserted is not strictly below the low-nullifier's nextValue (already present or wrong nullifier).
+error CommitmentTreeLowNullifierNotAbove(uint256 value, uint256 nextValue);
 
 // ── L2GlobalInteropRootImporter errors ──────────────────────────────────────────────
 error ImporterAlreadyInitialized();
@@ -47,6 +52,9 @@ error ProofInclusionFailed(bytes32 expectedRoot, bytes32 computedRoot);
 error ProofGlobalInclusionFailed(bytes32 expectedRoot, bytes32 computedRoot);
 error ProofDeadlineExceeded(uint256 timestamp, uint64 deadline);
 error ProofDeadlineNotExceeded(uint256 timestamp, uint64 deadline);
-error ProofRootChangedAcrossDeadline(bytes32 rootBefore, bytes32 rootAfter);
-error ProofLeafPresent(bytes32 leaf);
-error ProofNonInclusionRecomputeFailed(bytes32 expectedRoot, bytes32 computedRoot);
+/// @dev The included leaf's value does not equal the commit value being proven.
+error ProofValueMismatch(uint256 expected, uint256 actual);
+/// @dev The low-nullifier leaf's value is not strictly below the target (so it cannot certify absence).
+error ProofLowNullifierNotBelow(uint256 value, uint256 lowValue);
+/// @dev The target value is not strictly below the low-nullifier's `nextValue` (so the target could be present).
+error ProofLowNullifierNotAbove(uint256 value, uint256 nextValue);

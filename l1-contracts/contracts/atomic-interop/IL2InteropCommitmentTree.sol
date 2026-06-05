@@ -1,35 +1,41 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
+import {IndexedLeaf} from "./IAtomicInterop.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Per-chain append-only interop IMT. Whenever a participant "does their part" in a
-/// flow, a leaf is appended here. The chain's current root is what the operator exposes on L1
-/// (into {IGlobalInteropIMT}) when the batch settles; the full leaf set is the IMT preimage the
-/// DA commitment covers, which the off-chain IMT engine reads back to build inclusion proofs.
+/// @notice Per-chain **Indexed Merkle Tree** of interop commit values. Whenever a participant does
+/// their part in a flow, the leg's commit value is inserted here. Each {IndexedLeaf} points to the
+/// next-larger value in the tree, so the structure supports O(log n) proofs of both membership and
+/// non-membership (via a "low nullifier" leaf). The chain's current root is what the operator
+/// exposes on L1 (into {IGlobalInteropIMT}) when the batch settles; the full leaf set is the IMT
+/// preimage the DA commitment covers, which the off-chain IMT engine reads back to build proofs.
 ///
 /// Deployed in L2 userspace (CREATE2), so it has no constructor — wiring is done in `initialize`.
 interface IL2InteropCommitmentTree {
-    /// @notice Emitted for every appended leaf. `root` is the tree root *after* the append, and
-    /// `index` is the leaf's position; together with the full event log the engine reconstructs
-    /// the tree at any historical leaf count.
-    event CommitmentAppended(uint256 indexed index, bytes32 indexed leaf, bytes32 root);
+    /// @notice Emitted whenever a leaf slot is written (the head seed, a low-nullifier repoint, or a
+    /// freshly appended value). Replaying these in index order reconstructs the tree at any point.
+    event LeafUpdated(uint256 indexed index, uint256 value, uint256 nextValue, uint256 nextIndex, bytes32 root);
 
-    /// @notice Append a leaf to the IMT. Callable only by the configured appender (the escrow).
-    /// @param _leaf The leaf to append (a domain-tagged commit-leaf digest).
-    /// @return index The position assigned to the leaf.
-    /// @return root The new tree root.
-    function appendCommitment(bytes32 _leaf) external returns (uint256 index, bytes32 root);
+    /// @notice Insert `_value` into the indexed tree. Callable only by the configured appender.
+    /// @param _value The value to insert (a domain-tagged commit value, never 0).
+    /// @param _lowNullifierIndex Index of the existing leaf `L` with `L.value < _value` and
+    /// (`L.nextValue == 0` or `_value < L.nextValue`). The caller (or the IMT engine) computes it
+    /// from the current leaf set.
+    /// @return newIndex The slot assigned to the inserted leaf.
+    /// @return newRoot The new tree root.
+    function insert(uint256 _value, uint256 _lowNullifierIndex) external returns (uint256 newIndex, bytes32 newRoot);
 
     /// @notice The current IMT root.
     function root() external view returns (bytes32);
 
-    /// @notice Number of leaves appended so far (next leaf index).
+    /// @notice Number of leaf slots in use (includes the head leaf at index 0).
     function leafCount() external view returns (uint256);
 
-    /// @notice The current tree height (number of levels, excluding the root).
-    function height() external view returns (uint256);
+    /// @notice The leaf stored at `_index`.
+    function leafAt(uint256 _index) external view returns (IndexedLeaf memory);
 
-    /// @notice The address allowed to append (the escrow).
+    /// @notice The address allowed to insert (the escrow).
     function appender() external view returns (address);
 }

@@ -15,6 +15,14 @@ pragma solidity ^0.8.21;
 ///
 /// L2s import the historical global root (see `L2GlobalInteropRootImporter`) and use it to verify
 /// that a flow's legs were all committed before its deadline — without any L1 coordinator.
+///
+/// Two Merkle trees are maintained:
+///   - the **in-place global tree** (`FullMerkle`): leaf `i` = `keccak256(chainImtRoot, chainId)`,
+///     updated in place per chain; its root is `globalRoot`;
+///   - the **append-only history tree** (`DynamicIncrementalMerkle`): a leaf
+///     `keccak256(block, timestamp, globalRoot)` is appended every time `globalRoot` advances; its
+///     root (`historyRoot`) is an accumulating commitment to the full sequence of global roots.
+/// A `mapping(globalRoot => blockNumber)` records the L1 block at which each global root was appended.
 interface IGlobalInteropIMT {
     /// @notice Emitted whenever a chain's interop IMT root is (re)submitted.
     event ChainRootSubmitted(
@@ -31,6 +39,15 @@ interface IGlobalInteropIMT {
 
     /// @notice Emitted when a chain is first seen and assigned a leaf in the global tree.
     event ChainRegistered(uint256 indexed chainId, uint256 leafIndex);
+
+    /// @notice Emitted when a `(block, timestamp, globalRoot)` snapshot is appended to the history tree.
+    event HistoryAppended(
+        uint256 indexed leafIndex,
+        uint256 blockNumber,
+        uint256 timestamp,
+        bytes32 globalRoot,
+        bytes32 historyRoot
+    );
 
     /// @notice Emitted when an address is (de)authorized to submit roots for a chain.
     event SubmitterSet(uint256 indexed chainId, address indexed submitter, bool allowed);
@@ -59,8 +76,17 @@ interface IGlobalInteropIMT {
     /// @notice Authorize/deauthorize a submitter for all chains (demo operator). Owner only.
     function setGlobalSubmitter(address _submitter, bool _allowed) external;
 
-    /// @notice Current aggregated global interop-IMT root.
+    /// @notice Current aggregated global interop-IMT root (root of the in-place global tree).
     function globalRoot() external view returns (bytes32);
+
+    /// @notice Current root of the append-only history tree of `(block, timestamp, globalRoot)` leaves.
+    function historyRoot() external view returns (bytes32);
+
+    /// @notice Number of snapshots appended to the history tree.
+    function historyLeafCount() external view returns (uint256);
+
+    /// @notice The L1 block number at which `_globalRoot` was appended to the history tree (0 if never).
+    function historyBlockOfRoot(bytes32 _globalRoot) external view returns (uint256);
 
     /// @notice The latest global root recorded at L1 block `_blockNumber` (0 if none).
     function globalRootAtBlock(uint256 _blockNumber) external view returns (bytes32);

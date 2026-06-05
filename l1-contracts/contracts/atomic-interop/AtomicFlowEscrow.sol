@@ -57,7 +57,7 @@ contract AtomicFlowEscrow is IAtomicFlowEscrow {
     }
 
     /// @inheritdoc IAtomicFlowEscrow
-    function commitPart(bytes32 _flowId, FlowLeg calldata _leg) external {
+    function commitPart(bytes32 _flowId, FlowLeg calldata _leg, uint256 _lowNullifierIndex) external {
         if (_leg.chainId != block.chainid) revert EscrowLegNotOnThisChain(_leg.chainId);
         if (_leg.amount == 0) revert EscrowLegZeroAmount();
         if (_leg.token == address(0)) revert EscrowLegZeroToken();
@@ -72,8 +72,8 @@ contract AtomicFlowEscrow is IAtomicFlowEscrow {
 
         IERC20(_leg.token).safeTransferFrom(_leg.payer, address(this), _leg.amount);
 
-        bytes32 leaf = AtomicInteropProof.commitLeaf(_flowId, specHash);
-        (uint256 index, ) = IL2InteropCommitmentTree(_commitmentTree).appendCommitment(leaf);
+        uint256 value = AtomicInteropProof.commitValue(_flowId, specHash);
+        (uint256 index, ) = IL2InteropCommitmentTree(_commitmentTree).insert(value, _lowNullifierIndex);
 
         emit PartCommitted(_flowId, specHash, _leg.payer, index);
     }
@@ -92,13 +92,13 @@ contract AtomicFlowEscrow is IAtomicFlowEscrow {
         // 1. Prove every leg of the flow was committed before the deadline.
         uint256 n = _legs.length;
         for (uint256 i = 0; i < n; ++i) {
-            bytes32 commitLeaf = AtomicInteropProof.commitLeaf(_flowId, specHashes[i]);
+            uint256 value = AtomicInteropProof.commitValue(_flowId, specHashes[i]);
             (bytes32 importedRoot, uint256 importedTs) = _resolveImported(_proofs[i].l1BlockNumber);
             // solhint-disable-next-line func-named-parameters
             AtomicInteropProof.verifyInclusion(
                 _proofs[i],
                 _legs[i].chainId,
-                commitLeaf,
+                value,
                 importedRoot,
                 importedTs,
                 _deadline
@@ -134,7 +134,7 @@ contract AtomicFlowEscrow is IAtomicFlowEscrow {
         _verifyNonInclusion(
             _proof,
             _legs[_missingLegIndex].chainId,
-            AtomicInteropProof.commitLeaf(_flowId, specHashes[_missingLegIndex]),
+            AtomicInteropProof.commitValue(_flowId, specHashes[_missingLegIndex]),
             _deadline
         );
 
@@ -200,7 +200,7 @@ contract AtomicFlowEscrow is IAtomicFlowEscrow {
     function _verifyNonInclusion(
         ImtNonInclusionProof calldata _proof,
         uint256 _chainId,
-        bytes32 _commitLeaf,
+        uint256 _commitValue,
         uint64 _deadline
     ) internal view {
         (bytes32 rootBefore, uint256 tsBefore) = _resolveImported(_proof.l1BlockNumberBeforeDeadline);
@@ -209,7 +209,7 @@ contract AtomicFlowEscrow is IAtomicFlowEscrow {
         AtomicInteropProof.verifyNonInclusion(
             _proof,
             _chainId,
-            _commitLeaf,
+            _commitValue,
             rootBefore,
             tsBefore,
             rootAfter,

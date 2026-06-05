@@ -118,6 +118,29 @@ contract GlobalInteropIMTTest is Test {
         assertEq(registry.historyBlockAt(1), block.number);
     }
 
+    function test_submitChainRoot_appendsHistoryTree() public {
+        bytes32 historyBefore = registry.historyRoot();
+        assertEq(registry.historyLeafCount(), 0);
+
+        vm.prank(operator);
+        registry.submitChainRoot(CHAIN_A, 1, keccak256("A"), bytes32(0));
+        bytes32 g1 = registry.globalRoot();
+
+        assertEq(registry.historyLeafCount(), 1, "one snapshot appended");
+        assertTrue(registry.historyRoot() != historyBefore, "history root advanced");
+        assertEq(registry.historyBlockOfRoot(g1), block.number, "global root mapped to its block");
+
+        // A second submit appends another history leaf and advances the history root.
+        bytes32 historyAfter1 = registry.historyRoot();
+        vm.roll(block.number + 1);
+        vm.prank(operator);
+        registry.submitChainRoot(CHAIN_B, 1, keccak256("B"), bytes32(0));
+
+        assertEq(registry.historyLeafCount(), 2);
+        assertTrue(registry.historyRoot() != historyAfter1, "history root advanced again");
+        assertEq(registry.historyBlockOfRoot(registry.globalRoot()), block.number);
+    }
+
     function test_submitChainRoot_perChainSubmitterAuthorized() public {
         address chainSubmitter = makeAddr("chainSubmitter");
         vm.prank(owner);

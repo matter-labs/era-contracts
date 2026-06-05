@@ -2,6 +2,7 @@
 pragma solidity 0.8.28;
 
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
+import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IGlobalInteropIMT} from "./IGlobalInteropIMT.sol";
 import {AtomicInteropProof} from "./libraries/AtomicInteropProof.sol";
 import {IMT_EMPTY_LEAF} from "./IAtomicInterop.sol";
@@ -25,12 +26,18 @@ import {
 /// is exactly the data L2 importers consume.
 contract GlobalInteropIMT is IGlobalInteropIMT {
     using FullMerkle for FullMerkle.FullTree;
+    using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
     /// @notice Owner authorized to manage submitters.
     address public owner;
 
-    /// @dev The aggregated global tree (leaves are per-chain interop IMT roots).
+    /// @dev The aggregated, in-place global tree (leaves are per-chain interop IMT roots).
     FullMerkle.FullTree internal _globalTree;
+
+    /// @dev The append-only history tree of `keccak256(block, timestamp, globalRoot)` snapshots.
+    DynamicIncrementalMerkle.Bytes32PushTree internal _historyTree;
+    /// @dev globalRoot => L1 block number at which it was appended to the history tree.
+    mapping(bytes32 globalRoot => uint256 blockNumber) internal _historyBlockOfRoot;
 
     /// @dev chainId => assigned leaf index in `_globalTree`.
     mapping(uint256 chainId => uint256 leafIndex) internal _leafIndex;
@@ -67,9 +74,10 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
     constructor(address _owner) {
         if (_owner == address(0)) revert GlobalImtZeroOwner();
         owner = _owner;
-        // Initialize the global tree with the empty-leaf zero value so paths/zeros align with the
+        // Initialize both trees with the empty-leaf zero value so paths/zeros align with the
         // off-chain engine and the proof library.
         _globalTree.setup(IMT_EMPTY_LEAF);
+        _historyTree.setup(IMT_EMPTY_LEAF);
     }
 
     /// @inheritdoc IGlobalInteropIMT
@@ -128,14 +136,38 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
         _globalRootAtBlock[block.number] = newGlobalRoot;
         _timestampAtBlock[block.number] = block.timestamp;
 
+        // Append the snapshot to the append-only history tree and record its block.
+        bytes32 historyLeaf = keccak256(abi.encode(block.number, block.timestamp, newGlobalRoot));
+        (uint256 historyIndex, bytes32 newHistoryRoot) = _historyTree.push(historyLeaf);
+        if (_historyBlockOfRoot[newGlobalRoot] == 0) {
+            _historyBlockOfRoot[newGlobalRoot] = block.number;
+        }
+
         // solhint-disable-next-line func-named-parameters
         emit ChainRootSubmitted(_chainId, _batchNumber, _chainImtRoot, _daCommitment, newGlobalRoot);
         emit GlobalRootUpdated(block.number, block.timestamp, newGlobalRoot);
+        // solhint-disable-next-line func-named-parameters
+        emit HistoryAppended(historyIndex, block.number, block.timestamp, newGlobalRoot, newHistoryRoot);
     }
 
     /// @inheritdoc IGlobalInteropIMT
     function globalRoot() external view returns (bytes32) {
         return _globalTree.root();
+    }
+
+    /// @inheritdoc IGlobalInteropIMT
+    function historyRoot() external view returns (bytes32) {
+        return _historyTree.root();
+    }
+
+    /// @inheritdoc IGlobalInteropIMT
+    function historyLeafCount() external view returns (uint256) {
+        return _historyTree._nextLeafIndex;
+    }
+
+    /// @inheritdoc IGlobalInteropIMT
+    function historyBlockOfRoot(bytes32 _globalRoot) external view returns (uint256) {
+        return _historyBlockOfRoot[_globalRoot];
     }
 
     /// @inheritdoc IGlobalInteropIMT

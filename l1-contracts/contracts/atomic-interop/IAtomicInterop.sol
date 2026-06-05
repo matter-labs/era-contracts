@@ -21,12 +21,11 @@ enum PartState {
 ///
 /// A flow is a set of legs, possibly on different chains. The flow's atomicity is enforced
 /// purely by proofs: a leg may only finalize once *all* legs of the flow have appended their
-/// commit leaf to their chain's interop IMT within the deadline. There is no L1 coordinator.
+/// commit value to their chain's interop IMT within the deadline. There is no L1 coordinator.
 ///
 /// `payer` locks `amount` of `token` on `chainId` at commit time; `payee` receives it on
 /// finalize. Cross-chain intent is expressed by composing legs on different chains into one
-/// flow (e.g. Alice's leg on chain A and Bob's leg on chain B), so that either both settle
-/// or both refund.
+/// flow, so that either both settle or both refund.
 struct FlowLeg {
     uint256 chainId;
     address token;
@@ -35,18 +34,34 @@ struct FlowLeg {
     address payee;
 }
 
-/// @notice Inclusion proof that a leg's commit leaf is present in its chain's interop IMT,
-/// and that this IMT root was exposed in a global interop-IMT root imported on the verifying
-/// L2 with an L1 timestamp not later than the flow deadline.
+/// @notice A leaf of an Indexed Merkle Tree. In addition to its own `value`, each leaf points to
+/// the next-larger value currently in the tree (`nextValue`) at slot `nextIndex`, forming a sorted
+/// singly-linked list over the append-only leaf array. This is what makes non-membership provable
+/// in O(log n): a single "low nullifier" leaf `L` with `L.value < v < L.nextValue` (or
+/// `L.nextValue == 0`, meaning `L` is the current maximum) certifies that `v` is absent.
 ///
-/// Layered proof (leaf -> chain IMT root -> global IMT root -> imported root @ block):
-///   1. `commitLeaf` at `imtLeafIndex` with `imtProof` hashes up to `chainImtRoot`.
-///   2. `globalLeaf(chainId, chainImtRoot)` at `globalLeafIndex` with `globalProof` hashes up
-///      to the global root that the L2 importer stored for `l1BlockNumber`.
+/// `value == 0` is reserved for the head leaf (`{0, 0, 0}`) seeded at index 0; real commit values
+/// are keccak digests cast to uint256 and are never 0 in practice.
+struct IndexedLeaf {
+    uint256 value;
+    uint256 nextValue;
+    uint256 nextIndex;
+}
+
+/// @notice Inclusion proof that a leg's commit value is present in its chain's interop IMT, and
+/// that this IMT root was exposed in a global interop-IMT root imported on the verifying L2 with an
+/// L1 timestamp not later than the flow deadline.
+///
+/// Layered proof:
+///   1. `leaf` (with `leaf.value == commitValue`) at `imtLeafIndex` with `imtProof` hashes up to
+///      `chainImtRoot`.
+///   2. `globalLeaf(chainId, chainImtRoot)` at `globalLeafIndex` with `globalProof` hashes up to the
+///      global root the L2 importer stored for `l1BlockNumber`.
 ///   3. The importer's recorded L1 timestamp for `l1BlockNumber` must be `<= deadline`.
 struct ImtInclusionProof {
     uint256 chainId;
     bytes32 chainImtRoot;
+    IndexedLeaf leaf;
     uint256 imtLeafIndex;
     bytes32[] imtProof;
     uint256 globalLeafIndex;
@@ -54,36 +69,35 @@ struct ImtInclusionProof {
     uint256 l1BlockNumber;
 }
 
-/// @notice Non-inclusion proof used on the timeout/refund path.
+/// @notice Non-inclusion proof used on the timeout/refund path. O(log n) thanks to the indexed tree.
 ///
-/// Proves that, across the deadline boundary, the target leg's commit leaf was absent from
-/// its chain's interop IMT and that the chain added nothing in the window in which it could
-/// still have been counted:
-///   - `g1` is an imported global root whose L1 timestamp is `<= deadline`; the target chain's
-///     IMT root within it is `chainImtRoot`, proven by `globalProofG1` at `globalLeafIndex`.
-///   - `g2` is an imported global root whose L1 timestamp is `> deadline`; the target chain's
-///     IMT root within it is identical (`chainImtRoot`), proven by `globalProofG2`. The
-///     identical root means the chain settled no new leaves between `g1` and a point past the
-///     deadline — closing the "inserted just past the boundary" window the spec calls out.
-///   - `leaves` is the full ordered leaf set of the chain's IMT at `chainImtRoot`; recomputing
-///     the incremental root must reproduce `chainImtRoot`, and the target commit leaf must not
-///     appear among them.
+/// Proves that the target commit value was absent from its chain's interop IMT across the deadline
+/// boundary, so the flow can no longer finalize:
+///   - `lowLeaf` is the low-nullifier leaf: `lowLeaf.value < commitValue` and
+///     (`lowLeaf.nextValue == 0` or `commitValue < lowLeaf.nextValue`); its inclusion in
+///     `chainImtRoot` is shown by `imtProof` at `lowLeafIndex`. This certifies non-membership.
+///   - `chainImtRoot` is shown inside an imported global root with L1 timestamp `<= deadline`
+///     (`globalProofG1` against the root for `l1BlockNumberBeforeDeadline`) AND inside an imported
+///     global root with L1 timestamp `> deadline` (`globalProofG2` for `l1BlockNumberAfterDeadline`).
+///     Identical `chainImtRoot` on both sides means the chain settled nothing new across the
+///     boundary — closing the "inserted just past the boundary" / L1-reorg window.
 struct ImtNonInclusionProof {
     uint256 chainId;
     bytes32 chainImtRoot;
+    IndexedLeaf lowLeaf;
+    uint256 lowLeafIndex;
+    bytes32[] imtProof;
     uint256 globalLeafIndex;
     uint256 l1BlockNumberBeforeDeadline;
     bytes32[] globalProofG1;
     uint256 l1BlockNumberAfterDeadline;
     bytes32[] globalProofG2;
-    bytes32[] leaves;
 }
 
-/// @dev Empty-leaf / zero value of every interop IMT and of the global IMT. `bytes32(0)` keeps
-/// the off-chain engine's incremental-root math simple; real commit leaves are keccak digests
-/// and never collide with it.
+/// @dev Empty / zero value of every Merkle tree (chain IMT, global tree, history tree). `bytes32(0)`
+/// keeps the off-chain engine's math simple; real leaf hashes are keccak digests.
 bytes32 constant IMT_EMPTY_LEAF = bytes32(0);
 
-/// @dev Domain tag prepended to the preimage of a commit leaf so leaves cannot be confused with
-/// other hashes. `commitLeaf = keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, specHash))`.
+/// @dev Domain tag prepended to the preimage of a commit value so values cannot be confused with
+/// other hashes. `commitValue = uint256(keccak256(abi.encode(ATOMIC_COMMIT_LEAF_TAG, flowId, specHash)))`.
 bytes4 constant ATOMIC_COMMIT_LEAF_TAG = bytes4(keccak256("AtomicInterop.commit.v1"));

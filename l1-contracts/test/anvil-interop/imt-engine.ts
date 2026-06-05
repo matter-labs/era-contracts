@@ -1,41 +1,33 @@
 /**
  * IMT engine CLI.
  *
- * Given an RPC URL and an item, produces the Merkle proof for that item being present in a chain's
- * interop IMT at a given block, and the full proof up to the L1 historical global IMT root.
+ * Given an RPC URL and an item, produces the proofs the AtomicFlowEscrow needs against the per-chain
+ * Indexed Merkle Tree and the L1 historical global IMT.
  *
  * Subcommands:
- *   leaf           --flow-id <0x> --spec-hash <0x>
- *                  Compute the commit leaf for a (flowId, specHash).
+ *   value          --flow-id <0x> --spec-hash <0x>
+ *                  Compute the commit value for a (flowId, specHash).
  *
- *   chain-proof    --l2-rpc <url> --tree <addr> --leaf <0x> [--l2-block <n>]
- *                  Inclusion proof of a leaf within a chain's interop IMT (chain layer only).
+ *   low-nullifier  --l2-rpc <url> --tree <addr> --value <0x|dec> [--l2-block <n>]
+ *                  Low-nullifier index to pass to commitPart when inserting `value`.
  *
  *   full-proof     --l1-rpc <url> --l2-rpc <url> --tree <addr> --registry <addr>
- *                  --chain-id <n> --leaf <0x> --l1-block <n> [--l2-block <n>]
- *                  Full inclusion proof (chain IMT root -> global root @ L1 block) as the JSON the
- *                  AtomicFlowEscrow.finalize ImtInclusionProof struct expects.
+ *                  --chain-id <n> --value <0x|dec> --l1-block <n> [--l2-block <n>]
+ *                  Inclusion proof (ImtInclusionProof JSON) for AtomicFlowEscrow.finalize.
  *
  *   non-inclusion  --l1-rpc <url> --l2-rpc <url> --tree <addr> --registry <addr>
- *                  --chain-id <n> --leaf <0x> --l1-block-before <n> --l1-block-after <n> [--l2-block <n>]
- *                  Non-inclusion proof (timeout/refund path) as the ImtNonInclusionProof JSON.
- *
- * Examples:
- *   npx ts-node imt-engine.ts leaf --flow-id 0x.. --spec-hash 0x..
- *   npx ts-node imt-engine.ts full-proof --l1-rpc http://localhost:8545 --l2-rpc http://localhost:9545 \
- *       --tree 0xTree --registry 0xReg --chain-id 271 --leaf 0xLeaf --l1-block 100
+ *                  --chain-id <n> --value <0x|dec> --l1-block-before <n> --l1-block-after <n> [--l2-block <n>]
+ *                  O(log n) non-inclusion proof (ImtNonInclusionProof JSON) for AtomicFlowEscrow.refund.
  */
 
 import { providers } from "ethers";
 import {
   buildInclusionProof,
   buildNonInclusionProof,
-  buildTree,
-  commitLeaf,
+  commitValue,
   commitmentTree,
   globalRegistry,
-  merklePath,
-  reconstructChainImt,
+  lowNullifierIndexFor,
 } from "./src/helpers/imt-engine-lib";
 
 function parseFlags(argv: string[]): Record<string, string> {
@@ -65,21 +57,20 @@ async function main(): Promise<void> {
   const flags = parseFlags(rest);
 
   switch (command) {
-    case "leaf": {
-      print({ leaf: commitLeaf(require_(flags, "flow-id"), require_(flags, "spec-hash")) });
+    case "value": {
+      print({ value: commitValue(require_(flags, "flow-id"), require_(flags, "spec-hash")) });
       break;
     }
 
-    case "chain-proof": {
+    case "low-nullifier": {
       const provider = new providers.JsonRpcProvider(require_(flags, "l2-rpc"));
       const tree = commitmentTree(require_(flags, "tree"), provider);
-      const leaf = require_(flags, "leaf");
-      const l2Block = flags["l2-block"] ? Number(flags["l2-block"]) : undefined;
-      const { leaves } = await reconstructChainImt(tree, l2Block);
-      const index = leaves.indexOf(leaf);
-      if (index < 0) throw new Error(`leaf ${leaf} not found in the chain IMT`);
-      const built = buildTree(leaves);
-      print({ leaf, index, chainImtRoot: built.root, imtProof: merklePath(built, index) });
+      const index = await lowNullifierIndexFor(
+        tree,
+        require_(flags, "value"),
+        flags["l2-block"] ? Number(flags["l2-block"]) : undefined
+      );
+      print({ lowNullifierIndex: index });
       break;
     }
 
@@ -90,7 +81,7 @@ async function main(): Promise<void> {
         l2Tree: commitmentTree(require_(flags, "tree"), l2Provider),
         registry: globalRegistry(require_(flags, "registry"), l1Provider),
         chainId: require_(flags, "chain-id"),
-        leaf: require_(flags, "leaf"),
+        value: require_(flags, "value"),
         l1Block: Number(require_(flags, "l1-block")),
         l2BlockTag: flags["l2-block"] ? Number(flags["l2-block"]) : undefined,
       });
@@ -105,7 +96,7 @@ async function main(): Promise<void> {
         l2Tree: commitmentTree(require_(flags, "tree"), l2Provider),
         registry: globalRegistry(require_(flags, "registry"), l1Provider),
         chainId: require_(flags, "chain-id"),
-        leaf: require_(flags, "leaf"),
+        value: require_(flags, "value"),
         l1BlockBefore: Number(require_(flags, "l1-block-before")),
         l1BlockAfter: Number(require_(flags, "l1-block-after")),
         l2BlockTag: flags["l2-block"] ? Number(flags["l2-block"]) : undefined,
@@ -115,7 +106,7 @@ async function main(): Promise<void> {
     }
 
     default:
-      throw new Error(`unknown command "${command ?? ""}". Use: leaf | chain-proof | full-proof | non-inclusion`);
+      throw new Error(`unknown command "${command ?? ""}". Use: value | low-nullifier | full-proof | non-inclusion`);
   }
 }
 

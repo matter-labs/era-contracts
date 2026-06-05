@@ -26,9 +26,13 @@ interface IAtomicFlowEscrow {
     event PartFinalized(bytes32 indexed flowId, bytes32 indexed specHash, address indexed payee, uint256 amount);
     event PartRefunded(bytes32 indexed flowId, bytes32 indexed specHash, address indexed payer, uint256 amount);
 
-    /// @notice Lock `_leg.amount` of `_leg.token` from `_leg.payer` and append the commit leaf.
-    /// Caller must be `_leg.payer`; `_leg.chainId` must be this chain. State `Unset -> Committed`.
-    function commitPart(bytes32 _flowId, FlowLeg calldata _leg) external;
+    /// @notice Lock `_leg.amount` of `_leg.token` from `_leg.payer` and insert the leg's commit
+    /// value into the chain's indexed interop IMT. Caller must be `_leg.payer`; `_leg.chainId` must
+    /// be this chain. State `Unset -> Committed`.
+    /// @param _lowNullifierIndex The low-nullifier slot for the commit value in the current IMT,
+    /// as computed by the IMT engine off-chain. (If the tree changed since, the insert reverts and
+    /// the caller retries with a refreshed index.)
+    function commitPart(bytes32 _flowId, FlowLeg calldata _leg, uint256 _lowNullifierIndex) external;
 
     /// @notice Finalize this chain's leg(s) of a flow whose every leg is proven committed in time.
     /// @param _flowId The flow identifier.
