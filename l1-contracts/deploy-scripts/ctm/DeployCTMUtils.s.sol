@@ -360,6 +360,9 @@ abstract contract DeployCTMUtils is DeployUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "MultisigCommitter")) {
+            // Same constructor as ValidatorTimelock (it derives from it): the bridgehub immutable.
+            return abi.encode(coreAddresses.bridgehub.proxies.bridgehub);
         } else if (compareStrings(contractName, "L1AssetTracker")) {
             return
                 abi.encode(

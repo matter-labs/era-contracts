@@ -93,8 +93,11 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
 
         // v31 adds `UPGRADER_ROLE` + `upgradeChainFromVersion()` (IChainUpgrader) to ValidatorTimelock;
         // existing chains' proxy still points at the v30 impl, so swap it under the same CREATE2 flow.
+        // Deploy `MultisigCommitter` (a superset of ValidatorTimelock) as the default validator impl so the
+        // upgrade does NOT downgrade proxies that already run a MultisigCommitter — the v31 stage-1 upgrade
+        // previously deployed plain `ValidatorTimelock` here, which silently dropped multisig-commit support.
         ctmAddresses.stateTransition.implementations.validatorTimelock = deploySimpleContract(
-            "ValidatorTimelock",
+            "MultisigCommitter",
             false
         );
 
@@ -102,7 +105,10 @@ contract CTMUpgrade_v31 is Script, DefaultCTMUpgrade {
     }
 
     /// @notice Append the ValidatorTimelock proxy-admin upgrade to the stage-1 governance bundle.
-    /// @dev The new impl has no reinitializer — `ProxyAdmin.upgrade` (not `upgradeAndCall`) is enough.
+    /// @dev Plain `ProxyAdmin.upgrade` (not `upgradeAndCall`): the new `MultisigCommitter` impl is deployed
+    ///      with no reinitializer call. Proxies already running a MultisigCommitter are at `_initialized=2`
+    ///      with their multisig storage intact, so the swap just restores the multisig code; calling
+    ///      `reinitializeV2()` again would revert "already initialized".
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         address validatorTimelockProxy = ctmAddresses.stateTransition.proxies.validatorTimelock;
         address newImpl = ctmAddresses.stateTransition.implementations.validatorTimelock;

@@ -1130,13 +1130,16 @@ async fn verify_ctm_provenance(
             .abi_encode(),
             ctm_file,
         ),
-        // ValidatorTimelock impl(bridgehub). Deployed once per CTM by
-        // `CTMUpgrade_v31`; stage-1 governance swaps this behind the per-CTM
-        // ValidatorTimelock proxy.
+        // Validator impl(bridgehub). Deployed once per CTM by `CTMUpgrade_v31`;
+        // stage-1 governance swaps this behind the per-CTM ValidatorTimelock
+        // proxy. v31 deploys `MultisigCommitter` (a superset of ValidatorTimelock
+        // with the same `(bridgehub)` constructor) as the default validator impl,
+        // so the upgrade does not downgrade proxies already running a
+        // MultisigCommitter.
         (
             validator_timelock_impl,
             V31ValidatorTimelock::constructorCall::new((bridgehub_addr,)).abi_encode(),
-            "l1-contracts/ValidatorTimelock",
+            "l1-contracts/MultisigCommitter",
         ),
     ];
     for (addr, args, file) in &checks {
