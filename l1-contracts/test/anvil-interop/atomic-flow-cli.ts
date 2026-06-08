@@ -25,8 +25,14 @@
  *   commit-send <flowId> <legId> <privateKey> <rpcUrl>
  *   check-status <flowId>
  *       For each leg, reports whether its commit value is present in its origin chain's IMT.
+ *   authorize <flowId> <privateKey> <rpcUrl>
+ *       Authorizes the flow on the chain behind <rpcUrl>: builds IMT inclusion proofs for the
+ *       remote-origin legs (local-origin legs are checked via local state) and marks the relevant
+ *       specs Executable. This is the novel cross-chain step; it does not move tokens.
+ *   execute <flowId> <legId> <privateKey> <rpcUrl>
+ *       Executes a single (already-Executable) leg on the chain behind <rpcUrl> (AR/NTV settlement).
  *   finalize <flowId> <legId> <privateKey> <rpcUrl>
- *       Authorizes the flow (builds inclusion proofs for all legs) and executes the given leg.
+ *       Convenience: authorize the flow and then execute the given leg.
  *
  * All commands take an optional `--state <path>`.
  */
@@ -255,15 +261,18 @@ async function cmdCheckStatus(state: State, flowId: string): Promise<void> {
   print({ flowId, allCommitted, legs: statuses });
 }
 
-async function cmdFinalize(state: State, flowId: string, legId: string, pk: string, rpc: string): Promise<void> {
+/**
+ * Send `authorize` for the whole flow on the chain behind `rpc`: builds inclusion proofs for every
+ * leg that did NOT originate on that chain (local-origin legs are verified via local state) and
+ * submits them. Returns the finalizing chainId. Shared by the `authorize` and `finalize` commands.
+ */
+async function authorizeFlow(state: State, flowId: string, pk: string, rpc: string): Promise<number> {
   const flow = state.flows[flowId];
   if (!flow) throw new Error(`unknown flowId ${flowId}`);
-  const leg = flow.legs.find((l) => l.legId === legId);
-  if (!leg) throw new Error(`unknown legId ${legId}`);
 
   const provider = new providers.JsonRpcProvider(rpc);
   const wallet = new Wallet(pk, provider);
-  // The finalizing chain is this leg's chain (origin or dest); use its escrow + importer.
+  // The finalizing chain is the one behind `rpc`; use its escrow + importer.
   const chainId = (await provider.getNetwork()).chainId;
   const chainCfg = requireChain(state, chainId);
   const importer = new Contract(chainCfg.importer, getAbi("L2GlobalInteropRootImporter"), provider);
@@ -297,10 +306,37 @@ async function cmdFinalize(state: State, flowId: string, legId: string, pk: stri
   const specs = flow.legs.map((l) => specTuple(l.spec));
   const authTx = await escrow.authorize(flowId, specs, flow.chainIds, flow.deadline, proofs.map(proofTuple));
   await authTx.wait();
+  // eslint-disable-next-line no-console
+  console.log(`authorized flow ${flowId} on chain ${chainId} (${proofs.length} inclusion proof(s), tx ${authTx.hash})`);
+  return chainId;
+}
+
+/** `authorize` command: authorize the flow on the chain behind `rpc` (no execute). */
+async function cmdAuthorize(state: State, flowId: string, pk: string, rpc: string): Promise<void> {
+  await authorizeFlow(state, flowId, pk, rpc);
+}
+
+/** `execute` command: execute a single leg on the chain behind `rpc` (must already be Executable). */
+async function cmdExecute(state: State, flowId: string, legId: string, pk: string, rpc: string): Promise<void> {
+  const flow = state.flows[flowId];
+  if (!flow) throw new Error(`unknown flowId ${flowId}`);
+  const leg = flow.legs.find((l) => l.legId === legId);
+  if (!leg) throw new Error(`unknown legId ${legId}`);
+
+  const provider = new providers.JsonRpcProvider(rpc);
+  const wallet = new Wallet(pk, provider);
+  const chainId = (await provider.getNetwork()).chainId;
+  const chainCfg = requireChain(state, chainId);
+  const escrow = escrowContract(chainCfg.escrow, wallet);
   const execTx = await escrow.execute(flowId, specTuple(leg.spec));
   await execTx.wait();
   // eslint-disable-next-line no-console
-  console.log(`authorized + executed leg ${legId} on chain ${chainId} (auth ${authTx.hash}, exec ${execTx.hash})`);
+  console.log(`executed leg ${legId} on chain ${chainId} (tx ${execTx.hash})`);
+}
+
+async function cmdFinalize(state: State, flowId: string, legId: string, pk: string, rpc: string): Promise<void> {
+  await authorizeFlow(state, flowId, pk, rpc);
+  await cmdExecute(state, flowId, legId, pk, rpc);
 }
 
 /** Latest imported L1 block on `importer` whose timestamp is <= deadline. */
@@ -355,12 +391,18 @@ async function main(): Promise<void> {
     case "check-status":
       await cmdCheckStatus(state, positionals[0]);
       break;
+    case "authorize":
+      await cmdAuthorize(state, positionals[0], positionals[1], positionals[2]);
+      break;
+    case "execute":
+      await cmdExecute(state, positionals[0], positionals[1], positionals[2], positionals[3]);
+      break;
     case "finalize":
       await cmdFinalize(state, positionals[0], positionals[1], positionals[2], positionals[3]);
       break;
     default:
       throw new Error(
-        `unknown command "${command ?? ""}". Use: register-flow-id | list-flows | flow-info | commit-send | check-status | finalize`
+        `unknown command "${command ?? ""}". Use: register-flow-id | list-flows | flow-info | commit-send | check-status | authorize | execute | finalize`
       );
   }
 }

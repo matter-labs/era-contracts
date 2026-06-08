@@ -23,6 +23,32 @@ runbook. Every command below was executed and verified end to end (two ZKsync OS
 
 ---
 
+## TL;DR — the one-touch script
+
+The whole runbook is wrapped in [`l1-contracts/test/anvil-interop/atomic-os-demo.sh`](./l1-contracts/test/anvil-interop/atomic-os-demo.sh)
+as three repeatable commands. Copy `atomic-os-demo.env.example` to `atomic-os-demo.env` (next to
+the script) and set the three tool paths (`ZK_DEPLOYER`, `SERVER_BIN`, `LOCAL_DEV`), then:
+
+```bash
+cd l1-contracts/test/anvil-interop
+
+./atomic-os-demo.sh update-server   # forge build + zk-deployer bootstrap/apply + genesis + server configs
+./atomic-os-demo.sh launch          # start Anvil + both servers, deploy L1 GlobalInteropIMT,
+                                     # fund the rich/relayer wallet via L1->L2, start the relayer daemon
+./atomic-os-demo.sh demo            # register a sample swap, commit both legs, wait for relay,
+                                     # authorize (verifies the IMT inclusion proof), then try execute
+
+./atomic-os-demo.sh status          # show running processes + key addresses
+./atomic-os-demo.sh stop            # tear everything down
+```
+
+All three reuse the same constants (RPCs `8545`/`3050`/`3150`, chain ids `6565`/`6566`, the standard
+Anvil rich account as deployer/relayer/depositor) and a single work dir (`.atomic-os-demo/`), so they
+compose without any manual copy-paste. Each step prints a numbered, colourised progress log. The
+sections below explain what each command does, if you want to run it by hand.
+
+---
+
 ## What this demo proves
 
 | Step             | Component                                                                  | Result                                                                                                                                |

@@ -8,3 +8,7 @@ node_modules/
 
 # Logs
 *.log
+
+# atomic-os-demo local config + run state
+atomic-os-demo.env
+.atomic-os-demo/
