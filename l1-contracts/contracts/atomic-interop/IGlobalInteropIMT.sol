@@ -7,9 +7,9 @@ pragma solidity ^0.8.21;
 ///
 /// This is the L1-free atomic interop analogue of `MessageRoot`: when a chain settles a batch, its
 /// current interop IMT root is exposed on L1 — by the operator in the execute batch data, after
-/// which the chain's `Executor` (its diamond proxy) calls `submitChainRoot` here. There are no
-/// owner-managed submitter roles: the only address allowed to submit a chain's root is that chain's
-/// diamond proxy as registered in the Bridgehub.
+/// which the chain's `Executor` (its diamond proxy) calls `submitChainRoot` here. The production
+/// access model only allows a chain's diamond proxy (from the Bridgehub) to submit its root, but
+/// `submitChainRoot` is currently a TEMPORARY permissionless stub (anyone may submit) — see there.
 ///
 /// Two Merkle trees are maintained:
 ///   - the **in-place global tree** (`FullMerkle`): leaf `i` = `keccak256(chainImtRoot, chainId)`,
@@ -33,9 +33,6 @@ interface IGlobalInteropIMT {
     /// @notice Emitted when a chain is first seen and assigned a leaf in the global tree.
     event ChainRegistered(uint256 indexed chainId, uint256 leafIndex);
 
-    /// @notice Emitted when the (temporary) global-submitter set changes.
-    event GlobalSubmitterSet(address indexed submitter, bool allowed);
-
     /// @notice Emitted when a `(block, timestamp, globalRoot)` snapshot is appended to the history tree.
     event HistoryAppended(
         uint256 indexed leafIndex,
@@ -46,26 +43,22 @@ interface IGlobalInteropIMT {
     );
 
     /// @notice Submit a chain's interop IMT root for a freshly executed batch.
-    /// @dev Callable only by the chain's diamond proxy (the `Executor`), looked up in the Bridgehub.
-    /// Updates the chain's leaf in the global tree in place and appends a history snapshot.
+    /// @dev TEMPORARY permissionless stub: anyone may submit. (Production: only the chain's diamond
+    /// proxy from the Bridgehub — see `chainDiamond`.) Updates the chain's leaf in the global tree in
+    /// place and appends a history snapshot.
     /// @param _chainId The chain whose IMT root is being exposed.
     /// @param _batchNumber The settled batch number; must be the chain's previous batch number + 1.
     /// @param _chainImtRoot The chain's interop IMT root after the batch.
     function submitChainRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainImtRoot) external;
 
-    /// @notice TEMPORARY DUMMY STUB. Authorize/deauthorize a "global submitter" that may call
-    /// `submitChainRoot` on behalf of *any* chain (bypassing the Bridgehub diamond check). Owner only.
-    /// @dev Intended only for demos/relayers until chains submit their own roots via the `Executor`.
-    function setGlobalSubmitter(address _submitter, bool _allowed) external;
-
-    /// @notice Whether `_submitter` is an authorized global submitter (temporary stub).
-    function isGlobalSubmitter(address _submitter) external view returns (bool);
-
-    /// @notice The owner that manages the temporary global-submitter stub.
-    function owner() external view returns (address);
-
-    /// @notice The Bridgehub used to resolve each chain's diamond proxy (the authorized submitter).
+    /// @notice The Bridgehub used to resolve each chain's diamond proxy.
     function bridgehub() external view returns (address);
+
+    /// @notice The diamond proxy of `_chainId` (resolved from the Bridgehub) — the address that, in
+    /// the production access model, is the only authorized submitter of that chain's root.
+    /// @dev `submitChainRoot` is currently a permissionless stub; this preserves the "zk chain flow"
+    /// so the check can be re-enabled with `require(msg.sender == chainDiamond(_chainId))`.
+    function chainDiamond(uint256 _chainId) external view returns (address);
 
     /// @notice Current aggregated global interop-IMT root (root of the in-place global tree).
     function globalRoot() external view returns (bytes32);

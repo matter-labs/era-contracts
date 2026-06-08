@@ -6,17 +6,15 @@ pragma solidity ^0.8.21;
 /// @notice L2-side store of global interop-IMT roots imported from L1.
 ///
 /// This is the atomic-interop analogue of {IL2InteropRootStorage}: each imported root is treated
-/// like an interop dependency. In production the bootloader would write these; in the demo a
-/// trusted off-chain "IMT supplier" (an EOA) reads {IGlobalInteropIMT} on L1 and calls
-/// `importGlobalRoot` here. Roots are keyed by the originating L1 block number and carry the L1
-/// timestamp, which the escrow compares against a flow deadline.
-///
-/// Deployed in L2 userspace (CREATE2), so it has no constructor — wiring is done in `initialize`.
+/// like an interop dependency. In production the bootloader would write these; for now
+/// `importGlobalRoot` is a TEMPORARY permissionless stub (anyone may import, e.g. the demo relayer).
+/// Roots are keyed by the originating L1 block number and carry the L1 timestamp, which the escrow
+/// compares against a flow deadline.
 interface IL2GlobalInteropRootImporter {
     /// @notice Emitted when a global root is imported.
     event GlobalRootImported(uint256 indexed l1BlockNumber, uint256 l1Timestamp, bytes32 globalRoot);
 
-    /// @notice Import a global interop-IMT root snapshot from L1. Callable only by the supplier.
+    /// @notice Import a global interop-IMT root snapshot from L1. TEMPORARY permissionless stub.
     /// Re-importing the same `(l1BlockNumber, globalRoot)` is a no-op; a conflicting root reverts.
     /// @param _l1BlockNumber The L1 block number the global root was recorded at.
     /// @param _l1Timestamp The L1 timestamp recorded for that root.
@@ -37,7 +35,4 @@ interface IL2GlobalInteropRootImporter {
 
     /// @notice The `_i`-th imported L1 block number (insertion order).
     function importedBlockAt(uint256 _i) external view returns (uint256);
-
-    /// @notice The trusted supplier address.
-    function supplier() external view returns (address);
 }

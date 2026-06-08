@@ -326,13 +326,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @inheritdoc IAdmin
-    function setGlobalInteropImt(address _globalInteropImt) external onlyAdmin onlyL1 {
-        address oldGlobalInteropImt = s.globalInteropImt;
-        s.globalInteropImt = _globalInteropImt;
-        emit NewGlobalInteropImt(oldGlobalInteropImt, _globalInteropImt);
-    }
-
-    /// @inheritdoc IAdmin
     function getRollupDAManager() external view returns (address) {
         return address(ROLLUP_DA_MANAGER);
     }

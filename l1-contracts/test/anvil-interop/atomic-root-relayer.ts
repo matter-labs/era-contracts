@@ -1,18 +1,15 @@
 /**
  * Atomic-interop root relayer.
  *
- * A trusted demo daemon that, each cycle:
+ * A demo daemon that, each cycle:
  *   A. EXPOSE — reads every configured L2's current interop IMT root and submits it to the L1
- *      `GlobalInteropIMT` registry (via the temporary global-submitter stub), and
+ *      `GlobalInteropIMT` registry, and
  *   B. SUPPLY — imports the resulting historical global roots into every L2's
  *      `L2GlobalInteropRootImporter`.
  *
  * It is the demo stand-in for the production path where each chain's `Executor` submits its own root
- * and the bootloader delivers the global root to L2. A single private key is used for all chains.
- *
- * Prerequisites (one-time, by the registry owner / each importer's supplier):
- *   - the relayer key must be authorized via `GlobalInteropIMT.setGlobalSubmitter(relayer, true)`;
- *   - the relayer key must be each importer's `supplier` (set at `initialize`).
+ * and the bootloader delivers the global root to L2. Both `submitChainRoot` and `importGlobalRoot`
+ * are currently permissionless stubs, so any key works; a single private key is used for all chains.
  *
  * Config: a JSON file (`--config <path>`) holding the chain list (with per-chain addresses); the
  * connection params can be set there or overridden by flags. Shape:

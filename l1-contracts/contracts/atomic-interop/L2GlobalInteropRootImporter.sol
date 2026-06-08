@@ -2,17 +2,15 @@
 pragma solidity 0.8.28;
 
 import {IL2GlobalInteropRootImporter} from "./IL2GlobalInteropRootImporter.sol";
-import {
-    ImporterAlreadyInitialized,
-    ImporterNotSupplier,
-    ImporterRootMismatch,
-    ImporterZeroRoot,
-    ImporterZeroSupplier
-} from "./AtomicInteropErrors.sol";
+import {ImporterRootMismatch, ImporterZeroRoot} from "./AtomicInteropErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice See {IL2GlobalInteropRootImporter}. Stores global interop-IMT roots imported from L1.
+///
+/// `importGlobalRoot` is currently a TEMPORARY permissionless stub: anyone may import a root. In
+/// production this would be restricted (the bootloader writes it, like {L2InteropRootStorage}); the
+/// conflicting-root guard below already prevents a wrong root from overwriting a recorded one.
 contract L2GlobalInteropRootImporter is IL2GlobalInteropRootImporter {
     /// @dev L1 block number => imported global root.
     mapping(uint256 l1BlockNumber => bytes32 globalRoot) internal _globalRootAt;
@@ -23,20 +21,9 @@ contract L2GlobalInteropRootImporter is IL2GlobalInteropRootImporter {
     /// @dev Insertion-ordered list of imported L1 block numbers.
     uint256[] internal _importedBlocks;
 
-    /// @dev Trusted supplier; also serves as the "initialized" flag.
-    address internal _supplier;
-
-    /// @notice One-shot initializer.
-    /// @param _trustedSupplier The off-chain supplier (EOA in demo) allowed to import roots.
-    function initialize(address _trustedSupplier) external {
-        if (_supplier != address(0)) revert ImporterAlreadyInitialized();
-        if (_trustedSupplier == address(0)) revert ImporterZeroSupplier();
-        _supplier = _trustedSupplier;
-    }
-
     /// @inheritdoc IL2GlobalInteropRootImporter
     function importGlobalRoot(uint256 _l1BlockNumber, uint256 _l1Timestamp, bytes32 _globalRoot) external {
-        if (msg.sender != _supplier) revert ImporterNotSupplier(msg.sender);
+        // TEMPORARY permissionless stub: anyone may import. Production would restrict to the bootloader.
         if (_globalRoot == bytes32(0)) revert ImporterZeroRoot();
 
         if (_imported[_l1BlockNumber]) {
@@ -78,10 +65,5 @@ contract L2GlobalInteropRootImporter is IL2GlobalInteropRootImporter {
     /// @inheritdoc IL2GlobalInteropRootImporter
     function importedBlockAt(uint256 _i) external view returns (uint256) {
         return _importedBlocks[_i];
-    }
-
-    /// @inheritdoc IL2GlobalInteropRootImporter
-    function supplier() external view returns (address) {
-        return _supplier;
     }
 }

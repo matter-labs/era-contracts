@@ -84,9 +84,8 @@ contract ExecutorTest is UtilsCallMockerTest {
     uint256[] internal proofInput;
 
     function getAdminSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](16);
+        bytes4[] memory selectors = new bytes4[](15);
         uint256 i = 0;
-        selectors[i++] = admin.setGlobalInteropImt.selector;
         selectors[i++] = admin.setPendingAdmin.selector;
         selectors[i++] = admin.acceptAdmin.selector;
         selectors[i++] = admin.setValidator.selector;

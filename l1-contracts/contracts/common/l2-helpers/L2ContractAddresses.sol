@@ -139,6 +139,15 @@ address constant GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x1
 /// @dev The address of the base token holder contract that holds chain's base token reserves.
 address constant L2_BASE_TOKEN_HOLDER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x11);
 
+/// @dev The address of the per-chain atomic-interop commitment tree (Indexed Merkle Tree).
+address constant L2_INTEROP_COMMITMENT_TREE_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x12);
+
+/// @dev The address of the atomic-interop global-root importer (imports L1 global IMT roots).
+address constant L2_GLOBAL_INTEROP_ROOT_IMPORTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x13);
+
+/// @dev The address of the atomic-interop flow escrow.
+address constant L2_ATOMIC_FLOW_ESCROW_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x14);
+
 ////////////////////////////////////////////////////////////
 // ZKsync OS genesis contracts
 ////////////////////////////////////////////////////////////

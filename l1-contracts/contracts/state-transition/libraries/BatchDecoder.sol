@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IExecutor, InteropImtExport} from "../chain-interfaces/IExecutor.sol";
+import {IExecutor} from "../chain-interfaces/IExecutor.sol";
 import {CommitBatchInfo, CommitBatchInfoZKsyncOS, PrecommitInfo} from "../chain-interfaces/ICommitter.sol";
 import {PriorityOpsBatchInfo} from "./PriorityTree.sol";
 import {
@@ -22,10 +22,6 @@ import {InteropRoot, L2Log} from "../../common/Messaging.sol";
 library BatchDecoder {
     /// @notice The currently supported encoding version.
     uint8 internal constant SUPPORTED_ENCODING_VERSION = 1;
-    /// @notice Execute-data encoding version that additionally carries per-batch interop IMT
-    /// exports (see {InteropImtExport}). Backward compatible: version 1 execute data decodes with
-    /// an empty export array, so existing operators are unaffected.
-    uint8 internal constant SUPPORTED_ENCODING_VERSION_EXECUTE_WITH_IMT = 2;
     /// @notice The currently supported encoding version for ZKSync OS commit data.
     /// We use different encoding only for commit, while prove/execute are common for Era VM and ZKsync OS chains.
     uint8 internal constant SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 4;
@@ -249,9 +245,6 @@ library BatchDecoder {
     /// @return messages L2 messages for each batch.
     /// @return multichainBatchRoots Multichain batch roots for chain for each batch.
     /// @return settlementFeePayer Address that pays gateway settlement fees.
-    /// @dev Accepts both the legacy execute encoding (version 1) and the IMT-export encoding
-    /// (version 2). For version 2 the trailing {InteropImtExport} array is parsed but dropped here;
-    /// it is read separately via {decodeExecuteImtExports} to keep this function's stack small.
     function _decodeExecuteData(
         bytes calldata _executeData
     )
@@ -293,63 +286,6 @@ library BatchDecoder {
                         address
                     )
                 );
-        } else if (encodingVersion == SUPPORTED_ENCODING_VERSION_EXECUTE_WITH_IMT) {
-            (
-                executeData,
-                priorityOpsData,
-                dependencyRoots,
-                logs,
-                messages,
-                multichainBatchRoots,
-                settlementFeePayer,
-
-            ) = abi.decode(
-                    _executeData[1:],
-                    (
-                        IExecutor.StoredBatchInfo[],
-                        PriorityOpsBatchInfo[],
-                        InteropRoot[][],
-                        L2Log[][],
-                        bytes[][],
-                        bytes32[],
-                        address,
-                        InteropImtExport[]
-                    )
-                );
-        } else {
-            revert UnsupportedExecuteBatchEncoding(encodingVersion);
-        }
-    }
-
-    /// @notice Decodes only the per-batch interop IMT exports from execute data.
-    /// @dev Returns an empty array for the legacy encoding version, the exports for the IMT-export
-    /// version, and reverts on any other version. Kept separate from {decodeAndCheckExecuteData} so
-    /// the Executor can materialize the exports inside a narrow scope (stack-too-deep avoidance).
-    /// @param _executeData The calldata byte array containing the execution data.
-    /// @return imtExports Per-batch interop IMT exports (empty for the legacy encoding version).
-    function decodeExecuteImtExports(
-        bytes calldata _executeData
-    ) internal pure returns (InteropImtExport[] memory imtExports) {
-        if (_executeData.length == 0) {
-            revert EmptyData();
-        }
-        uint8 encodingVersion = uint8(_executeData[0]);
-        if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
-            return imtExports;
-        } else if (encodingVersion == SUPPORTED_ENCODING_VERSION_EXECUTE_WITH_IMT) {
-            (, , , , , , , imtExports) = abi.decode(
-                _executeData[1:],
-                (
-                    IExecutor.StoredBatchInfo[],
-                    PriorityOpsBatchInfo[],
-                    InteropRoot[][],
-                    L2Log[][],
-                    bytes[][],
-                    bytes32[],
-                    address,
-                    InteropImtExport[]
-                )
-            );
         } else {
             revert UnsupportedExecuteBatchEncoding(encodingVersion);
         }

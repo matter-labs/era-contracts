@@ -9,12 +9,9 @@ import {AtomicInteropProof} from "./libraries/AtomicInteropProof.sol";
 import {IMT_EMPTY_LEAF} from "./IAtomicInterop.sol";
 import {
     GlobalImtNonConsecutiveBatch,
-    GlobalImtNotOwner,
-    GlobalImtNotSubmitter,
     GlobalImtUnknownBlock,
     GlobalImtZeroBridgehub,
-    GlobalImtZeroRoot,
-    GlobalImtZeroSubmitter
+    GlobalImtZeroRoot
 } from "./AtomicInteropErrors.sol";
 
 /// @author Matter Labs
@@ -23,21 +20,19 @@ import {
 ///
 /// The in-place global tree is a {FullMerkle} tree whose leaf `i` is
 /// `keccak256(chainImtRoot, chainId)`. The history tree is an append-only
-/// {DynamicIncrementalMerkle} of `keccak256(block, timestamp, globalRoot)` snapshots. The only
-/// address allowed to submit a chain's root is that chain's diamond proxy, resolved from the
-/// Bridgehub — there are no owner-managed submitter roles.
+/// {DynamicIncrementalMerkle} of `keccak256(block, timestamp, globalRoot)` snapshots.
+///
+/// `submitChainRoot` is currently a TEMPORARY permissionless stub: anyone may submit any chain's
+/// root. The production access model — only the chain's diamond proxy (resolved from the Bridgehub)
+/// may submit — is preserved via `chainDiamond` and the `GlobalImtNotChainDiamond` error, so the
+/// stub is trivial to remove. The per-chain "zk chain flow" within the global tree (registration,
+/// leaf index, in-place updates) is independent of the access check and unaffected.
 contract GlobalInteropIMT is IGlobalInteropIMT {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
-    /// @notice The Bridgehub used to resolve each chain's diamond proxy (the authorized submitter).
+    /// @notice The Bridgehub used to resolve each chain's diamond proxy.
     address public immutable BRIDGE_HUB;
-
-    /// @notice Owner that manages the temporary global-submitter stub. Set to the deployer.
-    address public owner;
-
-    /// @dev TEMPORARY DUMMY STUB: addresses allowed to submit roots on behalf of any chain.
-    mapping(address submitter => bool allowed) internal _isGlobalSubmitter;
 
     /// @dev The aggregated, in-place global tree (leaves are per-chain interop IMT roots).
     FullMerkle.FullTree internal _globalTree;
@@ -66,16 +61,10 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
     /// @dev Ascending list of distinct L1 block numbers at which a global root was recorded.
     uint256[] internal _historyBlocks;
 
-    modifier onlyOwner() {
-        if (msg.sender != owner) revert GlobalImtNotOwner(msg.sender);
-        _;
-    }
-
     /// @param _bridgehub The Bridgehub used to resolve each chain's diamond proxy.
     constructor(address _bridgehub) {
         if (_bridgehub == address(0)) revert GlobalImtZeroBridgehub();
         BRIDGE_HUB = _bridgehub;
-        owner = msg.sender;
         // Initialize both trees with the empty-leaf zero value so paths/zeros align with the
         // off-chain engine and the proof library.
         _globalTree.setup(IMT_EMPTY_LEAF);
@@ -83,19 +72,13 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
     }
 
     /// @inheritdoc IGlobalInteropIMT
-    function setGlobalSubmitter(address _submitter, bool _allowed) external onlyOwner {
-        if (_submitter == address(0)) revert GlobalImtZeroSubmitter();
-        _isGlobalSubmitter[_submitter] = _allowed;
-        emit GlobalSubmitterSet(_submitter, _allowed);
-    }
-
-    /// @inheritdoc IGlobalInteropIMT
     function submitChainRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainImtRoot) external {
-        // The chain's diamond proxy (its Executor) may submit that chain's root. As a TEMPORARY DUMMY
-        // STUB, an authorized global submitter (a demo relayer) may submit on behalf of any chain.
-        if (msg.sender != IBridgehubBase(BRIDGE_HUB).getZKChain(_chainId) && !_isGlobalSubmitter[msg.sender]) {
-            revert GlobalImtNotSubmitter(msg.sender, _chainId);
-        }
+        // ──────────────────────────────────────────────────────────────────────────────────────
+        // TEMPORARY DUMMY STUB: anyone may submit any chain's root.
+        // To restore production access control, add (the "zk chain flow" is preserved in
+        // `chainDiamond`):
+        //     require(msg.sender == chainDiamond(_chainId), GlobalImtNotChainDiamond(msg.sender, _chainId));
+        // ──────────────────────────────────────────────────────────────────────────────────────
         if (_chainImtRoot == bytes32(0)) revert GlobalImtZeroRoot();
 
         // Batch numbers must be strictly consecutive (no gaps).
@@ -140,13 +123,13 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
     }
 
     /// @inheritdoc IGlobalInteropIMT
-    function isGlobalSubmitter(address _submitter) external view returns (bool) {
-        return _isGlobalSubmitter[_submitter];
+    function bridgehub() external view returns (address) {
+        return BRIDGE_HUB;
     }
 
     /// @inheritdoc IGlobalInteropIMT
-    function bridgehub() external view returns (address) {
-        return BRIDGE_HUB;
+    function chainDiamond(uint256 _chainId) public view returns (address) {
+        return IBridgehubBase(BRIDGE_HUB).getZKChain(_chainId);
     }
 
     /// @inheritdoc IGlobalInteropIMT

@@ -267,9 +267,12 @@ async function cmdFinalize(state: State, flowId: string, legId: string, pk: stri
   const l1Provider = new providers.JsonRpcProvider(state.config.l1.rpc);
   const registry = globalRegistry(state.config.l1.registry, l1Provider);
 
-  // Build inclusion proofs for every leg, in the sorted (legs) order.
+  // `authorize` only needs proofs for specs that did NOT originate on the finalizing chain — specs
+  // committed here are verified via local state. Build proofs for the remote-origin legs, in the
+  // flow's sorted leg order.
   const proofs = [];
   for (const l of flow.legs) {
+    if (Number(l.spec.originChainId) === chainId) continue;
     const originCfg = requireChain(state, Number(l.spec.originChainId));
     const originProvider = new providers.JsonRpcProvider(originCfg.rpc);
     const value = commitValue(flowId, l.legId);

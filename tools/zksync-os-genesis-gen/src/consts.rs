@@ -121,6 +121,15 @@ const L2_INTEROP_ROOT_STORAGE: Address = Address(FixedBytes::<20>(hex_literal::h
 const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::hex!(
     "0000000000000000000000000000000000010009"
 )));
+const L2_INTEROP_COMMITMENT_TREE: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "0000000000000000000000000000000000010012"
+)));
+const L2_GLOBAL_INTEROP_ROOT_IMPORTER: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "0000000000000000000000000000000000010013"
+)));
+const L2_ATOMIC_FLOW_ESCROW: Address = Address(FixedBytes::<20>(hex_literal::hex!(
+    "0000000000000000000000000000000000010014"
+)));
 
 /// All contracts to deploy at genesis, together with their deployment strategy.
 ///
@@ -134,7 +143,7 @@ const L2_MESSAGE_VERIFICATION: Address = Address(FixedBytes::<20>(hex_literal::h
 /// - `L2_WRAPPED_BASE_TOKEN` – uses its own proxy mechanism.
 /// - `SYSTEM_CONTRACT_PROXY_ADMIN` – the proxy admin itself.
 /// - `DETERMINISTIC_CREATE2_ADDRESS` – standard Create2 factory, not a system contract.
-pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 22] = [
+pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 25] = [
     (
         L2_COMPLEX_UPGRADER_ADDR,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2ComplexUpgrader")),
@@ -226,5 +235,18 @@ pub const INITIAL_CONTRACTS: [(Address, ContractDeployment); 22] = [
     (
         L2_MESSAGE_VERIFICATION,
         ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2MessageVerification")),
+    ),
+    // Atomic interop (L1-free) contracts.
+    (
+        L2_INTEROP_COMMITMENT_TREE,
+        ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2InteropCommitmentTree")),
+    ),
+    (
+        L2_GLOBAL_INTEROP_ROOT_IMPORTER,
+        ContractDeployment::SystemProxy(ContractSource::L1ContractName("L2GlobalInteropRootImporter")),
+    ),
+    (
+        L2_ATOMIC_FLOW_ESCROW,
+        ContractDeployment::SystemProxy(ContractSource::L1ContractName("AtomicFlowEscrow")),
     ),
 ];

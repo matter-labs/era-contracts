@@ -1932,19 +1932,6 @@
   },
   {
     "type": "function",
-    "name": "setGlobalInteropImt",
-    "inputs": [
-      {
-        "name": "_globalInteropImt",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setPendingAdmin",
     "inputs": [
       {
@@ -2553,25 +2540,6 @@
             "internalType": "uint64"
           }
         ]
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "NewGlobalInteropImt",
-    "inputs": [
-      {
-        "name": "oldGlobalInteropImt",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      },
-      {
-        "name": "newGlobalInteropImt",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
       }
     ],
     "anonymous": false

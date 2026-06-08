@@ -16,55 +16,60 @@ through the asset router + native token vault, but replaces the L1-linker author
    `uint256(keccak256(abi.encode(TAG, flowId, specHash)))` is inserted into the origin chain's
    **indexed** interop IMT (`L2InteropCommitmentTree`). Each leaf carries `{value, nextValue,
 nextIndex}` pointers, so both membership and non-membership are provable in O(log n).
-3. On batch settlement the operator exposes the chain's IMT root in the execute batch data; the
-   chain's `Executor` (its diamond proxy) calls `GlobalInteropIMT.submitChainRoot`. The only
-   authorized submitter for a chain is its diamond proxy, **resolved from the Bridgehub** — there
-   are no owner-managed submitter roles. The registry maintains:
+3. On batch settlement the chain's IMT root is exposed on L1 via `GlobalInteropIMT.submitChainRoot`.
+   This is currently a **permissionless stub** (anyone — e.g. the demo relayer — may submit any
+   chain's root); the production check (only the chain's diamond proxy, from the Bridgehub) is
+   preserved via `chainDiamond` so it is trivial to re-enable. The registry maintains:
    - the **in-place global tree** (`FullMerkle`): `global_imt_root -> chain -> imt`;
    - the **append-only history tree** (`DynamicIncrementalMerkle`) of
-     `keccak256(block, timestamp, globalRoot)` snapshots (`historyRoot`), plus
-     `mapping(globalRoot => blockNumber)`.
-     Batch numbers must be strictly consecutive (no gaps).
-4. L2s import the historical global root (`L2GlobalInteropRootImporter`).
-5. `authorize` — once a caller proves (against an imported global root with timestamp `<= deadline`)
-   that _every_ spec was committed in time, the specs relevant to this chain become `Executable`.
-6. `execute` — performs the asset op through AR/NTV: burn on the source, mint on the destination
-   (identical to `L2FlowEscrow`).
+     `keccak256(block, timestamp, globalRoot)` snapshots, plus `mapping(globalRoot => blockNumber)`.
+     Batch numbers must be strictly consecutive.
+4. L2s import the historical global root (`L2GlobalInteropRootImporter`) — also a permissionless stub.
+5. `authorize` — proves the flow was committed in time and marks this chain's specs `Executable`.
+   Specs that originate on the verifying chain were committed there, so they need **no** proof (their
+   local `Committed` state is checked); only specs from other chains require an inclusion proof
+   (against an imported global root with timestamp `<= deadline`).
+6. `execute` — performs the asset op through AR/NTV: burn on the source, mint on the destination.
 7. `authorizeRefund` / `claimRefund` — the timeout path: an O(log n) low-nullifier non-inclusion
    proof (chain IMT root identical in a global root `<= deadline` and one `> deadline`) marks source
    specs `Revertable`, then the depositor reclaims the lock.
 
 ## Contracts
 
-| Contract                       | Layer | Role                                                                                                               |
-| ------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------ |
-| `GlobalInteropIMT`             | L1    | In-place global tree + append-only history tree; submitter = the chain's diamond proxy (from the Bridgehub).       |
-| `L2InteropCommitmentTree`      | L2    | Per-chain **Indexed** Merkle Tree; leaves `{value, nextValue, nextIndex}`.                                         |
-| `L2GlobalInteropRootImporter`  | L2    | Stores global roots imported from L1.                                                                              |
-| `AtomicFlowEscrow`             | L2    | `commitSend` / `authorize` / `execute` / `authorizeRefund` / `claimRefund`, AR/NTV asset routing, IMT-proof gated. |
-| `libraries/AtomicInteropProof` | both  | O(log n) inclusion + low-nullifier non-inclusion verification.                                                     |
+| Contract                       | Layer | Role                                                                                                                                                                                    |
+| ------------------------------ | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GlobalInteropIMT`             | L1    | In-place global tree + append-only history tree. `submitChainRoot` is a permissionless stub; the Bridgehub diamond lookup (`chainDiamond`) is preserved for re-enabling access control. |
+| `L2InteropCommitmentTree`      | L2    | Per-chain **Indexed** Merkle Tree; leaves `{value, nextValue, nextIndex}`.                                                                                                              |
+| `L2GlobalInteropRootImporter`  | L2    | Stores global roots imported from L1 (permissionless stub).                                                                                                                             |
+| `AtomicFlowEscrow`             | L2    | `commitSend` / `authorize` / `execute` / `authorizeRefund` / `claimRefund`, AR/NTV asset routing, IMT-proof gated.                                                                      |
+| `libraries/AtomicInteropProof` | both  | O(log n) inclusion + low-nullifier non-inclusion verification.                                                                                                                          |
 
-The `Executor` integration is opt-in per chain (`Admin.setGlobalInteropImt`) and supplied via a new,
-backward-compatible execute-data encoding version (`InteropImtExport` = `{imtRoot}`); chains that do
-not opt in are byte-for-byte unaffected.
+## ZKsync OS genesis
+
+The three L2 contracts are predeployed in the ZKsync OS genesis (no `Executor`/core protocol changes
+are involved):
+
+- registered in the genesis gen tool `tools/zksync-os-genesis-gen/src/consts.rs` (`INITIAL_CONTRACTS`,
+  `SystemProxy`) at addresses `0x10012` (`L2InteropCommitmentTree`), `0x10013`
+  (`L2GlobalInteropRootImporter`), `0x10014` (`AtomicFlowEscrow`) — constants in
+  `common/l2-helpers/L2ContractAddresses.sol`;
+- wired during genesis in `L2GenesisForceDeploymentsHelper._initializeV31Contracts` (ZKsync OS only):
+  the tree's appender is set to the escrow, and the escrow is pointed at the tree, importer, asset
+  router and native token vault. The importer is permissionless and needs no init.
 
 ## Off-chain tooling (`test/anvil-interop/`)
 
 - `imt-engine.ts` — commit values, the low-nullifier index for `commitSend`, and the O(log n)
-  inclusion / non-inclusion proofs up to the L1 historical global IMT.
-- `imt-supplier.ts` — trusted component that imports L1 historical global roots into the L2 importer.
-- `atomic-root-relayer.ts` — trusted demo daemon that, each cycle, submits every L2's IMT root to L1
-  (via the temporary global-submitter stub) and imports the resulting global roots back into every
-  L2 importer. Takes the L1 RPC, the per-chain L2 RPCs/addresses, and a single private key.
+  inclusion / non-inclusion proofs.
+- `imt-supplier.ts` — imports L1 historical global roots into the L2 importer.
+- `atomic-root-relayer.ts` — demo daemon that, each cycle, submits every L2's IMT root to L1 and
+  imports the resulting global roots back into every L2; one private key, takes the L1 RPC + per-chain
+  L2 RPCs/addresses.
 - `atomic-flow-cli.ts` — interactive, JSON-backed demo: `register-flow-id`, `list-flows`,
   `flow-info`, `commit-send`, `check-status`, `finalize`.
 
-> **Temporary global-submitter stub.** Besides the chain's diamond proxy, the owner can authorize a
-> "global submitter" (`setGlobalSubmitter`) that may submit roots on behalf of any chain. This is a
-> demo-only relayer convenience (used by `atomic-root-relayer.ts`) and would be removed once chains
-> submit their own roots via the `Executor`.
-
-> **Demo scope.** Exposing the IMT root on L1 is trusted to the operator in the demo (the chain's
-> diamond submits it); in production the root is part of the block commitment. The AR/NTV asset
-> mechanics match `L2FlowEscrow` and are exercised in the anvil-interop suite; the Foundry unit tests
-> mock the asset router to isolate the escrow's proof-gating + state machine.
+> **Demo scope.** `submitChainRoot` / `importGlobalRoot` are temporary permissionless stubs (the
+> production access models — chain-diamond submitter; bootloader-delivered import — are documented in
+> the contracts and easy to restore). The AR/NTV asset mechanics match `L2FlowEscrow` and are
+> exercised in the anvil-interop suite; the Foundry unit tests mock the asset router to isolate the
+> escrow's proof-gating + state machine.

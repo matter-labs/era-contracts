@@ -48,10 +48,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
     /// @notice Set the transaction filterer
     function setTransactionFilterer(address _transactionFilterer) external;
 
-    /// @notice Set the L1 GlobalInteropIMT registry the Executor exposes interop IMT roots to.
-    /// @dev Zero disables the feature. See {InteropImtExport} and `ExecutorFacet._exportInteropImtRoots`.
-    function setGlobalInteropImt(address _globalInteropImt) external;
-
     /// @notice Sets the transaction filterer used in Priority Mode.
     /// By default, there is no transaction filtering in Priority Mode. This is the recommended setup.
     /// However, for some chains (e.g., Prividium or Gateway), a custom filterer may be required
@@ -149,9 +145,6 @@ interface IAdmin is IZKChainBase, IChainUpgrader {
 
     /// @notice The transaction filterer has been updated
     event NewTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);
-
-    /// @notice The GlobalInteropIMT registry address was updated.
-    event NewGlobalInteropImt(address oldGlobalInteropImt, address newGlobalInteropImt);
 
     /// @notice The address of the transaction filterer contract used when Priority Mode is activated
     event NewPriorityModeTransactionFilterer(address oldTransactionFilterer, address newTransactionFilterer);

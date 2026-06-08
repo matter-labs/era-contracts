@@ -5,11 +5,9 @@ import {SpecState} from "./IAtomicInterop.sol";
 
 // ── GlobalInteropIMT (L1) errors ────────────────────────────────────────────────────
 error GlobalImtZeroBridgehub();
-/// @dev The caller is neither the chain's diamond proxy (from the Bridgehub) nor a global submitter.
-error GlobalImtNotSubmitter(address sender, uint256 chainId);
-/// @dev Only the owner may manage the temporary global-submitter stub.
-error GlobalImtNotOwner(address sender);
-error GlobalImtZeroSubmitter();
+/// @dev Production submitter check: the caller is not the chain's diamond proxy (from the Bridgehub).
+/// @dev Kept defined so the temporary "anyone may submit" stub in `submitChainRoot` is trivial to remove.
+error GlobalImtNotChainDiamond(address sender, uint256 chainId);
 error GlobalImtZeroRoot();
 /// @dev Batch numbers must be strictly consecutive (no gaps).
 error GlobalImtNonConsecutiveBatch(uint256 chainId, uint256 expected, uint256 provided);
@@ -26,11 +24,7 @@ error CommitmentTreeLowNullifierNotBelow(uint256 value, uint256 lowValue);
 error CommitmentTreeLowNullifierNotAbove(uint256 value, uint256 nextValue);
 
 // ── L2GlobalInteropRootImporter errors ──────────────────────────────────────────────
-error ImporterAlreadyInitialized();
-error ImporterNotSupplier(address sender);
-error ImporterZeroSupplier();
 error ImporterZeroRoot();
-error ImporterRootAlreadyImported(uint256 l1BlockNumber);
 error ImporterRootMismatch(uint256 l1BlockNumber, bytes32 stored, bytes32 provided);
 error ImporterBlockNotImported(uint256 l1BlockNumber);
 
@@ -53,6 +47,10 @@ error EscrowFlowIdMismatch(bytes32 expected, bytes32 actual);
 error EscrowProofCountMismatch(uint256 specs, uint256 proofs);
 error EscrowSpecsNotSorted();
 error EscrowChainsNotSorted();
+/// @dev A spec originating on this chain was not committed here, yet no inclusion proof was supplied.
+error EscrowSpecNotCommittedLocally(bytes32 specHash, SpecState actual);
+/// @dev A spec originating on another chain has no inclusion proof.
+error EscrowMissingProof(bytes32 specHash);
 
 // ── AtomicInteropProof library errors ───────────────────────────────────────────────
 error ProofChainMismatch(uint256 expected, uint256 actual);

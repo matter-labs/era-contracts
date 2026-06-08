@@ -1,11 +1,10 @@
 /**
  * IMT supplier CLI.
  *
- * A trusted off-chain component that reads the historical global interop-IMT roots recorded on L1
- * by {GlobalInteropIMT} and imports them into an L2 {L2GlobalInteropRootImporter}. This stands in
- * for the zkSync OS feature that would deliver the global root to L2 as an interop dependency; in
- * the demo the supplier is simply trusted (mirrors how the {L2InteropRootStorage} bootloader path
- * is mocked by an EOA).
+ * An off-chain component that reads the historical global interop-IMT roots recorded on L1 by
+ * {GlobalInteropIMT} and imports them into an L2 {L2GlobalInteropRootImporter}. This stands in for
+ * the zkSync OS feature that would deliver the global root to L2 as an interop dependency.
+ * `importGlobalRoot` is currently a permissionless stub, so any key works.
  *
  * Usage:
  *   npx ts-node imt-supplier.ts \

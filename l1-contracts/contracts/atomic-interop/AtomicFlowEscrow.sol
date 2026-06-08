@@ -18,7 +18,9 @@ import {
     EscrowFlowIdMismatch,
     EscrowInvalidAuthorizeFromState,
     EscrowInvalidRefundAuthorizeFromState,
+    EscrowMissingProof,
     EscrowProofCountMismatch,
+    EscrowSpecNotCommittedLocally,
     EscrowSelfDestination,
     EscrowSendSpecMissingDest,
     EscrowSendSpecZeroAmount,
@@ -100,15 +102,13 @@ contract AtomicFlowEscrow is IAtomicFlowEscrow {
         ImtInclusionProof[] calldata _proofs
     ) external {
         bytes32[] memory specHashes = _computeAndCheckFlowId(_flowId, _specs, _chainIds, _deadline);
-        if (_proofs.length != _specs.length) revert EscrowProofCountMismatch(_specs.length, _proofs.length);
 
-
-        // SB: no need to prove / check spechash that has been committed as they happened on this chain.
-        // SB: If a proof is ommitted, we should check whether it has been committed here already. 
-
-        // 1. Prove every spec of the flow was committed (on its origin chain) before the deadline.
+        // 1. Establish that every spec of the flow was committed before the deadline. Specs that
+        //    originate on THIS chain were committed here (we check local state — no proof needed);
+        //    specs from other chains require an inclusion proof, consumed in order. A proof may thus
+        //    be omitted for any local-origin spec.
         // solhint-disable-next-line func-named-parameters
-        _verifyInclusions(_flowId, _specs, specHashes, _deadline, _proofs);
+        _verifyFlowCommitted(_flowId, _specs, specHashes, _deadline, _proofs);
 
         // 2. Mark the specs relevant to this chain Executable.
         _markExecutable(_flowId, _specs, specHashes);
@@ -278,9 +278,13 @@ contract AtomicFlowEscrow is IAtomicFlowEscrow {
         if (computed != _flowId) revert EscrowFlowIdMismatch(_flowId, computed);
     }
 
-    /// @dev Verifies every spec's inclusion proof (each against its origin chain) within the
-    /// deadline. Extracted from `authorize` to keep that function's stack within the non-via-IR limit.
-    function _verifyInclusions(
+    /// @dev Establishes that every spec of the flow was committed before the deadline:
+    ///   - a spec whose origin is THIS chain was committed here, so its local state must be
+    ///     `Committed` (no inclusion proof needed — it happened here);
+    ///   - a spec from another chain requires an inclusion proof, consumed from `_proofs` in order.
+    /// Reverts if any required proof is missing or if extra proofs are supplied.
+    /// Extracted from `authorize` to keep that function's stack within the non-via-IR limit.
+    function _verifyFlowCommitted(
         bytes32 _flowId,
         SendSpec[] calldata _specs,
         bytes32[] memory _specHashes,
@@ -288,19 +292,28 @@ contract AtomicFlowEscrow is IAtomicFlowEscrow {
         ImtInclusionProof[] calldata _proofs
     ) internal view {
         uint256 n = _specs.length;
+        uint256 p = 0;
         for (uint256 i = 0; i < n; ++i) {
+            if (_specs[i].originChainId == block.chainid) {
+                SpecState s = _state[_flowId][_specHashes[i]];
+                if (s != SpecState.Committed) revert EscrowSpecNotCommittedLocally(_specHashes[i], s);
+                continue;
+            }
+            if (p >= _proofs.length) revert EscrowMissingProof(_specHashes[i]);
             uint256 value = AtomicInteropProof.commitValue(_flowId, _specHashes[i]);
-            (bytes32 importedRoot, uint256 importedTs) = _resolveImported(_proofs[i].l1BlockNumber);
+            (bytes32 importedRoot, uint256 importedTs) = _resolveImported(_proofs[p].l1BlockNumber);
             // solhint-disable-next-line func-named-parameters
             AtomicInteropProof.verifyInclusion(
-                _proofs[i],
+                _proofs[p],
                 _specs[i].originChainId,
                 value,
                 importedRoot,
                 importedTs,
                 _deadline
             );
+            ++p;
         }
+        if (p != _proofs.length) revert EscrowProofCountMismatch(p, _proofs.length);
     }
 
     /// @dev Resolves the before/after imported roots and runs the non-inclusion check. Extracted from

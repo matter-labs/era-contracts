@@ -31,9 +31,10 @@ import {
     MockBridgehub
 } from "./AtomicInteropTestUtils.sol";
 
-/// @notice End-to-end tests for the L1-free atomic interop flow with SendSpec legs, the two-phase
-/// authorize/execute split, and AR/NTV asset routing. Two "chains" are simulated within one EVM via
-/// `vm.chainId`. The asset router is mocked to isolate the escrow's proof-gating + state machine.
+/// @notice End-to-end tests for the L1-free atomic interop flow. Submitting chain roots to L1 and
+/// importing global roots to L2 are permissionless (temporary stubs), so these tests submit/import
+/// without privileged senders. `authorize` requires inclusion proofs ONLY for specs that originate
+/// on another chain — specs committed on the verifying chain are checked via local state.
 contract AtomicFlowEscrowTest is Test {
     uint256 internal constant CHAIN_A = 271;
     uint256 internal constant CHAIN_B = 272;
@@ -42,8 +43,6 @@ contract AtomicFlowEscrowTest is Test {
     GlobalInteropIMT internal registry;
     MockBridgehub internal bridgehub;
     IndexedImtProver internal prover;
-    address internal operator = makeAddr("operator"); // the diamond proxy for both chains in this test
-    address internal supplier = makeAddr("supplier");
     address internal ntv = makeAddr("ntv");
 
     L2InteropCommitmentTree internal treeA;
@@ -64,8 +63,6 @@ contract AtomicFlowEscrowTest is Test {
 
     function setUp() public {
         bridgehub = new MockBridgehub();
-        bridgehub.setZKChain(CHAIN_A, operator);
-        bridgehub.setZKChain(CHAIN_B, operator);
         registry = new GlobalInteropIMT(address(bridgehub));
         prover = new IndexedImtProver();
 
@@ -88,11 +85,10 @@ contract AtomicFlowEscrowTest is Test {
         )
     {
         tree = new L2InteropCommitmentTree();
-        importer = new L2GlobalInteropRootImporter();
+        importer = new L2GlobalInteropRootImporter(); // permissionless; no initialize
         escrow = new AtomicFlowEscrow();
         ar = new MockAtomicAssetRouter();
         tree.initialize(address(escrow));
-        importer.initialize(supplier);
         escrow.initialize(address(tree), address(importer), address(ar), ntv);
     }
 
@@ -114,41 +110,35 @@ contract AtomicFlowEscrowTest is Test {
 
         _commitSend(escrowA, tokenA, treeA, CHAIN_A, alice, flowId, ab);
         _commitSend(escrowB, tokenB, treeB, CHAIN_B, carol, flowId, ba);
-
         assertEq(tokenA.balanceOf(address(escrowA)), 100, "source A locked");
         assertEq(tokenB.balanceOf(address(escrowB)), 50, "source B locked");
 
         _exposeAndImport(100, 1500);
 
-        ImtInclusionProof[] memory proofs = new ImtInclusionProof[](2);
-        for (uint256 i = 0; i < 2; ++i) {
-            proofs[i] = _inclusion(specs[i], flowId, 100);
-        }
+        // authorize only needs proofs for specs that did NOT originate on the verifying chain.
+        ImtInclusionProof[] memory proofsA = _remoteProofs(specs, flowId, 100, CHAIN_A);
+        ImtInclusionProof[] memory proofsB = _remoteProofs(specs, flowId, 100, CHAIN_B);
 
-        // Authorize on both chains.
         vm.chainId(CHAIN_A);
-        escrowA.authorize(flowId, specs, _chainIds(), DEADLINE, proofs);
+        escrowA.authorize(flowId, specs, _chainIds(), DEADLINE, proofsA);
         vm.chainId(CHAIN_B);
-        escrowB.authorize(flowId, specs, _chainIds(), DEADLINE, proofs);
+        escrowB.authorize(flowId, specs, _chainIds(), DEADLINE, proofsB);
 
         bytes32 hAB = AtomicInteropTestUtils.specHashOf(ab);
         bytes32 hBA = AtomicInteropTestUtils.specHashOf(ba);
         assertTrue(escrowA.specState(flowId, hAB) == SpecState.Executable, "AB executable on A (source)");
         assertTrue(escrowB.specState(flowId, hAB) == SpecState.Executable, "AB executable on B (dest)");
 
-        // Execute the AB leg: source burn on A, destination mint on B.
         vm.chainId(CHAIN_A);
         escrowA.execute(flowId, ab);
         vm.chainId(CHAIN_B);
         escrowB.execute(flowId, ab);
-
         assertTrue(escrowA.specState(flowId, hAB) == SpecState.Executed);
         assertTrue(escrowB.specState(flowId, hAB) == SpecState.Executed);
         assertEq(arA.indirectCallCount(), 1, "source burn routed via AR on A");
         assertEq(arB.finalizeDepositCount(), 1, "destination mint routed via AR on B");
         assertEq(arB.lastChainId(), CHAIN_A, "dest mint references origin chain");
 
-        // Execute the BA leg symmetrically.
         vm.chainId(CHAIN_B);
         escrowB.execute(flowId, ba);
         vm.chainId(CHAIN_A);
@@ -169,14 +159,10 @@ contract AtomicFlowEscrowTest is Test {
         _commitSend(escrowB, tokenB, treeB, CHAIN_B, carol, flowId, ba);
         _exposeAndImport(100, 5000); // after deadline
 
-        ImtInclusionProof[] memory proofs = new ImtInclusionProof[](2);
-        for (uint256 i = 0; i < 2; ++i) {
-            proofs[i] = _inclusion(specs[i], flowId, 100);
-        }
-
+        ImtInclusionProof[] memory proofsA = _remoteProofs(specs, flowId, 100, CHAIN_A);
         vm.chainId(CHAIN_A);
         vm.expectRevert(abi.encodeWithSelector(ProofDeadlineExceeded.selector, 5000, DEADLINE));
-        escrowA.authorize(flowId, specs, _chainIds(), DEADLINE, proofs);
+        escrowA.authorize(flowId, specs, _chainIds(), DEADLINE, proofsA);
     }
 
     function test_execute_revertsWhenNotAuthorized() public {
@@ -227,7 +213,6 @@ contract AtomicFlowEscrowTest is Test {
         _exposeAndImportForRefund();
 
         uint256 baValue = AtomicInteropTestUtils.commitValue(flowId, AtomicInteropTestUtils.specHashOf(ba));
-        // Forge: claim the head as low-nullifier even though BA is present -> upper-bracket fails.
         FullMerkleWrapper mirror = prover.mirror(treeB);
         ImtNonInclusionProof memory proof = ImtNonInclusionProof({
             chainId: CHAIN_B,
@@ -258,7 +243,6 @@ contract AtomicFlowEscrowTest is Test {
     }
 
     function test_commitSend_revertsOnSelfDestination() public {
-        // dest == origin == this chain.
         SendSpec memory bad = SendSpec(CHAIN_A, bob, CHAIN_A, address(tokenA), 100, "", alice);
         vm.chainId(CHAIN_A);
         vm.prank(alice);
@@ -336,29 +320,42 @@ contract AtomicFlowEscrowTest is Test {
     function _exposeAndImport(uint256 _l1Block, uint256 _timestamp) internal {
         bytes32 rootA = treeA.root();
         bytes32 rootB = treeB.root();
-        vm.prank(operator);
         registry.submitChainRoot(CHAIN_A, 1, rootA);
-        vm.prank(operator);
         registry.submitChainRoot(CHAIN_B, 1, rootB);
         bytes32 gRoot = registry.globalRoot();
-        vm.prank(supplier);
         importerA.importGlobalRoot(_l1Block, _timestamp, gRoot);
-        vm.prank(supplier);
         importerB.importGlobalRoot(_l1Block, _timestamp, gRoot);
     }
 
     function _exposeAndImportForRefund() internal {
         bytes32 rootA = treeA.root();
         bytes32 rootB = treeB.root();
-        vm.prank(operator);
         registry.submitChainRoot(CHAIN_A, 1, rootA);
-        vm.prank(operator);
         registry.submitChainRoot(CHAIN_B, 1, rootB);
         bytes32 gRoot = registry.globalRoot();
-        vm.prank(supplier);
-        importerA.importGlobalRoot(100, 1500, gRoot);
-        vm.prank(supplier);
-        importerA.importGlobalRoot(200, 5000, gRoot);
+        importerA.importGlobalRoot(100, 1500, gRoot); // before deadline
+        importerA.importGlobalRoot(200, 5000, gRoot); // after deadline
+    }
+
+    /// @dev Inclusion proofs for the specs whose origin is NOT `_thisChain`, in sorted order — these
+    /// are the only specs that need a proof when authorizing on `_thisChain`.
+    function _remoteProofs(
+        SendSpec[] memory _specs,
+        bytes32 _flowId,
+        uint256 _l1Block,
+        uint256 _thisChain
+    ) internal returns (ImtInclusionProof[] memory proofs) {
+        uint256 cnt;
+        for (uint256 i = 0; i < _specs.length; ++i) {
+            if (_specs[i].originChainId != _thisChain) ++cnt;
+        }
+        proofs = new ImtInclusionProof[](cnt);
+        uint256 j;
+        for (uint256 i = 0; i < _specs.length; ++i) {
+            if (_specs[i].originChainId != _thisChain) {
+                proofs[j++] = _inclusion(_specs[i], _flowId, _l1Block);
+            }
+        }
     }
 
     function _inclusion(
