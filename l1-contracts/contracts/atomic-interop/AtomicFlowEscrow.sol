@@ -102,6 +102,10 @@ contract AtomicFlowEscrow is IAtomicFlowEscrow {
         bytes32[] memory specHashes = _computeAndCheckFlowId(_flowId, _specs, _chainIds, _deadline);
         if (_proofs.length != _specs.length) revert EscrowProofCountMismatch(_specs.length, _proofs.length);
 
+
+        // SB: no need to prove / check spechash that has been committed as they happened on this chain.
+        // SB: If a proof is ommitted, we should check whether it has been committed here already. 
+
         // 1. Prove every spec of the flow was committed (on its origin chain) before the deadline.
         // solhint-disable-next-line func-named-parameters
         _verifyInclusions(_flowId, _specs, specHashes, _deadline, _proofs);
