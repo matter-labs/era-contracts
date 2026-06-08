@@ -1,7 +1,13 @@
 # Atomic interop without L1 coordination (Indexed-Merkle-Tree based)
 
 This document explains the **architecture** of the L1‑free atomic interop feature and gives
-**hands‑on instructions** for trying it out.
+**hands‑on instructions** for trying it out against the local **two‑Anvil mock** setup.
+
+> **Running it on real ZKsync OS servers?** See
+> [`atomic-imt-server-demo.md`](./atomic-imt-server-demo.md) — the end‑to‑end runbook that
+> bootstraps two `zksync-os-server` chains with `zk-deployer`, **starts Anvil + both servers**,
+> deploys the L1 `GlobalInteropIMT`, and drives the flow with the relayer + flow CLI. The
+> server‑startup steps live there (§3).
 
 It is the advanced counterpart of the L1‑coordinated `dummy-interop` stack
 (`l1-contracts/contracts/dummy-interop`, `L1FlowLinker` + `L2FlowEscrow`). It keeps that stack's
