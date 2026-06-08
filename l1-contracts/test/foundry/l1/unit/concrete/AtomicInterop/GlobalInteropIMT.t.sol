@@ -6,9 +6,11 @@ import {Test} from "forge-std/Test.sol";
 import {GlobalInteropIMT} from "contracts/atomic-interop/GlobalInteropIMT.sol";
 import {
     GlobalImtNonConsecutiveBatch,
-    GlobalImtNotChainDiamond,
+    GlobalImtNotOwner,
+    GlobalImtNotSubmitter,
     GlobalImtZeroBridgehub,
-    GlobalImtZeroRoot
+    GlobalImtZeroRoot,
+    GlobalImtZeroSubmitter
 } from "contracts/atomic-interop/AtomicInteropErrors.sol";
 import {
     AtomicInteropTestUtils,
@@ -127,15 +129,45 @@ contract GlobalInteropIMTTest is Test {
         assertEq(registry.historyBlockAt(1), block.number);
     }
 
-    function test_submitChainRoot_revertsForNonDiamond() public {
+    function test_submitChainRoot_revertsForNonSubmitter() public {
         vm.prank(stranger);
-        vm.expectRevert(abi.encodeWithSelector(GlobalImtNotChainDiamond.selector, stranger, CHAIN_A));
+        vm.expectRevert(abi.encodeWithSelector(GlobalImtNotSubmitter.selector, stranger, CHAIN_A));
         registry.submitChainRoot(CHAIN_A, 1, keccak256("A"));
 
         // Even the *other* chain's diamond cannot submit for CHAIN_A.
         vm.prank(diamondB);
-        vm.expectRevert(abi.encodeWithSelector(GlobalImtNotChainDiamond.selector, diamondB, CHAIN_A));
+        vm.expectRevert(abi.encodeWithSelector(GlobalImtNotSubmitter.selector, diamondB, CHAIN_A));
         registry.submitChainRoot(CHAIN_A, 1, keccak256("A"));
+    }
+
+    function test_globalSubmitter_canSubmitForAnyChain() public {
+        address relayer = makeAddr("relayer");
+        // The deployer (this test) is the owner and authorizes the temporary global submitter.
+        registry.setGlobalSubmitter(relayer, true);
+        assertTrue(registry.isGlobalSubmitter(relayer));
+
+        // The relayer can submit for any chain, bypassing the Bridgehub diamond check.
+        vm.prank(relayer);
+        registry.submitChainRoot(CHAIN_A, 1, keccak256("A"));
+        vm.prank(relayer);
+        registry.submitChainRoot(CHAIN_B, 1, keccak256("B"));
+        assertEq(registry.chainRootOf(CHAIN_A), keccak256("A"));
+        assertEq(registry.chainRootOf(CHAIN_B), keccak256("B"));
+
+        // Deauthorizing revokes the ability.
+        registry.setGlobalSubmitter(relayer, false);
+        vm.prank(relayer);
+        vm.expectRevert(abi.encodeWithSelector(GlobalImtNotSubmitter.selector, relayer, CHAIN_A));
+        registry.submitChainRoot(CHAIN_A, 2, keccak256("A2"));
+    }
+
+    function test_setGlobalSubmitter_onlyOwner() public {
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(GlobalImtNotOwner.selector, stranger));
+        registry.setGlobalSubmitter(stranger, true);
+
+        vm.expectRevert(GlobalImtZeroSubmitter.selector);
+        registry.setGlobalSubmitter(address(0), true);
     }
 
     function test_submitChainRoot_revertsOnZeroRoot() public {

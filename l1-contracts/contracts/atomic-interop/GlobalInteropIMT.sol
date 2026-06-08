@@ -9,10 +9,12 @@ import {AtomicInteropProof} from "./libraries/AtomicInteropProof.sol";
 import {IMT_EMPTY_LEAF} from "./IAtomicInterop.sol";
 import {
     GlobalImtNonConsecutiveBatch,
-    GlobalImtNotChainDiamond,
+    GlobalImtNotOwner,
+    GlobalImtNotSubmitter,
     GlobalImtUnknownBlock,
     GlobalImtZeroBridgehub,
-    GlobalImtZeroRoot
+    GlobalImtZeroRoot,
+    GlobalImtZeroSubmitter
 } from "./AtomicInteropErrors.sol";
 
 /// @author Matter Labs
@@ -30,6 +32,12 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
 
     /// @notice The Bridgehub used to resolve each chain's diamond proxy (the authorized submitter).
     address public immutable BRIDGE_HUB;
+
+    /// @notice Owner that manages the temporary global-submitter stub. Set to the deployer.
+    address public owner;
+
+    /// @dev TEMPORARY DUMMY STUB: addresses allowed to submit roots on behalf of any chain.
+    mapping(address submitter => bool allowed) internal _isGlobalSubmitter;
 
     /// @dev The aggregated, in-place global tree (leaves are per-chain interop IMT roots).
     FullMerkle.FullTree internal _globalTree;
@@ -58,10 +66,16 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
     /// @dev Ascending list of distinct L1 block numbers at which a global root was recorded.
     uint256[] internal _historyBlocks;
 
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert GlobalImtNotOwner(msg.sender);
+        _;
+    }
+
     /// @param _bridgehub The Bridgehub used to resolve each chain's diamond proxy.
     constructor(address _bridgehub) {
         if (_bridgehub == address(0)) revert GlobalImtZeroBridgehub();
         BRIDGE_HUB = _bridgehub;
+        owner = msg.sender;
         // Initialize both trees with the empty-leaf zero value so paths/zeros align with the
         // off-chain engine and the proof library.
         _globalTree.setup(IMT_EMPTY_LEAF);
@@ -69,10 +83,18 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
     }
 
     /// @inheritdoc IGlobalInteropIMT
+    function setGlobalSubmitter(address _submitter, bool _allowed) external onlyOwner {
+        if (_submitter == address(0)) revert GlobalImtZeroSubmitter();
+        _isGlobalSubmitter[_submitter] = _allowed;
+        emit GlobalSubmitterSet(_submitter, _allowed);
+    }
+
+    /// @inheritdoc IGlobalInteropIMT
     function submitChainRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainImtRoot) external {
-        // Only the chain's diamond proxy (its Executor) may submit that chain's root.
-        if (msg.sender != IBridgehubBase(BRIDGE_HUB).getZKChain(_chainId)) {
-            revert GlobalImtNotChainDiamond(msg.sender, _chainId);
+        // The chain's diamond proxy (its Executor) may submit that chain's root. As a TEMPORARY DUMMY
+        // STUB, an authorized global submitter (a demo relayer) may submit on behalf of any chain.
+        if (msg.sender != IBridgehubBase(BRIDGE_HUB).getZKChain(_chainId) && !_isGlobalSubmitter[msg.sender]) {
+            revert GlobalImtNotSubmitter(msg.sender, _chainId);
         }
         if (_chainImtRoot == bytes32(0)) revert GlobalImtZeroRoot();
 
@@ -115,6 +137,11 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
         emit GlobalRootUpdated(block.number, block.timestamp, newGlobalRoot);
         // solhint-disable-next-line func-named-parameters
         emit HistoryAppended(historyIndex, block.number, block.timestamp, newGlobalRoot, newHistoryRoot);
+    }
+
+    /// @inheritdoc IGlobalInteropIMT
+    function isGlobalSubmitter(address _submitter) external view returns (bool) {
+        return _isGlobalSubmitter[_submitter];
     }
 
     /// @inheritdoc IGlobalInteropIMT

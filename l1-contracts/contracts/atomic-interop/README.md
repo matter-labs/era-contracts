@@ -53,8 +53,16 @@ not opt in are byte-for-byte unaffected.
 - `imt-engine.ts` — commit values, the low-nullifier index for `commitSend`, and the O(log n)
   inclusion / non-inclusion proofs up to the L1 historical global IMT.
 - `imt-supplier.ts` — trusted component that imports L1 historical global roots into the L2 importer.
+- `atomic-root-relayer.ts` — trusted demo daemon that, each cycle, submits every L2's IMT root to L1
+  (via the temporary global-submitter stub) and imports the resulting global roots back into every
+  L2 importer. Takes the L1 RPC, the per-chain L2 RPCs/addresses, and a single private key.
 - `atomic-flow-cli.ts` — interactive, JSON-backed demo: `register-flow-id`, `list-flows`,
   `flow-info`, `commit-send`, `check-status`, `finalize`.
+
+> **Temporary global-submitter stub.** Besides the chain's diamond proxy, the owner can authorize a
+> "global submitter" (`setGlobalSubmitter`) that may submit roots on behalf of any chain. This is a
+> demo-only relayer convenience (used by `atomic-root-relayer.ts`) and would be removed once chains
+> submit their own roots via the `Executor`.
 
 > **Demo scope.** Exposing the IMT root on L1 is trusted to the operator in the demo (the chain's
 > diamond submits it); in production the root is part of the block commitment. The AR/NTV asset

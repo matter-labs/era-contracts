@@ -60,13 +60,13 @@ stores roots.
    atomic-flow-cli.ts: interactive register / commit / check-status / finalize over a JSON file.
 ```
 
-| Contract                       | Layer | Role                                                                                                                                                                                                                                                                     |
-| ------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GlobalInteropIMT`             | L1    | In‑place `FullMerkle` global tree (`globalRoot`) + append‑only `DynamicIncrementalMerkle` history tree (`historyRoot`) + `mapping(globalRoot => block)`. Submitter for a chain = its diamond proxy, resolved from the **Bridgehub**. Batch numbers strictly consecutive. |
-| `L2InteropCommitmentTree`      | L2    | Per‑chain **Indexed Merkle Tree**; leaves `{value, nextValue, nextIndex}`.                                                                                                                                                                                               |
-| `L2GlobalInteropRootImporter`  | L2    | Stores global roots imported from L1 (L1 block + timestamp).                                                                                                                                                                                                             |
-| `AtomicFlowEscrow`             | L2    | `commitSend` / `authorize` / `execute` / `authorizeRefund` / `claimRefund`. `SpecState`: `Unset → Committed → Executable → Executed` or `Committed → Revertable → Reverted`. AR/NTV asset routing.                                                                       |
-| `libraries/AtomicInteropProof` | both  | O(log n) inclusion and low‑nullifier non‑inclusion verification.                                                                                                                                                                                                         |
+| Contract                       | Layer | Role                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------ | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GlobalInteropIMT`             | L1    | In‑place `FullMerkle` global tree (`globalRoot`) + append‑only `DynamicIncrementalMerkle` history tree (`historyRoot`) + `mapping(globalRoot => block)`. Submitter for a chain = its diamond proxy (from the **Bridgehub**), or a temporary owner‑authorized **global submitter** stub (demo relayer). Batch numbers strictly consecutive. |
+| `L2InteropCommitmentTree`      | L2    | Per‑chain **Indexed Merkle Tree**; leaves `{value, nextValue, nextIndex}`.                                                                                                                                                                                                                                                                 |
+| `L2GlobalInteropRootImporter`  | L2    | Stores global roots imported from L1 (L1 block + timestamp).                                                                                                                                                                                                                                                                               |
+| `AtomicFlowEscrow`             | L2    | `commitSend` / `authorize` / `execute` / `authorizeRefund` / `claimRefund`. `SpecState`: `Unset → Committed → Executable → Executed` or `Committed → Revertable → Reverted`. AR/NTV asset routing.                                                                                                                                         |
+| `libraries/AtomicInteropProof` | both  | O(log n) inclusion and low‑nullifier non‑inclusion verification.                                                                                                                                                                                                                                                                           |
 
 ### 1.3 The Indexed Merkle Tree
 
@@ -165,6 +165,19 @@ npx ts-node imt-engine.ts non-inclusion --l1-rpc <url> --l2-rpc <url> --tree 0x<
 # Import L1 global roots to an L2 (one-shot, or --poll <seconds>):
 npx ts-node imt-supplier.ts --l1-rpc <url> --l2-rpc <url> \
     --registry 0x<GlobalInteropIMT> --importer 0x<importer> --pk 0x<supplierPk>
+```
+
+#### Root relayer — expose + supply in one process
+
+`atomic-root-relayer.ts` automates the whole "expose roots to L1 + supply global roots back to each
+L2" loop with a single private key (the relayer must be authorized via `setGlobalSubmitter` and be
+each importer's supplier). It takes a JSON config listing the L2 chains (rpc / tree / importer) and
+the L1 connection:
+
+```bash
+# relayer.json: { "l1Rpc", "registry", "privateKey", "chains": [{chainId, rpc, tree, importer}, ...] }
+npx ts-node atomic-root-relayer.ts --config relayer.json
+npx ts-node atomic-root-relayer.ts --config relayer.json --l1-rpc <url> --pk 0x<key> --poll 5
 ```
 
 ### 2.4 Interactive demo (`atomic-flow-cli.ts`)

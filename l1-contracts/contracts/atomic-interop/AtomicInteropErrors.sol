@@ -5,8 +5,11 @@ import {SpecState} from "./IAtomicInterop.sol";
 
 // ── GlobalInteropIMT (L1) errors ────────────────────────────────────────────────────
 error GlobalImtZeroBridgehub();
-/// @dev The caller is not the diamond proxy of `chainId` as registered in the Bridgehub.
-error GlobalImtNotChainDiamond(address sender, uint256 chainId);
+/// @dev The caller is neither the chain's diamond proxy (from the Bridgehub) nor a global submitter.
+error GlobalImtNotSubmitter(address sender, uint256 chainId);
+/// @dev Only the owner may manage the temporary global-submitter stub.
+error GlobalImtNotOwner(address sender);
+error GlobalImtZeroSubmitter();
 error GlobalImtZeroRoot();
 /// @dev Batch numbers must be strictly consecutive (no gaps).
 error GlobalImtNonConsecutiveBatch(uint256 chainId, uint256 expected, uint256 provided);

@@ -33,6 +33,9 @@ interface IGlobalInteropIMT {
     /// @notice Emitted when a chain is first seen and assigned a leaf in the global tree.
     event ChainRegistered(uint256 indexed chainId, uint256 leafIndex);
 
+    /// @notice Emitted when the (temporary) global-submitter set changes.
+    event GlobalSubmitterSet(address indexed submitter, bool allowed);
+
     /// @notice Emitted when a `(block, timestamp, globalRoot)` snapshot is appended to the history tree.
     event HistoryAppended(
         uint256 indexed leafIndex,
@@ -49,6 +52,17 @@ interface IGlobalInteropIMT {
     /// @param _batchNumber The settled batch number; must be the chain's previous batch number + 1.
     /// @param _chainImtRoot The chain's interop IMT root after the batch.
     function submitChainRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainImtRoot) external;
+
+    /// @notice TEMPORARY DUMMY STUB. Authorize/deauthorize a "global submitter" that may call
+    /// `submitChainRoot` on behalf of *any* chain (bypassing the Bridgehub diamond check). Owner only.
+    /// @dev Intended only for demos/relayers until chains submit their own roots via the `Executor`.
+    function setGlobalSubmitter(address _submitter, bool _allowed) external;
+
+    /// @notice Whether `_submitter` is an authorized global submitter (temporary stub).
+    function isGlobalSubmitter(address _submitter) external view returns (bool);
+
+    /// @notice The owner that manages the temporary global-submitter stub.
+    function owner() external view returns (address);
 
     /// @notice The Bridgehub used to resolve each chain's diamond proxy (the authorized submitter).
     function bridgehub() external view returns (address);
