@@ -80,6 +80,8 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
         _historyTree.setup(IMT_EMPTY_LEAF);
     }
 
+    // SB: the submitter for each chain is its diamond proxy (should be read from bridgehub)
+    // the owner does not need to set anyything.
     /// @inheritdoc IGlobalInteropIMT
     function setSubmitter(uint256 _chainId, address _submitter, bool _allowed) external onlyOwner {
         if (_submitter == address(0)) revert GlobalImtZeroSubmitter();
@@ -87,6 +89,8 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
         emit SubmitterSet(_chainId, _submitter, _allowed);
     }
 
+
+    // SB: this role should not exist at all
     /// @inheritdoc IGlobalInteropIMT
     function setGlobalSubmitter(address _submitter, bool _allowed) external onlyOwner {
         if (_submitter == address(0)) revert GlobalImtZeroSubmitter();
@@ -99,13 +103,16 @@ contract GlobalInteropIMT is IGlobalInteropIMT {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainImtRoot,
+        // SB: delete everything related to DA commitment
         bytes32 _daCommitment
     ) external {
+        // SB: again these roles should not exist.
         if (!_isGlobalSubmitter[msg.sender] && !_isSubmitter[_chainId][msg.sender]) {
             revert GlobalImtNotSubmitter(msg.sender, _chainId);
         }
         if (_chainImtRoot == bytes32(0)) revert GlobalImtZeroRoot();
 
+        // SB: must be strictly incremental, no gaps allwoed. 
         // Strictly increasing (gaps allowed) prevents replay/regression of a chain's root while
         // keeping batch execution liveness decoupled from exact-consecutive submissions.
         uint256 current = _currentBatchNumber[_chainId];

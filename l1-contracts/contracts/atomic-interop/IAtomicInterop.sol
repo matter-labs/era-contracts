@@ -26,6 +26,19 @@ enum PartState {
 /// `payer` locks `amount` of `token` on `chainId` at commit time; `payee` receives it on
 /// finalize. Cross-chain intent is expressed by composing legs on different chains into one
 /// flow, so that either both settle or both refund.
+// SB instead of the struct below, use the following struct that was used for hte L1 interop:
+// ```
+/* struct SendSpec {
+    uint256 destChainId;
+    address recipient;
+    uint256 originChainId;
+    address originToken;
+    uint256 amount;
+    bytes erc20Data;
+    address depositor;
+}
+*/
+// As the struct that we have right now does not specify the recipients chain etc
 struct FlowLeg {
     uint256 chainId;
     address token;

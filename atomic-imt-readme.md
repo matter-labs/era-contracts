@@ -192,6 +192,23 @@ Build artifacts first (`cd l1-contracts && forge build`), then run from
 
 #### IMT engine — values, low‑nullifiers, proofs
 
+// SB: please make an additional more interactive example as well, maybe like a pair 
+// of <(src chain_id, payer, token address)> <dst chain id, payer, token address>,
+// and the demo should autoresolve leg ids and flow id.
+// It should save all the details inside a JSON file.
+// and then provide the methods for the signers to do their part.
+// Basically, I want the following flow:
+// ```
+// - register_flow_id 
+// Please provide first part of the swap: <info> or the ability to use the default one
+// Please provide second part of the swap: <info> or the ability to use the default one
+// - list flows
+// - flow info <id> -> returns legs with their hashes and infos.
+// - commit-send <flow id> <legId> <privateKey> <rpcUrl>
+// - check-status <flow id> <rpcs> -> returns the status of whether all legs have been committed on the corresponding L2s.
+// - finalize <flow id> <legId> <rpc>
+
+
 ```bash
 cd l1-contracts/test/anvil-interop
 

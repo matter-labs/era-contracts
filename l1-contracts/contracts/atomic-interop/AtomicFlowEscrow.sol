@@ -105,6 +105,10 @@ contract AtomicFlowEscrow is IAtomicFlowEscrow {
             );
         }
 
+        // SB: this does not work for cross chain asset minting, please do what has been done inside `function execute` in the L2FlowEscrow.
+        // SB: In general make the flow a bit more similar to L2FlowEscrow. Make two functions: one to authorize (where just proof verification happens) 
+        // and execute.
+        // SB: this shuuld be well integrated into asset router / native token vault the same way as the L2FlowEscrow.
         // 2. Release this chain's committed leg(s) to their payees.
         for (uint256 i = 0; i < n; ++i) {
             FlowLeg calldata leg = _legs[i];
