@@ -50,6 +50,15 @@ export const DEFAULT_TX_GAS_LIMIT = 5_000_000;
 // 7 gwei, used by Anvil interop specs to exercise the non-zero dynamic fee path.
 export const ANVIL_INTEROP_PROTOCOL_FEE_WEI = "7000000000";
 
+// Gas limit used by the harness' base-token priority requests.
+export const ANVIL_INTEROP_BASE_TOKEN_PRIORITY_TX_GAS_LIMIT = 1_000_000;
+// Fixed L1 gas price matching the Anvil interop helpers' priority tx base-cost calculation.
+export const ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI = "50000000000";
+// Mirrors contracts/common/Config.sol::REQUIRED_L2_GAS_PRICE_PER_PUBDATA.
+export const ANVIL_INTEROP_REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
+// Utils.prepareL1L2TransactionTwoBridges funds the outer and inner priority requests.
+export const ANVIL_INTEROP_TWO_BRIDGES_PRIORITY_REQUEST_COUNT = 2;
+
 // Default TestnetERC20Token deployment parameters for interop test helpers
 export const TEST_TOKEN_DECIMALS = 18;
 export const TEST_TOKEN_MINT_AMOUNT_UNITS = "1000";

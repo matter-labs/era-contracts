@@ -62,6 +62,10 @@ import { encodeNtvAssetId } from "../../src/core/data-encoding";
 import {
   ANVIL_DEFAULT_ACCOUNT_ADDR,
   ANVIL_DEFAULT_PRIVATE_KEY,
+  ANVIL_INTEROP_BASE_TOKEN_PRIORITY_TX_GAS_LIMIT,
+  ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI,
+  ANVIL_INTEROP_REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+  ANVIL_INTEROP_TWO_BRIDGES_PRIORITY_REQUEST_COUNT,
   ANVIL_RECIPIENT_ADDR,
   ETH_TOKEN_ADDRESS,
   GW_ASSET_TRACKER_ADDR,
@@ -368,6 +372,8 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       });
       expect(ethBaseChainIds.length, "at least one ETH-base GW-settled chain is expected").to.be.greaterThan(0);
 
+      const bridgehub = new Contract(bridgehubAddr, getAbi("L1Bridgehub"), l1Provider);
+
       for (const chainId of ethBaseChainIds) {
         const l1Mig = await queryAssetMigrationNumber(
           l1Provider,
@@ -385,13 +391,23 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         );
 
         const accounting = await snapshotTrackerBalances(chainId, ethAssetId);
+        // Base-token TBM migrates the ETH amount that funded the two-bridges
+        // priority requests in the harness setup. Compute it through Bridgehub so
+        // the assertion follows the same base-cost formula as production.
+        const priorityRequestBaseCost = await bridgehub.l2TransactionBaseCost(
+          chainId,
+          ANVIL_INTEROP_PRIORITY_TX_L1_GAS_PRICE_WEI,
+          ANVIL_INTEROP_BASE_TOKEN_PRIORITY_TX_GAS_LIMIT,
+          ANVIL_INTEROP_REQUIRED_L2_GAS_PRICE_PER_PUBDATA
+        );
+        const expectedMigratedEth = priorityRequestBaseCost.mul(ANVIL_INTEROP_TWO_BRIDGES_PRIORITY_REQUEST_COUNT);
 
         expect(l1Mig, `L1AT assetMigrationNumber[${chainId}][ETH]`).to.equal(1);
         expect(l1Mig, `L1AT/GWAT assetMigrationNumber should match for chain ${chainId} (ETH)`).to.equal(gwMig);
         expect(accounting.l1.eq(0), `L1 chainBalance[${chainId}][ETH] migrated away from chain`).to.equal(true);
         expect(
-          accounting.gwChain.gt(0),
-          `GW chainBalance[${chainId}][ETH] contains migrated supply after forward TBM`
+          accounting.gwChain.eq(expectedMigratedEth),
+          `GW chainBalance[${chainId}][ETH] ${accounting.gwChain} == migrated ETH ${expectedMigratedEth}`
         ).to.equal(true);
         expect(
           accounting.gwPending.eq(0),
@@ -425,6 +441,12 @@ describe("10 - Token Balance Migration Lifecycle", function () {
         );
 
         const accounting = await snapshotTrackerBalances(chainId, testTokenAssetId);
+        const l1GatewayBalance = await queryL1ChainBalance(
+          l1Provider,
+          l1AssetTrackerAddr,
+          gwChainId,
+          testTokenAssetId
+        );
 
         expect(l1Mig, `L1AT assetMigrationNumber[${chainId}][testToken]`).to.equal(1);
         expect(l1Mig, `L1AT/GWAT assetMigrationNumber should match for chain ${chainId} (test token)`).to.equal(gwMig);
@@ -434,8 +456,8 @@ describe("10 - Token Balance Migration Lifecycle", function () {
           `GW pendingInteropBalance[${chainId}][testToken] is empty after forward TBM setup`
         ).to.equal(true);
         expect(
-          accounting.gwChain.gt(0),
-          `GW chainBalance[${chainId}][testToken] contains migrated supply after forward TBM`
+          accounting.gwChain.eq(l1GatewayBalance),
+          `GW chainBalance[${chainId}][testToken] ${accounting.gwChain} == L1 chainBalance[GW][testToken] ${l1GatewayBalance}`
         ).to.equal(true);
       }
     });
@@ -522,7 +544,7 @@ describe("10 - Token Balance Migration Lifecycle", function () {
       const ethMigNum = BigNumber.from(await l2AssetTracker.assetMigrationNumber(reverseTbmChainId, ethAssetId));
       const unmigratedMigNum = BigNumber.from(await l2AssetTracker.assetMigrationNumber(reverseTbmChainId, unmigrated));
 
-      expect(ethMigNum.gt(0), `L2 assetMigrationNumber[${reverseTbmChainId}][ETH] > 0`).to.equal(true);
+      expect(ethMigNum, `L2 assetMigrationNumber[${reverseTbmChainId}][ETH]`).to.equal(1);
       expect(unmigratedMigNum.eq(0), "L2 assetMigrationNumber[·][unmigrated] == 0").to.equal(true);
     });
 
